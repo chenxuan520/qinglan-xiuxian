@@ -8,8 +8,11 @@ import {
   treasure,
   FINAL_TRIAL_STAGE,
   MAX_FORGE_LEVEL,
+  SPIRIT_ROOTS,
+  spiritRootInfo,
+  rollSpiritRoot,
 } from './data.ts';
-import type { CultivationPath } from './data.ts';
+import type { CultivationPath, SpiritRootId } from './data.ts';
 
 export interface SaveData {
   version: 1;
@@ -29,9 +32,10 @@ export interface SaveData {
   volume: number;
   autoplay: boolean;
   path: CultivationPath;
+  spiritRoot: SpiritRootId;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
-export function freshSave(): SaveData {
+export function freshSave(spiritRoot: SpiritRootId = 'heaven'): SaveData {
   return {
     version: 1,
     stones: 0,
@@ -50,16 +54,18 @@ export function freshSave(): SaveData {
     volume: 0.6,
     autoplay: false,
     path: 'dual',
+    spiritRoot,
   };
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
   typeof n === 'number' && Number.isFinite(n) ? Math.min(max, Math.max(0, Math.floor(n))) : 0;
-export function parseSave(raw: string | null): SaveData {
+export function parseSave(raw: string | null, random: () => number = Math.random): SaveData {
   const base = freshSave();
   try {
-    if (!raw) return base;
+    if (!raw) return freshSave(rollSpiritRoot(random));
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
+    base.spiritRoot = SPIRIT_ROOTS.find((root) => root.id === s.spiritRoot)?.id ?? 'heaven';
     for (const key of ['stones', 'iron', 'cultivation', 'bestKills', 'runs'] as const)
       base[key] = int(s[key]);
     base.unlocked = int(s.unlocked, STAGES.length - 1);
@@ -146,12 +152,19 @@ export function realmBonuses(step: number) {
   return { hp: major * 45 + minor * 3, damage: (major * 35 + minor * 2.5) / 100 };
 }
 export function cultivationReward(
-  run: { kills: number; level: number; difficulty: number; combatCultivation?: number },
+  run: {
+    kills: number;
+    level: number;
+    difficulty: number;
+    combatCultivation?: number;
+    spiritRoot?: SpiritRootId;
+  },
   bonus = 0,
 ) {
   return Math.floor(
     (run.kills * 0.7 + (run.combatCultivation || 0) + run.level * 8 + bonus) *
-      DIFFICULTIES[run.difficulty].reward,
+      DIFFICULTIES[run.difficulty].reward *
+      spiritRootInfo(run.spiritRoot ?? 'heaven').rate,
   );
 }
 export const trainingCost = (level: number) => Math.round(45 * 1.42 ** level);
@@ -206,10 +219,14 @@ export function settleRun(
     level: number;
     creditedCultivation?: number;
     combatCultivation?: number;
+    spiritRoot?: SpiritRootId;
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
-  const cultivation = cultivationReward(run, run.victory ? 100 + run.stage * 50 : 0);
+  const cultivation = cultivationReward(
+    { ...run, spiritRoot: run.spiritRoot ?? save.spiritRoot },
+    run.victory ? 100 + run.stage * 50 : 0,
+  );
   const rewards = {
     stones: Math.floor(
       (run.kills * 0.35 + run.time * 0.1 + (run.victory ? STAGES[run.stage].reward : 0)) *

@@ -23,6 +23,9 @@ import {
   MAX_RUN_LEVEL,
   MAX_REVIVES,
   MAX_FORGE_LEVEL,
+  spiritRootInfo,
+  rollSpiritRoot,
+  AD_SUPPLIES,
 } from './data.ts';
 import {
   parseSave,
@@ -103,6 +106,8 @@ let resumeAfterDamage = false;
 let adReadyAt = 0;
 let adTimer: number | undefined;
 let victoryTimer: number | undefined;
+let rewardAd: 'root' | 'supplies' | null = null;
+let rewardAdFromCultivation = false;
 function persist() {
   const active = game && !settled ? game : pendingRun;
   try {
@@ -194,11 +199,16 @@ function renderLobby() {
         <div class="section-heading"><div><span class="section-number">壹 / 柒</span><h2>择一秘境，启程修行</h2></div><span class="muted">已探索 ${save.completed.length} / ${STAGES.length} 处秘境</span></div>
         <div class="stage-grid">${STAGES.map((s, i) => `<button class="stage-card ${i === selectedStage ? 'selected' : ''} ${i > save.unlocked ? 'locked' : ''}" data-action="stage" data-id="${i}" ${i > save.unlocked ? 'disabled' : ''} style="--stage-color:${s.color}"><span class="stage-top"><span>第${s.chapter}境</span>${i > save.unlocked ? smallIcon('lock') : save.completed.includes(i) ? '<span>已通关 ✓</span>' : '<span>可挑战</span>'}</span><strong>${s.name}</strong><span class="stage-bottom">${i > save.unlocked ? '通关前境解锁' : `${s.minutes} 分钟 · ${s.boss}`}</span><span class="stage-ornament">${s.chapter}</span></button>`).join('')}</div>
         <div class="expedition-footer"><div class="stage-description"><span class="tiny-diamond">◇</span><p>${stage.description}</p></div><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div></div>
+        ${spiritRootSummary()}
         <div class="path-selection"><span class="field-label">修行之道 · 本局法宝与功法路线</span><div class="path-grid" role="group" aria-label="选择修行路线">${CULTIVATION_PATHS.map((p) => `<button data-action="path" data-id="${p.id}" class="path-card ${save.path === p.id ? 'active' : ''}" aria-pressed="${save.path === p.id}" style="--path-color:${p.color}"><strong>${p.name}</strong><span>${p.desc}</span></button>`).join('')}</div><small>正道、魔道各 18 件法宝与 8 种功法，兼修可混搭。路线仅影响新历练，续局保留原路线。</small></div>
         <div class="depart-row"><div class="difficulty-wrap"><span class="field-label">历练难度</span><div class="difficulty-switch" role="group" aria-label="历练难度">${DIFFICULTIES.map((d, i) => `<button data-action="difficulty" data-id="${i}" class="${i === difficulty ? 'active' : ''}" aria-pressed="${i === difficulty}">${d.name}<small>${i === 0 ? '推荐初修' : `收益 ×${d.reward}`}</small></button>`).join('')}</div></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? '踏入秘境' : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button></div>
       </section>
     </main>
     <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><span><span class="status-dot"></span>${storageAvailable ? '修行进度自动保存于本机' : '本机存档不可用'}</span><span class="footer-tag">心有所向 · 道阻且长</span></footer>`;
+}
+function spiritRootSummary() {
+  const root = spiritRootInfo(save.spiritRoot);
+  return `<div class="spirit-root-summary"><div><small>此世灵根</small><strong>${root.name}</strong></div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><small>刷新保留 · 轮回转世重新抽取</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad" ${root.id === 'heaven' ? 'disabled' : ''}>${root.id === 'heaven' ? '已是天灵根' : '看广告 · 得天灵根'}</button><button class="secondary-button" data-action="watch-supplies-ad">看广告 · 领取物资<small>${AD_SUPPLIES.stones} 灵石 + ${AD_SUPPLIES.iron} 玄铁</small></button></div></div>`;
 }
 function showPanel(name: string) {
   panel = name;
@@ -288,7 +298,7 @@ function renderPanel() {
     panelFrame(
       '积一寸修为，近一寸长生',
       '洞府 / CULTIVATION',
-      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${REALMS[r.index]}</strong><span>${['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '渡劫圆满，仙途无尽。' : r.locked ? `渡劫瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><small>当前境界加成：气血 +${bonus.hp}，法宝伤害 +${Math.round(bonus.damage * 1000) / 10}%<br>小阶段突破 +3 气血 / +2.5% 伤害；大境界突破 +45 气血 / +35% 伤害，本局立即生效。</small></div></div><div class="realm-road">${REALMS.map((r, i) => `<div class="${i === realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index ? 'current' : i < realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
+      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${REALMS[r.index]}</strong><span>${['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '渡劫圆满，仙途无尽。' : r.locked ? `渡劫瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><small>当前境界加成：气血 +${bonus.hp}，法宝伤害 +${Math.round(bonus.damage * 1000) / 10}%<br>小阶段突破 +3 气血 / +2.5% 伤害；大境界突破 +45 气血 / +35% 伤害，本局立即生效。</small></div></div>${spiritRootSummary()}<div class="realm-road">${REALMS.map((r, i) => `<div class="${i === realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index ? 'current' : i < realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
         [
           {
             id: 'vitality',
@@ -555,6 +565,7 @@ function finishRun() {
     level: game.level,
     creditedCultivation: game.creditedCultivation,
     combatCultivation: game.combatCultivation,
+    spiritRoot: game.spiritRoot,
   });
   persist();
   if (game.state === 'won') renderVictory();
@@ -599,20 +610,47 @@ function showReviveAd() {
   )
     return;
   panel = 'revive-ad';
-  adReadyAt = Date.now() + 5000;
   modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div><div class="revive-ad">广告位招租</div><p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>5 秒后可复活</button><button class="secondary-button" data-action="finish-run">放弃复活并结算</button></div></section></div>`;
+  startAdCountdown('ad-revive', '满血复活');
+}
+function startAdCountdown(action: string, label: string) {
+  adReadyAt = Date.now() + 5000;
   clearInterval(adTimer);
   adTimer = window.setInterval(() => {
-    const button = modal.querySelector<HTMLButtonElement>('[data-action="ad-revive"]');
+    const button = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
     if (!button) {
       clearInterval(adTimer);
       return;
     }
     const seconds = Math.max(0, Math.ceil((adReadyAt - Date.now()) / 1000));
     button.disabled = seconds > 0;
-    button.textContent = seconds > 0 ? `${seconds} 秒后可复活` : '广告已结束 · 满血复活';
+    button.textContent = seconds > 0 ? `${seconds} 秒后${label}` : `广告已结束 · ${label}`;
     if (seconds === 0) clearInterval(adTimer);
   }, 200);
+}
+function showRewardAd(kind: 'root' | 'supplies') {
+  if (game || rewardAd || (kind === 'root' && save.spiritRoot === 'heaven')) return;
+  rewardAdFromCultivation = panel === 'cultivation';
+  rewardAd = kind;
+  panel = 'reward-ad';
+  const reward =
+    kind === 'root'
+      ? '获得天灵根，后续新历练的灵气与修为速度提升至 100%。未完成的历练保留出发时资质。'
+      : `领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁，可再次观看领取。`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '洗练灵根' : '仙缘补给'}</div><div class="revive-ad">广告位招租</div><p>${reward}<br>完整观看 5 秒后点击领取，中途离开不发放奖励。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>5 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
+  startAdCountdown('claim-ad-reward', '领取奖励');
+  modal
+    .querySelector<HTMLButtonElement>('[data-action="cancel-reward-ad"]')
+    ?.focus({ preventScroll: true });
+}
+function closeRewardAd() {
+  clearInterval(adTimer);
+  adReadyAt = 0;
+  rewardAd = null;
+  panel = '';
+  modal.innerHTML = '';
+  renderLobby();
+  if (rewardAdFromCultivation) showPanel('cultivation');
 }
 function renderResult() {
   if (!game || !rewards) return;
@@ -692,6 +730,36 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function handleAction(action: string, id?: string) {
+  if (action === 'watch-root-ad' || action === 'watch-supplies-ad') {
+    showRewardAd(action === 'watch-root-ad' ? 'root' : 'supplies');
+    return;
+  }
+  if (panel === 'reward-ad' && (action === 'close' || action === 'cancel-reward-ad')) {
+    closeRewardAd();
+    return;
+  }
+  if (action === 'claim-ad-reward') {
+    if (game || panel !== 'reward-ad' || !rewardAd || !adReadyAt || Date.now() < adReadyAt) return;
+    const kind = rewardAd;
+    if (kind === 'root') save.spiritRoot = 'heaven';
+    else {
+      save.stones += AD_SUPPLIES.stones;
+      save.iron += AD_SUPPLIES.iron;
+    }
+    persist();
+    closeRewardAd();
+    toast(
+      kind === 'root'
+        ? '天灵根已成 · 后续新历练生效'
+        : `仙缘补给 · 灵石 +${AD_SUPPLIES.stones} · 玄铁 +${AD_SUPPLIES.iron}`,
+    );
+    return;
+  }
+  if (action === 'root-guide') {
+    guideTab = 'roots';
+    handleAction('guide');
+    return;
+  }
   if (panel === 'victory' && (action === 'victory-result' || action === 'close')) {
     renderResult();
     return;
@@ -749,12 +817,12 @@ function handleAction(action: string, id?: string) {
     panelFrame(
       '轮回转世',
       '重启仙途',
-      '<p class="pause-description">将清空此浏览器在当前网址的全部进度：境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，默认拥有青霄剑与追魂钉。</p><div class="pause-actions"><button class="secondary-button" data-action="cultivation">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>',
+      '<p class="pause-description">将清空此浏览器在当前网址的全部进度：境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，默认拥有青霄剑与追魂钉，并重新随机灵根，资质可能低于当前。</p><div class="pause-actions"><button class="secondary-button" data-action="cultivation">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>',
     );
     return;
   }
   if (action === 'confirm-reincarnate' && panel === 'reincarnate' && !game) {
-    Object.assign(save, freshSave());
+    Object.assign(save, freshSave(rollSpiritRoot()));
     if (masterGain && audio) masterGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
     pendingRun = null;
     selectedStage = difficulty = treasurePage = 0;
@@ -763,7 +831,7 @@ function handleAction(action: string, id?: string) {
     bookTab = 'treasures';
     persist();
     returnLobby();
-    toast('轮回已启 · 炼气初期，从头修行');
+    toast(`轮回已启 · ${spiritRootInfo(save.spiritRoot).name} · 炼气初期，从头修行`);
     return;
   }
   if (action === 'autoplay') {
@@ -1186,7 +1254,7 @@ backgroundClock.onmessage = () => {
   }
 };
 renderLobby();
-if (pendingRun) persist();
+persist();
 renderer.ready
   .then(() => {
     assetsReady = true;

@@ -546,6 +546,17 @@ export class Renderer {
           c.stroke();
         }
       } else if (e.kind === 'line') {
+        if (e.radius > 30) {
+          c.save();
+          c.globalAlpha *= 0.2;
+          c.lineWidth = e.radius * 2;
+          c.lineCap = 'round';
+          c.beginPath();
+          c.moveTo(e.x, e.y);
+          c.lineTo(e.x2!, e.y2!);
+          c.stroke();
+          c.restore();
+        }
         c.lineWidth = 2;
         c.setLineDash([8, 5]);
         c.beginPath();

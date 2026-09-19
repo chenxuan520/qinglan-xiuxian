@@ -23,8 +23,10 @@ import {
   allowsSchool,
   evolutionPassives,
   isCultivationPath,
+  spiritRootInfo,
+  SPIRIT_ROOTS,
 } from './data.ts';
-import type { CultivationPath, WeaponKind } from './data.ts';
+import type { CultivationPath, WeaponKind, SpiritRootId } from './data.ts';
 import {
   cultivationReward,
   realmInfo,
@@ -57,6 +59,7 @@ export interface Enemy extends Point {
   boss: boolean;
   bossStage?: number;
   skillStep?: number;
+  pursuitCooldown?: number;
   cooldown: number;
   slow: number;
   flash: number;
@@ -156,6 +159,7 @@ export class Game {
   stage: number;
   difficulty: number;
   path: CultivationPath;
+  spiritRoot: SpiritRootId;
   random: () => number;
   constructor(
     save: SaveData,
@@ -169,6 +173,7 @@ export class Game {
     this.difficulty = difficulty;
     this.random = random;
     this.path = path;
+    this.spiritRoot = save.spiritRoot;
     this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
     this.baseHp = 100 + save.training.vitality * 10 + realmBonuses(this.realm).hp;
     this.player.hp = this.player.maxHp = this.maximumHealth;
@@ -233,7 +238,8 @@ export class Game {
           (p.soul || 0) * 0.06 +
           (p.forbidden || 0) * 0.12) /
           DIFFICULTIES[this.difficulty].amount) *
-        0.9,
+        0.9 *
+        spiritRootInfo(this.spiritRoot).rate,
       regen: (0.18 + (p.duration || 0) * 0.2) * (this.path === 'orthodox' ? 1.2 : 1),
       killHeal: (p.devour || 0) * 0.15,
     };
@@ -265,6 +271,7 @@ export class Game {
   }
   snapshot() {
     return {
+      spiritRoot: this.spiritRoot,
       version: 1,
       stage: this.stage,
       difficulty: this.difficulty,
@@ -310,6 +317,8 @@ export class Game {
       if (!s || s.version !== 1 || !['playing', 'paused', 'upgrade', 'lost'].includes(s.state))
         return null;
       if (s.path !== undefined && !isCultivationPath(s.path)) return null;
+      if (s.spiritRoot !== undefined && !SPIRIT_ROOTS.some((root) => root.id === s.spiritRoot))
+        return null;
       if (
         s.stage === FINAL_TRIAL_STAGE &&
         (!Number.isInteger(s.trialBossesDefeated) ||
@@ -357,7 +366,11 @@ export class Game {
         s.creditedCultivation !== undefined &&
         (!Number.isInteger(s.creditedCultivation) ||
           s.creditedCultivation < 0 ||
-          s.creditedCultivation > Math.min(save.cultivation, cultivationReward(s)))
+          s.creditedCultivation >
+            Math.min(
+              save.cultivation,
+              cultivationReward({ ...s, spiritRoot: s.spiritRoot ?? 'heaven' }),
+            ))
       )
         return null;
       if (
@@ -418,6 +431,7 @@ export class Game {
               'dy',
             ]) &&
             ENEMIES[e.type] &&
+            (e.pursuitCooldown === undefined || Number.isFinite(e.pursuitCooldown)) &&
             (e.bossStage === undefined ||
               (Number.isInteger(e.bossStage) &&
                 e.bossStage >= 0 &&
@@ -482,6 +496,7 @@ export class Game {
       )
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.spiritRoot = s.spiritRoot ?? 'heaven';
       g.time = s.time;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
@@ -498,6 +513,7 @@ export class Game {
       g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + (maxHp - g.player.maxHp)));
       g.player.maxHp = maxHp;
       g.enemies = s.enemies.map((e) => ({ ...e }));
+      for (const e of g.enemies) if (e.boss && !e.dead && e.charge > 0.7) g.bossChargeWarning(e);
       g.shots = s.shots.map((b) => ({ ...b, hit: new Set(b.hit) }));
       g.zones = s.zones.map((z) => ({ ...z }));
       g.pickups = s.pickups
@@ -738,6 +754,7 @@ export class Game {
       elite,
       boss,
       bossStage: boss ? bossStage : undefined,
+      pursuitCooldown: boss ? 2.5 : undefined,
       cooldown: boss ? 2.5 : 1 + this.random() * 3,
       slow: 0,
       flash: 0,
@@ -765,9 +782,22 @@ export class Game {
         this.isFinalTrial && enemyWave(this.stage, this.time) >= 1 && baseBehavior === 'chase'
           ? 'dash'
           : baseBehavior;
+      if (e.boss) {
+        e.pursuitCooldown = (e.pursuitCooldown ?? 2.5) - dt;
+        if (d > 330 && e.charge <= 0 && e.pursuitCooldown <= 0) {
+          this.startBossCharge(e, nx, ny);
+          this.announce(`${STAGES[e.bossStage ?? this.stage].boss} · 裂空追袭`);
+        }
+      }
+      const charging = e.charge > 0;
       if (e.charge > 0) {
-        e.charge -= dt;
-        if (e.charge < 0.55) {
+        const before = e.charge;
+        e.charge = Math.max(0, e.charge - dt);
+        if (e.boss) {
+          const movement = (Math.min(0.7, before) - Math.min(0.7, e.charge)) * 820;
+          e.x += e.dx * movement;
+          e.y += e.dy * movement;
+        } else if (e.charge < 0.55) {
           e.x += e.dx * 380 * dt;
           e.y += e.dy * 380 * dt;
         }
@@ -782,7 +812,7 @@ export class Game {
         e.x += nx * speed * dt;
         e.y += ny * speed * dt;
       }
-      if (e.boss && e.cooldown <= 0) {
+      if (e.boss && !charging && e.cooldown <= 0) {
         this.castBossSkill(e, nx, ny);
       } else if (!e.boss && e.cooldown <= 0) {
         e.cooldown = this.isFinalTrial
@@ -863,6 +893,27 @@ export class Game {
       }
     }
   }
+  private bossChargeWarning(e: Enemy) {
+    this.effect(
+      e.x,
+      e.y,
+      e.charge - 0.7,
+      e.radius + 13,
+      '#f2a174',
+      'line',
+      undefined,
+      e.x + e.dx * 574,
+      e.y + e.dy * 574,
+    );
+  }
+  private startBossCharge(e: Enemy, nx: number, ny: number, warning = 0.85) {
+    e.charge = warning + 0.7;
+    e.dx = nx;
+    e.dy = ny;
+    e.pursuitCooldown = e.hp < e.maxHp / 2 ? 6.5 : 9;
+    e.cooldown = Math.max(e.cooldown, e.charge + 0.5);
+    this.bossChargeWarning(e);
+  }
   private castBossSkill(e: Enemy, nx: number, ny: number) {
     const stage = e.bossStage ?? this.stage;
     const phase = e.skillStep ?? 0;
@@ -920,20 +971,7 @@ export class Game {
         break;
       case 2:
         if (phase === 0) {
-          e.charge = 1.3;
-          e.dx = nx;
-          e.dy = ny;
-          this.effect(
-            e.x,
-            e.y,
-            0.75,
-            30,
-            '#ed8879',
-            'line',
-            undefined,
-            e.x + nx * 240,
-            e.y + ny * 240,
-          );
+          this.startBossCharge(e, nx, ny);
         } else if (phase === 1) fan(7, 0.95, 205);
         else ringZones(8, 145, 46, 2);
         break;
@@ -971,21 +1009,7 @@ export class Game {
         } else if (phase === 4) {
           summons(6);
         } else {
-          e.charge = 1.55;
-          e.dx = nx;
-          e.dy = ny;
-          e.cooldown = Math.max(e.cooldown, 1.9);
-          this.effect(
-            e.x,
-            e.y,
-            1,
-            30,
-            '#f2d38e',
-            'line',
-            undefined,
-            e.x + nx * 210,
-            e.y + ny * 210,
-          );
+          this.startBossCharge(e, nx, ny, 1);
           blast(e.x, e.y, 85);
         }
         break;
@@ -1631,7 +1655,8 @@ export class Game {
       // 基础击杀收益保留，额外修为按地域与怪物强度结算；旧快照不追溯虚构击杀。
       const cultivationScale = cultivationFactor(this.realm);
       const bossReward = e.boss ? bossCultivationReward(this.stage, e.bossStage ?? this.stage) : 0;
-      this.bossCultivation += bossReward * DIFFICULTIES[this.difficulty].reward;
+      this.bossCultivation +=
+        bossReward * DIFFICULTIES[this.difficulty].reward * spiritRootInfo(this.spiritRoot).rate;
       this.combatCultivation += e.boss
         ? bossReward
         : Math.max(

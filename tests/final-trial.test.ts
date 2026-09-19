@@ -48,6 +48,7 @@ test('终关追击精英有冲刺；前六位首领三招，仙尊六招按顺�
     const boss = h.spawnEnemy(10, false, true, { x: 300, y: 0 }, stage);
     assert.equal(STAGES[stage].skills.length, stage === 6 ? 6 : 3);
     for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
+      boss.charge = 0;
       boss.cooldown = 0;
       h.update(0.01);
       assert.match(h.notice, new RegExp(STAGES[stage].skills[phase]));
