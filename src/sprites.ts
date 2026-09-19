@@ -12,6 +12,7 @@ export const SPRITE_ATLASES = [
   { start: 64, columns: 4, url: '/assets/enemies-nether.png' },
   { start: 72, columns: 4, url: '/assets/enemies-heaven.png' },
   { start: 80, columns: 1, url: '/assets/boss-immortal.png' },
+  { start: 81, columns: 1, size: 1254, url: '/assets/boss-tribulation.png' },
 ];
 export function spriteFrame(index: number) {
   const atlas = SPRITE_ATLASES.filter((sheet) => index >= sheet.start).length - 1;
@@ -25,8 +26,8 @@ export function spriteFrame(index: number) {
       local: 0,
       columns,
       rows: 1,
-      width: 1024,
-      height: 1024,
+      width: sheet.size ?? 1024,
+      height: sheet.size ?? 1024,
       x: 0,
       y: 0,
       url: sheet.url,

@@ -29,6 +29,7 @@ export interface SaveData {
   bestKills: number;
   runs: number;
   training: { vitality: number; power: number; speed: number };
+  retreatBonus: { vitality: number; power: number; speed: number };
   forge: Record<string, number>;
   artifacts: string[];
   artifactDrops: string[];
@@ -41,6 +42,9 @@ export interface SaveData {
   rootElements: ElementId[];
   age: number;
   lifespanBonus: number;
+  tribulations: number;
+  nextTribulationAge: number;
+  tribulationReturn: unknown | null;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 export function freshSave(
@@ -51,6 +55,9 @@ export function freshSave(
     version: 1,
     age: 0,
     lifespanBonus: 0,
+    tribulations: 0,
+    nextTribulationAge: 0,
+    tribulationReturn: null,
     stones: 0,
     iron: 0,
     cultivation: 0,
@@ -59,6 +66,7 @@ export function freshSave(
     bestKills: 0,
     runs: 0,
     training: { vitality: 0, power: 0, speed: 0 },
+    retreatBonus: { vitality: 0, power: 0, speed: 0 },
     forge: {},
     artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[rootElements[0] ?? 'metal']])],
     artifactDrops: [],
@@ -84,6 +92,10 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     if (!s || s.version !== 1) return base;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     base.lifespanBonus = int(s.lifespanBonus);
+    base.tribulations = int(s.tribulations);
+    if (typeof s.nextTribulationAge === 'number' && Number.isFinite(s.nextTribulationAge))
+      base.nextTribulationAge = Math.max(0, s.nextTribulationAge);
+    base.tribulationReturn = s.tribulationReturn ?? null;
     base.spiritRoot = SPIRIT_ROOTS.find((root) => root.id === s.spiritRoot)?.id ?? 'heaven';
     base.rootElements = rootElementsFor(base.spiritRoot, s.rootElements, random);
     for (const key of ['stones', 'iron', 'cultivation', 'bestKills', 'runs'] as const)
@@ -100,8 +112,10 @@ export function parseSave(raw: string | null, random: () => number = Math.random
         ]
       : [];
     if (base.completed.includes(FINAL_TRIAL_STAGE - 1)) base.unlocked = FINAL_TRIAL_STAGE;
-    for (const key of ['vitality', 'power', 'speed'] as const)
+    for (const key of ['vitality', 'power', 'speed'] as const) {
       base.training[key] = int(s.training?.[key], 20);
+      base.retreatBonus[key] = int(s.retreatBonus?.[key]);
+    }
     for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], MAX_FORGE_LEVEL);
     const validIds = (ids: unknown): string[] =>
       Array.isArray(ids) ? ids.filter((id) => TREASURES.some((t) => t.id === id)) : [];
@@ -130,6 +144,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
       !allowsSchool(base.path, treasure(base.starter).school)
     )
       base.starter = rootStarter(base.rootElements, base.path);
+    syncTribulationClock(base);
     return base;
   } catch {
     return base;
@@ -182,6 +197,56 @@ export function extendLifespan(save: SaveData) {
   save.lifespanBonus += years;
   return years;
 }
+export const TRIBULATION_INTERVAL = 20000;
+export function syncTribulationClock(save: SaveData) {
+  if (
+    !save.nextTribulationAge &&
+    realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index >= 7
+  )
+    save.nextTribulationAge = save.age + TRIBULATION_INTERVAL;
+}
+export function tribulationDue(save: SaveData) {
+  return save.nextTribulationAge > 0 && save.age >= save.nextTribulationAge - 1e-9;
+}
+export function completeTribulation(save: SaveData, round: number) {
+  if (!tribulationDue(save) || round !== save.tribulations + 1) return false;
+  save.tribulations = round;
+  save.nextTribulationAge += TRIBULATION_INTERVAL;
+  return true;
+}
+export const trainingYears = (save: SaveData) =>
+  Math.round(10 / spiritRootInfo(save.spiritRoot).rate) / 10;
+export function retreatPlan(save: SaveData, requested: number) {
+  if (
+    !Number.isFinite(requested) ||
+    requested <= 0 ||
+    !Number.isSafeInteger(Math.round(requested * 10)) ||
+    Math.abs(requested * 10 - Math.round(requested * 10)) > 1e-7 ||
+    tribulationDue(save)
+  )
+    return null;
+  const life = lifespanInfo(save);
+  const immortal = !Number.isFinite(life.limit);
+  const years = immortal
+    ? Math.min(requested, (save.nextTribulationAge || save.age + TRIBULATION_INTERVAL) - save.age)
+    : requested;
+  if (years <= 0 || life.remaining <= years + 1e-9) return null;
+  return { years, chance: immortal ? 0 : years / life.limit };
+}
+export function retreat(save: SaveData, requested: number, random: () => number = Math.random) {
+  const plan = retreatPlan(save, requested);
+  if (!plan) return null;
+  const { years, chance } = plan;
+  syncTribulationClock(save);
+  save.age += years;
+  const gains = { vitality: 0, power: 0, speed: 0 };
+  if (chance > 0 && random() < chance) {
+    const key = (['vitality', 'power', 'speed'] as const)[Math.floor(random() * 3)];
+    gains[key] = 1 + Math.floor(random() * 3);
+    save.retreatBonus[key] += gains[key];
+  }
+  return { years, gains };
+}
 export function cultivationFactor(step: number) {
   if (step < 15) return 1;
   return [2, 6, 16, 28][Math.min(3, Math.floor(step / 3) - 5)] * 1.15 ** (step % 3);
@@ -225,8 +290,17 @@ export const forgeCost = (level: number) => {
 };
 export function train(save: SaveData, kind: keyof SaveData['training']) {
   const cost = trainingCost(save.training[kind]);
-  if (save.training[kind] >= 20 || save.stones < cost) return false;
+  const years = trainingYears(save);
+  if (
+    save.training[kind] >= 20 ||
+    save.stones < cost ||
+    lifespanInfo(save).remaining <= years + 1e-9 ||
+    tribulationDue(save)
+  )
+    return false;
+  syncTribulationClock(save);
   save.stones -= cost;
+  save.age += years;
   save.training[kind]++;
   return true;
 }
@@ -290,6 +364,7 @@ export function settleRun(
   save.stones += rewards.stones;
   save.iron += rewards.iron;
   save.cultivation += rewards.cultivationRemaining;
+  syncTribulationClock(save);
   save.runs++;
   save.bestKills = Math.max(save.bestKills, run.kills);
   if (run.victory) {

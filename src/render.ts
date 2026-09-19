@@ -56,6 +56,7 @@ export class Renderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   draw(game: Game | null, now: number, stage: number, previewRealm = 0) {
+    if (game?.tribulation) stage = 6;
     const c = this.ctx,
       w = this.width,
       h = this.height,
@@ -245,6 +246,16 @@ export class Renderer {
   private drawGame(game: Game, time: number) {
     const c = this.ctx,
       p = game.player;
+    if (game.tribulation) {
+      c.save();
+      c.strokeStyle = '#d4adff';
+      c.lineWidth = 5;
+      c.setLineDash([18, 8]);
+      c.beginPath();
+      c.arc(0, 0, game.tribulationRadius, 0, TAU);
+      c.stroke();
+      c.restore();
+    }
     for (const z of game.zones) {
       if (!this.visible(z, p, z.radius + 50)) continue;
       c.save();
@@ -374,7 +385,21 @@ export class Renderer {
           c.ellipse(e.x, e.y + 7, e.radius + 4, e.radius * 0.5, 0, 0, TAU);
           c.fill();
         }
-        const sprite = e.boss ? STAGES[e.bossStage ?? game.stage].sprite : ENEMIES[e.type].sprite;
+        if (game.tribulation && e.boss)
+          this.formation(
+            e.x,
+            e.y,
+            e.radius + 25,
+            time * 0.7,
+            game.tribulationVulnerable ? '#ffdc83' : '#bb93ee',
+            0.8,
+          );
+        const sprite =
+          game.tribulation && e.boss
+            ? 81
+            : e.boss
+              ? STAGES[e.bossStage ?? game.stage].sprite
+              : ENEMIES[e.type].sprite;
         this.sprite(
           sprite,
           e.x,

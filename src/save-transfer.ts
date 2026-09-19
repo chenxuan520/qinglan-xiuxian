@@ -37,6 +37,11 @@ export function importSave(text: string) {
     !record(data) ||
     data.version !== 1 ||
     (data.lifespanBonus !== undefined && !integer(data.lifespanBonus)) ||
+    (data.tribulations !== undefined && !integer(data.tribulations)) ||
+    (data.nextTribulationAge !== undefined &&
+      (typeof data.nextTribulationAge !== 'number' ||
+        !Number.isFinite(data.nextTribulationAge) ||
+        data.nextTribulationAge < 0)) ||
     (data.age !== undefined &&
       (typeof data.age !== 'number' || !Number.isFinite(data.age) || data.age < 0)) ||
     !['stones', 'iron', 'cultivation', 'unlocked', 'bestKills', 'runs'].every((key) =>
@@ -48,6 +53,11 @@ export function importSave(text: string) {
     !['vitality', 'power', 'speed'].every((key) =>
       integer((data.training as Record<string, unknown>)[key]),
     ) ||
+    (data.retreatBonus !== undefined &&
+      (!record(data.retreatBonus) ||
+        !['vitality', 'power', 'speed'].every((key) =>
+          integer((data.retreatBonus as Record<string, unknown>)[key]),
+        ))) ||
     !record(data.forge) ||
     !Object.values(data.forge).every(integer) ||
     !TREASURES.some((t) => t.id === data.starter) ||
@@ -75,5 +85,10 @@ export function importSave(text: string) {
   const save = parseSave(JSON.stringify(data));
   const run = data.activeRun == null ? null : Game.restore(save, data.activeRun);
   if (data.activeRun != null && !run) throw new Error('未完成的历练数据已损坏，当前进度未更改');
+  if (save.tribulationReturn != null) {
+    const original = Game.restore(save, save.tribulationReturn);
+    if (!original || original.tribulation || !run?.tribulation)
+      throw new Error('天劫保存的原历练已损坏，当前进度未更改');
+  }
   return { save, run };
 }
