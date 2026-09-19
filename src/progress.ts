@@ -11,8 +11,13 @@ import {
   SPIRIT_ROOTS,
   spiritRootInfo,
   rollSpiritRoot,
+  rootElementsFor,
+  ROOT_STARTERS,
+  rootStarter,
+  ELEMENTS,
+  REALM_LIFESPANS,
 } from './data.ts';
-import type { CultivationPath, SpiritRootId } from './data.ts';
+import type { CultivationPath, SpiritRootId, ElementId } from './data.ts';
 
 export interface SaveData {
   version: 1;
@@ -33,11 +38,19 @@ export interface SaveData {
   autoplay: boolean;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
+  rootElements: ElementId[];
+  age: number;
+  lifespanBonus: number;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
-export function freshSave(spiritRoot: SpiritRootId = 'heaven'): SaveData {
+export function freshSave(
+  spiritRoot: SpiritRootId = 'heaven',
+  rootElements = rootElementsFor(spiritRoot, [], () => 0),
+): SaveData {
   return {
     version: 1,
+    age: 0,
+    lifespanBonus: 0,
     stones: 0,
     iron: 0,
     cultivation: 0,
@@ -47,14 +60,15 @@ export function freshSave(spiritRoot: SpiritRootId = 'heaven'): SaveData {
     runs: 0,
     training: { vitality: 0, power: 0, speed: 0 },
     forge: {},
-    artifacts: ['sword', 'nail'],
+    artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[rootElements[0] ?? 'metal']])],
     artifactDrops: [],
-    starter: 'sword',
+    starter: rootStarter(rootElements, 'dual'),
     sound: false,
     volume: 0.6,
     autoplay: false,
     path: 'dual',
     spiritRoot,
+    rootElements: [...rootElements],
   };
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
@@ -62,10 +76,16 @@ const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
 export function parseSave(raw: string | null, random: () => number = Math.random): SaveData {
   const base = freshSave();
   try {
-    if (!raw) return freshSave(rollSpiritRoot(random));
+    if (!raw) {
+      const root = rollSpiritRoot(random);
+      return freshSave(root, rootElementsFor(root, [], random));
+    }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
+    if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
+    base.lifespanBonus = int(s.lifespanBonus);
     base.spiritRoot = SPIRIT_ROOTS.find((root) => root.id === s.spiritRoot)?.id ?? 'heaven';
+    base.rootElements = rootElementsFor(base.spiritRoot, s.rootElements, random);
     for (const key of ['stones', 'iron', 'cultivation', 'bestKills', 'runs'] as const)
       base[key] = int(s[key]);
     base.unlocked = int(s.unlocked, STAGES.length - 1);
@@ -93,7 +113,9 @@ export function parseSave(raw: string | null, random: () => number = Math.random
             ...validIds([s.starter]),
           ]
         : validIds(s.artifacts);
-    base.artifacts = [...new Set([...base.artifacts, ...legacy])];
+    base.artifacts = [
+      ...new Set([...base.artifacts, ...ROOT_STARTERS[base.rootElements[0] ?? 'metal'], ...legacy]),
+    ];
     base.artifactDrops = [...new Set(validIds(s.artifactDrops))].filter(
       (id) => !base.artifacts.includes(id),
     );
@@ -107,11 +129,27 @@ export function parseSave(raw: string | null, random: () => number = Math.random
       !base.artifacts.includes(base.starter) ||
       !allowsSchool(base.path, treasure(base.starter).school)
     )
-      base.starter = base.path === 'demonic' ? 'nail' : 'sword';
+      base.starter = rootStarter(base.rootElements, base.path);
     return base;
   } catch {
     return base;
   }
+}
+export function attuneSpiritRoot(save: SaveData, root: SpiritRootId, elements: ElementId[]) {
+  const info = SPIRIT_ROOTS.find((r) => r.id === root);
+  if (
+    !info ||
+    elements.length !== info.count ||
+    new Set(elements).size !== elements.length ||
+    !elements.every((id) => ELEMENTS.some((e) => e.id === id))
+  )
+    return false;
+  save.rootElements = [...elements];
+  save.spiritRoot = root;
+  save.artifacts = [...new Set([...save.artifacts, ...ROOT_STARTERS[elements[0] ?? 'metal']])];
+  save.artifactDrops = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
+  save.starter = rootStarter(elements, save.path);
+  return true;
 }
 export function realmInfo(cultivation: number, finalTrialCleared = false) {
   let remaining = cultivation;
@@ -131,6 +169,19 @@ export function realmInfo(cultivation: number, finalTrialCleared = false) {
   };
 }
 export const realmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export function lifespanInfo(save: SaveData) {
+  const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
+  const base = REALM_LIFESPANS[realm.index];
+  const limit = base + save.lifespanBonus;
+  return { age: save.age, base, limit, remaining: Math.max(0, limit - save.age) };
+}
+export function extendLifespan(save: SaveData) {
+  const base = lifespanInfo(save).base;
+  if (!Number.isFinite(base)) return 0;
+  const years = Math.round(base * 0.3);
+  save.lifespanBonus += years;
+  return years;
+}
 export function cultivationFactor(step: number) {
   if (step < 15) return 1;
   return [2, 6, 16, 28][Math.min(3, Math.floor(step / 3) - 5)] * 1.15 ** (step % 3);
