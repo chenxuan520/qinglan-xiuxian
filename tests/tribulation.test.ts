@@ -11,6 +11,7 @@ import {
   syncTribulationClock,
   tribulationDue,
   completeTribulation,
+  settleRun,
 } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 
@@ -202,4 +203,80 @@ test('天劫瞄准雷弹真实移动并造成伤害，续局保留弹幕；核�
   assert.equal(resumed.shots.filter((s) => s.kind === 'hostile').length, 0);
   assert.equal(resumed.zones.filter((z) => z.hostile).length, 0);
   assert.equal(resumed.zones.filter((z) => !z.hostile).length, 1);
+});
+
+test('终关结算立即结束周期天劫，旧渡劫境存档清除倒计时且保留劫印', () => {
+  const save = immortal(3);
+  settleRun(save, {
+    stage: 6,
+    difficulty: 0,
+    kills: 0,
+    time: 600,
+    victory: true,
+    iron: 0,
+    level: 1,
+  });
+  assert.ok(save.completed.includes(6));
+  assert.equal(save.nextTribulationAge, 0);
+  assert.equal(tribulationDue(save), false);
+  assert.equal(save.tribulations, 2);
+  save.nextTribulationAge = save.age - 1; // 旧版已到期的天劫。
+  assert.equal(tribulationDue(save), false);
+  const restored = parseSave(JSON.stringify(save));
+  assert.equal(restored.nextTribulationAge, 0);
+  assert.equal(restored.tribulations, 2);
+  assert.equal(completeTribulation(restored, 3), false);
+  restored.stones = 10000;
+  assert.ok(train(restored, 'power'));
+  const g = new Game(restored, 6, 0);
+  g.update(0.05);
+  assert.equal(g.state, 'playing');
+});
+
+test('终关尚未通关的大乘高修为仍需迎劫，提前通关但修为未达渡劫也不再受天劫打断', () => {
+  const save = immortal();
+  assert.ok(tribulationDue(save));
+  save.completed = [6];
+  save.cultivation = 80000;
+  syncTribulationClock(save);
+  assert.equal(tribulationDue(save), false);
+  assert.equal(save.nextTribulationAge, 0);
+});
+
+test('旧通关档正在天劫中时，导入返回原历练且不重复结算，无原历练则返回首页', () => {
+  for (const hasOriginal of [false, true]) {
+    const save = immortal(3);
+    const source = new Game(save, 2, 0);
+    source.time = 83;
+    source.player.hp -= 30;
+    source.pause();
+    save.tribulationReturn = hasOriginal ? source.snapshot() : null;
+    const trial = Game.createTribulation(save, hasOriginal ? source : null);
+    save.completed = [0, 1, 2, 3, 4, 5, 6]; // 模拟更新前通关后仍被迫迎劫的存档。
+    const before = save.cultivation;
+    const imported = importSave(exportSave(save, trial));
+    assert.equal(imported.save.nextTribulationAge, 0);
+    assert.equal(imported.save.tribulationReturn, null);
+    assert.equal(imported.save.tribulations, 2);
+    assert.equal(imported.save.cultivation, before);
+    if (hasOriginal) {
+      assert.equal(imported.run!.tribulation, 0);
+      assert.equal(imported.run!.time, 83);
+      assert.equal(imported.run!.state, 'paused');
+      assert.equal(imported.run!.player.maxHp - imported.run!.player.hp, 30);
+    } else assert.equal(imported.run, null);
+    assert.equal(importSave(exportSave(imported.save, imported.run)).save.cultivation, before);
+  }
+});
+
+test('通关存档迁移仍拒绝损坏的原历练，普通未完成历练正常恢复', () => {
+  const save = immortal();
+  const trial = Game.createTribulation(save, null);
+  save.completed = [6];
+  save.tribulationReturn = { bad: true };
+  assert.throws(() => importSave(exportSave(save, trial)), /已损坏/);
+  save.tribulationReturn = null;
+  const regular = new Game(save, 0, 0);
+  regular.time = 12;
+  assert.equal(importSave(exportSave(save, regular)).run!.time, 12);
 });

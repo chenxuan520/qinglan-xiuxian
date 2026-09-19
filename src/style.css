@@ -4127,3 +4127,328 @@ body:not(.in-game) #ui {
   color: #becdb6;
   text-decoration: underline;
 }
+
+/* 通关后的仙途终章：沿用青绿与暖金，庆贺光环为静态装饰。 */
+body.journey-complete:not(.in-game) {
+  --gold: #ecd29b;
+  --border: #d8c4953b;
+}
+.journey-lobby .journey-hero {
+  position: relative;
+  min-height: 360px;
+  margin: 26px 0 0;
+  padding: 38px 48px;
+  border: 1px solid #dac48d59;
+  background:
+    radial-gradient(ellipse at 76% 40%, #b99b5140, transparent 43%),
+    linear-gradient(110deg, #102e2a 15%, #24453d 68%, #122e2b);
+  isolation: isolate;
+}
+.journey-hero::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid #e9d5a018;
+  pointer-events: none;
+}
+.journey-hero .hero-copy {
+  z-index: 1;
+}
+.journey-lobby .journey-hero h1 {
+  font-size: clamp(32px, 3.3vw, 48px);
+  line-height: 1.45;
+  letter-spacing: 7px;
+  margin-top: 17px;
+}
+.journey-hero h1 span {
+  color: #edd8a6;
+}
+.journey-hero .hero-copy > p {
+  margin-top: 16px;
+  color: #bed0bf;
+  font-size: 12px;
+}
+.journey-badges {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.journey-badges span {
+  padding: 4px 9px;
+  color: #dbc999;
+  border: 1px solid #ddc78f3d;
+  background: #bba16b0c;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.journey-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.journey-actions button {
+  min-height: 46px;
+  padding: 12px 22px;
+  font-size: 12px;
+}
+.journey-portrait {
+  position: relative;
+  flex: 0 0 330px;
+  height: 320px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.journey-orbit {
+  position: absolute;
+  top: 10px;
+  width: 240px;
+  height: 240px;
+  border: 1px solid #dcc58480;
+  border-radius: 50%;
+  background: radial-gradient(circle, #e7dcad1a, #f1d59508 60%, transparent 71%);
+  box-shadow:
+    0 0 0 12px #ebd29806,
+    0 0 0 13px #ddcda525;
+}
+.journey-orbit::before,
+.journey-orbit::after {
+  content: '✦';
+  position: absolute;
+  left: 50%;
+  top: -10px;
+  transform: translateX(-50%);
+  color: #edd8a6;
+  font-size: 15px;
+}
+.journey-orbit::after {
+  top: auto;
+  bottom: -10px;
+}
+.journey-character {
+  position: absolute;
+  width: 150px;
+  height: 200px;
+  top: 28px;
+  background-repeat: no-repeat;
+}
+.journey-poem {
+  position: absolute;
+  top: 40px;
+  right: 0;
+  writing-mode: vertical-rl;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: #d3c798a3;
+}
+.journey-realm {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 25px 0;
+}
+.journey-realm small {
+  color: #b6c6aa;
+  font-size: 9px;
+  letter-spacing: 4px;
+}
+.journey-realm strong {
+  color: #eddbad;
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: 5px;
+}
+.journey-realm > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #bfcaaf;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.journey-realm svg {
+  width: 14px;
+  height: 14px;
+}
+.journey-records {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 22px 12px;
+  margin: 0 0 36px;
+  border: 1px solid #dac48d40;
+  border-top: none;
+  background: #102c29ec;
+}
+.journey-records > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0 24px;
+}
+.journey-records > div + div {
+  border-left: 1px solid var(--border);
+}
+.journey-records span {
+  color: #b8c7ae;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.journey-records strong {
+  color: #ecdbaf;
+  font-size: 27px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.journey-records em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 13px;
+  color: #aaba9f;
+}
+.journey-records small {
+  font-size: 9px;
+  color: #94ad9c;
+  line-height: 1.7;
+}
+.journey-lobby .expedition {
+  scroll-margin-top: 24px;
+}
+.journey-lobby .stage-card::before {
+  background-image: linear-gradient(110deg, #0e282aed, #18382dc2), var(--stage-image);
+  background-size: cover;
+  background-position: center;
+  opacity: 1;
+}
+.journey-lobby .stage-card.selected {
+  border-color: #e3cb94;
+}
+.journey-lobby .stage-card.selected::before {
+  background-image: linear-gradient(110deg, #334c3ce6, #4d563fb3), var(--stage-image);
+}
+.result-panel.result-complete {
+  border-color: #e2cc9480;
+  background: radial-gradient(ellipse at 50% 0, #6f693540, transparent 45%), #12342ef7;
+}
+.result-complete .result-seal {
+  color: #f2dba4;
+  border-color: #e1c98b80;
+  background: #b7984630;
+}
+@media (max-width: 900px) {
+  .journey-lobby .journey-hero {
+    padding: 28px;
+  }
+  .journey-portrait {
+    flex-basis: 250px;
+  }
+  .journey-orbit {
+    width: 210px;
+    height: 210px;
+    top: 25px;
+  }
+  .journey-poem {
+    display: none;
+  }
+  .journey-records > div {
+    padding: 0 14px;
+  }
+}
+@media (max-width: 650px) {
+  .journey-lobby .journey-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 105px;
+    min-height: 0;
+    margin-top: 10px;
+    padding: 28px 20px;
+    gap: 0;
+    align-items: start;
+  }
+  .journey-hero .hero-copy {
+    display: contents;
+  }
+  .journey-hero .eyebrow {
+    grid-column: 1 / -1;
+  }
+  .journey-lobby .journey-hero h1 {
+    grid-column: 1;
+    font-size: clamp(23px, 6vw, 32px);
+    letter-spacing: 2px;
+    margin: 24px 0 16px;
+  }
+  .journey-hero .hero-copy > p,
+  .journey-badges,
+  .journey-actions {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+  .journey-hero .hero-copy > p {
+    font-size: 11px;
+    margin-top: 10px;
+  }
+  .journey-actions {
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .journey-actions button {
+    flex: 1;
+    padding: 12px 8px;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .journey-portrait {
+    grid-column: 2;
+    grid-row: 2;
+    height: 128px;
+    width: 105px;
+    margin-top: 10px;
+  }
+  .journey-orbit {
+    width: 86px;
+    height: 86px;
+    top: 6px;
+    box-shadow:
+      0 0 0 6px #ebd29806,
+      0 0 0 7px #ddcda525;
+  }
+  .journey-character {
+    width: 66px;
+    height: 88px;
+    top: 5px;
+  }
+  .journey-realm {
+    padding: 5px 0 0;
+    gap: 3px;
+  }
+  .journey-realm strong {
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  .journey-realm small,
+  .journey-realm > span {
+    display: none;
+  }
+  .journey-records {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 0;
+    padding: 20px 10px;
+    margin-bottom: 28px;
+  }
+  .journey-records > div:nth-child(3) {
+    border-left: none;
+  }
+  .journey-records strong {
+    font-size: 23px;
+  }
+  .journey-lobby .section-heading > div:first-child {
+    gap: 8px;
+  }
+  .journey-lobby .section-heading h2 {
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+}
