@@ -2,12 +2,19 @@ import {
   TREASURES,
   PASSIVES,
   STAGES,
+  FINAL_TRIAL_STAGE,
+  TRIAL_BOSS_STAGES,
+  TRIAL_BOSS_TIMES,
   DIFFICULTIES,
   ENEMIES,
+  STAGE_ENEMIES,
   enemyRoster,
+  enemyWave,
   MAX_WEAPONS,
   MAX_PASSIVES,
   MAX_WEAPON_LEVEL,
+  MAX_RUN_LEVEL,
+  MAX_REVIVES,
   MAX_PASSIVE_LEVEL,
   TAU,
   treasure,
@@ -18,7 +25,14 @@ import {
   isCultivationPath,
 } from './data.ts';
 import type { CultivationPath, WeaponKind } from './data.ts';
-import { cultivationReward, realmInfo } from './progress.ts';
+import {
+  cultivationReward,
+  realmInfo,
+  realmBonuses,
+  dropArtifacts,
+  cultivationFactor,
+  bossCultivationReward,
+} from './progress.ts';
 import type { SaveData } from './progress.ts';
 
 export interface Point {
@@ -41,6 +55,8 @@ export interface Enemy extends Point {
   damage: number;
   elite: boolean;
   boss: boolean;
+  bossStage?: number;
+  skillStep?: number;
   cooldown: number;
   slow: number;
   flash: number;
@@ -96,6 +112,7 @@ export interface Choice {
   level: number;
 }
 export type GameState = 'playing' | 'paused' | 'upgrade' | 'won' | 'lost';
+const distanceSquared = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export class Game {
@@ -105,6 +122,7 @@ export class Game {
   xp = 0;
   kills = 0;
   creditedCultivation = 0;
+  combatCultivation = 0;
   iron = 0;
   rerolls = 3;
   player = { x: 0, y: 0, hp: 100, maxHp: 100, invincible: 0, facing: 1, moving: false };
@@ -121,7 +139,13 @@ export class Game {
   notice = '';
   noticeTime = 0;
   bossSpawned = false;
+  trialBossesDefeated = 0;
+  trialBossesSpawned = 0;
+  nextTrialBossAt = TRIAL_BOSS_TIMES[0];
   damageDealt = 0;
+  damageBySource: Record<string, number> = {};
+  bossCultivation = 0;
+  revivesUsed = 0;
   nextElite = 60;
   onEvent: (name: string) => void = () => {};
   private spawnBudget = 0;
@@ -145,18 +169,26 @@ export class Game {
     this.difficulty = difficulty;
     this.random = random;
     this.path = path;
-    this.realm = realmInfo(save.cultivation).step;
-    this.baseHp =
-      100 + save.training.vitality * 10 + this.realm * 3 + (path === 'orthodox' ? 12 : 0);
-    this.player.hp = this.player.maxHp = this.baseHp;
+    this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
+    this.baseHp = 100 + save.training.vitality * 10 + realmBonuses(this.realm).hp;
+    this.player.hp = this.player.maxHp = this.maximumHealth;
     const starter =
-      TREASURES.find((t) => t.id === save.starter && allowsSchool(path, t.school)) ??
-      TREASURES.find((t) => allowsSchool(path, t.school))!;
+      TREASURES.find(
+        (t) =>
+          t.id === save.starter && save.artifacts.includes(t.id) && allowsSchool(path, t.school),
+      ) ?? treasure(path === 'demonic' ? 'nail' : 'sword');
     this.weapons.push({ id: starter.id, level: 1, evolved: false, timer: 0 });
     this.announce('踏入秘境 · 妖物将至');
   }
+  private get maximumHealth() {
+    const base = this.baseHp + (this.passives.guard || 0) * 20 + (this.passives.bone || 0) * 14;
+    return Math.round(base * (this.path === 'orthodox' ? 1.12 : 1));
+  }
   get boss() {
     return this.enemies.find((e) => e.boss && !e.dead);
+  }
+  get isFinalTrial() {
+    return this.stage === FINAL_TRIAL_STAGE;
   }
   get remaining() {
     return Math.max(0, STAGES[this.stage].minutes * 60 - this.time);
@@ -167,7 +199,7 @@ export class Game {
       damage:
         1 +
         this.save.training.power * 0.05 +
-        this.realm * 0.025 +
+        realmBonuses(this.realm).damage +
         (p.power || 0) * 0.12 +
         (p.spirit || 0) * 0.04 +
         (p.blood || 0) * 0.15 +
@@ -202,7 +234,7 @@ export class Game {
           (p.forbidden || 0) * 0.12) /
           DIFFICULTIES[this.difficulty].amount) *
         0.9,
-      regen: 0.18 + (p.duration || 0) * 0.2 + (this.path === 'orthodox' ? 0.2 : 0),
+      regen: (0.18 + (p.duration || 0) * 0.2) * (this.path === 'orthodox' ? 1.2 : 1),
       killHeal: (p.devour || 0) * 0.15,
     };
   }
@@ -217,14 +249,16 @@ export class Game {
     if (delta <= 0) return;
     this.save.cultivation += delta;
     this.creditedCultivation = earned;
-    const realm = realmInfo(this.save.cultivation);
+    const realm = realmInfo(this.save.cultivation, this.save.completed.includes(FINAL_TRIAL_STAGE));
     if (realm.step > this.realm) {
-      const hp = (realm.step - this.realm) * 3;
+      const hp = realmBonuses(realm.step).hp - realmBonuses(this.realm).hp;
+      const major = realm.index > Math.floor(this.realm / 3);
       this.realm = realm.step;
       this.baseHp += hp;
-      this.player.maxHp += hp;
-      if (this.player.hp > 0) this.player.hp += hp;
-      this.announce(`境界突破 · ${realm.name} · 气血与法宝威力提升`);
+      const increase = this.maximumHealth - this.player.maxHp;
+      this.player.maxHp = this.maximumHealth;
+      if (this.player.hp > 0) this.player.hp += increase;
+      this.announce(`${major ? '大境界突破' : '境界突破'} · ${realm.name} · 气血与法宝威力提升`);
       this.effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
       this.onEvent('breakthrough');
     }
@@ -241,6 +275,7 @@ export class Game {
       xp: this.xp,
       kills: this.kills,
       creditedCultivation: this.creditedCultivation,
+      combatCultivation: this.combatCultivation,
       iron: this.iron,
       rerolls: this.rerolls,
       player: { ...this.player },
@@ -252,8 +287,15 @@ export class Game {
       pickups: this.pickups.map((p) => ({ ...p })),
       choices: this.choices.map((c) => ({ ...c })),
       bossSpawned: this.bossSpawned,
+      trialBossesDefeated: this.trialBossesDefeated,
+      trialBossesSpawned: this.trialBossesSpawned,
+      nextTrialBossAt: this.nextTrialBossAt,
+      trialBossSchedule: 3,
       nextElite: this.nextElite,
       damageDealt: this.damageDealt,
+      damageBySource: { ...this.damageBySource },
+      bossCultivation: this.bossCultivation,
+      revivesUsed: this.revivesUsed,
       spawnBudget: this.spawnBudget,
       serial: this.serial,
     };
@@ -265,8 +307,19 @@ export class Game {
       fields.every((key) => Number.isFinite((value as Record<string, unknown>)[key]));
     try {
       const s = raw as ReturnType<Game['snapshot']>;
-      if (!s || s.version !== 1 || !['playing', 'paused', 'upgrade'].includes(s.state)) return null;
+      if (!s || s.version !== 1 || !['playing', 'paused', 'upgrade', 'lost'].includes(s.state))
+        return null;
       if (s.path !== undefined && !isCultivationPath(s.path)) return null;
+      if (
+        s.stage === FINAL_TRIAL_STAGE &&
+        (!Number.isInteger(s.trialBossesDefeated) ||
+          s.trialBossesDefeated < 0 ||
+          s.trialBossesDefeated > TRIAL_BOSS_STAGES.length ||
+          (s.trialBossesDefeated === TRIAL_BOSS_STAGES.length && s.state !== 'lost') ||
+          !Number.isFinite(s.nextTrialBossAt) ||
+          s.nextTrialBossAt < TRIAL_BOSS_TIMES[0])
+      )
+        return null;
       if (
         !numbers(s, [
           'stage',
@@ -296,6 +349,11 @@ export class Game {
       )
         return null;
       if (
+        s.combatCultivation !== undefined &&
+        (!Number.isFinite(s.combatCultivation) || s.combatCultivation < 0)
+      )
+        return null;
+      if (
         s.creditedCultivation !== undefined &&
         (!Number.isInteger(s.creditedCultivation) ||
           s.creditedCultivation < 0 ||
@@ -304,7 +362,7 @@ export class Game {
         return null;
       if (
         !numbers(s.player, ['x', 'y', 'hp', 'maxHp', 'invincible', 'facing']) ||
-        s.player.hp <= 0 ||
+        (s.state === 'lost' ? s.player.hp !== 0 : s.player.hp <= 0) ||
         s.player.maxHp < s.player.hp
       )
         return null;
@@ -358,7 +416,12 @@ export class Game {
               'charge',
               'dx',
               'dy',
-            ]) && ENEMIES[e.type],
+            ]) &&
+            ENEMIES[e.type] &&
+            (e.bossStage === undefined ||
+              (Number.isInteger(e.bossStage) &&
+                e.bossStage >= 0 &&
+                e.bossStage <= FINAL_TRIAL_STAGE)),
         )
       )
         return null;
@@ -420,27 +483,85 @@ export class Game {
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.time = s.time;
-      g.level = s.level;
-      g.xp = s.xp;
+      g.level = Math.min(MAX_RUN_LEVEL, s.level);
+      g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
       g.creditedCultivation = s.creditedCultivation ?? 0;
+      g.combatCultivation = s.combatCultivation ?? 0;
       g.iron = s.iron;
       g.rerolls = s.rerolls;
       g.player = { ...s.player, moving: false };
       g.weapons = s.weapons.map((w) => ({ ...w }));
       g.passives = { ...s.passives };
+      const maxHp = g.maximumHealth;
+      // 旧对局补齐境界收益，保留已损失气血；新快照的差额为零。
+      g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + (maxHp - g.player.maxHp)));
+      g.player.maxHp = maxHp;
       g.enemies = s.enemies.map((e) => ({ ...e }));
       g.shots = s.shots.map((b) => ({ ...b, hit: new Set(b.hit) }));
       g.zones = s.zones.map((z) => ({ ...z }));
-      g.pickups = s.pickups.map((p) => ({ ...p }));
+      g.pickups = s.pickups
+        .filter((p) => !g.isFinalTrial || p.kind !== 'heal')
+        .map((p) => ({ ...p }));
       g.choices = s.choices.map((c) => ({ ...c }));
       g.bossSpawned = s.bossSpawned;
+      g.trialBossesDefeated = Math.min(s.trialBossesDefeated ?? 0, TRIAL_BOSS_STAGES.length);
+      if (s.trialBossSchedule === 3) {
+        if (
+          !Number.isInteger(s.trialBossesSpawned) ||
+          s.trialBossesSpawned < g.trialBossesDefeated ||
+          s.trialBossesSpawned > TRIAL_BOSS_STAGES.length
+        )
+          return null;
+        g.trialBossesSpawned = s.trialBossesSpawned;
+      } else {
+        g.trialBossesSpawned = Math.min(
+          TRIAL_BOSS_STAGES.length,
+          g.trialBossesDefeated + g.enemies.filter((e) => e.boss && !e.dead).length,
+        );
+      }
+      g.nextTrialBossAt = TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? 600;
       g.nextElite = s.nextElite;
       g.damageDealt = s.damageDealt;
+      if (s.damageBySource !== undefined) {
+        if (!s.damageBySource || typeof s.damageBySource !== 'object') return null;
+        for (const [id, amount] of Object.entries(s.damageBySource)) {
+          if (
+            !(TREASURES.some((t) => t.id === id) || id === 'bone' || id === 'other') ||
+            !Number.isFinite(amount) ||
+            amount < 0
+          )
+            return null;
+          g.damageBySource[id] = amount;
+        }
+        if (Object.values(g.damageBySource).reduce((sum, n) => sum + n, 0) > g.damageDealt + 0.01)
+          return null;
+      }
+      if (
+        s.bossCultivation !== undefined &&
+        (!Number.isFinite(s.bossCultivation) || s.bossCultivation < 0)
+      )
+        return null;
+      g.bossCultivation = s.bossCultivation ?? 0;
+      if (
+        s.revivesUsed !== undefined &&
+        (!Number.isInteger(s.revivesUsed) || s.revivesUsed < 0 || s.revivesUsed > MAX_REVIVES)
+      )
+        return null;
+      g.revivesUsed = s.revivesUsed ?? 0;
       g.spawnBudget = s.spawnBudget;
       g.serial = s.serial;
-      g.state = s.state === 'upgrade' ? 'upgrade' : 'paused';
+      g.state = s.state === 'upgrade' && s.level <= MAX_RUN_LEVEL ? 'upgrade' : 'paused';
+      if (s.level > MAX_RUN_LEVEL) g.choices = [];
       if (g.state === 'upgrade' && !g.choices.length) return null;
+      if (g.state === 'upgrade' && g.choices.length === 1) {
+        g.choose(0);
+        g.state = 'paused';
+      }
+      if (s.state === 'lost') {
+        g.state = 'lost';
+        g.player.hp = 0;
+      }
       g.announce('重续仙缘 · 上次历练已恢复');
       g.creditCultivation();
       return g;
@@ -461,6 +582,7 @@ export class Game {
     if (this.state !== 'playing' || dt <= 0) return;
     dt = Math.min(dt, 0.05);
     this.time += dt;
+    const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     this.noticeTime -= dt;
     const p = this.player,
       stats = this.stats;
@@ -475,27 +597,41 @@ export class Game {
     }
     this.spawnBudget +=
       dt *
-      (1.3 + this.time * 0.017 + this.stage * 0.3) *
+      (this.isFinalTrial
+        ? 1 + 8 * progress ** 1.3
+        : 0.85 +
+          this.stage * 0.12 +
+          (STAGES[this.stage].minutes * 60 * 0.017 + this.stage * 0.18 + 0.45) * progress ** 1.3) *
       DIFFICULTIES[this.difficulty].amount *
-      (this.bossSpawned ? 0.32 : 1);
+      (this.isFinalTrial ? (this.boss ? 0.7 : 1) : this.bossSpawned ? 0.32 : 1);
     while (this.spawnBudget >= 1) {
       this.spawnBudget--;
-      if (this.enemies.length < 240) this.spawnEnemy();
+      if (this.enemies.length < (this.isFinalTrial ? 210 : 240)) this.spawnEnemy();
     }
-    if (this.time >= this.nextElite && !this.bossSpawned) {
-      const originalElite = Math.min(10, 4 + Math.floor(this.time / 120) * 3);
-      const additions = enemyRoster(this.stage, this.time).filter(
-        (type) => type >= 12 && ENEMIES[type].hp >= 110,
+    if (!this.isFinalTrial && this.time >= this.nextElite && !this.bossSpawned) {
+      const available = enemyRoster(this.stage, this.time);
+      const elites = available.filter((type) =>
+        ['tank', 'shield'].includes(ENEMIES[type].behavior),
       );
-      const eliteType =
-        additions.length && this.random() < 0.45
-          ? additions[Math.floor(this.random() * additions.length)]
-          : originalElite;
-      this.spawnEnemy(eliteType, true);
+      this.spawnEnemy(elites.at(-1) ?? available.at(-1), true);
+      if (progress >= 0.5) this.spawnEnemy(available.at(-1), true);
       this.nextElite += 60;
       this.announce('精英现身 · 击败可得炼器宝匣');
     }
-    if (!this.bossSpawned && this.remaining === 0) {
+    if (this.isFinalTrial) {
+      while (
+        this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
+        this.time >= this.nextTrialBossAt
+      ) {
+        const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
+        this.bossSpawned = true;
+        this.spawnEnemy(10, false, true, undefined, bossStage);
+        this.trialBossesSpawned++;
+        this.nextTrialBossAt = TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? 600;
+        this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
+        this.onEvent('boss');
+      }
+    } else if (!this.bossSpawned && this.remaining === 0) {
       this.bossSpawned = true;
       this.spawnEnemy(10, false, true);
       this.announce(`${STAGES[this.stage].boss}降临 · 小心红色预警`);
@@ -523,25 +659,52 @@ export class Game {
       this.state = 'lost';
       this.onEvent('lose');
     }
-    if (this.state === 'playing' && this.xp >= xpNeeded(this.level)) {
+    if (this.state === 'playing' && this.level < MAX_RUN_LEVEL && this.xp >= xpNeeded(this.level)) {
       this.xp -= xpNeeded(this.level);
       this.level++;
+      if (this.level === MAX_RUN_LEVEL) this.xp = 0;
       this.creditCultivation();
       this.state = 'upgrade';
       this.choices = this.makeChoices();
-      this.onEvent('upgrade');
-      this.input = { x: 0, y: 0 };
+      if (this.choices.length === 1) this.choose(0);
+      else {
+        this.onEvent('upgrade');
+        this.input = { x: 0, y: 0 };
+      }
     }
   }
-  spawnEnemy(type?: number, elite = false, boss = false, at?: Point) {
+  spawnEnemy(
+    type?: number,
+    elite = false,
+    boss = false,
+    at?: Point,
+    bossStage = this.isFinalTrial ? TRIAL_BOSS_STAGES[this.trialBossesDefeated] : this.stage,
+  ) {
+    if (this.isFinalTrial && !boss) elite = true;
     const available = enemyRoster(this.stage, this.time);
-    type ??= available[Math.floor(this.random() * available.length)];
+    if (type === undefined) {
+      const pool =
+        available.length > 3
+          ? this.random() < 0.65
+            ? available.slice(-3)
+            : available.slice(0, -3)
+          : available;
+      type = pool[Math.floor(this.random() * pool.length)];
+    }
     const template = ENEMIES[type],
       angle = this.random() * TAU;
     const difficulty = DIFFICULTIES[this.difficulty];
-    const strength = (1 + this.time / 260) * (1 + this.stage * 0.22);
+    const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
+    const strengthTime = this.isFinalTrial
+      ? Math.min(this.time, STAGES[this.stage].minutes * 60)
+      : this.time;
+    const strength = (1 + strengthTime / 260) * (1 + this.stage * 0.22);
     const hp = boss
-      ? (16000 + this.stage * 11000) * difficulty.hp
+      ? (this.isFinalTrial
+          ? bossStage === FINAL_TRIAL_STAGE
+            ? 560000
+            : 120000 + bossStage * 35000
+          : 16000 + this.stage * 11000) * difficulty.hp
       : template.hp * strength * difficulty.hp * (elite ? 7 : 1);
     const enemy: Enemy = {
       id: ++this.serial,
@@ -550,15 +713,31 @@ export class Game {
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
       hp,
       maxHp: hp,
-      radius: boss ? 48 : template.radius * (elite ? 1.55 : 1),
+      radius: boss
+        ? bossStage === FINAL_TRIAL_STAGE
+          ? 62
+          : 48
+        : template.radius * (elite ? 1.55 : 1),
       speed: boss
-        ? 53 + this.stage * 3
-        : template.speed * (1 + Math.min(0.3, this.time / 1400)) * (elite ? 1.1 : 1),
+        ? 70 + this.stage * 4
+        : (this.isFinalTrial
+            ? Math.max(95 + progress * 35, template.speed * (1.05 + progress * 0.3))
+            : template.speed) *
+          (1 + progress * 0.3) *
+          (elite ? 1.1 : 1),
       damage:
-        (boss ? 26 + this.stage * 3 : template.damage * (1 + this.stage * 0.12)) *
+        (boss
+          ? this.isFinalTrial
+            ? bossStage === FINAL_TRIAL_STAGE
+              ? 220
+              : 85 + bossStage * 10
+            : 26 + this.stage * 3
+          : template.damage * (1 + this.stage * 0.12)) *
+        (boss ? 1 : this.isFinalTrial ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
         difficulty.damage,
       elite,
       boss,
+      bossStage: boss ? bossStage : undefined,
       cooldown: boss ? 2.5 : 1 + this.random() * 3,
       slow: 0,
       flash: 0,
@@ -572,6 +751,7 @@ export class Game {
   }
   private updateEnemies(dt: number) {
     const p = this.player;
+    const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     for (const e of this.enemies) {
       if (e.dead) continue;
       e.slow -= dt;
@@ -580,7 +760,11 @@ export class Game {
       let d = distance(e, p),
         nx = (p.x - e.x) / (d || 1),
         ny = (p.y - e.y) / (d || 1);
-      const behavior = ENEMIES[e.type].behavior;
+      const baseBehavior = ENEMIES[e.type].behavior;
+      const behavior =
+        this.isFinalTrial && enemyWave(this.stage, this.time) >= 1 && baseBehavior === 'chase'
+          ? 'dash'
+          : baseBehavior;
       if (e.charge > 0) {
         e.charge -= dt;
         if (e.charge < 0.55) {
@@ -599,45 +783,19 @@ export class Game {
         e.y += ny * speed * dt;
       }
       if (e.boss && e.cooldown <= 0) {
-        e.cooldown = e.hp < e.maxHp / 2 ? 2 : 3.4;
-        const phase = Math.floor(this.time) % 3;
-        if (phase === 0) {
-          e.charge = 1.3;
-          e.dx = nx;
-          e.dy = ny;
-          this.effect(
-            e.x,
-            e.y,
-            1,
-            30,
-            '#ed8879',
-            'line',
-            undefined,
-            e.x + nx * 240,
-            e.y + ny * 240,
-          );
-        } else if (phase === 1) {
-          for (let i = 0; i < 10 + this.stage; i++) {
-            const a = (i / (10 + this.stage)) * TAU;
-            this.hostileShot(e, Math.cos(a), Math.sin(a), 105, e.damage * 0.75);
-          }
-        } else {
-          for (let i = 0; i < 3; i++)
-            this.zone(
-              p.x + (i - 1) * 105,
-              p.y + (i % 2) * 65,
-              68,
-              0.5,
-              e.damage,
-              '#ef8a7a',
-              'blast',
-              1.2,
-              true,
-            );
-        }
+        this.castBossSkill(e, nx, ny);
       } else if (!e.boss && e.cooldown <= 0) {
-        e.cooldown = 3 + this.random() * 2;
-        if (behavior === 'ranged' && d < 600) this.hostileShot(e, nx, ny, 145, e.damage);
+        e.cooldown = this.isFinalTrial
+          ? 4.2 - progress * 2.1 + this.random() * 1.2
+          : 4 - progress * 1.3 + this.random() * 2;
+        if (behavior === 'ranged' && d < 600)
+          this.hostileShot(
+            e,
+            nx,
+            ny,
+            this.isFinalTrial ? 150 + progress * 55 : 145 + progress * 30,
+            e.damage,
+          );
         if (behavior === 'volley' && d < 600) {
           const angle = Math.atan2(ny, nx);
           for (const offset of [-0.24, 0, 0.24])
@@ -645,17 +803,23 @@ export class Game {
               e,
               Math.cos(angle + offset),
               Math.sin(angle + offset),
-              140,
+              140 + progress * (this.isFinalTrial ? 45 : 30),
               e.damage * 0.8,
             );
         }
         if (behavior === 'nova' && d < 550) {
           for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * TAU + this.time * 0.15;
-            this.hostileShot(e, Math.cos(angle), Math.sin(angle), 105, e.damage * 0.7);
+            this.hostileShot(
+              e,
+              Math.cos(angle),
+              Math.sin(angle),
+              105 + progress * (this.isFinalTrial ? 45 : 25),
+              e.damage * 0.7,
+            );
           }
         }
-        if (behavior === 'dash' && d < 330) {
+        if (behavior === 'dash' && d < (this.isFinalTrial ? 460 : 330)) {
           e.charge = 1.25;
           e.dx = nx;
           e.dy = ny;
@@ -671,16 +835,18 @@ export class Game {
             e.y + ny * 180,
           );
         }
-        if (behavior === 'summon' && this.enemies.length < 230) {
-          this.spawnEnemy(e.type === 19 ? 16 : e.type === 27 ? 24 : 0, false, false, {
+        if (behavior === 'summon' && this.enemies.length < (this.isFinalTrial ? 208 : 230)) {
+          this.spawnEnemy(STAGE_ENEMIES[this.stage][0], false, false, {
             x: e.x + 35,
             y: e.y,
           });
-          this.spawnEnemy(e.type === 19 ? 16 : e.type === 27 ? 24 : 0, false, false, {
+          this.spawnEnemy(STAGE_ENEMIES[this.stage][0], false, false, {
             x: e.x - 35,
             y: e.y,
           });
         }
+        if (this.isFinalTrial && behavior === 'tank' && d < 500)
+          this.zone(p.x, p.y, 70, 0.5, e.damage, '#ef8a7a', 'blast', 1.1, true);
         if (behavior === 'poison' && d < 350)
           this.zone(p.x, p.y, 45, 3, e.damage * 0.7, '#adbe73', 'poison', 1, true);
       }
@@ -697,11 +863,139 @@ export class Game {
       }
     }
   }
+  private castBossSkill(e: Enemy, nx: number, ny: number) {
+    const stage = e.bossStage ?? this.stage;
+    const phase = e.skillStep ?? 0;
+    e.skillStep = (phase + 1) % STAGES[stage].skills.length;
+    const enraged = e.hp < e.maxHp / 2;
+    e.cooldown =
+      stage === FINAL_TRIAL_STAGE
+        ? enraged
+          ? 1.25
+          : 2.1
+        : this.isFinalTrial
+          ? enraged
+            ? 1.8
+            : 2.6
+          : enraged
+            ? 2.3
+            : 3.8;
+    const p = { x: this.player.x, y: this.player.y };
+    const angle = Math.atan2(ny, nx);
+    const fan = (count: number, spread: number, speed: number, center = angle) => {
+      for (let i = 0; i < count; i++) {
+        const a = center + (i / Math.max(1, count - 1) - 0.5) * spread;
+        this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.75);
+      }
+    };
+    const ring = (count: number, speed: number) =>
+      fan(count, (TAU * (count - 1)) / count, speed, this.time * 0.25);
+    const blast = (x: number, y: number, radius: number, life = 0.5) =>
+      this.zone(x, y, radius, life, e.damage, STAGES[stage].color, 'blast', 1.2, true);
+    const ringZones = (count: number, radius: number, size: number, life = 0.5) => {
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * TAU;
+        blast(p.x + Math.cos(a) * radius, p.y + Math.sin(a) * radius, size, life);
+      }
+    };
+    const summons = (count: number) => {
+      const pool = stage === FINAL_TRIAL_STAGE ? [24, 25] : enemyRoster(this.stage, this.time);
+      for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++)
+        this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], false, false, {
+          x: e.x + Math.cos((i / count) * TAU) * 90,
+          y: e.y + Math.sin((i / count) * TAU) * 90,
+        });
+    };
+    this.announce(`${STAGES[stage].boss} · ${STAGES[stage].skills[phase]}`);
+    switch (stage) {
+      case 0:
+        if (phase === 0) ringZones(6, 130, 42, 2);
+        else if (phase === 1) fan(7, 1.15, 165);
+        else summons(3);
+        break;
+      case 1:
+        if (phase === 0) fan(9, 1.5, 180);
+        else if (phase === 1) for (let i = -2; i <= 2; i++) blast(p.x + i * 85, p.y, 50, 3);
+        else ring(16, 150);
+        break;
+      case 2:
+        if (phase === 0) {
+          e.charge = 1.3;
+          e.dx = nx;
+          e.dy = ny;
+          this.effect(
+            e.x,
+            e.y,
+            0.75,
+            30,
+            '#ed8879',
+            'line',
+            undefined,
+            e.x + nx * 240,
+            e.y + ny * 240,
+          );
+        } else if (phase === 1) fan(7, 0.95, 205);
+        else ringZones(8, 145, 46, 2);
+        break;
+      case 3:
+        if (phase === 0) ringZones(5, 110, 62, 5);
+        else if (phase === 1) fan(5, 0.75, 160);
+        else summons(4);
+        break;
+      case 4:
+        if (phase === 0) summons(4);
+        else if (phase === 1) ring(20, 165);
+        else {
+          ringZones(6, 165, 52, 2);
+          blast(p.x, p.y, 60);
+        }
+        break;
+      case 5:
+        if (phase === 0) {
+          for (let i = -2; i <= 2; i++) {
+            blast(p.x + i * 105, p.y, 48);
+            if (i !== 0) blast(p.x, p.y + i * 105, 48);
+          }
+        } else if (phase === 1) ring(22, 175);
+        else ringZones(5, 95, 70);
+        break;
+      case FINAL_TRIAL_STAGE:
+        if (phase === 0) ring(enraged ? 32 : 24, 185);
+        else if (phase === 1)
+          for (let i = -2; i <= 2; i++) blast(p.x + i * 105, p.y + (i % 2) * 65, 88);
+        else if (phase === 2) {
+          ringZones(8, 180, 60);
+          blast(p.x, p.y, 80);
+        } else if (phase === 3) {
+          fan(enraged ? 15 : 11, Math.PI * 1.2, 230);
+        } else if (phase === 4) {
+          summons(6);
+        } else {
+          e.charge = 1.55;
+          e.dx = nx;
+          e.dy = ny;
+          e.cooldown = Math.max(e.cooldown, 1.9);
+          this.effect(
+            e.x,
+            e.y,
+            1,
+            30,
+            '#f2d38e',
+            'line',
+            undefined,
+            e.x + nx * 210,
+            e.y + ny * 210,
+          );
+          blast(e.x, e.y, 85);
+        }
+        break;
+    }
+  }
   private nearest(at: Point, excluded = new Set<number>(), range = 950) {
     let result: Enemy | undefined,
-      nearest = range;
+      nearest = range * range;
     for (const e of this.enemies) {
-      const d = distance(e, at);
+      const d = distanceSquared(e, at);
       if (!e.dead && !excluded.has(e.id) && d < nearest) {
         nearest = d;
         result = e;
@@ -737,7 +1031,7 @@ export class Game {
         kind: w.id,
         pierce: 1,
         hit: new Set(),
-        origin: { ...from },
+        origin: { x: from.x, y: from.y },
         age: 0,
         bounce: 0,
         crit,
@@ -752,7 +1046,7 @@ export class Game {
           blocked++;
         }
       }
-      this.areaDamage(p, radius * 1.6, dmg, 'pulse');
+      this.areaDamage(p, radius * 1.6, dmg, 'pulse', w.id);
       this.effect(p.x, p.y, 0.7, radius * 1.6, t.color, 'umbrella');
       for (let i = 0; i < Math.min(blocked, 8); i++)
         launch(a + (i - (Math.min(blocked, 8) - 1) / 2) * 0.2, p, { pierce: 3 });
@@ -871,6 +1165,7 @@ export class Game {
           18 * s.area,
           dmg,
           t.color,
+          w.id,
         );
       }
       return;
@@ -901,7 +1196,7 @@ export class Game {
         const d = distance(e, p);
         const dot = ((e.x - p.x) * Math.cos(a) + (e.y - p.y) * Math.sin(a)) / (d || 1);
         if (d < reach + e.radius && (w.evolved || dot > -0.15))
-          this.hitEnemy(e, dmg * (e.hp / e.maxHp < 0.3 ? 2 : 1));
+          this.hitEnemy(e, dmg * (e.hp / e.maxHp < 0.3 ? 2 : 1), false, w.id);
       }
       return;
     }
@@ -918,6 +1213,7 @@ export class Game {
         (w.evolved ? 42 : 27) * s.area,
         dmg,
         t.color,
+        w.id,
         true,
       );
       return;
@@ -1000,7 +1296,7 @@ export class Game {
       for (let i = 0; i < count + 2; i++) {
         hit.add(current.id);
         this.effect(from.x, from.y, 0.4, 5, t.color, 'line', undefined, current.x, current.y);
-        this.hitEnemy(current, dmg, false);
+        this.hitEnemy(current, dmg, false, w.id);
         current.slow = 2;
         from = current;
         const next = this.nearest(current, hit, 190 * s.area);
@@ -1079,9 +1375,10 @@ export class Game {
       }
       if (b.life <= 0) continue;
       for (const e of this.enemies) {
-        if (e.dead || b.hit.has(e.id) || distance(b, e) > b.radius + e.radius) continue;
+        if (e.dead || b.hit.has(e.id) || distanceSquared(b, e) > (b.radius + e.radius) ** 2)
+          continue;
         b.hit.add(e.id);
-        this.hitEnemy(e, b.damage, b.crit);
+        this.hitEnemy(e, b.damage, b.crit, b.kind);
         b.pierce--;
         if (b.kind === 'shard' && b.bounce === -1) {
           b.bounce = 0;
@@ -1152,7 +1449,7 @@ export class Game {
           const target = this.nearest(z, new Set(), z.radius);
           if (target) {
             this.effect(z.x, z.y, 0.3, 4, z.color, 'line', undefined, target.x, target.y);
-            this.hitEnemy(target, z.damage);
+            this.hitEnemy(target, z.damage, false, z.kind);
           }
         } else {
           const hits = this.enemies.some((e) => !e.dead && distance(e, z) < z.radius + e.radius);
@@ -1176,8 +1473,8 @@ export class Game {
         item.y += ((p.y - item.y) / (d || 1)) * step;
       }
       if (distance(item, p) < 20) {
-        if (item.kind === 'xp') this.xp += item.value * s.xp;
-        if (item.kind === 'heal') {
+        if (item.kind === 'xp' && this.level < MAX_RUN_LEVEL) this.xp += item.value * s.xp;
+        if (item.kind === 'heal' && !this.isFinalTrial) {
           this.heal(p.maxHp * 0.3);
           this.float(p, '+气血', '#b4e4aa');
         }
@@ -1191,7 +1488,7 @@ export class Game {
         }
         if (item.kind === 'chest') {
           this.iron += 2;
-          this.heal(20);
+          if (!this.isFinalTrial) this.heal(20);
           const candidates = this.weapons.filter((w) => w.level < MAX_WEAPON_LEVEL);
           if (candidates.length) {
             const w = candidates[Math.floor(this.random() * candidates.length)];
@@ -1199,7 +1496,7 @@ export class Game {
             this.announce(`炼器宝匣 · ${treasure(w.id).name}升至${w.level}重 · 玄铁 +2`);
           } else {
             this.iron += 2;
-            this.announce('炼器宝匣 · 玄铁 +4 · 气血回复');
+            this.announce(`炼器宝匣 · 玄铁 +4${this.isFinalTrial ? '' : ' · 气血回复'}`);
           }
           this.onEvent('upgrade');
         }
@@ -1232,7 +1529,7 @@ export class Game {
       kind: 'hostile',
       pierce: 1,
       hit: new Set(),
-      origin: { ...from },
+      origin: { x: from.x, y: from.y },
       age: 0,
       bounce: 0,
       crit: false,
@@ -1263,10 +1560,16 @@ export class Game {
       hostile,
     });
   }
-  private areaDamage(at: Point, radius: number, damage: number, kind: string) {
+  private areaDamage(
+    at: Point,
+    radius: number,
+    damage: number,
+    kind: string,
+    source = kind === 'grave' ? 'coffin' : kind,
+  ) {
     for (const e of this.enemies) {
-      if (e.dead || distance(at, e) > radius + e.radius) continue;
-      this.hitEnemy(e, damage, false);
+      if (e.dead || distanceSquared(at, e) > (radius + e.radius) ** 2) continue;
+      this.hitEnemy(e, damage, false, source);
       if (['ice', 'banner', 'nest'].includes(kind)) e.slow = 2.5 * this.stats.duration;
       if ((kind === 'pulse' || kind === 'axe') && !e.boss) {
         const d = distance(e, at) || 1;
@@ -1275,7 +1578,15 @@ export class Game {
       }
     }
   }
-  private beam(from: Point, to: Point, width: number, damage: number, color: string, pull = false) {
+  private beam(
+    from: Point,
+    to: Point,
+    width: number,
+    damage: number,
+    color: string,
+    source: WeaponKind,
+    pull = false,
+  ) {
     this.effect(from.x, from.y, 0.45, width, color, 'line', undefined, to.x, to.y);
     const dx = to.x - from.x,
       dy = to.y - from.y;
@@ -1286,7 +1597,7 @@ export class Game {
         Math.min(1, ((e.x - from.x) * dx + (e.y - from.y) * dy) / lengthSquared),
       );
       if (distance(e, { x: from.x + dx * t, y: from.y + dy * t }) > width + e.radius) continue;
-      this.hitEnemy(e, damage);
+      this.hitEnemy(e, damage, false, source);
       if (pull && !e.boss) {
         const d = distance(e, from) || 1;
         e.x += ((from.x - e.x) / d) * 40;
@@ -1295,7 +1606,7 @@ export class Game {
       }
     }
   }
-  hitEnemy(e: Enemy, damage: number, crit = false) {
+  hitEnemy(e: Enemy, damage: number, crit = false, source = 'other') {
     if (e.dead) return;
     if (this.passives.abyss) e.slow = Math.max(e.slow, this.passives.abyss * 0.15);
     if (!e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5) damage *= 0.45;
@@ -1303,31 +1614,101 @@ export class Game {
     e.hp -= damage;
     e.flash = 0.12;
     this.damageDealt += actual;
+    this.damageBySource[source] = (this.damageBySource[source] || 0) + actual;
     if (this.effects.length < 100)
       this.float(e, `${Math.ceil(damage)}${crit ? '!' : ''}`, crit ? '#f8db88' : '#e5edce');
     if (e.hp <= 0) {
       e.dead = true;
       this.kills++;
+      const xp = e.boss
+        ? Math.max(
+            1200 + this.stage * 600,
+            ...STAGE_ENEMIES[this.stage].map(
+              (type) => Math.round(ENEMIES[type].xp * (1 + this.stage * 0.16) * 8) * 30,
+            ),
+          )
+        : Math.round(ENEMIES[e.type].xp * (1 + this.stage * 0.16) * (e.elite ? 8 : 1));
+      // 基础击杀收益保留，额外修为按地域与怪物强度结算；旧快照不追溯虚构击杀。
+      const cultivationScale = cultivationFactor(this.realm);
+      const bossReward = e.boss ? bossCultivationReward(this.stage, e.bossStage ?? this.stage) : 0;
+      this.bossCultivation += bossReward * DIFFICULTIES[this.difficulty].reward;
+      this.combatCultivation += e.boss
+        ? bossReward
+        : Math.max(
+            0,
+            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * (e.elite ? 4 : 1)) /
+              cultivationScale -
+              0.7,
+          );
       this.creditCultivation();
       this.heal(this.stats.killHeal);
-      this.pickups.push({
-        x: e.x,
-        y: e.y,
-        kind: 'xp',
-        value: ENEMIES[e.type].xp * (e.elite ? 8 : 1),
-        pull: !!this.passives.soul && distance(e, this.player) <= 80 + this.passives.soul * 40,
-      });
-      if (e.elite) this.pickups.push({ x: e.x + 14, y: e.y, kind: 'chest', value: 1, pull: false });
+      if (e.boss) {
+        // 最后一击随即结算，妖王灵气直接吸收，避免奖励留在已结束的战场。
+        if (this.level < MAX_RUN_LEVEL) this.xp += xp * this.stats.xp;
+        while (
+          (!this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length - 1) &&
+          this.level < MAX_RUN_LEVEL &&
+          this.xp >= xpNeeded(this.level)
+        ) {
+          this.xp -= xpNeeded(this.level);
+          this.level++;
+        }
+        if (this.level === MAX_RUN_LEVEL) this.xp = 0;
+        this.creditCultivation();
+        dropArtifacts(this.save, this.random);
+      } else if (this.level < MAX_RUN_LEVEL)
+        this.pickups.push({
+          x: e.x,
+          y: e.y,
+          kind: 'xp',
+          value: xp,
+          pull: !!this.passives.soul && distance(e, this.player) <= 80 + this.passives.soul * 40,
+        });
+      if (
+        (e.elite && (!this.isFinalTrial || this.random() < 0.06)) ||
+        (e.boss && this.isFinalTrial)
+      )
+        this.pickups.push({ x: e.x + 14, y: e.y, kind: 'chest', value: 1, pull: false });
       else if (!e.boss) {
         const r = this.random();
         const kind = r < 0.005 ? 'heal' : r < 0.01 ? 'magnet' : r < 0.027 ? 'iron' : null;
-        if (kind) this.pickups.push({ x: e.x + 10, y: e.y, kind, value: 1, pull: false });
+        if (kind && !(this.isFinalTrial && kind === 'heal'))
+          this.pickups.push({ x: e.x + 10, y: e.y, kind, value: 1, pull: false });
       }
-      if (e.boss && this.player.hp > 0) {
-        this.state = 'won';
-        this.onEvent('win');
+      if (e.boss) {
+        if (this.isFinalTrial) {
+          this.trialBossesDefeated = Math.min(
+            this.trialBossesDefeated + 1,
+            TRIAL_BOSS_STAGES.length,
+          );
+          this.announce(
+            this.trialBossesDefeated === TRIAL_BOSS_STAGES.length
+              ? '七劫尽破 · 渡劫瓶颈解除'
+              : `已破 ${this.trialBossesDefeated} / 7 劫 · 妖王灵气入体 · 遗宝已掉落`,
+          );
+        }
+        if (
+          this.player.hp > 0 &&
+          (!this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length)
+        ) {
+          this.state = 'won';
+          this.onEvent('win');
+        }
+        this.onEvent('loot');
       }
     }
+  }
+  revive() {
+    if (this.state !== 'lost' || this.revivesUsed >= MAX_REVIVES) return false;
+    this.revivesUsed++;
+    this.player.hp = this.player.maxHp;
+    this.player.invincible = 3;
+    const cleared = this.isFinalTrial
+      ? this.trialBossesDefeated === TRIAL_BOSS_STAGES.length
+      : this.bossSpawned && !this.boss;
+    this.state = cleared ? 'won' : 'playing';
+    this.announce('重燃道心 · 满血复活 · 三息护体');
+    return true;
   }
   hurtPlayer(damage: number) {
     if (this.player.invincible > 0 || this.state !== 'playing') return;
@@ -1442,13 +1823,16 @@ export class Game {
     if (c.type === 'passive') {
       this.passives[c.id] = c.level;
       if (c.id === 'guard' || c.id === 'bone') {
-        this.player.maxHp =
-          this.baseHp + (this.passives.guard || 0) * 20 + (this.passives.bone || 0) * 14;
-        this.heal(c.id === 'guard' ? 20 : 14);
+        const increase = this.maximumHealth - this.player.maxHp;
+        this.player.maxHp = this.maximumHealth;
+        this.heal(increase);
       }
     }
     if (c.type === 'heal') {
-      this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.maxHp * 0.4);
+      this.player.hp = Math.min(
+        this.player.maxHp,
+        this.player.hp + this.player.maxHp * (this.isFinalTrial ? 0.15 : 0.4),
+      );
       this.iron++;
     }
     this.state = 'playing';

@@ -1,5 +1,65 @@
 # 素材与生成提示词
 
+## 最终首领：九天执劫仙尊（2026-09-19）
+
+项目路径：`public/assets/boss-immortal.png`。通过内置 imagegen 生成，1254 × 1254 RGBA PNG，白金仙袍、天冠、雷杖与金色光轮，实际透明背景。作为独立单格立绘用于战场与妖物志。
+
+```text
+Use case: stylized-concept. Production game asset: ONE final-boss Chinese celestial immortal deity for a polished xianxia survivors game. TRANSPARENT RGBA BACKGROUND, square 1024x1024 canvas. One full-body character centered, from crown to feet entirely visible with 12 percent transparent margin. Rich detailed hand-painted 2.5D chibi fantasy RPG art, slightly overhead three-quarter front view, readable at 160px. A majestic male immortal elder, long flowing silver hair and white beard, stern luminous eyes, ornate golden celestial crown, layered WHITE and pale blue silk robes with intricate GOLD armor and jade details, imposing broad silhouette. Floating over a compact cloud-shaped golden pedestal, holding a long ornate lightning scepter, concentric golden celestial halo behind shoulders, several small blue-gold thunder glyph shapes around him WITHOUT letters or writing. He looks divine and vastly more powerful than ordinary monsters, beautifully detailed and solemn. All magical effects contained within character footprint and margins. Clean transparent alpha outside figure, no solid background, no checkerboard, no scenery, no terrain, no text, no UI, no label, no watermark. Only ONE boss, not a sprite sheet.
+```
+
+## 终关地面（2026-09-19）
+
+项目路径：`public/assets/terrain-trial.png`。通过内置 imagegen 生成，万劫归墟专用黑玉石与银金天象纹地面，预览和战斗共用。
+
+```text
+Use case: stylized-concept. Asset type: seamless square ground texture for the FINAL TRIAL arena of a Chinese xianxia survivors videogame. 1536x1536, DIRECTLY OVERHEAD orthographic flat walkable floor, tileable on every edge. Premium finely hand-painted game environment art, understated contrast so tiny fighters and red attack telegraphs remain readable. Ancient storm-worn BLACK JADE and dark blue obsidian slabs, narrow aged SILVER and muted GOLD inlay fracture patterns, subtle circular astronomical carvings embedded flush in the paving, occasional thin drifting indigo mist, scattered small mineral chips. Grand desolate tribulation ground, material clearly different from white celestial marble or green forest. Broad open paving evenly distributed, no large central medallion or focal point. NO characters, bosses, buildings, horizon, perspective, elevated walls, bright lightning strokes, red cracks, text, UI, labels, borders, watermarks. Opaque textured background, no transparency.
+```
+
+## 各境专属妖物扩充（2026-09-19）
+
+本轮使用内置 imagegen 生成 44 个地域进阶种，五张图集均为 1536 × 1024 RGBA PNG，已检查实际透明通道。古墟为 6 列 × 2 行，其余为 4 列 × 2 行；顺序与 `src/data.ts` 中地域进阶种一致。先落盘验证，再接入加载清单。最终提示词如下。
+
+### enemies-ruins.png
+
+项目路径：`public/assets/enemies-ruins.png`。
+
+```text
+Use case: stylized-concept. Asset type: transparent PNG sprite atlas for a polished Chinese xianxia survivors videogame. EXACTLY 6 columns and 2 rows, 12 separate full-body monsters. Landscape 1536x1024. Every equal cell has ONE centered monster, generous 18 percent transparent padding, each body fully inside its cell; no overlaps or clipped parts. Highly detailed hand-painted 2.5D top-down/front angled chibi Chinese fantasy game art, soft overhead light, rich readable silhouettes and material detail, cohesive jade and gold RPG aesthetic. Genuine alpha-transparent background (NOT painted checkerboard, NOT a colored background), no visible grid, no labels, NO TEXT, no interface, no scenery. STRICT row-major order left to right: (1) ember-capped mushroom imp with sandstone cracks; (2) russet bronze-armored jackal with copper mane; (3) floating amber flame with broken ceramic mask; (4) copper-red desert fox with tasselled tail; (5) terracotta turtle with ancient temple roof shell; (6) ochre-robed masked talisman caster; (7) cracked red clay explosive urn monster with tiny legs; (8) rust-red saber-tooth cat with ember stripes; (9) bronze ritual summoner with bell staff and ceremonial hat; (10) sand-colored scorpion spirit with smoky tail; (11) massive clay-armored halberd sentinel; (12) golden wind fox with long swirling tails. Each monster visually distinct, new regional evolutions of familiar fantasy archetypes, beautiful contained magical accents, no effects extending outside cell.
+```
+
+### enemies-ice.png
+
+项目路径：`public/assets/enemies-ice.png`。
+
+```text
+Use case: stylized-concept. Asset type: transparent PNG sprite atlas for a polished Chinese xianxia survivors videogame. EXACTLY 4 columns and 2 rows, 8 separate full-body monsters. Landscape 1536x1024. Every equal cell has ONE centered monster, generous 18 percent transparent padding, each body fully inside its cell; no overlaps or clipped parts. Highly detailed hand-painted 2.5D top-down/front angled chibi Chinese fantasy game art, soft overhead light, rich readable silhouettes and material detail, cohesive jade and gold RPG aesthetic. Genuine alpha-transparent background (NOT painted checkerboard, NOT a colored background), no visible grid, no labels, NO TEXT, no interface, no scenery. STRICT row-major order left to right: (1) pale blue frost-capped mushroom imp; (2) white ice-armored arctic wolf; (3) floating blue frozen flame with crystal face; (4) snow-white fox with icy long tails; (5) snow-covered stone tortoise with icicle shell; (6) navy-robed frost shaman with ice orb; (7) round cracked ice core monster with small feet; (8) tall ice-bound ritual summoner holding frost lantern. Each monster visually distinct, new regional evolutions of familiar fantasy archetypes, beautiful contained magical accents, no effects extending outside cell.
+```
+
+### enemies-marsh.png
+
+项目路径：`public/assets/enemies-marsh.png`。
+
+```text
+Use case: stylized-concept. Asset type: transparent PNG sprite atlas for a polished Chinese xianxia survivors videogame. EXACTLY 4 columns and 2 rows, 8 separate full-body monsters. Landscape 1536x1024. Every equal cell has ONE centered monster, generous 18 percent transparent padding, each body fully inside its cell; no overlaps or clipped parts. Highly detailed hand-painted 2.5D top-down/front angled chibi Chinese fantasy game art, soft overhead light, rich readable silhouettes and material detail, cohesive jade and gold RPG aesthetic. Genuine alpha-transparent background (NOT painted checkerboard, NOT a colored background), no visible grid, no labels, NO TEXT, no interface, no scenery. STRICT row-major order left to right: (1) olive toxic mushroom imp with purple spores; (2) mossy green swamp hound with thorny mane; (3) floating wispy violet poison spirit; (4) green swamp fox with vine tails; (5) algae-covered snapping turtle with mossy shell; (6) ragged olive-robed witch with venom orb; (7) bulbous purple spore pod monster with legs; (8) tall vine-wrapped shaman summoner with insect staff. Each monster visually distinct, new regional evolutions of familiar fantasy archetypes, beautiful contained magical accents, no effects extending outside cell.
+```
+
+### enemies-nether.png
+
+项目路径：`public/assets/enemies-nether.png`。
+
+```text
+Use case: stylized-concept. Asset type: transparent PNG sprite atlas for a polished Chinese xianxia survivors videogame. EXACTLY 4 columns and 2 rows, 8 separate full-body monsters. Landscape 1536x1024. Every equal cell has ONE centered monster, generous 18 percent transparent padding, each body fully inside its cell; no overlaps or clipped parts. Highly detailed hand-painted 2.5D top-down/front angled chibi Chinese fantasy game art, soft overhead light, rich readable silhouettes and material detail, cohesive jade and gold RPG aesthetic. Genuine alpha-transparent background (NOT painted checkerboard, NOT a colored background), no visible grid, no labels, NO TEXT, no interface, no scenery. STRICT row-major order left to right: (1) pale bone-capped mushroom imp with ghostfire eyes; (2) charcoal skeletal hound with blue flaming mane; (3) floating ragged cyan ghost with hollow mask; (4) black spectral fox with wispy violet tails; (5) black tombstone tortoise with bone studs; (6) dark red-robed underworld sorcerer with skull orb; (7) cracked purple spirit urn monster leaking ghostfire; (8) tall black ceremonial soul summoner carrying a chained lantern. Each monster visually distinct, new regional evolutions of familiar fantasy archetypes, beautiful contained magical accents, no effects extending outside cell.
+```
+
+### enemies-heaven.png
+
+项目路径：`public/assets/enemies-heaven.png`。
+
+```text
+Use case: stylized-concept. Asset type: transparent PNG sprite atlas for a polished Chinese xianxia survivors videogame. EXACTLY 4 columns and 2 rows, 8 separate full-body monsters. Landscape 1536x1024. Every equal cell has ONE centered monster, generous 18 percent transparent padding, each body fully inside its cell; no overlaps or clipped parts. Highly detailed hand-painted 2.5D top-down/front angled chibi Chinese fantasy game art, soft overhead light, rich readable silhouettes and material detail, cohesive jade and gold RPG aesthetic. Genuine alpha-transparent background (NOT painted checkerboard, NOT a colored background), no visible grid, no labels, NO TEXT, no interface, no scenery. STRICT row-major order left to right: (1) ivory celestial mushroom imp with golden rune-like abstract bands; (2) silver storm wolf with electric blue mane; (3) floating golden star-flame spirit with jade eyes; (4) pearl-white cloud fox with flowing golden tails; (5) jade-and-gold tortoise with small celestial pavilion shell; (6) white-and-gold robed astral sorcerer with star orb; (7) round violet lightning core monster in a broken gold casing; (8) tall silver astral summoner with star wheel and long azure robes. Each monster visually distinct, new regional evolutions of familiar fantasy archetypes, beautiful contained magical accents, no effects extending outside cell.
+```
+
 全部位图由内置 `image_gen.imagegen` 工具生成，未使用 CLI/API 回退。最终素材均已保存进项目：
 
 | 文件                                 | 用途                                | 规格                  |

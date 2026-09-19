@@ -1,5 +1,5 @@
 import { Game } from '../src/game.ts';
-import { freshSave, realmInfo, settleRun, train, forge } from '../src/progress.ts';
+import { freshSave, realmInfo, settleRun, train, forge, claimArtifacts } from '../src/progress.ts';
 import { DIFFICULTIES, STAGES, CULTIVATION_PATHS, treasure, allowsSchool } from '../src/data.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
 
@@ -54,7 +54,7 @@ for (const path of CULTIVATION_PATHS)
     'bloodpool',
   ].entries()) {
     if (!allowsSchool(path.id, treasure(starter).school)) continue;
-    const save = { ...freshSave(), path: path.id, starter };
+    const save = { ...freshSave(), path: path.id, starter, artifacts: ['sword', 'nail', starter] };
     const game = new Game(save, 0, 0, seeded(51 + index * 37));
     for (let i = 0; i < 480 * 30 && !['won', 'lost'].includes(game.state); i++) {
       if (game.state === 'upgrade') {
@@ -89,56 +89,84 @@ console.log(
   realmInfo(0).name,
 );
 
-const campaignSave = freshSave();
 const campaign: Record<string, unknown>[] = [];
-for (let stage = 0; stage < 6; stage++) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    for (let i = 0; i < 12; i++) {
-      train(campaignSave, 'power');
-      train(campaignSave, 'vitality');
-      train(campaignSave, 'speed');
-    }
-    for (let i = 0; i < 5; i++) for (const id of favored) forge(campaignSave, id);
-    const game = new Game(campaignSave, stage, 0, seeded(73 + stage * 13 + attempt));
-    for (
-      let i = 0;
-      i < (STAGES[stage].minutes * 60 + 180) * 30 && !['won', 'lost'].includes(game.state);
-      i++
-    ) {
-      if (game.state === 'upgrade') {
-        const choice = autoplayChoice(game)!;
-        if (choice.reroll) {
-          game.reroll();
-          continue;
+for (const path of CULTIVATION_PATHS) {
+  for (const seed of [73, 146, 219]) {
+    const campaignSave = {
+      ...freshSave(),
+      path: path.id,
+      starter: path.id === 'demonic' ? 'nail' : 'sword',
+    };
+    for (let stage = 0; stage < 6; stage++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        for (let i = 0; i < 12; i++) {
+          train(campaignSave, 'power');
+          train(campaignSave, 'vitality');
+          train(campaignSave, 'speed');
         }
-        game.choose(choice.index);
+        for (let i = 0; i < 5; i++)
+          for (const id of new Set([campaignSave.starter, ...favored]))
+            if (allowsSchool(path.id, treasure(id).school)) forge(campaignSave, id);
+        const game = new Game(campaignSave, stage, 0, seeded(seed + stage * 13 + attempt));
+        const startRealm = realmInfo(
+          campaignSave.cultivation,
+          campaignSave.completed.includes(6),
+        ).name;
+        const maxHp = game.player.maxHp;
+        const damage = Math.round(game.stats.damage * 100) / 100;
+        let minHp = game.player.hp;
+        for (
+          let i = 0;
+          i < (STAGES[stage].minutes * 60 + 180) * 30 && !['won', 'lost'].includes(game.state);
+          i++
+        ) {
+          if (game.state === 'upgrade') {
+            const choice = autoplayChoice(game)!;
+            if (choice.reroll) {
+              game.reroll();
+              continue;
+            }
+            game.choose(choice.index);
+          }
+          if (i % 4 === 0) game.input = autoplayInput(game);
+          game.update(1 / 30);
+          minHp = Math.min(minHp, game.player.hp);
+        }
+        claimArtifacts(campaignSave);
+        settleRun(campaignSave, {
+          stage,
+          difficulty: 0,
+          kills: game.kills,
+          time: game.time,
+          victory: game.state === 'won',
+          iron: game.iron,
+          level: game.level,
+          creditedCultivation: game.creditedCultivation,
+          combatCultivation: game.combatCultivation,
+        });
+        campaign.push({
+          path: path.name,
+          seed,
+          startRealm,
+          maxHp,
+          damage,
+          minHp: Math.round(minHp),
+          stage: STAGES[stage].name,
+          attempt: attempt + 1,
+          state: game.state,
+          seconds: Math.round(game.time),
+          kills: game.kills,
+          level: game.level,
+          realm: realmInfo(campaignSave.cultivation, campaignSave.completed.includes(6)).name,
+          training: JSON.stringify(campaignSave.training),
+        });
+        if (game.state === 'won') break;
       }
-      if (i % 4 === 0) game.input = autoplayInput(game);
-      game.update(1 / 30);
+      if (campaignSave.unlocked < stage + 1 && stage < 5) break;
     }
-    settleRun(campaignSave, {
-      stage,
-      difficulty: 0,
-      kills: game.kills,
-      time: game.time,
-      victory: game.state === 'won',
-      iron: game.iron,
-      level: game.level,
-      creditedCultivation: game.creditedCultivation,
-    });
-    campaign.push({
-      stage: STAGES[stage].name,
-      attempt: attempt + 1,
-      state: game.state,
-      seconds: Math.round(game.time),
-      kills: game.kills,
-      level: game.level,
-      realm: realmInfo(campaignSave.cultivation).name,
-      training: JSON.stringify(campaignSave.training),
-    });
-    if (game.state === 'won') break;
   }
-  if (campaignSave.unlocked < stage + 1 && stage < 5) break;
 }
-console.log('连续六境模拟：携带真实结算收益，局间自动修炼与炼器，每境最多三次尝试。');
+console.log(
+  '三流派各三个固定种子连续六境：携带真实结算收益，局间自动修炼与炼器，每境最多三次尝试。',
+);
 console.table(campaign);

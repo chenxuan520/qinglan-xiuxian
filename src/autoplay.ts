@@ -38,14 +38,21 @@ export function autoplayInput(g: Game) {
   const p = g.player;
   let dx = 0,
     dy = 0;
-  const gems = g.pickups
-    .filter((i) => !i.pull)
-    .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
-  const target = gems[0] ?? g.enemies[0];
+  let nearest: Game['pickups'][number] | undefined;
+  let nearestDistance = Infinity;
+  for (const item of g.pickups) {
+    if (item.pull) continue;
+    const d = (item.x - p.x) ** 2 + (item.y - p.y) ** 2;
+    if (d < nearestDistance) {
+      nearest = item;
+      nearestDistance = d;
+    }
+  }
+  const target = nearest ?? g.enemies[0];
   if (target) {
     const d = Math.hypot(target.x - p.x, target.y - p.y) || 1;
-    dx += ((target.x - p.x) / d) * (gems.length ? 1 : 0.7);
-    dy += ((target.y - p.y) / d) * (gems.length ? 1 : 0.7);
+    dx += ((target.x - p.x) / d) * (nearest ? 1 : 0.7);
+    dy += ((target.y - p.y) / d) * (nearest ? 1 : 0.7);
   } else {
     dx = Math.cos(g.time * 0.3);
     dy = Math.sin(g.time * 0.3);
