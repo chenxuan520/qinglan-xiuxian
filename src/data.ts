@@ -1201,6 +1201,7 @@ export const MAX_PASSIVES = 4;
 export const MAX_WEAPON_LEVEL = 6;
 export const MAX_RUN_LEVEL = 100;
 export const MAX_REVIVES = 10;
+export const MAX_FORGE_LEVEL = 10;
 export const MAX_PASSIVE_LEVEL = 5;
 export const TAU = Math.PI * 2;
 export const treasure = (id: string) => TREASURES.find((t) => t.id === id)!;

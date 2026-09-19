@@ -359,7 +359,7 @@ test('灵石和玄铁不足不扣款，成功升级按对应成本扣款且有�
   save.training.power = 20;
   save.stones = 1000000;
   assert.equal(train(save, 'power'), false);
-  save.forge.sword = 5;
+  save.forge.sword = 10;
   save.iron = 100;
   assert.equal(forge(save, 'sword'), false);
 });
@@ -381,7 +381,7 @@ test('损坏和越界存档不会破坏游戏初始化', () => {
   assert.equal(s.stones, 0);
   assert.equal(s.unlocked, STAGES.length - 1);
   assert.equal(s.starter, 'sword');
-  assert.equal(s.forge.sword, 5);
+  assert.equal(s.forge.sword, 10);
   assert.equal(s.training.speed, 20);
   assert.deepEqual(s.completed, [0]);
 });

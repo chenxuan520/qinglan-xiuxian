@@ -2,7 +2,76 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { TREASURES } from '../src/data.ts';
-import { freshSave, parseSave, forge, claimArtifacts, settleRun } from '../src/progress.ts';
+import {
+  freshSave,
+  parseSave,
+  forge,
+  forgeCost,
+  claimArtifacts,
+  settleRun,
+} from '../src/progress.ts';
+
+test('三十六件已收藏法宝均能炼至十阶，每阶准确扣款且刷新保留，满阶不再扣款', () => {
+  for (const item of TREASURES) {
+    let save = freshSave();
+    save.artifacts = TREASURES.map((t) => t.id);
+    save.stones = save.iron = 1000000;
+    for (let level = 0; level < 10; level++) {
+      const cost = forgeCost(level);
+      const { stones, iron } = save;
+      assert.equal(forge(save, item.id), true, `${item.id} 升至 ${level + 1} 阶`);
+      assert.equal(save.stones, stones - cost.stones);
+      assert.equal(save.iron, iron - cost.iron);
+      save = parseSave(JSON.stringify(save));
+      assert.equal(save.forge[item.id], level + 1);
+    }
+    const before = JSON.stringify(save);
+    assert.equal(forge(save, item.id), false);
+    assert.equal(JSON.stringify(save), before);
+  }
+});
+
+test('炼器前五阶保持旧价，后五阶两种材料费用加速递增，缺少任一材料不扣款', () => {
+  assert.deepEqual(
+    Array.from({ length: 5 }, (_, level) => forgeCost(level)),
+    [
+      { iron: 3, stones: 35 },
+      { iron: 6, stones: 80 },
+      { iron: 9, stones: 125 },
+      { iron: 12, stones: 170 },
+      { iron: 15, stones: 215 },
+    ],
+  );
+  assert.deepEqual(forgeCost(9), { iron: 330, stones: 4940 });
+  for (let level = 5; level < 10; level++) {
+    const cost = forgeCost(level),
+      prior = forgeCost(level - 1),
+      beforePrior = forgeCost(level - 2);
+    for (const material of ['iron', 'stones'] as const) {
+      assert.ok(cost[material] - prior[material] > prior[material] - beforePrior[material]);
+      const save = freshSave();
+      save.forge.sword = level;
+      save.stones = cost.stones;
+      save.iron = cost.iron;
+      save[material]--;
+      const before = JSON.stringify(save);
+      assert.equal(forge(save, 'sword'), false);
+      assert.equal(JSON.stringify(save), before);
+    }
+  }
+});
+
+test('十阶炼器实际攻击伤害增加百分之八十，旧五阶存档仍保留原加成', () => {
+  const damage = (level: number) => {
+    const save = parseSave(JSON.stringify({ ...freshSave(), forge: { sword: level } }));
+    const game = new Game(save, 0, 0, () => 0.5);
+    game.spawnEnemy(0, false, false, { x: 200, y: 0 });
+    game.update(0.01);
+    return game.shots.find((shot) => shot.kind === 'sword')!.damage;
+  };
+  assert.ok(Math.abs(damage(5) / damage(0) - 1.4) < 1e-10);
+  assert.ok(Math.abs(damage(10) / damage(0) - 1.8) < 1e-10);
+});
 
 test('音量保存与旧档兼容，零音量和最大音量均有效，越界值被限制', () => {
   assert.equal(freshSave().volume, 0.6);
