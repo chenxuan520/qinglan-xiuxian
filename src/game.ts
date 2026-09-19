@@ -25,8 +25,14 @@ import {
   isCultivationPath,
   spiritRootInfo,
   SPIRIT_ROOTS,
+  ELEMENTS,
+  rootElementsFor,
+  weaponRootBonus,
+  rootStarter,
+  REALM_LIFESPANS,
+  STAGE_YEARS_PER_MINUTE,
 } from './data.ts';
-import type { CultivationPath, WeaponKind, SpiritRootId } from './data.ts';
+import type { CultivationPath, WeaponKind, SpiritRootId, ElementId } from './data.ts';
 import {
   cultivationReward,
   realmInfo,
@@ -34,6 +40,7 @@ import {
   dropArtifacts,
   cultivationFactor,
   bossCultivationReward,
+  extendLifespan,
 } from './progress.ts';
 import type { SaveData } from './progress.ts';
 
@@ -160,6 +167,7 @@ export class Game {
   difficulty: number;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
+  rootElements: ElementId[];
   random: () => number;
   constructor(
     save: SaveData,
@@ -170,10 +178,12 @@ export class Game {
   ) {
     this.save = save;
     this.stage = stage;
+    this.nextElite = this.eliteInterval;
     this.difficulty = difficulty;
     this.random = random;
     this.path = path;
     this.spiritRoot = save.spiritRoot;
+    this.rootElements = [...save.rootElements];
     this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
     this.baseHp = 100 + save.training.vitality * 10 + realmBonuses(this.realm).hp;
     this.player.hp = this.player.maxHp = this.maximumHealth;
@@ -181,7 +191,7 @@ export class Game {
       TREASURES.find(
         (t) =>
           t.id === save.starter && save.artifacts.includes(t.id) && allowsSchool(path, t.school),
-      ) ?? treasure(path === 'demonic' ? 'nail' : 'sword');
+      ) ?? treasure(rootStarter(this.rootElements, path));
     this.weapons.push({ id: starter.id, level: 1, evolved: false, timer: 0 });
     this.announce('踏入秘境 · 妖物将至');
   }
@@ -191,6 +201,28 @@ export class Game {
   }
   get boss() {
     return this.enemies.find((e) => e.boss && !e.dead);
+  }
+  get eliteInterval() {
+    return this.isFinalTrial
+      ? 60
+      : (60 * STAGES[this.stage].minutes) / (STAGES[this.stage].minutes + 2);
+  }
+  get lifespan() {
+    return REALM_LIFESPANS[Math.floor(this.realm / 3)] + this.save.lifespanBonus;
+  }
+  get expired() {
+    return this.save.age >= this.lifespan;
+  }
+  borrowLife() {
+    const expired = this.expired;
+    const years = extendLifespan(this.save);
+    if (years && expired && this.state === 'lost') {
+      this.player.hp = this.player.maxHp;
+      this.player.invincible = 3;
+      this.state = 'paused';
+      this.announce(`向天借寿 · 寿元 +${years} 年`);
+    }
+    return years;
   }
   get isFinalTrial() {
     return this.stage === FINAL_TRIAL_STAGE;
@@ -203,7 +235,7 @@ export class Game {
     return {
       damage:
         1 +
-        this.save.training.power * 0.05 +
+        (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100 +
         realmBonuses(this.realm).damage +
         (p.power || 0) * 0.12 +
         (p.spirit || 0) * 0.04 +
@@ -272,8 +304,10 @@ export class Game {
   snapshot() {
     return {
       spiritRoot: this.spiritRoot,
+      rootElements: [...this.rootElements],
       version: 1,
       stage: this.stage,
+      stageDuration: STAGES[this.stage].minutes * 60,
       difficulty: this.difficulty,
       path: this.path,
       state: this.state,
@@ -316,8 +350,21 @@ export class Game {
       const s = raw as ReturnType<Game['snapshot']>;
       if (!s || s.version !== 1 || !['playing', 'paused', 'upgrade', 'lost'].includes(s.state))
         return null;
+      if (
+        s.stageDuration !== undefined &&
+        (!Number.isFinite(s.stageDuration) || s.stageDuration <= 0)
+      )
+        return null;
       if (s.path !== undefined && !isCultivationPath(s.path)) return null;
       if (s.spiritRoot !== undefined && !SPIRIT_ROOTS.some((root) => root.id === s.spiritRoot))
+        return null;
+      if (
+        s.rootElements !== undefined &&
+        (!Array.isArray(s.rootElements) ||
+          s.rootElements.length !== spiritRootInfo(s.spiritRoot ?? 'heaven').count ||
+          new Set(s.rootElements).size !== s.rootElements.length ||
+          !s.rootElements.every((id) => ELEMENTS.some((e) => e.id === id)))
+      )
         return null;
       if (
         s.stage === FINAL_TRIAL_STAGE &&
@@ -497,7 +544,11 @@ export class Game {
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.spiritRoot = s.spiritRoot ?? 'heaven';
-      g.time = s.time;
+      g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
+      const duration = STAGES[s.stage].minutes * 60;
+      const oldDuration = s.stageDuration ?? (g.isFinalTrial ? duration : duration + 120);
+      const timeScale = g.isFinalTrial ? 1 : duration / oldDuration;
+      g.time = s.time * timeScale;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
@@ -537,7 +588,7 @@ export class Game {
         );
       }
       g.nextTrialBossAt = TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? 600;
-      g.nextElite = s.nextElite;
+      g.nextElite = s.nextElite * timeScale;
       g.damageDealt = s.damageDealt;
       if (s.damageBySource !== undefined) {
         if (!s.damageBySource || typeof s.damageBySource !== 'object') return null;
@@ -598,6 +649,14 @@ export class Game {
     if (this.state !== 'playing' || dt <= 0) return;
     dt = Math.min(dt, 0.05);
     this.time += dt;
+    this.save.age += (dt * STAGE_YEARS_PER_MINUTE[this.stage]) / 60;
+    if (this.save.age >= this.lifespan - 1e-9) {
+      this.save.age = this.lifespan;
+      this.player.hp = 0;
+      this.state = 'lost';
+      this.onEvent('lose');
+      return;
+    }
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     this.noticeTime -= dt;
     const p = this.player,
@@ -631,7 +690,7 @@ export class Game {
       );
       this.spawnEnemy(elites.at(-1) ?? available.at(-1), true);
       if (progress >= 0.5) this.spawnEnemy(available.at(-1), true);
-      this.nextElite += 60;
+      this.nextElite += this.eliteInterval;
       this.announce('精英现身 · 击败可得炼器宝匣');
     }
     if (this.isFinalTrial) {
@@ -1038,7 +1097,8 @@ export class Game {
       (1 + (w.level - 1) * 0.32) *
       s.damage *
       (1 + (this.save.forge[w.id] || 0) * 0.08) *
-      (w.evolved ? 1.8 : 1);
+      (w.evolved ? 1.8 : 1) *
+      (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t));
     const a = target ? Math.atan2(target.y - p.y, target.x - p.x) : this.time;
     const radius = (95 + w.level * 7) * s.area;
     const launch = (angle: number, from: Point = p, options: Partial<Shot> = {}) => {
@@ -1724,7 +1784,7 @@ export class Game {
     }
   }
   revive() {
-    if (this.state !== 'lost' || this.revivesUsed >= MAX_REVIVES) return false;
+    if (this.state !== 'lost' || this.revivesUsed >= MAX_REVIVES || this.expired) return false;
     this.revivesUsed++;
     this.player.hp = this.player.maxHp;
     this.player.invincible = 3;

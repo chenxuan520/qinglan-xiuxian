@@ -10,12 +10,20 @@ import {
   bossCultivationReward,
 } from '../src/progress.ts';
 
-test('六种灵根按公开概率抽取，新档随机，已存档与旧档读取不重抽', () => {
+test('七档灵根按公开概率抽取，新档随机，已存档与旧档读取不重抽', () => {
   const counts = Object.fromEntries(SPIRIT_ROOTS.map((root) => [root.id, 0]));
   for (let i = 0; i < 100; i++) counts[rollSpiritRoot(() => (i + 0.5) / 100)]++;
-  assert.deepEqual(counts, { heaven: 5, variant: 10, dual: 15, triple: 25, quad: 25, five: 20 });
+  assert.deepEqual(counts, {
+    heaven: 5,
+    variant: 10,
+    dual: 15,
+    triple: 25,
+    quad: 25,
+    five: 10,
+    none: 10,
+  });
   assert.equal(parseSave(null, () => 0).spiritRoot, 'heaven');
-  assert.equal(parseSave(null, () => 0.99).spiritRoot, 'five');
+  assert.equal(parseSave(null, () => 0.99).spiritRoot, 'none');
   const noRoll = () => {
     throw new Error('读档不应重新抽取');
   };
@@ -31,7 +39,7 @@ test('六种灵根按公开概率抽取，新档随机，已存档与旧档读�
   );
 });
 
-test('灵根同时缩放基础和功法灵气，天灵根保持原速度，战斗伤害与气血不受影响', () => {
+test('灵根同时缩放基础和功法灵气，天灵根保持原速度，基础攻击属性与气血不受影响', () => {
   for (const difficulty of [0, 1, 2]) {
     const baseline = new Game(freshSave(), 0, difficulty, () => 0.5);
     baseline.passives.spirit = 3;

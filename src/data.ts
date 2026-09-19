@@ -1,10 +1,35 @@
 export const SPIRIT_ROOTS = [
-  { id: 'heaven', name: '天灵根', rate: 1, chance: 5 },
-  { id: 'variant', name: '异灵根', rate: 0.85, chance: 10 },
-  { id: 'dual', name: '双灵根', rate: 0.7, chance: 15 },
-  { id: 'triple', name: '三灵根', rate: 0.55, chance: 25 },
-  { id: 'quad', name: '四灵根', rate: 0.4, chance: 25 },
-  { id: 'five', name: '五灵根', rate: 0.3, chance: 20 },
+  { id: 'heaven', name: '天灵根', rate: 1, chance: 5, count: 1, damageBonus: 15, powerPerLevel: 5 },
+  {
+    id: 'variant',
+    name: '异灵根',
+    rate: 0.85,
+    chance: 10,
+    count: 1,
+    damageBonus: 12,
+    powerPerLevel: 4,
+  },
+  {
+    id: 'dual',
+    name: '普通灵根',
+    rate: 0.7,
+    chance: 15,
+    count: 2,
+    damageBonus: 8,
+    powerPerLevel: 3,
+  },
+  {
+    id: 'triple',
+    name: '普通灵根',
+    rate: 0.55,
+    chance: 25,
+    count: 3,
+    damageBonus: 6,
+    powerPerLevel: 3,
+  },
+  { id: 'quad', name: '伪灵根', rate: 0.4, chance: 25, count: 4, damageBonus: 4, powerPerLevel: 2 },
+  { id: 'five', name: '伪灵根', rate: 0.3, chance: 10, count: 5, damageBonus: 3, powerPerLevel: 2 },
+  { id: 'none', name: '无灵根', rate: 0.2, chance: 10, count: 0, damageBonus: 0, powerPerLevel: 1 },
 ] as const;
 export type SpiritRootId = (typeof SPIRIT_ROOTS)[number]['id'];
 export const spiritRootInfo = (id: string) =>
@@ -15,7 +40,34 @@ export function rollSpiritRoot(random: () => number = Math.random): SpiritRootId
     roll -= root.chance;
     if (roll < 0) return root.id;
   }
-  return 'five';
+  return 'none';
+}
+
+export const ELEMENTS = [
+  { id: 'metal', name: '金', color: '#e8d69c' },
+  { id: 'wood', name: '木', color: '#9fe2b1' },
+  { id: 'water', name: '水', color: '#a9ddf3' },
+  { id: 'fire', name: '火', color: '#f3a887' },
+  { id: 'earth', name: '土', color: '#d7bc94' },
+] as const;
+export type ElementId = (typeof ELEMENTS)[number]['id'];
+export const elementInfo = (id: ElementId) => ELEMENTS.find((e) => e.id === id)!;
+export function rootElementsFor(
+  root: SpiritRootId,
+  existing: unknown = [],
+  random: () => number = Math.random,
+): ElementId[] {
+  const count = spiritRootInfo(root).count;
+  const valid = Array.isArray(existing)
+    ? existing.filter((id): id is ElementId => ELEMENTS.some((e) => e.id === id))
+    : [];
+  const result = [...new Set(valid)].slice(0, count);
+  const pool = ELEMENTS.map((e) => e.id).filter((id) => !result.includes(id));
+  while (result.length < count) result.push(...pool.splice(Math.floor(random() * pool.length), 1));
+  return result;
+}
+export function weaponRootBonus(root: SpiritRootId, elements: ElementId[], weapon: Treasure) {
+  return elements.includes(weapon.element) ? spiritRootInfo(root).damageBonus / 100 : 0;
 }
 
 export type WeaponKind =
@@ -55,8 +107,18 @@ export type WeaponKind =
   | 'shard'
   | 'axe'
   | 'sand';
+export const ROOT_STARTERS: Record<ElementId, [WeaponKind, WeaponKind]> = {
+  metal: ['sword', 'nail'],
+  wood: ['orbit', 'poison'],
+  water: ['ice', 'bloodpool'],
+  fire: ['lightning', 'fire'],
+  earth: ['pagoda', 'meteor'],
+};
+export const rootStarter = (elements: ElementId[], path: CultivationPath) =>
+  ROOT_STARTERS[elements[0] ?? 'metal'][path === 'demonic' ? 1 : 0];
 export interface Treasure {
   school: School;
+  element: ElementId;
   id: WeaponKind;
   name: string;
   mark: string;
@@ -71,6 +133,7 @@ export interface Treasure {
 export const TREASURES: Treasure[] = [
   {
     id: 'sword',
+    element: 'metal',
     school: 'orthodox',
     name: '青霄剑',
     mark: '剑',
@@ -84,6 +147,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'orbit',
+    element: 'wood',
     school: 'orthodox',
     name: '青莲灯',
     mark: '莲',
@@ -97,6 +161,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'lightning',
+    element: 'fire',
     school: 'orthodox',
     name: '九霄雷符',
     mark: '雷',
@@ -110,6 +175,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'pulse',
+    element: 'metal',
     school: 'orthodox',
     name: '东皇钟',
     mark: '钟',
@@ -123,6 +189,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'poison',
+    element: 'wood',
     school: 'demonic',
     name: '万毒葫',
     mark: '葫',
@@ -136,6 +203,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'ice',
+    element: 'water',
     school: 'orthodox',
     name: '玄冰镜',
     mark: '镜',
@@ -149,6 +217,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'fire',
+    element: 'fire',
     school: 'demonic',
     name: '离火珠',
     mark: '火',
@@ -162,6 +231,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'fan',
+    element: 'wood',
     school: 'orthodox',
     name: '芭蕉扇',
     mark: '扇',
@@ -175,6 +245,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'blade',
+    element: 'metal',
     school: 'demonic',
     name: '血月轮',
     mark: '轮',
@@ -188,6 +259,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'arrow',
+    element: 'metal',
     school: 'orthodox',
     name: '追星弓',
     mark: '弓',
@@ -201,6 +273,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'meteor',
+    element: 'earth',
     school: 'orthodox',
     name: '番天印',
     mark: '印',
@@ -214,6 +287,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'chain',
+    element: 'wood',
     school: 'demonic',
     name: '缚妖索',
     mark: '索',
@@ -227,6 +301,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'vortex',
+    element: 'earth',
     school: 'demonic',
     name: '阴阳盘',
     mark: '卦',
@@ -240,6 +315,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'talisman',
+    element: 'fire',
     school: 'demonic',
     name: '镇魂幡',
     mark: '幡',
@@ -253,6 +329,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'pearl',
+    element: 'water',
     school: 'orthodox',
     name: '沧海珠',
     mark: '珠',
@@ -266,6 +343,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'dragon',
+    element: 'fire',
     school: 'orthodox',
     name: '游龙尺',
     mark: '龙',
@@ -279,6 +357,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'qin',
+    element: 'water',
     school: 'orthodox',
     name: '镇岳古琴',
     mark: '琴',
@@ -292,6 +371,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'brush',
+    element: 'water',
     school: 'demonic',
     name: '判天笔',
     mark: '笔',
@@ -305,6 +385,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'pagoda',
+    element: 'earth',
     school: 'orthodox',
     name: '七宝玲珑塔',
     mark: '塔',
@@ -318,6 +399,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'banner',
+    element: 'earth',
     school: 'demonic',
     name: '五行阵旗',
     mark: '旗',
@@ -331,6 +413,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'cauldron',
+    element: 'earth',
     school: 'orthodox',
     name: '神农鼎',
     mark: '鼎',
@@ -344,6 +427,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'flute',
+    element: 'wood',
     school: 'orthodox',
     name: '玉清笛',
     mark: '笛',
@@ -357,6 +441,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'beads',
+    element: 'wood',
     school: 'orthodox',
     name: '菩提念珠',
     mark: '珠',
@@ -370,6 +455,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'compass',
+    element: 'metal',
     school: 'orthodox',
     name: '定星罗盘',
     mark: '盘',
@@ -383,6 +469,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'umbrella',
+    element: 'water',
     school: 'orthodox',
     name: '玄天伞',
     mark: '伞',
@@ -396,6 +483,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'spear',
+    element: 'metal',
     school: 'orthodox',
     name: '破军枪',
     mark: '枪',
@@ -409,6 +497,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'scythe',
+    element: 'metal',
     school: 'demonic',
     name: '摄魂镰',
     mark: '镰',
@@ -422,6 +511,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'nail',
+    element: 'metal',
     school: 'demonic',
     name: '追魂钉',
     mark: '钉',
@@ -435,6 +525,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'coffin',
+    element: 'earth',
     school: 'demonic',
     name: '葬天棺',
     mark: '棺',
@@ -448,6 +539,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'whip',
+    element: 'fire',
     school: 'demonic',
     name: '赤炼鞭',
     mark: '鞭',
@@ -461,6 +553,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'skull',
+    element: 'earth',
     school: 'demonic',
     name: '白骨髅',
     mark: '骨',
@@ -474,6 +567,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'bloodpool',
+    element: 'water',
     school: 'demonic',
     name: '化血盏',
     mark: '盏',
@@ -487,6 +581,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'nest',
+    element: 'wood',
     school: 'demonic',
     name: '万蛊巢',
     mark: '蛊',
@@ -500,6 +595,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'shard',
+    element: 'metal',
     school: 'demonic',
     name: '裂魂镜',
     mark: '镜',
@@ -513,6 +609,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'axe',
+    element: 'metal',
     school: 'demonic',
     name: '开天斧',
     mark: '斧',
@@ -526,6 +623,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'sand',
+    element: 'earth',
     school: 'demonic',
     name: '星河砂',
     mark: '砂',
@@ -720,6 +818,8 @@ export function evolutionPassives(t: Treasure, path: CultivationPath = 'dual') {
   );
 }
 export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '渡劫'];
+export const REALM_LIFESPANS = [100, 250, 500, 1000, 2000, 5000, 10000, Infinity, Infinity];
+export const STAGE_YEARS_PER_MINUTE = [10, 25, 50, 100, 200, 500, 1000];
 export const FINAL_TRIAL_STAGE = 6;
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [90, 180, 270, 360, 450, 540, 600];
@@ -730,7 +830,7 @@ export const STAGES = [
     terrain: '/assets/terrain.png',
     subtitle: '竹影藏灵 · 初入仙途',
     chapter: '壹',
-    minutes: 5,
+    minutes: 3,
     color: '#9fc6aa',
     boss: '苍木妖王',
     skills: ['万木囚笼', '荆棘散射', '唤醒山灵'],
@@ -743,7 +843,7 @@ export const STAGES = [
     terrain: '/assets/terrain-ruins.png',
     subtitle: '古阵余烬 · 妖影渐生',
     chapter: '贰',
-    minutes: 6,
+    minutes: 4,
     color: '#d6b784',
     boss: '赤炎狐王',
     skills: ['九尾炎扇', '焚天火径', '赤焰轮舞'],
@@ -756,7 +856,7 @@ export const STAGES = [
     terrain: '/assets/terrain-ice.png',
     subtitle: '千载寒霜 · 冰魄凝心',
     chapter: '叁',
-    minutes: 7,
+    minutes: 5,
     color: '#a8cfdc',
     boss: '霜魄狼王',
     skills: ['踏雪突袭', '霜牙连射', '玄冰牢狱'],
@@ -769,7 +869,7 @@ export const STAGES = [
     terrain: '/assets/terrain-marsh.png',
     subtitle: '瘴云蔽日 · 万物归寂',
     chapter: '肆',
-    minutes: 8,
+    minutes: 6,
     color: '#bcc895',
     boss: '玄甲毒君',
     skills: ['五毒瘴池', '蚀骨毒矢', '万蛊复生'],
@@ -782,7 +882,7 @@ export const STAGES = [
     terrain: '/assets/terrain-nether.png',
     subtitle: '百鬼夜行 · 一剑镇魂',
     chapter: '伍',
-    minutes: 9,
+    minutes: 7,
     color: '#baa2d0',
     boss: '九幽冥主',
     skills: ['百鬼夜行', '摄魂灵轮', '六道鬼牢'],
@@ -795,7 +895,7 @@ export const STAGES = [
     terrain: '/assets/terrain-heaven.png',
     subtitle: '雷劫淬身 · 问道长生',
     chapter: '陆',
-    minutes: 10,
+    minutes: 8,
     color: '#e0d7b2',
     boss: '太虚劫灵',
     skills: ['十字天雷', '太虚星环', '陨星天罚'],

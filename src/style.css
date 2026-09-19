@@ -100,6 +100,59 @@ svg {
 .spirit-root-summary b {
   color: var(--gold);
 }
+.root-elements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+}
+.element-affinity {
+  display: inline-block;
+  width: fit-content;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.element-affinity.resonant {
+  color: var(--element-color);
+  border-color: var(--element-color);
+}
+.root-ad-panel .revive-ad {
+  min-height: 80px;
+  height: 90px;
+  margin: 14px 0;
+  font-size: 26px;
+}
+.root-quality-options,
+.root-element-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 12px 0;
+}
+#root-picker .secondary-button {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+#root-picker .selected {
+  border-color: var(--gold);
+  background: #d4d9a322;
+  color: var(--gold);
+}
+#root-picker small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.collection-card .element-affinity {
+  margin-top: 5px;
+  font-size: 10px;
+}
 .spirit-root-summary button {
   font-size: 11px;
   padding: 10px 14px;
@@ -112,7 +165,7 @@ svg {
   width: 100%;
 }
 .spirit-root-rewards button {
-  flex: 1;
+  flex: 1 1 150px;
   min-width: 145px;
   flex-direction: column;
   gap: 4px;
@@ -1841,6 +1894,30 @@ kbd {
 .pause-actions > * {
   flex: 1;
 }
+.pause-actions > button,
+.pause-actions > .auto-button {
+  width: 100%;
+  min-width: 0;
+  height: 52px;
+  min-height: 52px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 1px;
+  border-radius: 0;
+}
+@media (max-width: 850px) {
+  .pause-actions {
+    flex-wrap: wrap;
+  }
+  .pause-actions > button {
+    flex: 1 1 calc(50% - 10px);
+  }
+}
 .victory-backdrop {
   overflow: hidden;
   backdrop-filter: none;
@@ -3365,10 +3442,6 @@ kbd {
     gap: 10px;
     flex-wrap: wrap;
   }
-  .pause-actions .auto-button {
-    flex-basis: 100%;
-    height: 36px;
-  }
   .pause-actions button {
     font-size: 11px;
     letter-spacing: 1px;
@@ -3896,6 +3969,10 @@ body:not(.in-game) #ui {
   margin: 0 0 14px;
   font-size: 18px;
 }
+.artifact-loot > .primary-button {
+  margin-inline: auto;
+  max-width: 100%;
+}
 .loot-items {
   display: flex;
   flex-wrap: wrap;
@@ -3931,6 +4008,49 @@ body:not(.in-game) #ui {
 .reincarnation-row p {
   margin: 0;
   color: #a6bdab;
+}
+.save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.save-actions button {
+  flex: 1 1 auto;
+  min-height: 48px;
+}
+.lifespan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #c6c99a44;
+  background: #183d31c9;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.lifespan-summary strong {
+  color: #e2d398;
+}
+.lifespan-summary small {
+  flex-basis: 100%;
+  color: #a6bdab;
+}
+.lifespan-summary button {
+  flex-direction: column;
+  gap: 5px;
+  max-width: 100%;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.lifespan-hud {
+  margin-top: 5px;
+  color: #cfcc9a;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.lifespan-hud.urgent {
+  color: #f2a28f;
 }
 
 .sound-control {
