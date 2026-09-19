@@ -13,7 +13,7 @@ import {
   xpNeeded,
 } from './data.ts';
 import type { WeaponKind } from './data.ts';
-import { realmInfo } from './progress.ts';
+import { cultivationReward, realmInfo } from './progress.ts';
 import type { SaveData } from './progress.ts';
 
 export interface Point {
@@ -99,6 +99,7 @@ export class Game {
   level = 1;
   xp = 0;
   kills = 0;
+  creditedCultivation = 0;
   iron = 0;
   rerolls = 3;
   player = { x: 0, y: 0, hp: 100, maxHp: 100, invincible: 0, facing: 1, moving: false };
@@ -175,6 +176,25 @@ export class Game {
     this.notice = message;
     this.noticeTime = 3;
   }
+  private creditCultivation() {
+    if (this.kills === 0 && this.level === 1) return;
+    const earned = cultivationReward(this);
+    const delta = earned - this.creditedCultivation;
+    if (delta <= 0) return;
+    this.save.cultivation += delta;
+    this.creditedCultivation = earned;
+    const realm = realmInfo(this.save.cultivation);
+    if (realm.step > this.realm) {
+      const hp = (realm.step - this.realm) * 3;
+      this.realm = realm.step;
+      this.baseHp += hp;
+      this.player.maxHp += hp;
+      if (this.player.hp > 0) this.player.hp += hp;
+      this.announce(`境界突破 · ${realm.name} · 气血与法宝威力提升`);
+      this.effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
+      this.onEvent('breakthrough');
+    }
+  }
   snapshot() {
     return {
       version: 1,
@@ -185,6 +205,7 @@ export class Game {
       level: this.level,
       xp: this.xp,
       kills: this.kills,
+      creditedCultivation: this.creditedCultivation,
       iron: this.iron,
       rerolls: this.rerolls,
       player: { ...this.player },
@@ -236,6 +257,13 @@ export class Game {
         s.level < 1 ||
         s.rerolls < 0 ||
         s.rerolls > 3
+      )
+        return null;
+      if (
+        s.creditedCultivation !== undefined &&
+        (!Number.isInteger(s.creditedCultivation) ||
+          s.creditedCultivation < 0 ||
+          s.creditedCultivation > Math.min(save.cultivation, cultivationReward(s)))
       )
         return null;
       if (
@@ -357,6 +385,7 @@ export class Game {
       g.level = s.level;
       g.xp = s.xp;
       g.kills = s.kills;
+      g.creditedCultivation = s.creditedCultivation ?? 0;
       g.iron = s.iron;
       g.rerolls = s.rerolls;
       g.player = { ...s.player, moving: false };
@@ -375,6 +404,7 @@ export class Game {
       g.state = s.state === 'upgrade' ? 'upgrade' : 'paused';
       if (g.state === 'upgrade' && !g.choices.length) return null;
       g.announce('重续仙缘 · 上次历练已恢复');
+      g.creditCultivation();
       return g;
     } catch {
       return null;
@@ -450,6 +480,7 @@ export class Game {
     if (this.state === 'playing' && this.xp >= xpNeeded(this.level)) {
       this.xp -= xpNeeded(this.level);
       this.level++;
+      this.creditCultivation();
       this.state = 'upgrade';
       this.choices = this.makeChoices();
       this.onEvent('upgrade');
@@ -911,6 +942,7 @@ export class Game {
     if (e.hp <= 0) {
       e.dead = true;
       this.kills++;
+      this.creditCultivation();
       this.pickups.push({
         x: e.x,
         y: e.y,

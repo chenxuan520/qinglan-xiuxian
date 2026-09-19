@@ -13,6 +13,7 @@ export interface SaveData {
   forge: Record<string, number>;
   starter: string;
   sound: boolean;
+  autoplay: boolean;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 export function freshSave(): SaveData {
@@ -29,6 +30,7 @@ export function freshSave(): SaveData {
     forge: {},
     starter: 'sword',
     sound: false,
+    autoplay: false,
   };
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
@@ -57,6 +59,7 @@ export function parseSave(raw: string | null): SaveData {
     for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], 5);
     base.starter = TREASURES.some((t) => t.id === s.starter) ? s.starter : 'sword';
     base.sound = s.sound === true;
+    base.autoplay = s.autoplay === true;
     return base;
   } catch {
     return base;
@@ -79,6 +82,14 @@ export function realmInfo(cultivation: number) {
   };
 }
 export const realmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export function cultivationReward(
+  run: { kills: number; level: number; difficulty: number },
+  bonus = 0,
+) {
+  return Math.floor(
+    (run.kills * 0.7 + run.level * 8 + bonus) * DIFFICULTIES[run.difficulty].reward,
+  );
+}
 export const trainingCost = (level: number) => Math.round(45 * 1.42 ** level);
 export const forgeCost = (level: number) => ({ iron: 3 + level * 3, stones: 35 + level * 45 });
 export function train(save: SaveData, kind: keyof SaveData['training']) {
@@ -108,22 +119,23 @@ export function settleRun(
     victory: boolean;
     iron: number;
     level: number;
+    creditedCultivation?: number;
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
+  const cultivation = cultivationReward(run, run.victory ? 100 + run.stage * 50 : 0);
   const rewards = {
     stones: Math.floor(
       (run.kills * 0.35 + run.time * 0.1 + (run.victory ? STAGES[run.stage].reward : 0)) *
         multiplier,
     ),
-    cultivation: Math.floor(
-      (run.kills * 0.7 + run.level * 8 + (run.victory ? 100 + run.stage * 50 : 0)) * multiplier,
-    ),
+    cultivation,
+    cultivationRemaining: cultivation - int(run.creditedCultivation, cultivation),
     iron: run.iron + (run.victory ? 3 + run.stage * 2 : 0),
   };
   save.stones += rewards.stones;
   save.iron += rewards.iron;
-  save.cultivation += rewards.cultivation;
+  save.cultivation += rewards.cultivationRemaining;
   save.runs++;
   save.bestKills = Math.max(save.bestKills, run.kills);
   if (run.victory) {

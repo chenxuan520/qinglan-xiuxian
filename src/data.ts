@@ -259,6 +259,7 @@ export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚
 export const STAGES = [
   {
     name: '青岚竹海',
+    terrain: '/assets/terrain.png',
     subtitle: '竹影藏灵 · 初入仙途',
     chapter: '壹',
     minutes: 5,
@@ -270,6 +271,7 @@ export const STAGES = [
   },
   {
     name: '落霞古墟',
+    terrain: '/assets/terrain-ruins.png',
     subtitle: '古阵余烬 · 妖影渐生',
     chapter: '贰',
     minutes: 6,
@@ -281,6 +283,7 @@ export const STAGES = [
   },
   {
     name: '玄冰幽谷',
+    terrain: '/assets/terrain-ice.png',
     subtitle: '千载寒霜 · 冰魄凝心',
     chapter: '叁',
     minutes: 7,
@@ -292,6 +295,7 @@ export const STAGES = [
   },
   {
     name: '万毒深泽',
+    terrain: '/assets/terrain-marsh.png',
     subtitle: '瘴云蔽日 · 万物归寂',
     chapter: '肆',
     minutes: 8,
@@ -303,6 +307,7 @@ export const STAGES = [
   },
   {
     name: '九幽冥府',
+    terrain: '/assets/terrain-nether.png',
     subtitle: '百鬼夜行 · 一剑镇魂',
     chapter: '伍',
     minutes: 9,
@@ -314,6 +319,7 @@ export const STAGES = [
   },
   {
     name: '太虚天境',
+    terrain: '/assets/terrain-heaven.png',
     subtitle: '雷劫淬身 · 问道长生',
     chapter: '陆',
     minutes: 10,

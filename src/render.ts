@@ -4,7 +4,6 @@ import { spriteFrame } from './sprites.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
-  terrain = new Image();
   atlas = new Image();
   private extraAtlas = new Image();
   private flashAtlas = document.createElement('canvas');
@@ -13,15 +12,25 @@ export class Renderer {
   height = 0;
   scale = 1;
   ready: Promise<void>;
-  private tile?: CanvasPattern;
+  private tiles: CanvasPattern[] = [];
   constructor(public canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     this.ready = Promise.all([
-      new Promise<void>((resolve, reject) => {
-        this.terrain.onload = () => resolve();
-        this.terrain.onerror = reject;
-        this.terrain.src = '/assets/terrain.png';
-      }),
+      ...STAGES.map(
+        (stage, index) =>
+          new Promise<void>((resolve, reject) => {
+            const terrain = new Image();
+            terrain.onload = () => {
+              const texture = document.createElement('canvas');
+              texture.width = texture.height = 850;
+              texture.getContext('2d')!.drawImage(terrain, 0, 0, 850, 850);
+              this.tiles[index] = this.ctx.createPattern(texture, 'repeat')!;
+              resolve();
+            };
+            terrain.onerror = reject;
+            terrain.src = stage.terrain;
+          }),
+      ),
       new Promise<void>((resolve, reject) => {
         this.atlas.onload = () => resolve();
         this.atlas.onerror = reject;
@@ -33,10 +42,6 @@ export class Renderer {
         this.extraAtlas.src = '/assets/enemies-distinct.png';
       }),
     ]).then(() => {
-      const texture = document.createElement('canvas');
-      texture.width = texture.height = 850;
-      texture.getContext('2d')!.drawImage(this.terrain, 0, 0, 850, 850);
-      this.tile = this.ctx.createPattern(texture, 'repeat')!;
       this.flashAtlas.width = this.atlas.width;
       this.flashAtlas.height = this.atlas.height;
       const flashContext = this.flashAtlas.getContext('2d')!;
@@ -75,13 +80,11 @@ export class Renderer {
     c.translate(cx, cy);
     c.scale(s, s);
     c.translate(-camera.x, -camera.y);
-    if (this.tile) {
-      c.fillStyle = this.tile;
+    if (this.tiles[stage]) {
+      c.fillStyle = this.tiles[stage];
       c.fillRect(camera.x - w / s, camera.y - h / s, (w * 2) / s, (h * 2) / s);
     }
-    c.fillStyle = ['#1a39352b', '#6d392d36', '#284b664a', '#31391742', '#34284470', '#2342453b'][
-      stage
-    ];
+    c.fillStyle = '#04171920';
     c.fillRect(camera.x - w / s, camera.y - h / s, (w * 2) / s, (h * 2) / s);
     if (game) this.drawGame(game, time);
     else this.drawPreview(camera, time);
@@ -142,6 +145,13 @@ export class Renderer {
       c.beginPath();
       c.arc(0, 0, z.radius, 0, TAU);
       c.fill();
+      if (z.hostile) {
+        c.strokeStyle = '#301c2280';
+        c.lineWidth = 4;
+        c.stroke();
+        c.strokeStyle = '#ff9b80';
+        c.lineWidth = 2;
+      }
       c.stroke();
       if (z.kind === 'vortex') this.formation(0, 0, z.radius * 0.9, time, z.color, 0.6);
       if (z.delay <= 0 && z.kind !== 'vortex') {
@@ -174,6 +184,9 @@ export class Renderer {
         c.lineTo(-r * 0.8, 0);
         c.closePath();
         c.fill();
+        c.strokeStyle = '#194c42';
+        c.lineWidth = 1;
+        c.stroke();
         c.fillStyle = '#edfff2';
         c.fillRect(-1, -r + 1, 2, 2);
       } else {
