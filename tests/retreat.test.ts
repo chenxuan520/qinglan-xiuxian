@@ -5,25 +5,32 @@ import {
   parseSave,
   retreat,
   retreatPlan,
+  realmCost,
+  realmInfo,
+  lifespanInfo,
+  bossCultivationReward,
   syncTribulationClock,
   tribulationDue,
 } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
+import { SPIRIT_ROOTS } from '../src/data.ts';
 
-test('闭关免费度过年岁，三属性均可随机提升，不增加修为与根基阶数', () => {
+test('闭关免费度过年岁，获得少量随机修为，三属性均可随机提升且不增加根基阶数', () => {
   const save = freshSave();
   save.stones = 80;
   assert.deepEqual(
     [1, 5, 10].map((years) => retreatPlan(save, years)?.years),
     [1, 5, 10],
   );
-  const values = [0.05, 0.5, 0.999];
+  const values = [0.05, 0.5, 0.999, 0.5];
   const result = retreat(save, 10, () => values.shift()!);
-  assert.deepEqual(result, { years: 10, gains: { vitality: 0, power: 3, speed: 0 } });
+  assert.equal(result!.years, 10);
+  assert.deepEqual(result!.gains, { vitality: 0, power: 3, speed: 0 });
+  assert.equal(result!.cultivation, 4);
   assert.equal(save.age, 10);
   assert.equal(save.stones, 80);
-  assert.equal(save.cultivation, 0);
+  assert.equal(save.cultivation, 4);
   assert.deepEqual(save.training, { vitality: 0, power: 0, speed: 0 });
   assert.deepEqual(retreat(save, 10, () => 0.1)?.gains, { vitality: 0, power: 0, speed: 0 });
   assert.deepEqual(save.retreatBonus, { vitality: 0, power: 3, speed: 0 });
@@ -54,7 +61,7 @@ test('闭关加成作用于实际气血、伤害与移速，续局及导入保�
   const damage = source.stats.damage;
   const speed = source.stats.speed;
   for (const pick of [0, 0.4, 0.9]) {
-    const rolls = [0, pick, 0];
+    const rolls = [0, pick, 0, 0];
     retreat(save, 10, () => rolls.shift()!);
   }
   const resumed = Game.restore(save, snapshot)!;
@@ -64,6 +71,8 @@ test('闭关加成作用于实际气血、伤害与移速，续局及导入保�
   assert.equal(resumed.stats.speed, speed * 1.01);
   const imported = importSave(exportSave(save, resumed));
   assert.deepEqual(imported.save.retreatBonus, save.retreatBonus);
+  assert.equal(imported.save.cultivation, save.cultivation);
+  assert.ok(imported.save.cultivation > 0);
   assert.equal(imported.run!.player.maxHp, resumed.player.maxHp);
   assert.deepEqual(
     parseSave(JSON.stringify({ ...save, retreatBonus: undefined })).retreatBonus,
@@ -92,6 +101,7 @@ test('大乘及渡劫境闭关只快进，在下次天劫处截停，不再抽�
       50,
     );
     assert.equal(save.age, 20000);
+    assert.equal(save.cultivation, 1e9);
     assert.ok(tribulationDue(save));
     assert.equal(retreat(save, 1), null);
     assert.deepEqual(save.retreatBonus, freshSave().retreatBonus);
@@ -100,7 +110,7 @@ test('大乘及渡劫境闭关只快进，在下次天劫处截停，不再抽�
 
 test('100年寿元投入50年为50%整次成功率，临界抽签失败；投入80年可达80%', () => {
   const success = freshSave();
-  const rolls = [0.4999, 0.9, 0.5];
+  const rolls = [0.4999, 0.9, 0.5, 0.5];
   assert.equal(retreatPlan(success, 50)!.chance, 0.5);
   assert.deepEqual(retreat(success, 50, () => rolls.shift()!)?.gains, {
     vitality: 0,
@@ -112,4 +122,75 @@ test('100年寿元投入50年为50%整次成功率，临界抽签失败；投入
   const high = freshSave();
   assert.equal(retreatPlan(high, 80)!.chance, 0.8);
   assert.equal(retreat(high, 80, () => 0)?.gains.vitality, 1);
+});
+
+test('相同投入的闭关修为随资质递减，收益符合预览的随机百分比范围', () => {
+  const expected = [21, 17, 14, 11, 8, 6, 4];
+  for (const [i, root] of SPIRIT_ROOTS.entries()) {
+    for (const roll of [0, 0.5, 0.999999]) {
+      const save = freshSave();
+      save.spiritRoot = root.id;
+      const plan = retreatPlan(save, 50)!;
+      const rolls = [0.9, roll]; // 属性未提升时，仍可获得修为。
+      const result = retreat(save, 50, () => rolls.shift()!)!;
+      assert.ok(result.cultivation >= plan.cultivation.min);
+      assert.ok(result.cultivation <= plan.cultivation.max);
+      assert.equal(result.cultivationPercent, (result.cultivation / 352) * 100);
+      assert.deepEqual(result.gains, freshSave().retreatBonus);
+      if (roll === 0.5) assert.equal(result.cultivation, expected[i]);
+    }
+  }
+});
+
+test('七个有限寿元境界即便全投闭关或拆分闭关，也无法从初期突破至中期，收益低于对应妖王', () => {
+  for (let major = 0; major < 7; major++) {
+    const start = Array.from({ length: major * 3 }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    for (const root of SPIRIT_ROOTS) {
+      for (const parts of [1, 10]) {
+        const save = freshSave();
+        save.cultivation = start;
+        save.spiritRoot = root.id;
+        const years = Math.floor(((lifespanInfo(save).limit - 0.1) / parts) * 10) / 10;
+        for (let i = 0; i < parts; i++) assert.ok(retreat(save, years, () => 0.999999));
+        assert.equal(realmInfo(save.cultivation).step, major * 3);
+        assert.ok(save.cultivation > start);
+        assert.ok(
+          save.cultivation - start < bossCultivationReward(Math.max(0, major - 1)) * root.rate,
+        );
+      }
+    }
+  }
+});
+
+test('极短闭关不保底送修为，借寿后的收益仍按延长后的寿元比例计算', () => {
+  const save = freshSave();
+  for (let i = 0; i < 100; i++) assert.equal(retreat(save, 0.1, () => 0.999999)!.cultivation, 0);
+  const before = retreatPlan(save, 50)!.cultivation;
+  save.lifespanBonus = 100;
+  const after = retreatPlan(save, 50)!.cultivation;
+  assert.equal(after.minPercent, before.minPercent / 2);
+  assert.equal(after.maxPercent, before.maxPercent / 2);
+});
+
+test('接近突破时可用闭关补足修为，突破大乘从出关年岁起计算天劫', () => {
+  for (const target of [3, 21]) {
+    const save = freshSave();
+    const threshold = Array.from({ length: target }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    save.cultivation = threshold - 1;
+    const before = lifespanInfo(save).limit;
+    const result = retreat(save, before / 10, () => 0.5)!;
+    assert.ok(result.cultivation > 1);
+    assert.equal(realmInfo(save.cultivation).step, target);
+    assert.ok(lifespanInfo(save).limit > before);
+    if (target === 21) assert.equal(save.nextTribulationAge, save.age + 20000);
+    const restored = parseSave(JSON.stringify(save));
+    assert.equal(restored.cultivation, save.cultivation);
+    assert.equal(restored.nextTribulationAge, save.nextTribulationAge);
+  }
 });

@@ -231,7 +231,23 @@ export function retreatPlan(save: SaveData, requested: number) {
     ? Math.min(requested, (save.nextTribulationAge || save.age + TRIBULATION_INTERVAL) - save.age)
     : requested;
   if (years <= 0 || life.remaining <= years + 1e-9) return null;
-  return { years, chance: immortal ? 0 : years / life.limit };
+  const chance = immortal ? 0 : years / life.limit;
+  const major = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
+  const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
+  // 天灵根投入整段寿元，也至多获得当前大境界总修为的 16%；历练仍是突破的主要来源。
+  const minPercent = chance * 8 * spiritRootInfo(save.spiritRoot).rate;
+  const maxPercent = minPercent * 2;
+  return {
+    years,
+    chance,
+    cultivation: {
+      budget,
+      minPercent,
+      maxPercent,
+      min: Math.floor((budget * minPercent) / 100),
+      max: Math.floor((budget * maxPercent) / 100),
+    },
+  };
 }
 export function retreat(save: SaveData, requested: number, random: () => number = Math.random) {
   const plan = retreatPlan(save, requested);
@@ -245,7 +261,14 @@ export function retreat(save: SaveData, requested: number, random: () => number 
     gains[key] = 1 + Math.floor(random() * 3);
     save.retreatBonus[key] += gains[key];
   }
-  return { years, gains };
+  const { budget, minPercent, maxPercent } = plan.cultivation;
+  const cultivation =
+    chance > 0
+      ? Math.floor((budget * (minPercent + (maxPercent - minPercent) * random())) / 100)
+      : 0;
+  save.cultivation += cultivation;
+  syncTribulationClock(save);
+  return { years, gains, cultivation, cultivationPercent: (cultivation / budget) * 100 };
 }
 export function cultivationFactor(step: number) {
   if (step < 15) return 1;

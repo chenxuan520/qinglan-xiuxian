@@ -267,7 +267,7 @@ function lifespanSummary() {
 function retreatEstimate(years: number) {
   const plan = retreatPlan(save, years);
   if (!plan) return '请输入正数年限（最多一位小数），并留有剩余寿元。';
-  return `实际度过 ${Number(plan.years.toFixed(1))} 年 · ${Number.isFinite(lifespanInfo(save).limit) ? `本次有 ${Number((plan.chance * 100).toFixed(2))}% 概率获得属性提升` : '大乘起无属性收益，到天劫自动出关'}`;
+  return `实际度过 ${Number(plan.years.toFixed(1))} 年 · ${Number.isFinite(lifespanInfo(save).limit) ? `预计修为 +${plan.cultivation.min}～${plan.cultivation.max}（本大境界总修为的 ${Number(plan.cultivation.minPercent.toFixed(2))}%～${Number(plan.cultivation.maxPercent.toFixed(2))}%，不足 1 点舍去）· 另有 ${Number((plan.chance * 100).toFixed(2))}% 概率获得属性提升` : '大乘起无修为或属性收益，到天劫自动出关'}`;
 }
 function retreatSection() {
   const life = lifespanInfo(save);
@@ -275,7 +275,7 @@ function retreatSection() {
   const years = immortal
     ? 1000
     : Math.max(0.1, Math.floor(Math.min(life.limit * 0.1, life.remaining / 2) * 10) / 10);
-  return `<div class="section-heading"><h3>闭关修炼</h3><span>只耗年岁 · 不花灵石</span></div><p class="panel-note">${immortal ? '大乘起闭关不再提升属性，只推进年岁；到达天劫时立即出关迎劫。' : '获得提升的概率 = 本次年岁 / 寿元上限，不设额外概率上限。例如寿元 100 年，闭关 50 年有 50% 概率提升；成功时随机提升气血、法宝伤害或移速中的一项 1%～3%。短期闭关多数没有提升，不增加修为或根基阶数。'}</p><div class="retreat-form"><label for="retreat-years">闭关年数<input id="retreat-years" type="number" inputmode="decimal" min="0.1" step="0.1" value="${years}" required aria-describedby="retreat-estimate"></label><button class="secondary-button" data-action="retreat" ${retreatPlan(save, years) ? '' : 'disabled'}>开始闭关</button></div><p class="panel-note" id="retreat-estimate" role="status">${retreatEstimate(years)}</p><p class="panel-note">闭关累计：气血 +${save.retreatBonus.vitality}% · 法宝伤害 +${save.retreatBonus.power}% · 移速 +${save.retreatBonus.speed}%。轮回后清空。</p>`;
+  return `<div class="section-heading"><h3>闭关修炼</h3><span>只耗年岁 · 不花灵石</span></div><p class="panel-note">${immortal ? '大乘起闭关不再获得修为或属性，只推进年岁；到达天劫时立即出关迎劫。' : '闭关获得少量随机修为：按投入年数占寿元上限的比例计算，灵根越好收益越高，明显慢于历练。一世寿元全部用于闭关，也不足以从大境界初期突破至中期；接近突破时可以补足修为。另按相同比例抽取属性提升，例如寿元 100 年闭关 50 年，有 50% 概率随机提升气血、法宝伤害或移速中的一项 1%～3%。不增加根基阶数。'}</p><div class="retreat-form"><label for="retreat-years">闭关年数<input id="retreat-years" type="number" inputmode="decimal" min="0.1" step="0.1" value="${years}" required aria-describedby="retreat-estimate"></label><button class="secondary-button" data-action="retreat" ${retreatPlan(save, years) ? '' : 'disabled'}>开始闭关</button></div><p class="panel-note" id="retreat-estimate" role="status">${retreatEstimate(years)}</p><p class="panel-note">闭关累计：气血 +${save.retreatBonus.vitality}% · 法宝伤害 +${save.retreatBonus.power}% · 移速 +${save.retreatBonus.speed}%。轮回后清空。</p>`;
 }
 function weaponAffinity(
   item: Treasure,
@@ -1375,7 +1375,7 @@ function handleAction(action: string, id?: string) {
     panelFrame(
       '岁月流转，出关之时',
       '闭关结束',
-      `<p class="pause-description">度过 ${Number(result.years.toFixed(1))} 年，未消耗灵石。</p><p class="boss-reward">${gains.length ? gains.join(' · ') : '此次未有精进'}<small>年岁 ${save.age.toFixed(1)} · 属性加成已保存</small></p><button class="primary-button guide-close" data-action="cultivation">返回洞府</button>`,
+      `<p class="pause-description">度过 ${Number(result.years.toFixed(1))} 年，未消耗灵石。</p><p class="boss-reward">修为 +${result.cultivation}<small>${result.cultivation ? `相当于闭关前大境界总修为的 ${Number(result.cultivationPercent.toFixed(2))}%` : '本次未积累到 1 点修为'} · ${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</small><small>${gains.length ? gains.join(' · ') : '此次无额外属性提升'}</small><small>年岁 ${save.age.toFixed(1)} · 收获已保存</small></p><button class="primary-button guide-close" data-action="cultivation">返回洞府</button>`,
     );
     return;
   }
