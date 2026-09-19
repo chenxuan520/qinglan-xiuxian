@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
+    "build:cloudflare": "npm run build -- --base / --outDir artifacts/cloudflare --emptyOutDir",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy artifacts/cloudflare --project-name qinglan-xiuxian --branch master",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "balance": "node --experimental-strip-types scripts/balance.ts",
@@ -17,7 +19,8 @@
   "devDependencies": {
     "prettier": "^3.6.2",
     "typescript": "~5.9.3",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "wrangler": "^4.135.0"
   },
   "engines": {
     "node": ">=22.18.0"

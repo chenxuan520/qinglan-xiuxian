@@ -1,5 +1,12 @@
 # 验证记录
 
+## Cloudflare 部署（2026-09-19）
+
+- 新建 `qinglan-xiuxian` Cloudflare Pages 项目，生产分支为 master，正式地址 `https://qinglan-xiuxian.pages.dev/`。通过 Wrangler 上传 28 个构建文件，服务纯静态站点，不增加后端或改变浏览器存档。
+- 新增 Wrangler 配置和 `build:cloudflare` / `deploy:cloudflare` 命令，使用独立目录 `artifacts/cloudflare` 与根路径 `/`。不覆盖本机 5173 使用的 dist，GitHub Pages 继续按仓库子路径自动构建。
+- Cloudflare 构建的脚本为 `index-COG8J6_u.js`，与本机生产构建一致；GitHub Pages 对应脚本为 `index-DKA6Zrzm.js`，工作流 35449967472 成功。格式检查与 Cloudflare TypeScript / Vite 构建通过；安装 Wrangler 未变更已有依赖版本，令牌只从本机环境读取。
+- Chrome DevTools MCP 确认 Cloudflare 生产地址首页、脚本、样式、地图及新天劫立绘请求返回 200。首次验证遭遇网络切换错误，重新加载后恢复请求；当前网络下首次下载全部素材较慢。
+
 ## 闭关修炼与两万年天劫（2026-09-19）
 
 - 洞府新增自填闭关年数，支持一位小数。整次获得属性提升的概率为消耗年岁 / 寿元上限，没有额外概率上限；100 年寿元投入 50 年即 50%。成功随机给气血、法宝伤害或移速中的一项增加 1%～3%，不扣灵石、不增加修为或根基等级。寿元不足拒绝且不扣资源。大乘及渡劫境只快进年岁，在天劫时截停；存档、导入与轮回覆盖新增加成。

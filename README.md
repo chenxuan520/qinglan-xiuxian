@@ -33,6 +33,21 @@ npm run format:check
 
 GitHub Pages 和 localhost 是不同来源，浏览器存档各自独立，不会自动同步。
 
+## Cloudflare Pages
+
+在线游玩：[青岚仙途 · Cloudflare](https://qinglan-xiuxian.pages.dev/)。
+
+使用 `wrangler.jsonc` 与独立构建目录 `artifacts/cloudflare`，避免覆盖本机正在运行的 `dist`。Cloudflare 使用根路径 `/`，GitHub Pages 仍按仓库子路径构建。
+
+```bash
+npx wrangler login
+npm run deploy:cloudflare
+```
+
+首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。Cloudflare 通过上述命令发布，GitHub Pages 仍在推送 master 后自动发布。
+
+不同网址的浏览器存档独立。迁移时先在原网址的洞府导出存档，再到新网址导入。
+
 ## 玩法
 
 - 电脑：WASD / 方向键移动，Esc / P 暂停，升级时按 1 / 2 / 3 选择。
