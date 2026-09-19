@@ -185,7 +185,10 @@ export class Game {
     this.spiritRoot = save.spiritRoot;
     this.rootElements = [...save.rootElements];
     this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
-    this.baseHp = 100 + save.training.vitality * 10 + realmBonuses(this.realm).hp;
+    this.baseHp =
+      spiritRootInfo(this.spiritRoot).baseHp +
+      save.training.vitality * 10 +
+      realmBonuses(this.realm).hp;
     this.player.hp = this.player.maxHp = this.maximumHealth;
     const starter =
       TREASURES.find(
@@ -272,7 +275,9 @@ export class Game {
           DIFFICULTIES[this.difficulty].amount) *
         0.9 *
         spiritRootInfo(this.spiritRoot).rate,
-      regen: (0.18 + (p.duration || 0) * 0.2) * (this.path === 'orthodox' ? 1.2 : 1),
+      regen:
+        (spiritRootInfo(this.spiritRoot).baseRegen + (p.duration || 0) * 0.2) *
+        (this.path === 'orthodox' ? 1.2 : 1),
       killHeal: (p.devour || 0) * 0.15,
     };
   }
@@ -544,6 +549,10 @@ export class Game {
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.spiritRoot = s.spiritRoot ?? 'heaven';
+      g.baseHp =
+        spiritRootInfo(g.spiritRoot).baseHp +
+        save.training.vitality * 10 +
+        realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       const duration = STAGES[s.stage].minutes * 60;
       const oldDuration = s.stageDuration ?? (g.isFinalTrial ? duration : duration + 120);
@@ -678,7 +687,7 @@ export class Game {
           this.stage * 0.12 +
           (STAGES[this.stage].minutes * 60 * 0.017 + this.stage * 0.18 + 0.45) * progress ** 1.3) *
       DIFFICULTIES[this.difficulty].amount *
-      (this.isFinalTrial ? (this.boss ? 0.7 : 1) : this.bossSpawned ? 0.32 : 1);
+      (this.isFinalTrial ? (this.boss ? 0.7 : 1) : (this.bossSpawned ? 0.32 : 1) * 1.25);
     while (this.spawnBudget >= 1) {
       this.spawnBudget--;
       if (this.enemies.length < (this.isFinalTrial ? 210 : 240)) this.spawnEnemy();
@@ -806,10 +815,11 @@ export class Game {
             ? bossStage === FINAL_TRIAL_STAGE
               ? 220
               : 85 + bossStage * 10
-            : 26 + this.stage * 3
+            : 52 + this.stage * 16
           : template.damage * (1 + this.stage * 0.12)) *
         (boss ? 1 : this.isFinalTrial ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
-        difficulty.damage,
+        difficulty.damage *
+        (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3),
       elite,
       boss,
       bossStage: boss ? bossStage : undefined,
