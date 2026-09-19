@@ -8,6 +8,7 @@ export class Renderer {
   private atlases: HTMLImageElement[] = [];
   private sprites = new Map<string, HTMLCanvasElement>();
   private formations = new Map<string, HTMLCanvasElement>();
+  private glowSprites = new Map<string, HTMLCanvasElement>();
   width = 0;
   height = 0;
   scale = 1;
@@ -314,21 +315,24 @@ export class Renderer {
         c.fillStyle = '#edfff2';
         c.fillRect(-1, -r + 1, 2, 2);
       } else {
-        const colors = { heal: '#e4a49a', magnet: '#a2e2ee', iron: '#cad6e1', chest: '#f0d88e' };
-        c.shadowColor = colors[item.kind];
-        c.shadowBlur = 14;
-        c.fillStyle = '#244740';
-        c.strokeStyle = colors[item.kind];
-        c.lineWidth = 1.5;
-        c.beginPath();
-        c.roundRect(-13, -13, 26, 26, 5);
-        c.fill();
-        c.stroke();
-        c.shadowBlur = 0;
-        c.fillStyle = colors[item.kind];
-        c.font = 'bold 15px serif';
-        c.textAlign = 'center';
-        c.fillText({ heal: '丹', magnet: '灵', iron: '铁', chest: '宝' }[item.kind], 0, 5);
+        const kind = item.kind;
+        this.glowSprite(`pickup:${kind}`, 60, 60, (c) => {
+          const colors = { heal: '#e4a49a', magnet: '#a2e2ee', iron: '#cad6e1', chest: '#f0d88e' };
+          c.shadowColor = colors[kind];
+          c.shadowBlur = 14;
+          c.fillStyle = '#244740';
+          c.strokeStyle = colors[kind];
+          c.lineWidth = 1.5;
+          c.beginPath();
+          c.roundRect(-13, -13, 26, 26, 5);
+          c.fill();
+          c.stroke();
+          c.shadowBlur = 0;
+          c.fillStyle = colors[kind];
+          c.font = 'bold 15px serif';
+          c.textAlign = 'center';
+          c.fillText({ heal: '丹', magnet: '灵', iron: '铁', chest: '宝' }[kind], 0, 5);
+        });
       }
       c.restore();
     }
@@ -444,93 +448,98 @@ export class Renderer {
         c.save();
         c.translate(shot.x, shot.y);
         c.rotate(a);
-        c.shadowColor = shot.color;
-        c.shadowBlur = 12;
-        c.strokeStyle = shot.color;
-        c.fillStyle = shot.color;
-        if (shot.kind === 'blade') {
-          c.rotate(time * 12);
-          c.lineWidth = 4;
-          c.beginPath();
-          c.arc(0, 0, 15, 0, Math.PI * 1.7);
-          c.stroke();
-        } else if (shot.kind === 'talisman') {
-          c.fillRect(-12, -5, 20, 10);
-          c.fillStyle = '#58475d';
-          c.fillRect(-7, -2, 10, 3);
-        } else if (shot.kind === 'spear' || shot.kind === 'nail') {
-          const length = shot.kind === 'spear' ? 48 : 20;
-          c.lineWidth = shot.kind === 'spear' ? 3 : 1.5;
-          c.beginPath();
-          c.moveTo(-length, 0);
-          c.lineTo(12, 0);
-          c.stroke();
-          c.beginPath();
-          c.moveTo(18, 0);
-          c.lineTo(5, -5);
-          c.lineTo(5, 5);
-          c.closePath();
-          c.fill();
-        } else if (shot.kind === 'qin') {
+        if (shot.kind === 'blade') c.rotate(time * 12);
+        if (shot.kind === 'qin') {
+          // 扩散音波的半径持续变化，直接画线，避免为每一帧建立纹理。
+          c.strokeStyle = shot.color;
           c.lineWidth = 2;
           for (let i = 0; i < 3; i++) {
             c.beginPath();
             c.arc(-15, 0, shot.radius + i * 7, -1, 1);
             c.stroke();
           }
-        } else if (shot.kind === 'flute') {
-          c.beginPath();
-          c.ellipse(0, 3, 6, 4, -0.4, 0, TAU);
-          c.fill();
-          c.lineWidth = 2;
-          c.beginPath();
-          c.moveTo(5, 3);
-          c.lineTo(5, -15);
-          c.lineTo(14, -9);
-          c.stroke();
-        } else if (shot.kind === 'shard' || shot.kind === 'umbrella') {
-          c.beginPath();
-          c.moveTo(14, 0);
-          c.lineTo(-8, -6);
-          c.lineTo(-2, 2);
-          c.lineTo(-8, 7);
-          c.closePath();
-          c.fill();
-          c.strokeStyle = '#eee7ff';
-          c.stroke();
-        } else if (shot.kind === 'skull') {
-          c.beginPath();
-          c.ellipse(0, 0, 13, 10, 0, 0, TAU);
-          c.fill();
-          c.fillRect(-2, 6, 9, 7);
-          c.fillStyle = '#332344';
-          c.beginPath();
-          c.arc(3, -4, 3, 0, TAU);
-          c.arc(3, 4, 3, 0, TAU);
-          c.fill();
-        } else if (shot.kind === 'beads') {
-          c.beginPath();
-          c.arc(0, 0, shot.radius, 0, TAU);
-          c.fill();
-          c.strokeStyle = '#fff0bb';
-          c.lineWidth = 1;
-          c.beginPath();
-          c.arc(0, 0, shot.radius * 0.65, 0, TAU);
-          c.stroke();
-        } else if (shot.kind === 'fan') {
-          c.lineWidth = 3;
-          c.beginPath();
-          c.arc(-10, 0, 20, -0.8, 0.8);
-          c.stroke();
-        } else {
-          c.beginPath();
-          c.arc(0, 0, shot.kind === 'hostile' ? 5 : shot.radius * 0.75, 0, TAU);
-          c.fill();
-          c.fillStyle = '#fff8df';
-          c.beginPath();
-          c.arc(-1, -1, 2.5, 0, TAU);
-          c.fill();
-        }
+        } else
+          this.glowSprite(`shot:${shot.kind}:${shot.color}:${shot.radius}`, 144, 112, (c) => {
+            c.shadowColor = shot.color;
+            c.shadowBlur = 12;
+            c.strokeStyle = shot.color;
+            c.fillStyle = shot.color;
+            if (shot.kind === 'blade') {
+              c.lineWidth = 4;
+              c.beginPath();
+              c.arc(0, 0, 15, 0, Math.PI * 1.7);
+              c.stroke();
+            } else if (shot.kind === 'talisman') {
+              c.fillRect(-12, -5, 20, 10);
+              c.fillStyle = '#58475d';
+              c.fillRect(-7, -2, 10, 3);
+            } else if (shot.kind === 'spear' || shot.kind === 'nail') {
+              const length = shot.kind === 'spear' ? 48 : 20;
+              c.lineWidth = shot.kind === 'spear' ? 3 : 1.5;
+              c.beginPath();
+              c.moveTo(-length, 0);
+              c.lineTo(12, 0);
+              c.stroke();
+              c.beginPath();
+              c.moveTo(18, 0);
+              c.lineTo(5, -5);
+              c.lineTo(5, 5);
+              c.closePath();
+              c.fill();
+            } else if (shot.kind === 'flute') {
+              c.beginPath();
+              c.ellipse(0, 3, 6, 4, -0.4, 0, TAU);
+              c.fill();
+              c.lineWidth = 2;
+              c.beginPath();
+              c.moveTo(5, 3);
+              c.lineTo(5, -15);
+              c.lineTo(14, -9);
+              c.stroke();
+            } else if (shot.kind === 'shard' || shot.kind === 'umbrella') {
+              c.beginPath();
+              c.moveTo(14, 0);
+              c.lineTo(-8, -6);
+              c.lineTo(-2, 2);
+              c.lineTo(-8, 7);
+              c.closePath();
+              c.fill();
+              c.strokeStyle = '#eee7ff';
+              c.stroke();
+            } else if (shot.kind === 'skull') {
+              c.beginPath();
+              c.ellipse(0, 0, 13, 10, 0, 0, TAU);
+              c.fill();
+              c.fillRect(-2, 6, 9, 7);
+              c.fillStyle = '#332344';
+              c.beginPath();
+              c.arc(3, -4, 3, 0, TAU);
+              c.arc(3, 4, 3, 0, TAU);
+              c.fill();
+            } else if (shot.kind === 'beads') {
+              c.beginPath();
+              c.arc(0, 0, shot.radius, 0, TAU);
+              c.fill();
+              c.strokeStyle = '#fff0bb';
+              c.lineWidth = 1;
+              c.beginPath();
+              c.arc(0, 0, shot.radius * 0.65, 0, TAU);
+              c.stroke();
+            } else if (shot.kind === 'fan') {
+              c.lineWidth = 3;
+              c.beginPath();
+              c.arc(-10, 0, 20, -0.8, 0.8);
+              c.stroke();
+            } else {
+              c.beginPath();
+              c.arc(0, 0, shot.kind === 'hostile' ? 5 : shot.radius * 0.75, 0, TAU);
+              c.fill();
+              c.fillStyle = '#fff8df';
+              c.beginPath();
+              c.arc(-1, -1, 2.5, 0, TAU);
+              c.fill();
+            }
+          });
         c.restore();
       }
     }
@@ -542,8 +551,9 @@ export class Renderer {
       if (e.kind === 'text') {
         c.font = `600 ${e.text?.includes('!') ? 16 : 13}px Georgia, serif`;
         c.textAlign = 'center';
-        c.shadowColor = '#132421';
-        c.shadowBlur = 3;
+        c.strokeStyle = '#132421';
+        c.lineWidth = 2;
+        c.strokeText(e.text || '', e.x, e.y);
         c.fillText(e.text || '', e.x, e.y);
       } else if (e.kind === 'cleave') {
         const angle = Math.atan2(e.y2! - e.y, e.x2! - e.x);
@@ -589,19 +599,23 @@ export class Renderer {
         c.lineTo(e.x2!, e.y2!);
         c.stroke();
       } else if (e.kind === 'lightning') {
-        c.lineWidth = 3;
-        c.shadowColor = e.color;
-        c.shadowBlur = 16;
-        c.beginPath();
-        c.moveTo(e.x - 20, e.y - 260);
-        c.lineTo(e.x + 12, e.y - 140);
-        c.lineTo(e.x - 9, e.y - 130);
-        c.lineTo(e.x + 5, e.y);
-        c.stroke();
-        c.lineWidth = 1;
-        c.beginPath();
-        c.ellipse(e.x, e.y, 35, 18, 0, 0, TAU);
-        c.stroke();
+        c.translate(e.x, e.y);
+        this.glowSprite(`lightning:${e.color}`, 110, 570, (c) => {
+          c.strokeStyle = e.color;
+          c.lineWidth = 3;
+          c.shadowColor = e.color;
+          c.shadowBlur = 16;
+          c.beginPath();
+          c.moveTo(-20, -260);
+          c.lineTo(12, -140);
+          c.lineTo(-9, -130);
+          c.lineTo(5, 0);
+          c.stroke();
+          c.lineWidth = 1;
+          c.beginPath();
+          c.ellipse(0, 0, 35, 18, 0, 0, TAU);
+          c.stroke();
+        });
       } else {
         const r = e.radius * (1 - e.life / e.maxLife);
         c.lineWidth = e.kind === 'ice' ? 4 : 3;
@@ -812,23 +826,47 @@ export class Renderer {
     c.translate(x, y);
     c.rotate(angle);
     c.scale(scale, scale);
-    c.shadowColor = '#adf0d3';
-    c.shadowBlur = 14;
-    for (let i = 0; i < 8; i++) {
-      c.rotate(TAU / 8);
-      c.fillStyle = i % 2 ? '#96ccbb' : '#c2e9c7';
-      c.strokeStyle = '#def3cf';
-      c.lineWidth = 0.7;
+    this.glowSprite('lotus', 90, 90, (c) => {
+      c.shadowColor = '#adf0d3';
+      c.shadowBlur = 14;
+      for (let i = 0; i < 8; i++) {
+        c.rotate(TAU / 8);
+        c.fillStyle = i % 2 ? '#96ccbb' : '#c2e9c7';
+        c.strokeStyle = '#def3cf';
+        c.lineWidth = 0.7;
+        c.beginPath();
+        c.ellipse(11, 0, 15, 7, 0, 0, TAU);
+        c.fill();
+        c.stroke();
+      }
+      c.fillStyle = '#e7d58e';
       c.beginPath();
-      c.ellipse(11, 0, 15, 7, 0, 0, TAU);
+      c.arc(0, 0, 9, 0, TAU);
       c.fill();
-      c.stroke();
-    }
-    c.fillStyle = '#e7d58e';
-    c.beginPath();
-    c.arc(0, 0, 9, 0, TAU);
-    c.fill();
+    });
     c.restore();
+  }
+  private glowSprite(
+    key: string,
+    width: number,
+    height: number,
+    paint: (context: CanvasRenderingContext2D) => void,
+  ) {
+    let texture = this.glowSprites.get(key);
+    if (!texture) {
+      texture = document.createElement('canvas');
+      texture.width = width * 2;
+      texture.height = height * 2;
+      const context = texture.getContext('2d')!;
+      context.scale(2, 2);
+      context.translate(width / 2, height / 2);
+      paint(context);
+      // 光效只在首次使用时计算模糊，后续帧复用；限制长局中的纹理占用。
+      if (this.glowSprites.size >= 96)
+        this.glowSprites.delete(this.glowSprites.keys().next().value!);
+      this.glowSprites.set(key, texture);
+    }
+    this.ctx.drawImage(texture, -width / 2, -height / 2, width, height);
   }
   private cachedFormation(
     x: number,
