@@ -1,4 +1,12 @@
-import { TREASURES, PASSIVES, DIFFICULTIES, treasure, passive } from './data.ts';
+import {
+  evolutionPassives,
+  pathInfo,
+  TREASURES,
+  PASSIVES,
+  DIFFICULTIES,
+  treasure,
+  passive,
+} from './data.ts';
 import { icon } from './icons.ts';
 
 export const GUIDE_TABS = [
@@ -53,8 +61,15 @@ export function guideContent(tab: string) {
       )
       .join('')}</div>`;
   if (tab === 'builds')
-    return `<div class="guide-steps"><div><b>01</b><h3>先构筑，再进化</h3><p>每局最多携带 <strong>6 件法宝、4 种功法</strong>。法宝最高六重，功法最高五重。法宝六重与对应功法三重齐备后，下次升级会优先提供仙器觉醒；觉醒带来更高伤害、更短冷却及强化招式。</p></div><div><b>02</b><h3>局内成长与永久成长</h3><p>局内等级、法宝重数和功法会在新一局重置。永久修为在斩妖、升级时实时增加，满额立即突破，永久气血 +3、法宝伤害 +2.5%，本局就生效。战斗左上角显示境界与突破进度；LV 只表示本局选技等级。境界、根基修炼和藏器阁炼器永久保留。</p></div></div><h3 class="guide-subheading">十六法宝 · 仙器配方</h3><div class="recipe-list">${TREASURES.map((t) => `<div>${icon(t.id, t.color)}<span>${t.name}<small>六重 + ${passive(t.passive).name}三重</small></span><i>→</i><strong>${t.evolution}</strong></div>`).join('')}</div><h3 class="guide-subheading">八种功法 · 每重效果</h3><div class="guide-passives">${PASSIVES.map((p) => `<p><strong>${p.name}</strong>${p.desc}</p>`).join('')}</div><h3 class="guide-subheading">入门搭配参考</h3><div class="build-tips"><p><strong>御剑雷法</strong>${treasure('sword').name} + 九霄雷符，配太玄剑经、周天星诀，持续清怪。</p><p><strong>青莲护体</strong>青莲灯 + 东皇钟，配乾坤道法、金刚不坏，处理近身妖潮。</p><p><strong>万毒困阵</strong>万毒葫 + 阴阳盘，配长生真经、吞天纳灵，聚怪持续消耗。</p></div>`;
+    return `<div class="guide-steps"><div><b>01</b><h3>先构筑，再进化</h3><p>每局最多携带 <strong>6 件法宝、4 种功法</strong>。法宝最高六重，功法最高五重。法宝六重与对应功法三重齐备后，下次升级会优先提供仙器觉醒；觉醒带来更高伤害、更短冷却及强化招式。</p></div><div><b>02</b><h3>局内成长与永久成长</h3><p>局内等级、法宝重数和功法会在新一局重置。永久修为在斩妖、升级时实时增加，满额立即突破，永久气血 +3、法宝伤害 +2.5%，本局就生效。战斗左上角显示境界与突破进度；LV 只表示本局选技等级。境界、根基修炼和藏器阁炼器永久保留。</p></div></div><h3 class="guide-subheading">正道、魔道与兼修</h3><p class="panel-note">正道仅出现正道法宝与功法，气血上限 +12、每秒回复 +0.2；魔道仅出现魔道法宝与功法，法宝伤害 +12%；兼修可以自由混搭，共用 4 个功法位，无额外路线加成。正道、魔道各有 18 件法宝和 8 种功法，兼修可使用全部 36 件。每件均有正、魔两条进化配方，兼修满足任意一条即可。同类属性加成相加；施法间隔最低为基础的 30%，暴击率最高 85%，承伤最低为基础的 30%。天魔解体仅在半血以下触发额外加成，白骨反击随受伤无敌间隔触发，吸血与斩妖回复不能复活角色。路线仅影响新局，旧存档默认兼修；更新前已有的跨流派法宝保留，之后新领悟遵循路线。</p><h3 class="guide-subheading">三十六法宝 · 仙器配方</h3><div class="recipe-list">${TREASURES.map(
+      (t) =>
+        `<div>${icon(t.id, t.color)}<span>${t.name}<small>六重 + ${evolutionPassives(t)
+          .map((id) => passive(id).name)
+          .join(' / ')}任一三重</small></span><i>→</i><strong>${t.evolution}</strong></div>`,
+    ).join(
+      '',
+    )}</div><h3 class="guide-subheading">十六种功法 · 每重效果</h3><div class="guide-passives">${PASSIVES.map((p) => `<p><strong>${p.name} · ${pathInfo(p.school).name}</strong>${p.desc}</p>`).join('')}</div><h3 class="guide-subheading">入门搭配参考</h3><div class="build-tips"><p><strong>御剑雷法</strong>${treasure('sword').name} + 九霄雷符，配太玄剑经、周天星诀，持续清怪。</p><p><strong>青莲护体</strong>青莲灯 + 东皇钟，配乾坤道法、金刚不坏，处理近身妖潮。</p><p><strong>万毒困阵</strong>万毒葫 + 阴阳盘，配长生真经、吞天纳灵，聚怪持续消耗。</p></div>`;
   if (tab === 'save')
-    return `<div class="guide-steps"><div><b>01</b><h3>永久进度保存在这个浏览器</h3><p>境界、修为、灵石、玄铁、关卡解锁、修炼等级、法宝炼器、本命法宝、AI 代打开关与音效设置都会自动保存在本机浏览器的 localStorage 中，无需登录。</p></div><div><b>02</b><h3>刷新后继续上次历练</h3><p>进行中的对局每 5 秒自动存一次，突破、暂停、升级选择和退出页面时也会保存。重新打开后点击「继续上次历练」，会恢复气血、时间、妖物、掉落和法宝搭配，先暂停等待你准备好；升级选择中的存档保留选项，若开启代打则自动选技。</p></div><div><b>03</b><h3>实时修为与结算收益</h3><p>实时修为和本局已入账数额一起保存，刷新续局不会重复领取。通关或失败只补发尚未入账的修为，并结算灵石、玄铁；旧版未结束对局读取时自动补发已有战绩的修为。主动放弃旧局新开时，已入账修为保留，旧局未结算的灵石、玄铁和通关奖励不保留。</p></div><div><b>04</b><h3>存档属于当前设备与网址</h3><p>换浏览器、换设备或换网址不会自动同步；清除网站数据会删除存档。隐私模式关闭后也可能清除进度。普通浏览器中打开并使用同一个网址即可继续。</p></div></div>`;
-  return `<div class="guide-steps"><div><b>01</b><h3>只需走位，法宝自动施放</h3><p>电脑用 <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 或方向键移动；手机按住战斗画面拖动虚拟摇杆。无需点击攻击，法宝会自动寻找妖物施放。按 <kbd>Esc</kbd> / <kbd>P</kbd> 或右上角按钮暂停。<strong>开启「AI 代打」后自动走位、拾取与选技，优先配套功法和仙器进化。</strong>可随时关闭；按移动键或触屏拖动也能立即接管。暂停或切到后台会停止代打，通关或失败后停在结算页。</p></div><div><b>02</b><h3>收集灵气，升级三选一</h3><p>靠近青色灵气即可收集。升级可选新法宝、升阶已有法宝或修炼功法。每局有 3 次「重悟机缘」刷新选项的机会，也可按 <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> 快速选择。做选择时战斗暂停。</p></div><div><b>03</b><h3>观察预警，击败妖王</h3><p>每分钟出现携带宝匣的精英，倒计时结束后妖王现身。<strong>击败妖王才会通关</strong>，并解锁下一秘境。避开地面红圈和冲刺路线，侧向躲开远程灵弹。残血时寻找回春丹或精英宝匣。</p></div><div><b>04</b><h3>修炼根基，再赴下一境</h3><p>六处秘境的倒计时依次为 5、6、7、8、9、10 分钟，妖王战另计。每次历练所得可用于洞府修炼与法宝炼器，斩妖与升级的修为实时推动九大境界、初中后三期逐步突破，通关另有修为奖励。</p></div></div><div class="guide-difficulties">${DIFFICULTIES.map((d, i) => `<div><strong>${d.name}</strong><span>灵石 / 修为 ×${d.reward}</span><p>${['适合首次历练，熟悉走位与搭配。', '怪群更密集，适合已有搭配思路的修士。', '妖物气血与伤害显著提升，建议修炼根基后挑战。'][i]}</p></div>`).join('')}</div>`;
+    return `<div class="guide-steps"><div><b>01</b><h3>永久进度保存在这个浏览器</h3><p>境界、修为、灵石、玄铁、关卡解锁、修炼等级、法宝炼器、本命法宝、修行路线、AI 代打开关与音效设置都会自动保存在本机浏览器的 localStorage 中，无需登录。</p></div><div><b>02</b><h3>刷新后继续上次历练</h3><p>进行中的对局每 5 秒自动存一次，突破、暂停、升级选择和退出页面时也会保存。重新打开后点击「继续上次历练」，会恢复气血、时间、妖物、掉落和法宝搭配，先暂停等待你准备好；升级选择中的存档保留选项，若开启代打则自动选技。</p></div><div><b>03</b><h3>实时修为与结算收益</h3><p>实时修为和本局已入账数额一起保存，刷新续局不会重复领取。通关或失败只补发尚未入账的修为，并结算灵石、玄铁；旧版未结束对局读取时自动补发已有战绩的修为。主动放弃旧局新开时，已入账修为保留，旧局未结算的灵石、玄铁和通关奖励不保留。</p></div><div><b>04</b><h3>存档属于当前设备与网址</h3><p>换浏览器、换设备或换网址不会自动同步；清除网站数据会删除存档。隐私模式关闭后也可能清除进度。普通浏览器中打开并使用同一个网址即可继续。</p></div></div>`;
+  return `<div class="guide-steps"><div><b>01</b><h3>只需走位，法宝自动施放</h3><p>电脑用 <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> 或方向键移动；手机按住战斗画面拖动虚拟摇杆。无需点击攻击，法宝会自动寻找妖物施放。按 <kbd>Esc</kbd> / <kbd>P</kbd> 或右上角按钮暂停。<strong>开启「AI 代打」后自动走位、拾取与选技，优先配套功法和仙器进化。</strong>可随时关闭；按移动键或触屏拖动也能立即接管。暂停或切到后台会停止代打，通关或失败后停在结算页。</p></div><div><b>02</b><h3>收集灵气，升级三选一</h3><p>靠近青色灵气即可收集。升级可选新法宝、升阶已有法宝或修炼功法。每局有 3 次「重悟机缘」刷新选项的机会，也可按 <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> 快速选择。做选择时战斗暂停。</p></div><div><b>03</b><h3>观察预警，击败妖王</h3><p>每分钟出现携带宝匣的精英，倒计时结束后妖王现身。<strong>击败妖王才会通关</strong>，并解锁下一秘境。28 种妖物逐境累加，保留之前的类型，后期陆续加入冰傀、毒蝎、冥卫与天将。避开地面红圈和冲刺路线，从散射与环射弹幕的空隙穿行；护盾妖物亮盾时减伤 55%，暗盾时集中攻击。残血时寻找回春丹或精英宝匣。</p></div><div><b>04</b><h3>修炼根基，再赴下一境</h3><p>六处秘境的倒计时依次为 5、6、7、8、9、10 分钟，妖王战另计。每次历练所得可用于洞府修炼与法宝炼器，斩妖与升级的修为实时推动九大境界、初中后三期逐步突破，通关另有修为奖励。</p></div></div><div class="guide-difficulties">${DIFFICULTIES.map((d, i) => `<div><strong>${d.name}</strong><span>灵石 / 修为 ×${d.reward}</span><p>${['适合首次历练，熟悉走位与搭配。', '怪群更密集，适合已有搭配思路的修士。', '妖物气血与伤害显著提升，建议修炼根基后挑战。'][i]}</p></div>`).join('')}</div>`;
 }

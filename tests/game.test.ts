@@ -60,9 +60,9 @@ test('斜向移动不比直线快，受伤具有无敌间隔', () => {
   straight.hurtPlayer(10);
   assert.equal(straight.player.hp, 90);
 });
-test('16 种攻击法宝均能独立对妖物造成伤害', () => {
-  assert.equal(TREASURES.length, 16);
-  assert.equal(new Set(TREASURES.map((t) => t.id)).size, 16);
+test('36 种攻击法宝均能独立对妖物造成伤害', () => {
+  assert.equal(TREASURES.length, 36);
+  assert.equal(new Set(TREASURES.map((t) => t.id)).size, 36);
   for (const t of TREASURES) {
     const save = freshSave();
     save.starter = t.id;
@@ -383,8 +383,8 @@ test('已结束或损坏的对局不恢复，永久进度仍可读取', () => {
   const s = parseSave(JSON.stringify({ ...game.save, stones: 35, activeRun: { invalid: true } }));
   assert.equal(s.stones, 35);
 });
-test('十二种普通妖物分别使用独立立绘，图集坐标不会越界', () => {
-  assert.equal(new Set(ENEMIES.map((e) => e.sprite)).size, 12);
+test('28 种普通妖物分别使用独立立绘，图集坐标不会越界', () => {
+  assert.equal(new Set(ENEMIES.map((e) => e.sprite)).size, 28);
   for (const e of [...ENEMIES, ...STAGES]) {
     const f = spriteFrame(e.sprite);
     assert.ok(f.x >= 0 && f.y >= 0);

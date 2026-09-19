@@ -1,4 +1,13 @@
-import { REALMS, STAGES, TREASURES, DIFFICULTIES } from './data.ts';
+import {
+  REALMS,
+  STAGES,
+  TREASURES,
+  DIFFICULTIES,
+  isCultivationPath,
+  allowsSchool,
+  treasure,
+} from './data.ts';
+import type { CultivationPath } from './data.ts';
 
 export interface SaveData {
   version: 1;
@@ -14,6 +23,7 @@ export interface SaveData {
   starter: string;
   sound: boolean;
   autoplay: boolean;
+  path: CultivationPath;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 export function freshSave(): SaveData {
@@ -31,6 +41,7 @@ export function freshSave(): SaveData {
     starter: 'sword',
     sound: false,
     autoplay: false,
+    path: 'dual',
   };
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
@@ -60,6 +71,9 @@ export function parseSave(raw: string | null): SaveData {
     base.starter = TREASURES.some((t) => t.id === s.starter) ? s.starter : 'sword';
     base.sound = s.sound === true;
     base.autoplay = s.autoplay === true;
+    base.path = isCultivationPath(s.path) ? s.path : 'dual';
+    if (!allowsSchool(base.path, treasure(base.starter).school))
+      base.starter = TREASURES.find((t) => allowsSchool(base.path, t.school))!.id;
     return base;
   } catch {
     return base;
