@@ -1059,13 +1059,28 @@ kbd {
   margin-top: 8px;
 }
 .evolution-recipe {
-  font-size: 9px;
+  font-size: 11px;
   line-height: 1.9;
   color: #a9b9a4;
   margin-top: 8px;
 }
-.evolution-recipe span {
+.evolution-recipe > span {
+  display: block;
   color: #d7c894;
+}
+.collection-card > div {
+  min-width: 0;
+}
+.collection-card .evolution-recipe {
+  font-size: 10px;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+.choice-card .evolution-recipe {
+  grid-column: 1 / -1;
+  margin: 12px 0;
+  padding: 9px 0;
+  border-top: 1px solid #b9c49e33;
 }
 .detail-actions {
   display: flex;
@@ -1741,6 +1756,8 @@ kbd {
   gap: 21px;
 }
 .choice-card {
+  display: flex;
+  flex-direction: column;
   background: linear-gradient(150deg, #2e4d3eee, #123730f7);
   border: 1px solid #b6c79767;
   padding: 20px 23px;
@@ -1811,6 +1828,7 @@ kbd {
   min-height: 65px;
 }
 .choice-benefit {
+  margin-top: auto;
   padding: 14px 0;
   font-size: 9px;
   color: #d1d3ac;
@@ -2950,6 +2968,9 @@ kbd {
   .collection-grid {
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
+  }
+  .collection-grid.treasure-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .collection-card {
     padding: 13px 5px 19px;
