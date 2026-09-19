@@ -68,6 +68,55 @@ svg {
   border-radius: 8px;
   vertical-align: middle;
 }
+.spirit-root-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin: 18px 0;
+  padding: 18px 22px;
+  border: 1px solid var(--border);
+  background: #183b333d;
+}
+.spirit-root-summary strong {
+  display: block;
+  color: var(--gold);
+  font-size: 23px;
+  font-weight: 500;
+  margin-top: 5px;
+}
+.spirit-root-summary small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.spirit-root-summary p {
+  flex: 1;
+  min-width: 160px;
+  font-size: 12px;
+  line-height: 2;
+}
+.spirit-root-summary b {
+  color: var(--gold);
+}
+.spirit-root-summary button {
+  font-size: 11px;
+  padding: 10px 14px;
+  min-height: 38px;
+}
+.spirit-root-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+.spirit-root-rewards button {
+  flex: 1;
+  min-width: 145px;
+  flex-direction: column;
+  gap: 4px;
+}
 .path-selection {
   margin: 18px 0;
 }

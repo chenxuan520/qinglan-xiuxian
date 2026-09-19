@@ -1,3 +1,23 @@
+export const SPIRIT_ROOTS = [
+  { id: 'heaven', name: '天灵根', rate: 1, chance: 5 },
+  { id: 'variant', name: '异灵根', rate: 0.85, chance: 10 },
+  { id: 'dual', name: '双灵根', rate: 0.7, chance: 15 },
+  { id: 'triple', name: '三灵根', rate: 0.55, chance: 25 },
+  { id: 'quad', name: '四灵根', rate: 0.4, chance: 25 },
+  { id: 'five', name: '五灵根', rate: 0.3, chance: 20 },
+] as const;
+export type SpiritRootId = (typeof SPIRIT_ROOTS)[number]['id'];
+export const spiritRootInfo = (id: string) =>
+  SPIRIT_ROOTS.find((r) => r.id === id) ?? SPIRIT_ROOTS[0];
+export function rollSpiritRoot(random: () => number = Math.random): SpiritRootId {
+  let roll = random() * 100;
+  for (const root of SPIRIT_ROOTS) {
+    roll -= root.chance;
+    if (roll < 0) return root.id;
+  }
+  return 'five';
+}
+
 export type WeaponKind =
   | 'sword'
   | 'orbit'
@@ -1202,6 +1222,7 @@ export const MAX_WEAPON_LEVEL = 6;
 export const MAX_RUN_LEVEL = 100;
 export const MAX_REVIVES = 10;
 export const MAX_FORGE_LEVEL = 10;
+export const AD_SUPPLIES = { stones: 300, iron: 30 };
 export const MAX_PASSIVE_LEVEL = 5;
 export const TAU = Math.PI * 2;
 export const treasure = (id: string) => TREASURES.find((t) => t.id === id)!;
