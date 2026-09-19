@@ -1,0 +1,467 @@
+export type WeaponKind =
+  | 'sword'
+  | 'orbit'
+  | 'lightning'
+  | 'pulse'
+  | 'poison'
+  | 'ice'
+  | 'fire'
+  | 'fan'
+  | 'blade'
+  | 'arrow'
+  | 'meteor'
+  | 'chain'
+  | 'vortex'
+  | 'talisman'
+  | 'pearl'
+  | 'dragon';
+export interface Treasure {
+  id: WeaponKind;
+  name: string;
+  mark: string;
+  color: string;
+  tag: string;
+  desc: string;
+  evolution: string;
+  passive: string;
+  damage: number;
+  cooldown: number;
+}
+export const TREASURES: Treasure[] = [
+  {
+    id: 'sword',
+    name: '青霄剑',
+    mark: '剑',
+    color: '#e8d69c',
+    tag: '御剑 · 穿透',
+    desc: '飞剑自动索敌，贯穿沿途妖物；升阶增加剑数与伤害。',
+    evolution: '万剑归宗',
+    passive: 'power',
+    damage: 24,
+    cooldown: 0.85,
+  },
+  {
+    id: 'orbit',
+    name: '青莲灯',
+    mark: '莲',
+    color: '#9fe2c2',
+    tag: '环绕 · 护体',
+    desc: '青莲绕身，持续绞杀近身妖物；升阶增加莲花数量。',
+    evolution: '九品莲台',
+    passive: 'area',
+    damage: 17,
+    cooldown: 0.65,
+  },
+  {
+    id: 'lightning',
+    name: '九霄雷符',
+    mark: '雷',
+    color: '#c9b5ff',
+    tag: '雷法 · 群攻',
+    desc: '天雷轰击附近妖物，波及周围；升阶增加落雷数。',
+    evolution: '紫霄天劫',
+    passive: 'haste',
+    damage: 38,
+    cooldown: 2.2,
+  },
+  {
+    id: 'pulse',
+    name: '东皇钟',
+    mark: '钟',
+    color: '#edc77f',
+    tag: '音波 · 击退',
+    desc: '洪钟震出环形冲击，将附近妖物击退。',
+    evolution: '太一神钟',
+    passive: 'guard',
+    damage: 30,
+    cooldown: 3,
+  },
+  {
+    id: 'poison',
+    name: '万毒葫',
+    mark: '葫',
+    color: '#bcda80',
+    tag: '毒法 · 持续',
+    desc: '在妖群中播撒毒雾，持续腐蚀踏入其中的妖物。',
+    evolution: '蚀骨万毒域',
+    passive: 'duration',
+    damage: 11,
+    cooldown: 3.5,
+  },
+  {
+    id: 'ice',
+    name: '玄冰镜',
+    mark: '镜',
+    color: '#a9ddf3',
+    tag: '寒冰 · 控制',
+    desc: '寒光冻结身旁妖物，使其移动速度大幅降低。',
+    evolution: '万里霜天',
+    passive: 'area',
+    damage: 22,
+    cooldown: 3.2,
+  },
+  {
+    id: 'fire',
+    name: '离火珠',
+    mark: '火',
+    color: '#f3a887',
+    tag: '离火 · 爆裂',
+    desc: '射出炽热火球，命中时爆裂灼烧一片妖物。',
+    evolution: '焚天业火',
+    passive: 'power',
+    damage: 32,
+    cooldown: 1.6,
+  },
+  {
+    id: 'fan',
+    name: '芭蕉扇',
+    mark: '扇',
+    color: '#addec2',
+    tag: '风法 · 扇射',
+    desc: '朝妖群挥出扇形风刃，覆盖宽阔战线。',
+    evolution: '九天罡风',
+    passive: 'haste',
+    damage: 19,
+    cooldown: 1.6,
+  },
+  {
+    id: 'blade',
+    name: '血月轮',
+    mark: '轮',
+    color: '#e7a1a4',
+    tag: '飞刃 · 回旋',
+    desc: '血色月轮盘旋而出，贯穿后飞回身边。',
+    evolution: '修罗血月',
+    passive: 'duration',
+    damage: 24,
+    cooldown: 2,
+  },
+  {
+    id: 'arrow',
+    name: '追星弓',
+    mark: '弓',
+    color: '#e8dda3',
+    tag: '远程 · 暴击',
+    desc: '迅疾灵箭锁定最近妖物，暴击率额外提升。',
+    evolution: '陨日逐星',
+    passive: 'crit',
+    damage: 40,
+    cooldown: 1.15,
+  },
+  {
+    id: 'meteor',
+    name: '番天印',
+    mark: '印',
+    color: '#d7b18a',
+    tag: '重击 · 范围',
+    desc: '灵印自高空落下，对妖群造成高额范围伤害。',
+    evolution: '山河社稷',
+    passive: 'area',
+    damage: 65,
+    cooldown: 4.5,
+  },
+  {
+    id: 'chain',
+    name: '缚妖索',
+    mark: '索',
+    color: '#e3c680',
+    tag: '连锁 · 禁锢',
+    desc: '金索在妖物间弹射，以灵力束缚目标。',
+    evolution: '天罗地网',
+    passive: 'duration',
+    damage: 23,
+    cooldown: 2,
+  },
+  {
+    id: 'vortex',
+    name: '阴阳盘',
+    mark: '卦',
+    color: '#bccfdf',
+    tag: '法阵 · 牵引',
+    desc: '布下阴阳法阵，将周围妖物缓缓拉入阵心。',
+    evolution: '混元无极阵',
+    passive: 'magnet',
+    damage: 12,
+    cooldown: 4,
+  },
+  {
+    id: 'talisman',
+    name: '镇魂幡',
+    mark: '幡',
+    color: '#c4a5e8',
+    tag: '符咒 · 环射',
+    desc: '向四周发出镇魂符，阻截多个方向的妖潮。',
+    evolution: '幽冥万魂',
+    passive: 'spirit',
+    damage: 23,
+    cooldown: 2.4,
+  },
+  {
+    id: 'pearl',
+    name: '沧海珠',
+    mark: '珠',
+    color: '#95d4e0',
+    tag: '灵水 · 弹射',
+    desc: '灵珠命中后跳向附近目标，连续打击妖物。',
+    evolution: '四海潮生',
+    passive: 'magnet',
+    damage: 25,
+    cooldown: 1.5,
+  },
+  {
+    id: 'dragon',
+    name: '游龙尺',
+    mark: '龙',
+    color: '#ecd297',
+    tag: '龙息 · 游走',
+    desc: '放出游龙灵气，蜿蜒穿过妖群并击退目标。',
+    evolution: '太虚龙吟',
+    passive: 'crit',
+    damage: 33,
+    cooldown: 2.2,
+  },
+];
+export const PASSIVES = [
+  { id: 'power', name: '太玄剑经', mark: '玄', desc: '所有法宝伤害 +12%', color: '#e5d095' },
+  { id: 'haste', name: '周天星诀', mark: '星', desc: '法宝施法间隔 -7%', color: '#bdb1e7' },
+  { id: 'area', name: '乾坤道法', mark: '坤', desc: '法术范围 +12%', color: '#a8d8bd' },
+  { id: 'guard', name: '金刚不坏', mark: '罡', desc: '气血上限 +20，受伤 -6%', color: '#e2c286' },
+  {
+    id: 'duration',
+    name: '长生真经',
+    mark: '生',
+    desc: '持续法术时长 +18%，每秒回复气血 +0.2',
+    color: '#b8d794',
+  },
+  {
+    id: 'crit',
+    name: '破妄心诀',
+    mark: '心',
+    desc: '暴击概率 +7%，移动速度 +3%',
+    color: '#e4a6a1',
+  },
+  {
+    id: 'magnet',
+    name: '吞天纳灵',
+    mark: '灵',
+    desc: '自动吸取附近掉落；每重拾取范围 +28%，灵气获取 +8%',
+    color: '#9fd9db',
+  },
+  {
+    id: 'spirit',
+    name: '紫府仙经',
+    mark: '府',
+    desc: '灵气获取 +15%，法宝伤害 +4%',
+    color: '#c7b0e8',
+  },
+];
+export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '渡劫'];
+export const STAGES = [
+  {
+    name: '青岚竹海',
+    subtitle: '竹影藏灵 · 初入仙途',
+    chapter: '壹',
+    minutes: 5,
+    color: '#9fc6aa',
+    boss: '苍木妖王',
+    sprite: 4,
+    reward: 100,
+    description: '古道生苔，青岚漫野。于竹海深处，踏出问道的第一步。',
+  },
+  {
+    name: '落霞古墟',
+    subtitle: '古阵余烬 · 妖影渐生',
+    chapter: '贰',
+    minutes: 6,
+    color: '#d6b784',
+    boss: '赤炎狐王',
+    sprite: 5,
+    reward: 160,
+    description: '夕照古墟，离火未熄。疾行的狐妖在残垣间伺机而动。',
+  },
+  {
+    name: '玄冰幽谷',
+    subtitle: '千载寒霜 · 冰魄凝心',
+    chapter: '叁',
+    minutes: 7,
+    color: '#a8cfdc',
+    boss: '霜魄狼王',
+    sprite: 2,
+    reward: 240,
+    description: '冰魄凝谷，寒意入骨。穿过狼群，寻得幽谷中的一线生机。',
+  },
+  {
+    name: '万毒深泽',
+    subtitle: '瘴云蔽日 · 万物归寂',
+    chapter: '肆',
+    minutes: 8,
+    color: '#bcc895',
+    boss: '玄甲毒君',
+    sprite: 7,
+    reward: 340,
+    description: '幽泽瘴气千重，毒灵四伏。唯有攻守兼备，方能涉水而归。',
+  },
+  {
+    name: '九幽冥府',
+    subtitle: '百鬼夜行 · 一剑镇魂',
+    chapter: '伍',
+    minutes: 9,
+    color: '#baa2d0',
+    boss: '九幽冥主',
+    sprite: 13,
+    reward: 460,
+    description: '幽冥之门洞开，万千魂影涌现。执剑守心，莫入迷途。',
+  },
+  {
+    name: '太虚天境',
+    subtitle: '雷劫淬身 · 问道长生',
+    chapter: '陆',
+    minutes: 10,
+    color: '#e0d7b2',
+    boss: '太虚劫灵',
+    sprite: 3,
+    reward: 600,
+    description: '九天雷动，太虚无垠。历过重重天劫，叩问长生之门。',
+  },
+];
+export const DIFFICULTIES = [
+  { name: '初入仙途', label: '从容修行', hp: 0.85, damage: 0.72, amount: 0.9, reward: 1 },
+  { name: '问道试炼', label: '妖潮渐涌', hp: 1.12, damage: 1, amount: 1.13, reward: 1.5 },
+  { name: '天劫降临', label: '险中求道', hp: 1.9, damage: 1.45, amount: 1.35, reward: 2.2 },
+];
+export const ENEMIES = [
+  {
+    name: '赤伞菇妖',
+    sprite: 1,
+    hp: 24,
+    speed: 48,
+    damage: 8,
+    radius: 15,
+    behavior: 'chase',
+    xp: 3,
+  },
+  {
+    name: '青鬃灵狼',
+    sprite: 2,
+    hp: 32,
+    speed: 94,
+    damage: 10,
+    radius: 17,
+    behavior: 'chase',
+    xp: 4,
+  },
+  {
+    name: '碧火游魂',
+    sprite: 3,
+    hp: 28,
+    speed: 56,
+    damage: 9,
+    radius: 14,
+    behavior: 'ranged',
+    xp: 4,
+  },
+  {
+    name: '逐影妖狐',
+    sprite: 5,
+    hp: 42,
+    speed: 71,
+    damage: 12,
+    radius: 17,
+    behavior: 'dash',
+    xp: 5,
+  },
+  {
+    name: '玄甲石龟',
+    sprite: 7,
+    hp: 140,
+    speed: 32,
+    damage: 15,
+    radius: 23,
+    behavior: 'tank',
+    xp: 8,
+  },
+  {
+    name: '紫袍咒师',
+    sprite: 6,
+    hp: 58,
+    speed: 42,
+    damage: 12,
+    radius: 17,
+    behavior: 'ranged',
+    xp: 7,
+  },
+  {
+    name: '赤焰爆菇',
+    sprite: 8,
+    hp: 30,
+    speed: 80,
+    damage: 17,
+    radius: 15,
+    behavior: 'explode',
+    xp: 5,
+  },
+  {
+    name: '霜牙妖狼',
+    sprite: 9,
+    hp: 64,
+    speed: 83,
+    damage: 14,
+    radius: 20,
+    behavior: 'dash',
+    xp: 7,
+  },
+  {
+    name: '摄魂使',
+    sprite: 10,
+    hp: 95,
+    speed: 35,
+    damage: 13,
+    radius: 20,
+    behavior: 'summon',
+    xp: 10,
+  },
+  {
+    name: '剧毒妖灵',
+    sprite: 11,
+    hp: 44,
+    speed: 63,
+    damage: 12,
+    radius: 17,
+    behavior: 'poison',
+    xp: 6,
+  },
+  {
+    name: '苍木树卫',
+    sprite: 4,
+    hp: 200,
+    speed: 37,
+    damage: 19,
+    radius: 27,
+    behavior: 'tank',
+    xp: 12,
+  },
+  {
+    name: '金尾幻狐',
+    sprite: 12,
+    hp: 80,
+    speed: 107,
+    damage: 13,
+    radius: 19,
+    behavior: 'dash',
+    xp: 8,
+  },
+];
+export const MAX_WEAPONS = 6;
+export const MAX_PASSIVES = 4;
+export const MAX_WEAPON_LEVEL = 6;
+export const MAX_PASSIVE_LEVEL = 5;
+export const TAU = Math.PI * 2;
+export const treasure = (id: string) => TREASURES.find((t) => t.id === id)!;
+export const passive = (id: string) => PASSIVES.find((p) => p.id === id)!;
+export const xpNeeded = (level: number) => Math.round(12 + level * 6 + level ** 1.45 * 2);
+export const formatTime = (seconds: number) =>
+  `${Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, '0')}:${Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, '0')}`;
