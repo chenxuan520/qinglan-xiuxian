@@ -71,7 +71,7 @@ export function freshSave(
     artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[rootElements[0] ?? 'metal']])],
     artifactDrops: [],
     starter: rootStarter(rootElements, 'dual'),
-    sound: false,
+    sound: true,
     volume: 0.6,
     autoplay: false,
     path: 'dual',
@@ -134,7 +134,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
       (id) => !base.artifacts.includes(id),
     );
     base.starter = TREASURES.some((t) => t.id === s.starter) ? s.starter : 'sword';
-    base.sound = s.sound === true;
+    if (typeof s.sound === 'boolean') base.sound = s.sound;
     if (typeof s.volume === 'number' && Number.isFinite(s.volume))
       base.volume = Math.min(1, Math.max(0, s.volume));
     base.autoplay = s.autoplay === true;

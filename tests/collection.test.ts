@@ -82,6 +82,14 @@ test('音量保存与旧档兼容，零音量和最大音量均有效，越界�
   assert.equal(parseSave('{"version":1,"volume":"bad"}').volume, 0.6);
 });
 
+test('新角色默认开启音乐与音效，旧档和导入档的静音选择保持不变', () => {
+  assert.equal(freshSave().sound, true);
+  assert.equal(parseSave(null).sound, true);
+  assert.equal(parseSave('{"version":1}').sound, true);
+  for (const sound of [false, true])
+    assert.equal(parseSave(JSON.stringify({ ...freshSave(), sound })).sound, sound);
+});
+
 test('默认仅有青霄剑与追魂钉，未收藏法宝不能炼器但仍可局内领悟', () => {
   const save = freshSave();
   assert.deepEqual(save.artifacts, ['sword', 'nail']);
