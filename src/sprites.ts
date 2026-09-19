@@ -1,3 +1,5 @@
+import { assetUrl } from './asset-url.ts';
+
 export const SPRITE_ATLASES = [
   { start: 0, columns: 4, url: '/assets/characters.png' },
   { start: 8, columns: 3, url: '/assets/enemies-distinct.png' },
@@ -46,6 +48,6 @@ export function spriteFrame(index: number) {
 export function spriteStyle(index: number) {
   const f = spriteFrame(index);
   if (f.columns === 1)
-    return `--sprite-ratio:1;background-image:url('${f.url}');background-size:100% 100%;background-position:center`;
-  return `--sprite-ratio:${f.width / f.height};background-image:url('${f.url}');background-size:${f.columns * 100}% 200%;background-position:${((f.local % f.columns) / (f.columns - 1)) * 100}% ${Math.floor(f.local / f.columns) * 100}%`;
+    return `--sprite-ratio:1;background-image:url('${assetUrl(f.url)}');background-size:100% 100%;background-position:center`;
+  return `--sprite-ratio:${f.width / f.height};background-image:url('${assetUrl(f.url)}');background-size:${f.columns * 100}% 200%;background-position:${((f.local % f.columns) / (f.columns - 1)) * 100}% ${Math.floor(f.local / f.columns) * 100}%`;
 }

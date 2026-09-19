@@ -1,6 +1,7 @@
 import { ENEMIES, STAGES, TAU } from './data.ts';
 import type { Game, Point } from './game.ts';
 import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
+import { assetUrl } from './asset-url.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -27,7 +28,7 @@ export class Renderer {
               resolve();
             };
             terrain.onerror = reject;
-            terrain.src = stage.terrain;
+            terrain.src = assetUrl(stage.terrain);
           }),
       ),
       ...SPRITE_ATLASES.map(
@@ -39,7 +40,7 @@ export class Renderer {
               resolve();
             };
             atlas.onerror = reject;
-            atlas.src = sheet.url;
+            atlas.src = assetUrl(sheet.url);
           }),
       ),
     ]).then(() => {});
