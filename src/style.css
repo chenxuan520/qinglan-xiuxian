@@ -4018,6 +4018,31 @@ body:not(.in-game) #ui {
   flex: 1 1 auto;
   min-height: 48px;
 }
+.retreat-form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.retreat-form label {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 180px;
+}
+.retreat-form input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px;
+  background: #102f28;
+  border: 1px solid #a9baa166;
+  color: #e2d398;
+  font: inherit;
+}
+.retreat-form button {
+  min-height: 48px;
+  flex: 1 1 120px;
+}
 .lifespan-summary {
   display: flex;
   flex-wrap: wrap;

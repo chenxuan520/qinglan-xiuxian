@@ -31,6 +31,7 @@ import {
   rootStarter,
   REALM_LIFESPANS,
   STAGE_YEARS_PER_MINUTE,
+  tribulationRules,
 } from './data.ts';
 import type { CultivationPath, WeaponKind, SpiritRootId, ElementId } from './data.ts';
 import {
@@ -41,6 +42,8 @@ import {
   cultivationFactor,
   bossCultivationReward,
   extendLifespan,
+  syncTribulationClock,
+  tribulationDue,
 } from './progress.ts';
 import type { SaveData } from './progress.ts';
 
@@ -156,6 +159,10 @@ export class Game {
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
   revivesUsed = 0;
+  tribulation = 0;
+  tribulationStep = 0;
+  tribulationNextAt = 1.2;
+  tribulationOpeningDamage = 0;
   nextElite = 60;
   onEvent: (name: string) => void = () => {};
   private spawnBudget = 0;
@@ -177,6 +184,7 @@ export class Game {
     path: CultivationPath = save.path,
   ) {
     this.save = save;
+    syncTribulationClock(save);
     this.stage = stage;
     this.nextElite = this.eliteInterval;
     this.difficulty = difficulty;
@@ -200,7 +208,12 @@ export class Game {
   }
   private get maximumHealth() {
     const base = this.baseHp + (this.passives.guard || 0) * 20 + (this.passives.bone || 0) * 14;
-    return Math.round(base * (this.path === 'orthodox' ? 1.12 : 1));
+    return Math.round(
+      base *
+        (this.path === 'orthodox' ? 1.12 : 1) *
+        (1 + this.save.tribulations * 0.03) *
+        (1 + this.save.retreatBonus.vitality / 100),
+    );
   }
   get boss() {
     return this.enemies.find((e) => e.boss && !e.dead);
@@ -228,7 +241,48 @@ export class Game {
     return years;
   }
   get isFinalTrial() {
-    return this.stage === FINAL_TRIAL_STAGE;
+    return this.stage === FINAL_TRIAL_STAGE && !this.tribulation;
+  }
+  get encounterName() {
+    return this.tribulation ? `天劫 · 第 ${this.tribulation} 劫` : STAGES[this.stage].name;
+  }
+  get tribulationVulnerable() {
+    return this.tribulation > 0 && this.tribulationStep === 0 && this.time > 1.2;
+  }
+  get tribulationRadius() {
+    return 460;
+  }
+  static createTribulation(save: SaveData, source: Game | null) {
+    const g = new Game(
+      save,
+      source?.stage ?? save.unlocked,
+      0,
+      Math.random,
+      source?.path ?? save.path,
+    );
+    g.tribulation = save.tribulations + 1;
+    if (source) {
+      g.spiritRoot = source.spiritRoot;
+      g.rootElements = [...source.rootElements];
+      g.weapons = source.weapons.map((w) => ({ ...w, timer: 0 }));
+      g.passives = { ...source.passives };
+      g.level = source.level;
+    } else {
+      g.weapons[0].level = 6;
+      g.weapons[0].evolved = true;
+    }
+    g.baseHp =
+      spiritRootInfo(g.spiritRoot).baseHp + save.training.vitality * 10 + realmBonuses(g.realm).hp;
+    g.player.hp = g.player.maxHp = g.maximumHealth;
+    g.player.y = 240;
+    g.bossSpawned = true;
+    const boss = g.spawnEnemy(10, false, true, { x: 0, y: 0 }, 6);
+    boss.hp = boss.maxHp = tribulationRules(g.tribulation).hp;
+    boss.radius = 65;
+    boss.speed = 0;
+    boss.damage = g.player.maxHp * tribulationRules(g.tribulation).damage;
+    g.announce(`第 ${g.tribulation} 次天劫 · 先避雷，再攻核心`);
+    return g;
   }
   get remaining() {
     return Math.max(0, STAGES[this.stage].minutes * 60 - this.time);
@@ -237,14 +291,16 @@ export class Game {
     const p = this.passives;
     return {
       damage:
-        1 +
-        (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100 +
-        realmBonuses(this.realm).damage +
-        (p.power || 0) * 0.12 +
-        (p.spirit || 0) * 0.04 +
-        (p.blood || 0) * 0.15 +
-        (p.forbidden || 0) * 0.06 +
-        (this.path === 'demonic' ? 0.12 : 0),
+        (1 +
+          (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100 +
+          realmBonuses(this.realm).damage +
+          (p.power || 0) * 0.12 +
+          (p.spirit || 0) * 0.04 +
+          (p.blood || 0) * 0.15 +
+          (p.forbidden || 0) * 0.06 +
+          (this.path === 'demonic' ? 0.12 : 0)) *
+        (1 + this.save.tribulations * 0.02) *
+        (1 + this.save.retreatBonus.power / 100),
       cooldown: Math.max(
         0.3,
         1 -
@@ -258,7 +314,8 @@ export class Game {
         (1 +
           this.save.training.speed * 0.02 +
           (p.crit || 0) * 0.03 +
-          (this.player.hp < this.player.maxHp / 2 ? (p.frenzy || 0) * 0.04 : 0)),
+          (this.player.hp < this.player.maxHp / 2 ? (p.frenzy || 0) * 0.04 : 0)) *
+        (1 + this.save.retreatBonus.speed / 100),
       crit: Math.min(0.85, 0.07 + (p.crit || 0) * 0.07 + (p.curse || 0) * 0.06),
       criticalDamage: 1.8 + (p.curse || 0) * 0.1,
       armor: Math.max(
@@ -286,11 +343,13 @@ export class Game {
     this.noticeTime = 3;
   }
   private creditCultivation() {
+    if (this.tribulation) return;
     if (this.kills === 0 && this.level === 1) return;
     const earned = cultivationReward(this);
     const delta = earned - this.creditedCultivation;
     if (delta <= 0) return;
     this.save.cultivation += delta;
+    syncTribulationClock(this.save);
     this.creditedCultivation = earned;
     const realm = realmInfo(this.save.cultivation, this.save.completed.includes(FINAL_TRIAL_STAGE));
     if (realm.step > this.realm) {
@@ -342,6 +401,10 @@ export class Game {
       damageBySource: { ...this.damageBySource },
       bossCultivation: this.bossCultivation,
       revivesUsed: this.revivesUsed,
+      tribulation: this.tribulation,
+      tribulationStep: this.tribulationStep,
+      tribulationNextAt: this.tribulationNextAt,
+      tribulationOpeningDamage: this.tribulationOpeningDamage,
       spawnBudget: this.spawnBudget,
       serial: this.serial,
     };
@@ -361,6 +424,27 @@ export class Game {
       )
         return null;
       if (s.path !== undefined && !isCultivationPath(s.path)) return null;
+      if (
+        s.tribulation !== undefined &&
+        (!Number.isSafeInteger(s.tribulation) || s.tribulation < 0)
+      )
+        return null;
+      if (
+        s.tribulation &&
+        (!tribulationDue(save) ||
+          s.tribulation !== save.tribulations + 1 ||
+          !Number.isInteger(s.tribulationStep) ||
+          s.tribulationStep < 0 ||
+          s.tribulationStep > 4 ||
+          !Number.isFinite(s.tribulationNextAt) ||
+          s.tribulationNextAt < 0 ||
+          !Number.isFinite(s.tribulationOpeningDamage) ||
+          s.tribulationOpeningDamage < 0 ||
+          !Array.isArray(s.enemies) ||
+          s.enemies.length !== 1 ||
+          !s.enemies[0].boss)
+      )
+        return null;
       if (s.spiritRoot !== undefined && !SPIRIT_ROOTS.some((root) => root.id === s.spiritRoot))
         return null;
       if (
@@ -548,6 +632,10 @@ export class Game {
       )
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.tribulation = s.tribulation ?? 0;
+      g.tribulationStep = s.tribulationStep ?? 0;
+      g.tribulationNextAt = s.tribulationNextAt ?? 1.2;
+      g.tribulationOpeningDamage = s.tribulationOpeningDamage ?? 0;
       g.spiritRoot = s.spiritRoot ?? 'heaven';
       g.baseHp =
         spiritRootInfo(g.spiritRoot).baseHp +
@@ -658,7 +746,14 @@ export class Game {
     if (this.state !== 'playing' || dt <= 0) return;
     dt = Math.min(dt, 0.05);
     this.time += dt;
-    this.save.age += (dt * STAGE_YEARS_PER_MINUTE[this.stage]) / 60;
+    if (!this.tribulation) {
+      this.save.age += (dt * STAGE_YEARS_PER_MINUTE[this.stage]) / 60;
+      if (tribulationDue(this.save)) {
+        this.save.age = this.save.nextTribulationAge;
+        this.pause();
+        return;
+      }
+    }
     if (this.save.age >= this.lifespan - 1e-9) {
       this.save.age = this.lifespan;
       this.player.hp = 0;
@@ -679,47 +774,58 @@ export class Game {
       p.y += (this.input.y / Math.max(1, length)) * stats.speed * dt;
       if (Math.abs(this.input.x) > 0.05) p.facing = this.input.x > 0 ? 1 : -1;
     }
-    this.spawnBudget +=
-      dt *
-      (this.isFinalTrial
-        ? 1 + 8 * progress ** 1.3
-        : 0.85 +
-          this.stage * 0.12 +
-          (STAGES[this.stage].minutes * 60 * 0.017 + this.stage * 0.18 + 0.45) * progress ** 1.3) *
-      DIFFICULTIES[this.difficulty].amount *
-      (this.isFinalTrial ? (this.boss ? 0.7 : 1) : (this.bossSpawned ? 0.32 : 1) * 1.25);
-    while (this.spawnBudget >= 1) {
-      this.spawnBudget--;
-      if (this.enemies.length < (this.isFinalTrial ? 210 : 240)) this.spawnEnemy();
-    }
-    if (!this.isFinalTrial && this.time >= this.nextElite && !this.bossSpawned) {
-      const available = enemyRoster(this.stage, this.time);
-      const elites = available.filter((type) =>
-        ['tank', 'shield'].includes(ENEMIES[type].behavior),
-      );
-      this.spawnEnemy(elites.at(-1) ?? available.at(-1), true);
-      if (progress >= 0.5) this.spawnEnemy(available.at(-1), true);
-      this.nextElite += this.eliteInterval;
-      this.announce('精英现身 · 击败可得炼器宝匣');
-    }
-    if (this.isFinalTrial) {
-      while (
-        this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
-        this.time >= this.nextTrialBossAt
-      ) {
-        const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
+    if (this.tribulation) {
+      const radius = Math.hypot(p.x, p.y);
+      if (radius > this.tribulationRadius - 15) {
+        p.x *= (this.tribulationRadius - 15) / radius;
+        p.y *= (this.tribulationRadius - 15) / radius;
+      }
+      if (this.boss) this.boss.flash = Math.max(0, this.boss.flash - dt);
+      this.updateTribulation();
+    } else {
+      this.spawnBudget +=
+        dt *
+        (this.isFinalTrial
+          ? 1 + 8 * progress ** 1.3
+          : 0.85 +
+            this.stage * 0.12 +
+            (STAGES[this.stage].minutes * 60 * 0.017 + this.stage * 0.18 + 0.45) *
+              progress ** 1.3) *
+        DIFFICULTIES[this.difficulty].amount *
+        (this.isFinalTrial ? (this.boss ? 0.7 : 1) : (this.bossSpawned ? 0.32 : 1) * 1.25);
+      while (this.spawnBudget >= 1) {
+        this.spawnBudget--;
+        if (this.enemies.length < (this.isFinalTrial ? 210 : 240)) this.spawnEnemy();
+      }
+      if (!this.isFinalTrial && this.time >= this.nextElite && !this.bossSpawned) {
+        const available = enemyRoster(this.stage, this.time);
+        const elites = available.filter((type) =>
+          ['tank', 'shield'].includes(ENEMIES[type].behavior),
+        );
+        this.spawnEnemy(elites.at(-1) ?? available.at(-1), true);
+        if (progress >= 0.5) this.spawnEnemy(available.at(-1), true);
+        this.nextElite += this.eliteInterval;
+        this.announce('精英现身 · 击败可得炼器宝匣');
+      }
+      if (this.isFinalTrial) {
+        while (
+          this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
+          this.time >= this.nextTrialBossAt
+        ) {
+          const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
+          this.bossSpawned = true;
+          this.spawnEnemy(10, false, true, undefined, bossStage);
+          this.trialBossesSpawned++;
+          this.nextTrialBossAt = TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? 600;
+          this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
+          this.onEvent('boss');
+        }
+      } else if (!this.bossSpawned && this.remaining === 0) {
         this.bossSpawned = true;
-        this.spawnEnemy(10, false, true, undefined, bossStage);
-        this.trialBossesSpawned++;
-        this.nextTrialBossAt = TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? 600;
-        this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
+        this.spawnEnemy(10, false, true);
+        this.announce(`${STAGES[this.stage].boss}降临 · 小心红色预警`);
         this.onEvent('boss');
       }
-    } else if (!this.bossSpawned && this.remaining === 0) {
-      this.bossSpawned = true;
-      this.spawnEnemy(10, false, true);
-      this.announce(`${STAGES[this.stage].boss}降临 · 小心红色预警`);
-      this.onEvent('boss');
     }
     for (const w of this.weapons) {
       w.timer -= dt;
@@ -728,7 +834,7 @@ export class Game {
         w.timer = treasure(w.id).cooldown * stats.cooldown * (w.evolved ? 0.7 : 1);
       }
     }
-    this.updateEnemies(dt);
+    if (!this.tribulation) this.updateEnemies(dt);
     this.updateShots(dt);
     this.updateZones(dt);
     this.updatePickups(dt);
@@ -756,6 +862,83 @@ export class Game {
         this.input = { x: 0, y: 0 };
       }
     }
+  }
+  private updateTribulation() {
+    const boss = this.boss;
+    if (!boss) return;
+    if (distance(this.player, boss) < boss.radius + 13) this.hurtPlayer(boss.damage);
+    if (this.time < this.tribulationNextAt) return;
+    const power = this.tribulation - 1;
+    const rules = tribulationRules(this.tribulation);
+    const warning = rules.warning;
+    const step = this.tribulationStep;
+    const aim = Math.atan2(this.player.y - boss.y, this.player.x - boss.x);
+    const speed = 190 + Math.min(6, power) * 25;
+    const shoot = (angle: number, velocity = speed) => {
+      this.hostileShot(boss, Math.cos(angle), Math.sin(angle), velocity, boss.damage * 0.85);
+      const shot = this.shots[this.shots.length - 1];
+      shot.color = '#d2b5ff';
+      shot.radius = 8;
+      shot.life = 3.8;
+    };
+    const fan = (angle: number, count: number, spread: number) => {
+      for (let i = 0; i < count; i++) shoot(angle + (i / (count - 1) - 0.5) * spread);
+    };
+    const strike = (x: number, y: number, radius: number, delay = warning) =>
+      this.zone(x, y, radius, 0.5, boss.damage, '#d2b5ff', 'blast', delay, true);
+    const ring = (radius: number, count: number, gap: number, size: number, delay = warning) => {
+      for (let i = 0; i < count; i++) {
+        if (gap >= 0 && (i - gap + count) % count < 3) continue;
+        const angle = (i / count) * TAU;
+        strike(Math.cos(angle) * radius, Math.sin(angle) * radius, size, delay);
+      }
+    };
+    if (step === 0) {
+      this.announce('天劫 · 追身三雷与雷弹 · 侧移离开标记');
+      fan(aim, 3 + Math.min(4, power), 0.7);
+      for (let i = 0; i < 3; i++)
+        strike(
+          this.player.x + this.input.x * 65 * i,
+          this.player.y + this.input.y * 65 * i,
+          50 + Math.min(15, power * 2),
+          warning + i * 0.4,
+        );
+    } else if (step === 1) {
+      this.announce('天劫 · 缺月雷环 · 寻找缺口');
+      const count = Math.min(24, 14 + power);
+      const gap = Math.floor(this.random() * count);
+      for (let i = 0; i < count; i++) {
+        if ((i - gap + count) % count >= 3) shoot((i / count) * TAU, speed * 0.85);
+      }
+      for (let wave = 0; wave < 3; wave++)
+        ring(120 + wave * 120, count, gap, 38, warning + wave * 0.3);
+      if (this.tribulation >= 3) strike(this.player.x, this.player.y, 55);
+    } else if (step === 2) {
+      this.announce('天劫 · 横贯雷柱与交叉弹幕 · 穿过空隙');
+      for (let i = 0; i < 4; i++) fan((i * TAU) / 4 + this.time * 0.17, 3, 0.32);
+      const vertical = Math.floor(this.time / 10) % 2 === 0;
+      const gap = Math.floor(this.random() * 7) - 3;
+      for (let i = -6; i <= 6; i++) {
+        if (i === gap || i === gap + 1) continue;
+        strike(vertical ? 0 : i * 70, vertical ? i * 70 : 0, 38);
+        if (this.tribulation >= 5) strike(vertical ? i * 70 : 0, vertical ? 0 : i * 70, 38);
+      }
+    } else if (step === 3) {
+      this.announce('天劫 · 雷界收束与散射 · 返回内圈');
+      fan(aim, 5 + Math.min(6, power), Math.PI * 1.2);
+      ring(365, 24, -1, 68);
+      if (this.tribulation >= 4) strike(this.player.x, this.player.y, 55);
+    } else {
+      this.zones = this.zones.filter((zone) => !zone.hostile);
+      this.shots = this.shots.filter((s) => s.kind !== 'hostile');
+      this.tribulationOpeningDamage = 0;
+      this.announce('天劫核心显露 · 御器反击');
+      this.tribulationStep = 0;
+      this.tribulationNextAt = this.time + rules.opening;
+      return;
+    }
+    this.tribulationStep++;
+    this.tribulationNextAt = this.time + rules.interval;
   }
   spawnEnemy(
     type?: number,
@@ -1702,6 +1885,19 @@ export class Game {
   }
   hitEnemy(e: Enemy, damage: number, crit = false, source = 'other') {
     if (e.dead) return;
+    if (this.tribulation) {
+      if (!this.tribulationVulnerable) return;
+      damage = Math.min(
+        damage,
+        Math.max(
+          0,
+          e.maxHp * tribulationRules(this.tribulation).openingDamage -
+            this.tribulationOpeningDamage,
+        ),
+      );
+      if (!damage) return;
+      this.tribulationOpeningDamage += damage;
+    }
     if (this.passives.abyss) e.slow = Math.max(e.slow, this.passives.abyss * 0.15);
     if (!e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5) damage *= 0.45;
     const actual = Math.min(e.hp, damage);
@@ -1714,6 +1910,11 @@ export class Game {
     if (e.hp <= 0) {
       e.dead = true;
       this.kills++;
+      if (this.tribulation) {
+        this.state = this.player.hp > 0 ? 'won' : 'lost';
+        this.onEvent(this.state === 'won' ? 'win' : 'lose');
+        return;
+      }
       const xp = e.boss
         ? Math.max(
             1200 + this.stage * 600,

@@ -867,6 +867,18 @@ export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚
 export const REALM_LIFESPANS = [100, 250, 500, 1000, 2000, 5000, 10000, Infinity, Infinity];
 export const STAGE_YEARS_PER_MINUTE = [10, 25, 50, 100, 200, 500, 1000];
 export const FINAL_TRIAL_STAGE = 6;
+export function tribulationRules(round: number) {
+  const tier = Math.min(4, Math.max(0, round - 1));
+  const extra = Math.max(0, round - 5);
+  return {
+    hp: [5000, 8000, 12000, 20000, 40000][tier] * (1 + extra * 0.35),
+    damage: Math.min(0.65, [0.25, 0.28, 0.32, 0.38, 0.55][tier] + extra * 0.025),
+    warning: Math.max(0.55, [1.2, 1.1, 1, 0.85, 0.7][tier] - extra * 0.015),
+    interval: Math.max(1.2, [3.4, 3.1, 2.8, 2.4, 1.8][tier] - extra * 0.035),
+    opening: Math.max(0.65, [2.8, 2.5, 2.2, 1.8, 1][tier] - extra * 0.025),
+    openingDamage: [0.26, 0.24, 0.22, 0.18, 0.03][tier],
+  };
+}
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [90, 180, 270, 360, 450, 540, 600];
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];

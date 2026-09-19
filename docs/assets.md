@@ -193,3 +193,7 @@ Use case: stylized-concept. Asset type: one square seamless terrain texture for 
 ```text
 Use case: stylized-concept. Asset type: one square seamless terrain texture for a top-down Chinese xianxia survivors game, 1024x1024. Strict directly overhead orthographic camera, flat walkable ground filling the entire image. Premium detailed hand-painted 2D videogame environment art. Evenly distributed material detail with generous open areas; no central focal point, no border, no vignette, no horizon or perspective. All four edges seamlessly tileable. Moderate subdued contrast so small characters, aqua XP crystals and red attack telegraphs remain easy to see. NO characters, monsters, UI, text, letters, watermarks, structures viewed from the side, tall foreground objects, opaque fog, or bright dots resembling loot. A celestial Chinese immortal palace terrace among the clouds. Cool pearl-gray and pale blue jade floor slabs with thin understated aged-gold inlay geometric filigree, shallow lotus carvings, small patches of translucent cloud wisps drifting over the surface. Elegant broad stone planes in varied rectangular shapes, medium-light brightness, soft heavenly ambiance. Clearly refined celestial architecture viewed strictly from overhead, no raised walls, no cliff edges, no central medallion, no pure white glare.
 ```
+
+## 天劫首领（2026-09-19）
+
+`public/assets/boss-tribulation.png` 为本次通过 imagegen 生成的独立透明立绘，1254 × 1254 RGBA，Sprite 81。紫色劫云凝成雷霆巨人，白金雷面与破碎冠环；用于每两万年的独立天劫，不替换第七境仙尊。使用原图，未裁切或重新采样。渡劫场复用终关地形并绘制可见边界、护盾和核心状态。
