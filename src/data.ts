@@ -14,8 +14,29 @@ export type WeaponKind =
   | 'vortex'
   | 'talisman'
   | 'pearl'
-  | 'dragon';
+  | 'dragon'
+  | 'qin'
+  | 'brush'
+  | 'pagoda'
+  | 'banner'
+  | 'cauldron'
+  | 'flute'
+  | 'beads'
+  | 'compass'
+  | 'umbrella'
+  | 'spear'
+  | 'scythe'
+  | 'nail'
+  | 'coffin'
+  | 'whip'
+  | 'skull'
+  | 'bloodpool'
+  | 'nest'
+  | 'shard'
+  | 'axe'
+  | 'sand';
 export interface Treasure {
+  school: School;
   id: WeaponKind;
   name: string;
   mark: string;
@@ -30,6 +51,7 @@ export interface Treasure {
 export const TREASURES: Treasure[] = [
   {
     id: 'sword',
+    school: 'orthodox',
     name: '青霄剑',
     mark: '剑',
     color: '#e8d69c',
@@ -42,6 +64,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'orbit',
+    school: 'orthodox',
     name: '青莲灯',
     mark: '莲',
     color: '#9fe2c2',
@@ -54,6 +77,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'lightning',
+    school: 'orthodox',
     name: '九霄雷符',
     mark: '雷',
     color: '#c9b5ff',
@@ -66,6 +90,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'pulse',
+    school: 'orthodox',
     name: '东皇钟',
     mark: '钟',
     color: '#edc77f',
@@ -78,6 +103,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'poison',
+    school: 'demonic',
     name: '万毒葫',
     mark: '葫',
     color: '#bcda80',
@@ -90,6 +116,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'ice',
+    school: 'orthodox',
     name: '玄冰镜',
     mark: '镜',
     color: '#a9ddf3',
@@ -102,6 +129,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'fire',
+    school: 'demonic',
     name: '离火珠',
     mark: '火',
     color: '#f3a887',
@@ -114,6 +142,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'fan',
+    school: 'orthodox',
     name: '芭蕉扇',
     mark: '扇',
     color: '#addec2',
@@ -126,6 +155,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'blade',
+    school: 'demonic',
     name: '血月轮',
     mark: '轮',
     color: '#e7a1a4',
@@ -138,6 +168,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'arrow',
+    school: 'orthodox',
     name: '追星弓',
     mark: '弓',
     color: '#e8dda3',
@@ -150,6 +181,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'meteor',
+    school: 'orthodox',
     name: '番天印',
     mark: '印',
     color: '#d7b18a',
@@ -162,6 +194,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'chain',
+    school: 'demonic',
     name: '缚妖索',
     mark: '索',
     color: '#e3c680',
@@ -174,6 +207,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'vortex',
+    school: 'demonic',
     name: '阴阳盘',
     mark: '卦',
     color: '#bccfdf',
@@ -186,6 +220,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'talisman',
+    school: 'demonic',
     name: '镇魂幡',
     mark: '幡',
     color: '#c4a5e8',
@@ -198,6 +233,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'pearl',
+    school: 'orthodox',
     name: '沧海珠',
     mark: '珠',
     color: '#95d4e0',
@@ -210,6 +246,7 @@ export const TREASURES: Treasure[] = [
   },
   {
     id: 'dragon',
+    school: 'orthodox',
     name: '游龙尺',
     mark: '龙',
     color: '#ecd297',
@@ -220,14 +257,348 @@ export const TREASURES: Treasure[] = [
     damage: 33,
     cooldown: 2.2,
   },
+  {
+    id: 'qin',
+    school: 'orthodox',
+    name: '镇岳古琴',
+    mark: '琴',
+    color: '#b8e4ce',
+    tag: '音律 · 声浪',
+    desc: '拨出不断扩散的穿透音波，扇形覆盖前方妖潮。',
+    evolution: '太古镇魂曲',
+    passive: 'area',
+    damage: 18,
+    cooldown: 1.8,
+  },
+  {
+    id: 'brush',
+    school: 'demonic',
+    name: '判天笔',
+    mark: '笔',
+    color: '#e7d8ae',
+    tag: '符墨 · 连阵',
+    desc: '沿目标方向连书三道墨印，依次爆发范围伤害。',
+    evolution: '万象天书',
+    passive: 'spirit',
+    damage: 30,
+    cooldown: 3.1,
+  },
+  {
+    id: 'pagoda',
+    school: 'orthodox',
+    name: '七宝玲珑塔',
+    mark: '塔',
+    color: '#f1d39a',
+    tag: '镇守 · 灵塔',
+    desc: '在身侧立起灵塔，持续锁定附近妖物降下镇压灵光。',
+    evolution: '三十三天塔',
+    passive: 'duration',
+    damage: 23,
+    cooldown: 4.8,
+  },
+  {
+    id: 'banner',
+    school: 'demonic',
+    name: '五行阵旗',
+    mark: '旗',
+    color: '#a9dca5',
+    tag: '法阵 · 三才',
+    desc: '在周围布下三才阵点，交错爆发并减速阵内妖物。',
+    evolution: '五方封天阵',
+    passive: 'area',
+    damage: 15,
+    cooldown: 4.2,
+  },
+  {
+    id: 'cauldron',
+    school: 'orthodox',
+    name: '神农鼎',
+    mark: '鼎',
+    color: '#c9da98',
+    tag: '丹道 · 药域',
+    desc: '展开药火领域灼烧近敌，命中妖物时少量回复气血。',
+    evolution: '百草万灵鼎',
+    passive: 'duration',
+    damage: 12,
+    cooldown: 4.2,
+  },
+  {
+    id: 'flute',
+    school: 'orthodox',
+    name: '玉清笛',
+    mark: '笛',
+    color: '#94dcd5',
+    tag: '音律 · 追踪',
+    desc: '放出悠长灵音，飞行时不断转向附近妖物。',
+    evolution: '九天引凤曲',
+    passive: 'haste',
+    damage: 24,
+    cooldown: 1.7,
+  },
+  {
+    id: 'beads',
+    school: 'orthodox',
+    name: '菩提念珠',
+    mark: '珠',
+    color: '#ead494',
+    tag: '佛法 · 弹射',
+    desc: '念珠从身周散出，命中后弹向附近尚未击中的妖物。',
+    evolution: '大日菩提轮',
+    passive: 'spirit',
+    damage: 17,
+    cooldown: 2.3,
+  },
+  {
+    id: 'compass',
+    school: 'orthodox',
+    name: '定星罗盘',
+    mark: '盘',
+    color: '#aebeea',
+    tag: '星术 · 十字',
+    desc: '投射四向星线，贯穿长距离直线路径上的妖物。',
+    evolution: '周天定星仪',
+    passive: 'area',
+    damage: 32,
+    cooldown: 2.8,
+  },
+  {
+    id: 'umbrella',
+    school: 'orthodox',
+    name: '玄天伞',
+    mark: '伞',
+    color: '#b9dceb',
+    tag: '护体 · 拦截',
+    desc: '震退近敌并消解身边的敌方灵弹，消解后放出反击光束。',
+    evolution: '乾坤万法伞',
+    passive: 'guard',
+    damage: 27,
+    cooldown: 3.4,
+  },
+  {
+    id: 'spear',
+    school: 'orthodox',
+    name: '破军枪',
+    mark: '枪',
+    color: '#e0bf86',
+    tag: '枪意 · 贯穿',
+    desc: '凝出高速长枪，贯穿整列妖物，适合击破厚重目标。',
+    evolution: '诛仙破军枪',
+    passive: 'crit',
+    damage: 43,
+    cooldown: 1.9,
+  },
+  {
+    id: 'scythe',
+    school: 'demonic',
+    name: '摄魂镰',
+    mark: '镰',
+    color: '#c0a4de',
+    tag: '近战 · 斩杀',
+    desc: '横扫前方半圆，气血低于三成的目标受到额外伤害。',
+    evolution: '九幽夺命镰',
+    passive: 'crit',
+    damage: 38,
+    cooldown: 2.1,
+  },
+  {
+    id: 'nail',
+    school: 'demonic',
+    name: '追魂钉',
+    mark: '钉',
+    color: '#d39ab5',
+    tag: '暗器 · 速射',
+    desc: '连续射出细小追魂钉，快速追踪并集中打击单个目标。',
+    evolution: '七煞索命钉',
+    passive: 'haste',
+    damage: 13,
+    cooldown: 0.85,
+  },
+  {
+    id: 'coffin',
+    school: 'demonic',
+    name: '葬天棺',
+    mark: '棺',
+    color: '#b897b2',
+    tag: '冥术 · 延迟',
+    desc: '在目标脚下显化冥棺，延迟重击后留下持续伤害的冥土。',
+    evolution: '万劫葬仙棺',
+    passive: 'duration',
+    damage: 63,
+    cooldown: 4.6,
+  },
+  {
+    id: 'whip',
+    school: 'demonic',
+    name: '赤炼鞭',
+    mark: '鞭',
+    color: '#eead88',
+    tag: '鞭法 · 牵引',
+    desc: '鞭影贯穿前方，拉近命中的普通妖物并使其减速。',
+    evolution: '赤练锁天鞭',
+    passive: 'area',
+    damage: 30,
+    cooldown: 1.8,
+  },
+  {
+    id: 'skull',
+    school: 'demonic',
+    name: '白骨髅',
+    mark: '骨',
+    color: '#d7cfb9',
+    tag: '召唤 · 骨灵',
+    desc: '从周围召出骨灵，缓慢追踪妖群并穿透多个目标。',
+    evolution: '万骨幽冥王',
+    passive: 'spirit',
+    damage: 25,
+    cooldown: 2.7,
+  },
+  {
+    id: 'bloodpool',
+    school: 'demonic',
+    name: '化血盏',
+    mark: '盏',
+    color: '#db8298',
+    tag: '血法 · 汲取',
+    desc: '在妖群中形成血池，持续伤敌并少量回复自身气血。',
+    evolution: '无边血海',
+    passive: 'duration',
+    damage: 10,
+    cooldown: 4.3,
+  },
+  {
+    id: 'nest',
+    school: 'demonic',
+    name: '万蛊巢',
+    mark: '蛊',
+    color: '#b2c788',
+    tag: '蛊术 · 伏击',
+    desc: '在目标附近布下多枚蛊卵，先后破壳毒爆并减速妖物。',
+    evolution: '万蛊噬天巢',
+    passive: 'magnet',
+    damage: 25,
+    cooldown: 3.3,
+  },
+  {
+    id: 'shard',
+    school: 'demonic',
+    name: '裂魂镜',
+    mark: '镜',
+    color: '#c6a2de',
+    tag: '镜术 · 分裂',
+    desc: '射出穿魂镜片，首次命中会向两侧分裂出次级镜片。',
+    evolution: '千影碎魂镜',
+    passive: 'power',
+    damage: 23,
+    cooldown: 1.8,
+  },
+  {
+    id: 'axe',
+    school: 'demonic',
+    name: '开天斧',
+    mark: '斧',
+    color: '#d9ac89',
+    tag: '重兵 · 震地',
+    desc: '在前方砸下巨斧，短暂蓄势后爆发并击退一片妖物。',
+    evolution: '盘古开天钺',
+    passive: 'power',
+    damage: 70,
+    cooldown: 3.7,
+  },
+  {
+    id: 'sand',
+    school: 'demonic',
+    name: '星河砂',
+    mark: '砂',
+    color: '#b7cce9',
+    tag: '星术 · 落星',
+    desc: '在目标附近洒下数团星砂，错时落下轰击分散妖群。',
+    evolution: '无尽星河',
+    passive: 'magnet',
+    damage: 26,
+    cooldown: 3.2,
+  },
 ];
-export const PASSIVES = [
-  { id: 'power', name: '太玄剑经', mark: '玄', desc: '所有法宝伤害 +12%', color: '#e5d095' },
-  { id: 'haste', name: '周天星诀', mark: '星', desc: '法宝施法间隔 -7%', color: '#bdb1e7' },
-  { id: 'area', name: '乾坤道法', mark: '坤', desc: '法术范围 +12%', color: '#a8d8bd' },
-  { id: 'guard', name: '金刚不坏', mark: '罡', desc: '气血上限 +20，受伤 -6%', color: '#e2c286' },
+export type School = 'orthodox' | 'demonic';
+export type CultivationPath = School | 'dual';
+export const CULTIVATION_PATHS = [
+  {
+    id: 'orthodox',
+    name: '正道',
+    color: '#b9dfbc',
+    desc: '正道法宝与功法；气血上限 +12，每秒回复 +0.2。',
+  },
+  {
+    id: 'demonic',
+    name: '魔道',
+    color: '#dca4b9',
+    desc: '魔道法宝与功法；法宝伤害 +12%，擅长爆发与汲取。',
+  },
+  {
+    id: 'dual',
+    name: '兼修',
+    color: '#ded3a0',
+    desc: '正魔法宝与功法自由搭配，无额外路线加成。',
+  },
+] as const;
+export const isCultivationPath = (value: unknown): value is CultivationPath =>
+  CULTIVATION_PATHS.some((path) => path.id === value);
+export const pathInfo = (path: CultivationPath) => CULTIVATION_PATHS.find((p) => p.id === path)!;
+export const allowsSchool = (path: CultivationPath, school: School) =>
+  path === 'dual' || path === school;
+export interface Passive {
+  id: string;
+  name: string;
+  mark: string;
+  desc: string;
+  color: string;
+  school: School;
+}
+export const DEMONIC_COUNTERPARTS: Record<string, string> = {
+  power: 'blood',
+  haste: 'frenzy',
+  area: 'abyss',
+  guard: 'bone',
+  duration: 'devour',
+  crit: 'curse',
+  magnet: 'soul',
+  spirit: 'forbidden',
+};
+export const PASSIVES: Passive[] = [
+  {
+    id: 'power',
+    school: 'orthodox',
+    name: '太玄剑经',
+    mark: '玄',
+    desc: '所有法宝伤害 +12%',
+    color: '#e5d095',
+  },
+  {
+    id: 'haste',
+    school: 'orthodox',
+    name: '周天星诀',
+    mark: '星',
+    desc: '法宝施法间隔 -7%',
+    color: '#bdb1e7',
+  },
+  {
+    id: 'area',
+    school: 'orthodox',
+    name: '乾坤道法',
+    mark: '坤',
+    desc: '法术范围 +12%',
+    color: '#a8d8bd',
+  },
+  {
+    id: 'guard',
+    school: 'orthodox',
+    name: '金刚不坏',
+    mark: '罡',
+    desc: '气血上限 +20，受伤 -6%',
+    color: '#e2c286',
+  },
   {
     id: 'duration',
+    school: 'orthodox',
     name: '长生真经',
     mark: '生',
     desc: '持续法术时长 +18%，每秒回复气血 +0.2',
@@ -235,6 +606,7 @@ export const PASSIVES = [
   },
   {
     id: 'crit',
+    school: 'orthodox',
     name: '破妄心诀',
     mark: '心',
     desc: '暴击概率 +7%，移动速度 +3%',
@@ -242,6 +614,7 @@ export const PASSIVES = [
   },
   {
     id: 'magnet',
+    school: 'orthodox',
     name: '吞天纳灵',
     mark: '灵',
     desc: '自动吸取附近掉落；每重拾取范围 +28%，灵气获取 +8%',
@@ -249,12 +622,83 @@ export const PASSIVES = [
   },
   {
     id: 'spirit',
+    school: 'orthodox',
     name: '紫府仙经',
     mark: '府',
     desc: '灵气获取 +15%，法宝伤害 +4%',
     color: '#c7b0e8',
   },
+
+  {
+    id: 'blood',
+    name: '血煞真经',
+    mark: '血',
+    desc: '法宝伤害 +15%，承受伤害 +3%',
+    color: '#dc8e9c',
+    school: 'demonic',
+  },
+  {
+    id: 'frenzy',
+    name: '天魔解体',
+    mark: '魔',
+    desc: '施法间隔 -3%；气血低于一半时额外 -5%、移动速度 +4%（每重）',
+    color: '#d698bc',
+    school: 'demonic',
+  },
+  {
+    id: 'abyss',
+    name: '九幽冥典',
+    mark: '幽',
+    desc: '法术范围 +10%；每次命中使目标减速 0.15 秒，重数叠加',
+    color: '#bca6de',
+    school: 'demonic',
+  },
+  {
+    id: 'bone',
+    name: '白骨魔功',
+    mark: '骨',
+    desc: '气血上限 +14；受到伤害时以骨刺反击周围妖物，每重造成 12 点基础伤害',
+    color: '#dbcfb9',
+    school: 'demonic',
+  },
+  {
+    id: 'devour',
+    name: '噬魂大法',
+    mark: '噬',
+    desc: '每次斩妖回复 0.15 气血，持续时间 +12%',
+    color: '#c29bd9',
+    school: 'demonic',
+  },
+  {
+    id: 'curse',
+    name: '厄运咒',
+    mark: '咒',
+    desc: '暴击率 +6%，暴击伤害倍率 +0.1',
+    color: '#dca3b4',
+    school: 'demonic',
+  },
+  {
+    id: 'soul',
+    name: '拘魂秘术',
+    mark: '魂',
+    desc: '每重灵气收益 +6%；首重自动拘取周围 120 像素内斩妖灵气，之后每重范围 +40 像素',
+    color: '#aaaedc',
+    school: 'demonic',
+  },
+  {
+    id: 'forbidden',
+    name: '逆命魔典',
+    mark: '逆',
+    desc: '灵气收益 +12%，法宝伤害 +6%，承受伤害 +1.5%',
+    color: '#d7a2b6',
+    school: 'demonic',
+  },
 ];
+export function evolutionPassives(t: Treasure, path: CultivationPath = 'dual') {
+  return [t.passive, DEMONIC_COUNTERPARTS[t.passive]].filter((id) =>
+    allowsSchool(path, passive(id).school),
+  );
+}
 export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '渡劫'];
 export const STAGES = [
   {
@@ -265,7 +709,7 @@ export const STAGES = [
     minutes: 5,
     color: '#9fc6aa',
     boss: '苍木妖王',
-    sprite: 4,
+    sprite: 30,
     reward: 100,
     description: '古道生苔，青岚漫野。于竹海深处，踏出问道的第一步。',
   },
@@ -277,7 +721,7 @@ export const STAGES = [
     minutes: 6,
     color: '#d6b784',
     boss: '赤炎狐王',
-    sprite: 5,
+    sprite: 31,
     reward: 160,
     description: '夕照古墟，离火未熄。疾行的狐妖在残垣间伺机而动。',
   },
@@ -289,7 +733,7 @@ export const STAGES = [
     minutes: 7,
     color: '#a8cfdc',
     boss: '霜魄狼王',
-    sprite: 2,
+    sprite: 32,
     reward: 240,
     description: '冰魄凝谷，寒意入骨。穿过狼群，寻得幽谷中的一线生机。',
   },
@@ -301,7 +745,7 @@ export const STAGES = [
     minutes: 8,
     color: '#bcc895',
     boss: '玄甲毒君',
-    sprite: 7,
+    sprite: 33,
     reward: 340,
     description: '幽泽瘴气千重，毒灵四伏。唯有攻守兼备，方能涉水而归。',
   },
@@ -313,7 +757,7 @@ export const STAGES = [
     minutes: 9,
     color: '#baa2d0',
     boss: '九幽冥主',
-    sprite: 13,
+    sprite: 34,
     reward: 460,
     description: '幽冥之门洞开，万千魂影涌现。执剑守心，莫入迷途。',
   },
@@ -325,7 +769,7 @@ export const STAGES = [
     minutes: 10,
     color: '#e0d7b2',
     boss: '太虚劫灵',
-    sprite: 3,
+    sprite: 35,
     reward: 600,
     description: '九天雷动，太虚无垠。历过重重天劫，叩问长生之门。',
   },
@@ -456,7 +900,185 @@ export const ENEMIES = [
     behavior: 'dash',
     xp: 8,
   },
+
+  {
+    name: '冰晶螯虫',
+    sprite: 14,
+    hp: 72,
+    speed: 72,
+    damage: 13,
+    radius: 17,
+    behavior: 'chase',
+    xp: 7,
+  },
+  {
+    name: '玄霜鹤灵',
+    sprite: 15,
+    hp: 66,
+    speed: 52,
+    damage: 14,
+    radius: 18,
+    behavior: 'volley',
+    xp: 8,
+  },
+  {
+    name: '寒铁傀儡',
+    sprite: 16,
+    hp: 170,
+    speed: 35,
+    damage: 18,
+    radius: 24,
+    behavior: 'shield',
+    xp: 12,
+  },
+  {
+    name: '雪魄镜妖',
+    sprite: 17,
+    hp: 85,
+    speed: 38,
+    damage: 15,
+    radius: 19,
+    behavior: 'nova',
+    xp: 10,
+  },
+  {
+    name: '碧甲毒蝎',
+    sprite: 18,
+    hp: 95,
+    speed: 66,
+    damage: 15,
+    radius: 20,
+    behavior: 'poison',
+    xp: 9,
+  },
+  {
+    name: '瘴囊蟾蜍',
+    sprite: 19,
+    hp: 110,
+    speed: 42,
+    damage: 18,
+    radius: 21,
+    behavior: 'explode',
+    xp: 10,
+  },
+  {
+    name: '翡翠妖螳',
+    sprite: 20,
+    hp: 80,
+    speed: 88,
+    damage: 16,
+    radius: 20,
+    behavior: 'dash',
+    xp: 10,
+  },
+  {
+    name: '盘香蛇母',
+    sprite: 21,
+    hp: 115,
+    speed: 35,
+    damage: 15,
+    radius: 23,
+    behavior: 'summon',
+    xp: 12,
+  },
+  {
+    name: '冥骨剑卒',
+    sprite: 22,
+    hp: 98,
+    speed: 72,
+    damage: 17,
+    radius: 20,
+    behavior: 'chase',
+    xp: 11,
+  },
+  {
+    name: '锁狱刑卫',
+    sprite: 23,
+    hp: 200,
+    speed: 38,
+    damage: 21,
+    radius: 26,
+    behavior: 'shield',
+    xp: 16,
+  },
+  {
+    name: '白无常',
+    sprite: 24,
+    hp: 108,
+    speed: 42,
+    damage: 17,
+    radius: 21,
+    behavior: 'volley',
+    xp: 13,
+  },
+  {
+    name: '噬心夜叉',
+    sprite: 25,
+    hp: 90,
+    speed: 94,
+    damage: 18,
+    radius: 20,
+    behavior: 'dash',
+    xp: 12,
+  },
+  {
+    name: '金甲天将',
+    sprite: 26,
+    hp: 140,
+    speed: 62,
+    damage: 19,
+    radius: 24,
+    behavior: 'dash',
+    xp: 15,
+  },
+  {
+    name: '星羽凰灵',
+    sprite: 27,
+    hp: 105,
+    speed: 60,
+    damage: 17,
+    radius: 21,
+    behavior: 'volley',
+    xp: 14,
+  },
+  {
+    name: '太古钟灵',
+    sprite: 28,
+    hp: 220,
+    speed: 32,
+    damage: 21,
+    radius: 25,
+    behavior: 'nova',
+    xp: 18,
+  },
+  {
+    name: '虚空星君',
+    sprite: 29,
+    hp: 130,
+    speed: 38,
+    damage: 19,
+    radius: 23,
+    behavior: 'summon',
+    xp: 16,
+  },
 ];
+// 第一、二境保留原有十二妖物，后续每境累计加入四种高阶妖物。
+export const STAGE_ENEMIES = STAGES.map((_, stage) =>
+  Array.from({ length: 12 + Math.max(0, stage - 1) * 4 }, (_, type) => type),
+);
+export function enemyRoster(stage: number, seconds: number) {
+  const base = Array.from(
+    { length: Math.min(12, 1 + Math.floor(seconds / 25) + stage * 2) },
+    (_, type) => type,
+  );
+  if (stage < 2) return base;
+  const previous = Array.from({ length: (stage - 2) * 4 }, (_, index) => 12 + index);
+  const additions = Array.from(
+    { length: Math.min(4, 2 + Math.floor(seconds / 45)) },
+    (_, index) => 12 + (stage - 2) * 4 + index,
+  );
+  return [...base, ...previous, ...additions];
+}
 export const MAX_WEAPONS = 6;
 export const MAX_PASSIVES = 4;
 export const MAX_WEAPON_LEVEL = 6;

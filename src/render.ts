@@ -1,13 +1,11 @@
 import { ENEMIES, STAGES, TAU } from './data.ts';
 import type { Game, Point } from './game.ts';
-import { spriteFrame } from './sprites.ts';
+import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
-  atlas = new Image();
-  private extraAtlas = new Image();
-  private flashAtlas = document.createElement('canvas');
-  private extraFlashAtlas = document.createElement('canvas');
+  private atlases: HTMLImageElement[] = [];
+  private flashes: HTMLCanvasElement[] = [];
   width = 0;
   height = 0;
   scale = 1;
@@ -31,28 +29,26 @@ export class Renderer {
             terrain.src = stage.terrain;
           }),
       ),
-      new Promise<void>((resolve, reject) => {
-        this.atlas.onload = () => resolve();
-        this.atlas.onerror = reject;
-        this.atlas.src = '/assets/characters.png';
-      }),
-      new Promise<void>((resolve, reject) => {
-        this.extraAtlas.onload = () => resolve();
-        this.extraAtlas.onerror = reject;
-        this.extraAtlas.src = '/assets/enemies-distinct.png';
-      }),
-    ]).then(() => {
-      this.flashAtlas.width = this.atlas.width;
-      this.flashAtlas.height = this.atlas.height;
-      const flashContext = this.flashAtlas.getContext('2d')!;
-      flashContext.filter = 'brightness(1.7)';
-      flashContext.drawImage(this.atlas, 0, 0);
-      this.extraFlashAtlas.width = this.extraAtlas.width;
-      this.extraFlashAtlas.height = this.extraAtlas.height;
-      const extraFlash = this.extraFlashAtlas.getContext('2d')!;
-      extraFlash.filter = 'brightness(1.7)';
-      extraFlash.drawImage(this.extraAtlas, 0, 0);
-    });
+      ...SPRITE_ATLASES.map(
+        (sheet, index) =>
+          new Promise<void>((resolve, reject) => {
+            const atlas = new Image();
+            this.atlases[index] = atlas;
+            atlas.onload = () => {
+              const flash = document.createElement('canvas');
+              flash.width = atlas.width;
+              flash.height = atlas.height;
+              const c = flash.getContext('2d')!;
+              c.filter = 'brightness(1.7)';
+              c.drawImage(atlas, 0, 0);
+              this.flashes[index] = flash;
+              resolve();
+            };
+            atlas.onerror = reject;
+            atlas.src = sheet.url;
+          }),
+      ),
+    ]).then(() => {});
     this.resize();
   }
   resize() {
@@ -153,6 +149,7 @@ export class Renderer {
         c.lineWidth = 2;
       }
       c.stroke();
+      this.zoneEmblem(z.kind, z.color, time, z.radius);
       if (z.kind === 'vortex') this.formation(0, 0, z.radius * 0.9, time, z.color, 0.6);
       if (z.delay <= 0 && z.kind !== 'vortex') {
         for (let i = 0; i < 9; i++) {
@@ -219,6 +216,7 @@ export class Renderer {
         slow: 0,
         flash: 0,
         charge: 0,
+        cooldown: 0,
         dx: 0,
         dy: 0,
         maxHp: p.maxHp,
@@ -246,6 +244,13 @@ export class Renderer {
             e.boss ? '#dd8e7a' : '#e0c18a',
             0.7,
           );
+        if (!e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5) {
+          c.strokeStyle = '#b4d9ee';
+          c.lineWidth = 3;
+          c.beginPath();
+          c.ellipse(e.x, e.y - 12, e.radius + 9, e.radius * 1.5, 0, 0, TAU);
+          c.stroke();
+        }
         if (e.slow > 0) {
           c.fillStyle = '#b3dcf048';
           c.beginPath();
@@ -311,6 +316,65 @@ export class Renderer {
           c.fillRect(-12, -5, 20, 10);
           c.fillStyle = '#58475d';
           c.fillRect(-7, -2, 10, 3);
+        } else if (shot.kind === 'spear' || shot.kind === 'nail') {
+          const length = shot.kind === 'spear' ? 48 : 20;
+          c.lineWidth = shot.kind === 'spear' ? 3 : 1.5;
+          c.beginPath();
+          c.moveTo(-length, 0);
+          c.lineTo(12, 0);
+          c.stroke();
+          c.beginPath();
+          c.moveTo(18, 0);
+          c.lineTo(5, -5);
+          c.lineTo(5, 5);
+          c.closePath();
+          c.fill();
+        } else if (shot.kind === 'qin') {
+          c.lineWidth = 2;
+          for (let i = 0; i < 3; i++) {
+            c.beginPath();
+            c.arc(-15, 0, shot.radius + i * 7, -1, 1);
+            c.stroke();
+          }
+        } else if (shot.kind === 'flute') {
+          c.beginPath();
+          c.ellipse(0, 3, 6, 4, -0.4, 0, TAU);
+          c.fill();
+          c.lineWidth = 2;
+          c.beginPath();
+          c.moveTo(5, 3);
+          c.lineTo(5, -15);
+          c.lineTo(14, -9);
+          c.stroke();
+        } else if (shot.kind === 'shard' || shot.kind === 'umbrella') {
+          c.beginPath();
+          c.moveTo(14, 0);
+          c.lineTo(-8, -6);
+          c.lineTo(-2, 2);
+          c.lineTo(-8, 7);
+          c.closePath();
+          c.fill();
+          c.strokeStyle = '#eee7ff';
+          c.stroke();
+        } else if (shot.kind === 'skull') {
+          c.beginPath();
+          c.ellipse(0, 0, 13, 10, 0, 0, TAU);
+          c.fill();
+          c.fillRect(-2, 6, 9, 7);
+          c.fillStyle = '#332344';
+          c.beginPath();
+          c.arc(3, -4, 3, 0, TAU);
+          c.arc(3, 4, 3, 0, TAU);
+          c.fill();
+        } else if (shot.kind === 'beads') {
+          c.beginPath();
+          c.arc(0, 0, shot.radius, 0, TAU);
+          c.fill();
+          c.strokeStyle = '#fff0bb';
+          c.lineWidth = 1;
+          c.beginPath();
+          c.arc(0, 0, shot.radius * 0.65, 0, TAU);
+          c.stroke();
         } else if (shot.kind === 'fan') {
           c.lineWidth = 3;
           c.beginPath();
@@ -339,6 +403,31 @@ export class Renderer {
         c.shadowColor = '#132421';
         c.shadowBlur = 3;
         c.fillText(e.text || '', e.x, e.y);
+      } else if (e.kind === 'cleave') {
+        const angle = Math.atan2(e.y2! - e.y, e.x2! - e.x);
+        c.lineWidth = (10 * e.life) / e.maxLife + 1;
+        c.beginPath();
+        c.arc(e.x, e.y, e.radius * (1 - (e.life / e.maxLife) * 0.35), angle - 1.7, angle + 1.7);
+        c.stroke();
+      } else if (e.kind === 'umbrella' || e.kind === 'bone') {
+        const radius = e.radius * (1 - (e.life / e.maxLife) * 0.6);
+        c.lineWidth = 2;
+        c.beginPath();
+        for (let i = 0; i <= 8; i++) {
+          const a = (i / 8) * TAU;
+          c.lineTo(e.x + Math.cos(a) * radius, e.y + Math.sin(a) * radius);
+        }
+        c.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU;
+          c.beginPath();
+          c.moveTo(
+            e.x + Math.cos(a) * radius * (e.kind === 'bone' ? 0.65 : 0),
+            e.y + Math.sin(a) * radius * (e.kind === 'bone' ? 0.65 : 0),
+          );
+          c.lineTo(e.x + Math.cos(a) * radius, e.y + Math.sin(a) * radius);
+          c.stroke();
+        }
       } else if (e.kind === 'line') {
         c.lineWidth = 2;
         c.setLineDash([8, 5]);
@@ -371,6 +460,117 @@ export class Renderer {
       c.restore();
     }
   }
+  private zoneEmblem(kind: string, color: string, time: number, radius: number) {
+    const c = this.ctx;
+    c.save();
+    c.strokeStyle = color;
+    c.fillStyle = color;
+    c.lineWidth = 2;
+    c.globalAlpha = 0.8;
+    c.setLineDash([]);
+    if (kind === 'pagoda') {
+      for (let i = 0; i < 4; i++) {
+        const width = 10 + i * 5,
+          y = -40 + i * 15;
+        c.beginPath();
+        c.moveTo(-width, y + 8);
+        c.lineTo(0, y);
+        c.lineTo(width, y + 8);
+        c.stroke();
+        c.strokeRect(-width * 0.65, y + 8, width * 1.3, 9);
+      }
+    } else if (kind === 'cauldron') {
+      c.beginPath();
+      c.ellipse(0, 0, 24, 17, 0, 0, Math.PI);
+      c.stroke();
+      c.beginPath();
+      c.ellipse(0, 0, 24, 8, 0, 0, TAU);
+      c.stroke();
+      c.beginPath();
+      c.moveTo(-17, 12);
+      c.lineTo(-20, 24);
+      c.moveTo(17, 12);
+      c.lineTo(20, 24);
+      c.stroke();
+      for (let i = -1; i <= 1; i++) {
+        c.beginPath();
+        c.moveTo(i * 12, -8);
+        c.quadraticCurveTo(i * 12 + Math.sin(time * 3) * 10, -23, i * 12, -34);
+        c.stroke();
+      }
+    } else if (kind === 'coffin' || kind === 'grave') {
+      c.beginPath();
+      c.moveTo(-17, -32);
+      c.lineTo(17, -32);
+      c.lineTo(24, -16);
+      c.lineTo(15, 30);
+      c.lineTo(-15, 30);
+      c.lineTo(-24, -16);
+      c.closePath();
+      c.stroke();
+      c.strokeRect(-8, -20, 16, 33);
+    } else if (kind === 'banner') {
+      c.beginPath();
+      c.moveTo(-8, 23);
+      c.lineTo(-8, -30);
+      c.lineTo(26, -16);
+      c.lineTo(-8, -4);
+      c.stroke();
+      this.formation(0, 0, radius * 0.8, time * 0.25, color, 0.3);
+    } else if (kind === 'brush') {
+      c.lineWidth = 5;
+      c.rotate(-0.35);
+      c.beginPath();
+      c.moveTo(-24, -12);
+      c.lineTo(18, -12);
+      c.moveTo(0, -27);
+      c.lineTo(0, 25);
+      c.moveTo(-20, 20);
+      c.lineTo(18, 2);
+      c.stroke();
+    } else if (kind === 'bloodpool') {
+      for (let i = 0; i < 3; i++) {
+        c.beginPath();
+        c.ellipse(
+          0,
+          0,
+          radius * (0.35 + i * 0.2),
+          radius * (0.2 + i * 0.13),
+          time * 0.3 + i,
+          0,
+          TAU,
+        );
+        c.stroke();
+      }
+    } else if (kind === 'nest') {
+      for (let i = 0; i < 5; i++) {
+        const a = (i * TAU) / 5;
+        c.beginPath();
+        c.ellipse(Math.cos(a) * 15, Math.sin(a) * 15, 6, 10, a, 0, TAU);
+        c.stroke();
+      }
+    } else if (kind === 'sand') {
+      c.rotate(time);
+      c.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i * TAU) / 10,
+          r = i % 2 ? 8 : 25;
+        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      c.closePath();
+      c.fill();
+    } else if (kind === 'axe') {
+      c.rotate(-0.5);
+      c.fillRect(-3, -28, 6, 60);
+      c.beginPath();
+      c.moveTo(0, -24);
+      c.quadraticCurveTo(35, -45, 32, 10);
+      c.lineTo(0, -3);
+      c.closePath();
+      c.fill();
+    }
+    c.restore();
+  }
   private visible(at: Point, camera: Point) {
     return (
       Math.abs(at.x - camera.x) < this.width / this.scale / 2 + 150 &&
@@ -378,7 +578,6 @@ export class Renderer {
     );
   }
   private sprite(index: number, x: number, y: number, size: number, facing = 1, flash = false) {
-    if (!this.atlas.complete || !this.atlas.naturalWidth) return;
     const c = this.ctx;
     c.save();
     c.translate(x, y);
@@ -388,16 +587,16 @@ export class Renderer {
     c.ellipse(0, 11, size * 0.25, size * 0.09, 0, 0, TAU);
     c.fill();
     const frame = spriteFrame(index);
-    const source = frame.extra ? this.extraAtlas : this.atlas;
-    const flashSource = frame.extra ? this.extraFlashAtlas : this.flashAtlas;
+    const source = this.atlases[frame.atlas];
+    const flashSource = this.flashes[frame.atlas];
     const height = (size * frame.height) / frame.width;
-    if (source.complete && source.naturalWidth)
+    if (source?.complete && source.naturalWidth)
       c.drawImage(
-        flash && flashSource.width === source.width ? flashSource : source,
-        frame.x,
-        frame.y,
-        frame.width,
-        frame.height,
+        flash && flashSource?.width === source.width ? flashSource : source,
+        (frame.x / 1536) * source.naturalWidth,
+        (frame.y / 1024) * source.naturalHeight,
+        (frame.width / 1536) * source.naturalWidth,
+        (frame.height / 1024) * source.naturalHeight,
         -size / 2,
         -height * 0.765,
         size,

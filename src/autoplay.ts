@@ -1,16 +1,36 @@
-import { treasure } from './data.ts';
+import { treasure, evolutionPassives } from './data.ts';
 import type { Choice, Game } from './game.ts';
 
-const favored = ['sword', 'orbit', 'lightning', 'pulse', 'fire', 'chain'];
+const favored = [
+  'sword',
+  'orbit',
+  'lightning',
+  'pulse',
+  'fire',
+  'chain',
+  'pagoda',
+  'cauldron',
+  'umbrella',
+  'scythe',
+  'compass',
+  'coffin',
+];
 function choiceScore(c: Choice, g: Game) {
   if (c.type === 'evolve') return 100;
   if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
   if (c.type === 'weapon')
-    return (favored.includes(c.id) ? 15 : 1) + (c.level > 1 ? 5 : 2) + c.level;
-  const needed = g.weapons.some((w) => treasure(w.id).passive === c.id && !w.evolved);
+    return (favored.includes(c.id) ? 15 : 10) + (c.level > 1 ? 8 : 2) + c.level;
+  const needed = g.weapons.some(
+    (w) => evolutionPassives(treasure(w.id), g.path).includes(c.id) && !w.evolved,
+  );
   return (
     (needed ? 16 : 0) +
-    (['power', 'haste', 'guard', 'area'].includes(c.id) ? 4 : 0) +
+    (g.player.hp < g.player.maxHp * 0.5 && ['guard', 'bone', 'duration', 'devour'].includes(c.id)
+      ? 10
+      : 0) +
+    (['power', 'haste', 'guard', 'area', 'blood', 'devour', 'bone', 'abyss'].includes(c.id)
+      ? 4
+      : 0) +
     (c.level <= 3 ? 5 : 0)
   );
 }

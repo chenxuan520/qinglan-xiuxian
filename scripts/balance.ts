@@ -1,6 +1,6 @@
 import { Game } from '../src/game.ts';
 import { freshSave, realmInfo, settleRun, train, forge } from '../src/progress.ts';
-import { DIFFICULTIES, STAGES } from '../src/data.ts';
+import { DIFFICULTIES, STAGES, CULTIVATION_PATHS, treasure, allowsSchool } from '../src/data.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
 
 function seeded(seed: number) {
@@ -41,6 +41,42 @@ for (const difficulty of [0, 1, 2])
       hp: Math.round(game.player.hp),
       minHp: Math.round(minHp),
       upgrades,
+      loadout: game.weapons.map((w) => `${w.id}:${w.level}${w.evolved ? '*' : ''}`).join(' '),
+    });
+  }
+for (const path of CULTIVATION_PATHS)
+  for (const [index, starter] of [
+    'pagoda',
+    'scythe',
+    'umbrella',
+    'sand',
+    'qin',
+    'bloodpool',
+  ].entries()) {
+    if (!allowsSchool(path.id, treasure(starter).school)) continue;
+    const save = { ...freshSave(), path: path.id, starter };
+    const game = new Game(save, 0, 0, seeded(51 + index * 37));
+    for (let i = 0; i < 480 * 30 && !['won', 'lost'].includes(game.state); i++) {
+      if (game.state === 'upgrade') {
+        const choice = autoplayChoice(game)!;
+        if (choice.reroll) {
+          game.reroll();
+          continue;
+        }
+        game.choose(choice.index);
+      }
+      if (i % 4 === 0) game.input = autoplayInput(game);
+      game.update(1 / 30);
+    }
+    results.push({
+      difficulty: '初入仙途',
+      path: path.name,
+      starter,
+      state: game.state,
+      seconds: Math.round(game.time),
+      level: game.level,
+      kills: game.kills,
+      hp: Math.round(game.player.hp),
       loadout: game.weapons.map((w) => `${w.id}:${w.level}${w.evolved ? '*' : ''}`).join(' '),
     });
   }
