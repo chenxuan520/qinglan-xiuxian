@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
+import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
 import { TREASURES, PASSIVES, STAGES, ENEMIES, xpNeeded } from '../src/data.ts';
 import { spriteFrame } from '../src/sprites.ts';
 import {
@@ -148,6 +149,97 @@ test('境界按九大境界三阶段逐级突破，达到渡劫封顶', () => {
   assert.equal(realmInfo(toFoundation).name, '筑基初期');
   assert.equal(realmInfo(1e9).name, '渡劫后期');
   assert.ok(realmInfo(1e9).max);
+});
+test('斩妖和升级实时增加修为，突破立即提升气血与伤害', () => {
+  const save = freshSave();
+  save.cultivation = 80;
+  const game = new Game(save, 0, 0, seeded());
+  for (let i = 0; i < 3; i++) {
+    const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
+    game.hitEnemy(enemy, enemy.maxHp);
+  }
+  assert.equal(save.cultivation, 90);
+  assert.equal(game.creditedCultivation, 10);
+  assert.equal(realmInfo(save.cultivation).name, '炼气中期');
+  assert.equal(game.player.maxHp, 103);
+  assert.equal(game.player.hp, 103);
+  assert.equal(game.stats.damage, 1.025);
+  assert.match(game.notice, /突破.*炼气中期/);
+  game.xp = xpNeeded(1);
+  game.update(0.05);
+  assert.equal(save.cultivation, 98);
+  assert.equal(game.creditedCultivation, 18);
+  game.choices = [{ type: 'passive', id: 'guard', level: 1 }];
+  game.choose(0);
+  assert.equal(game.player.maxHp, 123);
+});
+test('各难度实时修为保留小数累计，失败和通关结算只补差额', () => {
+  for (const difficulty of [0, 1, 2]) {
+    for (const victory of [false, true]) {
+      const save = freshSave();
+      save.cultivation = 300;
+      const game = new Game(save, 0, difficulty, seeded());
+      for (let i = 0; i < 17; i++) {
+        const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
+        game.hitEnemy(enemy, enemy.maxHp);
+      }
+      const run = {
+        stage: 0,
+        difficulty,
+        kills: game.kills,
+        time: game.time,
+        victory,
+        iron: game.iron,
+        level: game.level,
+      };
+      const expected = settleRun(freshSave(), run).cultivation;
+      const paid = game.creditedCultivation;
+      assert.ok(paid > 0);
+      assert.equal(save.cultivation, 300 + paid);
+      const rewards = settleRun(save, { ...run, creditedCultivation: paid });
+      assert.equal(save.cultivation, 300 + expected);
+      assert.equal(rewards.cultivation, expected);
+      assert.equal(rewards.cultivationRemaining, expected - paid);
+    }
+  }
+});
+test('实时修为随存档恢复，不重复入账或重复增加气血', () => {
+  const save = freshSave();
+  save.cultivation = 85;
+  const game = new Game(save, 0, 0, seeded());
+  const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
+  game.hitEnemy(enemy, enemy.maxHp);
+  const stored = JSON.stringify({ ...save, activeRun: game.snapshot() });
+  const restoredSave = parseSave(stored);
+  const restored = Game.restore(restoredSave, JSON.parse(stored).activeRun)!;
+  assert.ok(restored);
+  assert.equal(restoredSave.cultivation, 93);
+  assert.equal(restored.creditedCultivation, 8);
+  assert.equal(restored.player.maxHp, 103);
+  assert.equal(restored.player.hp, game.player.hp);
+  assert.equal(restored.stats.damage, game.stats.damage);
+  restored.resume();
+  restored.update(0.05);
+  assert.equal(restoredSave.cultivation, 93);
+  assert.equal(restored.player.maxHp, 103);
+});
+test('旧对局补发未结算修为，连续刷新只补发一次', () => {
+  const game = createGame();
+  game.level = 25;
+  game.kills = 500;
+  const legacy = JSON.parse(JSON.stringify(game.snapshot()));
+  delete legacy.creditedCultivation;
+  const save = freshSave();
+  const restored = Game.restore(save, legacy)!;
+  assert.ok(restored);
+  assert.equal(save.cultivation, 550);
+  assert.equal(restored.creditedCultivation, 550);
+  assert.equal(realmInfo(save.cultivation).name, '筑基中期');
+  assert.equal(restored.player.maxHp, 112);
+  const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
+  assert.equal(save.cultivation, 550);
+  assert.equal(again.player.maxHp, 112);
+  assert.equal(again.stats.damage, 1.1);
 });
 test('失败保留收益但不解锁，通关逐境解锁并保存', () => {
   const save = freshSave();
@@ -298,4 +390,85 @@ test('十二种普通妖物分别使用独立立绘，图集坐标不会越界',
     assert.ok(f.x >= 0 && f.y >= 0);
     assert.ok(f.x + f.width <= 1536 && f.y + f.height <= 1024);
   }
+});
+test('AI 拾取灵气并避开近身妖物、弹道与法阵，移动向量不超速', () => {
+  const game = createGame();
+  game.pickups = [{ x: 300, y: 0, kind: 'xp', value: 3, pull: false }];
+  assert.deepEqual(autoplayInput(game), { x: 1, y: 0 });
+  game.spawnEnemy(0, false, false, { x: 30, y: 0 });
+  const away = autoplayInput(game);
+  assert.ok(away.x < 0);
+  assert.ok(Math.hypot(away.x, away.y) <= 1);
+  game.enemies = [];
+  game.zones.push({
+    x: 0,
+    y: 0,
+    radius: 100,
+    life: 1,
+    maxLife: 1,
+    damage: 20,
+    tick: 1,
+    color: '#f00',
+    kind: 'poison',
+    delay: 0.3,
+    hostile: true,
+  });
+  assert.ok(Math.hypot(autoplayInput(game).x, autoplayInput(game).y) > 0);
+  game.zones = [];
+  game.shots.push({
+    x: 10,
+    y: 0,
+    vx: -100,
+    vy: 0,
+    life: 2,
+    radius: 8,
+    damage: 10,
+    color: '#f00',
+    kind: 'hostile',
+    pierce: 0,
+    hit: new Set(),
+    origin: { x: 50, y: 0 },
+    age: 0,
+    bounce: 0,
+    crit: false,
+  });
+  assert.ok(autoplayInput(game).x < 0);
+});
+test('AI 优先进化与配套功法，低血量选恢复，劣质选项使用有限重悟', () => {
+  const game = createGame();
+  game.weapons[0].level = 6;
+  game.choices = [
+    { type: 'weapon', id: 'poison', level: 1 },
+    { type: 'passive', id: 'power', level: 3 },
+    { type: 'passive', id: 'spirit', level: 1 },
+  ];
+  assert.deepEqual(autoplayChoice(game), { index: 1, reroll: false });
+  game.choices[2] = { type: 'evolve', id: 'sword', level: 6 };
+  assert.deepEqual(autoplayChoice(game), { index: 2, reroll: false });
+  game.player.hp = 20;
+  game.choices = [{ type: 'heal', id: 'heal', level: 1 }, game.choices[0]];
+  assert.deepEqual(autoplayChoice(game), { index: 0, reroll: false });
+  game.player.hp = 100;
+  assert.deepEqual(autoplayChoice(game), { index: 1, reroll: true });
+  game.rerolls = 0;
+  assert.deepEqual(autoplayChoice(game), { index: 1, reroll: false });
+  game.choices = [];
+  assert.equal(autoplayChoice(game), null);
+});
+test('代打开关保存在浏览器存档，旧存档默认手动', () => {
+  assert.equal(parseSave(null).autoplay, false);
+  assert.equal(parseSave(JSON.stringify({ version: 1 })).autoplay, false);
+  assert.equal(parseSave(JSON.stringify({ ...freshSave(), autoplay: true })).autoplay, true);
+});
+test('气血已耗尽时斩妖突破不会复活角色', () => {
+  const save = freshSave();
+  save.cultivation = 85;
+  const game = new Game(save, 0, 0, seeded());
+  game.hurtPlayer(1000);
+  const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
+  game.hitEnemy(enemy, enemy.maxHp);
+  game.update(0.05);
+  assert.equal(game.state, 'lost');
+  assert.equal(game.player.hp, 0);
+  assert.equal(save.cultivation, 93);
 });

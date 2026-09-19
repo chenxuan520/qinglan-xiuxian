@@ -223,6 +223,18 @@ button:not(:disabled):hover {
   background: #c5ddbd16;
   border-color: #bbcda578;
 }
+.round-button.auto-button {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 5px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.auto-button.active {
+  color: #f0dfa5;
+  border-color: #ccb87799;
+  background: #4c5739cc;
+}
 .help-button {
   font:
     19px Georgia,
@@ -1193,6 +1205,15 @@ kbd {
   background: linear-gradient(90deg, #9bcbb0, #d6dda9);
   transition: width 0.15s;
 }
+.cultivation-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+  color: #cfc698;
+  font-size: 10px;
+  white-space: nowrap;
+}
 .stage-timer {
   position: absolute;
   left: 50%;
@@ -1243,6 +1264,9 @@ kbd {
   width: 42px;
   height: 42px;
   background: #123c30b3;
+}
+.combat-actions .round-button.auto-button {
+  width: auto;
 }
 .kill-counter {
   background: #10372bbf;
@@ -2668,6 +2692,10 @@ kbd {
   .health-bar {
     height: 5px;
   }
+  .cultivation-label {
+    margin-top: 7px;
+    font-size: 8px;
+  }
   .stage-timer {
     top: 102px;
     left: 50%;
@@ -2695,6 +2723,12 @@ kbd {
     flex-wrap: wrap;
     max-width: 125px;
     justify-content: flex-end;
+  }
+  .combat-actions .round-button.auto-button {
+    order: 4;
+    width: 100%;
+    height: 28px;
+    font-size: 10px;
   }
   .kill-counter {
     padding: 7px 10px;
@@ -2921,6 +2955,11 @@ kbd {
   }
   .pause-actions {
     gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pause-actions .auto-button {
+    flex-basis: 100%;
+    height: 36px;
   }
   .pause-actions button {
     font-size: 11px;

@@ -37,3 +37,37 @@ Use case: stylized-concept. The provided image is a STYLE REFERENCE ONLY for pai
 ```text
 Use case: background-extraction. EDIT THIS EXACT ATLAS. Keep all six character illustrations, positions, sizes, colors, details and 3 columns x 2 rows layout EXACTLY unchanged. Remove the entire gray-and-white checkerboard background, including checkerboard visible through translucent glows, and output a PNG with REAL ALPHA TRANSPARENCY. The checkerboard in the source is incorrectly painted into an opaque RGB image. It MUST be replaced with genuine alpha=0 background pixels, not drawn checkerboard, not white, not black. Preserve clean character silhouettes with antialiased transparent edges. Do not redraw or rearrange any creature. Canvas stays 1536x1024. Actual transparent background required.
 ```
+
+## 各秘境独立地面
+
+青岚竹海沿用 `terrain.png`；其余五境由内置工具分别生成独立纹理，均为 1254 × 1254 PNG，保存于 `public/assets/`。关卡通过 `src/data.ts` 的 `terrain` 字段选择实际背景，战斗和选关预览共用。
+
+### terrain-ruins.png
+
+```text
+Use case: stylized-concept. Asset type: one square seamless terrain texture for a top-down Chinese xianxia survivors game, 1024x1024. Strict directly overhead orthographic camera, flat walkable ground filling the entire image. Premium detailed hand-painted 2D videogame environment art. Evenly distributed material detail with generous open areas; no central focal point, no border, no vignette, no horizon or perspective. All four edges seamlessly tileable. Moderate subdued contrast so small characters, aqua XP crystals and red attack telegraphs remain easy to see. NO characters, monsters, UI, text, letters, watermarks, structures viewed from the side, tall foreground objects, opaque fog, or bright dots resembling loot. A ruined ancient Chinese temple courtyard at sunset. Warm dusty terracotta stone paving and weathered sandstone slabs, broken geometric floor mosaics and faint ornamental carvings, fine sand in cracks, scattered russet maple leaves, small fragments of fallen roof tiles embedded flush with the ground. Muted copper, ochre, warm taupe; material is clearly a red stone archaeological ruin, NOT green forest or moss.
+```
+
+### terrain-ice.png
+
+```text
+Use case: stylized-concept. Asset type: one square seamless terrain texture for a top-down Chinese xianxia survivors game, 1024x1024. Strict directly overhead orthographic camera, flat walkable ground filling the entire image. Premium detailed hand-painted 2D videogame environment art. Evenly distributed material detail with generous open areas; no central focal point, no border, no vignette, no horizon or perspective. All four edges seamlessly tileable. Moderate subdued contrast so small characters, aqua XP crystals and red attack telegraphs remain easy to see. NO characters, monsters, UI, text, letters, watermarks, structures viewed from the side, tall foreground objects, opaque fog, or bright dots resembling loot. An ancient frozen mountain valley ground. Blue-gray slate beneath translucent fractured ice plates, thin soft snow drifts, small low frost crystals, delicate frost fern patterns and scattered dark pebbles. Muted steel blue, cool gray, pale icy cyan, medium brightness, avoid pure white glare. Organic ice fissures and snow edges, distinctly a snowy frozen landscape, not recolored green courtyard.
+```
+
+### terrain-marsh.png
+
+```text
+Use case: stylized-concept. Asset type: one square seamless terrain texture for a top-down Chinese xianxia survivors game, 1024x1024. Strict directly overhead orthographic camera, flat walkable ground filling the entire image. Premium detailed hand-painted 2D videogame environment art. Evenly distributed material detail with generous open areas; no central focal point, no border, no vignette, no horizon or perspective. All four edges seamlessly tileable. Moderate subdued contrast so small characters, aqua XP crystals and red attack telegraphs remain easy to see. NO characters, monsters, UI, text, letters, watermarks, structures viewed from the side, tall foreground objects, opaque fog, or bright dots resembling loot. A poisonous misty wetland floor. Uneven dark peat mud, shallow olive and deep teal stagnant puddles with soft ripple rings, tangled flat roots, tiny dull purple fungi and short moss clumps, scattered reeds along small pools. Earthy olive, muted plum, dark khaki, desaturated jade. Clearly muddy organic swamp with water and roots, no paving, no large inaccessible lake, no tall vegetation, no luminous green neon.
+```
+
+### terrain-nether.png
+
+```text
+Use case: stylized-concept. Asset type: one square seamless terrain texture for a top-down Chinese xianxia survivors game, 1024x1024. Strict directly overhead orthographic camera, flat walkable ground filling the entire image. Premium detailed hand-painted 2D videogame environment art. Evenly distributed material detail with generous open areas; no central focal point, no border, no vignette, no horizon or perspective. All four edges seamlessly tileable. Moderate subdued contrast so small characters, aqua XP crystals and red attack telegraphs remain easy to see. NO characters, monsters, UI, text, letters, watermarks, structures viewed from the side, tall foreground objects, opaque fog, or bright dots resembling loot. A ghostly underworld burial plain. Irregular dark charcoal and muted violet basalt ground, winding ashen seams, shallow etched spirals on ancient fractured grave-stone fragments embedded into soil, small worn pale bone fragments and dried crooked roots, faint smoke wisps. Slate, smoky indigo, ash gray, low-key violet. Clearly barren haunted obsidian earth, NOT tiled green courtyard, no glowing red cracks that resemble damage zones, no bright sigils, no prominent skull centerpiece.
+```
+
+### terrain-heaven.png
+
+```text
+Use case: stylized-concept. Asset type: one square seamless terrain texture for a top-down Chinese xianxia survivors game, 1024x1024. Strict directly overhead orthographic camera, flat walkable ground filling the entire image. Premium detailed hand-painted 2D videogame environment art. Evenly distributed material detail with generous open areas; no central focal point, no border, no vignette, no horizon or perspective. All four edges seamlessly tileable. Moderate subdued contrast so small characters, aqua XP crystals and red attack telegraphs remain easy to see. NO characters, monsters, UI, text, letters, watermarks, structures viewed from the side, tall foreground objects, opaque fog, or bright dots resembling loot. A celestial Chinese immortal palace terrace among the clouds. Cool pearl-gray and pale blue jade floor slabs with thin understated aged-gold inlay geometric filigree, shallow lotus carvings, small patches of translucent cloud wisps drifting over the surface. Elegant broad stone planes in varied rectangular shapes, medium-light brightness, soft heavenly ambiance. Clearly refined celestial architecture viewed strictly from overhead, no raised walls, no cliff edges, no central medallion, no pure white glare.
+```

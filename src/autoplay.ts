@@ -1,0 +1,67 @@
+import { treasure } from './data.ts';
+import type { Choice, Game } from './game.ts';
+
+const favored = ['sword', 'orbit', 'lightning', 'pulse', 'fire', 'chain'];
+function choiceScore(c: Choice, g: Game) {
+  if (c.type === 'evolve') return 100;
+  if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
+  if (c.type === 'weapon')
+    return (favored.includes(c.id) ? 15 : 1) + (c.level > 1 ? 5 : 2) + c.level;
+  const needed = g.weapons.some((w) => treasure(w.id).passive === c.id && !w.evolved);
+  return (
+    (needed ? 16 : 0) +
+    (['power', 'haste', 'guard', 'area'].includes(c.id) ? 4 : 0) +
+    (c.level <= 3 ? 5 : 0)
+  );
+}
+export function autoplayInput(g: Game) {
+  const p = g.player;
+  let dx = 0,
+    dy = 0;
+  const gems = g.pickups
+    .filter((i) => !i.pull)
+    .sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+  const target = gems[0] ?? g.enemies[0];
+  if (target) {
+    const d = Math.hypot(target.x - p.x, target.y - p.y) || 1;
+    dx += ((target.x - p.x) / d) * (gems.length ? 1 : 0.7);
+    dy += ((target.y - p.y) / d) * (gems.length ? 1 : 0.7);
+  } else {
+    dx = Math.cos(g.time * 0.3);
+    dy = Math.sin(g.time * 0.3);
+  }
+  for (const e of g.enemies) {
+    const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
+    const radius = e.radius + (e.boss ? 135 : 100);
+    if (d < radius) {
+      const f = ((radius - d) / radius) * 2.4;
+      dx -= ((e.x - p.x) / d) * f;
+      dy -= ((e.y - p.y) / d) * f;
+    }
+  }
+  for (const b of g.shots) {
+    if (b.kind !== 'hostile') continue;
+    const d = Math.hypot(b.x - p.x, b.y - p.y) || 1;
+    if (d < 80) {
+      dx -= ((b.x - p.x) / d) * 2;
+      dy -= ((b.y - p.y) / d) * 2;
+    }
+  }
+  for (const z of g.zones) {
+    if (!z.hostile) continue;
+    const d = Math.hypot(z.x - p.x, z.y - p.y) || 1;
+    if (d < z.radius + 45) {
+      dx += d < 1.01 ? 3 : ((p.x - z.x) / d) * 3;
+      dy += ((p.y - z.y) / d) * 3;
+    }
+  }
+  const norm = Math.hypot(dx, dy) || 1;
+  return { x: dx / norm, y: dy / norm };
+}
+export function autoplayChoice(game: Game) {
+  const ranked = game.choices
+    .map((choice, index) => ({ index, score: choiceScore(choice, game) }))
+    .sort((a, b) => b.score - a.score);
+  if (!ranked.length) return null;
+  return { index: ranked[0].index, reroll: ranked[0].score < 15 && game.rerolls > 0 };
+}
