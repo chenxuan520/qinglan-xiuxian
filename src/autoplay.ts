@@ -83,7 +83,39 @@ export function autoplayInput(g: Game) {
     }
   }
   const norm = Math.hypot(dx, dy) || 1;
-  return { x: dx / norm, y: dy / norm };
+  const preferred = { x: dx / norm, y: dy / norm };
+  const charges = g.enemies.filter((e) => e.boss && !e.dead && e.charge > 0);
+  if (!charges.length) return preferred;
+  const speed = g.stats.speed;
+  // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
+  const clearance = (e: (typeof charges)[number]) => e.radius + 13 + speed * 0.24;
+  const distanceToPath = (x: number, y: number, e: (typeof charges)[number]) => {
+    const along = Math.max(
+      0,
+      Math.min(Math.min(0.7, e.charge) * 820, (x - e.x) * e.dx + (y - e.y) * e.dy),
+    );
+    return Math.hypot(x - e.x - e.dx * along, y - e.y - e.dy * along);
+  };
+  if (!charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e))) return preferred;
+  let best = preferred;
+  let bestScore = Infinity;
+  // 只在冲撞路径附近比较方向；同时评估所有妖王，交叉预警不会抵消成原地不动。
+  for (let i = 0; i < 16; i++) {
+    const x = Math.cos((i * Math.PI) / 8),
+      y = Math.sin((i * Math.PI) / 8);
+    let score = -(x * preferred.x + y * preferred.y) * 0.08;
+    for (const e of charges) {
+      for (const seconds of [0.12, 0.24, 0.36]) {
+        const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);
+        score += Math.max(0, 1 - distance / clearance(e));
+      }
+    }
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x, y };
+    }
+  }
+  return best;
 }
 export function autoplayChoice(game: Game) {
   const ranked = game.choices
