@@ -3179,7 +3179,7 @@ kbd {
     font-size: 8px;
   }
   .stage-timer {
-    top: 102px;
+    top: 122px;
     left: 50%;
     padding: 0;
   }
@@ -3296,7 +3296,7 @@ kbd {
     margin-left: 2px;
   }
   .battle-notice {
-    top: 29%;
+    top: calc(29% + 20px);
     font-size: 10px;
     letter-spacing: 1px;
     padding: 10px 16px;
@@ -3306,7 +3306,7 @@ kbd {
     line-height: 1.8;
   }
   .boss-bar {
-    top: 202px;
+    top: 222px;
     width: 65%;
     padding: 8px 10px;
   }
@@ -4035,13 +4035,6 @@ body:not(.in-game) #ui {
 .lifespan-summary small {
   flex-basis: 100%;
   color: #a6bdab;
-}
-.lifespan-summary button {
-  flex-direction: column;
-  gap: 5px;
-  max-width: 100%;
-  font-size: 12px;
-  letter-spacing: 1px;
 }
 .lifespan-hud {
   margin-top: 5px;

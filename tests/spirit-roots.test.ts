@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SPIRIT_ROOTS, rollSpiritRoot, xpNeeded, DIFFICULTIES } from '../src/data.ts';
+import { SPIRIT_ROOTS, rollSpiritRoot, xpNeeded, DIFFICULTIES, rootStarter } from '../src/data.ts';
 import { Game } from '../src/game.ts';
 import {
   freshSave,
@@ -8,6 +8,8 @@ import {
   cultivationReward,
   settleRun,
   bossCultivationReward,
+  realmBonuses,
+  realmInfo,
 } from '../src/progress.ts';
 
 test('七档灵根按公开概率抽取，新档随机，已存档与旧档读取不重抽', () => {
@@ -39,7 +41,7 @@ test('七档灵根按公开概率抽取，新档随机，已存档与旧档读�
   );
 });
 
-test('灵根同时缩放基础和功法灵气，天灵根保持原速度，基础攻击属性与气血不受影响', () => {
+test('灵根同时缩放基础和功法灵气，天灵根保持原速度，未修炼悟道的基础攻击属性不变', () => {
   for (const difficulty of [0, 1, 2]) {
     const baseline = new Game(freshSave(), 0, difficulty, () => 0.5);
     baseline.passives.spirit = 3;
@@ -48,10 +50,73 @@ test('灵根同时缩放基础和功法灵气，天灵根保持原速度，基�
       g.passives.spirit = 3;
       assert.ok(Math.abs(g.stats.xp - baseline.stats.xp * root.rate) < 1e-10);
       assert.equal(g.stats.damage, baseline.stats.damage);
-      assert.equal(g.player.maxHp, baseline.player.maxHp);
       g.pickups.push({ x: 0, y: 0, kind: 'xp', value: 3, pull: false });
       g.update(0.01);
       assert.ok(Math.abs(g.xp - 3 * baseline.stats.xp * root.rate) < 1e-10);
+    }
+  }
+});
+
+test('灵根基础气血依次100/95/90/85/80，正道、境界与淬体在基础上叠加', () => {
+  const expected = [100, 95, 90, 90, 85, 85, 80];
+  for (const [i, root] of SPIRIT_ROOTS.entries()) {
+    for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+      const save = freshSave(root.id);
+      save.path = path;
+      save.starter = rootStarter(save.rootElements, path);
+      const factor = path === 'orthodox' ? 1.12 : 1;
+      assert.equal(new Game(save, 0, 0).player.maxHp, Math.round(expected[i] * factor));
+      save.training.vitality = 10;
+      save.cultivation = 12345;
+      const hp = expected[i] + 100 + realmBonuses(realmInfo(save.cultivation).step).hp;
+      const g = new Game(save, 0, 0);
+      assert.equal(g.player.maxHp, Math.round(hp * factor));
+      g.state = 'upgrade';
+      g.choices = [{ type: 'passive', id: path === 'demonic' ? 'bone' : 'guard', level: 1 }];
+      g.choose(0);
+      assert.equal(g.player.maxHp, Math.round((hp + (path === 'demonic' ? 14 : 20)) * factor));
+    }
+  }
+});
+
+test('旧续局按开局灵根换算气血，保留损失血量，洗根与重复读档不会补满', () => {
+  const save = freshSave('triple');
+  const g = new Game(save, 0, 0);
+  const old = JSON.parse(JSON.stringify(g.snapshot()));
+  old.player.maxHp = 100;
+  old.player.hp = 67;
+  save.spiritRoot = 'heaven';
+  const restored = Game.restore(save, old)!;
+  assert.equal(restored.spiritRoot, 'triple');
+  assert.equal(restored.player.maxHp, 90);
+  assert.equal(restored.player.hp, 57);
+  const again = Game.restore(save, restored.snapshot())!;
+  assert.equal(again.player.maxHp, 90);
+  assert.equal(again.player.hp, 57);
+  old.state = 'lost';
+  old.player.hp = 0;
+  assert.equal(Game.restore(save, old)!.player.hp, 0);
+  assert.equal(new Game(save, 0, 0).player.maxHp, 100);
+});
+
+test('灵根基础回血分档，功法正常叠加，正道合计加20%，洗根不改变当前局', () => {
+  const rates = [0.18, 0.16, 0.14, 0.14, 0.12, 0.12, 0.1];
+  for (const [i, root] of SPIRIT_ROOTS.entries()) {
+    for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+      for (const level of [0, 3]) {
+        const save = freshSave(root.id);
+        save.path = path;
+        const g = new Game(save, 0, 0);
+        g.passives.duration = level;
+        const expected = (rates[i] + level * 0.2) * (path === 'orthodox' ? 1.2 : 1);
+        assert.ok(Math.abs(g.stats.regen - expected) < 1e-10);
+        g.player.hp -= 10;
+        const before = g.player.hp;
+        g.update(0.05);
+        assert.ok(Math.abs(g.player.hp - before - expected * 0.05) < 1e-10);
+        save.spiritRoot = 'heaven';
+        assert.ok(Math.abs(g.stats.regen - expected) < 1e-10);
+      }
     }
   }
 });

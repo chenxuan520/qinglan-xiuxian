@@ -126,7 +126,6 @@ let rewardAdFromCultivation = false;
 let adRoot: SpiritRootId = 'heaven';
 let adElements: ElementId[] = [];
 let pendingImport: ReturnType<typeof importSave> | null = null;
-let lifeAdFromCultivation = false;
 function persist() {
   const active = game && !settled ? game : pendingRun;
   try {
@@ -227,11 +226,11 @@ function renderLobby() {
 }
 function spiritRootSummary() {
   const root = spiritRootInfo(save.spiritRoot);
-  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div></div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="watch-supplies-ad">看广告 · 领取物资<small>${AD_SUPPLIES.stones} 灵石 + ${AD_SUPPLIES.iron} 玄铁</small></button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
+  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div></div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>悟道每阶 <b>+${root.powerPerLevel}%</b><small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="watch-supplies-ad">看广告 · 领取物资<small>${AD_SUPPLIES.stones} 灵石 + ${AD_SUPPLIES.iron} 玄铁</small></button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
 }
 function lifespanSummary() {
   const life = lifespanInfo(save);
-  return `<div class="lifespan-summary"><strong>年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</strong><span>${STAGES[selectedStage].name} · 战斗每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><small>年龄跨局累计，突破大境界延寿；大乘起长生。暂停不计龄，寿尽可广告续命，放弃则强制轮回清空本世进度。${save.lifespanBonus ? `已借寿 ${save.lifespanBonus} 年。` : ''}</small>${Number.isFinite(life.limit) ? `<button class="secondary-button" data-action="watch-lifespan-ad">向天再借五百年<small>看广告 · 寿元 +${Math.round(life.base * 0.3)} 年（基础寿命 30%）</small></button>` : ''}</div>`;
+  return `<div class="lifespan-summary"><strong>年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</strong><span>${STAGES[selectedStage].name} · 战斗每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><small>年龄跨局累计，突破大境界延寿；大乘起长生。暂停不计龄，寿尽可广告续命，放弃则强制轮回清空本世进度。${save.lifespanBonus ? `已借寿 ${save.lifespanBonus} 年。` : ''}</small></div>`;
 }
 function weaponAffinity(
   item: Treasure,
@@ -690,7 +689,7 @@ function renderRootPicker() {
   const container = modal.querySelector('#root-picker');
   if (!container) return;
   const root = spiritRootInfo(adRoot);
-  container.innerHTML = `<div class="root-quality-options" role="group" aria-label="灵根资质">${SPIRIT_ROOTS.map((r) => `<button class="secondary-button ${r.id === adRoot ? 'selected' : ''}" data-action="ad-root-quality" data-id="${r.id}" aria-pressed="${r.id === adRoot}">${r.name}${r.count > 1 ? `·${r.count}系` : ''}</button>`).join('')}</div><p>选择 ${root.count} 种五行 · 已选 ${adElements.length} / ${root.count} · 对应法宝伤害 +${root.damageBonus}%<br>灵气与修为 ${Math.round(root.rate * 100)}%，首位五行决定默认本命。</p><div class="root-element-options" role="group" aria-label="灵根五行">${ELEMENTS.map((e) => `<button class="secondary-button ${adElements.includes(e.id) ? 'selected' : ''}" data-action="ad-root-element" data-id="${e.id}" aria-pressed="${adElements.includes(e.id)}" ${root.count ? '' : 'disabled'}>${e.name}${adElements[0] === e.id ? ' · 首位' : ''}</button>`).join('')}</div><small>入门法宝：${ROOT_STARTERS[adElements[0] ?? 'metal'].map((id) => treasure(id).name).join(' / ')}；领取后设为当前路线本命，已有收藏与炼器保留。</small>`;
+  container.innerHTML = `<div class="root-quality-options" role="group" aria-label="灵根资质">${SPIRIT_ROOTS.map((r) => `<button class="secondary-button ${r.id === adRoot ? 'selected' : ''}" data-action="ad-root-quality" data-id="${r.id}" aria-pressed="${r.id === adRoot}">${r.name}${r.count > 1 ? `·${r.count}系` : ''}</button>`).join('')}</div><p>选择 ${root.count} 种五行 · 已选 ${adElements.length} / ${root.count} · 对应法宝伤害 +${root.damageBonus}%<br>灵气与修为 ${Math.round(root.rate * 100)}%，基础气血 ${root.baseHp}，基础回血 ${root.baseRegen.toFixed(2)}/秒，悟道每阶 +${root.powerPerLevel}%。<br>首位五行决定默认本命。</p><div class="root-element-options" role="group" aria-label="灵根五行">${ELEMENTS.map((e) => `<button class="secondary-button ${adElements.includes(e.id) ? 'selected' : ''}" data-action="ad-root-element" data-id="${e.id}" aria-pressed="${adElements.includes(e.id)}" ${root.count ? '' : 'disabled'}>${e.name}${adElements[0] === e.id ? ' · 首位' : ''}</button>`).join('')}</div><small>入门法宝：${ROOT_STARTERS[adElements[0] ?? 'metal'].map((id) => treasure(id).name).join(' / ')}；领取后设为当前路线本命，已有收藏与炼器保留。</small>`;
 }
 function showRewardAd(kind: 'root' | 'supplies') {
   if (game || rewardAd) return;
@@ -833,10 +832,9 @@ function renderLifespanEnd() {
 }
 function showLifespanAd() {
   const life = lifespanInfo(save);
-  if (!Number.isFinite(life.base) || panel === 'lifespan-ad' || (game && !game.expired)) return;
-  lifeAdFromCultivation = panel === 'cultivation';
+  if (!Number.isFinite(life.base) || life.remaining > 0 || panel !== 'lifespan-ended') return;
   panel = 'lifespan-ad';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div><div class="revive-ad">广告位招租</div><p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>可重复观看，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>5 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div><div class="revive-ad">广告位招租</div><p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>再次寿尽时可再借，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>5 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
   startAdCountdown('claim-lifespan', '领取寿元');
 }
 function clearInput() {
@@ -878,7 +876,6 @@ function handleAction(action: string, id?: string) {
       panel = '';
       modal.innerHTML = '';
       renderLobby();
-      if (lifeAdFromCultivation) showPanel('cultivation');
     }
     if (years) toast(`向天借寿 · 寿元 +${years} 年`);
     return;
