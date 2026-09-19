@@ -22,6 +22,7 @@ import {
   xpNeeded,
   MAX_RUN_LEVEL,
   MAX_REVIVES,
+  MAX_FORGE_LEVEL,
 } from './data.ts';
 import {
   parseSave,
@@ -235,14 +236,14 @@ function renderPanel() {
       owned = save.artifacts.includes(t.id);
     const detail =
       bookTab === 'treasures'
-        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / 5</small></h3><p>${t.desc}</p><div class="evolution-recipe">${t.name}六重 + ${evolutionPassives(
+        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p><div class="evolution-recipe">${t.name}六重 + ${evolutionPassives(
             t,
             save.path,
           )
             .map((id) => passive(id).name)
             .join(
               ' / ',
-            )}任一三重 <span>→ ${t.evolution}</span></div></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需拾取妖王遗宝解锁' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" ${!owned || level >= 5 || save.iron < cost.iron || save.stones < cost.stones ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= 5 ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>每阶永久增加 8% 伤害</small></div></div>`
+            )}任一三重 <span>→ ${t.evolution}</span></div></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需拾取妖王遗宝解锁' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" ${!owned || level >= MAX_FORGE_LEVEL || save.iron < cost.iron || save.stones < cost.stones ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>每阶永久增加 8% 伤害 · 当前 +${level * 8}%</small></div></div>`
         : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修至三重，可使六重法宝进化为仙器。</p>';
     panelFrame(
       '万般法宝，皆可入道',
@@ -265,7 +266,7 @@ function renderPanel() {
               .slice(treasurePage * 12, treasurePage * 12 + 12)
               .map(
                 (t) =>
-                  `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${save.artifacts.includes(t.id) ? '已收藏' : '待收集'}</small></div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots">${'◆'.repeat(save.forge[t.id] || 0)}${'◇'.repeat(5 - (save.forge[t.id] || 0))}</span></button>`,
+                  `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${save.artifacts.includes(t.id) ? '已收藏' : '待收集'}</small></div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots">炼器 ${save.forge[t.id] || 0} / ${MAX_FORGE_LEVEL}</span></button>`,
               )
               .join('')
           : PASSIVES.filter((p) => schoolFilter === 'all' || p.school === schoolFilter)

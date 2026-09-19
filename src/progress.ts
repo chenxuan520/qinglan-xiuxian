@@ -7,6 +7,7 @@ import {
   allowsSchool,
   treasure,
   FINAL_TRIAL_STAGE,
+  MAX_FORGE_LEVEL,
 } from './data.ts';
 import type { CultivationPath } from './data.ts';
 
@@ -75,7 +76,7 @@ export function parseSave(raw: string | null): SaveData {
     if (base.completed.includes(FINAL_TRIAL_STAGE - 1)) base.unlocked = FINAL_TRIAL_STAGE;
     for (const key of ['vitality', 'power', 'speed'] as const)
       base.training[key] = int(s.training?.[key], 20);
-    for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], 5);
+    for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], MAX_FORGE_LEVEL);
     const validIds = (ids: unknown): string[] =>
       Array.isArray(ids) ? ids.filter((id) => TREASURES.some((t) => t.id === id)) : [];
     // 旧档保留已经投入资源的法宝和本命，未投入的法宝开始收集。
@@ -154,7 +155,10 @@ export function cultivationReward(
   );
 }
 export const trainingCost = (level: number) => Math.round(45 * 1.42 ** level);
-export const forgeCost = (level: number) => ({ iron: 3 + level * 3, stones: 35 + level * 45 });
+export const forgeCost = (level: number) => {
+  const advanced = Math.max(0, level - 4) ** 2;
+  return { iron: 3 + level * 3 + advanced * 12, stones: 35 + level * 45 + advanced * 180 };
+};
 export function train(save: SaveData, kind: keyof SaveData['training']) {
   const cost = trainingCost(save.training[kind]);
   if (save.training[kind] >= 20 || save.stones < cost) return false;
@@ -166,7 +170,7 @@ export function forge(save: SaveData, id: string) {
   if (!save.artifacts.includes(id) || !TREASURES.some((t) => t.id === id)) return false;
   const level = save.forge[id] || 0;
   const cost = forgeCost(level);
-  if (level >= 5 || save.stones < cost.stones || save.iron < cost.iron) return false;
+  if (level >= MAX_FORGE_LEVEL || save.stones < cost.stones || save.iron < cost.iron) return false;
   save.stones -= cost.stones;
   save.iron -= cost.iron;
   save.forge[id] = level + 1;
