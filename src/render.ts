@@ -5,7 +5,8 @@ import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
 export class Renderer {
   ctx: CanvasRenderingContext2D;
   private atlases: HTMLImageElement[] = [];
-  private flashes: HTMLCanvasElement[] = [];
+  private sprites = new Map<string, HTMLCanvasElement>();
+  private formations = new Map<string, HTMLCanvasElement>();
   width = 0;
   height = 0;
   scale = 1;
@@ -35,13 +36,6 @@ export class Renderer {
             const atlas = new Image();
             this.atlases[index] = atlas;
             atlas.onload = () => {
-              const flash = document.createElement('canvas');
-              flash.width = atlas.width;
-              flash.height = atlas.height;
-              const c = flash.getContext('2d')!;
-              c.filter = 'brightness(1.7)';
-              c.drawImage(atlas, 0, 0);
-              this.flashes[index] = flash;
               resolve();
             };
             atlas.onerror = reject;
@@ -60,7 +54,7 @@ export class Renderer {
     this.canvas.height = Math.round(this.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  draw(game: Game | null, now: number, stage: number) {
+  draw(game: Game | null, now: number, stage: number, previewRealm = 0) {
     const c = this.ctx,
       w = this.width,
       h = this.height,
@@ -83,7 +77,7 @@ export class Renderer {
     c.fillStyle = '#04171920';
     c.fillRect(camera.x - w / s, camera.y - h / s, (w * 2) / s, (h * 2) / s);
     if (game) this.drawGame(game, time);
-    else this.drawPreview(camera, time);
+    else this.drawPreview(camera, time, previewRealm);
     c.restore();
     const shade = c.createRadialGradient(w * 0.52, h * 0.4, h * 0.15, w / 2, h / 2, w * 0.73);
     shade.addColorStop(0, '#06221f00');
@@ -110,19 +104,139 @@ export class Renderer {
     }
     c.globalAlpha = 1;
   }
-  private drawPreview(camera: Point, time: number) {
+  private drawPreview(camera: Point, time: number, realm: number) {
     const c = this.ctx;
     c.save();
     c.translate(camera.x, camera.y);
-    this.formation(0, 15, 175, time * 0.1, '#b6cfac', 0.22);
-    this.formation(0, 15, 116, -time * 0.08, '#e4d49b', 0.32);
-    for (let i = 0; i < 9; i++) {
-      const a = time * 0.26 + (i / 9) * TAU;
-      this.sword(Math.cos(a) * 174, Math.sin(a) * 112, a + Math.PI / 2, '#ead8a5', 1.25);
-    }
-    for (let i = 0; i < 5; i++) {
-      const a = time * 0.35 + (i / 5) * TAU;
-      this.lotus(Math.cos(a) * 85, Math.sin(a) * 50 + 10, time, 0.7);
+    const colors = [
+      '#a6dac7',
+      '#b7d8ec',
+      '#f3d288',
+      '#a6efd6',
+      '#dfc1f4',
+      '#a9c5f3',
+      '#e9d6a5',
+      '#f6dd97',
+      '#d9e8ff',
+    ];
+    const color = colors[realm];
+    const swords = (count: number, radius: number) => {
+      for (let i = 0; i < count; i++) {
+        const a = time * 0.26 + (i / count) * TAU;
+        this.sword(Math.cos(a) * radius, Math.sin(a) * radius * 0.65, a + Math.PI / 2, color, 1.15);
+      }
+    };
+    const orb = (x: number, y: number, radius: number, tint: string) => {
+      c.save();
+      c.shadowColor = tint;
+      c.shadowBlur = 20;
+      const glow = c.createRadialGradient(x - radius * 0.25, y - radius * 0.25, 0, x, y, radius);
+      glow.addColorStop(0, '#fff9df');
+      glow.addColorStop(0.35, tint);
+      glow.addColorStop(1, tint + '15');
+      c.fillStyle = glow;
+      c.beginPath();
+      c.arc(x, y, radius, 0, TAU);
+      c.fill();
+      c.restore();
+    };
+    if (realm > 0) this.formation(0, 15, 110 + realm * 8, time * 0.08, color, 0.35);
+    switch (realm) {
+      case 0:
+        swords(1, 90);
+        for (let i = 0; i < 3; i++) {
+          const a = time * 0.4 + (i / 3) * TAU;
+          orb(Math.cos(a) * 75, Math.sin(a) * 45, 7, color);
+        }
+        break;
+      case 1:
+        swords(3, 130);
+        this.formation(0, 15, 78, -time * 0.12, color, 0.45);
+        break;
+      case 2:
+        orb(0, -142 + Math.sin(time) * 7, 25, color);
+        swords(3, 145);
+        this.formation(0, -142 + Math.sin(time) * 7, 35, time * 0.2, color, 0.7);
+        break;
+      case 3:
+        for (let i = 0; i < 3; i++) {
+          const a = time * 0.3 + (i / 3) * TAU;
+          this.lotus(Math.cos(a) * 110, Math.sin(a) * 65 + 15, time * 0.2, 0.7);
+        }
+        c.save();
+        c.globalAlpha = 0.6;
+        c.shadowColor = color;
+        c.shadowBlur = 18;
+        this.sprite(0, 75, -95 + Math.sin(time) * 8, 65, -1);
+        c.restore();
+        break;
+      case 4:
+        for (let i = 0; i < 5; i++) {
+          const a = -time * 0.25 + (i / 5) * TAU;
+          c.save();
+          c.translate(Math.cos(a) * 140, Math.sin(a) * 88);
+          c.rotate(Math.sin(a) * 0.2);
+          c.fillStyle = '#322d46b0';
+          c.strokeStyle = color;
+          c.fillRect(-12, -23, 24, 46);
+          c.strokeRect(-12, -23, 24, 46);
+          c.fillStyle = color;
+          c.font = '18px serif';
+          c.textAlign = 'center';
+          c.fillText(['金', '木', '水', '火', '土'][i], 0, 6);
+          c.restore();
+        }
+        break;
+      case 5:
+        for (let ring = 0; ring < 2; ring++) {
+          c.save();
+          c.rotate(ring ? -0.6 : 0.6);
+          c.strokeStyle = color + '90';
+          c.beginPath();
+          c.ellipse(0, 0, 175, 65, 0, 0, TAU);
+          c.stroke();
+          for (let i = 0; i < 8; i++) {
+            const a = time * (ring ? -0.3 : 0.3) + (i / 8) * TAU;
+            orb(Math.cos(a) * 175, Math.sin(a) * 65, i % 2 ? 3 : 6, color);
+          }
+          c.restore();
+        }
+        break;
+      case 6:
+        for (let i = 0; i < 2; i++) {
+          const a = time * 0.4 + i * Math.PI;
+          orb(Math.cos(a) * 125, Math.sin(a) * 75, 27, i ? '#b5cdf6' : '#f1d290');
+        }
+        for (let i = 0; i < 6; i++) {
+          const a = -time * 0.18 + (i / 6) * TAU;
+          this.lotus(Math.cos(a) * 175, Math.sin(a) * 100, -time * 0.1, 0.5);
+        }
+        break;
+      case 7:
+        swords(12, 178);
+        this.formation(0, 15, 115, -time * 0.1, color, 0.55);
+        this.formation(0, 15, 195, time * 0.04, color, 0.3);
+        break;
+      case 8:
+        swords(9, 180);
+        this.formation(0, 15, 190, -time * 0.1, '#f6dd97', 0.5);
+        for (let i = 0; i < 6; i++) {
+          c.save();
+          c.rotate((i / 6) * TAU + time * 0.06);
+          c.globalAlpha = 0.5 + Math.sin(time * 2 + i) * 0.2;
+          c.strokeStyle = color;
+          c.shadowColor = color;
+          c.shadowBlur = 12;
+          c.lineWidth = 2;
+          c.beginPath();
+          c.moveTo(95, 0);
+          c.lineTo(135, -10);
+          c.lineTo(127, 8);
+          c.lineTo(182, -4);
+          c.stroke();
+          c.restore();
+        }
+        break;
     }
     this.sprite(0, 0, 0, 150, 1);
     c.restore();
@@ -131,6 +245,7 @@ export class Renderer {
     const c = this.ctx,
       p = game.player;
     for (const z of game.zones) {
+      if (!this.visible(z, p, z.radius + 50)) continue;
       c.save();
       c.translate(z.x, z.y);
       const alpha = z.delay > 0 ? 0.15 + Math.sin(time * 13) * 0.06 : 0.22;
@@ -212,6 +327,7 @@ export class Renderer {
         type: -1,
         radius: 20,
         boss: false,
+        bossStage: undefined,
         elite: false,
         slow: 0,
         flash: 0,
@@ -236,7 +352,7 @@ export class Renderer {
         c.globalAlpha = 1;
       } else {
         if (e.elite || e.boss)
-          this.formation(
+          this.cachedFormation(
             e.x,
             e.y + 6,
             e.radius + 10,
@@ -257,7 +373,7 @@ export class Renderer {
           c.ellipse(e.x, e.y + 7, e.radius + 4, e.radius * 0.5, 0, 0, TAU);
           c.fill();
         }
-        const sprite = e.boss ? STAGES[game.stage].sprite : ENEMIES[e.type].sprite;
+        const sprite = e.boss ? STAGES[e.bossStage ?? game.stage].sprite : ENEMIES[e.type].sprite;
         this.sprite(
           sprite,
           e.x,
@@ -571,10 +687,10 @@ export class Renderer {
     }
     c.restore();
   }
-  private visible(at: Point, camera: Point) {
+  private visible(at: Point, camera: Point, margin = 150) {
     return (
-      Math.abs(at.x - camera.x) < this.width / this.scale / 2 + 150 &&
-      Math.abs(at.y - camera.y) < this.height / this.scale / 2 + 150
+      Math.abs(at.x - camera.x) < this.width / this.scale / 2 + margin &&
+      Math.abs(at.y - camera.y) < this.height / this.scale / 2 + margin
     );
   }
   private sprite(index: number, x: number, y: number, size: number, facing = 1, flash = false) {
@@ -588,20 +704,33 @@ export class Renderer {
     c.fill();
     const frame = spriteFrame(index);
     const source = this.atlases[frame.atlas];
-    const flashSource = this.flashes[frame.atlas];
-    const height = (size * frame.height) / frame.width;
-    if (source?.complete && source.naturalWidth)
-      c.drawImage(
-        flash && flashSource?.width === source.width ? flashSource : source,
-        (frame.x / 1536) * source.naturalWidth,
-        (frame.y / 1024) * source.naturalHeight,
-        (frame.width / 1536) * source.naturalWidth,
-        (frame.height / 1024) * source.naturalHeight,
-        -size / 2,
-        -height * 0.765,
-        size,
-        height,
-      );
+    const width = Math.min(size, (size * 4 * frame.width) / (3 * frame.height));
+    const height = (width * frame.height) / frame.width;
+    if (source?.complete && source.naturalWidth) {
+      const key = `${index}:${size}:${flash}`;
+      let sprite = this.sprites.get(key);
+      if (!sprite) {
+        sprite = document.createElement('canvas');
+        sprite.width = Math.ceil(width * 2);
+        sprite.height = Math.ceil(height * 2);
+        const context = sprite.getContext('2d')!;
+        context.imageSmoothingQuality = 'high';
+        if (flash) context.filter = 'brightness(1.7)';
+        context.drawImage(
+          source,
+          (frame.x / 1536) * source.naturalWidth,
+          (frame.y / 1024) * source.naturalHeight,
+          source.naturalWidth / frame.columns,
+          source.naturalHeight / frame.rows,
+          0,
+          0,
+          sprite.width,
+          sprite.height,
+        );
+        this.sprites.set(key, sprite);
+      }
+      c.drawImage(sprite, -width / 2, -height * 0.765, width, height);
+    }
     c.restore();
   }
   private sword(x: number, y: number, angle: number, color: string, scale = 1) {
@@ -664,7 +793,7 @@ export class Renderer {
     c.fill();
     c.restore();
   }
-  private formation(
+  private cachedFormation(
     x: number,
     y: number,
     radius: number,
@@ -672,7 +801,34 @@ export class Renderer {
     color: string,
     alpha: number,
   ) {
+    const key = `${radius}:${color}`;
+    const extent = Math.ceil(radius + 3);
+    let texture = this.formations.get(key);
+    if (!texture) {
+      texture = document.createElement('canvas');
+      texture.width = texture.height = extent * 4;
+      const context = texture.getContext('2d')!;
+      context.scale(2, 2);
+      this.formation(extent, extent, radius, 0, color, 1, context);
+      this.formations.set(key, texture);
+    }
     const c = this.ctx;
+    c.save();
+    c.translate(x, y);
+    c.rotate(angle);
+    c.globalAlpha = alpha;
+    c.drawImage(texture, -extent, -extent, extent * 2, extent * 2);
+    c.restore();
+  }
+  private formation(
+    x: number,
+    y: number,
+    radius: number,
+    angle: number,
+    color: string,
+    alpha: number,
+    c = this.ctx,
+  ) {
     c.save();
     c.translate(x, y);
     c.rotate(angle);

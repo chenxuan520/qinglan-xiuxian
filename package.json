@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "balance": "node --experimental-strip-types scripts/balance.ts",
+    "balance:trial": "node --experimental-strip-types scripts/final-trial-balance.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

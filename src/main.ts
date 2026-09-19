@@ -8,19 +8,28 @@ import {
   evolutionPassives,
   PASSIVES,
   STAGES,
+  FINAL_TRIAL_STAGE,
+  TRIAL_BOSS_STAGES,
+  TRIAL_BOSS_TIMES,
   DIFFICULTIES,
   REALMS,
   ENEMIES,
+  enemyWave,
   STAGE_ENEMIES,
   treasure,
   passive,
-  xpNeeded,
   formatTime,
+  xpNeeded,
+  MAX_RUN_LEVEL,
+  MAX_REVIVES,
 } from './data.ts';
 import {
   parseSave,
+  freshSave,
+  claimArtifacts,
   SAVE_KEY,
   realmInfo,
+  realmBonuses,
   trainingCost,
   forgeCost,
   train,
@@ -49,6 +58,17 @@ try {
   storageAvailable = false;
 }
 const save = parseSave(raw);
+// 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
+const catalogTreasures = [...TREASURES];
+catalogTreasures.splice(
+  catalogTreasures.findIndex((t) => t.id === 'nail'),
+  1,
+);
+catalogTreasures.splice(
+  catalogTreasures.findIndex((t) => t.school === 'demonic'),
+  0,
+  treasure('nail'),
+);
 let pendingRun: Game | null = null;
 try {
   pendingRun = Game.restore(save, JSON.parse(raw || '{}').activeRun);
@@ -65,7 +85,7 @@ let panel = '',
 let guideTab = 'basics';
 let schoolFilter = 'all';
 let bestiaryStage = -1;
-let treasurePage = Math.floor(TREASURES.findIndex((t) => t.id === save.starter) / 12);
+let treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
 let rewards: ReturnType<typeof settleRun> | null = null,
   oldRealm = '',
   abandonConfirm = false;
@@ -76,6 +96,12 @@ let touchInput = { x: 0, y: 0 },
 let audio: AudioContext | null = null,
   lastSound = 0,
   assetsReady = false;
+let masterGain: GainNode | null = null;
+let volumeOpen = false;
+let resumeAfterDamage = false;
+let adReadyAt = 0;
+let adTimer: number | undefined;
+let victoryTimer: number | undefined;
 function persist() {
   const active = game && !settled ? game : pendingRun;
   try {
@@ -124,12 +150,17 @@ function sound(name: string) {
   gain.gain.exponentialRampToValueAtTime(name === 'cast' ? 0.015 : 0.06, now + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
   osc.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(masterGain!);
   osc.start(now);
   osc.stop(now + 0.36);
 }
 function unlockAudio() {
   audio ??= new AudioContext();
+  if (!masterGain) {
+    masterGain = audio.createGain();
+    masterGain.connect(audio.destination);
+  }
+  masterGain.gain.setTargetAtTime(save.sound ? save.volume : 0, audio.currentTime, 0.02);
   if (audio.state === 'suspended') void audio.resume();
 }
 const currency = () =>
@@ -138,11 +169,11 @@ function autoplayButton() {
   return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；点击切换手动">AI 代打 · ${save.autoplay ? '开' : '关'}</button>`;
 }
 function controls(inGame = false) {
-  return `${autoplayButton()}<button class="round-button" data-action="sound" aria-label="${save.sound ? '关闭' : '开启'}音效" title="${save.sound ? '关闭' : '开启'}音效">${smallIcon(save.sound ? 'sound' : 'mute')}</button><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
+  return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音效'}" title="${save.sound ? '调节音量' : '开启音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音量 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音效音量" /></label><button data-action="mute">关闭音效</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button><button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 function renderLobby() {
   const stage = STAGES[selectedStage],
-    realm = realmInfo(save.cultivation);
+    realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   document.body.classList.remove('in-game');
   ui.innerHTML = `
     <header class="lobby-header">
@@ -153,13 +184,13 @@ function renderLobby() {
     <main class="lobby-main">
       <section class="hero">
         <div class="hero-copy"><div class="eyebrow"><span></span>一人 · 一剑 · 一场长生梦</div><h1>御剑问长生<span>青岚入仙途</span></h1><p>踏入烟岚深处，执剑斩尽妖潮。<br>集天地灵气，炼本命法宝，从一介凡尘修至渡劫。</p>
-          <div class="hero-features"><span>三十六法宝</span><i>·</i><span>六重秘境</span><i>·</i><span>正魔兼修</span></div>
+          <div class="hero-features"><span>三十六法宝</span><i>·</i><span>七重秘境</span><i>·</i><span>正魔兼修</span></div>
         </div>
         <button class="realm-preview" data-action="cultivation"><span class="vertical-poem">万法归一 · 道心长存</span><span class="realm-circle"><small>当前境界</small><strong>${REALMS[realm.index]}</strong><span>${['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>
       </section>
       <section class="expedition" aria-label="选择秘境">
         ${pendingRun ? `<div class="resume-banner"><div><span class="status-dot"></span>尚有一段仙缘未了<small>${STAGES[pendingRun.stage].name} · ${formatTime(pendingRun.time)} · ${pathInfo(pendingRun.path).name} · 局内 ${pendingRun.level} 级</small></div><button class="secondary-button" data-action="restore">继续上次历练 ${smallIcon('arrow')}</button></div>` : ''}
-        <div class="section-heading"><div><span class="section-number">壹 / 陆</span><h2>择一秘境，启程修行</h2></div><span class="muted">已探索 ${save.completed.length} / 6 处秘境</span></div>
+        <div class="section-heading"><div><span class="section-number">壹 / 柒</span><h2>择一秘境，启程修行</h2></div><span class="muted">已探索 ${save.completed.length} / ${STAGES.length} 处秘境</span></div>
         <div class="stage-grid">${STAGES.map((s, i) => `<button class="stage-card ${i === selectedStage ? 'selected' : ''} ${i > save.unlocked ? 'locked' : ''}" data-action="stage" data-id="${i}" ${i > save.unlocked ? 'disabled' : ''} style="--stage-color:${s.color}"><span class="stage-top"><span>第${s.chapter}境</span>${i > save.unlocked ? smallIcon('lock') : save.completed.includes(i) ? '<span>已通关 ✓</span>' : '<span>可挑战</span>'}</span><strong>${s.name}</strong><span class="stage-bottom">${i > save.unlocked ? '通关前境解锁' : `${s.minutes} 分钟 · ${s.boss}`}</span><span class="stage-ornament">${s.chapter}</span></button>`).join('')}</div>
         <div class="expedition-footer"><div class="stage-description"><span class="tiny-diamond">◇</span><p>${stage.description}</p></div><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div></div>
         <div class="path-selection"><span class="field-label">修行之道 · 本局法宝与功法路线</span><div class="path-grid" role="group" aria-label="选择修行路线">${CULTIVATION_PATHS.map((p) => `<button data-action="path" data-id="${p.id}" class="path-card ${save.path === p.id ? 'active' : ''}" aria-pressed="${save.path === p.id}" style="--path-color:${p.color}"><strong>${p.name}</strong><span>${p.desc}</span></button>`).join('')}</div><small>正道、魔道各 18 件法宝与 8 种功法，兼修可混搭。路线仅影响新历练，续局保留原路线。</small></div>
@@ -195,12 +226,13 @@ function panelFrame(title: string, subtitle: string, body: string, wide = false)
 }
 function renderPanel() {
   if (panel === 'arsenal') {
-    const visibleTreasures = TREASURES.filter(
+    const visibleTreasures = catalogTreasures.filter(
       (t) => schoolFilter === 'all' || t.school === schoolFilter,
     );
     const t = treasure(selectedTreasure),
       level = save.forge[t.id] || 0,
-      cost = forgeCost(level);
+      cost = forgeCost(level),
+      owned = save.artifacts.includes(t.id);
     const detail =
       bookTab === 'treasures'
         ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / 5</small></h3><p>${t.desc}</p><div class="evolution-recipe">${t.name}六重 + ${evolutionPassives(
@@ -210,12 +242,12 @@ function renderPanel() {
             .map((id) => passive(id).name)
             .join(
               ' / ',
-            )}任一三重 <span>→ ${t.evolution}</span></div></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" ${level >= 5 || save.iron < cost.iron || save.stones < cost.stones ? 'disabled' : ''}>${level >= 5 ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>每阶永久增加 8% 伤害</small></div></div>`
+            )}任一三重 <span>→ ${t.evolution}</span></div></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需拾取妖王遗宝解锁' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" ${!owned || level >= 5 || save.iron < cost.iron || save.stones < cost.stones ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= 5 ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>每阶永久增加 8% 伤害</small></div></div>`
         : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修至三重，可使六重法宝进化为仙器。</p>';
     panelFrame(
       '万般法宝，皆可入道',
       '藏器阁 / ARTIFACT COLLECTION',
-      `<div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency()}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
+      `${artifactLoot()}<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，拾取后可设本命与炼器。</p><div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency()}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
         bookTab === 'treasures'
           ? `<div class="guide-tabs collection-pages" role="group" aria-label="法宝分页">${Array.from(
               { length: Math.ceil(visibleTreasures.length / 12) },
@@ -233,7 +265,7 @@ function renderPanel() {
               .slice(treasurePage * 12, treasurePage * 12 + 12)
               .map(
                 (t) =>
-                  `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${t.tag}</small></div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots">${'◆'.repeat(save.forge[t.id] || 0)}${'◇'.repeat(5 - (save.forge[t.id] || 0))}</span></button>`,
+                  `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${save.artifacts.includes(t.id) ? '已收藏' : '待收集'}</small></div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots">${'◆'.repeat(save.forge[t.id] || 0)}${'◇'.repeat(5 - (save.forge[t.id] || 0))}</span></button>`,
               )
               .join('')
           : PASSIVES.filter((p) => schoolFilter === 'all' || p.school === schoolFilter)
@@ -246,15 +278,16 @@ function renderPanel() {
                   }</small></article>`,
               )
               .join('')
-      }</div>${detail}<p class="panel-note">当前路线：${pathInfo(save.path).name}。纯修只领悟本流派法宝和功法，兼修可混搭。出发携带 1 件本命法宝，局内最多 6 件。精英宝匣可直接提升法宝重数，玄铁可用于局外永久炼器。</p>`,
+      }</div>${detail}<p class="panel-note">当前路线：${pathInfo(save.path).name}。纯修只领悟本流派法宝和功法，兼修可混搭。出发携带 1 件本命法宝，局内最多 6 件。精英宝匣可直接提升法宝重数，拾取妖王遗宝后可设本命与永久炼器；未收藏法宝仍可在局内领悟。</p>`,
       true,
     );
   } else if (panel === 'cultivation') {
-    const r = realmInfo(save.cultivation);
+    const r = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
+    const bonus = realmBonuses(r.step);
     panelFrame(
       '积一寸修为，近一寸长生',
       '洞府 / CULTIVATION',
-      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${REALMS[r.index]}</strong><span>${['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '渡劫圆满，仙途无尽。' : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><small>每次突破：永久气血 +3，法宝伤害 +2.5%，本局立即生效</small></div></div><div class="realm-road">${REALMS.map((r, i) => `<div class="${i === realmInfo(save.cultivation).index ? 'current' : i < realmInfo(save.cultivation).index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
+      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${REALMS[r.index]}</strong><span>${['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '渡劫圆满，仙途无尽。' : r.locked ? `渡劫瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><small>当前境界加成：气血 +${bonus.hp}，法宝伤害 +${Math.round(bonus.damage * 1000) / 10}%<br>小阶段突破 +3 气血 / +2.5% 伤害；大境界突破 +45 气血 / +35% 伤害，本局立即生效。</small></div></div><div class="realm-road">${REALMS.map((r, i) => `<div class="${i === realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index ? 'current' : i < realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
         [
           {
             id: 'vitality',
@@ -285,7 +318,7 @@ function renderPanel() {
         )
         .join(
           '',
-        )}</div><p class="panel-note">斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p>`,
+        )}</div><p class="panel-note">斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p><div class="reincarnation-row"><div><h3>轮回转世</h3><p>清空此浏览器进度，重启仙途。</p></div><button class="secondary-button" data-action="reincarnate">轮回转世</button></div>`,
       true,
     );
   } else if (panel === 'bestiary') {
@@ -304,25 +337,28 @@ function renderPanel() {
     panelFrame(
       '知妖性，方能破万劫',
       '妖物志 / BESTIARY',
-      `<p class="panel-note">28 种妖物逐境累加，后期四境各新增 4 种高阶妖物，之前的种类仍会出现。每分钟出现精英，倒计时结束后妖王现身。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物池">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
+      `<p class="panel-note">前六境各有 12 种专属妖物，共 72 种；普通秘境只出现本境妖物。每关分四批加入强敌：前六境按时长 0%、25%、50%、75% 解锁，终关提前到 0:00、0:45、1:30、2:30，后续以新批次为主。第七境「万劫归墟」汇聚历境精英，六位妖王与九天执劫仙尊依次登场；全部击败才能通关并解除渡劫瓶颈。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物池">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
         (_, index) => bestiaryStage < 0 || STAGE_ENEMIES[bestiaryStage].includes(index),
       )
         .map(
           (e) =>
-            `<article class="enemy-card"><span class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}" style="${spriteStyle(e.sprite)}"></span><div><h3>${e.name}</h3><p>${behavior[e.behavior]}</p><small>基础气血 ${e.hp} · 伤害 ${e.damage}</small></div></article>`,
+            `<article class="enemy-card"><span class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}" style="${spriteStyle(e.sprite)}"></span><div><h3>${e.name}</h3><p>${behavior[e.behavior]}</p><small>${bestiaryStage === FINAL_TRIAL_STAGE ? '终关以精英形态出现 · ' : ''}基础气血 ${e.hp} · 伤害 ${e.damage}</small></div></article>`,
         )
         .join(
           '',
-        )}</div><h3 class="guide-subheading">六境妖王</h3><div class="bestiary-grid">${STAGES.filter(
-        (_, index) => bestiaryStage < 0 || index === bestiaryStage,
+        )}</div><h3 class="guide-subheading">历境妖王与执劫仙尊</h3><div class="bestiary-grid">${STAGES.filter(
+        (_, index) =>
+          bestiaryStage < 0 ||
+          (bestiaryStage === FINAL_TRIAL_STAGE && TRIAL_BOSS_STAGES.includes(index)) ||
+          index === bestiaryStage,
       )
         .map(
           (stage) =>
-            `<article class="enemy-card"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${stage.name} · ${stage.minutes} 分钟后现身</p><small>独立妖王 · 半血后攻势加快</small></div></article>`,
+            `<article class="enemy-card"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${bestiaryStage === FINAL_TRIAL_STAGE ? `第 ${TRIAL_BOSS_STAGES.indexOf(STAGES.indexOf(stage)) + 1} 劫 · 最早 ${formatTime(TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(STAGES.indexOf(stage))])} 后现身` : `${stage.name} · ${stage.minutes} 分钟后现身`}</p><small>${stage.skills.join(' · ')}<br>半血后攻势加快</small></div></article>`,
         )
         .join(
           '',
-        )}</div><div class="boss-note">${smallIcon('book')} 妖王招式：直线冲撞、环形灵弹、落地法阵。半血后攻势加快，所有落地攻击均有红色预警。</div>`,
+        )}</div><div class="boss-note">${smallIcon('book')} 前六位首领各有三招，最终仙尊有六招交替施放，半血后攻势加快。冲刺与落地法阵有预警，及时横移；召唤物优先清理。终关第二批阶段开始追击精英追加冲刺，远程怪后期施法更快。</div>`,
       true,
     );
   } else if (panel === 'guide') {
@@ -337,7 +373,7 @@ function renderHud() {
   if (!game) return;
   lastLoadout = '';
   document.body.classList.add('in-game');
-  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div></div><div class="stage-timer"><div>${STAGES[game.stage].name} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small>触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>存活历练 · 斩灭妖王</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
+  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div></div><div class="stage-timer"><div>${STAGES[game.stage].name} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small>触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
   updateHud();
 }
 let lastLoadout = '';
@@ -347,36 +383,57 @@ function updateHud() {
     const el = document.getElementById(id);
     if (el && el.textContent !== text) el.textContent = text;
   };
-  const realm = realmInfo(save.cultivation);
+  const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   set('realm-name', realm.name);
-  set('cultivation-text', realm.max ? '渡劫圆满' : `${realm.progress} / ${realm.needed}`);
+  set(
+    'cultivation-text',
+    realm.max
+      ? '渡劫圆满'
+      : realm.locked
+        ? '渡劫瓶颈 · 需通关第七境'
+        : `${realm.progress} / ${realm.needed}`,
+  );
   set('level', `LV. ${game.level}`);
   set('health-text', `${Math.ceil(game.player.hp)} / ${game.player.maxHp}`);
   document.querySelector<HTMLElement>('#health-fill')!.style.width =
     `${Math.max(0, game.player.hp / game.player.maxHp) * 100}%`;
   set('kills', `${game.kills}`);
   set('time', formatTime(game.time));
-  set('xp-text', `灵气 ${Math.floor(game.xp)} / ${xpNeeded(game.level)}`);
+  const maxLevel = game.level >= MAX_RUN_LEVEL;
+  set(
+    'xp-text',
+    maxLevel
+      ? `已满级 · LV. ${MAX_RUN_LEVEL}`
+      : `灵气 ${Math.floor(game.xp)} / ${xpNeeded(game.level)}`,
+  );
   document.querySelector<HTMLElement>('#xp-fill')!.style.width =
-    `${Math.min(100, (game.xp / xpNeeded(game.level)) * 100)}%`;
+    `${maxLevel ? 100 : Math.min(100, (game.xp / xpNeeded(game.level)) * 100)}%`;
   set(
     'wave-label',
-    game.bossSpawned
-      ? '妖王现身 · 决战之时'
-      : game.time > 180
-        ? '妖潮汹涌 · 固守道心'
-        : game.time > 60
-          ? '妖影渐密 · 精英出没'
-          : '初入秘境 · 稳固道心',
+    game.isFinalTrial
+      ? `七劫试炼 · 已破 ${game.trialBossesDefeated} / 7 劫 · 妖潮 ${enemyWave(game.stage, game.time) + 1} / 4`
+      : game.bossSpawned
+        ? '妖王现身 · 决战之时'
+        : [
+            '初入秘境 · 稳固道心',
+            '第二批妖物 · 突袭来袭',
+            '第三批妖物 · 强敌压境',
+            '最后一批 · 妖潮汹涌',
+          ][enemyWave(game.stage, game.time)],
   );
   const notice = document.getElementById('notice')!;
   notice.textContent = game.noticeTime > 0 ? game.notice : '';
   notice.classList.toggle('visible', game.noticeTime > 0);
+  const aliveBosses = game.enemies.filter((e) => e.boss && !e.dead);
   const bossBar = document.querySelector<HTMLElement>('#boss-bar')!;
   bossBar.hidden = !game.boss;
-  if (game.boss)
+  if (game.boss) {
+    bossBar.querySelector<HTMLElement>('span')!.textContent =
+      STAGES[game.boss.bossStage ?? game.stage].boss +
+      (aliveBosses.length > 1 ? ` · 同场 ${aliveBosses.length} 位妖王` : '');
     bossBar.querySelector<HTMLElement>('i')!.style.width =
       `${(game.boss.hp / game.boss.maxHp) * 100}%`;
+  }
   const loadout = JSON.stringify([
     game.weapons.map((w) => [w.id, w.level, w.evolved]),
     game.passives,
@@ -411,7 +468,7 @@ function choiceCard(c: Choice, i: number) {
         ? {
             name: '回春灵露',
             color: '#b6d8a5',
-            desc: '恢复 40% 最大气血，并获得 1 枚玄铁。',
+            desc: `恢复 ${game?.isFinalTrial ? 15 : 40}% 最大气血，并获得 1 枚玄铁。`,
             id: 'duration',
           }
         : treasure(c.id);
@@ -432,15 +489,138 @@ function renderPause() {
   panelFrame(
     '静心片刻',
     '修行暂歇 / PAUSED',
-    `<p class="pause-description">${STAGES[game.stage].name} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · 已斩 ${game.kills} 妖</p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重</span>`).join('')}</div><p class="panel-note">${abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton()}<button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
+    `<p class="pause-description">${STAGES[game.stage].name} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · 已斩 ${game.kills} 妖</p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重</span>`).join('')}</div><p class="panel-note">${abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton()}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
   );
+}
+function artifactLoot() {
+  if (!save.artifactDrops.length) return '';
+  return `<section class="artifact-loot"><h3>妖王遗宝 · 待拾取 ${save.artifactDrops.length} 件</h3><div class="loot-items">${save.artifactDrops.map((id) => `<span>${icon(id, treasure(id).color)}${treasure(id).name}</span>`).join('')}</div><button class="primary-button compact" data-action="claim-artifacts">拾取全部 · 解锁本命与炼器</button><p class="panel-note">遗宝已保存，也可稍后在藏器阁拾取。</p></section>`;
+}
+function gameEvent(name: string) {
+  sound(name);
+  if (name === 'loot') {
+    if (save.autoplay) {
+      const items = claimArtifacts(save);
+      if (items.length) toast(`AI 拾取：${items.map((id) => treasure(id).name).join('、')}`);
+    }
+    persist();
+  }
+}
+function damageReport() {
+  if (!game) return '';
+  const total = game.damageDealt;
+  const rows = game.weapons.map((w) => {
+    const item = treasure(w.id);
+    return {
+      id: w.id as string,
+      name: w.evolved ? item.evolution : item.name,
+      color: item.color,
+      damage: game!.damageBySource[w.id] || 0,
+    };
+  });
+  if (game.damageBySource.bone)
+    rows.push({
+      id: 'bone',
+      name: '白骨魔甲 · 反伤',
+      color: passive('bone').color,
+      damage: game.damageBySource.bone,
+    });
+  const other = Math.max(0, total - rows.reduce((sum, row) => sum + row.damage, 0));
+  if (other > 0.01)
+    rows.push({ id: '', name: '其他 / 旧记录未分类', color: '#a7bbae', damage: other });
+  rows.sort((a, b) => b.damage - a.damage);
+  return `<section class="damage-report" aria-label="本局伤害统计"><div class="damage-heading"><h3>法宝伤害占比</h3><span>总伤害 ${Math.round(total).toLocaleString('zh-CN')}</span></div>${rows
+    .map((row) => {
+      const percent = total > 0 ? (row.damage / total) * 100 : 0;
+      return `<div class="damage-row" style="--damage-color:${row.color}">${row.id ? icon(row.id, row.color) : '<span class="damage-other">✧</span>'}<div class="damage-detail"><div class="damage-label"><strong>${row.name}</strong><span>${Math.round(row.damage).toLocaleString('zh-CN')} <b>${percent.toFixed(1)}%</b></span></div><div class="damage-bar"><i style="width:${percent}%"></i></div></div></div>`;
+    })
+    .join(
+      '',
+    )}<p class="panel-note">按实际扣血统计，不含击杀时的溢出伤害；反伤单列。${other > 0.01 ? '旧版对局已造成的伤害无法追溯法宝归属。' : ''}</p></section>`;
+}
+function finishRun() {
+  if (!game || settled || (game.state !== 'won' && game.state !== 'lost')) return;
+  clearInterval(adTimer);
+  adReadyAt = 0;
+  panel = '';
+  settled = true;
+  rewards = settleRun(save, {
+    stage: game.stage,
+    difficulty: game.difficulty,
+    kills: game.kills,
+    time: game.time,
+    victory: game.state === 'won',
+    iron: game.iron,
+    level: game.level,
+    creditedCultivation: game.creditedCultivation,
+    combatCultivation: game.combatCultivation,
+  });
+  persist();
+  if (game.state === 'won') renderVictory();
+  else renderResult();
+}
+function renderVictory() {
+  if (!game || !rewards) return;
+  panel = 'victory';
+  const final = game.isFinalTrial;
+  modal.innerHTML = `<div class="modal-backdrop victory-backdrop ${final ? 'victory-final' : ''}"><section class="victory-scene" role="dialog" aria-modal="true" aria-labelledby="victory-title"><div class="victory-formation" aria-hidden="true">${Array.from({ length: 8 }, (_, i) => `<span class="victory-sword" style="--angle:${i * 45}deg"><i class="victory-blade"></i></span>`).join('')}</div><div class="victory-sparks" aria-hidden="true">${Array.from(
+    { length: 24 },
+    (_, i) => {
+      const angle = (i / 24) * Math.PI * 2;
+      const distance = 35 + (i % 4) * 6;
+      return `<i style="--x:${Math.cos(angle) * distance}vmin;--y:${Math.sin(angle) * distance}vmin;--delay:${(i % 4) * 90}ms"></i>`;
+    },
+  ).join(
+    '',
+  )}</div><div class="victory-copy"><div class="eyebrow">${STAGES[game.stage].name} · 历练圆满</div><h2 id="victory-title">${final ? '七劫尽破' : '一剑荡妖尘'}</h2><p>${final ? '仙尊已陨 · 渡劫之门已开' : '妖王伏诛 · 此境已破'}</p>${final ? '<div class="victory-trials" aria-label="七劫全部完成">壹 · 贰 · 叁 · 肆 · 伍 · 陆 · 柒</div>' : ''}</div><button class="secondary-button victory-skip" data-action="victory-result">查看通关战绩 ${smallIcon('arrow')}</button></section></div>`;
+  modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  victoryTimer = window.setTimeout(() => {
+    if (panel === 'victory') renderResult();
+  }, 3000);
+}
+function renderDeath() {
+  if (!game || game.state !== 'lost' || settled) return;
+  if (game.revivesUsed >= MAX_REVIVES) {
+    finishRun();
+    return;
+  }
+  panel = 'death';
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="重燃道心"><div class="eyebrow">仙途未尽</div><h2>重燃道心</h2><p>观看广告后原地满血复活，获得 3 秒护体。<br>每局最多复活 ${MAX_REVIVES} 次，法宝、等级和战绩全部保留。</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-ad">看广告复活 · 剩余 ${MAX_REVIVES - game.revivesUsed} 次</button><button class="secondary-button" data-action="finish-run">直接结算</button></div></section></div>`;
+  modal.querySelector<HTMLButtonElement>('button')?.focus();
+}
+function showReviveAd() {
+  if (
+    !game ||
+    game.state !== 'lost' ||
+    game.revivesUsed >= MAX_REVIVES ||
+    settled ||
+    panel === 'revive-ad'
+  )
+    return;
+  panel = 'revive-ad';
+  adReadyAt = Date.now() + 5000;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div><div class="revive-ad">广告位招租</div><p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>5 秒后可复活</button><button class="secondary-button" data-action="finish-run">放弃复活并结算</button></div></section></div>`;
+  clearInterval(adTimer);
+  adTimer = window.setInterval(() => {
+    const button = modal.querySelector<HTMLButtonElement>('[data-action="ad-revive"]');
+    if (!button) {
+      clearInterval(adTimer);
+      return;
+    }
+    const seconds = Math.max(0, Math.ceil((adReadyAt - Date.now()) / 1000));
+    button.disabled = seconds > 0;
+    button.textContent = seconds > 0 ? `${seconds} 秒后可复活` : '广告已结束 · 满血复活';
+    if (seconds === 0) clearInterval(adTimer);
+  }, 200);
 }
 function renderResult() {
   if (!game || !rewards) return;
+  window.clearTimeout(victoryTimer);
+  panel = '';
   const won = game.state === 'won',
-    realm = realmInfo(save.cultivation).name;
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? '破境' : '归来'}</div><div class="eyebrow">${STAGES[game.stage].name} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? '一剑荡妖尘' : '仙途漫漫，再行一程'}</h2><p>${won ? (game.stage === 5 ? '六境已破，长生之路仍可在更高难度中继续。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div><div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < 5 ? 'next' : 'retry'}">${won && game.stage < 5 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
-  modal.querySelector<HTMLButtonElement>('button')?.focus();
+    realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? '破境' : '归来'}</div><div class="eyebrow">${STAGES[game.stage].name} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? '一剑荡妖尘' : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七劫试炼已破，渡劫瓶颈解除。修为达标即可突破渡劫！' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN')}<small>已计入本局总修为</small></p>` : ''}${damageReport()}${artifactLoot()}<div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
+  modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
 }
 function startRun() {
   if (!assetsReady || selectedStage > save.unlocked) return;
@@ -461,9 +641,12 @@ function startRun() {
   rewards = null;
   abandonConfirm = false;
   game = new Game(save, selectedStage, difficulty);
-  game.onEvent = sound;
+  game.onEvent = gameEvent;
   previousState = 'playing';
-  oldRealm = realmInfo(save.cultivation - game.creditedCultivation).name;
+  oldRealm = realmInfo(
+    save.cultivation - game.creditedCultivation,
+    save.completed.includes(FINAL_TRIAL_STAGE),
+  ).name;
   renderHud();
   if (save.sound) unlockAudio();
   persist();
@@ -477,13 +660,17 @@ function restoreRun() {
   abandonConfirm = false;
   selectedStage = game.stage;
   difficulty = game.difficulty;
-  game.onEvent = sound;
+  game.onEvent = gameEvent;
   clearInput();
   panel = '';
   previousState = game.state;
-  oldRealm = realmInfo(save.cultivation - game.creditedCultivation).name;
+  oldRealm = realmInfo(
+    save.cultivation - game.creditedCultivation,
+    save.completed.includes(FINAL_TRIAL_STAGE),
+  ).name;
   renderHud();
   if (game.state === 'upgrade') renderChoices();
+  else if (game.state === 'lost') renderDeath();
   else renderPause();
   if (save.sound) unlockAudio();
   persist();
@@ -504,6 +691,80 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function handleAction(action: string, id?: string) {
+  if (panel === 'victory' && (action === 'victory-result' || action === 'close')) {
+    renderResult();
+    return;
+  }
+  if (action === 'damage' && game && (game.state === 'playing' || game.state === 'paused')) {
+    resumeAfterDamage = game.state === 'playing';
+    clearInput();
+    game.pause();
+    previousState = game.state;
+    panel = 'damage';
+    panelFrame(
+      '伤害统计',
+      `${STAGES[game.stage].name} · ${formatTime(game.time)} · 斩妖 ${game.kills}`,
+      `${damageReport()}<button class="primary-button guide-close" data-action="close">${resumeAfterDamage ? '继续修行' : '返回暂停界面'} ${smallIcon('arrow')}</button>`,
+    );
+    persist();
+    return;
+  }
+  if (action === 'watch-ad') {
+    showReviveAd();
+    return;
+  }
+  if (action === 'finish-run' && game?.state === 'lost') {
+    finishRun();
+    return;
+  }
+  if (action === 'ad-revive') {
+    if (panel !== 'revive-ad' || !adReadyAt || Date.now() < adReadyAt || settled || !game?.revive())
+      return;
+    clearInterval(adTimer);
+    adReadyAt = 0;
+    clearInput();
+    panel = '';
+    modal.innerHTML = '';
+    previousState = 'playing';
+    if (game.state === 'won') {
+      finishRun();
+      return;
+    }
+    lastFrame = performance.now();
+    updateHud();
+    persist();
+    return;
+  }
+  if (action === 'claim-artifacts') {
+    const items = claimArtifacts(save);
+    persist();
+    if (game && settled) renderResult();
+    else renderPanel();
+    toast(`已收藏 ${items.length} 件法宝`);
+    return;
+  }
+  if (action === 'reincarnate' && !game) {
+    panel = 'reincarnate';
+    panelFrame(
+      '轮回转世',
+      '重启仙途',
+      '<p class="pause-description">将清空此浏览器在当前网址的全部进度：境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，默认拥有青霄剑与追魂钉。</p><div class="pause-actions"><button class="secondary-button" data-action="cultivation">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>',
+    );
+    return;
+  }
+  if (action === 'confirm-reincarnate' && panel === 'reincarnate' && !game) {
+    Object.assign(save, freshSave());
+    if (masterGain && audio) masterGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
+    pendingRun = null;
+    selectedStage = difficulty = treasurePage = 0;
+    selectedTreasure = save.starter;
+    schoolFilter = 'all';
+    bookTab = 'treasures';
+    persist();
+    returnLobby();
+    toast('轮回已启 · 炼气初期，从头修行');
+    return;
+  }
   if (action === 'autoplay') {
     save.autoplay = !save.autoplay;
     clearInput();
@@ -518,8 +779,11 @@ function handleAction(action: string, id?: string) {
     toast(save.autoplay ? 'AI 代打已开启 · 自动走位与选技' : '已切回手动操作');
     return;
   }
-  if (action === 'sound') {
-    save.sound = !save.sound;
+  if (action === 'sound' || action === 'mute') {
+    volumeOpen = action === 'sound' && !volumeOpen;
+    save.sound = action === 'sound';
+    if (masterGain && audio)
+      masterGain.gain.setTargetAtTime(save.sound ? save.volume : 0, audio.currentTime, 0.02);
     if (save.sound) {
       unlockAudio();
       sound('select');
@@ -530,7 +794,15 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'close') {
-    if (game?.state === 'paused' && panel === 'guide') {
+    if (game?.state === 'lost' && !settled) return;
+    if (game?.state === 'paused' && panel === 'damage') {
+      panel = '';
+      if (resumeAfterDamage) {
+        game.resume();
+        modal.innerHTML = '';
+      } else renderPause();
+      resumeAfterDamage = false;
+    } else if (game?.state === 'paused' && panel === 'guide') {
       panel = '';
       renderPause();
     } else if (game?.state === 'paused') {
@@ -586,9 +858,9 @@ function handleAction(action: string, id?: string) {
   if (action === 'path' && !game && isCultivationPath(id)) {
     save.path = id;
     if (!allowsSchool(id, treasure(save.starter).school)) {
-      save.starter = TREASURES.find((t) => allowsSchool(id, t.school))!.id;
+      save.starter = id === 'demonic' ? 'nail' : 'sword';
       selectedTreasure = save.starter;
-      treasurePage = Math.floor(TREASURES.findIndex((t) => t.id === save.starter) / 12);
+      treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
       schoolFilter = 'all';
     }
     persist();
@@ -596,15 +868,15 @@ function handleAction(action: string, id?: string) {
   }
   if (action === 'treasure-page') {
     treasurePage = Number(id);
-    selectedTreasure = TREASURES.filter((t) => schoolFilter === 'all' || t.school === schoolFilter)[
-      treasurePage * 12
-    ].id;
+    selectedTreasure = catalogTreasures.filter(
+      (t) => schoolFilter === 'all' || t.school === schoolFilter,
+    )[treasurePage * 12].id;
     renderPanel();
   }
   if (action === 'school-filter') {
     schoolFilter = id!;
     treasurePage = 0;
-    selectedTreasure = TREASURES.find(
+    selectedTreasure = catalogTreasures.find(
       (t) => schoolFilter === 'all' || t.school === schoolFilter,
     )!.id;
     renderPanel();
@@ -623,7 +895,11 @@ function handleAction(action: string, id?: string) {
     renderPanel();
     modal.querySelector('.panel')?.scrollTo(0, 0);
   }
-  if (action === 'equip' && allowsSchool(save.path, treasure(selectedTreasure).school)) {
+  if (
+    action === 'equip' &&
+    save.artifacts.includes(selectedTreasure) &&
+    allowsSchool(save.path, treasure(selectedTreasure).school)
+  ) {
     save.starter = selectedTreasure;
     persist();
     renderLobby();
@@ -649,7 +925,7 @@ function handleAction(action: string, id?: string) {
     startRun();
   }
   if (action === 'next' && game) {
-    selectedStage = Math.min(5, game.stage + 1);
+    selectedStage = Math.min(STAGES.length - 1, game.stage + 1);
     startRun();
   }
   if (action === 'return') returnLobby();
@@ -675,6 +951,8 @@ function handleAction(action: string, id?: string) {
     }
   }
   if (action === 'choose' && game?.choose(Number(id))) {
+    // 经验可跨多级：下帧再次进入 upgrade 时也必须显示新选项。
+    previousState = game.state;
     clearInput();
     modal.innerHTML = '';
     updateHud();
@@ -686,12 +964,25 @@ function handleAction(action: string, id?: string) {
   }
 }
 document.addEventListener('click', (event) => {
+  if (volumeOpen && !(event.target as Element).closest('.sound-control')) {
+    volumeOpen = false;
+    document.querySelector('.volume-control')?.remove();
+  }
   const target = (event.target as Element).closest<HTMLElement>('[data-action]');
   if (!target || target.hasAttribute('disabled')) return;
   event.preventDefault();
   handleAction(target.dataset.action!, target.dataset.id);
 });
+document.addEventListener('input', (event) => {
+  const input = event.target as HTMLInputElement;
+  if (!input.matches('input[data-volume]')) return;
+  save.volume = Number(input.value) / 100;
+  input.parentElement!.querySelector('output')!.textContent = `${input.value}%`;
+  unlockAudio();
+  persist();
+});
 document.addEventListener('keydown', (event) => {
+  if ((event.target as HTMLElement).matches('input[type="range"]')) return;
   if (event.key === 'Tab' && modal.innerHTML) {
     const elements = [
       ...modal.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex="0"]'),
@@ -711,7 +1002,7 @@ document.addEventListener('keydown', (event) => {
   const key = event.key.toLowerCase();
   if (key === 'escape' || key === 'p') {
     if (event.repeat) return;
-    if (panel === 'guide') handleAction('close');
+    if (panel === 'guide' || panel === 'damage') handleAction('close');
     else if (game?.state === 'playing') handleAction('pause');
     else if (game?.state === 'paused') handleAction('resume');
     else if (panel) handleAction('close');
@@ -734,12 +1025,13 @@ document.addEventListener('keydown', (event) => {
 document.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => {
   clearInput();
-  if (game?.state === 'playing') handleAction('pause');
+  if (!save.autoplay && game?.state === 'playing') handleAction('pause');
 });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     clearInput();
-    if (game?.state === 'playing') handleAction('pause');
+    if (!save.autoplay && game?.state === 'playing') handleAction('pause');
+    if (game && !settled) persist();
   }
 });
 const canvas = renderer.canvas;
@@ -774,28 +1066,32 @@ const releasePointer = (e: PointerEvent) => {
 canvas.addEventListener('pointerup', releasePointer);
 canvas.addEventListener('pointercancel', releasePointer);
 canvas.addEventListener('lostpointercapture', releasePointer);
-window.addEventListener('resize', () => renderer.resize());
+window.addEventListener('resize', () => {
+  renderer.resize();
+  canvasDirty = true;
+});
 window.addEventListener('pagehide', () => {
   if (game && !settled) persist();
 });
 window.setInterval(() => {
   if (game && !settled) persist();
 }, 5000);
+let lastBackgroundSave = 0;
+let canvasDirty = true;
+let lastRenderedState: Game['state'] | undefined;
 let lastFrame = performance.now(),
   lastHud = 0,
   previousState = '',
   nextAiMove = 0,
   aiChoiceTime = 0;
-function frame(now: number) {
-  const dt = Math.min(0.05, (now - lastFrame) / 1000);
-  lastFrame = now;
+function simulate(dt: number, now: number) {
   if (game) {
     if (save.autoplay) {
       if (game.state === 'playing' && now >= nextAiMove) {
         game.input = autoplayInput(game);
         nextAiMove = now + 120;
       }
-      if (game.state === 'upgrade' && !document.hidden && document.hasFocus()) {
+      if (game.state === 'upgrade') {
         aiChoiceTime += dt;
         if (aiChoiceTime >= 0.9) {
           const choice = autoplayChoice(game);
@@ -814,7 +1110,10 @@ function frame(now: number) {
           Number(keys.has('w') || keys.has('arrowup')) +
           touchInput.y,
       };
-    const realmBefore = realmInfo(save.cultivation).step;
+    const realmBefore = realmInfo(
+      save.cultivation,
+      save.completed.includes(FINAL_TRIAL_STAGE),
+    ).step;
     game.update(dt);
     if (game.state !== previousState) {
       clearInput();
@@ -824,31 +1123,67 @@ function frame(now: number) {
         persist();
       }
       if (game.state === 'paused') renderPause();
-      if ((game.state === 'won' || game.state === 'lost') && !settled) {
-        settled = true;
-        rewards = settleRun(save, {
-          stage: game.stage,
-          difficulty: game.difficulty,
-          kills: game.kills,
-          time: game.time,
-          victory: game.state === 'won',
-          iron: game.iron,
-          level: game.level,
-          creditedCultivation: game.creditedCultivation,
-        });
-        persist();
-        renderResult();
+      if (game.state === 'won' && !settled) finishRun();
+      if (game.state === 'lost' && !settled) {
+        if (abandonConfirm) finishRun();
+        else {
+          renderDeath();
+          persist();
+        }
       }
     }
-    if (!settled && realmInfo(save.cultivation).step !== realmBefore) persist();
+    if (
+      !settled &&
+      realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step !== realmBefore
+    )
+      persist();
     if (now - lastHud > 100) {
       updateHud();
       lastHud = now;
     }
   }
-  renderer.draw(game, now, game?.stage ?? selectedStage);
+}
+function tick(now: number, draw: boolean) {
+  let remaining = Math.max(0, Math.min(2, (now - lastFrame) / 1000));
+  lastFrame = now;
+  if (save.autoplay) {
+    while (remaining > 0) {
+      const dt = Math.min(1 / 30, remaining);
+      simulate(dt, now - remaining * 1000);
+      remaining -= dt;
+    }
+  } else simulate(Math.min(0.05, remaining), now);
+  if (
+    draw &&
+    (canvasDirty || !game || game.state === 'playing' || game.state !== lastRenderedState)
+  ) {
+    renderer.draw(
+      game,
+      now,
+      game?.stage ?? selectedStage,
+      game ? 0 : realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
+    );
+    lastRenderedState = game?.state;
+    canvasDirty = false;
+  }
+}
+function frame(now: number) {
+  tick(now, true);
   requestAnimationFrame(frame);
 }
+const backgroundClock = new Worker(new URL('./background-clock.ts', import.meta.url), {
+  type: 'module',
+});
+backgroundClock.onmessage = () => {
+  if (document.hidden && save.autoplay) {
+    const now = performance.now();
+    tick(now, false);
+    if (game && !settled && now - lastBackgroundSave >= 5000) {
+      persist();
+      lastBackgroundSave = now;
+    }
+  }
+};
 renderLobby();
 if (pendingRun) persist();
 renderer.ready

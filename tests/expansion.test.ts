@@ -26,7 +26,12 @@ function seeded(seed = 72) {
   return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 }
 function fixture(id: WeaponKind = 'sword', path: CultivationPath = 'dual') {
-  return new Game({ ...freshSave(), starter: id, path }, 0, 0, seeded());
+  return new Game(
+    { ...freshSave(), artifacts: ['sword', 'nail', id], starter: id, path },
+    0,
+    0,
+    seeded(),
+  );
 }
 function advance(g: Game, seconds: number) {
   for (let i = 0; i < seconds * 20; i++) g.update(0.05);
@@ -102,7 +107,7 @@ test('路线加成与存档迁移：旧档兼修，本局不受大厅改路线�
     demonic = fixture('sword', 'demonic'),
     dual = fixture();
   assert.equal(orthodox.player.maxHp, 112);
-  assert.equal(orthodox.stats.regen, dual.stats.regen + 0.2);
+  assert.equal(orthodox.stats.regen, dual.stats.regen * 1.2);
   assert.equal(demonic.stats.damage, 1.12);
   demonic.save.path = 'orthodox';
   assert.equal(demonic.path, 'demonic');
@@ -216,7 +221,7 @@ test('吸血、持续恢复与地面丹药都不能让致死伤害后的角色�
 });
 
 test('AI 识别魔道配套功法并优先仙器进化', () => {
-  const g = fixture('pagoda', 'demonic');
+  const g = fixture('poison', 'demonic');
   g.weapons[0].level = 6;
   g.choices = [
     { type: 'weapon', id: 'sand', level: 1 },
@@ -224,7 +229,7 @@ test('AI 识别魔道配套功法并优先仙器进化', () => {
     { type: 'passive', id: 'curse', level: 1 },
   ];
   assert.equal(autoplayChoice(g)?.index, 1);
-  g.choices.push({ type: 'evolve', id: 'pagoda', level: 7 });
+  g.choices.push({ type: 'evolve', id: 'poison', level: 7 });
   assert.equal(autoplayChoice(g)?.index, 3);
 });
 
@@ -248,10 +253,13 @@ test('正魔各 18 法宝，本命不跨流派；旧对局已有装备仍保留'
   }
 });
 
-test('六境妖潮累加保留旧怪；新召唤师生成对应高阶妖物', () => {
+test('前六境各有十二种独立妖物，普通怪、精英和召唤物不会跨境混入', () => {
+  assert.equal(ENEMIES.length, 72);
+  assert.equal(new Set(STAGE_ENEMIES.flat()).size, 72);
   for (let stage = 0; stage < 6; stage++) {
+    assert.equal(STAGE_ENEMIES[stage].length, 12);
     const g = new Game(freshSave(), stage, 0, seeded());
-    g.time = 300;
+    g.time = STAGES[stage].minutes * 60;
     const seen = new Set<number>();
     for (let i = 0; i < 500; i++) {
       const e = g.spawnEnemy(undefined, i % 10 === 0);
@@ -263,9 +271,25 @@ test('六境妖潮累加保留旧怪；新召唤师生成对应高阶妖物', ()
       [...STAGE_ENEMIES[stage]].sort((a, b) => a - b),
     );
     assert.ok(enemyRoster(stage, 0).length < enemyRoster(stage, 300).length);
-    if (stage > 0)
-      for (const type of enemyRoster(stage - 1, 300))
-        assert.ok(enemyRoster(stage, 300).includes(type));
+    for (const type of STAGE_ENEMIES[stage].filter((type) => ENEMIES[type].behavior === 'summon')) {
+      const summons = new Game(freshSave(), stage, 0, seeded());
+      summons.weapons = [];
+      const summoner = summons.spawnEnemy(type, false, false, { x: 250, y: 0 });
+      summoner.cooldown = 0;
+      summons.update(0.05);
+      assert.equal(summons.enemies.length, 3);
+      assert.ok(summons.enemies.every((e) => STAGE_ENEMIES[stage].includes(e.type)));
+    }
+    const elites = new Game(freshSave(), stage, 0, seeded());
+    elites.weapons = [];
+    for (const time of [60, 120, 180]) {
+      elites.time = time;
+      elites.nextElite = time;
+      elites.enemies = [];
+      elites.update(0.05);
+      assert.ok(elites.enemies.some((e) => e.elite));
+      assert.ok(elites.enemies.every((e) => STAGE_ENEMIES[stage].includes(e.type)));
+    }
   }
   const g = new Game(freshSave(), 5, 0, seeded());
   g.weapons = [];
@@ -298,7 +322,7 @@ test('散射发出三弹、环射发出八弹，亮盾减伤而暗盾可被全�
   e.cooldown = 1;
   g.hitEnemy(e, 100);
   assert.equal(e.hp, 855);
-  assert.equal(new Set([...ENEMIES, ...STAGES].map((e) => e.sprite)).size, 34);
+  assert.equal(new Set([...ENEMIES, ...STAGES].map((e) => e.sprite)).size, 79);
 });
 
 test('所有场景和人物图集真实存在且为有效 PNG，新增引用不会缺图', () => {

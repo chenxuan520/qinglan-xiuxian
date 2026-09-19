@@ -44,6 +44,23 @@ test('暂停与升级选择冻结模拟，恢复后时间继续', () => {
   game.update(0.05);
   assert.ok(game.time > time);
 });
+
+test('只剩一个顿悟机缘时自动领取，无需暂停或重复弹窗', () => {
+  const g = createGame();
+  g.weapons = TREASURES.slice(0, 6).map((t) => ({ id: t.id, level: 6, evolved: true, timer: 999 }));
+  g.passives = Object.fromEntries(PASSIVES.slice(0, 4).map((p) => [p.id, 5]));
+  g.player.hp = 50;
+  g.xp = xpNeeded(g.level);
+  const events: string[] = [];
+  g.onEvent = (name) => events.push(name);
+  g.update(0.01);
+  assert.equal(g.state, 'playing');
+  assert.equal(g.level, 2);
+  assert.equal(g.iron, 1);
+  assert.deepEqual(g.choices, []);
+  assert.ok(g.player.hp > 50);
+  assert.ok(!events.includes('upgrade'));
+});
 test('斜向移动不比直线快，受伤具有无敌间隔', () => {
   const straight = createGame(),
     diagonal = createGame();
@@ -66,6 +83,7 @@ test('36 种攻击法宝均能独立对妖物造成伤害', () => {
   for (const t of TREASURES) {
     const save = freshSave();
     save.starter = t.id;
+    save.artifacts.push(t.id);
     const game = new Game(save, 0, 0, seeded());
     game.player.maxHp = game.player.hp = 10000;
     for (let i = 0; i < 9; i++) {
@@ -147,8 +165,8 @@ test('境界按九大境界三阶段逐级突破，达到渡劫封顶', () => {
   assert.equal(realmInfo(realmCost(0)).name, '炼气中期');
   const toFoundation = realmCost(0) + realmCost(1) + realmCost(2);
   assert.equal(realmInfo(toFoundation).name, '筑基初期');
-  assert.equal(realmInfo(1e9).name, '渡劫后期');
-  assert.ok(realmInfo(1e9).max);
+  assert.equal(realmInfo(1e9, true).name, '渡劫后期');
+  assert.ok(realmInfo(1e9, true).max);
 });
 test('斩妖和升级实时增加修为，突破立即提升气血与伤害', () => {
   const save = freshSave();
@@ -203,6 +221,75 @@ test('各难度实时修为保留小数累计，失败和通关结算只补差�
     }
   }
 });
+test('每次跨大境界突破增加 45 气血和 35% 伤害，并与新局属性一致', () => {
+  let threshold = 0;
+  for (let step = 1; step <= 26; step++) {
+    threshold += realmCost(step - 1);
+    if (step % 3 !== 0) continue;
+    const save = freshSave();
+    save.cultivation = threshold - 1;
+    save.completed = [6];
+    const game = new Game(save, 0, 0, seeded());
+    game.player.hp -= 30;
+    const hp = game.player.hp;
+    const maxHp = game.player.maxHp;
+    const damage = game.stats.damage;
+    const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
+    game.hitEnemy(enemy, enemy.maxHp);
+    assert.equal(game.player.maxHp - maxHp, 45);
+    assert.equal(game.player.hp - hp, 45);
+    assert.ok(Math.abs(game.stats.damage - damage - 0.35) < 1e-10);
+    assert.match(game.notice, /大境界突破/);
+    const next = new Game(save, 0, 0, seeded());
+    assert.equal(next.player.maxHp, game.player.maxHp);
+    assert.equal(next.stats.damage, game.stats.damage);
+  }
+});
+test('旧版元婴对局补齐境界加成，保留已损失气血，重复读档不重复增加', () => {
+  const save = freshSave();
+  save.cultivation = Array.from({ length: 9 }, (_, step) => realmCost(step)).reduce(
+    (a, b) => a + b,
+    0,
+  );
+  save.training.vitality = 2;
+  const game = new Game(save, 0, 0, seeded());
+  const legacy = JSON.parse(JSON.stringify(game.snapshot()));
+  legacy.passives = { guard: 2, bone: 1 };
+  legacy.player.maxHp = 100 + 20 + 9 * 3 + 40 + 14;
+  legacy.player.hp = legacy.player.maxHp - 37;
+  const restored = Game.restore(save, legacy)!;
+  assert.ok(restored);
+  assert.equal(restored.player.maxHp, 327);
+  assert.equal(restored.player.hp, 290);
+  assert.equal(restored.stats.damage, 2.2);
+  const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
+  assert.equal(again.player.hp, 290);
+  assert.equal(again.player.maxHp, 327);
+  assert.equal(again.stats.damage, 2.2);
+  again.state = 'upgrade';
+  again.choices = [{ type: 'passive', id: 'guard', level: 3 }];
+  again.choose(0);
+  assert.equal(again.player.maxHp, 347);
+});
+test('通关奖励跨大境界后，下次开局获得完整加成且没有额外修为', () => {
+  const save = freshSave();
+  const threshold = realmCost(0) + realmCost(1) + realmCost(2);
+  save.cultivation = threshold - 50;
+  const reward = settleRun(save, {
+    stage: 0,
+    difficulty: 0,
+    kills: 0,
+    level: 1,
+    time: 300,
+    victory: true,
+    iron: 0,
+  });
+  assert.equal(save.cultivation, threshold - 50 + reward.cultivation);
+  const game = new Game(save, 0, 0, seeded());
+  assert.equal(realmInfo(save.cultivation).name, '筑基初期');
+  assert.equal(game.player.maxHp, 151);
+  assert.equal(game.stats.damage, 1.4);
+});
 test('实时修为随存档恢复，不重复入账或重复增加气血', () => {
   const save = freshSave();
   save.cultivation = 85;
@@ -235,11 +322,11 @@ test('旧对局补发未结算修为，连续刷新只补发一次', () => {
   assert.equal(save.cultivation, 550);
   assert.equal(restored.creditedCultivation, 550);
   assert.equal(realmInfo(save.cultivation).name, '筑基中期');
-  assert.equal(restored.player.maxHp, 112);
+  assert.equal(restored.player.maxHp, 154);
   const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
   assert.equal(save.cultivation, 550);
-  assert.equal(again.player.maxHp, 112);
-  assert.equal(again.stats.damage, 1.1);
+  assert.equal(again.player.maxHp, 154);
+  assert.equal(again.stats.damage, 1.425);
 });
 test('失败保留收益但不解锁，通关逐境解锁并保存', () => {
   const save = freshSave();
@@ -292,7 +379,7 @@ test('损坏和越界存档不会破坏游戏初始化', () => {
     }),
   );
   assert.equal(s.stones, 0);
-  assert.equal(s.unlocked, 5);
+  assert.equal(s.unlocked, STAGES.length - 1);
   assert.equal(s.starter, 'sword');
   assert.equal(s.forge.sword, 5);
   assert.equal(s.training.speed, 20);
@@ -383,8 +470,8 @@ test('已结束或损坏的对局不恢复，永久进度仍可读取', () => {
   const s = parseSave(JSON.stringify({ ...game.save, stones: 35, activeRun: { invalid: true } }));
   assert.equal(s.stones, 35);
 });
-test('28 种普通妖物分别使用独立立绘，图集坐标不会越界', () => {
-  assert.equal(new Set(ENEMIES.map((e) => e.sprite)).size, 28);
+test('72 种普通妖物分别使用独立立绘，图集坐标不会越界', () => {
+  assert.equal(new Set(ENEMIES.map((e) => e.sprite)).size, 72);
   for (const e of [...ENEMIES, ...STAGES]) {
     const f = spriteFrame(e.sprite);
     assert.ok(f.x >= 0 && f.y >= 0);

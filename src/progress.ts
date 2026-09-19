@@ -6,6 +6,7 @@ import {
   isCultivationPath,
   allowsSchool,
   treasure,
+  FINAL_TRIAL_STAGE,
 } from './data.ts';
 import type { CultivationPath } from './data.ts';
 
@@ -20,8 +21,11 @@ export interface SaveData {
   runs: number;
   training: { vitality: number; power: number; speed: number };
   forge: Record<string, number>;
+  artifacts: string[];
+  artifactDrops: string[];
   starter: string;
   sound: boolean;
+  volume: number;
   autoplay: boolean;
   path: CultivationPath;
 }
@@ -38,8 +42,11 @@ export function freshSave(): SaveData {
     runs: 0,
     training: { vitality: 0, power: 0, speed: 0 },
     forge: {},
+    artifacts: ['sword', 'nail'],
+    artifactDrops: [],
     starter: 'sword',
     sound: false,
+    volume: 0.6,
     autoplay: false,
     path: 'dual',
   };
@@ -65,24 +72,44 @@ export function parseSave(raw: string | null): SaveData {
           ),
         ]
       : [];
+    if (base.completed.includes(FINAL_TRIAL_STAGE - 1)) base.unlocked = FINAL_TRIAL_STAGE;
     for (const key of ['vitality', 'power', 'speed'] as const)
       base.training[key] = int(s.training?.[key], 20);
     for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], 5);
+    const validIds = (ids: unknown): string[] =>
+      Array.isArray(ids) ? ids.filter((id) => TREASURES.some((t) => t.id === id)) : [];
+    // 旧档保留已经投入资源的法宝和本命，未投入的法宝开始收集。
+    const legacy =
+      s.artifacts === undefined
+        ? [
+            ...TREASURES.filter((t) => base.forge[t.id] > 0).map((t) => t.id),
+            ...validIds([s.starter]),
+          ]
+        : validIds(s.artifacts);
+    base.artifacts = [...new Set([...base.artifacts, ...legacy])];
+    base.artifactDrops = [...new Set(validIds(s.artifactDrops))].filter(
+      (id) => !base.artifacts.includes(id),
+    );
     base.starter = TREASURES.some((t) => t.id === s.starter) ? s.starter : 'sword';
     base.sound = s.sound === true;
+    if (typeof s.volume === 'number' && Number.isFinite(s.volume))
+      base.volume = Math.min(1, Math.max(0, s.volume));
     base.autoplay = s.autoplay === true;
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
-    if (!allowsSchool(base.path, treasure(base.starter).school))
-      base.starter = TREASURES.find((t) => allowsSchool(base.path, t.school))!.id;
+    if (
+      !base.artifacts.includes(base.starter) ||
+      !allowsSchool(base.path, treasure(base.starter).school)
+    )
+      base.starter = base.path === 'demonic' ? 'nail' : 'sword';
     return base;
   } catch {
     return base;
   }
 }
-export function realmInfo(cultivation: number) {
+export function realmInfo(cultivation: number, finalTrialCleared = false) {
   let remaining = cultivation;
   let step = 0;
-  while (step < 26 && remaining >= realmCost(step)) {
+  while (step < (finalTrialCleared ? 26 : 23) && remaining >= realmCost(step)) {
     remaining -= realmCost(step);
     step++;
   }
@@ -93,15 +120,37 @@ export function realmInfo(cultivation: number) {
     progress: remaining,
     needed: realmCost(step),
     max: step === 26,
+    locked: step === 23 && !finalTrialCleared,
   };
 }
 export const realmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export function cultivationFactor(step: number) {
+  if (step < 15) return 1;
+  return [2, 6, 16, 28][Math.min(3, Math.floor(step / 3) - 5)] * 1.15 ** (step % 3);
+}
+// 各秘境对应的大境界修为预算，Boss 奖励不受高境界小怪折算影响。
+export function bossCultivationReward(stage: number, bossStage = stage) {
+  const major = Math.min(7, stage + 1);
+  const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
+  return Math.max(
+    2500 * (stage + 1),
+    Math.round(
+      budget * (stage === FINAL_TRIAL_STAGE ? (bossStage === FINAL_TRIAL_STAGE ? 1 : 0.3) : 0.8),
+    ),
+  );
+}
+export function realmBonuses(step: number) {
+  const major = Math.floor(step / 3);
+  const minor = step - major;
+  return { hp: major * 45 + minor * 3, damage: (major * 35 + minor * 2.5) / 100 };
+}
 export function cultivationReward(
-  run: { kills: number; level: number; difficulty: number },
+  run: { kills: number; level: number; difficulty: number; combatCultivation?: number },
   bonus = 0,
 ) {
   return Math.floor(
-    (run.kills * 0.7 + run.level * 8 + bonus) * DIFFICULTIES[run.difficulty].reward,
+    (run.kills * 0.7 + (run.combatCultivation || 0) + run.level * 8 + bonus) *
+      DIFFICULTIES[run.difficulty].reward,
   );
 }
 export const trainingCost = (level: number) => Math.round(45 * 1.42 ** level);
@@ -114,7 +163,7 @@ export function train(save: SaveData, kind: keyof SaveData['training']) {
   return true;
 }
 export function forge(save: SaveData, id: string) {
-  if (!TREASURES.some((t) => t.id === id)) return false;
+  if (!save.artifacts.includes(id) || !TREASURES.some((t) => t.id === id)) return false;
   const level = save.forge[id] || 0;
   const cost = forgeCost(level);
   if (level >= 5 || save.stones < cost.stones || save.iron < cost.iron) return false;
@@ -122,6 +171,24 @@ export function forge(save: SaveData, id: string) {
   save.iron -= cost.iron;
   save.forge[id] = level + 1;
   return true;
+}
+export function dropArtifacts(save: SaveData, random: () => number) {
+  const pool = TREASURES.filter(
+    (t) => !save.artifacts.includes(t.id) && !save.artifactDrops.includes(t.id),
+  );
+  const dropped: string[] = [];
+  while (pool.length && dropped.length < 3) {
+    const [item] = pool.splice(Math.floor(random() * pool.length), 1);
+    dropped.push(item.id);
+  }
+  save.artifactDrops.push(...dropped);
+  return dropped;
+}
+export function claimArtifacts(save: SaveData) {
+  const claimed = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
+  save.artifacts.push(...claimed);
+  save.artifactDrops = [];
+  return claimed;
 }
 export function settleRun(
   save: SaveData,
@@ -134,6 +201,7 @@ export function settleRun(
     iron: number;
     level: number;
     creditedCultivation?: number;
+    combatCultivation?: number;
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;

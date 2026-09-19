@@ -525,7 +525,7 @@ export const CULTIVATION_PATHS = [
     id: 'orthodox',
     name: '正道',
     color: '#b9dfbc',
-    desc: '正道法宝与功法；气血上限 +12，每秒回复 +0.2。',
+    desc: '正道法宝与功法；气血上限 +12%，持续回血速度 +20%。',
   },
   {
     id: 'demonic',
@@ -700,6 +700,10 @@ export function evolutionPassives(t: Treasure, path: CultivationPath = 'dual') {
   );
 }
 export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '渡劫'];
+export const FINAL_TRIAL_STAGE = 6;
+export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
+export const TRIAL_BOSS_TIMES = [90, 180, 270, 360, 450, 540, 600];
+export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
 export const STAGES = [
   {
     name: '青岚竹海',
@@ -709,6 +713,7 @@ export const STAGES = [
     minutes: 5,
     color: '#9fc6aa',
     boss: '苍木妖王',
+    skills: ['万木囚笼', '荆棘散射', '唤醒山灵'],
     sprite: 30,
     reward: 100,
     description: '古道生苔，青岚漫野。于竹海深处，踏出问道的第一步。',
@@ -721,6 +726,7 @@ export const STAGES = [
     minutes: 6,
     color: '#d6b784',
     boss: '赤炎狐王',
+    skills: ['九尾炎扇', '焚天火径', '赤焰轮舞'],
     sprite: 31,
     reward: 160,
     description: '夕照古墟，离火未熄。疾行的狐妖在残垣间伺机而动。',
@@ -733,6 +739,7 @@ export const STAGES = [
     minutes: 7,
     color: '#a8cfdc',
     boss: '霜魄狼王',
+    skills: ['踏雪突袭', '霜牙连射', '玄冰牢狱'],
     sprite: 32,
     reward: 240,
     description: '冰魄凝谷，寒意入骨。穿过狼群，寻得幽谷中的一线生机。',
@@ -745,6 +752,7 @@ export const STAGES = [
     minutes: 8,
     color: '#bcc895',
     boss: '玄甲毒君',
+    skills: ['五毒瘴池', '蚀骨毒矢', '万蛊复生'],
     sprite: 33,
     reward: 340,
     description: '幽泽瘴气千重，毒灵四伏。唯有攻守兼备，方能涉水而归。',
@@ -757,6 +765,7 @@ export const STAGES = [
     minutes: 9,
     color: '#baa2d0',
     boss: '九幽冥主',
+    skills: ['百鬼夜行', '摄魂灵轮', '六道鬼牢'],
     sprite: 34,
     reward: 460,
     description: '幽冥之门洞开，万千魂影涌现。执剑守心，莫入迷途。',
@@ -769,9 +778,24 @@ export const STAGES = [
     minutes: 10,
     color: '#e0d7b2',
     boss: '太虚劫灵',
+    skills: ['十字天雷', '太虚星环', '陨星天罚'],
     sprite: 35,
     reward: 600,
     description: '九天雷动，太虚无垠。历过重重天劫，叩问长生之门。',
+  },
+  {
+    name: '万劫归墟',
+    terrain: '/assets/terrain-trial.png',
+    subtitle: '仙尊问劫 · 大乘破关',
+    chapter: '柒',
+    minutes: 10,
+    color: '#c8b981',
+    boss: '九天执劫仙尊',
+    skills: ['诛仙雷轮', '五方劫雷', '八荒封天', '天罡剑潮', '金阙天兵', '踏云雷袭'],
+    sprite: 80,
+    reward: 1200,
+    description:
+      '终极试炼，全员精英。六位妖王每九十秒依次复临，第十分钟九天执劫仙尊降临。尽破七劫，方可突破渡劫。建议大乘、炼器与完整搭配后挑战。',
   },
 ];
 export const DIFFICULTIES = [
@@ -1062,31 +1086,127 @@ export const ENEMIES = [
     xp: 16,
   },
 ];
-// 第一、二境保留原有十二妖物，后续每境累计加入四种高阶妖物。
-export const STAGE_ENEMIES = STAGES.map((_, stage) =>
-  Array.from({ length: 12 + Math.max(0, stage - 1) * 4 }, (_, type) => type),
-);
+// 地域进阶种沿用基础行为，拥有独立立绘和随秘境提升的基础数值。
+for (const region of [
+  {
+    stage: 1,
+    sprite: 36,
+    names: [
+      '熔岩菇兵',
+      '赤铜战獒',
+      '陶面炎灵',
+      '赤砂灵狐',
+      '古殿铜龟',
+      '黄符祭师',
+      '爆炎陶俑',
+      '裂焰剑齿兽',
+      '铜铃祭司',
+      '烟尾砂蝎',
+      '赤陶戟卫',
+      '流金风狐',
+    ],
+  },
+  {
+    stage: 2,
+    sprite: 48,
+    names: [
+      '冰冠菇灵',
+      '玄冰战狼',
+      '寒晶魄火',
+      '雪尾灵狐',
+      '冰岳玄龟',
+      '霜袍巫师',
+      '裂冰妖核',
+      '提灯雪巫',
+    ],
+  },
+  {
+    stage: 3,
+    sprite: 56,
+    names: [
+      '瘴孢菇妖',
+      '荆棘沼獒',
+      '紫瘴怨灵',
+      '藤尾妖狐',
+      '苔甲鳄龟',
+      '瘴袍毒巫',
+      '爆孢妖囊',
+      '万蛊祭司',
+    ],
+  },
+  {
+    stage: 4,
+    sprite: 64,
+    names: [
+      '白骨菇鬼',
+      '冥火骨獒',
+      '无面幽魂',
+      '幽月冥狐',
+      '负碑冥龟',
+      '赤袍咒鬼',
+      '爆魂冥瓮',
+      '引魂灯使',
+    ],
+  },
+  {
+    stage: 5,
+    sprite: 72,
+    names: [
+      '金纹仙菇',
+      '银霆天狼',
+      '曜日星灵',
+      '流云天狐',
+      '金阙玄龟',
+      '御星法使',
+      '裂雷灵核',
+      '星轮召灵使',
+    ],
+  },
+]) {
+  const archetypes =
+    region.stage === 1 ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] : [0, 1, 2, 3, 4, 5, 6, 8];
+  region.names.forEach((name, index) => {
+    const base = ENEMIES[archetypes[index]];
+    ENEMIES.push({
+      ...base,
+      name,
+      sprite: region.sprite + index,
+      hp: Math.round(base.hp * (1 + region.stage * 0.3)),
+      damage: Math.round(base.damage * (1 + region.stage * 0.08)),
+      xp: Math.round(base.xp * (1 + region.stage * 0.15)),
+    });
+  });
+}
+// 每三种为一批：基础兵种、突袭兵种、强敌、压轴兵种。
+export const STAGE_ENEMIES = [
+  [0, 1, 2, 3, 5, 6, 4, 7, 9, 8, 10, 11],
+  [28, 29, 30, 31, 33, 34, 32, 35, 37, 36, 38, 39],
+  [40, 41, 42, 43, 12, 46, 44, 45, 13, 14, 15, 47],
+  [48, 49, 50, 51, 53, 54, 52, 16, 17, 18, 19, 55],
+  [56, 57, 58, 59, 61, 62, 60, 20, 23, 21, 22, 63],
+  [64, 65, 66, 67, 69, 70, 24, 25, 68, 26, 27, 71],
+  [65, 66, 59, 67, 61, 62, 69, 24, 25, 27, 63, 71],
+];
+export function enemyWave(stage: number, seconds: number) {
+  if (stage === FINAL_TRIAL_STAGE)
+    return TRIAL_ENEMY_TIMES.filter((time) => time <= Math.max(0, seconds)).length - 1;
+  return Math.min(3, Math.floor((Math.max(0, seconds) / (STAGES[stage].minutes * 60)) * 4));
+}
 export function enemyRoster(stage: number, seconds: number) {
-  const base = Array.from(
-    { length: Math.min(12, 1 + Math.floor(seconds / 25) + stage * 2) },
-    (_, type) => type,
-  );
-  if (stage < 2) return base;
-  const previous = Array.from({ length: (stage - 2) * 4 }, (_, index) => 12 + index);
-  const additions = Array.from(
-    { length: Math.min(4, 2 + Math.floor(seconds / 45)) },
-    (_, index) => 12 + (stage - 2) * 4 + index,
-  );
-  return [...base, ...previous, ...additions];
+  const count = stage === 0 && seconds < 20 ? 1 : (enemyWave(stage, seconds) + 1) * 3;
+  return STAGE_ENEMIES[stage].slice(0, count);
 }
 export const MAX_WEAPONS = 6;
 export const MAX_PASSIVES = 4;
 export const MAX_WEAPON_LEVEL = 6;
+export const MAX_RUN_LEVEL = 100;
+export const MAX_REVIVES = 10;
 export const MAX_PASSIVE_LEVEL = 5;
 export const TAU = Math.PI * 2;
 export const treasure = (id: string) => TREASURES.find((t) => t.id === id)!;
 export const passive = (id: string) => PASSIVES.find((p) => p.id === id)!;
-export const xpNeeded = (level: number) => Math.round(12 + level * 6 + level ** 1.45 * 2);
+export const xpNeeded = (level: number) =>
+  Math.round((12 + level * 6 + level ** 1.45 * 2) * (1 + Math.max(0, level - 60) ** 2 / 180));
 export const formatTime = (seconds: number) =>
   `${Math.floor(seconds / 60)
     .toString()
