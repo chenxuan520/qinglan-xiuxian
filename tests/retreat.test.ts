@@ -83,7 +83,7 @@ test('闭关加成作用于实际气血、伤害与移速，续局及导入保�
   );
 });
 
-test('大乘及渡劫境闭关只快进，在下次天劫处截停，不再抽属性提升', () => {
+test('大乘闭关在天劫处截停，通关后的渡劫境自由快进，两者不再抽取收益', () => {
   for (const completed of [[], [6]]) {
     const save = freshSave();
     save.cultivation = 1e9;
@@ -98,12 +98,13 @@ test('大乘及渡劫境闭关只快进，在下次天劫处截停，不再抽�
       retreat(save, 5000, () => {
         throw new Error('不应抽取属性');
       })?.years,
-      50,
+      completed.length ? 5000 : 50,
     );
-    assert.equal(save.age, 20000);
+    assert.equal(save.age, completed.length ? 24950 : 20000);
     assert.equal(save.cultivation, 1e9);
-    assert.ok(tribulationDue(save));
-    assert.equal(retreat(save, 1), null);
+    assert.equal(tribulationDue(save), !completed.length);
+    if (!completed.length) assert.equal(retreat(save, 1), null);
+    else assert.equal(retreatPlan(save, 50000)!.years, 50000);
     assert.deepEqual(save.retreatBonus, freshSave().retreatBonus);
   }
 });

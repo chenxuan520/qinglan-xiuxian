@@ -199,6 +199,10 @@ export function extendLifespan(save: SaveData) {
 }
 export const TRIBULATION_INTERVAL = 20000;
 export function syncTribulationClock(save: SaveData) {
+  if (save.completed.includes(FINAL_TRIAL_STAGE)) {
+    save.nextTribulationAge = 0;
+    return;
+  }
   if (
     !save.nextTribulationAge &&
     realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index >= 7
@@ -206,7 +210,11 @@ export function syncTribulationClock(save: SaveData) {
     save.nextTribulationAge = save.age + TRIBULATION_INTERVAL;
 }
 export function tribulationDue(save: SaveData) {
-  return save.nextTribulationAge > 0 && save.age >= save.nextTribulationAge - 1e-9;
+  return (
+    !save.completed.includes(FINAL_TRIAL_STAGE) &&
+    save.nextTribulationAge > 0 &&
+    save.age >= save.nextTribulationAge - 1e-9
+  );
 }
 export function completeTribulation(save: SaveData, round: number) {
   if (!tribulationDue(save) || round !== save.tribulations + 1) return false;
@@ -227,9 +235,10 @@ export function retreatPlan(save: SaveData, requested: number) {
     return null;
   const life = lifespanInfo(save);
   const immortal = !Number.isFinite(life.limit);
-  const years = immortal
-    ? Math.min(requested, (save.nextTribulationAge || save.age + TRIBULATION_INTERVAL) - save.age)
-    : requested;
+  const years =
+    immortal && !save.completed.includes(FINAL_TRIAL_STAGE)
+      ? Math.min(requested, (save.nextTribulationAge || save.age + TRIBULATION_INTERVAL) - save.age)
+      : requested;
   if (years <= 0 || life.remaining <= years + 1e-9) return null;
   const chance = immortal ? 0 : years / life.limit;
   const major = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
@@ -387,12 +396,12 @@ export function settleRun(
   save.stones += rewards.stones;
   save.iron += rewards.iron;
   save.cultivation += rewards.cultivationRemaining;
-  syncTribulationClock(save);
   save.runs++;
   save.bestKills = Math.max(save.bestKills, run.kills);
   if (run.victory) {
     save.unlocked = Math.max(save.unlocked, Math.min(STAGES.length - 1, run.stage + 1));
     if (!save.completed.includes(run.stage)) save.completed.push(run.stage);
   }
+  syncTribulationClock(save);
   return rewards;
 }
