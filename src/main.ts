@@ -67,6 +67,7 @@ import { Renderer } from './render.ts';
 import { icon, smallIcon } from './icons.ts';
 import { GUIDE_TABS, guideContent } from './guide.ts';
 import { spriteStyle } from './sprites.ts';
+import { assetUrl } from './asset-url.ts';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `<canvas id="world" aria-label="修仙战斗场景"></canvas><div class="screen-grain"></div><div id="ui"></div><div id="modal-root"></div><div id="joystick"><span></span></div><div id="toast" role="status"></div>`;
@@ -121,6 +122,8 @@ let audio: AudioContext | null = null,
   lastSound = 0,
   assetsReady = false;
 let masterGain: GainNode | null = null;
+let music: HTMLAudioElement | null = null;
+let musicStarting = false;
 let volumeOpen = false;
 let resumeAfterDamage = false;
 let adReadyAt = 0;
@@ -184,13 +187,36 @@ function sound(name: string) {
   osc.stop(now + 0.36);
 }
 function unlockAudio() {
+  if (!save.sound) {
+    if (masterGain && audio) masterGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
+    music?.pause();
+    return;
+  }
   audio ??= new AudioContext();
   if (!masterGain) {
     masterGain = audio.createGain();
     masterGain.connect(audio.destination);
   }
-  masterGain.gain.setTargetAtTime(save.sound ? save.volume : 0, audio.currentTime, 0.02);
-  if (audio.state === 'suspended') void audio.resume();
+  masterGain.gain.setTargetAtTime(save.volume, audio.currentTime, 0.02);
+  if (!music) {
+    music = new Audio(assetUrl('assets/audio/qinglan-mist.m4a'));
+    music.loop = true;
+    const musicGain = audio.createGain();
+    musicGain.gain.value = 0.4;
+    audio.createMediaElementSource(music).connect(musicGain);
+    musicGain.connect(masterGain);
+  }
+  // 音乐独立加载，不阻塞场景；播放被浏览器拦截时，在下次操作重试。
+  if (audio.state === 'suspended') void audio.resume().catch(() => {});
+  if (music.paused && !musicStarting) {
+    musicStarting = true;
+    void music
+      .play()
+      .catch(() => {})
+      .finally(() => {
+        musicStarting = false;
+      });
+  }
 }
 const currency = () =>
   `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
@@ -198,7 +224,7 @@ function autoplayButton() {
   return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；点击切换手动">AI 代打 · ${save.autoplay ? '开' : '关'}</button>`;
 }
 function controls(inGame = false) {
-  return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音效'}" title="${save.sound ? '调节音量' : '开启音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音量 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音效音量" /></label><button data-action="mute">关闭音效</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button><button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
+  return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button><button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 function renderLobby() {
   const stage = STAGES[selectedStage],
@@ -834,8 +860,9 @@ function resetLifetime() {
   game = null;
   pendingRun = null;
   rewards = null;
-  Object.assign(save, freshSave(root, rootElementsFor(root)));
-  if (masterGain && audio) masterGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
+  const { sound: soundEnabled, volume } = save;
+  Object.assign(save, freshSave(root, rootElementsFor(root)), { sound: soundEnabled, volume });
+  unlockAudio();
   selectedStage = difficulty = treasurePage = 0;
   selectedTreasure = save.starter;
   schoolFilter = 'all';
@@ -1047,8 +1074,7 @@ function handleAction(action: string, id?: string) {
     difficulty = 0;
     schoolFilter = 'all';
     bookTab = 'treasures';
-    if (masterGain && audio)
-      masterGain.gain.setTargetAtTime(save.sound ? save.volume : 0, audio.currentTime, 0.02);
+    unlockAudio();
     returnLobby();
     if (lifespanInfo(save).remaining === 0) {
       renderLifespanEnd();
@@ -1203,12 +1229,8 @@ function handleAction(action: string, id?: string) {
   if (action === 'sound' || action === 'mute') {
     volumeOpen = action === 'sound' && !volumeOpen;
     save.sound = action === 'sound';
-    if (masterGain && audio)
-      masterGain.gain.setTargetAtTime(save.sound ? save.volume : 0, audio.currentTime, 0.02);
-    if (save.sound) {
-      unlockAudio();
-      sound('select');
-    }
+    unlockAudio();
+    if (save.sound) sound('select');
     persist();
     if (game) renderHud();
     else renderLobby();
@@ -1422,6 +1444,7 @@ function handleAction(action: string, id?: string) {
   }
 }
 document.addEventListener('click', (event) => {
+  if (event.isTrusted && save.sound) unlockAudio();
   if (volumeOpen && !(event.target as Element).closest('.sound-control')) {
     volumeOpen = false;
     document.querySelector('.volume-control')?.remove();
@@ -1474,6 +1497,7 @@ document.addEventListener('change', async (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
+  if (event.isTrusted && save.sound && !event.repeat) unlockAudio();
   if ((event.target as HTMLElement).matches('input[type="range"], input[type="number"]')) return;
   if (event.key === 'Tab' && modal.innerHTML) {
     const elements = [
