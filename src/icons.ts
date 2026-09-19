@@ -1,9 +1,10 @@
 import { itemArt } from './item-art.ts';
+import { assetUrl } from './asset-url.ts';
 
 export function icon(id: string, color = 'currentColor', cls = '') {
   const art = itemArt(id);
   if (art)
-    return `<span class="icon item-art ${cls}" aria-hidden="true" style="background-image:url('${art.src}');background-size:400% ${art.rows * 100}%;background-position:${(art.column / 3) * 100}% ${(art.row / (art.rows - 1)) * 100}%"></span>`;
+    return `<span class="icon item-art ${cls}" aria-hidden="true" style="background-image:url('${assetUrl(art.src)}');background-size:400% ${art.rows * 100}%;background-position:${(art.column / 3) * 100}% ${(art.row / (art.rows - 1)) * 100}%"></span>`;
   return `<span class="icon ${cls}" aria-hidden="true" style="color:${color}">◇</span>`;
 }
 export const smallIcon = (id: string) => {

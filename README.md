@@ -22,6 +22,14 @@ npm run balance:trial # 四档境界的终关挑战模拟
 npm run format:check
 ```
 
+## GitHub Pages
+
+`.github/workflows/pages.yml` 在推送到 `master` 时执行格式检查、测试与生产构建，再部署到 GitHub Pages，也支持在 Actions 页面手动运行。仓库 Settings → Pages 的发布来源需设为 **GitHub Actions**；私有仓库需要支持 Pages 的 GitHub 套餐。
+
+构建会使用 Pages 提供的子目录路径，地图、人物、法宝图标和后台计时 Worker 均支持仓库地址下访问。本地 `npm run dev` 与默认构建继续使用根路径。
+
+GitHub Pages 和 localhost 是不同来源，浏览器存档各自独立，不会自动同步。
+
 ## 玩法
 
 - 电脑：WASD / 方向键移动，Esc / P 暂停，升级时按 1 / 2 / 3 选择。

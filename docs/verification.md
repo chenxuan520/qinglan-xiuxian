@@ -1,5 +1,12 @@
 # 验证记录
 
+## GitHub Pages 路径兼容验证（2026-09-19）
+
+- GitHub Actions 工作流对 master 推送执行格式检查、测试、类型检查、构建和 Pages 部署。Actions 版本按官方发布记录核对并固定到 commit；Node.js 使用项目支持的 22 版本，发布路径读取 configure-pages 的 base_path。
+- `npm test` 80 / 80 通过，TypeScript 检查通过；分别构建默认根路径和 `/qinglan-xiuxian/` 子目录版本。
+- Chrome DevTools MCP 在隔离上下文访问 5173 上的临时子目录产物：七张地图、全部人物图集、法宝图集、脚本、样式、图标与后台 Worker 均请求子目录地址并返回 200；实际进入战斗、暂停并查看指南正常，无素材加载失败或控制台错误。截图检查战斗与暂停界面。
+- 默认根路径构建同样通过浏览器验证，妖物志 79 个角色图集引用仍使用 `/assets/`，未出现加载失败。以上是本地产物验证，不代表 GitHub Pages 已发布；线上状态以 GitHub Actions 部署结果为准。
+
 ## 当前版本：通关特效、性能、复活与战绩（2026-09-19）
 
 仅发布至 `http://localhost:5173/`。正式入口实际加载 `index-DfpgEupG.js` 与 `index-49xAofQD.css`；原 preview 进程未重启，保留旧 hash 资源，发布仅原子替换入口，不刷新正在游玩的页面。
