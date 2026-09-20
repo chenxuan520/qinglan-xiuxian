@@ -12,7 +12,7 @@ function learn(game: Game, id: string, level: number) {
   assert.equal(game.choose(0), true);
 }
 
-test('白骨每重按整体基础气血加14%，与正道、劫印、闭关及金刚功法共同生效', () => {
+test('白骨每重按整体基础气血加18%，与正道、劫印、闭关及金刚功法共同生效', () => {
   for (const step of [0, 9, 24]) {
     const save = freshSave();
     save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
@@ -30,7 +30,7 @@ test('白骨每重按整体基础气血加14%，与正道、劫印、闭关及�
       learn(game, 'bone', level);
       assert.equal(
         game.player.maxHp,
-        Math.round((240 + realmBonuses(step).hp) * (1 + level * 0.14) * 1.12 * 1.06 * 1.07),
+        Math.round((240 + realmBonuses(step).hp) * (1 + level * 0.18) * 1.12 * 1.06 * 1.07),
       );
       assert.equal(game.player.maxHp - game.player.hp, 30);
     }
@@ -68,9 +68,9 @@ test('固定气血白骨旧局迁移保留损失气血，重复续局不加血�
   old.player.maxHp = 428;
   old.player.hp = 391;
   const restored = Game.restore(save, old)!;
-  assert.equal(restored.player.maxHp, 512);
-  assert.equal(restored.player.hp, 475);
-  assert.equal(Game.restore(save, restored.snapshot())!.player.hp, 475);
+  assert.equal(restored.player.maxHp, 544);
+  assert.equal(restored.player.hp, 507);
+  assert.equal(Game.restore(save, restored.snapshot())!.player.hp, 507);
   old.state = 'lost';
   old.player.hp = 0;
   assert.equal(Game.restore(save, old)!.player.hp, 0);

@@ -13,6 +13,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "balance": "node --experimental-strip-types scripts/balance.ts",
+    "balance:passives": "node --experimental-strip-types scripts/passive-balance.ts",
+    "balance:training": "node --experimental-strip-types scripts/training-balance.ts",
     "balance:tribulation": "node --experimental-strip-types scripts/tribulation-balance.ts",
     "balance:trial": "node --experimental-strip-types scripts/final-trial-balance.ts",
     "format": "prettier --write .",

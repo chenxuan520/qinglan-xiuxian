@@ -1,9 +1,10 @@
 import { npcDefaultLine, type NpcDialogueRequest, type NpcMessage } from './npc-dialogue.ts';
 import { type TownResident } from './town-population.ts';
 import { realmInfo, type SaveData } from './progress.ts';
-import { NPC_AI_SETTINGS } from './setting.ts';
+import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from './setting.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 import { smithStoryLine } from './town-story.ts';
+import { StorySpeech } from './story-speech.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
@@ -14,7 +15,9 @@ export async function requestNpcDialogue(
   input: NpcDialogueRequest,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
-  timeout: number = NPC_AI_SETTINGS.requestTimeoutMs,
+  timeout: number = input.mode === 'tea-story'
+    ? TEA_STORY_SETTINGS.requestTimeoutMs
+    : NPC_AI_SETTINGS.requestTimeoutMs,
 ): Promise<string | null> {
   const controller = new AbortController();
   const abort = () => controller.abort();
@@ -33,7 +36,8 @@ export async function requestNpcDialogue(
     const data = await response.json();
     return typeof data?.reply === 'string' &&
       data.reply.trim() &&
-      data.reply.length <= NPC_AI_SETTINGS.maxReplyLength
+      data.reply.length <=
+        (input.mode === 'tea-story' ? TEA_STORY_SETTINGS : NPC_AI_SETTINGS).maxReplyLength
       ? data.reply.trim()
       : null;
   } catch {
@@ -47,9 +51,65 @@ export async function requestNpcDialogue(
 // 仅保留本次页面内每个位置当前人物的最近闲谈，不继承给下一任，也不上传完整存档。
 const conversations = new Map<string, { identity: string; messages: NpcMessage[] }>();
 let activeRequest: AbortController | null = null;
+let activeSpeech: StorySpeech | null = null;
 export function closeNpcChat() {
   activeRequest?.abort();
   activeRequest = null;
+  activeSpeech?.stop();
+  activeSpeech = null;
+}
+
+export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSound: () => void) {
+  closeNpcChat();
+  const controller = new AbortController();
+  activeRequest = controller;
+  const text = host.querySelector<HTMLElement>('.tea-story-text')!;
+  const status = host.querySelector<HTMLElement>('.tea-story-status')!;
+  const play = host.querySelector<HTMLButtonElement>('.tea-story-play')!;
+  const stop = host.querySelector<HTMLButtonElement>('.tea-story-stop')!;
+  host.setAttribute('aria-busy', 'true');
+  const reply = await requestNpcDialogue(
+    {
+      mode: 'tea-story',
+      population: save.mortal.population!,
+      age: save.age,
+      npcId: 'tea',
+      realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
+      message: '请讲一回关于问大道、求长生，仙途险恶艰难与人心无情的完整旧闻。',
+      history: [],
+    },
+    controller.signal,
+  );
+  if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
+  activeRequest = null;
+  host.setAttribute('aria-busy', 'false');
+  if (!reply) {
+    status.textContent = '说书暂歇，下回再来听吧。';
+    return;
+  }
+  text.textContent = reply;
+  status.textContent = '茶馆传说 · 一回一故事';
+  const reader = new StorySpeech((state) => {
+    if (!host.isConnected) return;
+    play.disabled = state === 'speaking';
+    stop.disabled = state !== 'speaking';
+    status.textContent =
+      state === 'speaking'
+        ? '正在说书 · 可随时停止'
+        : state === 'unavailable'
+          ? '此设备暂无法朗读中文，可继续阅读故事。'
+          : '茶馆传说 · 一回一故事';
+  });
+  activeSpeech = reader;
+  play.hidden = stop.hidden = !reader.supported;
+  if (!reader.supported) status.textContent = '此设备暂不支持朗读，可阅读故事。';
+  play.textContent = save.sound && save.volume > 0 ? '朗读故事' : '开启声音并朗读';
+  play.addEventListener('click', () => {
+    if (!save.sound || save.volume === 0) enableSound();
+    play.textContent = '朗读故事';
+    reader.play(reply, save.volume);
+  });
+  stop.addEventListener('click', () => reader.stop());
 }
 export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResident) {
   closeNpcChat();

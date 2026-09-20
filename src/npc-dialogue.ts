@@ -29,6 +29,7 @@ export interface NpcMessage {
   content: string;
 }
 export interface NpcDialogueRequest {
+  mode?: 'tea-story';
   population: TownPopulation;
   age: number;
   npcId: TownNpc['id'];

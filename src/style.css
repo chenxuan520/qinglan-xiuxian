@@ -873,9 +873,6 @@ kbd {
   border-radius: 50%;
   margin-right: 7px;
 }
-.footer-tag {
-  letter-spacing: 3px;
-}
 /* Panels */
 .modal-backdrop {
   position: fixed;
@@ -2786,9 +2783,6 @@ kbd {
   .embark {
     width: 185px;
     font-size: 15px;
-  }
-  .footer-tag {
-    display: none;
   }
   .lobby-main {
     min-height: calc(100svh - 149px);
@@ -4999,27 +4993,28 @@ body.journey-complete:not(.in-game) {
   line-height: 2.5;
 }
 
-.chronicle-entrance {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  margin: 0 0 24px;
-  padding: 24px 28px;
-  border: 1px solid #9eaa7655;
-  background: #173e32d9;
+.chronicle-link {
+  min-height: 40px;
+  padding: 10px 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
 }
-.chronicle-entrance strong,
+.chronicle-link:hover {
+  color: var(--gold);
+}
+.spirit-root-summary .root-age {
+  margin-top: 10px;
+  font-size: 12px;
+}
 .chronicle-power > strong {
   display: block;
   font-size: 34px;
   color: #e6d69b;
   font-weight: 500;
-}
-.chronicle-entrance small,
-.chronicle-entrance p {
-  color: #b6c4b0;
-  line-height: 1.9;
 }
 .chronicle-power {
   padding: 22px;
@@ -5093,19 +5088,6 @@ body.journey-complete:not(.in-game) {
   overflow-wrap: anywhere;
 }
 @media (max-width: 650px) {
-  .chronicle-entrance {
-    flex-wrap: wrap;
-    padding: 20px;
-    gap: 16px;
-  }
-  .chronicle-entrance p {
-    flex: 1;
-    min-width: 140px;
-    font-size: 13px;
-  }
-  .chronicle-entrance > button {
-    width: 100%;
-  }
   .chronicle-achievements {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5227,23 +5209,13 @@ body.journey-complete:not(.in-game) {
 .immortal-home .journey-records :is(span, small, em) {
   color: #526e53;
 }
-.immortal-home :is(.chronicle-entrance, .spirit-root-summary, .lifespan-summary, .mortal-entrance) {
+.immortal-home :is(.spirit-root-summary, .lifespan-summary, .mortal-entrance) {
   border: 0;
   border-bottom: 1px solid #52725b33;
   background: linear-gradient(95deg, #f8faed52, #ffffff12);
   padding: 26px 24px;
 }
-.immortal-home .chronicle-entrance strong {
-  color: #315947;
-}
-.immortal-home
-  :is(
-    .chronicle-entrance p,
-    .chronicle-entrance small,
-    .spirit-root-summary p,
-    .spirit-root-summary small,
-    .lifespan-summary small
-  ) {
+.immortal-home :is(.spirit-root-summary p, .spirit-root-summary small, .lifespan-summary small) {
   color: #4f6b5e;
 }
 .immortal-home :is(.spirit-root-summary b, .lifespan-summary strong) {
@@ -5362,8 +5334,7 @@ body.journey-complete:not(.in-game) {
   .immortal-home .journey-realm strong {
     font-size: 16px;
   }
-  .immortal-home
-    :is(.chronicle-entrance, .spirit-root-summary, .lifespan-summary, .mortal-entrance) {
+  .immortal-home :is(.spirit-root-summary, .lifespan-summary, .mortal-entrance) {
     padding: 22px 14px;
   }
 }

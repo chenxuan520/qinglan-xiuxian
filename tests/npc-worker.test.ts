@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker, { dialogueMessages, extractReply, NPC_MODEL } from '../workers/npc-ai/index.ts';
 import { townResidents } from '../src/town-population.ts';
-import { NPC_AI_SETTINGS } from '../src/setting.ts';
+import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { freshSave } from '../src/progress.ts';
 import { chooseSmithStory, smithAt } from '../src/town-story.ts';
 
@@ -248,4 +248,52 @@ test('AI 获得已确认的三代故事事实，错误故事状态拒绝，旧�
     400,
   );
   assert.equal((await worker.fetch(request(input), env())).status, 200);
+});
+
+test('茶馆说书使用独立完整故事提示和输出预算，不把长篇带进日常闲聊', async () => {
+  const body = { ...input, mode: 'tea-story', npcId: 'tea' };
+  const story = '仙途旧闻\n' + '问道长生，终有取舍。'.repeat(40);
+  const response = await worker.fetch(
+    request(body),
+    env(async (_model, options) => {
+      assert.equal(options.max_tokens, TEA_STORY_SETTINGS.maxOutputTokens);
+      const prompt = options.messages[0].content;
+      for (const word of ['听雨茶馆', '觅长生', '险恶', '艰难', '无情', '完整', '不改变游戏数值'])
+        assert.ok(prompt.includes(word), word);
+      assert.ok(!prompt.includes('每次一至三句'));
+      return { response: story };
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { reply: story });
+  assert.equal(extractReply({ response: story }).length, NPC_AI_SETTINGS.maxReplyLength);
+  assert.equal(extractReply({ response: '字'.repeat(901) }, true), '');
+  assert.equal(
+    extractReply({ choices: [{ finish_reason: 'length', message: { content: story } }] }, true),
+    '',
+  );
+  for (const bad of [
+    { ...body, npcId: 'smith' },
+    { ...body, mode: 'anything' },
+    { ...body, history: [{ role: 'user', content: '继续' }] },
+  ])
+    assert.equal(
+      (
+        await worker.fetch(
+          request(bad),
+          env(async () => assert.fail('不应调用 AI')),
+        )
+      ).status,
+      400,
+    );
+  assert.equal(
+    (
+      await worker.fetch(
+        request(body, 'https://evil.example'),
+        env(async () => assert.fail('不应调用 AI')),
+      )
+    ).status,
+    403,
+  );
+  assert.equal((await worker.fetch(request(body), env(undefined, false))).status, 429);
 });

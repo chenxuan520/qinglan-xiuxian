@@ -75,7 +75,7 @@ test('灵根基础气血依次100/95/90/85/80，正道、境界与淬体在基�
       g.state = 'upgrade';
       g.choices = [{ type: 'passive', id: path === 'demonic' ? 'bone' : 'guard', level: 1 }];
       g.choose(0);
-      assert.equal(g.player.maxHp, Math.round((path === 'demonic' ? hp * 1.14 : hp + 20) * factor));
+      assert.equal(g.player.maxHp, Math.round((path === 'demonic' ? hp * 1.18 : hp + 20) * factor));
     }
   }
 });
@@ -137,11 +137,11 @@ test('灵根基础暴击与移速分档，实际移动使用各自速度并正�
     save.retreatBonus.speed = 10;
     g.passives = { crit: 2, curse: 3, frenzy: 1 };
     g.player.hp = g.player.maxHp * 0.4;
-    assert.ok(Math.abs(g.stats.crit - (crits[i] + 0.14 + 0.18)) < 1e-10);
+    assert.ok(Math.abs(g.stats.crit - (crits[i] + 0.14 + 0.24)) < 1e-10);
     assert.ok(Math.abs(g.stats.speed - speeds[i] * 1.2 * 1.1) < 1e-10);
     g.passives.crit = g.passives.curse = 10;
     assert.equal(g.stats.crit, 0.85);
-    assert.equal(g.stats.criticalDamage, 2.8);
+    assert.equal(g.stats.criticalDamage, 3);
   }
 });
 

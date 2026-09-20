@@ -12,8 +12,7 @@ const ageLabel = (age: number | null | undefined) =>
 
 export function chronicleEntrance(save: SaveData) {
   const power = spiritPower(save);
-  const achievements = chronicleAchievements(save);
-  return `<section class="chronicle-entrance" aria-label="仙途履历与灵威"><div><span class="eyebrow">此世灵威</span><strong>${power.score.toLocaleString('zh-CN')}</strong><small>一级满血入场 · 成长参考</small></div><p>从十五岁离乡，到此刻的你。<br>已留 ${achievements.filter((a) => a.achieved).length} / ${achievements.length} 枚仙途印记</p><button class="secondary-button" data-action="chronicle">仙途履历 · 查看往事 →</button></section>`;
+  return `<button class="chronicle-link" data-action="chronicle" title="一级满血入场的成长参考，点击查看履历与成就">灵威 ${power.score.toLocaleString('zh-CN')} · 仙途履历 →</button>`;
 }
 export function chronicleContent(save: SaveData) {
   const power = spiritPower(save);

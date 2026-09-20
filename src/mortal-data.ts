@@ -90,7 +90,7 @@ export const TOWN_JOBS = {
     years: 0.5,
     stones: 0,
     iron: 0,
-    desc: '半载闲谈，偶遇愿赠资粮的有缘人。',
+    desc: '听一回问道长生的仙途旧闻，半载闲谈，偶遇愿赠资粮的有缘人。',
   },
 };
 export type TownJob = keyof typeof TOWN_JOBS;

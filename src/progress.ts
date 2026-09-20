@@ -278,8 +278,8 @@ export function retreatPlan(save: SaveData, requested: number) {
   const chance = immortal ? 0 : years / life.limit;
   const major = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
   const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
-  // 天灵根投入整段寿元，也至多获得当前大境界总修为的 16%；历练仍是突破的主要来源。
-  const minPercent = chance * 8 * spiritRootInfo(save.spiritRoot).rate;
+  // 天灵根投入整段寿元，也至多获得当前大境界总修为的 32%；历练仍是突破的主要来源。
+  const minPercent = chance * 16 * spiritRootInfo(save.spiritRoot).rate;
   const maxPercent = minPercent * 2;
   return {
     years,
@@ -390,7 +390,8 @@ export function cultivationReward(
       spiritRootInfo(run.spiritRoot ?? 'heaven').rate,
   );
 }
-export const trainingCost = (level: number) => Math.round(45 * 1.42 ** level);
+export const trainingCost = (level: number) =>
+  Math.round(45 * 1.42 ** Math.min(level, 9) * 1.25 ** Math.max(0, level - 9));
 const FORGE_DAMAGE_BONUSES = [0, 8, 16, 24, 32, 40, 52, 68, 88, 114, 150];
 export const forgeDamageBonus = (level: number) =>
   FORGE_DAMAGE_BONUSES[Math.min(MAX_FORGE_LEVEL, Math.max(0, Math.floor(level)))] / 100;

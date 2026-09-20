@@ -403,6 +403,12 @@
 .npc-dialogue {
   margin: 20px 0 28px;
 }
+.tea-story-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 2;
+  margin-bottom: 24px;
+}
 .town-story {
   border: 1px solid #c4b88266;
   background: #183b31;
