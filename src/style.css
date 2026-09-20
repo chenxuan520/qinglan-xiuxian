@@ -5209,16 +5209,18 @@ body.journey-complete:not(.in-game) {
 .immortal-home .journey-records :is(span, small, em) {
   color: #526e53;
 }
-.immortal-home :is(.spirit-root-summary, .lifespan-summary, .mortal-entrance) {
+.immortal-home #ui :is(.spirit-root-summary, .lifespan-summary, .mortal-entrance) {
   border: 0;
   border-bottom: 1px solid #52725b33;
   background: linear-gradient(95deg, #f8faed52, #ffffff12);
   padding: 26px 24px;
 }
-.immortal-home :is(.spirit-root-summary p, .spirit-root-summary small, .lifespan-summary small) {
+.immortal-home
+  #ui
+  :is(.spirit-root-summary p, .spirit-root-summary small, .lifespan-summary small) {
   color: #4f6b5e;
 }
-.immortal-home :is(.spirit-root-summary b, .lifespan-summary strong) {
+.immortal-home #ui :is(.spirit-root-summary b, .lifespan-summary strong) {
   color: #315947;
 }
 .immortal-home .expedition {
@@ -5239,6 +5241,7 @@ body.journey-complete:not(.in-game) {
   background-image: linear-gradient(110deg, #d3e4cec9, #dfeac8a8), var(--stage-image);
 }
 .immortal-home
+  #ui
   :is(
     .stage-top,
     .stage-bottom,
@@ -5279,7 +5282,7 @@ body.journey-complete:not(.in-game) {
   border-color: #3c6352;
   box-shadow: inset 0 0 0 3px #f2efd038;
 }
-.immortal-home #ui button:not(:disabled):hover {
+.immortal-home #ui button:not(:disabled):not(.journey-portrait):hover {
   color: #173e2d;
   background-color: #d9e8ce;
 }
@@ -5334,7 +5337,7 @@ body.journey-complete:not(.in-game) {
   .immortal-home .journey-realm strong {
     font-size: 16px;
   }
-  .immortal-home :is(.spirit-root-summary, .lifespan-summary, .mortal-entrance) {
+  .immortal-home #ui :is(.spirit-root-summary, .lifespan-summary, .mortal-entrance) {
     padding: 22px 14px;
   }
 }
