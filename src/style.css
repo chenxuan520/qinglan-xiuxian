@@ -1753,6 +1753,66 @@ kbd {
   line-height: 1.9;
   margin-top: 8px;
 }
+.guide-growth {
+  gap: 30px;
+}
+.guide-growth > div + div {
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+}
+.guide-growth > div + div > b {
+  top: 22px;
+}
+.guide-growth p + p {
+  margin-top: 12px;
+}
+.guide-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 12px;
+  color: #abc0a9;
+  line-height: 1.8;
+}
+.guide-table caption {
+  text-align: left;
+  margin-bottom: 8px;
+  color: #dad9b5;
+}
+.guide-table th,
+.guide-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: right;
+  font-weight: 400;
+}
+.guide-table th:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+.guide-table thead th {
+  color: #dad9b5;
+}
+.guide-bullets {
+  padding-left: 18px;
+  margin: 12px 0;
+  color: #abc0a9;
+  font-size: 12px;
+  line-height: 2;
+}
+.guide-bullets li + li {
+  margin-top: 6px;
+}
+.guide-bullets strong {
+  color: #d8d1a5;
+  font-weight: 500;
+}
+.guide-growth .guide-formula {
+  border-left: 2px solid #bdc79277;
+  padding: 8px 12px;
+  color: #d8d1a5;
+  line-height: 2;
+}
 .pickup-guide {
   display: flex;
   flex-wrap: wrap;
