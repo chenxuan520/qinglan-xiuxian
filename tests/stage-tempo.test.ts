@@ -4,12 +4,12 @@ import { Game } from '../src/game.ts';
 import { STAGES, TRIAL_BOSS_TIMES, enemyRoster } from '../src/data.ts';
 import { freshSave } from '../src/progress.ts';
 
-test('前六境为334455分钟，四批敌人和精英随时长提前，终关十分钟时序不变', () => {
+test('前六境为334455分钟，四批敌人和精英随时长提前，终关七分钟每分钟出王', () => {
   assert.deepEqual(
     STAGES.map((s) => s.minutes),
-    [3, 3, 4, 4, 5, 5, 10],
+    [3, 3, 4, 4, 5, 5, 7],
   );
-  assert.deepEqual(TRIAL_BOSS_TIMES, [90, 180, 270, 360, 450, 540, 600]);
+  assert.deepEqual(TRIAL_BOSS_TIMES, [60, 120, 180, 240, 300, 360, 420]);
   for (let stage = 0; stage < 6; stage++) {
     const g = new Game(freshSave(), stage, 0, () => 0.5);
     g.weapons = [];
@@ -42,7 +42,7 @@ test('无时长标记的早期续局按原始5至10分钟换算，重复读档�
     save.unlocked = stage;
     const g = new Game(save, stage, 0, () => 0.5);
     const duration = STAGES[stage].minutes * 60;
-    const oldDuration = stage === 6 ? duration : (stage + 5) * 60;
+    const oldDuration = stage === 6 ? 600 : (stage + 5) * 60;
     g.time = oldDuration / 2;
     g.nextElite = oldDuration / 2 + 60;
     g.player.hp -= 15;

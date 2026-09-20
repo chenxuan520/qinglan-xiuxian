@@ -894,7 +894,7 @@ export function tribulationRules(round: number) {
   };
 }
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
-export const TRIAL_BOSS_TIMES = [90, 180, 270, 360, 450, 540, 600];
+export const TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
 // 固定秘境强度，不随玩家境界或灵威追涨；普通怪的伤害增幅低于精英与妖王。
 export const STAGE_COMBAT_SCALING = [
@@ -990,14 +990,14 @@ export const STAGES = [
     terrain: '/assets/terrain-trial.webp',
     subtitle: '仙尊问劫 · 大乘破关',
     chapter: '柒',
-    minutes: 10,
+    minutes: 7,
     color: '#c8b981',
     boss: '九天执劫仙尊',
     skills: ['诛仙雷轮', '五方劫雷', '八荒封天', '天罡剑潮', '金阙天兵', '踏云雷袭'],
     sprite: 80,
     reward: 1200,
     description:
-      '终极试炼，全员精英。六位妖王每九十秒依次复临，第十分钟九天执劫仙尊降临。尽破七劫，修为达标即可渡劫飞升、成就真仙。建议大乘、炼器与完整搭配后挑战。',
+      '终极试炼，全员精英。六位妖王每分钟依次复临，第七分钟九天执劫仙尊降临。尽破七劫，修为达标即可渡劫飞升、成就真仙。建议大乘、炼器与完整搭配后挑战。',
   },
 ];
 export const DIFFICULTIES = [

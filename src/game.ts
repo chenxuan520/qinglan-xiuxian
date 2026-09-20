@@ -419,7 +419,7 @@ export class Game {
       trialBossesDefeated: this.trialBossesDefeated,
       trialBossesSpawned: this.trialBossesSpawned,
       nextTrialBossAt: this.nextTrialBossAt,
-      trialBossSchedule: 3,
+      trialBossSchedule: 4,
       nextElite: this.nextElite,
       damageDealt: this.damageDealt,
       damageBySource: { ...this.damageBySource },
@@ -667,9 +667,9 @@ export class Game {
         realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       const duration = STAGES[s.stage].minutes * 60;
-      // 无时长标记的早期六境固定为 5–10 分钟，不随当前关卡调整。
-      const oldDuration = s.stageDuration ?? (g.isFinalTrial ? duration : (s.stage + 5) * 60);
-      const timeScale = g.isFinalTrial ? 1 : duration / oldDuration;
+      // 无时长标记的早期六境固定为 5–10 分钟，终关按旧十分钟迁移。
+      const oldDuration = s.stageDuration ?? (g.isFinalTrial ? 600 : (s.stage + 5) * 60);
+      const timeScale = g.tribulation ? 1 : duration / oldDuration;
       g.time = s.time * timeScale;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
@@ -695,7 +695,7 @@ export class Game {
       g.choices = s.choices.map((c) => ({ ...c }));
       g.bossSpawned = s.bossSpawned;
       g.trialBossesDefeated = Math.min(s.trialBossesDefeated ?? 0, TRIAL_BOSS_STAGES.length);
-      if (s.trialBossSchedule === 3) {
+      if (s.trialBossSchedule === 3 || s.trialBossSchedule === 4) {
         if (
           !Number.isInteger(s.trialBossesSpawned) ||
           s.trialBossesSpawned < g.trialBossesDefeated ||
@@ -709,7 +709,8 @@ export class Game {
           g.trialBossesDefeated + g.enemies.filter((e) => e.boss && !e.dead).length,
         );
       }
-      g.nextTrialBossAt = TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? 600;
+      g.nextTrialBossAt =
+        TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? STAGES[FINAL_TRIAL_STAGE].minutes * 60;
       g.nextElite = s.nextElite * timeScale;
       g.damageDealt = s.damageDealt;
       if (s.damageBySource !== undefined) {
@@ -842,7 +843,8 @@ export class Game {
           this.bossSpawned = true;
           this.spawnEnemy(10, false, true, undefined, bossStage);
           this.trialBossesSpawned++;
-          this.nextTrialBossAt = TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? 600;
+          this.nextTrialBossAt =
+            TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? STAGES[FINAL_TRIAL_STAGE].minutes * 60;
           this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
           this.onEvent('boss');
         }
@@ -990,9 +992,8 @@ export class Game {
     const scaling = STAGE_COMBAT_SCALING[this.stage];
     const eliteScaling = elite && !boss ? scaling.elite : undefined;
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
-    const strengthTime = this.isFinalTrial
-      ? Math.min(this.time, STAGES[this.stage].minutes * 60)
-      : this.time;
+    // 终关缩短至七分钟，仍按进度抵达原十分钟的气血峰值。
+    const strengthTime = this.isFinalTrial ? progress * 600 : this.time;
     const strength = (1 + strengthTime / 260) * (1 + this.stage * 0.22);
     const hp = boss
       ? (this.isFinalTrial
