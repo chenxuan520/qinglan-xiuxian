@@ -1,4 +1,7 @@
 import { PASSIVES } from './data.ts';
+import { validTownPopulation, type TownPopulation } from './town-population.ts';
+import { validTownScenery, type TownScenery } from './town-history.ts';
+import { validSmithStory, smithStoryFits, type SmithStory } from './town-story.ts';
 
 export const SECTS = PASSIVES.map((manual, index) => ({
   id: manual.id,
@@ -53,7 +56,7 @@ export const MASTERY_REALMS = [
   { step: 18, name: '合体初期' },
   { step: 21, name: '大乘初期' },
   { step: 23, name: '大乘后期' },
-  { step: 24, name: '渡劫' },
+  { step: 24, name: '真仙' },
 ];
 export const MASTERY_PER_LEVEL = 0.03;
 export const SECT_ROLES = [
@@ -93,6 +96,9 @@ export const TOWN_JOBS = {
 export type TownJob = keyof typeof TOWN_JOBS;
 export interface MortalState {
   years: number;
+  population?: TownPopulation;
+  scenery?: TownScenery;
+  smithStory?: SmithStory;
   member: { id: string; dueAt: number; dues: number } | null;
   mastery: Record<string, number>;
   activity: {
@@ -106,13 +112,19 @@ export interface MortalState {
 export function freshMortal(): MortalState {
   return { years: 0, member: null, mastery: {}, activity: null, events: [] };
 }
-export function validMortal(value: unknown): value is MortalState {
+export function validMortal(value: unknown, age = 15): value is MortalState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const s = value as MortalState;
   const number = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const sect = (id: unknown) => SECTS.some((s) => s.id === id);
   return (
     number(s.years) &&
+    (s.population === undefined || validTownPopulation(s.population)) &&
+    (s.scenery === undefined || validTownScenery(s.scenery)) &&
+    (s.smithStory === undefined ||
+      (validSmithStory(s.smithStory) &&
+        !!s.population &&
+        smithStoryFits(s.smithStory, s.population, age))) &&
     (s.member === null ||
       (!!s.member &&
         sect(s.member.id) &&
@@ -130,7 +142,10 @@ export function validMortal(value: unknown): value is MortalState {
     (s.activity === null ||
       (!!s.activity &&
         number(s.activity.remaining) &&
-        s.activity.remaining > 0 &&
+        (s.activity.remaining > 0 ||
+          (!!s.member?.dues &&
+            s.member.dueAt <= s.years + 1e-9 &&
+            s.activity.remaining >= -1e-9)) &&
         number(s.activity.total) &&
         s.activity.remaining <= s.activity.total &&
         (s.activity.kind === 'study'

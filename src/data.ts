@@ -877,7 +877,7 @@ export function evolutionPassives(t: Treasure, path: CultivationPath = 'dual') {
     allowsSchool(path, passive(id).school),
   );
 }
-export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '渡劫'];
+export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '真仙'];
 export const REALM_LIFESPANS = [100, 250, 500, 1000, 2000, 5000, 10000, Infinity, Infinity];
 export const STAGE_YEARS_PER_MINUTE = [10, 25, 50, 100, 200, 500, 1000];
 export const FINAL_TRIAL_STAGE = 6;
@@ -896,6 +896,16 @@ export function tribulationRules(round: number) {
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [90, 180, 270, 360, 450, 540, 600];
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
+// 固定秘境强度，不随玩家境界或灵威追涨；普通怪的伤害增幅低于精英与妖王。
+export const STAGE_COMBAT_SCALING = [
+  { hp: 1, damage: 1 },
+  { hp: 1.08, damage: 1.08 },
+  { hp: 1.16, damage: 1.16 },
+  { hp: 1.25, damage: 1.24 },
+  { hp: 1.35, damage: 1.32 },
+  { hp: 1.45, damage: 1.42 },
+  { hp: 1.35, damage: 1.35 },
+];
 export const STAGES = [
   {
     name: '青岚竹海',
@@ -915,7 +925,7 @@ export const STAGES = [
     terrain: '/assets/terrain-ruins.webp',
     subtitle: '古阵余烬 · 妖影渐生',
     chapter: '贰',
-    minutes: 4,
+    minutes: 3,
     color: '#d6b784',
     boss: '赤炎狐王',
     skills: ['九尾炎扇', '焚天火径', '赤焰轮舞'],
@@ -941,7 +951,7 @@ export const STAGES = [
     terrain: '/assets/terrain-marsh.webp',
     subtitle: '瘴云蔽日 · 万物归寂',
     chapter: '肆',
-    minutes: 6,
+    minutes: 5,
     color: '#bcc895',
     boss: '玄甲毒君',
     skills: ['五毒瘴池', '蚀骨毒矢', '万蛊复生'],
@@ -967,7 +977,7 @@ export const STAGES = [
     terrain: '/assets/terrain-heaven.webp',
     subtitle: '雷劫淬身 · 问道长生',
     chapter: '陆',
-    minutes: 8,
+    minutes: 7,
     color: '#e0d7b2',
     boss: '太虚劫灵',
     skills: ['十字天雷', '太虚星环', '陨星天罚'],
@@ -987,7 +997,7 @@ export const STAGES = [
     sprite: 80,
     reward: 1200,
     description:
-      '终极试炼，全员精英。六位妖王每九十秒依次复临，第十分钟九天执劫仙尊降临。尽破七劫，方可突破渡劫。建议大乘、炼器与完整搭配后挑战。',
+      '终极试炼，全员精英。六位妖王每九十秒依次复临，第十分钟九天执劫仙尊降临。尽破七劫，修为达标即可渡劫飞升、成就真仙。建议大乘、炼器与完整搭配后挑战。',
   },
 ];
 export const DIFFICULTIES = [
@@ -1392,7 +1402,7 @@ export const MAX_WEAPONS = 6;
 export const MAX_PASSIVES = 4;
 export const MAX_WEAPON_LEVEL = 6;
 export const MAX_RUN_LEVEL = 100;
-export const MAX_REVIVES = 10;
+export const MAX_REVIVES = 1;
 export const MAX_FORGE_LEVEL = 10;
 export const AD_SUPPLIES = { stones: 300, iron: 30 };
 export const MAX_PASSIVE_LEVEL = 5;

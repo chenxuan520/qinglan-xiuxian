@@ -8,6 +8,7 @@ import {
   type CultivationPath,
 } from './data.ts';
 import { lifespanInfo, realmInfo, tribulationDue, type SaveData } from './progress.ts';
+import { recordChronicle } from './chronicle.ts';
 import {
   SECTS,
   SECT_DUES,
@@ -36,6 +37,23 @@ export function entryCost(save: SaveData) {
     save.spiritRoot
   ];
 }
+export function sectDuesPending(save: SaveData) {
+  const member = save.mortal.member;
+  return !!member?.dues && sectDues(save).stones > 0 && member.dueAt <= save.mortal.years + 1e-9;
+}
+export function settleSectDues(save: SaveData, decline = false, random = Math.random) {
+  if (!sectDuesPending(save)) return false;
+  if (decline) return leaveSect(save, true);
+  const member = save.mortal.member!;
+  if (save.stones < member.dues) return false;
+  save.stones -= member.dues;
+  log(save, `已补缴供奉 ${member.dues} 灵石。`);
+  const next = sectDues(save);
+  member.dueAt += next.years;
+  member.dues = next.stones;
+  completeActivity(save, random);
+  return true;
+}
 function masteryLimit(save: SaveData) {
   const step = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
   return MASTERY_REALMS.filter((r) => r.step <= step).length;
@@ -59,11 +77,12 @@ export function studyPlan(save: SaveData) {
   };
 }
 function log(save: SaveData, text: string) {
+  recordChronicle(save, '人间行迹', text);
   save.mortal.events.unshift(`人间 ${save.mortal.years.toFixed(1)} 年 · ${text}`);
   save.mortal.events.length = Math.min(6, save.mortal.events.length);
 }
 function canAct(save: SaveData) {
-  return lifespanInfo(save).remaining > 0 && !tribulationDue(save);
+  return lifespanInfo(save).remaining > 0 && !tribulationDue(save) && !sectDuesPending(save);
 }
 export function joinSect(save: SaveData, id: string, unfinishedPath?: CultivationPath) {
   const sect = SECTS.find((s) => s.id === id);
@@ -86,17 +105,19 @@ export function joinSect(save: SaveData, id: string, unfinishedPath?: Cultivatio
     dues: dues.stones,
   };
   log(save, `拜入${SECTS.find((s) => s.id === id)!.name}，本门精研加成已生效。`);
+  if (!Object.hasOwn(save.chronicle.milestones, 'sect')) save.chronicle.milestones.sect = save.age;
   return true;
 }
 export function leaveSect(save: SaveData, expelled = false) {
   if (!save.mortal.member) return false;
+  const name = SECTS.find((s) => s.id === save.mortal.member!.id)!.name;
   if (save.mortal.activity?.kind === 'study') save.mortal.activity = null;
   save.mortal.member = null;
   log(
     save,
     expelled
-      ? '供奉不足，已被清退；精研等级保留，加成立即失效。'
-      : '已离开宗门；精研等级保留，加成暂停。',
+      ? `供奉不足，已被${name}清退；精研等级保留，加成立即失效。`
+      : `已离开${name}；精研等级保留，加成暂停。`,
   );
   return true;
 }
@@ -156,13 +177,17 @@ export function advanceMortal(save: SaveData, seconds: number, random = Math.ran
     world.years += step;
     save.age += step;
     remaining -= step;
-    if (world.activity && !studyPaused) world.activity.remaining -= step;
+    if (world.activity && !studyPaused)
+      world.activity.remaining = Math.max(0, world.activity.remaining - step);
     // 同时到期先扣供奉，不能用尚未完成的委托收入透支门费。
     if (world.member?.dues && world.years >= world.member.dueAt - 1e-9) {
       const member = world.member;
       member.dues = Math.min(member.dues, MAX_SECT_DUES);
-      if (save.stones < member.dues) leaveSect(save, true);
-      else {
+      if (save.stones < member.dues) {
+        // 停在账期边界，先给广告补缴机会；放弃时才清退，余下时间不推进。
+        changed = true;
+        break;
+      } else {
         save.stones -= member.dues;
         log(save, `已缴供奉 ${member.dues} 灵石。`);
         const next = sectDues(save);
@@ -171,28 +196,38 @@ export function advanceMortal(save: SaveData, seconds: number, random = Math.ran
       }
       changed = true;
     }
-    const activity = world.activity;
-    if (activity && !studyPaused && activity.remaining <= 1e-9) {
-      world.activity = null;
-      if (activity.kind === 'study') {
-        const id = activity.sect!;
-        world.mastery[id] = Math.min(MAX_MASTERY, (world.mastery[id] || 0) + 1);
-        log(
-          save,
-          `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。`,
-        );
-      } else {
-        const job = TOWN_JOBS[activity.kind];
-        const stones = activity.kind === 'tea' ? (random() < 0.3 ? 8 : 0) : job.stones;
-        save.stones += stones;
-        save.iron += job.iron;
-        log(
-          save,
-          `${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事，未遇机缘'}。`,
-        );
-      }
-      changed = true;
-    }
+    if (completeActivity(save, random)) changed = true;
   }
   return changed;
+}
+
+function completeActivity(save: SaveData, random: () => number) {
+  const world = save.mortal;
+  const activity = world.activity;
+  if (
+    activity &&
+    (activity.kind !== 'study' || studyPlan(save).eligible) &&
+    activity.remaining <= 1e-9
+  ) {
+    world.activity = null;
+    if (activity.kind === 'study') {
+      const id = activity.sect!;
+      world.mastery[id] = Math.min(MAX_MASTERY, (world.mastery[id] || 0) + 1);
+      log(
+        save,
+        `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。`,
+      );
+    } else {
+      const job = TOWN_JOBS[activity.kind];
+      const stones = activity.kind === 'tea' ? (random() < 0.3 ? 8 : 0) : job.stones;
+      save.stones += stones;
+      save.iron += job.iron;
+      log(
+        save,
+        `${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事，未遇机缘'}。`,
+      );
+    }
+    return true;
+  }
+  return false;
 }

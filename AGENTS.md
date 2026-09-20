@@ -9,7 +9,7 @@
 
 ## 技术与目录
 
-纯静态 Vite + TypeScript + Canvas 2D，无后端、无运行时游戏框架。需要 Node.js **22.18+**。
+前端使用 Vite + TypeScript + Canvas 2D，无运行时游戏框架。战斗与存档本地运行，NPC 闲谈使用独立 Cloudflare Workers AI，失败回退本地对白。需要 Node.js **22.18+**。
 
 | 路径                                  | 职责                                      |
 | ------------------------------------- | ----------------------------------------- |
@@ -43,6 +43,7 @@ npm run format:check
 有人正在使用 5173 时，不启动第二个服务，不自动换成 5174。先检查现有进程，并按下一节更新生产预览。`npm run preview -- --port 5173 --strictPort` 用于尚无服务时预览 `dist`。
 
 - 修改战斗或成长后，运行相关测试；涉及整体难度时再运行 `npm run balance`、`npm run balance:trial` 或 `npm run balance:tribulation`。音频和文档改动无需重跑全部平衡模拟。
+- NPC 域名、模型、超时、对话长度与换代年限集中在 `src/setting.ts`；姓名与换代在 `src/town-population.ts`，百年城景和上次入城记录在 `src/town-history.ts`，对白 UI 在 `src/npc-chat.ts`，共享协议与兜底在 `src/npc-dialogue.ts`。Worker 在 `workers/npc-ai/`；修改后执行 `npm run check:npc-ai` 与相关测试，`npm run deploy:npc-ai` 单独发布。默认域名 `qinglan-npc-ai.011203.xyz`，绑定和 CORS 来源随配置维护；严禁将 API 密钥放入前端，AI 文本不能改变游戏数值或当作 HTML 执行。
 - 视觉及交互改动需用真实页面验证，桌面和手机布局都要检查。开发模式可用 `window.__qinglan`；生产构建没有此入口。
 - 存档键为 `qinglan-immortal-v1`。兼容旧档，保留玩家进度，注意永久结算不能重复入账。测试使用隔离存档，禁止清空用户真实 localStorage。
 - 新图片生成后运行 `python3 scripts/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。

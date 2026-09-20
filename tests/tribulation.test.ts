@@ -26,6 +26,24 @@ function immortal(round = 1) {
   return save;
 }
 
+test('每次天劫最多广告复活一次，续局不会重置机会', () => {
+  const save = immortal();
+  const g = Game.createTribulation(save);
+  g.player.invincible = 0;
+  g.hurtPlayer(1e9);
+  g.update(0.01);
+  assert.equal(g.state, 'lost');
+  assert.equal(g.revive(), true);
+  const restored = Game.restore(save, JSON.parse(JSON.stringify(g.snapshot())))!;
+  assert.equal(restored.revivesUsed, 1);
+  restored.resume();
+  restored.player.invincible = 0;
+  restored.hurtPlayer(1e9);
+  restored.update(0.01);
+  assert.equal(restored.state, 'lost');
+  assert.equal(restored.revive(), false);
+});
+
 test('根基每阶同时扣灵石与年岁，七档灵根耗时不同，资源不足或寿元不足不扣除', () => {
   const years = [1, 1.2, 1.4, 1.8, 2.5, 3.3, 5];
   for (const [i, root] of SPIRIT_ROOTS.entries()) {

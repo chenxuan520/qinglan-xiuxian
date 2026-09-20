@@ -11,7 +11,10 @@ import {
 } from './mortal-data.ts';
 import { entryCost, masteryBonus, sectDues, sectRole, studyPlan } from './mortal.ts';
 import { icon } from './icons.ts';
-import { type TownNpc } from './town.ts';
+import { type TownResident } from './town-population.ts';
+import { npcDefaultLine } from './npc-dialogue.ts';
+import { NPC_AI_SETTINGS } from './setting.ts';
+import { smithAt, smithStoryView } from './town-story.ts';
 
 const escape = (text: string) =>
   text.replace(
@@ -53,7 +56,7 @@ export function mortalStatus(save: SaveData) {
   const free = sectDues(save).stones === 0;
   const activity = world.activity;
   const study = activity?.kind === 'study' ? studyPlan(save) : null;
-  return `<div><small>此世年岁 / 寿元</small><strong>${life.age.toFixed(2)} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong></div><div><small>累计游历人间</small><strong>${world.years.toFixed(2)} <em>年</em></strong></div><div><small>${member ? '下次宗门供奉' : '宗门身份'}</small><strong>${member ? (free ? '渡劫 · 免供奉' : `${Math.max(0, member.dueAt - world.years).toFixed(1)} 年后`) : '逍遥散修'}</strong><span>${member && !free ? `${member.dues} 灵石 · 到期自动缴纳` : member ? '在籍精研加成持续生效' : '可拜入任一正道或魔道宗门'}</span></div><div><small>正在进行</small><strong>${activity ? (activity.kind === 'study' ? (study?.eligible ? '研习本门功法' : '研习暂停 · 境界未达标') : TOWN_JOBS[activity.kind].name) : '闲游人间'}</strong><span>${activity ? `剩余 ${activity.remaining.toFixed(2)} 年 · ${study && !study.eligible ? `需${study.requiredRealm}，达标后入城继续` : '离开暂停'}` : '可承接委托或入门研习'}</span></div>`;
+  return `<div><small>此世年岁 / 寿元</small><strong>${life.age.toFixed(2)} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong></div><div><small>累计游历人间</small><strong>${world.years.toFixed(2)} <em>年</em></strong></div><div><small>${member ? '下次宗门供奉' : '宗门身份'}</small><strong>${member ? (free ? '真仙 · 免供奉' : `${Math.max(0, member.dueAt - world.years).toFixed(1)} 年后`) : '逍遥散修'}</strong><span>${member && !free ? `${member.dues} 灵石 · 到期自动缴纳` : member ? '在籍精研加成持续生效' : '可拜入任一正道或魔道宗门'}</span></div><div><small>正在进行</small><strong>${activity ? (activity.kind === 'study' ? (study?.eligible ? '研习本门功法' : '研习暂停 · 境界未达标') : TOWN_JOBS[activity.kind].name) : '闲游人间'}</strong><span>${activity ? `剩余 ${activity.remaining.toFixed(2)} 年 · ${study && !study.eligible ? `需${study.requiredRealm}，达标后入城继续` : '离开暂停'}` : '可承接委托或入门研习'}</span></div>`;
 }
 export function townStatus(save: SaveData) {
   const life = lifespanInfo(save);
@@ -62,7 +65,7 @@ export function townStatus(save: SaveData) {
   return `<strong>年岁 ${life.age.toFixed(2)} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong><span>灵石 ${save.stones.toLocaleString('zh-CN')} · 玄铁 ${save.iron}</span>${activity ? `<span>${activity.kind === 'study' ? (study!.eligible ? '功法研习' : `研习暂停 · 需${study!.requiredRealm}`) : TOWN_JOBS[activity.kind].name} · 剩余 ${activity.remaining.toFixed(2)} 年</span>` : ''}`;
 }
 export function townPage(save: SaveData, fullscreenButton: string) {
-  return `<main class="town-scene" aria-label="青岚镇游历"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，可用方向键移动，靠近镇民按 E 交谈"></div><header class="town-scene-heading"><div class="town-hud"><h2>青岚镇</h2><small>现实 1 分钟 = 1 年</small><div id="town-status">${townStatus(save)}</div></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="town-exit">离开城镇</button></div></header><footer class="town-scene-controls"><p>WASD / 方向键 · 触屏拖动<br>靠近镇民，按 E 或点击交谈</p><button class="primary-button" data-action="town-talk" disabled>走近镇民可交谈</button></footer></main>`;
+  return `<main class="town-scene" aria-label="青岚镇游历"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，可用方向键移动，靠近镇民按 E 交谈"></div><header class="town-scene-heading"><div class="town-hud"><h2>青岚镇</h2>${save.mortal.scenery?.revision ? '<small>旧铺迁址 · 故宅成庭</small>' : ''}<small>现实 1 分钟 = 1 年</small><div id="town-status">${townStatus(save)}</div></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="town-exit">离开城镇</button></div></header><footer class="town-scene-controls"><p>WASD / 方向键 · 触屏拖动<br>靠近镇民，按 E 或点击交谈</p><button class="primary-button" data-action="town-talk" disabled>走近镇民可交谈</button></footer></main>`;
 }
 export function mortalPage(
   save: SaveData,
@@ -84,7 +87,7 @@ export function mortalPage(
       )
       .join('')}</nav>
     <div id="mortal-content">${mortalTabContent(save, tab, filter, unfinishedPath)}</div>
-    <section class="mortal-journal"><h2>人间见闻</h2><ol>${save.mortal.events.length ? save.mortal.events.map((event) => `<li>${escape(event)}</li>`).join('') : '<li>初入人间，山河待访。</li>'}</ol></section>
+    ${smithStoryJournal(save)}<section class="mortal-journal"><h2>人间见闻</h2><ol>${save.mortal.events.length ? save.mortal.events.map((event) => `<li>${escape(event)}</li>`).join('') : '<li>初入人间，山河待访。</li>'}</ol></section>
     <footer class="mortal-footer">一程烟火，一卷仙缘。<button data-action="home">返回仙途 →</button></footer>
   </main>`;
 }
@@ -96,7 +99,7 @@ export function mortalTabContent(
 ) {
   const world = save.mortal;
   if (tab === 'town')
-    return `<section class="town-arrival"><div><span class="eyebrow">山下烟火</span><h2>青岚镇</h2><p>商铺沿街，炊烟绕巷。<br>走进城镇，去港口听潮，拜访街巷中的九位镇民。</p><p class="panel-note">城门外不消耗寿元。入城后时间流逝，切换到宗门或离开城镇即暂停。</p><button class="primary-button" data-action="town-enter">走进青岚镇 →</button></div><div class="town-arrival-art" aria-hidden="true"><span></span><span></span><span></span></div></section>`;
+    return `<section class="town-arrival"><div><span class="eyebrow">山下烟火</span><h2>青岚镇</h2><p>商铺沿街，炊烟绕巷。<br>走进城镇，去港口听潮，拜访九位行当中人，与街上十二位村民闲谈。</p><p class="panel-note">城门外不消耗寿元。入城后时间流逝，切换到宗门或离开城镇即暂停。</p><button class="primary-button" data-action="town-enter">走进青岚镇 →</button></div><div class="town-arrival-art" aria-hidden="true"><span></span><span></span><span></span></div></section>`;
   const member = SECTS.find((s) => s.id === world.member?.id);
   const plan = studyPlan(save);
   const dues = sectDues(save);
@@ -112,7 +115,7 @@ export function mortalTabContent(
     )
     .join(
       '',
-    )}</div></div><p class="mortal-sect-note">${spiritRootInfo(save.spiritRoot).name}入门礼：${entryCost(save)} 灵石。${dues.stones ? `当前境界新账期每 ${dues.years} 年缴 ${dues.stones} 灵石。` : '渡劫免供奉。'}不论在哪一门，入门礼与供奉标准相同。门费只按城镇内游历时间累计；宗门页签、秘境、闭关不计入账期。${unfinishedPath ? '尚有未结束的历练：只能拜入相同路线的宗门；兼修旧局需先结束历练再入宗，避免更改原战况。' : ''}</p><div class="sect-grid">${SECTS.filter(
+    )}</div></div><p class="mortal-sect-note">${spiritRootInfo(save.spiritRoot).name}入门礼：${entryCost(save)} 灵石。${dues.stones ? `当前境界新账期每 ${dues.years} 年缴 ${dues.stones} 灵石。` : '真仙免供奉。'}不论在哪一门，入门礼与供奉标准相同。门费只按城镇内游历时间累计；宗门页签、秘境、闭关不计入账期。${unfinishedPath ? '尚有未结束的历练：只能拜入相同路线的宗门；兼修旧局需先结束历练再入宗，避免更改原战况。' : ''}</p><div class="sect-grid">${SECTS.filter(
     (s) => filter === 'all' || s.school === filter,
   )
     .map((s) => {
@@ -120,21 +123,10 @@ export function mortalTabContent(
       return `<article class="sect-card ${s.school} ${member?.id === s.id ? 'joined' : ''}">${sectArt(s)}<div class="sect-copy"><span class="sect-school">${s.school === 'orthodox' ? '正道' : '魔道'}仙门${member?.id === s.id ? ` · 本门${sectRole(save)}` : ''}</span><h3>${s.name}</h3><p class="sect-motto">${s.motto}</p><div class="sect-manual">${icon(manual.id, manual.color)}<strong>${manual.name}<small>本门专修功法</small></strong></div><p>${manual.desc}</p><small class="sect-mastery">精研 ${world.mastery[s.id] || 0} / ${MAX_MASTERY} 阶${world.mastery[s.id] ? ` · ${member?.id === s.id ? `当前生效 ${Math.min(world.mastery[s.id], plan.limit)} 阶` : '成果保留，待入本门'}` : ''}</small><button class="secondary-button" data-action="mortal-join" data-id="${s.id}" data-cost-stones="${entryCost(save)}" ${member || (unfinishedPath && unfinishedPath !== s.school) ? 'disabled' : ''}>${member?.id === s.id ? '已拜入本门' : member ? '需先退出当前宗门' : unfinishedPath && unfinishedPath !== s.school ? '需先结束不同路线的历练' : `拜入山门 · ${entryCost(save)} 灵石`}</button></div></article>`;
     })
     .join('')}</div></section>
-    <section class="mortal-rules"><h2>入世须知</h2><p>炼气至合体每隔寿元上限的 1/5 缴纳一次，借寿也计入下一账期；大乘每 5000 年一次，渡劫免供奉。每次供奉最多 ${MAX_SECT_DUES} 灵石，旧档尚未缴纳的超额账单同步封顶。入门礼不抵供奉。突破或借寿后，当前账期按原约定结清，下一账期更新；进入渡劫立即免除供奉。余额不足会自动清退出宗门，不产生欠款。</p><div class="dues-grid">${SECT_DUES.map((d, i) => `<span>${REALMS[i]} · ${SECT_ROLES[i]}<b>${d.stones ? `${d.years} 年 / ${d.stones} 灵石` : '免供奉'}</b></span>`).join('')}</div><small>职务随境界自动晋升，重新入宗按当前境界授职；未突破渡劫时不会提前成为开宗老祖。表中为未借寿的标准间隔。未完成的委托和研习可离开后继续，不会自动重复；退宗与轮回会影响宗门成果，轮回清空本世全部精研。</small></section>`;
+    <section class="mortal-rules"><h2>入世须知</h2><p>炼气至合体每隔寿元上限的 1/5 缴纳一次，借寿也计入下一账期；大乘每 5000 年一次，真仙免供奉。每次供奉最多 ${MAX_SECT_DUES} 灵石，旧档尚未缴纳的超额账单同步封顶。入门礼不抵供奉。突破或借寿后，当前账期按原约定结清，下一账期更新；进入真仙立即免除供奉。余额不足会自动清退出宗门，不产生欠款。</p><div class="dues-grid">${SECT_DUES.map((d, i) => `<span>${REALMS[i]} · ${SECT_ROLES[i]}<b>${d.stones ? `${d.years} 年 / ${d.stones} 灵石` : '免供奉'}</b></span>`).join('')}</div><small>职务随境界自动晋升，重新入宗按当前境界授职；未突破真仙时不会提前成为开宗老祖。表中为未借寿的标准间隔。未完成的委托和研习可离开后继续，不会自动重复；退宗与轮回会影响宗门成果，轮回清空本世全部精研。</small></section>`;
 }
 
-export function townEventContent(save: SaveData, npc: TownNpc) {
-  const intro = {
-    herbs: '山中草药正当时，可愿帮我采来一篓？',
-    tea: '行路辛苦，来听一段茶馆闲谈吧。',
-    escort: '镖队正缺人手，愿意护送这一趟吗？',
-    market: '灵材有价，买卖随缘。看看可有用得上的？',
-    smith: '好铁还得慢火锻，做人做事也是一样。',
-    scholar: '书里山河无数，终究还得亲自走一遭。',
-    fisher: '今晨水静，鱼倒是不少。道友有空也看看河上风光。',
-    farmer: '这一季稻穗饱满，家里又能过个安稳年了。',
-    tailor: '衣裳合身，走路也轻快。针脚细些，才耐得住岁月。',
-  }[npc.id];
+export function townEventContent(save: SaveData, npc: TownResident) {
   let actions = '';
   if (npc.id === 'market') {
     actions = `<p>每枚玄铁：买入 30 灵石 · 卖出 12 灵石</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。</p><div class="save-actions"><button class="secondary-button" data-action="mortal-buy" data-cost-stones="30">购入 1 枚玄铁</button><button class="secondary-button" data-action="mortal-sell" ${save.iron < 1 ? 'disabled' : ''}>售出 1 枚玄铁</button></div>`;
@@ -142,5 +134,26 @@ export function townEventContent(save: SaveData, npc: TownNpc) {
     const job = TOWN_JOBS[npc.id];
     actions = `<p>${job.desc}</p><p class="panel-note">耗时 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>接下后在城镇内推进，离开暂停，完成后不自动重复。</p><button class="primary-button" data-action="mortal-activity" data-id="${npc.id}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '已有进行中的委托或研习' : '接下这件事'}</button>`;
   }
-  return `<p class="pause-description">「${intro}」</p>${actions}`;
+  return `<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}<section class="npc-dialogue" aria-label="与${npc.name}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(npc.id)}</p></div><small class="npc-chat-status" role="status">街巷闲谈 · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="想对镇民说的话" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">闲谈不改变修为与物资，办事请用故事或委托按钮。</small></section>${actions}`;
+}
+
+function smithStoryContent(save: SaveData) {
+  const story = save.mortal.smithStory;
+  const view = smithStoryView(save.mortal.population!, save.age, story);
+  const labels: Record<string, string> = {
+    iron: '添两枚玄铁 · 修补钟沿',
+    bellows: '留下帮忙 · 拉风箱叙家常',
+    harbor: '留在渡口 · 报归船平安',
+    school: '送去学堂 · 伴孩子读书',
+    remember: `收下旧铃 · 玄铁 +${story?.help === 'iron' ? 6 : 4}`,
+  };
+  return `<section class="town-story" aria-label="炉火未凉"><span class="eyebrow">青岚旧事 · ${view.chapter} / 3</span><h3>${view.title}</h3><p>${escape(view.text)}</p><blockquote>${escape(view.quote)}</blockquote><div class="story-choices">${view.actions.map((choice) => `<button class="secondary-button" data-action="smith-story" data-id="${choice}" ${choice === 'iron' && save.iron < 2 ? 'disabled' : ''}>${labels[choice]}</button>`).join('')}</div><small>${view.actions.includes('iron') ? `现有 ${save.iron} 枚玄铁；也可免费留下帮忙，两种选择都会被记住。` : story?.completed ? '纪念物 · 炉火旧铃。没有战力加成，这段往事可在人间入口重读。' : view.actions.length ? '选择会写入此世存档，闲谈不会代替你作决定。' : '故人会随年岁老去。历练或闭关后再访，故事随传人更替继续；错过的岁月也有旧信可寻。'}</small></section>`;
+}
+
+function smithStoryJournal(save: SaveData) {
+  const story = save.mortal.smithStory;
+  if (!story || !save.mortal.population) return '';
+  const first = smithAt(save.mortal.population, story.metAt);
+  const view = smithStoryView(save.mortal.population, save.age, story);
+  return `<section class="mortal-journal town-story"><span class="eyebrow">此世旧事 · ${story.completed ? '三代烟火' : `${view.chapter} / 3`}</span><h2>炉火未凉${story.completed ? ' · 炉火旧铃' : ''}</h2><p>${story.metAt.toFixed(1)} 岁，你结识了铁匠${first.name}，${story.help === 'iron' ? '留下两枚玄铁' : '陪他拉风箱、叙家常'}，一起修好渡船旧钟。</p>${story.legacy ? `<p>故人的信托你安置旧钟，你让它${story.legacy === 'school' ? '在学堂伴孩子读书' : '在渡口报归船平安'}。</p>` : ''}<p>${escape(view.text)}</p><small>${story.completed ? '旧铃已收藏于此。此世的纪念会随存档导出，轮回后重新开始。' : view.actions.length ? '铁匠铺有新的往事，入城后可拜访当代传人。' : '一别山川，归来再访。故事随年岁和铁匠换代推进。'}</small></section>`;
 }

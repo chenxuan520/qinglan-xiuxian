@@ -34,7 +34,7 @@ test('前六境各阶段刷新量增加25%，妖王阶段比例与同屏上限�
   }
 });
 
-test('前六境普通怪伤害增加30%，精英为旧版2.2倍，碰撞按减伤后实际扣血', () => {
+test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣血', () => {
   for (let stage = 0; stage < 6; stage++) {
     for (let difficulty = 0; difficulty < 3; difficulty++) {
       for (const elite of [false, true]) {
@@ -43,6 +43,7 @@ test('前六境普通怪伤害增加30%，精英为旧版2.2倍，碰撞按减�
         g.time = STAGES[stage].minutes * 30;
         g.nextElite = 9999;
         g.passives.guard = 3;
+        g.player.hp = g.player.maxHp = 10000;
         const type = STAGE_ENEMIES[stage][0];
         const e = g.spawnEnemy(type, elite, false, { x: 0, y: 0 });
         const expected =
@@ -50,7 +51,8 @@ test('前六境普通怪伤害增加30%，精英为旧版2.2倍，碰撞按减�
           (1 + stage * 0.12) *
           1.175 *
           DIFFICULTIES[difficulty].damage *
-          (elite ? 2.2 : 1.3);
+          (elite ? 2.2 : 1.3) *
+          (1 + [0, 0.08, 0.16, 0.24, 0.32, 0.42][stage] * (elite ? 1 : 0.65));
         assert.ok(Math.abs(e.damage - expected) < 1e-8);
         const before = g.player.hp;
         g.update(0.01);
@@ -69,7 +71,8 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
       const g = new Game(save, stage, difficulty, () => 0.5);
       g.weapons = [];
       const boss = g.spawnEnemy(10, false, true, { x: 300, y: 0 });
-      const expected = damage[stage] * DIFFICULTIES[difficulty].damage;
+      const expected =
+        damage[stage] * DIFFICULTIES[difficulty].damage * [1, 1.08, 1.16, 1.24, 1.32, 1.42][stage];
       assert.equal(boss.damage, expected);
       boss.skillStep = stage === 1 ? 0 : 1;
       boss.cooldown = 0;
@@ -91,7 +94,7 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
   }
 });
 
-test('第七境精英与七位妖王保持原伤害，续局不会再乘前六境倍率', () => {
+test('第七境精英与七位妖王伤害提高35%，重复续局不会重复乘倍率', () => {
   for (let difficulty = 0; difficulty < 3; difficulty++) {
     for (const progress of [0, 0.5, 1]) {
       const save = freshSave();
@@ -101,7 +104,11 @@ test('第七境精英与七位妖王保持原伤害，续局不会再乘前六�
       for (const type of STAGE_ENEMIES[6]) {
         const e = g.spawnEnemy(type);
         const expected =
-          ENEMIES[type].damage * 1.72 * (1.1 + progress * 0.9) * DIFFICULTIES[difficulty].damage;
+          ENEMIES[type].damage *
+          1.72 *
+          (1.1 + progress * 0.9) *
+          DIFFICULTIES[difficulty].damage *
+          1.35;
         assert.ok(e.elite);
         assert.ok(Math.abs(e.damage - expected) < 1e-8);
       }
@@ -109,7 +116,7 @@ test('第七境精英与七位妖王保持原伤害，续局不会再乘前六�
         const boss = g.spawnEnemy(10, false, true, undefined, stage);
         assert.equal(
           boss.damage,
-          (stage === 6 ? 220 : 85 + stage * 10) * DIFFICULTIES[difficulty].damage,
+          (stage === 6 ? 220 : 85 + stage * 10) * DIFFICULTIES[difficulty].damage * 1.35,
         );
       }
       const restored = Game.restore(g.save, g.snapshot())!;

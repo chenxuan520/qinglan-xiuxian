@@ -891,7 +891,7 @@ kbd {
 }
 .modal-backdrop.prologue-backdrop {
   padding: 0;
-  background: #e5eee1;
+  background: #102a2c;
   backdrop-filter: none;
   animation: none;
 }
@@ -906,21 +906,21 @@ kbd {
   height: 100svh;
   padding: 100px 8vw 48px;
   overflow: hidden;
-  color: #203e39;
-  background: #e5eee1 var(--prologue-image) left center / cover no-repeat;
+  color: #dce5d7;
+  background: #102a2c var(--prologue-image) left center / cover no-repeat;
 }
 .prologue-scene::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(90deg, #eff3df08 20%, #eef3e477 48%, #f2f3e9eb 75%);
+  background: linear-gradient(90deg, #0b242c18 20%, #102a2c88 48%, #102a2ceb 75%);
 }
 .prologue-scene::after {
   content: '';
   position: absolute;
   inset: 20px;
-  border: 1px solid #617d6266;
+  border: 1px solid #bdc4a844;
   pointer-events: none;
 }
 .prologue-skip {
@@ -937,19 +937,20 @@ kbd {
 }
 .prologue-scene button:focus-visible,
 .prologue-story:focus-visible {
-  outline: 2px solid #39664e;
+  outline: 2px solid #e6d69b;
   outline-offset: 5px;
 }
 .prologue-heading {
   align-self: start;
   text-shadow:
-    0 1px 16px #f7f6da,
-    0 1px 3px #fff;
+    0 1px 16px #10282c,
+    0 1px 3px #10282c;
 }
 .prologue-heading .eyebrow {
-  color: #355d4c;
+  color: #cfdbc5;
 }
 .prologue-heading h1 {
+  color: #f0e3b3;
   margin: 30px 0 24px;
   font-size: clamp(64px, 6.8vw, 104px);
   font-weight: 500;
@@ -959,7 +960,7 @@ kbd {
 }
 .prologue-heading h1 span {
   display: block;
-  color: #365b49;
+  color: #c5d7bf;
 }
 .prologue-heading p {
   font-size: 15px;
@@ -969,9 +970,9 @@ kbd {
   display: inline-block;
   margin-top: 30px;
   padding: 9px 7px;
-  border: 1px solid #ac674f;
-  color: #9c4935;
-  background: #faf0dcb8;
+  border: 1px solid #ba8870;
+  color: #e9c7a1;
+  background: #492d29b8;
   writing-mode: vertical-rl;
   letter-spacing: 4px;
   font-size: 14px;
@@ -987,14 +988,14 @@ kbd {
   line-height: 2.2;
   letter-spacing: 1px;
   scrollbar-width: thin;
-  scrollbar-color: #7f997b #e6ebdc;
+  scrollbar-color: #879b80 #183537;
 }
 .prologue-story p + p {
   margin-top: 20px;
 }
 .prologue-story .prologue-last {
   margin-top: 28px;
-  color: #7b5130;
+  color: #e6d5a2;
 }
 .prologue-footer {
   grid-column: 2;
@@ -1003,21 +1004,21 @@ kbd {
   justify-content: space-between;
   gap: 20px;
   padding-top: 20px;
-  border-top: 1px solid #6e8a6940;
+  border-top: 1px solid #bdc4a844;
 }
 .prologue-footer > span {
   font-size: 11px;
   letter-spacing: 2px;
 }
 .prologue-footer .primary-button {
-  color: #f6f2dc;
-  background: #365b49;
-  border-color: #365b49;
-  box-shadow: inset 0 0 0 3px #cbd6ba38;
+  color: #f0e3b3;
+  background: #35534c;
+  border-color: #97aa82;
+  box-shadow: inset 0 0 0 3px #cbd6ba28;
   white-space: nowrap;
 }
 .prologue-footer .primary-button:hover {
-  background: #244c3c;
+  background: #426358;
 }
 @media (max-width: 650px) {
   .prologue-scene {
@@ -1027,7 +1028,7 @@ kbd {
     padding: 76px 30px 30px;
   }
   .prologue-scene::before {
-    background: linear-gradient(#f2f3e43b, #f2f3e4e8 40%, #f2f3e4f5);
+    background: linear-gradient(#102a2c55, #102a2ce8 40%, #102a2cf5);
   }
   .prologue-scene::after {
     inset: 12px;
@@ -4996,4 +4997,373 @@ body.journey-complete:not(.in-game) {
   width: min(300px, 85%);
   text-align: center;
   line-height: 2.5;
+}
+
+.chronicle-entrance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 24px;
+  padding: 24px 28px;
+  border: 1px solid #9eaa7655;
+  background: #173e32d9;
+}
+.chronicle-entrance strong,
+.chronicle-power > strong {
+  display: block;
+  font-size: 34px;
+  color: #e6d69b;
+  font-weight: 500;
+}
+.chronicle-entrance small,
+.chronicle-entrance p {
+  color: #b6c4b0;
+  line-height: 1.9;
+}
+.chronicle-power {
+  padding: 22px;
+  border: 1px solid #b6bf8e55;
+  background: #254a3c;
+}
+.chronicle-power p,
+.chronicle-power details {
+  font-size: 13px;
+  line-height: 1.9;
+  color: #c0ccb9;
+}
+.chronicle-power summary {
+  cursor: pointer;
+  margin-top: 16px;
+  color: #e6d69b;
+}
+.chronicle-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 16px;
+  font-size: 13px;
+}
+.chronicle-achievements {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.chronicle-achievements article {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid #77937b55;
+  color: #a4b6a4;
+  font-size: 13px;
+}
+.chronicle-achievements .achieved {
+  border-color: #c2b97888;
+  background: #b9b57612;
+  color: #e1d5a1;
+}
+.chronicle-achievements small {
+  color: #a4b6a4;
+}
+.chronicle-timeline {
+  list-style: none;
+  padding: 0;
+}
+.chronicle-timeline li {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid #77937b44;
+}
+.chronicle-timeline time {
+  color: #d7ce99;
+  font-size: 13px;
+}
+.chronicle-timeline h4 {
+  margin: 0 0 7px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.chronicle-timeline p {
+  color: #b6c4b0;
+  font-size: 13px;
+  line-height: 1.9;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 650px) {
+  .chronicle-entrance {
+    flex-wrap: wrap;
+    padding: 20px;
+    gap: 16px;
+  }
+  .chronicle-entrance p {
+    flex: 1;
+    min-width: 140px;
+    font-size: 13px;
+  }
+  .chronicle-entrance > button {
+    width: 100%;
+  }
+  .chronicle-achievements {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .chronicle-timeline li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+}
+
+/* 仅真仙首页进入云海；渡劫和此前的首页、战斗、弹窗保持原主题。 */
+.immortal-home #ui {
+  --gold: #735b2e;
+  --jade: #356451;
+  --muted: #4f6b5e;
+  --border: #476b5338;
+  color: #244a3e;
+  background:
+    linear-gradient(100deg, #f0f5e6c9, #eef5e69e 52%, #f4f5e8c7),
+    url('/assets/qinglan-prologue.webp') center / cover fixed;
+}
+.immortal-home .screen-grain {
+  opacity: 0.02;
+}
+.immortal-home .lobby-header {
+  border-bottom: 1px solid #52725b33;
+  background: #eff4e73b;
+}
+.immortal-home .lobby-main {
+  max-width: 1400px;
+}
+.immortal-home #ui :is(.nav-link, .brand small, .currency, .eyebrow) {
+  color: #4f6b5e;
+}
+.immortal-home #ui :is(.nav-link.active, .currency b, .element-affinity) {
+  color: #355844;
+}
+.immortal-home
+  #ui
+  :is(
+    .stage-card strong,
+    .section-heading h2,
+    .loadout-preview button,
+    .difficulty-switch button small
+  ) {
+  color: #244a3e;
+  text-shadow: none;
+}
+.immortal-home .journey-lobby .journey-hero {
+  min-height: 470px;
+  padding: 58px 4%;
+  margin-top: 12px;
+  border: 0;
+  background: radial-gradient(ellipse at 76% 43%, #ffffff70, #f2f5e210 43%, transparent 65%);
+}
+.immortal-home .journey-hero::after {
+  display: none;
+}
+.immortal-home .journey-lobby .journey-hero h1 {
+  font-size: clamp(38px, 4vw, 62px);
+  line-height: 1.5;
+  color: #244b3f;
+  text-shadow: 0 2px 20px #f8f9e5;
+}
+.immortal-home .journey-hero h1 span {
+  color: #476f59;
+}
+.immortal-home .journey-hero .hero-copy > p {
+  color: #45634e;
+  font-size: 14px;
+  line-height: 2.2;
+}
+.immortal-home .journey-portrait {
+  height: 355px;
+}
+.immortal-home .journey-orbit {
+  width: 265px;
+  height: 265px;
+  border-color: #7c956265;
+  background: radial-gradient(circle, #ffffefaa, #ffffff15 63%, transparent 72%);
+  box-shadow:
+    0 0 0 14px #ffffe820,
+    0 0 0 15px #7c956237;
+}
+.immortal-home .journey-character {
+  width: 174px;
+  height: 232px;
+  top: 15px;
+}
+.immortal-home .journey-realm strong {
+  color: #315947;
+  font-size: 32px;
+}
+.immortal-home .journey-realm :is(small, span),
+.immortal-home .journey-poem {
+  color: #526e53;
+}
+.immortal-home .journey-orbit::before,
+.immortal-home .journey-orbit::after {
+  color: #8a7135;
+}
+.immortal-home .journey-badges span {
+  border: 0;
+  border-bottom: 1px solid #5b79534f;
+  color: #5a704b;
+  background: transparent;
+  padding: 5px 0;
+  margin-right: 14px;
+}
+.immortal-home .journey-records {
+  border: 0;
+  border-top: 1px solid #52725b44;
+  border-bottom: 1px solid #52725b44;
+  background: #ffffff16;
+  padding: 26px 0;
+}
+.immortal-home .journey-records strong {
+  color: #315947;
+}
+.immortal-home .journey-records :is(span, small, em) {
+  color: #526e53;
+}
+.immortal-home :is(.chronicle-entrance, .spirit-root-summary, .lifespan-summary, .mortal-entrance) {
+  border: 0;
+  border-bottom: 1px solid #52725b33;
+  background: linear-gradient(95deg, #f8faed52, #ffffff12);
+  padding: 26px 24px;
+}
+.immortal-home .chronicle-entrance strong {
+  color: #315947;
+}
+.immortal-home
+  :is(
+    .chronicle-entrance p,
+    .chronicle-entrance small,
+    .spirit-root-summary p,
+    .spirit-root-summary small,
+    .lifespan-summary small
+  ) {
+  color: #4f6b5e;
+}
+.immortal-home :is(.spirit-root-summary b, .lifespan-summary strong) {
+  color: #315947;
+}
+.immortal-home .expedition {
+  border-top-color: #52725b44;
+}
+.immortal-home .stage-card {
+  border-color: #52725b44;
+  color: #315947;
+  background: #f5f8e530;
+}
+.immortal-home .journey-lobby .stage-card::before {
+  background-image: linear-gradient(110deg, #edf4e5c9, #eef6e2b3), var(--stage-image);
+}
+.immortal-home .journey-lobby .stage-card.selected {
+  border-color: #587b57;
+}
+.immortal-home .journey-lobby .stage-card.selected::before {
+  background-image: linear-gradient(110deg, #d3e4cec9, #dfeac8a8), var(--stage-image);
+}
+.immortal-home
+  :is(
+    .stage-top,
+    .stage-bottom,
+    .stage-description,
+    .loadout-preview,
+    .path-card span,
+    .path-selection > small,
+    .field-label,
+    .control-hint,
+    .lobby-footer
+  ) {
+  color: #4f6b5e;
+}
+.immortal-home .stage-ornament {
+  color: #52725b18;
+}
+.immortal-home .path-card {
+  border-color: #52725b44;
+  background: #f4f7e844;
+}
+.immortal-home .path-card strong {
+  color: #385f46;
+}
+.immortal-home .path-card.active {
+  border-color: #628255;
+  box-shadow: none;
+  background: #d8e7cc70;
+}
+.immortal-home #ui .secondary-button,
+.immortal-home #ui .round-button {
+  color: #315947;
+  border-color: #52725b66;
+  background: #f5f8e650;
+}
+.immortal-home #ui .primary-button {
+  color: #f5f3dc;
+  background: #3c6352;
+  border-color: #3c6352;
+  box-shadow: inset 0 0 0 3px #f2efd038;
+}
+.immortal-home #ui button:not(:disabled):hover {
+  color: #173e2d;
+  background-color: #d9e8ce;
+}
+.immortal-home #ui .primary-button:hover {
+  color: #ffffe6;
+  background: #2d5543;
+}
+.immortal-home .difficulty-switch {
+  border-color: #52725b55;
+}
+.immortal-home .difficulty-switch button {
+  color: #4f6b5e;
+}
+.immortal-home .difficulty-switch .active {
+  color: #244a3e;
+  background: #cddfc26b;
+}
+.immortal-home .resume-banner {
+  background: #e9f0db99;
+  border-color: #52725b55;
+}
+.immortal-home .resume-banner small {
+  color: #4f6b5e;
+}
+.immortal-home .lobby-footer {
+  background: #f4f6e533;
+  border-top-color: #52725b33;
+}
+@media (max-width: 650px) {
+  .immortal-home .journey-lobby .journey-hero {
+    min-height: 0;
+    padding: 26px 4px 32px;
+  }
+  .immortal-home .journey-lobby .journey-hero h1 {
+    font-size: 29px;
+  }
+  .immortal-home .journey-hero .hero-copy > p {
+    font-size: 12px;
+  }
+  .immortal-home .journey-portrait {
+    height: 145px;
+  }
+  .immortal-home .journey-orbit {
+    width: 95px;
+    height: 95px;
+  }
+  .immortal-home .journey-character {
+    width: 75px;
+    height: 100px;
+    top: 1px;
+  }
+  .immortal-home .journey-realm strong {
+    font-size: 16px;
+  }
+  .immortal-home
+    :is(.chronicle-entrance, .spirit-root-summary, .lifespan-summary, .mortal-entrance) {
+    padding: 22px 14px;
+  }
 }

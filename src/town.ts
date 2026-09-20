@@ -3,17 +3,27 @@ export const TOWN_WIDTH = 3600;
 export const TOWN_HEIGHT = 2500;
 export const TOWN_START = { x: 1740, y: 1250 };
 export const TOWN_NPCS = [
-  { id: 'herbs', name: '药铺先生', place: '百草堂', x: 1120, y: 650, art: 0 },
-  { id: 'tea', name: '茶馆掌柜', place: '听雨茶馆', x: 2080, y: 650, art: 1 },
-  { id: 'escort', name: '镖局教头', place: '青岚镖局', x: 580, y: 1250, art: 2 },
-  { id: 'market', name: '坊市货商', place: '灵材坊市', x: 2310, y: 1250, art: 3 },
-  { id: 'smith', name: '铁匠', place: '街头匠人', x: 1120, y: 1850, art: 4 },
-  { id: 'scholar', name: '书生', place: '访学游人', x: 1440, y: 650, art: 5 },
-  { id: 'fisher', name: '渔夫', place: '青岚码头', x: 3070, y: 1250, art: 6 },
-  { id: 'farmer', name: '农人', place: '赶集镇民', x: 2810, y: 1850, art: 7 },
-  { id: 'tailor', name: '裁缝', place: '布衣手艺人', x: 2810, y: 650, art: 8 },
+  { id: 'herbs', role: '药铺先生', place: '百草堂', x: 1120, y: 650, art: 0 },
+  { id: 'tea', role: '茶馆掌柜', place: '听雨茶馆', x: 2080, y: 650, art: 1 },
+  { id: 'escort', role: '镖局教头', place: '青岚镖局', x: 580, y: 1250, art: 2 },
+  { id: 'market', role: '坊市货商', place: '灵材坊市', x: 2310, y: 1250, art: 3 },
+  { id: 'smith', role: '铁匠', place: '街头匠人', x: 1120, y: 1850, art: 4 },
+  { id: 'scholar', role: '书生', place: '访学游人', x: 1440, y: 650, art: 5 },
+  { id: 'fisher', role: '渔夫', place: '青岚码头', x: 3070, y: 1250, art: 6 },
+  { id: 'farmer', role: '农人', place: '赶集镇民', x: 2810, y: 1850, art: 7 },
+  { id: 'tailor', role: '裁缝', place: '布衣手艺人', x: 2810, y: 650, art: 8 },
+  ...[650, 1250, 1850].flatMap((y, row) =>
+    [300, 900, 1800, 2750].map((x, col) => ({
+      id: `villager-${row * 4 + col}` as const,
+      role: ['街坊', '赶路村民', '邻里乡亲', '赶集村民'][col],
+      place: ['北街', '河畔长街', '南街'][row],
+      x,
+      y: y + 35,
+      art: (row * 3 + col) % 9,
+    })),
+  ),
 ] as const;
-export type TownNpc = (typeof TOWN_NPCS)[number];
+export type TownNpc = Omit<(typeof TOWN_NPCS)[number], 'x' | 'y'> & TownPoint;
 // 地图由可复用图集和坐标摆放构成；扩建时同步增加街道与建筑坐标。
 export const TOWN_STREETS = [
   [725, 100, 915, 2400],
@@ -66,12 +76,21 @@ export function moveInTown(position: TownPoint, input: TownPoint, seconds: numbe
   if (townWalkable({ x: next.x, y: next.y + input.y * distance })) next.y += input.y * distance;
   return next;
 }
-export function nearbyTownNpc(position: TownPoint) {
-  return TOWN_NPCS.filter((npc) => Math.hypot(npc.x - position.x, npc.y - position.y) <= 115).sort(
-    (a, b) =>
-      Math.hypot(a.x - position.x, a.y - position.y) -
-      Math.hypot(b.x - position.x, b.y - position.y),
-  )[0];
+export function townNpcPosition(npc: TownNpc, seconds = 0): TownPoint {
+  if (!npc.id.startsWith('villager-')) return { x: npc.x, y: npc.y };
+  const index = Number(npc.id.slice('villager-'.length));
+  return { x: npc.x + Math.sin(seconds / (5 + (index % 4)) + index) * 100, y: npc.y };
+}
+export function nearbyTownNpc(
+  position: TownPoint,
+  seconds?: number,
+  npcs: readonly TownNpc[] = TOWN_NPCS,
+) {
+  const distance = (npc: TownNpc) => {
+    const point = seconds === undefined ? npc : townNpcPosition(npc, seconds);
+    return Math.hypot(point.x - position.x, point.y - position.y);
+  };
+  return npcs.filter((npc) => distance(npc) <= 115).sort((a, b) => distance(a) - distance(b))[0];
 }
 export function townClockRunning(
   inTown: boolean,

@@ -40,7 +40,7 @@ test('第七境未通关时超额修为也不能开启十阶精研', () => {
   s.cultivation = 1e9;
   joinSect(s, 'power');
   s.mortal.mastery.power = 9;
-  assert.equal(studyPlan(s).requiredRealm, '渡劫');
+  assert.equal(studyPlan(s).requiredRealm, '真仙');
   assert.equal(startActivity(s, 'study'), false);
   s.completed = [6];
   assert.equal(startActivity(s, 'study'), true);

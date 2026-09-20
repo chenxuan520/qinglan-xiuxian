@@ -96,7 +96,7 @@ test('旧快照保留总伤害，新统计从续局后累计；拒绝不合法�
   assert.equal(Game.restore(g.save, { ...old, damageBySource: { sword: 81 } }), null);
 });
 
-test('每局最多复活十次，满血三秒无敌，保留敌人、法宝与时间，刷新不重置次数', () => {
+test('每局最多复活一次，满血三秒无敌，保留敌人、法宝与时间，刷新不重置次数', () => {
   const g = create();
   assert.equal(g.revive(), false);
   g.weapons[0].timer = 999;
@@ -109,6 +109,7 @@ test('每局最多复活十次，满血三秒无敌，保留敌人、法宝与�
   assert.equal(death.state, 'lost');
   assert.equal(death.player.hp, 0);
   assert.equal(death.revive(), true);
+  assert.equal(death.revive(), false, '同一次死亡不能重复复活');
   assert.equal(death.player.hp, death.player.maxHp);
   assert.equal(death.player.invincible, 3);
   assert.equal(death.time, before.time);
@@ -116,27 +117,38 @@ test('每局最多复活十次，满血三秒无敌，保留敌人、法宝与�
   assert.deepEqual(death.weapons, before.weapons);
   death.hurtPlayer(1e6);
   assert.equal(death.player.hp, death.player.maxHp);
-  let again = Game.restore(death.save, death.snapshot())!;
+  const again = Game.restore(death.save, death.snapshot())!;
   again.resume();
   again.player.invincible = 0;
   again.hurtPlayer(1e6);
   again.update(0.01);
   assert.equal(again.state, 'lost');
-  for (let used = 1; used < 10; used++) {
-    assert.equal(again.revivesUsed, used);
-    assert.equal(again.revive(), true);
-    assert.equal(again.revive(), false, '同一次死亡不能重复复活');
-    again = Game.restore(again.save, JSON.parse(JSON.stringify(again.snapshot())))!;
-    assert.equal(again.revivesUsed, used + 1);
-    again.resume();
-    again.player.invincible = 0;
-    again.hurtPlayer(1e6);
-    again.update(0.01);
-  }
-  assert.equal(again.revivesUsed, 10);
+  assert.equal(again.revivesUsed, 1);
   assert.equal(again.revive(), false);
+  const refreshed = Game.restore(again.save, JSON.parse(JSON.stringify(again.snapshot())))!;
+  assert.equal(refreshed.revivesUsed, 1);
+  assert.equal(refreshed.revive(), false);
   for (const invalid of [-1, 0.5, 11, Infinity, '1'])
     assert.equal(Game.restore(g.save, { ...before, revivesUsed: invalid }), null);
+});
+
+test('旧版已复活多次的续局仍可读取，但不再获得复活机会', () => {
+  const g = create();
+  g.time = 30;
+  for (const used of [1, 2, 9, 10]) {
+    for (const state of ['playing', 'lost']) {
+      const snapshot = JSON.parse(JSON.stringify(g.snapshot()));
+      snapshot.revivesUsed = used;
+      snapshot.state = state;
+      if (state === 'lost') snapshot.player.hp = 0;
+      const restored = Game.restore(g.save, snapshot)!;
+      assert.ok(restored);
+      assert.equal(restored.revivesUsed, used);
+      assert.equal(restored.time, 30);
+      assert.deepEqual(restored.weapons, g.weapons);
+      assert.equal(restored.revive(), false);
+    }
+  }
 });
 
 test('Boss 经验至少三十只本关最强精英，永久突破奖励高于小怪且只入账一次', () => {

@@ -9,6 +9,7 @@ import {
 import { Game } from './game.ts';
 import { parseSave, type SaveData } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
+import { validChronicle } from './chronicle.ts';
 
 export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -66,7 +67,8 @@ export function importSave(text: string) {
   if (
     !record(data) ||
     data.version !== 1 ||
-    (data.mortal !== undefined && !validMortal(data.mortal)) ||
+    (data.chronicle !== undefined && !validChronicle(data.chronicle, Number(data.age ?? 15))) ||
+    (data.mortal !== undefined && !validMortal(data.mortal, Number(data.age ?? 15))) ||
     (data.lifespanBonus !== undefined && !integer(data.lifespanBonus)) ||
     (data.tribulations !== undefined && !integer(data.tribulations)) ||
     (data.nextTribulationAge !== undefined &&

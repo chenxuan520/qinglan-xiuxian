@@ -7,6 +7,7 @@ import {
   townWalkable,
   nearbyTownNpc,
   townClockRunning,
+  townNpcPosition,
 } from '../src/town.ts';
 
 test('只有载入完成、前台有焦点的城镇场景且无弹窗才计时', () => {
@@ -31,8 +32,9 @@ test('城镇移动归一化且不穿墙，长帧不会跨过建筑', () => {
   assert.deepEqual(moveInTown({ x: 1630, y: 2310 }, { x: -1, y: 0 }, 100), { x: 1630, y: 2310 });
   assert.deepEqual(moveInTown(TOWN_START, { x: 0, y: 0 }, 1), TOWN_START);
 });
-test('九位镇民均在可达街巷，远处不触发，走近可触发对应事件', () => {
-  assert.equal(nearbyTownNpc(TOWN_START), undefined);
+test('九位职业镇民与十二位村民均在可达街巷，走近可触发对应交谈', () => {
+  assert.equal(TOWN_NPCS.length, 21);
+  assert.equal(nearbyTownNpc({ x: 1740, y: 2350 }), undefined);
   for (const npc of TOWN_NPCS) {
     assert.ok(townWalkable(npc));
     assert.equal(nearbyTownNpc(npc)?.id, npc.id);
@@ -48,5 +50,18 @@ test('九位镇民均在可达街巷，远处不触发，走近可触发对应�
       }
     }
     assert.equal(nearbyTownNpc(p)?.id, npc.id);
+  }
+});
+
+test('十二位村民沿街行走，交谈判定跟随当前位置，职业镇民驻留原地', () => {
+  const villagers = TOWN_NPCS.filter((npc) => npc.id.startsWith('villager-'));
+  assert.equal(villagers.length, 12);
+  for (const npc of TOWN_NPCS) {
+    for (const seconds of [0, 5, 10, 30, 100]) {
+      const point = townNpcPosition(npc, seconds);
+      assert.ok(townWalkable(point));
+      assert.equal(nearbyTownNpc(point, seconds)?.id, npc.id);
+      if (!npc.id.startsWith('villager-')) assert.deepEqual(point, { x: npc.x, y: npc.y });
+    }
   }
 });

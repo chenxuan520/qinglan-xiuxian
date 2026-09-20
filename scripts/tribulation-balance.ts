@@ -1,7 +1,7 @@
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 import { autoplayInput } from '../src/autoplay.ts';
-// 满阶根基、十阶炼器、六件觉醒法宝；每次天劫允许用尽十次复活。
+// 满阶根基、十阶炼器、六件觉醒法宝；每次天劫最多使用一次广告复活。
 const results = [];
 for (let round = 1; round <= 5; round++)
   for (const initial of [41, 82, 123, 164, 205, 246, 287, 328, 369]) {

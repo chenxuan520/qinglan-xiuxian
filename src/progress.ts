@@ -19,6 +19,13 @@ import {
 } from './data.ts';
 import type { CultivationPath, SpiritRootId, ElementId } from './data.ts';
 import { freshMortal, validMortal, SECTS, MAX_SECT_DUES, type MortalState } from './mortal-data.ts';
+import {
+  freshChronicle,
+  restoreChronicle,
+  recordChronicle,
+  realmTitle,
+  type Chronicle,
+} from './chronicle.ts';
 
 export interface SaveData {
   version: 1;
@@ -48,6 +55,7 @@ export interface SaveData {
   nextTribulationAge: number;
   tribulationReturn: unknown | null;
   mortal: MortalState;
+  chronicle: Chronicle;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 export function freshSave(
@@ -57,6 +65,7 @@ export function freshSave(
   return {
     version: 1,
     mortal: freshMortal(),
+    chronicle: freshChronicle(),
     age: 15,
     lifespanBonus: 0,
     tribulations: 0,
@@ -95,10 +104,10 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
-    if (validMortal(s.mortal)) base.mortal = s.mortal;
+    if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
+    if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
     if (base.mortal.member)
       base.mortal.member.dues = Math.min(base.mortal.member.dues, MAX_SECT_DUES);
-    if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     base.lifespanBonus = int(s.lifespanBonus);
     base.tribulations = int(s.tribulations);
     if (typeof s.nextTribulationAge === 'number' && Number.isFinite(s.nextTribulationAge))
@@ -155,6 +164,8 @@ export function parseSave(raw: string | null, random: () => number = Math.random
       !allowsSchool(base.path, treasure(base.starter).school)
     )
       base.starter = rootStarter(base.rootElements, base.path);
+    const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
+    restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
     syncTribulationClock(base);
     return base;
   } catch {
@@ -184,15 +195,21 @@ export function realmInfo(cultivation: number, finalTrialCleared = false) {
     remaining -= realmCost(step);
     step++;
   }
+  const ascending = step === 23 && !finalTrialCleared && remaining >= realmCost(step);
   return {
     step,
     index: Math.floor(step / 3),
     name:
-      step === 24 ? '渡劫' : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
+      step === 24
+        ? REALMS[8]
+        : ascending
+          ? '渡劫'
+          : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
     progress: remaining,
     needed: realmCost(step),
     max: step === 24,
     locked: step === 23 && !finalTrialCleared,
+    ascending,
   };
 }
 export const realmCost = (step: number) => Math.round(90 * 1.28 ** step);
@@ -232,6 +249,12 @@ export function completeTribulation(save: SaveData, round: number) {
   if (!tribulationDue(save) || round !== save.tribulations + 1) return false;
   save.tribulations = round;
   save.nextTribulationAge += TRIBULATION_INTERVAL;
+  recordChronicle(
+    save,
+    `踏破第 ${round} 次天劫`,
+    '雷霆散尽，道心仍在。',
+    round === 1 ? 'tribulation' : undefined,
+  );
   return true;
 }
 export const trainingYears = (save: SaveData) =>
@@ -287,7 +310,20 @@ export function retreat(save: SaveData, requested: number, random: () => number 
     chance > 0
       ? Math.floor((budget * (minPercent + (maxPercent - minPercent) * random())) / 100)
       : 0;
-  save.cultivation += cultivation;
+  recordChronicle(
+    save,
+    '闭关出关',
+    `闭关 ${years.toFixed(1)} 年，修为 +${cultivation}。${
+      Object.entries(gains)
+        .filter(([, amount]) => amount > 0)
+        .map(
+          ([key, amount]) =>
+            `${({ vitality: '气血', power: '法宝伤害', speed: '移速' } as Record<string, string>)[key]} +${amount}%`,
+        )
+        .join('、') || '根基未有额外感悟。'
+    }`,
+  );
+  gainCultivation(save, cultivation);
   syncTribulationClock(save);
   return { years, gains, cultivation, cultivationPercent: (cultivation / budget) * 100 };
 }
@@ -306,14 +342,37 @@ export function bossCultivationReward(stage: number, bossStage = stage) {
     ),
   );
 }
+const REALM_HP_BONUSES = [0, 45, 95, 155, 225, 310, 415, 545];
+const REALM_DAMAGE_BONUSES = [0, 35, 75, 125, 185, 260, 355, 475];
 export function realmBonuses(step: number): { hp: number; damage: number } {
   if (step >= 24) {
     const previous = realmBonuses(23);
-    return { hp: previous.hp + 100, damage: previous.damage + 0.5 };
+    return { hp: previous.hp + 200, damage: previous.damage };
   }
   const major = Math.floor(step / 3);
   const minor = step - major;
-  return { hp: major * 45 + minor * 3, damage: (major * 35 + minor * 2.5) / 100 };
+  // 大境界累计收益；后期突破的增量随境界提高，避免被已有加成稀释。
+  const hp = REALM_HP_BONUSES[major];
+  const damage = REALM_DAMAGE_BONUSES[major];
+  return { hp: hp + minor * 3, damage: (damage + minor * 2.5) / 100 };
+}
+export const realmDamageMultiplier = (step: number) => (step >= 24 ? 2 : 1);
+function recordRealmChange(save: SaveData, before: ReturnType<typeof realmInfo>) {
+  const after = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
+  for (let step = before.step + 1; step <= after.step; step++)
+    recordChronicle(
+      save,
+      `突破 · ${realmTitle(step)}`,
+      step === 24 ? '七境皆破，渡劫功成，证得真仙。' : '修为凝成新境，气血与法宝威力提升。',
+      `realm-${step}`,
+    );
+  if (!before.ascending && after.ascending)
+    recordChronicle(save, '渡劫待成仙', '修为已足，尚待踏破第七境。', 'ascension');
+}
+export function gainCultivation(save: SaveData, amount: number) {
+  const before = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
+  save.cultivation += amount;
+  recordRealmChange(save, before);
 }
 export function cultivationReward(
   run: {
@@ -332,6 +391,9 @@ export function cultivationReward(
   );
 }
 export const trainingCost = (level: number) => Math.round(45 * 1.42 ** level);
+const FORGE_DAMAGE_BONUSES = [0, 8, 16, 24, 32, 40, 52, 68, 88, 114, 150];
+export const forgeDamageBonus = (level: number) =>
+  FORGE_DAMAGE_BONUSES[Math.min(MAX_FORGE_LEVEL, Math.max(0, Math.floor(level)))] / 100;
 export const forgeCost = (level: number) => {
   const advanced = Math.max(0, level - 4) ** 2;
   return { iron: 3 + level * 3 + advanced * 12, stones: 35 + level * 45 + advanced * 180 };
@@ -350,6 +412,11 @@ export function train(save: SaveData, kind: keyof SaveData['training']) {
   save.stones -= cost;
   save.age += years;
   save.training[kind]++;
+  recordChronicle(
+    save,
+    '修习根基',
+    `${{ vitality: '锻体', power: '悟道', speed: '身法' }[kind]}修至 ${save.training[kind]} 阶，耗时 ${years} 年。`,
+  );
   return true;
 }
 export function forge(save: SaveData, id: string) {
@@ -360,6 +427,9 @@ export function forge(save: SaveData, id: string) {
   save.stones -= cost.stones;
   save.iron -= cost.iron;
   save.forge[id] = level + 1;
+  recordChronicle(save, '炼器有成', `${treasure(id).name}炼器至 ${level + 1} 阶。`);
+  if (level + 1 === MAX_FORGE_LEVEL)
+    recordChronicle(save, '炉火纯青', '首次将法宝炼至十阶。', 'forge');
   return true;
 }
 export function dropArtifacts(save: SaveData, random: () => number) {
@@ -378,6 +448,10 @@ export function claimArtifacts(save: SaveData) {
   const claimed = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
   save.artifacts.push(...claimed);
   save.artifactDrops = [];
+  if (claimed.length)
+    recordChronicle(save, '妖王遗宝', `收藏${claimed.map((id) => treasure(id).name).join('、')}。`);
+  if (save.artifacts.length >= TREASURES.length)
+    recordChronicle(save, '万宝归藏', '三十六件法宝尽入珍藏。', 'collection');
   return claimed;
 }
 export function settleRun(
@@ -411,12 +485,20 @@ export function settleRun(
   };
   save.stones += rewards.stones;
   save.iron += rewards.iron;
-  save.cultivation += rewards.cultivationRemaining;
+  gainCultivation(save, rewards.cultivationRemaining);
   save.runs++;
   save.bestKills = Math.max(save.bestKills, run.kills);
   if (run.victory) {
+    const before = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
     save.unlocked = Math.max(save.unlocked, Math.min(STAGES.length - 1, run.stage + 1));
     if (!save.completed.includes(run.stage)) save.completed.push(run.stage);
+    recordChronicle(
+      save,
+      `踏破 · ${STAGES[run.stage].name}`,
+      `击败${STAGES[run.stage].boss}，首次通关此境。`,
+      `stage-${run.stage}`,
+    );
+    recordRealmChange(save, before);
   }
   syncTribulationClock(save);
   return rewards;
