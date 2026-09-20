@@ -49,7 +49,7 @@ npm run format:check
 - 新图片生成后运行 `python3 scripts/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。
 - 动态素材 URL 使用 `assetUrl()`，兼容 GitHub Pages 子路径。新增素材先生成并检查，再接入。法宝图标沿用统一图集，避免混用图片和 SVG。
 - 背景音乐在首次真实点击或按键后启动，与音效共用总音量和静音；只创建一个播放实例，不在渲染循环中创建音源。保留用户静音偏好，音乐加载不得阻塞开局。生成方法见 [素材说明](docs/assets.md)。
-- README 保持简短，只放封面、Cloudflare 主入口、核心特色和开发入口；详细玩法同步 [玩法详解](docs/gameplay.md) 和游戏内指南，部署细节维护 [开发与部署](docs/development.md)。实际验证记录写入 [docs/verification.md](docs/verification.md)，不要把预计结果写成已通过。
+- README 保持简短，只放封面、唯一官网 `https://xiuxian.011203.xyz/`、核心特色和开发入口；详细玩法同步 [玩法详解](docs/gameplay.md) 和游戏内指南，部署细节维护 [开发与部署](docs/development.md)。实际验证记录写入 [docs/verification.md](docs/verification.md)，不要把预计结果写成已通过。
 
 ## 本机 5173 安全更新
 
@@ -72,16 +72,16 @@ PY
 
 执行各步前确认上一步成功。如果新增 `assets/` 外的公共文件，也需先复制。可先把新入口另存为 `dist/__verify-<任务>.html`，用 MCP 隔离页面验证，通过后切换正式入口并清理自己的验证入口。旧页面继续使用旧资源，新打开或用户自行刷新才使用新版本。
 
-## GitHub Pages 发布（备用站）
+## GitHub Pages 发布（平台部署）
 
 - 仓库：<https://github.com/chenxuan520/qinglan-xiuxian>。
-- 备用地址：<https://chenxuan520.github.io/qinglan-xiuxian/>。README 和仓库网站栏以 Cloudflare 为主入口。
+- 平台部署地址：<https://chenxuan520.github.io/qinglan-xiuxian/>，仅供部署检查。README 和仓库网站栏只放唯一官网 <https://xiuxian.011203.xyz/>。
 - `.github/workflows/pages.yml` 在 push `master` 后自动检查格式、测试、按仓库子路径构建并发布；也支持手动触发。仓库 Pages 来源为 GitHub Actions。
 - 经用户授权提交后，`git push origin master`，再用 `gh run list` / `gh run view <run-id>` 检查这次提交的部署结果。发布后用 MCP 确认新入口、资源与关键交互，不能只以 push 成功作为发布完成。
 
 ## Cloudflare Pages 发布（主站）
 
-- 项目名 `qinglan-xiuxian`，生产分支 `master`，正式地址 <https://qinglan-xiuxian.pages.dev/>。
+- 项目名 `qinglan-xiuxian`，生产分支 `master`，唯一官网 <https://xiuxian.011203.xyz/>。所有面向玩家的链接只使用官网域名。NPC Worker 的 `ALLOWED_ORIGINS` 必须包含官网来源，域名变更需同步配置并验证浏览器预检和实际对话。
 - `wrangler.jsonc` 管理配置；独立构建目录为 `artifacts/cloudflare`，使用根路径 `/`，不会覆盖本机 `dist`。
 - 已有项目无需重新创建。优先使用环境中的 `CLOUDFLARE_API_TOKEN`，或用 `npx wrangler login` 登录；`npx wrangler whoami` 检查身份。不得把令牌写入仓库、日志或文档。
 

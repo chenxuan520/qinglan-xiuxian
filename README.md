@@ -4,7 +4,7 @@
 
 > 山河未老，故人先秋。此去青岚，愿你历尽千劫，仍记得为何出发。
 
-**[立即游玩 · Cloudflare 主站](https://qinglan-xiuxian.pages.dev/)** · [GitHub Pages 备用入口](https://chenxuan520.github.io/qinglan-xiuxian/)
+**[立即游玩 · 官方网站](https://xiuxian.011203.xyz/)**
 
 一款修仙题材的 Web 幸存者游戏。操控走位，法宝自动攻敌，从炼气一路问道长生。
 

@@ -15,7 +15,7 @@
     },
   ],
   "vars": {
-    "ALLOWED_ORIGINS": "https://qinglan-xiuxian.pages.dev,https://chenxuan520.github.io",
+    "ALLOWED_ORIGINS": "https://xiuxian.011203.xyz,https://chenxuan520.github.io",
   },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 },
 }
