@@ -24,7 +24,7 @@ function quietGame(stage = 0) {
   return g;
 }
 
-test('各境寿元符合设定，大乘与渡劫无限，突破保留年岁与广告借寿', () => {
+test('各境寿元符合设定，大乘与真仙无限，突破保留年岁与广告借寿', () => {
   assert.deepEqual(REALM_LIFESPANS, [100, 250, 500, 1000, 2000, 5000, 10000, Infinity, Infinity]);
   const save = freshSave();
   save.age = 20;

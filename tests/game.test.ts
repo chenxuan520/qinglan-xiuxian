@@ -160,21 +160,27 @@ test('死亡会结算失败，回血不会复活已结束的一局', () => {
   assert.equal(game.time, time);
   assert.equal(game.player.hp, 0);
 });
-test('前八境三阶段逐级突破，渡劫只有一个境界并封顶', () => {
+test('前八境三阶段逐级突破，真仙只有一个境界并封顶', () => {
   assert.equal(realmInfo(0).name, '炼气初期');
   assert.equal(realmInfo(realmCost(0)).name, '炼气中期');
   const toFoundation = realmCost(0) + realmCost(1) + realmCost(2);
   assert.equal(realmInfo(toFoundation).name, '筑基初期');
-  assert.equal(realmInfo(1e9, true).name, '渡劫');
+  assert.equal(realmInfo(1e9, true).name, '真仙');
   assert.ok(realmInfo(1e9, true).max);
   const threshold = Array.from({ length: 24 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
   assert.equal(realmInfo(threshold - 1, true).name, '大乘后期');
-  assert.equal(realmInfo(threshold, true).name, '渡劫');
+  assert.equal(realmInfo(threshold - 1, false).name, '大乘后期');
+  assert.equal(realmInfo(threshold - 1, false).ascending, false);
+  assert.equal(realmInfo(threshold, true).name, '真仙');
   assert.equal(realmInfo(threshold, true).step, 24);
   assert.equal(realmInfo(threshold, true).max, true);
-  assert.equal(realmInfo(threshold, false).name, '大乘后期');
+  assert.equal(realmInfo(threshold, false).name, '渡劫');
+  assert.equal(realmInfo(threshold, false).ascending, true);
+  assert.equal(realmInfo(threshold, false).step, 23);
+  assert.equal(realmInfo(threshold, false).index, 7);
+  assert.equal(realmInfo(threshold, false).max, false);
 });
-test('旧渡劫三阶段归为同一境界，保留修为与缺血，重复续局不重复增加属性', () => {
+test('旧渡劫三阶段归为真仙境界，保留修为与缺血，重复续局不重复增加属性', () => {
   for (const oldStep of [24, 25, 26]) {
     const save = freshSave();
     save.completed = [6];
@@ -188,18 +194,34 @@ test('旧渡劫三阶段归为同一境界，保留修为与缺血，重复续�
     old.player.hp = old.player.maxHp - 37;
     const restored = Game.restore(save, old)!;
     assert.equal(restored.realm, 24);
-    assert.equal(restored.player.maxHp, 563);
-    assert.equal(restored.player.hp, 526);
-    assert.ok(Math.abs(restored.stats.damage - 4.35) < 1e-8);
+    assert.equal(restored.player.maxHp, 893);
+    assert.equal(restored.player.hp, 856);
+    assert.ok(Math.abs(restored.stats.damage - 12.3) < 1e-8);
     const again = Game.restore(save, restored.snapshot())!;
-    assert.equal(again.player.hp, 526);
-    assert.equal(again.player.maxHp, 563);
+    assert.equal(again.player.hp, 856);
+    assert.equal(again.player.maxHp, 893);
     assert.equal(save.cultivation, cultivation);
     old.player.hp = 0;
     old.state = 'lost';
     assert.equal(Game.restore(save, old)!.player.hp, 0);
   }
 });
+test('旧末境加成升级为真仙，续局补齐上限且保留缺血，刷新不反复回血', () => {
+  const save = freshSave();
+  save.completed = [6];
+  save.cultivation = 1e9;
+  const old = new Game(save, 0, 0).snapshot();
+  old.player.maxHp = 563;
+  old.player.hp = 420;
+  const restored = Game.restore(save, old)!;
+  assert.equal(restored.player.maxHp, 893);
+  assert.equal(restored.player.hp, 750);
+  assert.ok(Math.abs(restored.stats.damage - 12.3) < 1e-8);
+  const again = Game.restore(save, restored.snapshot())!;
+  assert.equal(again.player.hp, 750);
+  assert.equal(again.stats.damage, restored.stats.damage);
+});
+
 test('斩妖和升级实时增加修为，突破立即提升气血与伤害', () => {
   const save = freshSave();
   save.cultivation = 80;
@@ -253,7 +275,9 @@ test('各难度实时修为保留小数累计，失败和通关结算只补差�
     }
   }
 });
-test('前七次大境界突破增加45气血与35%伤害，渡劫增加100气血与50%伤害', () => {
+test('大境界增量随境界提高，真仙独立翻倍，当局突破与新开局一致', () => {
+  const health = [45, 50, 60, 70, 85, 105, 130, 200];
+  const attacks = [0.35, 0.4, 0.5, 0.6, 0.75, 0.95, 1.2];
   let threshold = 0;
   for (let step = 1; step <= 26; step++) {
     threshold += realmCost(step - 1);
@@ -268,9 +292,11 @@ test('前七次大境界突破增加45气血与35%伤害，渡劫增加100气血
     const damage = game.stats.damage;
     const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
     game.hitEnemy(enemy, enemy.maxHp);
-    assert.equal(game.player.maxHp - maxHp, step === 24 ? 100 : 45);
-    assert.equal(game.player.hp - hp, step === 24 ? 100 : 45);
-    assert.ok(Math.abs(game.stats.damage - damage - (step === 24 ? 0.5 : 0.35)) < 1e-10);
+    assert.equal(game.player.maxHp - maxHp, health[step / 3 - 1]);
+    assert.equal(game.player.hp - hp, health[step / 3 - 1]);
+    assert.ok(
+      Math.abs(game.stats.damage - damage - (step === 24 ? damage : attacks[step / 3 - 1])) < 1e-10,
+    );
     assert.match(game.notice, /大境界突破/);
     const next = new Game(save, 0, 0, seeded());
     assert.equal(next.player.maxHp, game.player.maxHp);
@@ -291,17 +317,17 @@ test('旧版元婴对局补齐境界加成，保留已损失气血，重复读�
   legacy.player.hp = legacy.player.maxHp - 37;
   const restored = Game.restore(save, legacy)!;
   assert.ok(restored);
-  assert.equal(restored.player.maxHp, 357);
-  assert.equal(restored.player.hp, 320);
-  assert.equal(restored.stats.damage, 2.2);
+  assert.equal(restored.player.maxHp, 380);
+  assert.equal(restored.player.hp, 343);
+  assert.equal(restored.stats.damage, 2.4);
   const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
-  assert.equal(again.player.hp, 320);
-  assert.equal(again.player.maxHp, 357);
-  assert.equal(again.stats.damage, 2.2);
+  assert.equal(again.player.hp, 343);
+  assert.equal(again.player.maxHp, 380);
+  assert.equal(again.stats.damage, 2.4);
   again.state = 'upgrade';
   again.choices = [{ type: 'passive', id: 'guard', level: 3 }];
   again.choose(0);
-  assert.equal(again.player.maxHp, 380);
+  assert.equal(again.player.maxHp, 402);
 });
 test('通关奖励跨大境界后，下次开局获得完整加成且没有额外修为', () => {
   const save = freshSave();

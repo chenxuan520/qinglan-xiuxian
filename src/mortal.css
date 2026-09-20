@@ -228,6 +228,9 @@
   margin: 0 0 3px;
   font-size: 23px;
 }
+.town-hud > small {
+  display: block;
+}
 .town-scene small,
 .town-scene-controls p,
 #town-status span {
@@ -321,6 +324,15 @@
   background: url('/assets/town-buildings.webp') no-repeat;
   background-size: 300% 300%;
 }
+.town-vacant-lot {
+  position: absolute;
+  width: 235px;
+  height: 165px;
+  transform: translate(-50%, -100%);
+  border: 8px double #8b8b6888;
+  background: repeating-linear-gradient(15deg, #67734b66 0 18px, #75805b44 18px 20px);
+  box-shadow: inset 0 0 30px #384b3c88;
+}
 .town-prop {
   position: absolute;
   background: url('/assets/town-props.webp') no-repeat;
@@ -387,6 +399,89 @@
 .town-npc.nearby .town-npc-name {
   border-color: #efdd9e;
   background: #385339;
+}
+.npc-dialogue {
+  margin: 20px 0 28px;
+}
+.town-story {
+  border: 1px solid #c4b88266;
+  background: #183b31;
+  padding: 22px;
+  margin-top: 20px;
+}
+.town-story h3 {
+  color: var(--gold);
+  font-size: 23px;
+  margin: 12px 0;
+}
+.town-story p {
+  line-height: 1.9;
+}
+.town-story blockquote {
+  margin: 18px 0;
+  padding: 4px 0 4px 16px;
+  border-left: 2px solid #c4b882;
+  color: #ede2b9;
+  line-height: 1.9;
+}
+.story-choices {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+.story-choices button {
+  width: 100%;
+  white-space: normal;
+  padding: 14px;
+}
+.town-story small {
+  display: block;
+  color: #acbdac;
+  line-height: 1.7;
+}
+.npc-chat-log {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px 16px;
+  border: 1px solid #b9bc9255;
+  background: #102d2680;
+}
+.npc-chat-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.npc-chat-line strong {
+  display: block;
+  color: var(--gold);
+  font-size: 13px;
+}
+.npc-chat-line.user {
+  color: #a8c9bf;
+}
+.npc-chat-status {
+  display: block;
+  margin: 10px 0;
+  color: #a8bca6;
+}
+.npc-chat-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.npc-chat-form input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #b9bc9277;
+  background: #102d26;
+  color: #eee5c1;
+  padding: 12px;
+  font: inherit;
+  font-size: 16px;
+}
+.npc-chat-form button {
+  flex-shrink: 0;
+  padding: 10px 18px;
 }
 .town-loading {
   position: absolute;
@@ -769,22 +864,17 @@
   }
 }
 
-.town-citizen {
-  position: absolute;
-  width: 72px;
-  height: 72px;
-  pointer-events: none;
-  animation: town-stroll 22s ease-in-out infinite alternate;
+.town-villager {
+  width: 82px;
+  height: 82px;
 }
-@keyframes town-stroll {
-  0%,
-  12% {
-    transform: translate(-50%, -100%);
-  }
-  80%,
-  100% {
-    transform: translate(110px, -100%);
-  }
+.town-crowd {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 80px;
+  height: 80px;
+  pointer-events: none;
 }
 .town-smoke {
   position: absolute;
@@ -809,12 +899,10 @@
     transform: translate(28px, -65px) scale(1.6);
   }
 }
-.town-paused .town-citizen,
 .town-paused .town-smoke {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
-  .town-citizen,
   .town-smoke {
     animation: none;
   }

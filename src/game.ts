@@ -3,6 +3,7 @@ import {
   TREASURES,
   PASSIVES,
   STAGES,
+  STAGE_COMBAT_SCALING,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
@@ -39,12 +40,15 @@ import {
   cultivationReward,
   realmInfo,
   realmBonuses,
+  realmDamageMultiplier,
+  forgeDamageBonus,
   dropArtifacts,
   cultivationFactor,
   bossCultivationReward,
   extendLifespan,
   syncTribulationClock,
   tribulationDue,
+  gainCultivation,
 } from './progress.ts';
 import type { SaveData } from './progress.ts';
 
@@ -305,7 +309,8 @@ export class Game {
           this.passivePower('forbidden') * 0.06 +
           (this.path === 'demonic' ? 0.12 : 0)) *
         (1 + this.save.tribulations * 0.02) *
-        (1 + this.save.retreatBonus.power / 100),
+        (1 + this.save.retreatBonus.power / 100) *
+        realmDamageMultiplier(this.realm),
       cooldown: Math.max(
         0.3,
         1 -
@@ -361,7 +366,7 @@ export class Game {
     const earned = cultivationReward(this);
     const delta = earned - this.creditedCultivation;
     if (delta <= 0) return;
-    this.save.cultivation += delta;
+    gainCultivation(this.save, delta);
     syncTribulationClock(this.save);
     this.creditedCultivation = earned;
     const realm = realmInfo(this.save.cultivation, this.save.completed.includes(FINAL_TRIAL_STAGE));
@@ -656,7 +661,8 @@ export class Game {
         realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       const duration = STAGES[s.stage].minutes * 60;
-      const oldDuration = s.stageDuration ?? (g.isFinalTrial ? duration : duration + 120);
+      // 无时长标记的早期六境固定为 5–10 分钟，不随当前关卡调整。
+      const oldDuration = s.stageDuration ?? (g.isFinalTrial ? duration : (s.stage + 5) * 60);
       const timeScale = g.isFinalTrial ? 1 : duration / oldDuration;
       g.time = s.time * timeScale;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
@@ -720,9 +726,10 @@ export class Game {
       )
         return null;
       g.bossCultivation = s.bossCultivation ?? 0;
+      // 旧版可复活十次：保留续局已用次数，新版不补发复活机会。
       if (
         s.revivesUsed !== undefined &&
-        (!Number.isInteger(s.revivesUsed) || s.revivesUsed < 0 || s.revivesUsed > MAX_REVIVES)
+        (!Number.isInteger(s.revivesUsed) || s.revivesUsed < 0 || s.revivesUsed > 10)
       )
         return null;
       g.revivesUsed = s.revivesUsed ?? 0;
@@ -974,6 +981,7 @@ export class Game {
     const template = ENEMIES[type],
       angle = this.random() * TAU;
     const difficulty = DIFFICULTIES[this.difficulty];
+    const scaling = STAGE_COMBAT_SCALING[this.stage];
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     const strengthTime = this.isFinalTrial
       ? Math.min(this.time, STAGES[this.stage].minutes * 60)
@@ -991,8 +999,8 @@ export class Game {
       type,
       x: at?.x ?? this.player.x + Math.cos(angle) * (this.viewport.width / 2 + 70),
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
-      hp,
-      maxHp: hp,
+      hp: hp * scaling.hp,
+      maxHp: hp * scaling.hp,
       radius: boss
         ? bossStage === FINAL_TRIAL_STAGE
           ? 62
@@ -1015,6 +1023,7 @@ export class Game {
           : template.damage * (1 + this.stage * 0.12)) *
         (boss ? 1 : this.isFinalTrial ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
         difficulty.damage *
+        (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
         (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3),
       elite,
       boss,
@@ -1302,7 +1311,7 @@ export class Game {
       t.damage *
       (1 + (w.level - 1) * 0.32) *
       s.damage *
-      (1 + (this.save.forge[w.id] || 0) * 0.08) *
+      (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
       (w.evolved ? 1.8 : 1) *
       (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t));
     const a = target ? Math.atan2(target.y - p.y, target.x - p.x) : this.time;
@@ -1995,7 +2004,7 @@ export class Game {
           );
           this.announce(
             this.trialBossesDefeated === TRIAL_BOSS_STAGES.length
-              ? '七劫尽破 · 渡劫瓶颈解除'
+              ? '七劫尽破 · 成仙瓶颈解除'
               : `已破 ${this.trialBossesDefeated} / 7 劫 · 妖王灵气入体 · 遗宝已掉落`,
           );
         }

@@ -57,11 +57,11 @@ test('终关追击精英有冲刺；前六位首领三招，仙尊六招按顺�
   }
 });
 
-test('仙尊新增横扫、精英天兵与预警突进，基础伤害提高到二百二十', () => {
+test('仙尊新增横扫、精英天兵与预警突进，伤害随终关强度提高', () => {
   const g = trial();
   g.weapons = [];
   const boss = g.spawnEnemy(10, false, true, { x: 300, y: 0 }, 6);
-  assert.equal(boss.damage, 220 * 0.72);
+  assert.ok(Math.abs(boss.damage - 297 * 0.72) < 1e-8);
   boss.skillStep = 3;
   boss.cooldown = 0;
   g.update(0.01);
@@ -81,13 +81,14 @@ test('仙尊新增横扫、精英天兵与预警突进，基础伤害提高到�
   assert.equal(boss.x, x, '突进预警期间保持原地');
 });
 
-test('第七关未通关时修为再高也停在大乘，通关后才解除渡劫瓶颈', () => {
-  assert.equal(realmInfo(1e9, false).name, '大乘后期');
+test('修为达标但第七关未通关显示渡劫，通关后成为真仙并获得突破加成', () => {
+  assert.equal(realmInfo(1e9, false).name, '渡劫');
+  assert.equal(realmInfo(1e9, false).ascending, true);
   assert.equal(realmInfo(1e9, false).locked, true);
-  assert.equal(realmInfo(1e9, true).name, '渡劫');
+  assert.equal(realmInfo(1e9, true).name, '真仙');
   const g = trial();
   const before = g.save.cultivation;
-  assert.equal(g.player.maxHp, 463);
+  assert.equal(g.player.maxHp, 693);
   settleRun(g.save, {
     stage: 6,
     difficulty: 0,
@@ -97,7 +98,7 @@ test('第七关未通关时修为再高也停在大乘，通关后才解除渡�
     iron: 0,
     victory: false,
   });
-  assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '大乘后期');
+  assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '渡劫');
   assert.ok(g.save.cultivation > before);
   settleRun(g.save, {
     stage: 6,
@@ -108,8 +109,9 @@ test('第七关未通关时修为再高也停在大乘，通关后才解除渡�
     iron: 0,
     victory: true,
   });
-  assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '渡劫');
-  assert.equal(new Game(g.save, 6, 0).player.maxHp, 563);
+  assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '真仙');
+  assert.equal(realmInfo(g.save.cultivation, true).ascending, false);
+  assert.equal(new Game(g.save, 6, 0).player.maxHp, 893);
 });
 
 test('旧版已过第六关的存档自动解锁终关，已有修为不丢失', () => {

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "qinglan-npc-ai",
+  "main": "index.ts",
+  "compatibility_date": "2026-09-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [{ "pattern": "qinglan-npc-ai.011203.xyz", "custom_domain": true }],
+  "ai": { "binding": "AI" },
+  "ratelimits": [
+    {
+      "name": "NPC_LIMITER",
+      "namespace_id": "202609201",
+      "simple": { "limit": 12, "period": 60 },
+    },
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://qinglan-xiuxian.pages.dev,https://chenxuan520.github.io,http://localhost:5173,http://127.0.0.1:5173",
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

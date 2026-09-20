@@ -6,6 +6,7 @@ function seeded(seed: number) {
   return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
 }
 const results = [];
+const forgeLevel = process.argv.includes('--max-forge') ? 10 : 5;
 for (const step of [15, 18, 21, 23]) {
   for (const seed of [41, 82, 123]) {
     const save = freshSave();
@@ -17,7 +18,7 @@ for (const step of [15, 18, 21, 23]) {
     );
     save.training = { vitality: 10, power: 10, speed: 8 };
     save.forge = Object.fromEntries(
-      ['sword', 'orbit', 'lightning', 'pulse', 'fire', 'chain'].map((id) => [id, 5]),
+      ['sword', 'orbit', 'lightning', 'pulse', 'fire', 'chain'].map((id) => [id, forgeLevel]),
     );
     save.artifacts = [...new Set([...save.artifacts, ...Object.keys(save.forge)])];
     const g = new Game(save, 6, 0, seeded(seed));
@@ -44,6 +45,7 @@ for (const step of [15, 18, 21, 23]) {
       realm: startingRealm,
       endRealm: realmInfo(save.cultivation).name,
       seed,
+      forgeLevel,
       state: g.state,
       seconds: Math.round(g.time),
       kings: g.trialBossesDefeated,
@@ -58,5 +60,5 @@ for (const step of [15, 18, 21, 23]) {
 }
 console.table(results);
 console.log(
-  '相同根基（10/10/8）、六件常用法宝五阶、兼修新局，固定种子 AI。仅比较境界收益，不代表真人胜率。',
+  `相同根基（10/10/8）、六件常用法宝 ${forgeLevel} 阶、兼修新局，固定种子 AI。仅比较成长收益，不代表真人胜率。`,
 );

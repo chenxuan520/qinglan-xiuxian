@@ -282,7 +282,8 @@ test('前六境各有十二种独立妖物，普通怪、精英和召唤物不�
     }
     const elites = new Game(freshSave(), stage, 0, seeded());
     elites.weapons = [];
-    for (const time of [60, 120, 180]) {
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const time = STAGES[stage].minutes * 60 * fraction;
       elites.time = time;
       elites.nextElite = time;
       elites.enemies = [];

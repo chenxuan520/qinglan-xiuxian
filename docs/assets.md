@@ -2,9 +2,11 @@
 
 ## 山河一梦 · 序章与 README 封面（2026-09-20）
 
-项目路径：`public/assets/qinglan-prologue.webp`。内置 imagegen 先生成青岚镇、竹海、云山与仙门的全景图，再按反馈将暮色改成明亮晨光：青绿群峰、金色霞光、白色云海与仙鹤。最终为 1672 × 941 RGB，保持原尺寸，WebP quality=76、method=6；2,843,572 字节 PNG 压缩至 249,902 字节（减少 91.2%）。项目只使用最终晨曦版，原始工具输出保留在生成目录。
+亮版路径：`public/assets/qinglan-prologue.webp`，保留给 README。内置 imagegen 先生成青岚镇、竹海、云山与仙门的全景图，再按反馈将暮色改成明亮晨光：青绿群峰、金色霞光、白色云海与仙鹤。1672 × 941 RGB，保持原尺寸，WebP quality=76、method=6；2,843,572 字节 PNG 压缩至 249,902 字节（减少 91.2%）。
 
-首访在场景加载进度条中一并预载，加载完成后展示序章；已读存档不再加载该背景。序章叠加浅色渐变以衬托墨绿色正文，README 使用同一张完整背景。
+暗版路径：`public/assets/qinglan-prologue-dark.webp`，用于游戏序章。以亮版为底图，用内置 imagegen 编辑为青蓝暮色与暖色灯火，保留原有构图。1672 × 941 RGB，同样使用 quality=76、method=6，2,717,911 字节 PNG 压缩至 212,726 字节（减少 92.2%）。两版均保留，原始工具输出留在生成目录，不作为网页下载资源。
+
+首访在场景加载进度条中预载暗版，加载完成后展示序章；已读存档不再加载该背景。序章使用深青渐变、浅色正文与淡金标题；游戏不同时下载亮版，README 继续展示完整晨光版。
 
 初始生成提示词：
 
@@ -12,10 +14,16 @@
 Use case: stylized-concept. Create an original wide panoramic background painting for the Chinese xianxia game Qinglan Xian Tu, shared by its poetic prologue screen and README cover. Landscape 16:9 composition, highest available quality. Beautiful sophisticated hand-painted Chinese blue-green shanshui fantasy illustration, delicate atmospheric brushwork, mineral jade, deep teal and ink blue, restrained warm amber lamps. Foreground lower left: a lived-in ancient riverside town, clusters of black tiled timber houses, little bridges, warmly glowing windows, fishing boats with lanterns reflected in dark calm water, tiny human silhouettes conveying mortal life. A winding river and bamboo groves lead into immense layers of misty mountains, a distant graceful immortal temple gate perched on a high peak in the left-center, slender waterfalls dissolving into a luminous sea of cloud. A very small lone robed traveler on the nearest bridge, no large character. Blue hour just after sunset, thin crescent moon, quiet longing, human warmth amid vast mountains, a sense of embarking on an uncertain immortal journey. Architectural and mountain detail concentrated in the left half and lower third, the upper right half should be quieter deep teal sky and elegant mist with low visual contrast so overlaid prose will remain readable. It must also be a gorgeous coherent standalone landscape without text. Layered painterly detail, cinematic atmospheric depth, Chinese traditional architecture, no European castles. NO lettering, NO title, NO logos, NO watermark, NO borders, NO interface, NO panels, NO collage.
 ```
 
-最终编辑提示词（以上一版图片为参考）：
+晨光版编辑提示词（以上一版图片为参考）：
 
 ```text
 Edit this landscape for the Chinese xianxia cultivation game 青岚仙途. The user says this picture is too dark and does not feel like immortal cultivation fantasy. Make a substantial daylight lighting and color revision, preserving the panoramic composition, riverside mortal town on the lower left, arched bridge and boats, bamboo groves, layered mountains, distant immortal temple gates, waterfalls and sea of clouds. Replace dark blue-hour night with luminous early-morning peach-gold sunshine, soft pale jade and emerald blue-green mountain colors, bright ivory mist and airy pearl-white cloud sea, subtly glowing golden immortal temple gates, shafts of warm sunlight from the upper right. Remove the night moon and stars. Make the river clear luminous celadon turquoise with gentle golden reflections; town roofs warm grey teal, houses visible and welcoming, lanterns secondary in daylight. Strong feeling of a magnificent Chinese xianxia immortal realm with heavenly mist, soaring peaks, ethereal light and delicate small white cranes far above the clouds. Refined hand-painted Chinese blue-green shanshui fantasy painting, elegant tranquil wonder, generous atmospheric depth; bright and clear rather than moody or dark. Keep enough pale clean sky and gentle low-contrast mist on the right half to overlay dark green poetic text. Overall midtones and shadows should be markedly brighter; no blackened corners, no heavy dark vignette. Beautiful coherent standalone illustration. NO text, no title, no logos, no watermark, no UI, no borders. Landscape wide 16:9.
+```
+
+暮色版编辑提示词（以保留的晨光版为参考）：
+
+```text
+Use case: lighting-weather. Edit the provided panoramic Chinese xianxia painting into an elegant dusk / blue-hour variant for a poetic game prologue. Preserve the exact landscape composition, the riverside town and fishing boats at lower left, bridge, bamboo, immense green peaks, distant immortal gate, delicate waterfalls and mist, tiny human figures, detailed hand-painted illustration style, and wide landscape aspect ratio. Change only time-of-day lighting and palette: deep but luminous jade and ink-teal mountains, soft silver-blue evening mist, a muted blue dusk sky instead of bright sunrise; small warm amber windows and lanterns reflect in the river. Retain clear and beautiful architectural and landscape details, a serene hopeful immortal atmosphere and visible layers of cloud. The right half should be low-contrast dark teal mist suitable behind pale prose. Remove harsh white sunshine and bright golden sunrays. No large moon, no pitch-black crushed shadows, no horror atmosphere, no purple neon, no text, no interface, no borders or watermarks. This must look like the same painting at dusk, not a different town.
 ```
 
 ## 网页素材压缩与场景加载（2026-09-20）

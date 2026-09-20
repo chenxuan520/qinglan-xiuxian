@@ -61,7 +61,7 @@ test('炼器前五阶保持旧价，后五阶两种材料费用加速递增，�
   }
 });
 
-test('十阶炼器实际攻击伤害增加百分之八十，旧五阶存档仍保留原加成', () => {
+test('十阶炼器实际攻击伤害增加百分之一百五十，旧五阶存档仍保留原加成', () => {
   const damage = (level: number) => {
     const save = parseSave(JSON.stringify({ ...freshSave(), forge: { sword: level } }));
     const game = new Game(save, 0, 0, () => 0.5);
@@ -70,7 +70,7 @@ test('十阶炼器实际攻击伤害增加百分之八十，旧五阶存档仍�
     return game.shots.find((shot) => shot.kind === 'sword')!.damage;
   };
   assert.ok(Math.abs(damage(5) / damage(0) - 1.4) < 1e-10);
-  assert.ok(Math.abs(damage(10) / damage(0) - 1.8) < 1e-10);
+  assert.ok(Math.abs(damage(10) / damage(0) - 2.5) < 1e-10);
 });
 
 test('音量保存与旧档兼容，零音量和最大音量均有效，越界值被限制', () => {
