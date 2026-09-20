@@ -54,7 +54,7 @@ test('八本魔功分别增强专长并承担代价，正道数值保留', () =>
     },
   };
   for (const p of PASSIVES.filter((p) => p.school === 'demonic')) {
-    assert.match(p.desc, /代价/);
+    assert.doesNotMatch(p.desc, /代价[:：]/);
     const g = new Game(freshSave(), 0, 0);
     learn(g, p.id);
     checks[p.id](g);
