@@ -84,7 +84,7 @@ export function freshSave(
     artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[rootElements[0] ?? 'metal']])],
     artifactDrops: [],
     starter: rootStarter(rootElements, 'dual'),
-    sound: true,
+    sound: false,
     volume: 0.6,
     autoplay: false,
     prologueSeen: false,

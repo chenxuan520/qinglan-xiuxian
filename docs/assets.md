@@ -83,7 +83,7 @@ Use case: stylized-concept. Asset type: one production-ready transparent PNG arc
 python3 scripts/generate-music.py
 ```
 
-生成使用固定随机种子，临时 WAV 自动清理。运行和部署直接使用已提交的 M4A 文件，不需要 Python 或音频编码器。浏览器首次真实点击 / 按键后才启动播放，音乐和战斗音效共用总音量与静音，旧档静音设置保留。
+生成使用固定随机种子，临时 WAV 自动清理。运行和部署直接使用已提交的 M4A 文件，不需要 Python 或音频编码器。每次进入页面先静音，序章右上角和主界面提供开启声音按钮；普通点击 / 按键不触发播放。音乐和战斗音效共用总音量与静音，保留音量，导入存档不自动打开声音。
 
 ## 最终首领：九天执劫仙尊（2026-09-19）
 
