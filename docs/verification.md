@@ -1,5 +1,12 @@
 # 验证记录
 
+## README 精简与 Cloudflare 主站同步（2026-09-20）
+
+- README 从 234 行缩至 31 行，保留封面、主入口、四项特色和简短启动命令。详细规则迁入 `docs/gameplay.md`，开发与部署迁入 `docs/development.md`；相对链接和封面路径检查通过，格式及 diff 空白检查通过。本次仅调整文档，不改游戏逻辑，未重复运行本地战斗测试。
+- README、GitHub 仓库网站栏、开发指南与 AGENTS.md 均明确 Cloudflare 为主站、GitHub Pages 为备用。主站地址为 `https://qinglan-xiuxian.pages.dev/`。
+- 通过项目发布命令完成类型检查、独立目录构建和 Cloudflare 上传，部署地址 `https://15490a51.qinglan-xiuxian.pages.dev`。发布的是已验证的 `a920e9c` 游戏代码，未提交部分仅为此次文档整理。
+- Chrome DevTools MCP 隔离页面确认 Cloudflare 正式域名加载 `index-DT2-ROqn.js`，序章与首境九张 WebP 均返回 200；进入首页、开局与暂停正常，控制台无 error / warn。没有改动或刷新玩家页面，5173 服务和产物保持不变。
+
 ## GitHub 发布前检查与仓库信息（2026-09-20）
 
 - 汇总城镇扩建、压缩素材与预载、成长属性调整、晨曦背景及序章的当前版本；重新运行 189 项测试、TypeScript 检查、GitHub Pages 子路径生产构建、Prettier 和 diff 空白检查，全部通过。独立构建目录为 `/tmp/qinglan-github-release`，未覆盖正在服务的 5173。
