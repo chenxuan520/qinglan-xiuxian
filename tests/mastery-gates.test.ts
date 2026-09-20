@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, parseSave, realmCost } from '../src/progress.ts';
-import { advanceMortal, joinSect, masteryBonus, startActivity, studyPlan } from '../src/mortal.ts';
+import {
+  advanceMortal,
+  joinSect,
+  masteryBonus,
+  startActivity,
+  resolveActivity,
+  studyPlan,
+} from '../src/mortal.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { Game } from '../src/game.ts';
 
@@ -28,7 +35,8 @@ test('十阶精研逐级检查境界，修为差一点也不能扣费或开始�
     assert.equal(startActivity(s, 'study'), true);
     assert.equal(s.stones, stones - plan.stones);
     assert.equal(s.cultivation, cultivationAt(step));
-    advanceMortal(s, plan.years * 60);
+    assert.equal(s.age, 15 + plan.years);
+    assert.equal(s.mortal.activity, null);
     assert.equal(s.mortal.mastery.power, index + 1);
     assert.equal(startActivity(s, 'study'), false);
   }
@@ -68,7 +76,7 @@ test('旧高阶成果保留但按境界限制实际加成，突破恢复；导�
   }
 });
 
-test('旧档未达门槛的进行中研习暂停，入城仍计龄，突破后保留进度继续且不再收费', () => {
+test('旧档未达门槛的进行中研习暂停，入城仍计龄，突破后立即结算剩余年岁且不再收费', () => {
   const s = freshSave();
   s.stones = 10000;
   s.cultivation = cultivationAt(2);
@@ -82,7 +90,8 @@ test('旧档未达门槛的进行中研习暂停，入城仍计龄，突破后�
   assert.equal(restored.mortal.mastery.power, 1);
   assert.equal(restored.age, s.age + 1);
   restored.cultivation = cultivationAt(3);
-  advanceMortal(restored, 30);
+  assert.equal(resolveActivity(restored), true);
+  assert.equal(restored.age, s.age + 1.5);
   assert.equal(restored.mortal.activity, null);
   assert.equal(restored.mortal.mastery.power, 2);
   assert.equal(restored.stones, stones);

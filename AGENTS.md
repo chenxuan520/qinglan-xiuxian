@@ -47,6 +47,7 @@ npm run format:check
 - 视觉及交互改动需用真实页面验证，桌面和手机布局都要检查。开发模式可用 `window.__qinglan`；生产构建没有此入口。
 - 存档键为 `qinglan-immortal-v1`。兼容旧档，保留玩家进度，注意永久结算不能重复入账。测试使用隔离存档，禁止清空用户真实 localStorage。
 - 新图片生成后运行 `python3 scripts/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。
+- 人间研习、委托等主动操作直接消耗游戏年岁并结算，禁止让玩家等待现实倒计时；沿用寿尽、天劫、供奉边界，旧任务只结算剩余部分。城镇闲逛保留前台计时。
 - 动态素材 URL 使用 `assetUrl()`，兼容 GitHub Pages 子路径。新增素材先生成并检查，再接入。法宝图标沿用统一图集，避免混用图片和 SVG。
 - 背景音乐在首次真实点击或按键后启动，与音效共用总音量和静音；只创建一个播放实例，不在渲染循环中创建音源。保留用户静音偏好，音乐加载不得阻塞开局。生成方法见 [素材说明](docs/assets.md)。
 - README 保持简短，只放封面、唯一官网 `https://xiuxian.011203.xyz/`、核心特色和开发入口；详细玩法同步 [玩法详解](docs/gameplay.md) 和游戏内指南，部署细节维护 [开发与部署](docs/development.md)。实际验证记录写入 [docs/verification.md](docs/verification.md)，不要把预计结果写成已通过。

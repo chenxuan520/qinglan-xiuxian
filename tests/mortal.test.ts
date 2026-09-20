@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshSave, parseSave, realmCost, realmBonuses } from '../src/progress.ts';
+import {
+  freshSave,
+  parseSave,
+  realmCost,
+  realmBonuses,
+  extendLifespan,
+  completeTribulation,
+} from '../src/progress.ts';
 import { SECTS, SECT_DUES, MAX_MASTERY } from '../src/mortal-data.ts';
 import {
   advanceMortal,
@@ -15,6 +22,7 @@ import {
   tradeIron,
   sectDuesPending,
   settleSectDues,
+  resolveActivity,
 } from '../src/mortal.ts';
 import { PASSIVES, SPIRIT_ROOTS, treasure, evolutionPassives } from '../src/data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
@@ -71,9 +79,9 @@ test('入门费随资质变化，天灵根最低；只能加入一个宗门', ()
 test('供奉在边界准时扣除；不足暂停待补缴，放弃才清退', () => {
   const s = wealthy();
   joinSect(s, 'power');
-  s.stones = 80;
+  s.stones = 50;
   advanceMortal(s, 1199);
-  assert.equal(s.stones, 80);
+  assert.equal(s.stones, 50);
   advanceMortal(s, 1);
   assert.equal(s.stones, 0);
   assert.equal(s.mortal.member?.dueAt, 40);
@@ -88,19 +96,19 @@ test('境界越高供奉间隔越长，金额递增至上限；突破不修改�
   joinSect(s, 'power');
   s.cultivation = Array.from({ length: 6 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
   assert.deepEqual(sectDues(s), SECT_DUES[2]);
-  assert.equal(s.mortal.member?.dues, 80);
+  assert.equal(s.mortal.member?.dues, 50);
   const before = s.stones;
   advanceMortal(s, 1200);
-  assert.equal(s.stones, before - 80);
-  assert.equal(s.mortal.member?.dues, 450);
+  assert.equal(s.stones, before - 50);
+  assert.equal(s.mortal.member?.dues, 150);
   assert.equal(s.mortal.member?.dueAt, 120);
   for (let i = 1; i < SECT_DUES.length - 1; i++) {
     assert.ok(SECT_DUES[i].years >= SECT_DUES[i - 1].years);
     assert.ok(SECT_DUES[i].stones >= SECT_DUES[i - 1].stones);
   }
 });
-test('供奉单次最多一千，低境界原价、缴费间隔及真仙免供奉保留', () => {
-  const amounts = [80, 200, 450, 1000, 1000, 1000, 1000, 1000, 0];
+test('供奉按境界递进且最多五百，缴费间隔及真仙免供奉保留', () => {
+  const amounts = [50, 100, 150, 200, 300, 400, 450, 500, 0];
   const years = [20, 50, 100, 200, 400, 1000, 2000, 5000, 0];
   for (let realm = 0; realm < amounts.length; realm++) {
     const s = wealthy();
@@ -124,7 +132,7 @@ test('旧档和导入的未缴高额供奉立即封顶，不改变到期日或�
     startActivity(s, 'study');
     s.mortal.years = 4999;
     const expected = structuredClone(s.mortal);
-    expected.member!.dues = Math.min(dues, 1000);
+    expected.member!.dues = Math.min(dues, 500);
     for (const restored of [parseSave(JSON.stringify(s)), importSave(exportSave(s, null)).save]) {
       assert.deepEqual(restored.mortal, expected);
       assert.equal(restored.stones, s.stones);
@@ -133,8 +141,8 @@ test('旧档和导入的未缴高额供奉立即封顶，不改变到期日或�
     }
   }
 });
-test('旧高额账单结算最多扣一千，按封顶后的金额判断余额不足', () => {
-  for (const stones of [999, 1000, 1200]) {
+test('旧高额账单结算最多扣五百，按封顶后的金额判断余额不足', () => {
+  for (const stones of [499, 500, 700]) {
     const s = wealthy();
     s.cultivation = 1e9;
     joinSect(s, 'power');
@@ -142,41 +150,44 @@ test('旧高额账单结算最多扣一千，按封顶后的金额判断余额�
     s.mortal.years = 4999;
     s.stones = stones;
     advanceMortal(s, 60);
-    if (stones < 1000) {
+    if (stones < 500) {
       assert.equal(sectDuesPending(s), true);
       settleSectDues(s, true);
       assert.equal(s.mortal.member, null);
       assert.equal(s.stones, stones);
     } else {
-      assert.equal(s.stones, stones - 1000);
+      assert.equal(s.stones, stones - 500);
       assert.equal(s.mortal.member?.id, 'power');
       assert.equal(s.mortal.member?.dueAt, 10000);
-      assert.equal(s.mortal.member?.dues, 1000);
+      assert.equal(s.mortal.member?.dues, 500);
     }
   }
 });
-test('研习需成员身份，耗时完成才升级；新局自动获得本门一重功法', () => {
+test('研习需成员身份，立即扣灵石与年岁并升级；新局自动获得本门一重功法', () => {
   const s = wealthy(2);
   assert.equal(startActivity(s, 'study'), false);
   joinSect(s, 'power');
-  startActivity(s, 'study');
-  advanceMortal(s, 59);
-  assert.equal(s.mortal.mastery.power, undefined);
-  advanceMortal(s, 1);
+  const stones = s.stones;
+  assert.equal(startActivity(s, 'study'), true);
+  assert.equal(s.stones, stones - 30);
+  near(s.age, 16);
+  near(s.mortal.years, 1);
   assert.equal(s.mortal.mastery.power, 1);
   assert.equal(s.mortal.activity, null);
   assert.deepEqual(new Game(s, 0, 0).passives, { power: 1 });
   s.mortal.mastery.power = MAX_MASTERY;
   assert.equal(startActivity(s, 'study'), false);
 });
-test('低资质精研更慢；离开与读档不丢失进行中的研习', () => {
+test('低资质精研消耗更多年岁，立即完成且读档不重复扣除', () => {
   const s = wealthy(2);
   joinSect(s, 'power');
   const fast = studyPlan(s).years;
   s.spiritRoot = 'none';
   assert.ok(studyPlan(s).years > fast);
+  const years = studyPlan(s).years;
   startActivity(s, 'study');
-  advanceMortal(s, 30);
+  near(s.age, 15 + years);
+  assert.equal(s.mortal.activity, null);
   assert.deepEqual(parseSave(JSON.stringify(s)).mortal, s.mortal);
 });
 test('退宗保留精研，只有当前宗门加成；重新入宗恢复', () => {
@@ -195,9 +206,8 @@ test('同刻欠费先暂停精研结算，放弃补缴不发放成果', () => {
   const s = wealthy(2);
   joinSect(s, 'power');
   advanceMortal(s, 1140);
+  s.stones = studyPlan(s).stones;
   startActivity(s, 'study');
-  s.stones = 0;
-  advanceMortal(s, 60);
   assert.equal(sectDuesPending(s), true);
   assert.equal(s.mortal.mastery.power, undefined);
   settleSectDues(s, true);
@@ -206,28 +216,27 @@ test('同刻欠费先暂停精研结算，放弃补缴不发放成果', () => {
   assert.equal(s.mortal.mastery.power, undefined);
 });
 test('欠费状态可读档，广告物资不足时可分次补足，补缴只扣一次并完成同刻精研', () => {
-  const s = wealthy(2);
+  const s = wealthy(21);
   joinSect(s, 'power');
-  advanceMortal(s, 1140);
+  s.mortal.years = 4999;
+  s.stones = studyPlan(s).stones;
+  s.mortal.member!.dues = 500;
   startActivity(s, 'study');
-  s.stones = 0;
-  s.mortal.member!.dues = 1000;
-  advanceMortal(s, 600);
   assert.equal(sectDuesPending(s), true);
-  assert.equal(s.mortal.years, 20);
+  assert.equal(s.mortal.years, 5000);
   const restored = importSave(exportSave(s, null)).save;
   const age = restored.age;
   advanceMortal(restored, 600);
   assert.equal(restored.age, age);
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 1; i++) {
     restored.stones += 300;
     assert.equal(settleSectDues(restored), false);
   }
   restored.stones += 300;
   assert.equal(settleSectDues(restored), true);
-  assert.equal(restored.stones, 200);
+  assert.equal(restored.stones, 100);
   assert.equal(restored.mortal.member!.id, 'power');
-  assert.equal(restored.mortal.member!.dueAt, 40);
+  assert.equal(restored.mortal.member!.dueAt, 10000);
   assert.equal(restored.mortal.mastery.power, 1);
   assert.equal(restored.mortal.activity, null);
   assert.equal(settleSectDues(restored), false);
@@ -254,7 +263,8 @@ test('寿尽和天劫准确截停人间时间，不能继续工作', () => {
 test('委托收入只领取一次，坊市不能无成本套利，茶馆不是高效资源来源', () => {
   const s = freshSave();
   startActivity(s, 'escort');
-  advanceMortal(s, 120);
+  near(s.age, 17);
+  assert.equal(s.mortal.activity, null);
   assert.equal(s.stones, 40);
   assert.equal(s.iron, 1);
   advanceMortal(s, 60);
@@ -262,19 +272,16 @@ test('委托收入只领取一次，坊市不能无成本套利，茶馆不是�
   tradeIron(s, true);
   tradeIron(s, false);
   assert.equal(s.stones, 22);
-  startActivity(s, 'tea');
-  advanceMortal(s, 30, () => 0.9);
+  startActivity(s, 'tea', () => 0.9);
   assert.equal(s.stones, 22);
 });
-test('听书原有机缘在半载委托完成时判定，30% 边界与一次结算保留', () => {
+test('听书立即消耗半载并判定机缘，30% 边界与一次结算保留', () => {
   for (const roll of [0, 0.299999, 0.3, 0.9]) {
     const s = freshSave();
-    assert.equal(startActivity(s, 'tea'), true);
-    assert.equal(startActivity(s, 'tea'), false);
-    advanceMortal(s, 29, () => roll);
-    assert.equal(s.stones, 0);
-    assert.equal(s.mortal.activity?.kind, 'tea');
-    advanceMortal(s, 1, () => roll);
+    assert.equal(
+      startActivity(s, 'tea', () => roll),
+      true,
+    );
     assert.equal(s.stones, roll < 0.3 ? 8 : 0);
     assert.equal(s.mortal.activity, null);
     near(s.age, 15.5);
@@ -283,6 +290,52 @@ test('听书原有机缘在半载委托完成时判定，30% 边界与一次结�
     assert.equal(s.iron, 0);
     assert.equal(s.cultivation, 0);
   }
+});
+
+test('旧研习和委托立即结算剩余年岁，不重复收费或领取收益', () => {
+  for (const kind of ['study', 'herbs', 'escort', 'tea'] as const) {
+    const s = wealthy(2);
+    joinSect(s, 'power');
+    const stones = s.stones;
+    s.mortal.activity = {
+      kind,
+      remaining: 0.25,
+      total: 1,
+      sect: kind === 'study' ? 'power' : null,
+    };
+    assert.equal(
+      resolveActivity(s, () => 0),
+      true,
+    );
+    near(s.age, 15.25);
+    near(s.mortal.years, 0.25);
+    assert.equal(s.mortal.activity, null);
+    assert.equal(s.stones, stones + { study: 0, herbs: 18, escort: 40, tea: 8 }[kind]);
+    if (kind === 'study') assert.equal(s.mortal.mastery.power, 1);
+    assert.equal(resolveActivity(s), false);
+    const restored = importSave(exportSave(s, null)).save;
+    assert.equal(resolveActivity(restored), false);
+    assert.deepEqual(restored, parseSave(JSON.stringify(s)));
+  }
+});
+
+test('即时委托遇供奉不足截停，补缴后立即完成剩余年岁且不能透支报酬', () => {
+  const s = wealthy();
+  joinSect(s, 'power');
+  s.mortal.years = 19.5;
+  s.age = 34.5;
+  s.stones = 0;
+  assert.equal(startActivity(s, 'escort'), true);
+  near(s.age, 35);
+  near(s.mortal.activity!.remaining, 1.5);
+  assert.equal(s.stones, 0);
+  s.stones = 50;
+  assert.equal(settleSectDues(s), true);
+  near(s.age, 36.5);
+  near(s.mortal.years, 21.5);
+  assert.equal(s.mortal.activity, null);
+  assert.equal(s.stones, 40);
+  assert.equal(s.iron, 1);
 });
 test('精研增强正向功法效果，保留原魔道代价与局内等级', () => {
   const s = wealthy(24);
@@ -487,4 +540,47 @@ test('九大境界对应宗门职务，真仙前不能成为开宗老祖，退�
   assert.equal(sectRole(s), '散修');
   joinSect(s, 'blood');
   assert.equal(sectRole(s), '开宗老祖');
+});
+
+test('旧账单按各境界新供奉降价，低于新标准的旧账单不涨价', () => {
+  for (let realm = 0; realm < SECT_DUES.length; realm++) {
+    for (const previous of [20, 30000]) {
+      const s = wealthy(realm * 3);
+      joinSect(s, 'power');
+      s.mortal.member!.dues = previous;
+      const restored = parseSave(JSON.stringify(s));
+      assert.equal(restored.mortal.member!.dues, Math.min(previous, SECT_DUES[realm].stones));
+      assert.equal(restored.mortal.member!.dueAt, s.mortal.member!.dueAt);
+    }
+  }
+});
+
+test('即时办事遇寿尽或天劫只消耗至边界，处理后立即完成且不重复发奖', () => {
+  const s = freshSave();
+  s.age = 99.5;
+  startActivity(s, 'herbs');
+  assert.equal(s.age, 100);
+  assert.equal(s.mortal.activity?.remaining, 0.5);
+  assert.equal(s.stones, 0);
+  assert.equal(resolveActivity(s), false);
+  extendLifespan(s);
+  assert.equal(resolveActivity(s), true);
+  assert.equal(s.age, 100.5);
+  assert.equal(s.stones, 18);
+  assert.equal(resolveActivity(s), false);
+  const t = wealthy(21);
+  t.nextTribulationAge = 20000;
+  t.age = 19999.5;
+  const stones = t.stones;
+  startActivity(t, 'escort');
+  assert.equal(t.age, 20000);
+  assert.equal(t.mortal.activity?.remaining, 1.5);
+  assert.equal(t.stones, stones);
+  assert.equal(resolveActivity(t), false);
+  assert.equal(completeTribulation(t, 1), true);
+  assert.equal(resolveActivity(t), true);
+  assert.equal(t.age, 20001.5);
+  assert.equal(t.stones, stones + 40);
+  assert.equal(t.iron, 1);
+  assert.equal(resolveActivity(t), false);
 });

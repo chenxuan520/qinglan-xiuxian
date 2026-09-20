@@ -1,4 +1,4 @@
-import { treasure, evolutionPassives } from './data.ts';
+import { treasure, evolutionPassives, MAX_WEAPON_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
 
 const favored = [
@@ -20,6 +20,21 @@ function choiceScore(c: Choice, g: Game) {
   if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
   if (c.type === 'weapon')
     return (favored.includes(c.id) ? 15 : 10) + (c.level > 1 ? 8 : 2) + c.level;
+  // 满重法宝只差这一重功法便能觉醒时，先补齐；其他选技继续沿用原评分。
+  if (
+    c.level === 3 &&
+    g.passives[c.id] === 2 &&
+    g.weapons.some((w) => {
+      const required = evolutionPassives(treasure(w.id), g.path);
+      return (
+        !w.evolved &&
+        w.level === MAX_WEAPON_LEVEL &&
+        required.includes(c.id) &&
+        !required.some((id) => (g.passives[id] || 0) >= 3)
+      );
+    })
+  )
+    return 50;
   const needed = g.weapons.some(
     (w) => evolutionPassives(treasure(w.id), g.path).includes(c.id) && !w.evolved,
   );

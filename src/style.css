@@ -4205,40 +4205,6 @@ body:not(.in-game) #ui {
   }
 }
 
-.artifact-loot {
-  margin: 22px 0;
-  padding: 18px;
-  border: 1px solid #c8cd9855;
-  background: #12382e;
-}
-.artifact-loot h3 {
-  color: #e3d6a0;
-  margin: 0 0 14px;
-  font-size: 18px;
-}
-.artifact-loot > .primary-button {
-  margin-inline: auto;
-  max-width: 100%;
-}
-.loot-items {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  max-height: 180px;
-  overflow: auto;
-}
-.loot-items > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-}
-.loot-items .icon {
-  width: 40px;
-  height: 40px;
-}
 .reincarnation-row {
   margin-top: 30px;
   padding-top: 20px;

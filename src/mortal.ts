@@ -12,7 +12,6 @@ import { recordChronicle } from './chronicle.ts';
 import {
   SECTS,
   SECT_DUES,
-  MAX_SECT_DUES,
   SECT_ROLES,
   MAX_MASTERY,
   MASTERY_REALMS,
@@ -45,6 +44,7 @@ export function settleSectDues(save: SaveData, decline = false, random = Math.ra
   if (!sectDuesPending(save)) return false;
   if (decline) return leaveSect(save, true);
   const member = save.mortal.member!;
+  member.dues = Math.min(member.dues, sectDues(save).stones);
   if (save.stones < member.dues) return false;
   save.stones -= member.dues;
   log(save, `已补缴供奉 ${member.dues} 灵石。`);
@@ -52,6 +52,7 @@ export function settleSectDues(save: SaveData, decline = false, random = Math.ra
   member.dueAt += next.years;
   member.dues = next.stones;
   completeActivity(save, random);
+  resolveActivity(save, random);
   return true;
 }
 function masteryLimit(save: SaveData) {
@@ -121,7 +122,7 @@ export function leaveSect(save: SaveData, expelled = false) {
   );
   return true;
 }
-export function startActivity(save: SaveData, kind: string) {
+export function startActivity(save: SaveData, kind: string, random = Math.random) {
   if (!canAct(save) || save.mortal.activity) return false;
   if (kind === 'study') {
     const plan = studyPlan(save);
@@ -143,7 +144,17 @@ export function startActivity(save: SaveData, kind: string) {
       sect: null,
     };
   }
+  resolveActivity(save, random);
   return true;
+}
+export function resolveActivity(save: SaveData, random = Math.random) {
+  const activity = save.mortal.activity;
+  if (!activity || !canAct(save) || (activity.kind === 'study' && !studyPlan(save).eligible))
+    return false;
+  if (activity.remaining <= 1e-9) return completeActivity(save, random);
+  const age = save.age;
+  advanceMortal(save, activity.remaining * 60, random);
+  return save.age > age;
 }
 export function tradeIron(save: SaveData, buy: boolean) {
   if (!canAct(save) || (buy ? save.stones < 30 : save.iron < 1)) return false;
@@ -151,7 +162,7 @@ export function tradeIron(save: SaveData, buy: boolean) {
   save.iron += buy ? 1 : -1;
   return true;
 }
-// 调用方仅传入城镇场景就绪且处于前台的时间；不使用墙钟，不补算离线收益或供奉。
+// 城镇前台计时与主动消耗年岁共用边界结算；不使用墙钟，不补算离线时间。
 export function advanceMortal(save: SaveData, seconds: number, random = Math.random) {
   if (!Number.isFinite(seconds) || seconds <= 0 || !canAct(save)) return false;
   const world = save.mortal;
@@ -182,7 +193,7 @@ export function advanceMortal(save: SaveData, seconds: number, random = Math.ran
     // 同时到期先扣供奉，不能用尚未完成的委托收入透支门费。
     if (world.member?.dues && world.years >= world.member.dueAt - 1e-9) {
       const member = world.member;
-      member.dues = Math.min(member.dues, MAX_SECT_DUES);
+      member.dues = Math.min(member.dues, sectDues(save).stones);
       if (save.stones < member.dues) {
         // 停在账期边界，先给广告补缴机会；放弃时才清退，余下时间不推进。
         changed = true;

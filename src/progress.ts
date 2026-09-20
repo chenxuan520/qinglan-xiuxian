@@ -18,7 +18,7 @@ import {
   REALM_LIFESPANS,
 } from './data.ts';
 import type { CultivationPath, SpiritRootId, ElementId } from './data.ts';
-import { freshMortal, validMortal, SECTS, MAX_SECT_DUES, type MortalState } from './mortal-data.ts';
+import { freshMortal, validMortal, SECTS, SECT_DUES, type MortalState } from './mortal-data.ts';
 import {
   freshChronicle,
   restoreChronicle,
@@ -106,8 +106,6 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     if (!s || s.version !== 1) return base;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
-    if (base.mortal.member)
-      base.mortal.member.dues = Math.min(base.mortal.member.dues, MAX_SECT_DUES);
     base.lifespanBonus = int(s.lifespanBonus);
     base.tribulations = int(s.tribulations);
     if (typeof s.nextTribulationAge === 'number' && Number.isFinite(s.nextTribulationAge))
@@ -165,7 +163,10 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     )
       base.starter = rootStarter(base.rootElements, base.path);
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
+    if (base.mortal.member)
+      base.mortal.member.dues = Math.min(base.mortal.member.dues, SECT_DUES[realm.index].stones);
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
+    claimArtifacts(base);
     syncTribulationClock(base);
     return base;
   } catch {
@@ -443,6 +444,7 @@ export function dropArtifacts(save: SaveData, random: () => number) {
     dropped.push(item.id);
   }
   save.artifactDrops.push(...dropped);
+  claimArtifacts(save);
   return dropped;
 }
 export function claimArtifacts(save: SaveData) {

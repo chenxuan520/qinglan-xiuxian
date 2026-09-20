@@ -169,7 +169,7 @@ export class Game {
   tribulationNextAt = 1.2;
   tribulationOpeningDamage = 0;
   nextElite = 60;
-  onEvent: (name: string) => void = () => {};
+  onEvent: (name: string, items?: string[]) => void = () => {};
   private spawnBudget = 0;
   private serial = 0;
   private baseHp: number;
@@ -988,6 +988,7 @@ export class Game {
       angle = this.random() * TAU;
     const difficulty = DIFFICULTIES[this.difficulty];
     const scaling = STAGE_COMBAT_SCALING[this.stage];
+    const eliteScaling = elite && !boss ? scaling.elite : undefined;
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     const strengthTime = this.isFinalTrial
       ? Math.min(this.time, STAGES[this.stage].minutes * 60)
@@ -999,7 +1000,7 @@ export class Game {
             ? 560000
             : 120000 + bossStage * 35000
           : 16000 + this.stage * 11000) * difficulty.hp
-      : template.hp * strength * difficulty.hp * (elite ? 7 : 1);
+      : template.hp * strength * difficulty.hp * (elite ? 7 : 1) * (eliteScaling?.hp ?? 1);
     const enemy: Enemy = {
       id: ++this.serial,
       type,
@@ -1018,7 +1019,8 @@ export class Game {
             ? Math.max(95 + progress * 35, template.speed * (1.05 + progress * 0.3))
             : template.speed) *
           (1 + progress * 0.3) *
-          (elite ? 1.1 : 1),
+          (elite ? 1.1 : 1) *
+          (eliteScaling?.speed ?? 1),
       damage:
         (boss
           ? this.isFinalTrial
@@ -1030,7 +1032,8 @@ export class Game {
         (boss ? 1 : this.isFinalTrial ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
         difficulty.damage *
         (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
-        (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3),
+        (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3) *
+        (eliteScaling?.damage ?? 1),
       elite,
       boss,
       bossStage: boss ? bossStage : undefined,
@@ -1966,6 +1969,7 @@ export class Game {
           );
       this.creditCultivation();
       this.heal(this.stats.killHeal);
+      let collected: string[] = [];
       if (e.boss) {
         // 最后一击随即结算，妖王灵气直接吸收，避免奖励留在已结束的战场。
         if (this.level < MAX_RUN_LEVEL) this.xp += xp * this.stats.xp;
@@ -1979,7 +1983,7 @@ export class Game {
         }
         if (this.level === MAX_RUN_LEVEL) this.xp = 0;
         this.creditCultivation();
-        dropArtifacts(this.save, this.random);
+        collected = dropArtifacts(this.save, this.random);
       } else if (this.level < MAX_RUN_LEVEL)
         this.pickups.push({
           x: e.x,
@@ -2011,7 +2015,7 @@ export class Game {
           this.announce(
             this.trialBossesDefeated === TRIAL_BOSS_STAGES.length
               ? '七劫尽破 · 成仙瓶颈解除'
-              : `已破 ${this.trialBossesDefeated} / 7 劫 · 妖王灵气入体 · 遗宝已掉落`,
+              : `已破 ${this.trialBossesDefeated} / 7 劫 · 妖王灵气入体 · 遗宝自动入库`,
           );
         }
         if (
@@ -2021,7 +2025,7 @@ export class Game {
           this.state = 'won';
           this.onEvent('win');
         }
-        this.onEvent('loot');
+        this.onEvent('loot', collected);
       }
     }
   }

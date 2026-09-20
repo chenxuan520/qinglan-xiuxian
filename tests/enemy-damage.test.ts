@@ -52,7 +52,8 @@ test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣�
           1.175 *
           DIFFICULTIES[difficulty].damage *
           (elite ? 2.2 : 1.3) *
-          (1 + [0, 0.08, 0.16, 0.24, 0.32, 0.42][stage] * (elite ? 1 : 0.65));
+          (1 + [0, 0.08, 0.16, 0.24, 0.32, 0.42][stage] * (elite ? 1 : 0.65)) *
+          (elite ? [1, 1, 1.2, 1.3, 1.4, 1.5][stage] : 1);
         assert.ok(Math.abs(e.damage - expected) < 1e-8);
         const before = g.player.hp;
         g.update(0.01);
@@ -124,6 +125,34 @@ test('第七境精英与七位妖王伤害提高35%，重复续局不会重复�
         restored.enemies.map((e) => e.damage),
         g.enemies.map((e) => e.damage),
       );
+    }
+  }
+});
+
+test('第三至第六境精英拉开气血与追击差距，普通怪不变，重复续局不叠加', () => {
+  for (let stage = 0; stage < 6; stage++) {
+    for (const progress of [0, 0.5, 1]) {
+      const save = freshSave();
+      save.unlocked = stage;
+      const g = new Game(save, stage, 0, () => 0.5);
+      g.time = STAGES[stage].minutes * 60 * progress;
+      for (const type of STAGE_ENEMIES[stage]) {
+        const normal = g.spawnEnemy(type, false, false, { x: 200, y: 0 });
+        const elite = g.spawnEnemy(type, true, false, { x: 200, y: 0 });
+        const speed = ENEMIES[type].speed * (1 + progress * 0.3);
+        assert.equal(normal.speed, speed);
+        assert.ok(
+          Math.abs(elite.maxHp / normal.maxHp - 7 * [1, 1, 1.25, 1.35, 1.45, 1.55][stage]) < 1e-8,
+        );
+        assert.ok(
+          Math.abs(elite.speed - speed * 1.1 * [1, 1, 1.08, 1.12, 1.16, 1.2][stage]) < 1e-8,
+        );
+        elite.hp *= 0.4;
+      }
+      const restored = Game.restore(save, g.snapshot())!;
+      assert.ok(restored);
+      const twice = Game.restore(save, restored.snapshot())!;
+      assert.deepEqual(twice.enemies, g.enemies);
     }
   }
 });

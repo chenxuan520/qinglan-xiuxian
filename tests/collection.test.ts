@@ -108,27 +108,46 @@ test('默认仅有青霄剑与追魂钉，未收藏法宝不能炼器但仍可�
   assert.equal(new Game(save, 0, 0).weapons[0].id, 'nail');
 });
 
-test('只有击败妖王才掉三件未拥有法宝，拾取后解锁，收齐后不重复掉落', () => {
+test('只有击败妖王才掉三件未拥有法宝，自动入库，收齐后不重复掉落', () => {
   const save = freshSave();
   const g = new Game(save, 6, 0, () => 0.5);
   const small = g.spawnEnemy(0, true);
   g.hitEnemy(small, 1e9);
   assert.deepEqual(save.artifactDrops, []);
+  assert.equal(save.artifacts.length, 2);
   for (let i = 0; i < 12; i++) {
     g.hitEnemy(g.spawnEnemy(10, false, true, undefined, 0), 1e9);
-    assert.equal(
-      new Set([...save.artifacts, ...save.artifactDrops]).size,
-      Math.min(36, 2 + (i + 1) * 3),
-    );
+    assert.equal(new Set(save.artifacts).size, Math.min(36, 2 + (i + 1) * 3));
+    assert.deepEqual(save.artifactDrops, []);
   }
-  assert.equal(save.artifacts.length, 2);
-  assert.equal(save.artifactDrops.length, 34);
   const reloaded = parseSave(JSON.stringify(save));
-  assert.equal(reloaded.artifactDrops.length, 34);
-  assert.equal(claimArtifacts(reloaded).length, 34);
   assert.equal(reloaded.artifacts.length, 36);
   assert.deepEqual(claimArtifacts(reloaded), []);
   assert.deepEqual(reloaded.artifactDrops, []);
+  assert.equal(reloaded.chronicle.entries.filter((e) => e.title === '万宝归藏').length, 1);
+});
+
+test('手动与代打击败妖王后立即解锁炼器，重复击杀和续局不重复入库', () => {
+  for (const autoplay of [false, true]) {
+    const save = freshSave();
+    save.autoplay = autoplay;
+    save.unlocked = 6;
+    save.stones = save.iron = 1000;
+    const g = new Game(save, 6, 0, () => 0.5);
+    g.time = 90;
+    g.trialBossesSpawned = 1;
+    const boss = g.spawnEnemy(10, false, true, undefined, 0);
+    g.hitEnemy(boss, 1e9);
+    const id = save.artifacts.find((id) => !['sword', 'nail'].includes(id))!;
+    assert.ok(id);
+    assert.equal(forge(save, id), true);
+    g.hitEnemy(boss, 1e9);
+    assert.equal(save.artifacts.length, 5);
+    const restored = Game.restore(save, JSON.parse(JSON.stringify(g.snapshot())))!;
+    assert.ok(restored);
+    assert.equal(save.artifacts.length, 5);
+    assert.equal(save.chronicle.entries.filter((e) => e.title === '妖王遗宝').length, 1);
+  }
 });
 
 test('旧档保留已炼器和当前本命，其余法宝待收集；无效、重复收藏被过滤', () => {
@@ -144,9 +163,10 @@ test('旧档保留已炼器和当前本命，其余法宝待收集；无效、�
       artifactDrops: ['orbit', 'orbit', 'nail', 'bad'],
     }),
   );
-  assert.deepEqual(parsed.artifacts, ['sword', 'nail']);
-  assert.deepEqual(parsed.artifactDrops, ['orbit']);
+  assert.deepEqual(parsed.artifacts, ['sword', 'nail', 'orbit']);
+  assert.deepEqual(parsed.artifactDrops, []);
   assert.equal(parsed.starter, 'sword');
+  assert.deepEqual(parseSave(JSON.stringify(parsed)), parsed);
 });
 
 test('后期强怪、精英和妖王给予递增灵气与修为，续局结算不重复入账', () => {
