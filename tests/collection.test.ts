@@ -82,10 +82,10 @@ test('音量保存与旧档兼容，零音量和最大音量均有效，越界�
   assert.equal(parseSave('{"version":1,"volume":"bad"}').volume, 0.6);
 });
 
-test('新角色默认开启音乐与音效，旧档和导入档的静音选择保持不变', () => {
-  assert.equal(freshSave().sound, true);
-  assert.equal(parseSave(null).sound, true);
-  assert.equal(parseSave('{"version":1}').sound, true);
+test('新角色默认静音，存档解析仍保留显式声音设置', () => {
+  assert.equal(freshSave().sound, false);
+  assert.equal(parseSave(null).sound, false);
+  assert.equal(parseSave('{"version":1}').sound, false);
   for (const sound of [false, true])
     assert.equal(parseSave(JSON.stringify({ ...freshSave(), sound })).sound, sound);
 });

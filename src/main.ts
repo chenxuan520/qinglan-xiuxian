@@ -115,6 +115,8 @@ try {
   storageAvailable = false;
 }
 const save = parseSave(raw);
+// 每次进入先静音，保留音量，只有明确开启声音后才播放。
+save.sound = false;
 resolveActivity(save);
 const PROLOGUE_IMAGE = '/assets/qinglan-prologue-dark.webp';
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
@@ -336,11 +338,11 @@ function renderPrologue() {
   if (save.prologueSeen || game || inMortalWorld || panel) return;
   panel = 'prologue';
   ui.inert = true;
-  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title"><button class="prologue-skip" data-action="prologue-enter">略过序章 ${smallIcon('arrow')}</button><div class="prologue-heading"><span class="eyebrow">青岚仙途 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">入此山河 ${smallIcon('arrow')}</button></footer></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="prologue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="prologue-enter">略过序章 ${smallIcon('arrow')}</button></div><div class="prologue-heading"><span class="eyebrow">青岚仙途 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">入此山河 ${smallIcon('arrow')}</button></footer></section></div>`;
   modal
     .querySelector<HTMLElement>('.prologue-scene')!
     .style.setProperty('--prologue-image', `url("${assetUrl(PROLOGUE_IMAGE)}")`);
-  modal.querySelector<HTMLButtonElement>('.prologue-skip')?.focus({ preventScroll: true });
+  modal.querySelector<HTMLElement>('.prologue-scene')?.focus({ preventScroll: true });
 }
 function releaseTownScene() {
   if (!townScene) return;
@@ -464,10 +466,36 @@ function tickMortal(now: number) {
     nextMortalStatus = now + 1000;
   }
 }
+const ROOT_IMPRESSIONS: Record<SpiritRootId, { seal: string; verse: string }> = {
+  heaven: { seal: '天', verse: '一气天成，百脉皆通。长生路上，似有清风送君行。' },
+  variant: { seal: '异', verse: '灵机独异，不循常途。天地万法，或为你另开一门。' },
+  dual: { seal: '凡', verse: '两脉相依，资质平常。肯踏千山，凡根亦可问长生。' },
+  triple: { seal: '凡', verse: '三脉交织，仙路渐远。不借天资，便以岁月磨道心。' },
+  quad: { seal: '伪', verse: '四脉纷杂，聚气维艰。命数未许，仍可执灯向山行。' },
+  five: { seal: '伪', verse: '五行俱在，却难归一。大道无言，且看你如何叩门。' },
+  none: { seal: '废', verse: '五行沉寂，仙缘如尘。若道心不灭，凡骨也敢问苍天。' },
+};
+function spiritRootDiagram(reveal = false) {
+  const root = spiritRootInfo(save.spiritRoot);
+  const vertices = ELEMENTS.map((element, i) => {
+    const angle = ((i * 72 - 90) * Math.PI) / 180;
+    return {
+      ...element,
+      x: (50 + Math.cos(angle) * 40).toFixed(2),
+      y: (50 + Math.sin(angle) * 40).toFixed(2),
+      active: save.rootElements.includes(element.id),
+    };
+  });
+  const rootLabel = `${root.name}；${vertices.map((e) => `${e.name}灵根${e.active ? '已显现' : '未显现'}`).join('，')}`;
+  return `<div class="root-pentagon" role="img" aria-label="${rootLabel}"><svg class="root-pentagon-lines" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40"/><polygon points="${vertices.map((e) => `${e.x},${e.y}`).join(' ')}"/>${vertices.map((e) => `<path d="M50 50L${e.x} ${e.y}"/>`).join('')}</svg><div class="root-quality"><small>此世灵根</small><strong>${reveal ? ROOT_IMPRESSIONS[save.spiritRoot].seal : root.name}</strong><small>${reveal ? `${root.name} · ` : ''}${root.count ? `${root.count} 系共鸣` : '五行未显'}</small></div>${vertices.map((e) => `<span class="root-node${e.active ? ' is-active' : ''}" style="--root-x:${e.x}%;--root-y:${e.y}%;--element-color:${e.color}"><i class="root-orb"></i><span>${e.name}</span></span>`).join('')}</div>`;
+}
+function spiritRootEffects() {
+  const root = spiritRootInfo(save.spiritRoot);
+  return `灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>基础暴击 <b>${Math.round(root.baseCrit * 100)}%</b> · 基础移速 <b>${root.baseSpeed}</b><br>悟道每阶独立增伤 <b>+${root.powerPerLevel}%</b>`;
+}
 function spiritRootSummary(showAge = false) {
   const life = lifespanInfo(save);
-  const root = spiritRootInfo(save.spiritRoot);
-  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div>${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>基础暴击 <b>${Math.round(root.baseCrit * 100)}%</b> · 基础移速 <b>${root.baseSpeed}</b><br>悟道每阶独立增伤 <b>+${root.powerPerLevel}%</b><small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
+  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram()}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects()}<small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
 }
 function lifespanSummary() {
   const life = lifespanInfo(save);
@@ -1164,7 +1192,23 @@ function returnLobby() {
   clearInput();
   renderLobby();
 }
-function resetLifetime() {
+function renderRootReveal(previousLife = '前尘已散，新一世从十五岁启程。') {
+  panel = 'root-reveal';
+  ui.inert = true;
+  panelFrame(
+    '一念轮回，再问长生',
+    '命盘初现 · 此世资质',
+    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout"><div class="root-reveal-disc">${spiritRootDiagram(true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects()}</p></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div><div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
+    true,
+  );
+  modal.querySelector('[data-action="close"]')?.remove();
+  const section = modal.querySelector<HTMLElement>('.panel')!;
+  section.classList.add('root-reveal-panel');
+  section.scrollTop = 0;
+  section.tabIndex = -1;
+  section.focus({ preventScroll: true });
+}
+function resetLifetime(previousLife?: string) {
   const root = rollSpiritRoot();
   clearInterval(adTimer);
   window.clearTimeout(victoryTimer);
@@ -1188,6 +1232,7 @@ function resetLifetime() {
   bookTab = 'treasures';
   persist();
   returnLobby();
+  renderRootReveal(previousLife);
 }
 function renderTribulationPending() {
   if (game) {
@@ -1267,12 +1312,8 @@ function finishTribulation() {
 function endLifetime() {
   const life = lifespanInfo(save);
   const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name;
-  resetLifetime();
-  panel = 'lifetime-ended';
-  panelFrame(
-    '寿元已尽 · 轮回已启',
-    '此世修行已结束',
-    `<p class="pause-description">此世止于 ${realm}，享年 ${life.age.toFixed(1)} 年。</p><p class="panel-note">已放弃续命。本世修为、物资、法宝收藏、炼器和未完成历练已清空，新一世从 0 岁、炼气初期开始，并重新随机灵根。</p><p class="pause-description">新生资质：${spiritRootInfo(save.spiritRoot).name}</p><button class="primary-button" data-action="home">开启新一世 ${smallIcon('arrow')}</button>`,
+  resetLifetime(
+    `前世止于${realm}，享年 ${life.age.toFixed(1)} 年。尘缘已了，今世从十五岁再启仙途。`,
   );
 }
 function renderLifespanEnd() {
@@ -1301,13 +1342,33 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function handleAction(action: string, id?: string) {
+  if (panel === 'root-reveal') {
+    if (action === 'reroll-root') resetLifetime();
+    else if (action === 'accept-root' || action === 'close') {
+      ui.inert = false;
+      panel = '';
+      modal.innerHTML = '';
+      ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
+    }
+    return;
+  }
   if (panel === 'prologue') {
+    if (action === 'prologue-sound') {
+      save.sound = !save.sound;
+      unlockAudio();
+      persist();
+      const button = modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!;
+      button.innerHTML = `${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span>`;
+      button.setAttribute('aria-pressed', String(save.sound));
+      return;
+    }
     if (action === 'prologue-enter' || action === 'close') {
       save.prologueSeen = true;
       ui.inert = false;
       panel = '';
       modal.innerHTML = '';
       persist();
+      renderLobby();
       ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
     }
     return;
@@ -1325,8 +1386,7 @@ function handleAction(action: string, id?: string) {
   }
   if (panel === 'tribulation-forfeit') {
     if (action === 'confirm-forfeit') {
-      resetLifetime();
-      toast('渡劫已弃 · 本世进度已清空，轮回重启');
+      resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
     } else if (action === 'cancel-forfeit' || action === 'close') {
       if (game?.tribulation) game.state === 'lost' ? renderDeath() : renderPause();
       else renderTribulationPending();
@@ -1540,7 +1600,7 @@ function handleAction(action: string, id?: string) {
       toast('浏览器无法写入存档，当前进度未更改');
       return;
     }
-    Object.assign(save, candidate.save);
+    Object.assign(save, candidate.save, { sound: save.sound });
     resolveActivity(save);
     pendingRun = candidate.run ? Game.restore(save, candidate.run.snapshot()) : null;
     storageAvailable = true;
@@ -1684,9 +1744,6 @@ function handleAction(action: string, id?: string) {
   }
   if (action === 'confirm-reincarnate' && panel === 'reincarnate' && !game) {
     resetLifetime();
-    toast(
-      `轮回已启 · ${spiritRootInfo(save.spiritRoot).name}${save.rootElements.length ? `（${save.rootElements.map((id) => elementInfo(id).name).join('、')}）` : ''} · 炼气初期，从头修行`,
-    );
     return;
   }
   if (action === 'autoplay') {
@@ -1927,7 +1984,13 @@ function handleAction(action: string, id?: string) {
   }
 }
 document.addEventListener('click', (event) => {
-  if (event.isTrusted && save.sound) unlockAudio();
+  if (
+    (event.target as Element).matches('.modal-backdrop') &&
+    (modal.querySelector('[data-action="close"]') || panel === 'root-reveal')
+  ) {
+    handleAction('close');
+    return;
+  }
   if (volumeOpen && !(event.target as Element).closest('.sound-control')) {
     volumeOpen = false;
     document.querySelector('.volume-control')?.remove();
@@ -1988,7 +2051,6 @@ document.addEventListener('change', async (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
-  if (event.isTrusted && save.sound && !event.repeat) unlockAudio();
   if ((event.target as HTMLElement).matches('input[type="range"], input[type="number"]')) return;
   if (
     (event.target as HTMLElement).matches('input, textarea') &&

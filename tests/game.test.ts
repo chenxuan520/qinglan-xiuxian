@@ -600,7 +600,7 @@ test('AI 优先进化与配套功法，低血量选恢复，劣质选项使用�
   game.choices = [];
   assert.equal(autoplayChoice(game), null);
 });
-test('AI 优先补齐最后一重觉醒功法，其他选技与已有觉醒优先级保持原样', () => {
+test('AI 为六重法宝优先补齐一至三重配套功法，其他选技保持原样', () => {
   for (const path of ['orthodox', 'demonic', 'dual'] as const) {
     const save = freshSave();
     save.path = path;
@@ -622,9 +622,17 @@ test('AI 优先补齐最后一重觉醒功法，其他选技与已有觉醒优�
     g.weapons[0].level = 5;
     assert.equal(autoplayChoice(g)?.index, 0);
     g.weapons[0].level = 6;
-    g.choices[1].level = 2;
-    g.passives[id] = 1;
-    assert.equal(autoplayChoice(g)?.index, 0);
+    for (const level of [1, 2, 3]) {
+      g.choices[1].level = level;
+      g.passives[id] = level - 1;
+      assert.deepEqual(autoplayChoice(g), { index: 1, reroll: false });
+      g.choices.push({ type: 'evolve', id: 'orbit', level: 7 });
+      assert.equal(autoplayChoice(g)?.index, 2);
+      g.choices.pop();
+    }
+    const missing = g.choices.pop()!;
+    assert.deepEqual(autoplayChoice(g), { index: 0, reroll: false });
+    g.choices.push(missing);
     g.choices[1].level = 3;
     g.passives[id] = 2;
     g.weapons[0].evolved = true;

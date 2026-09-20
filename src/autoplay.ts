@@ -20,10 +20,11 @@ function choiceScore(c: Choice, g: Game) {
   if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
   if (c.type === 'weapon')
     return (favored.includes(c.id) ? 15 : 10) + (c.level > 1 ? 8 : 2) + c.level;
-  // 满重法宝只差这一重功法便能觉醒时，先补齐；其他选技继续沿用原评分。
+  // 六重法宝优先从领悟起补齐三重配套功法；实际觉醒仍是最高优先级。
   if (
-    c.level === 3 &&
-    g.passives[c.id] === 2 &&
+    c.level >= 1 &&
+    c.level <= 3 &&
+    (g.passives[c.id] || 0) === c.level - 1 &&
     g.weapons.some((w) => {
       const required = evolutionPassives(treasure(w.id), g.path);
       return (
@@ -34,7 +35,7 @@ function choiceScore(c: Choice, g: Game) {
       );
     })
   )
-    return 50;
+    return 50 + c.level * 5;
   const needed = g.weapons.some(
     (w) => evolutionPassives(treasure(w.id), g.path).includes(c.id) && !w.evolved,
   );
