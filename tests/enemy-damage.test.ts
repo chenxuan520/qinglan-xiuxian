@@ -101,7 +101,7 @@ test('第七境精英与七位妖王伤害提高35%，重复续局不会重复�
       const save = freshSave();
       save.unlocked = 6;
       const g = new Game(save, 6, difficulty, () => 0.5);
-      g.time = progress * 600;
+      g.time = progress * 420;
       for (const type of STAGE_ENEMIES[6]) {
         const e = g.spawnEnemy(type);
         const expected =

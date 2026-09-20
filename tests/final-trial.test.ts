@@ -39,7 +39,7 @@ test('终关追击精英有冲刺；前六位首领三招，仙尊六招按顺�
   g.time = 60;
   const chase = g.spawnEnemy(65, false, false, { x: 300, y: 0 });
   // 中段精英独立加强，终关开场仍保留原有构筑空间与渐进速度。
-  const expectedSpeed = Math.max(98.5, ENEMIES[65].speed * 1.08) * 1.03 * 1.1;
+  const expectedSpeed = Math.max(100, ENEMIES[65].speed * (1.05 + 0.3 / 7)) * (1 + 0.3 / 7) * 1.1;
   assert.ok(Math.abs(chase.speed - expectedSpeed) < 1e-8);
   chase.cooldown = 0;
   g.update(0.01);
@@ -118,7 +118,7 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
 
 test('旧版已过第六关的存档自动解锁终关，已有修为不丢失', () => {
   assert.equal(STAGES.length, 7);
-  assert.equal(STAGES[6].minutes, 10);
+  assert.equal(STAGES[6].minutes, 7);
   assert.equal(TRIAL_BOSS_STAGES.length, 7);
   assert.equal(TRIAL_BOSS_STAGES.at(-1), 6);
   const legacy = { ...freshSave(), unlocked: 5, completed: [0, 1, 2, 3, 4, 5], cultivation: 1e6 };
@@ -166,6 +166,7 @@ test('旧十二分钟终关的末王续局不能跳过新仙尊', () => {
   const legacy = JSON.parse(JSON.stringify(g.snapshot()));
   delete legacy.trialBossesSpawned;
   legacy.trialBossSchedule = 2;
+  legacy.stageDuration = 720;
   const restored = Game.restore(g.save, legacy)!;
   assert.ok(restored);
   restored.resume();
@@ -216,12 +217,12 @@ test('终关到点继续出王，允许七王同时存在，乱序击杀全部�
   const g = trial();
   g.weapons[0].timer = 1e9;
   g.player.invincible = 999;
-  g.time = 90;
+  g.time = 60;
   g.update(0.01);
-  g.time = 180;
+  g.time = 120;
   g.update(0.01);
   assert.equal(g.enemies.filter((e) => e.boss && !e.dead).length, 2);
-  g.time = 600;
+  g.time = 420;
   g.update(0.01);
   assert.equal(g.trialBossesSpawned, 7);
   assert.equal(g.trialBossesDefeated, 0);
@@ -239,12 +240,13 @@ test('终关到点继续出王，允许七王同时存在，乱序击杀全部�
 
 test('旧串行 Boss 存档迁移后补齐到期妖王，不重复当前妖王', () => {
   const g = trial();
-  g.time = 90;
+  g.time = 60;
   g.weapons[0].timer = 9999;
   g.update(0.01);
   const raw = JSON.parse(JSON.stringify(g.snapshot()));
   raw.time = 300;
   raw.trialBossSchedule = 2;
+  raw.stageDuration = 600;
   delete raw.trialBossesSpawned;
   const resumed = Game.restore(g.save, raw)!;
   resumed.resume();
@@ -257,4 +259,82 @@ test('旧串行 Boss 存档迁移后补齐到期妖王，不重复当前妖王',
   twice.resume();
   twice.update(0.01);
   assert.equal(twice.enemies.filter((e) => e.boss && !e.dead).length, 3);
+});
+
+test('终关七王在整分钟边界出场，存活前王不阻塞且七分钟后不再加王', () => {
+  const g = trial();
+  g.weapons[0].timer = 99999;
+  g.player.invincible = 99999;
+  for (let minute = 1; minute <= 7; minute++) {
+    g.time = minute * 60 - 0.02;
+    g.update(0.01);
+    assert.equal(g.trialBossesSpawned, minute - 1);
+    g.update(0.02);
+    assert.equal(g.trialBossesSpawned, minute);
+    assert.equal(g.enemies.filter((e) => e.boss && !e.dead).length, minute);
+    assert.equal(g.state, 'playing');
+  }
+  g.time = 900;
+  g.update(0.01);
+  assert.equal(g.trialBossesSpawned, 7);
+  assert.equal(g.remaining, 0);
+  assert.notEqual(g.state, 'won');
+});
+
+test('十分钟终关存档按比例缩至七分钟，保留乱序击杀和在场妖王且不重复迁移', () => {
+  const oldTimes = [90, 180, 270, 360, 450, 540, 600];
+  for (const time of [0, 89, 90, 180, 300, 540, 600, 690]) {
+    const g = trial();
+    g.time = time;
+    g.weapons[0].timer = 99999;
+    g.trialBossesSpawned = oldTimes.filter((at) => at <= time).length;
+    g.trialBossesDefeated = Math.min(2, g.trialBossesSpawned);
+    // 最后出现的两位先被击败，剩下的前王仍在场。
+    for (let stage = 0; stage < g.trialBossesSpawned - g.trialBossesDefeated; stage++) {
+      const boss = g.spawnEnemy(10, false, true, { x: 600, y: 0 }, stage);
+      boss.hp *= 0.4;
+    }
+    g.bossSpawned = g.trialBossesSpawned > 0;
+    g.kills = g.trialBossesDefeated;
+    g.creditCultivation();
+    g.player.hp -= 7;
+    g.player.invincible = 99999;
+    const raw = { ...g.snapshot(), stageDuration: 600, trialBossSchedule: 3 };
+    const before = JSON.stringify(g.save);
+    const restored = Game.restore(g.save, raw)!;
+    assert.ok(restored);
+    assert.equal(restored.time, time * 0.7);
+    assert.equal(restored.trialBossesSpawned, g.trialBossesSpawned);
+    assert.equal(restored.trialBossesDefeated, g.trialBossesDefeated);
+    assert.equal(restored.player.hp, g.player.hp);
+    assert.deepEqual(restored.enemies, g.enemies);
+    assert.equal(JSON.stringify(g.save), before);
+    const twice = Game.restore(g.save, restored.snapshot())!;
+    assert.equal(twice.time, restored.time);
+    assert.equal(twice.snapshot().trialBossSchedule, 4);
+    twice.resume();
+    twice.update(0.01);
+    const expected = Math.max(
+      g.trialBossesSpawned,
+      TRIAL_BOSS_TIMES.filter((at) => at <= twice.time).length,
+    );
+    assert.equal(twice.trialBossesSpawned, expected);
+    const alive = twice.enemies.filter((e) => e.boss && !e.dead).map((e) => e.bossStage);
+    assert.equal(new Set(alive).size, alive.length);
+    assert.equal(alive.length, expected - g.trialBossesDefeated);
+  }
+});
+
+test('终关缩时不改变独立天劫的战斗时间和已保存招式', () => {
+  const s = freshSave();
+  s.cultivation = 1e9;
+  s.unlocked = 6;
+  s.age = s.nextTribulationAge = 20000;
+  const g = Game.createTribulation(s);
+  g.time = 123;
+  const restored = Game.restore(s, { ...g.snapshot(), stageDuration: 600, trialBossSchedule: 3 })!;
+  assert.ok(restored);
+  assert.equal(restored.time, 123);
+  assert.equal(restored.tribulationNextAt, g.tribulationNextAt);
+  assert.deepEqual(restored.enemies, g.enemies);
 });

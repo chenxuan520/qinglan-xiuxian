@@ -44,7 +44,7 @@ test('新一批强敌成为刷怪主体，早期兵种保留少量且没有提�
 });
 
 test('终关先给构筑空间，后期密度、移动、伤害与施法压力逐步提高', () => {
-  const samples = [0, 300, 590].map((time) => {
+  const samples = [0, 210, 419].map((time) => {
     const g = new Game(freshSave(), 6, 0, () => 0.5);
     g.weapons = [];
     g.time = time;
@@ -87,8 +87,8 @@ test('定时精英遵守当前兵种批次，后半程精英增多', () => {
   }
 });
 
-test('终关十分钟后数量和属性不再增长，自然刷新与召唤遵守同屏上限', () => {
-  const samples = [600, 1200, 3600].map((time) => {
+test('终关七分钟后数量和属性不再增长，自然刷新与召唤遵守同屏上限', () => {
+  const samples = [420, 600, 1200, 3600].map((time) => {
     const g = new Game(freshSave(), 6, 0, () => 0.5);
     g.time = time;
     g.nextTrialBossAt = 10000;
@@ -107,7 +107,7 @@ test('终关十分钟后数量和属性不再增长，自然刷新与召唤遵�
   assert.deepEqual(samples[0], samples[1]);
   assert.deepEqual(samples[1], samples[2]);
   const g = new Game(freshSave(), 6, 0, () => 0.5);
-  g.time = 600;
+  g.time = 420;
   g.nextTrialBossAt = 10000;
   g.weapons = [];
   for (let i = 0; i < 210; i++) g.spawnEnemy(i === 0 ? 71 : 65, false, false, { x: 500, y: 0 });
