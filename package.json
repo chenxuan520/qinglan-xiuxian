@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "build:cloudflare": "npm run build -- --base / --outDir artifacts/cloudflare --emptyOutDir",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy artifacts/cloudflare --project-name qinglan-xiuxian --branch master",
-    "check:npc-ai": "wrangler types artifacts/npc-ai-env.d.ts --config workers/npc-ai/wrangler.jsonc --env-interface NpcAiEnv && tsc -p workers/npc-ai/tsconfig.json",
+    "check:npc-ai": "node -e \"require('node:fs').mkdirSync('artifacts', { recursive: true })\" && wrangler types artifacts/npc-ai-env.d.ts --config workers/npc-ai/wrangler.jsonc --env-interface NpcAiEnv && tsc -p workers/npc-ai/tsconfig.json",
     "deploy:npc-ai": "npm run check:npc-ai && wrangler deploy --config workers/npc-ai/wrangler.jsonc",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",

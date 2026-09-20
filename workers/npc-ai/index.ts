@@ -5,6 +5,19 @@ import { NPC_AI_SETTINGS } from '../../src/setting.ts';
 import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town-story.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
+function allowedOrigin(origin: string, configured: string) {
+  try {
+    const url = new URL(origin);
+    // Origin 只能是协议、主机与端口，不能混入路径、凭据或多个来源。
+    if (url.origin !== origin) return false;
+    const local =
+      ['http:', 'https:'].includes(url.protocol) &&
+      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    return local || configured.split(',').some((value) => value.trim() === origin);
+  } catch {
+    return false;
+  }
+}
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 export function validDialogue(value: unknown): value is NpcDialogueRequest {
@@ -98,20 +111,18 @@ export function extractReply(output: unknown) {
 export default {
   async fetch(request: Request, env: NpcAiEnv): Promise<Response> {
     const origin = request.headers.get('Origin') || '';
-    const allowed = env.ALLOWED_ORIGINS.split(',').includes(origin);
+    const allowed = allowedOrigin(origin, env.ALLOWED_ORIGINS);
     const headers = new Headers({ 'Cache-Control': 'no-store', Vary: 'Origin' });
-    if (allowed) {
-      headers.set('Access-Control-Allow-Origin', origin);
-      headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
-      headers.set('Access-Control-Allow-Headers', 'Content-Type');
-      headers.set('Access-Control-Max-Age', '86400');
-    }
+    if (!allowed) return new Response(null, { status: 403, headers });
+    headers.set('Access-Control-Allow-Origin', origin);
+    headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    headers.set('Access-Control-Max-Age', '86400');
     const json = (body: unknown, status = 200) => Response.json(body, { status, headers });
     const path = new URL(request.url).pathname;
     if (path === '/health' && request.method === 'GET')
       return json({ service: 'qinglan-npc-ai', model: NPC_MODEL, version: 1 });
     if (path !== '/chat') return json({ error: 'not-found' }, 404);
-    if (!allowed) return json({ error: 'origin' }, 403);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST') return json({ error: 'method' }, 405);
     if (!request.headers.get('Content-Type')?.startsWith('application/json'))

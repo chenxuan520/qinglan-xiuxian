@@ -43,16 +43,16 @@ npm run deploy:cloudflare
 
 ## NPC 对话 · Cloudflare Workers AI
 
-独立 Worker 名称为 `qinglan-npc-ai`，配置在 `workers/npc-ai/wrangler.jsonc`。默认入口为 `https://qinglan-npc-ai.011203.xyz`，`GET /health` 检查服务信息，`POST /chat` 生成对白。自定义域名已写入 routes，后续发布保留绑定；模型使用 `@cf/zai-org/glm-4.7-flash`，通过原生 `AI` binding 调用，前端没有 API 密钥。
+独立 Worker 名称为 `qinglan-npc-ai`，配置在 `workers/npc-ai/wrangler.jsonc`。默认入口为 `https://qinglan-npc-ai.011203.xyz`，`GET /health` 检查服务信息，`POST /chat` 生成对白；两者都必须携带受支持的 `Origin`。自定义域名已写入 routes，后续发布保留绑定；模型使用 `@cf/zai-org/glm-4.7-flash`，通过原生 `AI` binding 调用，前端没有 API 密钥。
 
 ```bash
 npm run check:npc-ai
 npm run deploy:npc-ai
 ```
 
-`check:npc-ai` 将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Actions 同步执行此检查，但只部署静态站；Worker 和 Cloudflare Pages 分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
+`check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Actions 同步执行此检查，但只部署静态站；Worker 和 Cloudflare Pages 分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
 
-允许来源为 Cloudflare 主站、GitHub Pages 备用站、localhost / 127.0.0.1 的 5173。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；按来源 IP 每 60 秒允许 12 次请求，限流是边缘节点级保护，不是登录认证。模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 超时 12 秒，客户端 14 秒；任何失败均回退本地台词。关闭对话会取消客户端请求，返回的文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
+服务端按 `Origin` 完整匹配公网来源：`https://qinglan-xiuxian.pages.dev`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；按来源 IP 每 60 秒允许 12 次请求，限流是边缘节点级保护，不是登录认证。模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 超时 12 秒，客户端 14 秒；任何失败均回退本地台词。关闭对话会取消客户端请求，返回的文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
 
 镇民用保存的种子与角色总年岁确定姓名及代际，换代间隔 50–70 年。直接计算当代人物，长时间闭关不逐代循环；场景仅在换代节点更新人物标签与配色，不重建地图。聊天只保留在当前页面内存中，各人物独立，换代后交谈不继承前任聊天。服务端无聊天存储，只记录不含正文的异常事件。
 

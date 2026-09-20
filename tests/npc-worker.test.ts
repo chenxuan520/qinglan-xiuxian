@@ -6,6 +6,12 @@ import { NPC_AI_SETTINGS } from '../src/setting.ts';
 import { freshSave } from '../src/progress.ts';
 import { chooseSmithStory, smithAt } from '../src/town-story.ts';
 
+const origins = [
+  'https://qinglan-xiuxian.pages.dev',
+  'https://chenxuan520.github.io',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+];
 const input = {
   population: { seed: 12345, since: 15 },
   age: 15,
@@ -24,7 +30,7 @@ const env = (
   run = async () => ({ response: '火候正好，炉里这块铁就快成了。' }),
   success = true,
 ) => ({
-  ALLOWED_ORIGINS: 'http://localhost:5173,https://qinglan-xiuxian.pages.dev',
+  ALLOWED_ORIGINS: origins.join(','),
   NPC_LIMITER: { limit: async () => ({ success }) },
   AI: { run },
 });
@@ -49,10 +55,89 @@ test('NPC Worker 允许游戏来源并生成对白，预检和健康检查不调
   );
   assert.equal(preflight.status, 204);
   assert.equal(
-    (await worker.fetch(new Request('https://npc.example/health'), bindings)).status,
+    (
+      await worker.fetch(
+        new Request('https://npc.example/health', { headers: { Origin: origins[0] } }),
+        bindings,
+      )
+    ).status,
     200,
   );
   assert.equal(calls, 1);
+});
+
+test('不支持或缺失来源时所有入口都空响应拒绝，读体与限流和模型均不执行', async () => {
+  const bindings = {
+    ...env(),
+    NPC_LIMITER: { limit: async () => assert.fail('不应触发限流调用') },
+    AI: { run: async () => assert.fail('不应调用模型') },
+  };
+  for (const origin of [
+    undefined,
+    '',
+    'null',
+    'https://unknown.example',
+    'https://qinglan-xiuxian.pages.dev.evil.example',
+    'https://attacker.pages.dev',
+    'https://attacker.github.io',
+    'https://chenxuan520.github.io.evil.example',
+    'http://localhost.evil.example:5173',
+    'http://127.0.0.1.evil.example',
+    'http://localhost:65536',
+    'http://evil.example@localhost:5173',
+    'http://localhost:5173/path',
+    'file://localhost',
+    `${origins[0]},${origins[1]}`,
+  ])
+    for (const path of ['/chat', '/health', '/unknown'])
+      for (const method of ['POST', 'OPTIONS', 'GET']) {
+        const headers = new Headers({ 'Content-Type': 'application/json' });
+        if (origin !== undefined) headers.set('Origin', origin);
+        const req = new Request(`https://npc.example${path}`, {
+          method,
+          headers,
+          ...(method === 'POST' ? { body: JSON.stringify(input) } : {}),
+        });
+        const response = await worker.fetch(req, bindings);
+        assert.equal(response.status, 403, `${origin} ${method} ${path}`);
+        assert.equal(await response.text(), '');
+        assert.equal(response.headers.get('Access-Control-Allow-Origin'), null);
+        assert.equal(req.bodyUsed, false);
+      }
+});
+
+test('公网精确来源与本机任意端口正常预检和对话，空配置不能放行缺失来源', async () => {
+  let calls = 0;
+  const bindings = env(async () => {
+    calls++;
+    return { response: '好。' };
+  });
+  bindings.ALLOWED_ORIGINS = ` , ${origins.slice(0, 2).join(', ')}, `;
+  const supported = [
+    ...origins,
+    'http://localhost',
+    'https://localhost',
+    'http://localhost:5174',
+    'http://localhost:5273',
+    'http://127.0.0.1:65535',
+    'http://[::1]',
+    'https://[::1]:8443',
+  ];
+  for (const origin of supported) {
+    const preflight = await worker.fetch(
+      new Request('https://npc.example/chat', { method: 'OPTIONS', headers: { Origin: origin } }),
+      bindings,
+    );
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), origin);
+    assert.equal((await worker.fetch(request(input, origin), bindings)).status, 200);
+  }
+  assert.equal(calls, supported.length);
+  for (const allowed of ['', ',,', bindings.ALLOWED_ORIGINS]) {
+    bindings.ALLOWED_ORIGINS = allowed;
+    assert.equal((await worker.fetch(request(input, ''), bindings)).status, 403);
+  }
+  assert.equal(calls, supported.length);
 });
 
 test('不合法来源、伪造历史角色及超长请求不会触发 AI，限流与推理失败可兜底', async () => {
