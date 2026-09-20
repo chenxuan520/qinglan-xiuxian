@@ -82,6 +82,36 @@ test('三条路线同时筛选法宝和功法；各流派法宝满足配方后�
   }
 });
 
+test('开局首轮候选覆盖本路线全部法宝，后排和未收藏法宝不受境界限制', () => {
+  for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+    const random = seeded(8349071);
+    const expected = TREASURES.filter((t) => allowsSchool(path, t.school)).map((t) => t.id);
+    const seen = new Set<string>();
+    for (let i = 0; i < 2000; i++) {
+      const save = freshSave();
+      save.path = path;
+      save.starter = path === 'demonic' ? 'nail' : 'sword';
+      const g = new Game(save, 0, 0, random);
+      assert.equal(g.level, 1);
+      assert.equal(g.weapons.length, 1);
+      assert.equal(save.cultivation, 0);
+      assert.deepEqual(save.artifacts, ['sword', 'nail']);
+      const choices = g.makeChoices();
+      assert.equal(choices.length, 3);
+      for (const c of choices) {
+        if (c.type !== 'weapon' || c.level !== 1) continue;
+        assert.ok(expected.includes(c.id as WeaponKind), `${path}: ${c.id}`);
+        seen.add(c.id);
+      }
+    }
+    assert.deepEqual(
+      [...seen].sort(),
+      expected.filter((id) => id !== (path === 'demonic' ? 'nail' : 'sword')).sort(),
+      path,
+    );
+  }
+});
+
 test('36 件觉醒法宝均能独立战斗且对局可保存恢复', () => {
   for (const t of TREASURES) {
     const g = fixture(t.id, t.school);
