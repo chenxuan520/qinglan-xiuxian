@@ -15,7 +15,7 @@ test('序章已读状态保留于存档和导入，未读或缺失字段时保�
   }
 });
 
-test('存档导出导入保留永久进度、五行、炼器、待拾取与设置，不依赖浏览器存储', () => {
+test('存档导入自动收取旧遗宝，保留永久进度、五行、炼器与设置，不依赖浏览器存储', () => {
   const save = freshSave('dual', ['water', 'fire']);
   Object.assign(save, {
     cultivation: 12345,
@@ -39,10 +39,13 @@ test('存档导出导入保留永久进度、五行、炼器、待拾取与设�
   const file = exportSave(save, null);
   const restored = importSave(file);
   assert.deepEqual(restored.save, parseSave(before));
+  assert.ok(['brush', 'whip'].every((id) => restored.save.artifacts.includes(id)));
+  assert.deepEqual(restored.save.artifactDrops, []);
   assert.equal(restored.run, null);
   assert.equal(JSON.stringify(save), before);
   assert.equal(JSON.parse(file).format, 'qinglan-save');
   assert.deepEqual(importSave(before).save, restored.save);
+  assert.deepEqual(importSave(exportSave(restored.save, null)).save, restored.save);
 });
 
 test('导入保存的战斗、升级与待复活对局，修为不重复领取且坏续局不丢弃', () => {

@@ -38,7 +38,9 @@ test('终关追击精英有冲刺；前六位首领三招，仙尊六招按顺�
   g.weapons = [];
   g.time = 60;
   const chase = g.spawnEnemy(65, false, false, { x: 300, y: 0 });
-  assert.ok(chase.speed > new Game(freshSave(), 5, 0).spawnEnemy(65, true).speed);
+  // 中段精英独立加强，终关开场仍保留原有构筑空间与渐进速度。
+  const expectedSpeed = Math.max(98.5, ENEMIES[65].speed * 1.08) * 1.03 * 1.1;
+  assert.ok(Math.abs(chase.speed - expectedSpeed) < 1e-8);
   chase.cooldown = 0;
   g.update(0.01);
   assert.ok(chase.charge > 0);

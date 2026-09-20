@@ -70,15 +70,15 @@ export const SECT_ROLES = [
   '太上长老',
   '开宗老祖',
 ];
-export const MAX_SECT_DUES = 1000;
+export const MAX_SECT_DUES = 500;
 export const SECT_DUES = [
-  { years: 20, stones: 80 },
-  { years: 50, stones: 200 },
-  { years: 100, stones: 450 },
-  { years: 200, stones: MAX_SECT_DUES },
-  { years: 400, stones: MAX_SECT_DUES },
-  { years: 1000, stones: MAX_SECT_DUES },
-  { years: 2000, stones: MAX_SECT_DUES },
+  { years: 20, stones: 50 },
+  { years: 50, stones: 100 },
+  { years: 100, stones: 150 },
+  { years: 200, stones: 200 },
+  { years: 400, stones: 300 },
+  { years: 1000, stones: 400 },
+  { years: 2000, stones: 450 },
   { years: 5000, stones: MAX_SECT_DUES },
   { years: 0, stones: 0 },
 ];

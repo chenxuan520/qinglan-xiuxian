@@ -600,6 +600,42 @@ test('AI 优先进化与配套功法，低血量选恢复，劣质选项使用�
   game.choices = [];
   assert.equal(autoplayChoice(game), null);
 });
+test('AI 优先补齐最后一重觉醒功法，其他选技与已有觉醒优先级保持原样', () => {
+  for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+    const save = freshSave();
+    save.path = path;
+    const g = new Game(save, 0, 0, seeded());
+    g.weapons = [
+      { id: 'sword', level: 6, evolved: false, timer: 0 },
+      { id: 'orbit', level: 5, evolved: false, timer: 0 },
+    ];
+    const id = path === 'demonic' ? 'blood' : 'power';
+    g.passives = { [id]: 2 };
+    g.choices = [
+      { type: 'weapon', id: 'orbit', level: 6 },
+      { type: 'passive', id, level: 3 },
+    ];
+    assert.deepEqual(autoplayChoice(g), { index: 1, reroll: false });
+    g.choices.push({ type: 'evolve', id: 'orbit', level: 7 });
+    assert.equal(autoplayChoice(g)?.index, 2);
+    g.choices.pop();
+    g.weapons[0].level = 5;
+    assert.equal(autoplayChoice(g)?.index, 0);
+    g.weapons[0].level = 6;
+    g.choices[1].level = 2;
+    g.passives[id] = 1;
+    assert.equal(autoplayChoice(g)?.index, 0);
+    g.choices[1].level = 3;
+    g.passives[id] = 2;
+    g.weapons[0].evolved = true;
+    assert.equal(autoplayChoice(g)?.index, 0);
+    if (path === 'dual') {
+      g.weapons[0].evolved = false;
+      g.passives.blood = 3;
+      assert.equal(autoplayChoice(g)?.index, 0);
+    }
+  }
+});
 test('代打开关保存在浏览器存档，旧存档默认手动', () => {
   assert.equal(parseSave(null).autoplay, false);
   assert.equal(parseSave(JSON.stringify({ version: 1 })).autoplay, false);
