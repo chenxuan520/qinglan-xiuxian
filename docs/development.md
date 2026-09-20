@@ -2,7 +2,7 @@
 
 [返回项目首页](../README.md)
 
-Cloudflare Pages 是主要游玩入口，GitHub Pages 作为备用。发布新版本时须同步主站；仅推送 GitHub 不会更新 Cloudflare。
+唯一官网是 [xiuxian.011203.xyz](https://xiuxian.011203.xyz/)，由 Cloudflare Pages 托管。README 和仓库网站栏只使用官网域名；平台域名仅供部署检查。发布新版本时须同步 Cloudflare；仅推送 GitHub 不会更新官网。
 
 ## 本地运行
 
@@ -30,7 +30,7 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 ## Cloudflare Pages · 主站
 
-主入口：[青岚仙途](https://qinglan-xiuxian.pages.dev/)。
+官网：[青岚仙途](https://xiuxian.011203.xyz/)。
 
 使用 `wrangler.jsonc` 与独立构建目录 `artifacts/cloudflare`，避免覆盖本机正在运行的 `dist`。Cloudflare 使用根路径 `/`，GitHub Pages 仍按仓库子路径构建。
 
@@ -54,7 +54,7 @@ npm run deploy:npc-ai
 
 `check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Actions 同步执行此检查，但只部署静态站；Worker 和 Cloudflare Pages 分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
 
-服务端按 `Origin` 完整匹配公网来源：`https://qinglan-xiuxian.pages.dev`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；按来源 IP 每 60 秒允许 12 次请求，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 超时 12 秒，客户端 14 秒；任何失败均回退本地台词。关闭对话会取消客户端请求，返回的文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
+服务端按 `Origin` 完整匹配公网来源：`https://xiuxian.011203.xyz`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；按来源 IP 每 60 秒允许 12 次请求，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 超时 12 秒，客户端 14 秒；任何失败均回退本地台词。关闭对话会取消客户端请求，返回的文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
 
 茶馆听书复用 `POST /chat`，请求带 `mode: "tea-story"`，仅接受 `npcId: "tea"` 和空历史；与闲谈共用来源检查和每 IP 限流。`TEA_STORY_SETTINGS` 单独设置 1400 tokens、900 字上限、服务端 20 秒 / 客户端 22 秒超时，提示生成 320–500 字的完整修仙故事；超长、截断或失败返回不展示故事，前端提示暂歇。正文以 `textContent` 展示，不写入存档，不控制奖励；原有听书委托仍半载后判定 30% 概率获赠 8 灵石，AI 失败也照常结算。
 
@@ -68,9 +68,9 @@ npm run deploy:npc-ai
 
 `src/town-story.ts` 管理《炉火未凉》的固定三章和分支，`mortal.smithStory` 只保存相识年岁 / 代际、帮助方式、旧钟去向和完成标记。人物姓名由原人口种子派生，沿用换代节点，不生成历史人物列表。按钮事件统一校验可选动作、扣除玄铁或一次性发奖后立即存档；AI 只接收经过校验的故事状态，由 Worker 生成事实提示，不具备写入故事或发奖的能力。故事变化会重置相关闲谈上下文，避免旧对白覆盖新的选择。
 
-## GitHub Pages · 备用站
+## GitHub Pages · 平台部署
 
-备用入口：[青岚仙途](https://chenxuan520.github.io/qinglan-xiuxian/)。
+平台部署地址：`https://chenxuan520.github.io/qinglan-xiuxian/`，不作为对外游玩入口。
 
 `.github/workflows/pages.yml` 在推送到 `master` 时执行格式检查、测试与生产构建，再部署到 GitHub Pages，也支持在 Actions 页面手动运行。仓库 Settings → Pages 的发布来源需设为 **GitHub Actions**；私有仓库需要支持 Pages 的 GitHub 套餐。
 

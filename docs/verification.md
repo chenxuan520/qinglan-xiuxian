@@ -1,5 +1,11 @@
 # 验证记录
 
+## 官网域名与 NPC 预检修复（2026-09-21）
+
+- `ALLOWED_ORIGINS` 漏配 `https://xiuxian.011203.xyz`，官网浏览器请求在预检阶段被拒绝。补入完整 HTTPS 来源，移除原 Cloudflare 默认域名白名单，保留 GitHub 来源与本机任意端口规则，其他同主域子域名、相似后缀和非 HTTPS 官网来源仍拒绝。测试改为读取实际部署配置，先复现官网 403 / 预期 204 的失败，修复后 NPC 相关 12 项测试与 Worker 类型检查通过。
+- Worker 最终部署版本 `d16ac156-56ec-4274-9e3f-427567666d6a`。Chrome DevTools MCP 隔离页从 `https://xiuxian.011203.xyz/` 实测：修复前 POST 被 CORS 拦截；修复后 OPTIONS 204、健康检查 200、真实 GLM 对话 200，响应头 `Access-Control-Allow-Origin` 精确为官网来源，返回有效中文对白，耗时约 1.6 秒。未操作玩家存档。
+- 官网统一为 `https://xiuxian.011203.xyz/`：README 只保留这个游玩入口，GitHub 仓库网站栏同步更新；开发指南和 AGENTS 约定同步。原 Cloudflare 平台域名已从所有受版本控制的文件移除，包括历史记录与测试；全文扫描为零处。格式与 diff 检查通过。本轮未改前端构建与玩法。
+
 ## 真仙导航悬停底色（2026-09-21）
 
 - 复现真仙导航悬停时出现浅绿矩形：上轮仅排除人物按钮，通用背景填色仍覆盖其他透明入口。本轮把填色限定给带底板的操作按钮、关卡 / 路线卡片和难度选项，导航、灵威履历与本命法宝文字入口保持透明，文字变色和当前导航底部细线保留。
@@ -110,8 +116,8 @@
 ## README 精简与 Cloudflare 主站同步（2026-09-20）
 
 - README 从 234 行缩至 31 行，保留封面、主入口、四项特色和简短启动命令。详细规则迁入 `docs/gameplay.md`，开发与部署迁入 `docs/development.md`；相对链接和封面路径检查通过，格式及 diff 空白检查通过。本次仅调整文档，不改游戏逻辑，未重复运行本地战斗测试。
-- README、GitHub 仓库网站栏、开发指南与 AGENTS.md 均明确 Cloudflare 为主站、GitHub Pages 为备用。主站地址为 `https://qinglan-xiuxian.pages.dev/`。
-- 通过项目发布命令完成类型检查、独立目录构建和 Cloudflare 上传，部署地址 `https://15490a51.qinglan-xiuxian.pages.dev`。发布的是已验证的 `a920e9c` 游戏代码，未提交部分仅为此次文档整理。
+- README、GitHub 仓库网站栏、开发指南与 AGENTS.md 均明确 Cloudflare 为主站、GitHub Pages 为备用。当时使用平台默认域名，现已统一使用官网自定义域名。
+- 通过项目发布命令完成类型检查、独立目录构建和 Cloudflare 上传，部署编号 `15490a51`。发布的是已验证的 `a920e9c` 游戏代码，未提交部分仅为此次文档整理。
 - Chrome DevTools MCP 隔离页面确认 Cloudflare 正式域名加载 `index-DT2-ROqn.js`，序章与首境九张 WebP 均返回 200；进入首页、开局与暂停正常，控制台无 error / warn。没有改动或刷新玩家页面，5173 服务和产物保持不变。
 
 ## GitHub 发布前检查与仓库信息（2026-09-20）
@@ -240,7 +246,7 @@
 
 ## Cloudflare 部署（2026-09-19）
 
-- 新建 `qinglan-xiuxian` Cloudflare Pages 项目，生产分支为 master，正式地址 `https://qinglan-xiuxian.pages.dev/`。通过 Wrangler 上传 28 个构建文件，服务纯静态站点，不增加后端或改变浏览器存档。
+- 新建 `qinglan-xiuxian` Cloudflare Pages 项目，生产分支为 master，当时使用平台默认域名。通过 Wrangler 上传 28 个构建文件，服务纯静态站点，不增加后端或改变浏览器存档。
 - 新增 Wrangler 配置和 `build:cloudflare` / `deploy:cloudflare` 命令，使用独立目录 `artifacts/cloudflare` 与根路径 `/`。不覆盖本机 5173 使用的 dist，GitHub Pages 继续按仓库子路径自动构建。
 - Cloudflare 构建的脚本为 `index-COG8J6_u.js`，与本机生产构建一致；GitHub Pages 对应脚本为 `index-DKA6Zrzm.js`，工作流 35449967472 成功。格式检查与 Cloudflare TypeScript / Vite 构建通过；安装 Wrangler 未变更已有依赖版本，令牌只从本机环境读取。
 - Chrome DevTools MCP 确认 Cloudflare 生产地址首页、脚本、样式、地图及新天劫立绘请求返回 200。首次验证遭遇网络切换错误，重新加载后恢复请求；当前网络下首次下载全部素材较慢。

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import worker, { dialogueMessages, extractReply, NPC_MODEL } from '../workers/npc-ai/index.ts';
 import { townResidents } from '../src/town-population.ts';
 import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from '../src/setting.ts';
@@ -7,11 +8,15 @@ import { freshSave } from '../src/progress.ts';
 import { chooseSmithStory, smithAt } from '../src/town-story.ts';
 
 const origins = [
-  'https://qinglan-xiuxian.pages.dev',
+  'https://xiuxian.011203.xyz',
   'https://chenxuan520.github.io',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ];
+const deployedOrigins =
+  readFileSync(new URL('../workers/npc-ai/wrangler.jsonc', import.meta.url), 'utf8').match(
+    /"ALLOWED_ORIGINS":\s*"([^"]*)"/,
+  )?.[1] ?? '';
 const input = {
   population: { seed: 12345, since: 15 },
   age: 15,
@@ -30,7 +35,7 @@ const env = (
   run = async () => ({ response: '火候正好，炉里这块铁就快成了。' }),
   success = true,
 ) => ({
-  ALLOWED_ORIGINS: origins.join(','),
+  ALLOWED_ORIGINS: deployedOrigins,
   NPC_LIMITER: { limit: async () => ({ success }) },
   AI: { run },
 });
@@ -77,10 +82,12 @@ test('不支持或缺失来源时所有入口都空响应拒绝，读体与限�
     '',
     'null',
     'https://unknown.example',
-    'https://qinglan-xiuxian.pages.dev.evil.example',
-    'https://attacker.pages.dev',
+    'https://attacker.example',
     'https://attacker.github.io',
     'https://chenxuan520.github.io.evil.example',
+    'https://xiuxian.011203.xyz.evil.example',
+    'https://other.011203.xyz',
+    'http://xiuxian.011203.xyz',
     'http://localhost.evil.example:5173',
     'http://127.0.0.1.evil.example',
     'http://localhost:65536',
@@ -112,7 +119,7 @@ test('公网精确来源与本机任意端口正常预检和对话，空配置�
     calls++;
     return { response: '好。' };
   });
-  bindings.ALLOWED_ORIGINS = ` , ${origins.slice(0, 2).join(', ')}, `;
+  bindings.ALLOWED_ORIGINS = ` , ${deployedOrigins}, `;
   const supported = [
     ...origins,
     'http://localhost',
@@ -125,11 +132,20 @@ test('公网精确来源与本机任意端口正常预检和对话，空配置�
   ];
   for (const origin of supported) {
     const preflight = await worker.fetch(
-      new Request('https://npc.example/chat', { method: 'OPTIONS', headers: { Origin: origin } }),
+      new Request('https://npc.example/chat', {
+        method: 'OPTIONS',
+        headers: {
+          Origin: origin,
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'content-type',
+        },
+      }),
       bindings,
     );
-    assert.equal(preflight.status, 204);
+    assert.equal(preflight.status, 204, origin);
     assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), origin);
+    assert.equal(preflight.headers.get('Access-Control-Allow-Methods'), 'POST, OPTIONS');
+    assert.equal(preflight.headers.get('Access-Control-Allow-Headers'), 'Content-Type');
     assert.equal((await worker.fetch(request(input, origin), bindings)).status, 200);
   }
   assert.equal(calls, supported.length);
