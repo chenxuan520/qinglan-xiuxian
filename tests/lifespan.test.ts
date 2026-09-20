@@ -46,7 +46,7 @@ test('七境按战斗时间计龄，暂停、选技与死亡不计龄，年龄�
   for (let stage = 0; stage < 7; stage++) {
     const g = quietGame(stage);
     for (let i = 0; i < 20; i++) g.update(0.05);
-    assert.ok(Math.abs(g.save.age - STAGE_YEARS_PER_MINUTE[stage] / 60) < 1e-8);
+    assert.ok(Math.abs(g.save.age - 15 - STAGE_YEARS_PER_MINUTE[stage] / 60) < 1e-8);
     const age = g.save.age;
     for (const state of ['paused', 'upgrade', 'lost', 'won'] as const) {
       g.state = state;
@@ -59,9 +59,9 @@ test('七境按战斗时间计龄，暂停、选技与死亡不计龄，年龄�
   }
 });
 
-test('炼气在第一境累计十分钟寿尽，普通复活无效，借寿延长三成并保留战绩', () => {
+test('炼气在第一境从十五岁累计八分半寿尽，普通复活无效，借寿延长三成并保留战绩', () => {
   const g = quietGame();
-  for (let i = 0; i < 11999; i++) g.update(0.05);
+  for (let i = 0; i < 10199; i++) g.update(0.05);
   assert.equal(g.state, 'playing');
   g.update(0.05);
   assert.equal(g.save.age, 100);
@@ -85,7 +85,7 @@ test('炼气在第一境累计十分钟寿尽，普通复活无效，借寿延�
   assert.equal(g.borrowLife(), 30);
   assert.equal(g.save.lifespanBonus, 60);
   const fresh = freshSave();
-  assert.equal(fresh.age, 0);
+  assert.equal(fresh.age, 15);
   assert.equal(fresh.lifespanBonus, 0);
 });
 
@@ -102,7 +102,7 @@ test('年龄与借寿保存恢复不重复扣减，旧档不追扣游戏时间',
   assert.equal(resumed.lifespan, 160);
   assert.equal(Game.restore(loaded, resumed.snapshot())!.save.age, 51.25);
   const legacy = parseSave(JSON.stringify({ ...save, age: undefined, lifespanBonus: undefined }));
-  assert.equal(legacy.age, 0);
+  assert.equal(legacy.age, 15);
   assert.equal(legacy.lifespanBonus, 0);
 });
 

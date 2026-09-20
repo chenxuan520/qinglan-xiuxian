@@ -8,6 +8,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 15,
     baseHp: 100,
     baseRegen: 0.18,
+    baseCrit: 0.07,
+    baseSpeed: 175,
     powerPerLevel: 5,
   },
   {
@@ -19,6 +21,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 12,
     baseHp: 95,
     baseRegen: 0.16,
+    baseCrit: 0.07,
+    baseSpeed: 175,
     powerPerLevel: 4,
   },
   {
@@ -30,6 +34,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 8,
     baseHp: 90,
     baseRegen: 0.14,
+    baseCrit: 0.05,
+    baseSpeed: 160,
     powerPerLevel: 3,
   },
   {
@@ -41,6 +47,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 6,
     baseHp: 90,
     baseRegen: 0.14,
+    baseCrit: 0.05,
+    baseSpeed: 160,
     powerPerLevel: 3,
   },
   {
@@ -52,6 +60,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 4,
     baseHp: 85,
     baseRegen: 0.12,
+    baseCrit: 0.03,
+    baseSpeed: 150,
     powerPerLevel: 2,
   },
   {
@@ -63,6 +73,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 3,
     baseHp: 85,
     baseRegen: 0.12,
+    baseCrit: 0.03,
+    baseSpeed: 150,
     powerPerLevel: 2,
   },
   {
@@ -74,6 +86,8 @@ export const SPIRIT_ROOTS = [
     damageBonus: 0,
     baseHp: 80,
     baseRegen: 0.1,
+    baseCrit: 0.01,
+    baseSpeed: 140,
     powerPerLevel: 1,
   },
 ] as const;
@@ -821,7 +835,7 @@ export const PASSIVES: Passive[] = [
     id: 'bone',
     name: '白骨魔功',
     mark: '骨',
-    desc: '气血上限 +14；受到伤害时以骨刺反击周围妖物，每重造成 12 点基础伤害',
+    desc: '每重气血上限 +14%；受伤时骨刺反击周围妖物，每重基础伤害为最大气血的 12%，再受伤害加成',
     color: '#dbcfb9',
     school: 'demonic',
   },
@@ -885,7 +899,7 @@ export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
 export const STAGES = [
   {
     name: '青岚竹海',
-    terrain: '/assets/terrain.png',
+    terrain: '/assets/terrain.webp',
     subtitle: '竹影藏灵 · 初入仙途',
     chapter: '壹',
     minutes: 3,
@@ -898,7 +912,7 @@ export const STAGES = [
   },
   {
     name: '落霞古墟',
-    terrain: '/assets/terrain-ruins.png',
+    terrain: '/assets/terrain-ruins.webp',
     subtitle: '古阵余烬 · 妖影渐生',
     chapter: '贰',
     minutes: 4,
@@ -911,7 +925,7 @@ export const STAGES = [
   },
   {
     name: '玄冰幽谷',
-    terrain: '/assets/terrain-ice.png',
+    terrain: '/assets/terrain-ice.webp',
     subtitle: '千载寒霜 · 冰魄凝心',
     chapter: '叁',
     minutes: 5,
@@ -924,7 +938,7 @@ export const STAGES = [
   },
   {
     name: '万毒深泽',
-    terrain: '/assets/terrain-marsh.png',
+    terrain: '/assets/terrain-marsh.webp',
     subtitle: '瘴云蔽日 · 万物归寂',
     chapter: '肆',
     minutes: 6,
@@ -937,7 +951,7 @@ export const STAGES = [
   },
   {
     name: '九幽冥府',
-    terrain: '/assets/terrain-nether.png',
+    terrain: '/assets/terrain-nether.webp',
     subtitle: '百鬼夜行 · 一剑镇魂',
     chapter: '伍',
     minutes: 7,
@@ -950,7 +964,7 @@ export const STAGES = [
   },
   {
     name: '太虚天境',
-    terrain: '/assets/terrain-heaven.png',
+    terrain: '/assets/terrain-heaven.webp',
     subtitle: '雷劫淬身 · 问道长生',
     chapter: '陆',
     minutes: 8,
@@ -963,7 +977,7 @@ export const STAGES = [
   },
   {
     name: '万劫归墟',
-    terrain: '/assets/terrain-trial.png',
+    terrain: '/assets/terrain-trial.webp',
     subtitle: '仙尊问劫 · 大乘破关',
     chapter: '柒',
     minutes: 10,

@@ -96,7 +96,7 @@ export function importSave(text: string) {
     (data.spiritRoot !== undefined && !SPIRIT_ROOTS.some((r) => r.id === data.spiritRoot)) ||
     (data.artifacts !== undefined && !artifactIds(data.artifacts)) ||
     (data.artifactDrops !== undefined && !artifactIds(data.artifactDrops)) ||
-    ['sound', 'autoplay'].some(
+    ['sound', 'autoplay', 'prologueSeen'].some(
       (key) => data[key] !== undefined && typeof data[key] !== 'boolean',
     ) ||
     (data.volume !== undefined &&

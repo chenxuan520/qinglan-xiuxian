@@ -43,6 +43,18 @@ export const SECTS = PASSIVES.map((manual, index) => ({
 }));
 
 export const MAX_MASTERY = 10;
+export const MASTERY_REALMS = [
+  { step: 2, name: '炼气后期' },
+  { step: 3, name: '筑基初期' },
+  { step: 6, name: '金丹初期' },
+  { step: 9, name: '元婴初期' },
+  { step: 12, name: '化神初期' },
+  { step: 15, name: '炼虚初期' },
+  { step: 18, name: '合体初期' },
+  { step: 21, name: '大乘初期' },
+  { step: 23, name: '大乘后期' },
+  { step: 24, name: '渡劫' },
+];
 export const MASTERY_PER_LEVEL = 0.03;
 export const SECT_ROLES = [
   '外门杂役',
@@ -55,15 +67,16 @@ export const SECT_ROLES = [
   '太上长老',
   '开宗老祖',
 ];
+export const MAX_SECT_DUES = 1000;
 export const SECT_DUES = [
   { years: 20, stones: 80 },
   { years: 50, stones: 200 },
   { years: 100, stones: 450 },
-  { years: 200, stones: 1000 },
-  { years: 400, stones: 2200 },
-  { years: 1000, stones: 6000 },
-  { years: 2000, stones: 14000 },
-  { years: 5000, stones: 30000 },
+  { years: 200, stones: MAX_SECT_DUES },
+  { years: 400, stones: MAX_SECT_DUES },
+  { years: 1000, stones: MAX_SECT_DUES },
+  { years: 2000, stones: MAX_SECT_DUES },
+  { years: 5000, stones: MAX_SECT_DUES },
   { years: 0, stones: 0 },
 ];
 export const TOWN_JOBS = {

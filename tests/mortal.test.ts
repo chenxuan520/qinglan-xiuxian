@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshSave, parseSave, realmCost } from '../src/progress.ts';
+import { freshSave, parseSave, realmCost, realmBonuses } from '../src/progress.ts';
 import { SECTS, SECT_DUES, MAX_MASTERY } from '../src/mortal-data.ts';
 import {
   advanceMortal,
@@ -18,9 +18,11 @@ import { PASSIVES, SPIRIT_ROOTS, treasure, evolutionPassives } from '../src/data
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { Game } from '../src/game.ts';
 
-function wealthy() {
+function wealthy(step = 0) {
   const s = freshSave();
   s.stones = 20000;
+  s.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
+  if (step === 24) s.completed = [6];
   return s;
 }
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
@@ -34,17 +36,17 @@ test('正魔各八宗，与十六功法一一对应', () => {
   assert.equal(SECTS.filter((s) => s.school === 'demonic').length, 8);
   assert.equal(new Set(SECTS.map((s) => s.name)).size, 16);
 });
-test('人间前台一分钟一年，同时扣寿元；无时间输入不补算', () => {
+test('城镇前台一分钟一年，同时扣寿元；无时间输入不补算', () => {
   const s = freshSave();
   advanceMortal(s, 60);
-  near(s.age, 1);
+  near(s.age, 16);
   near(s.mortal.years, 1);
   advanceMortal(s, 0);
   advanceMortal(s, NaN);
-  near(s.age, 1);
+  near(s.age, 16);
 });
 test('旧档补空人间数据，导出导入保留身份、账期、研习与精研', () => {
-  const s = wealthy();
+  const s = wealthy(6);
   joinSect(s, 'power');
   s.mortal.mastery.power = 2;
   startActivity(s, 'study');
@@ -77,7 +79,7 @@ test('供奉在边界准时扣除；不足自动清退，不能形成负余额',
   assert.equal(s.mortal.member, null);
   assert.equal(s.stones, 0);
 });
-test('境界越高供奉间隔、金额越大；突破不修改已承诺账单', () => {
+test('境界越高供奉间隔越长，金额递增至上限；突破不修改已承诺账单', () => {
   const s = wealthy();
   joinSect(s, 'power');
   s.cultivation = Array.from({ length: 6 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
@@ -90,11 +92,65 @@ test('境界越高供奉间隔、金额越大；突破不修改已承诺账单',
   assert.equal(s.mortal.member?.dueAt, 120);
   for (let i = 1; i < SECT_DUES.length - 1; i++) {
     assert.ok(SECT_DUES[i].years >= SECT_DUES[i - 1].years);
-    assert.ok(SECT_DUES[i].stones > SECT_DUES[i - 1].stones);
+    assert.ok(SECT_DUES[i].stones >= SECT_DUES[i - 1].stones);
+  }
+});
+test('供奉单次最多一千，低境界原价、缴费间隔及渡劫免供奉保留', () => {
+  const amounts = [80, 200, 450, 1000, 1000, 1000, 1000, 1000, 0];
+  const years = [20, 50, 100, 200, 400, 1000, 2000, 5000, 0];
+  for (let realm = 0; realm < amounts.length; realm++) {
+    const s = wealthy();
+    s.cultivation = Array.from({ length: realm * 3 }, (_, i) => realmCost(i)).reduce(
+      (sum, cost) => sum + cost,
+      0,
+    );
+    if (realm === 8) s.completed = [6];
+    assert.deepEqual(sectDues(s), { stones: amounts[realm], years: years[realm] });
+    joinSect(s, 'power');
+    assert.equal(s.mortal.member?.dues, amounts[realm]);
+  }
+});
+test('旧档和导入的未缴高额供奉立即封顶，不改变到期日或其他进度', () => {
+  for (const dues of [80, 200, 450, 1000, 2200, 6000, 14000, 30000]) {
+    const s = wealthy();
+    s.cultivation = 1e9;
+    joinSect(s, 'power');
+    s.mortal.member!.dues = dues;
+    s.mortal.mastery.power = 4;
+    startActivity(s, 'study');
+    s.mortal.years = 4999;
+    const expected = structuredClone(s.mortal);
+    expected.member!.dues = Math.min(dues, 1000);
+    for (const restored of [parseSave(JSON.stringify(s)), importSave(exportSave(s, null)).save]) {
+      assert.deepEqual(restored.mortal, expected);
+      assert.equal(restored.stones, s.stones);
+      assert.equal(restored.age, s.age);
+      assert.equal(restored.cultivation, s.cultivation);
+    }
+  }
+});
+test('旧高额账单结算最多扣一千，按封顶后的金额判断余额不足', () => {
+  for (const stones of [999, 1000, 1200]) {
+    const s = wealthy();
+    s.cultivation = 1e9;
+    joinSect(s, 'power');
+    s.mortal.member!.dues = 30000;
+    s.mortal.years = 4999;
+    s.stones = stones;
+    advanceMortal(s, 60);
+    if (stones < 1000) {
+      assert.equal(s.mortal.member, null);
+      assert.equal(s.stones, stones);
+    } else {
+      assert.equal(s.stones, stones - 1000);
+      assert.equal(s.mortal.member?.id, 'power');
+      assert.equal(s.mortal.member?.dueAt, 10000);
+      assert.equal(s.mortal.member?.dues, 1000);
+    }
   }
 });
 test('研习需成员身份，耗时完成才升级；新局自动获得本门一重功法', () => {
-  const s = wealthy();
+  const s = wealthy(2);
   assert.equal(startActivity(s, 'study'), false);
   joinSect(s, 'power');
   startActivity(s, 'study');
@@ -108,7 +164,7 @@ test('研习需成员身份，耗时完成才升级；新局自动获得本门�
   assert.equal(startActivity(s, 'study'), false);
 });
 test('低资质精研更慢；离开与读档不丢失进行中的研习', () => {
-  const s = wealthy();
+  const s = wealthy(2);
   joinSect(s, 'power');
   const fast = studyPlan(s).years;
   s.spiritRoot = 'none';
@@ -118,7 +174,7 @@ test('低资质精研更慢；离开与读档不丢失进行中的研习', () =>
   assert.deepEqual(parseSave(JSON.stringify(s)).mortal, s.mortal);
 });
 test('退宗保留精研，只有当前宗门加成；重新入宗恢复', () => {
-  const s = wealthy();
+  const s = wealthy(24);
   joinSect(s, 'power');
   s.mortal.mastery = { power: 10, blood: 10 };
   near(masteryBonus(s, 'power'), 0.3);
@@ -130,7 +186,7 @@ test('退宗保留精研，只有当前宗门加成；重新入宗恢复', () =>
   near(masteryBonus(s, 'power'), 0.3);
 });
 test('同刻欠费先清退，未完成的精研不发放成果', () => {
-  const s = wealthy();
+  const s = wealthy(2);
   joinSect(s, 'power');
   advanceMortal(s, 1140);
   startActivity(s, 'study');
@@ -174,24 +230,24 @@ test('委托收入只领取一次，坊市不能无成本套利，茶馆不是�
   assert.equal(s.stones, 22);
 });
 test('精研增强正向功法效果，保留原魔道代价与局内等级', () => {
-  const s = wealthy();
+  const s = wealthy(24);
   joinSect(s, 'power');
   s.mortal.mastery.power = 10;
   const g = new Game(s, 0, 0);
   g.passives.power = 2;
-  near(g.stats.damage, 1 + 0.24 * 1.3);
+  near(g.stats.damage, 1 + realmBonuses(24).damage + 0.24 * 1.3);
   assert.equal(g.passives.power, 2);
   leaveSect(s);
-  near(g.stats.damage, 1.24);
+  near(g.stats.damage, 1.24 + realmBonuses(24).damage);
   joinSect(s, 'blood');
   s.mortal.mastery.blood = 10;
   g.passives = { blood: 1 };
-  near(g.stats.damage, 1 + 0.15 * 1.3);
+  near(g.stats.damage, 1 + realmBonuses(24).damage + 0.15 * 1.3);
   near(g.stats.armor, 1.03);
 });
 test('所有宗门均增强对应功法，气血变化可安全恢复续局', () => {
   for (const sect of SECTS) {
-    const s = wealthy();
+    const s = wealthy(24);
     const g = new Game(s, 0, 0);
     g.passives[sect.id] = 1;
     g.player.hp = g.player.maxHp / 4;
@@ -208,7 +264,7 @@ test('所有宗门均增强对应功法，气血变化可安全恢复续局', ()
 });
 
 test('精研不能代替功法三重，也不会绕过历练路线', () => {
-  const s = wealthy();
+  const s = wealthy(24);
   const manual = evolutionPassives(treasure('sword'), 'orthodox')[0];
   joinSect(s, manual);
   s.mortal.mastery[manual] = 10;
@@ -228,7 +284,7 @@ test('精研不能代替功法三重，也不会绕过历练路线', () => {
 
 test('九幽减速、拘魂吸取和白骨反击的实际技能获得精研增益', () => {
   for (const id of ['abyss', 'soul', 'bone']) {
-    const s = wealthy();
+    const s = wealthy(24);
     joinSect(s, id);
     s.mortal.mastery[id] = 10;
     const g = new Game(s, 0, 0, () => 0.9);
@@ -243,13 +299,13 @@ test('九幽减速、拘魂吸取和白骨反击的实际技能获得精研增�
       assert.equal(g.pickups.find((p) => p.kind === 'xp')?.pull, true);
     } else {
       g.hurtPlayer(1);
-      near(e.maxHp - e.hp, 15.6 * g.stats.damage);
+      near(e.maxHp - e.hp, g.player.maxHp * 0.156 * g.stats.damage);
     }
   }
 });
 
 test('续局反复恢复不重复增加气血，退宗取消气血加成但不复活死者', () => {
-  const s = wealthy();
+  const s = wealthy(24);
   const g = new Game(s, 0, 0);
   g.passives.guard = 1;
   const base = Game.restore(s, g.snapshot())!;

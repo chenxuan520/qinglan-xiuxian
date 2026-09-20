@@ -4,6 +4,17 @@ import { exportSave, importSave, MAX_SAVE_FILE_BYTES } from '../src/save-transfe
 import { freshSave, parseSave } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 
+test('序章已读状态保留于存档和导入，未读或缺失字段时保持未读', () => {
+  const save = freshSave();
+  assert.equal(save.prologueSeen, false);
+  assert.equal(parseSave(JSON.stringify({ ...save, prologueSeen: undefined })).prologueSeen, false);
+  for (const seen of [true, false]) {
+    save.prologueSeen = seen;
+    assert.equal(parseSave(JSON.stringify(save)).prologueSeen, seen);
+    assert.equal(importSave(exportSave(save, null)).save.prologueSeen, seen);
+  }
+});
+
 test('存档导出导入保留永久进度、五行、炼器、待拾取与设置，不依赖浏览器存储', () => {
   const save = freshSave('dual', ['water', 'fire']);
   Object.assign(save, {
@@ -19,6 +30,7 @@ test('存档导出导入保留永久进度、五行、炼器、待拾取与设�
     sound: true,
     autoplay: true,
     volume: 0.27,
+    prologueSeen: true,
   });
   save.training = { power: 10, speed: 7, vitality: 5 };
   save.forge.ice = 10;
@@ -81,6 +93,7 @@ test('导入拒绝错误格式、版本、缺失字段、非法数值、损坏�
     { ...save, forge: { sword: '10' } },
     { ...save, rootElements: ['fire', 'fire'] },
     { ...save, spiritRoot: 'unknown' },
+    { ...save, prologueSeen: 'yes' },
     { ...save, activeRun: {} },
     { format: 'foreign', version: 1, save },
     { format: 'qinglan-save', version: 2, save },

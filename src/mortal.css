@@ -81,8 +81,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 350px;
-  padding: 35px 0;
+  min-height: 250px;
+  padding: 25px 0;
   overflow: hidden;
 }
 .mortal-hero > div:first-child {
@@ -109,15 +109,6 @@
   font-size: 11px;
   margin-top: 18px;
 }
-.mortal-hero-art {
-  position: absolute;
-  display: flex;
-  width: 53%;
-  right: 0;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
 .sect-art {
   display: block;
   background-repeat: no-repeat;
@@ -126,11 +117,286 @@
   clip-path: inset(0 0 4% 0);
   width: 100%;
 }
-.mortal-hero-art .sect-art {
-  width: 40%;
+.mortal-tabs {
+  display: flex;
+  gap: 12px;
+  margin: 26px 0;
+  border-bottom: 1px solid var(--border);
 }
-.mortal-hero-art .sect-art:first-child {
-  transform: translateY(12px);
+.mortal-tabs button {
+  padding: 15px 24px;
+  text-align: left;
+  border-bottom: 2px solid transparent;
+}
+.mortal-tabs strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: 3px;
+}
+.mortal-tabs span {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.mortal-tabs .active {
+  color: var(--gold);
+  border-bottom-color: var(--gold);
+  background: #a5b78c19;
+}
+.town-arrival {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 28px;
+  align-items: center;
+  padding: 26px;
+  border: 1px solid var(--border);
+  background: #16362c88;
+}
+.town-arrival h2,
+.town-scene h2 {
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--gold);
+  margin: 10px 0;
+}
+.town-arrival p {
+  font-size: 13px;
+  line-height: 2;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+.town-arrival-art {
+  display: flex;
+  align-items: end;
+  width: 100%;
+  min-height: 240px;
+}
+.town-arrival-art span {
+  width: 38%;
+  aspect-ratio: 1;
+  background: url('/assets/town-buildings.webp') no-repeat;
+  background-size: 300% 300%;
+}
+.town-arrival-art span:nth-child(2) {
+  background-position: 50% 0;
+  margin-left: -5%;
+  transform: translateY(-22px);
+}
+.town-arrival-art span:nth-child(3) {
+  background-position: 100% 100%;
+  margin-left: -5%;
+}
+.in-town #ui {
+  overflow: hidden;
+}
+.town-scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+.town-scene-heading,
+.town-scene-controls {
+  position: absolute;
+  z-index: 2;
+  left: max(22px, env(safe-area-inset-left));
+  right: max(22px, env(safe-area-inset-right));
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+}
+.town-scene-heading {
+  top: max(20px, env(safe-area-inset-top));
+  align-items: flex-start;
+}
+.town-scene-controls {
+  bottom: max(20px, env(safe-area-inset-bottom));
+  align-items: flex-end;
+}
+.town-hud,
+.town-scene-controls p {
+  padding: 12px 16px;
+  background: #102d27eb;
+  border: 1px solid var(--border);
+}
+.town-hud {
+  max-width: calc(100% - 170px);
+}
+.town-hud h2 {
+  margin: 0 0 3px;
+  font-size: 23px;
+}
+.town-scene small,
+.town-scene-controls p,
+#town-status span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.8;
+}
+#town-status strong {
+  display: block;
+  color: var(--gold);
+  font-size: 17px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin: 6px 0 2px;
+}
+#town-status em {
+  font-style: normal;
+}
+#town-status span {
+  display: block;
+}
+.town-scene-actions {
+  display: flex;
+  gap: 8px;
+}
+.town-scene-actions button,
+.town-scene-controls button {
+  pointer-events: auto;
+}
+.town-scene-actions button {
+  background: #102d27eb;
+  font-size: 12px;
+  min-height: 44px;
+}
+.town-scene-actions .fullscreen-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.town-scene .primary-button,
+.town-arrival .primary-button {
+  font-size: 14px;
+  min-height: 48px;
+  padding: 14px 22px;
+}
+.town-scene-controls button:disabled {
+  opacity: 1;
+  background: #17392de8;
+  border-color: var(--border);
+  color: var(--muted);
+}
+.town-view {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #1b2e28;
+  touch-action: none;
+  user-select: none;
+}
+.town-map {
+  position: absolute;
+  transform-origin: top left;
+  background:
+    linear-gradient(#665c3944, #665c3944),
+    url('/assets/town-ground.webp') repeat;
+  background-size: auto, 600px;
+  will-change: transform;
+}
+.town-water {
+  position: absolute;
+  inset: 0 0 0 3180px;
+  background: repeating-linear-gradient(172deg, #315857 0 28px, #426b6520 32px 35px), #264f52;
+}
+.town-street {
+  position: absolute;
+  background: url('/assets/town-ground.webp') repeat;
+  background-size: 600px;
+  box-shadow: 0 0 0 3px #b3aa8c88;
+}
+.town-street.town-dock {
+  background: none;
+  box-shadow: none;
+}
+.town-building {
+  position: absolute;
+  width: 305px;
+  height: 305px;
+  transform: translate(-50%, -100%);
+  background: url('/assets/town-buildings.webp') no-repeat;
+  background-size: 300% 300%;
+}
+.town-prop {
+  position: absolute;
+  background: url('/assets/town-props.webp') no-repeat;
+  background-size: 300% 200%;
+  pointer-events: none;
+}
+.town-minimap {
+  position: absolute;
+  bottom: max(108px, calc(env(safe-area-inset-bottom) + 88px));
+  left: max(22px, env(safe-area-inset-left));
+  width: 120px;
+  height: 84px;
+  border: 1px solid #d5c58e99;
+  opacity: 0.88;
+  pointer-events: none;
+}
+.town-player,
+.town-npc {
+  position: absolute;
+  transform: translate(-50%, -100%);
+}
+.town-player {
+  width: 78px;
+  height: 104px;
+  background-repeat: no-repeat;
+}
+.town-player > span {
+  display: block;
+  text-align: center;
+  margin-top: -18px;
+  font-size: 12px;
+  color: white;
+  text-shadow: 0 1px 3px #000;
+}
+.town-npc {
+  width: 112px;
+  height: 112px;
+  z-index: 1;
+}
+.town-npc-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: url('/assets/town-npcs.webp') no-repeat;
+  background-size: 300% 300%;
+}
+.town-npc-name {
+  position: absolute;
+  left: 50%;
+  top: -42px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 14px;
+  background: #122b24e8;
+  border: 1px solid #b9bc9277;
+  color: #e7dcaa;
+}
+.town-npc-name small {
+  display: block;
+  font-size: 10px;
+}
+.town-npc.nearby .town-npc-name {
+  border-color: #efdd9e;
+  background: #385339;
+}
+.town-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #142b25;
+  z-index: 1;
+  padding: 25px;
+  color: var(--gold);
 }
 .mortal-status {
   display: grid;
@@ -228,55 +494,14 @@
 .mortal-main .section-heading h2 {
   font-size: 23px;
 }
-.town-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin: 20px 0 45px;
-}
-.town-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 23px;
-  border: 1px solid var(--border);
-  background: #192f28bb;
-  gap: 12px;
-}
-.town-mark {
-  font-size: 25px;
-  color: var(--gold);
-  border: 1px solid #b3aa705c;
-  padding: 7px 12px;
-}
-.town-card h3 {
-  font-size: 19px;
-  font-weight: 500;
-}
+
 .town-card p,
-.town-card small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.9;
-}
-.town-card > .secondary-button,
-.town-trades {
-  margin-top: auto;
-  width: 100%;
-}
 .mortal-main .secondary-button {
   min-height: 43px;
   padding: 10px 14px;
   font-size: 12px;
 }
-.town-trades {
-  display: flex;
-  gap: 6px;
-}
-.town-trades button {
-  flex: 1;
-  padding-inline: 5px !important;
-}
+
 .mortal-filters {
   display: flex;
   border: 1px solid var(--border);
@@ -424,9 +649,7 @@
   .sect-card > .sect-art {
     max-width: 200px;
   }
-  .town-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+
   .mortal-status {
     grid-template-columns: repeat(2, 1fr);
     row-gap: 22px;
@@ -436,6 +659,13 @@
   }
 }
 @media (max-width: 600px) {
+  .town-arrival {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+  .town-arrival-art {
+    grid-row: 1;
+  }
   .mortal-entrance {
     flex-direction: column;
     align-items: stretch;
@@ -461,24 +691,19 @@
     font-size: 11px;
   }
   .mortal-hero {
-    min-height: 330px;
-    padding-block: 28px;
+    min-height: 0;
+    padding-block: 24px;
   }
   .mortal-hero h1 {
     font-size: 32px;
     letter-spacing: 3px;
   }
-  .mortal-hero-art {
-    width: 55%;
-    right: -8%;
-    opacity: 0.3;
-    top: 20px;
+  .mortal-tabs button {
+    flex: 1;
+    padding: 13px 10px;
   }
-  .mortal-hero-art .sect-art:first-child {
-    display: none;
-  }
-  .mortal-hero-art .sect-art {
-    width: 100%;
+  .mortal-tabs span {
+    font-size: 10px;
   }
   .mortal-status > div {
     padding: 0 12px;
@@ -504,19 +729,7 @@
   .mortal-main .section-heading .muted {
     font-size: 11px;
   }
-  .town-grid {
-    gap: 10px;
-  }
-  .town-card {
-    padding: 15px;
-    gap: 10px;
-  }
-  .town-card h3 {
-    font-size: 17px;
-  }
-  .town-trades {
-    flex-direction: column;
-  }
+
   .sect-grid {
     gap: 12px;
   }
@@ -554,7 +767,112 @@
   .sect-grid {
     grid-template-columns: 1fr;
   }
-  .town-grid {
-    grid-template-columns: 1fr;
+}
+
+.town-citizen {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  pointer-events: none;
+  animation: town-stroll 22s ease-in-out infinite alternate;
+}
+@keyframes town-stroll {
+  0%,
+  12% {
+    transform: translate(-50%, -100%);
+  }
+  80%,
+  100% {
+    transform: translate(110px, -100%);
+  }
+}
+.town-smoke {
+  position: absolute;
+  top: -20px;
+  right: 45px;
+  width: 32px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #eee3c87a, #eee3c800 70%);
+  animation: town-smoke 5s ease-out infinite;
+}
+@keyframes town-smoke {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.65);
+  }
+  25% {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0;
+    transform: translate(28px, -65px) scale(1.6);
+  }
+}
+.town-paused .town-citizen,
+.town-paused .town-smoke {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .town-citizen,
+  .town-smoke {
+    animation: none;
+  }
+}
+
+@media (max-width: 600px), (max-height: 500px) {
+  .town-scene-heading,
+  .town-scene-controls {
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    gap: 8px;
+  }
+  .town-scene-heading {
+    top: max(12px, env(safe-area-inset-top));
+  }
+  .town-scene-controls {
+    bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .town-hud,
+  .town-scene-controls p {
+    padding: 8px 10px;
+  }
+  .town-hud {
+    max-width: calc(100% - 126px);
+  }
+  .town-hud h2 {
+    font-size: 18px;
+  }
+  #town-status strong {
+    font-size: 14px;
+    margin-top: 2px;
+  }
+  .town-scene small,
+  #town-status span,
+  .town-scene-controls p {
+    font-size: 10px;
+  }
+  .town-scene-actions {
+    gap: 6px;
+  }
+  .town-scene-actions .secondary-button {
+    padding: 8px 10px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+  .town-scene-controls .primary-button {
+    padding: 10px 12px;
+    font-size: 12px;
+    max-width: 56%;
+  }
+  .town-minimap {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: max(82px, calc(env(safe-area-inset-bottom) + 70px));
+    width: 86px;
+    height: 60px;
+  }
+  .in-town .modal-backdrop {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
 }

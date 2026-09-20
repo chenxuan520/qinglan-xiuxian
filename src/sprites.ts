@@ -1,18 +1,18 @@
 import { assetUrl } from './asset-url.ts';
 
 export const SPRITE_ATLASES = [
-  { start: 0, columns: 4, url: '/assets/characters.png' },
-  { start: 8, columns: 3, url: '/assets/enemies-distinct.png' },
-  { start: 14, columns: 4, url: '/assets/enemies-ascended-1.png' },
-  { start: 22, columns: 4, url: '/assets/enemies-ascended-2.png' },
-  { start: 30, columns: 3, url: '/assets/bosses-six.png' },
-  { start: 36, columns: 6, url: '/assets/enemies-ruins.png' },
-  { start: 48, columns: 4, url: '/assets/enemies-ice.png' },
-  { start: 56, columns: 4, url: '/assets/enemies-marsh.png' },
-  { start: 64, columns: 4, url: '/assets/enemies-nether.png' },
-  { start: 72, columns: 4, url: '/assets/enemies-heaven.png' },
-  { start: 80, columns: 1, url: '/assets/boss-immortal.png' },
-  { start: 81, columns: 1, size: 1254, url: '/assets/boss-tribulation.png' },
+  { start: 0, columns: 4, url: '/assets/characters.webp' },
+  { start: 8, columns: 3, url: '/assets/enemies-distinct.webp' },
+  { start: 14, columns: 4, url: '/assets/enemies-ascended-1.webp' },
+  { start: 22, columns: 4, url: '/assets/enemies-ascended-2.webp' },
+  { start: 30, columns: 3, url: '/assets/bosses-six.webp' },
+  { start: 36, columns: 6, url: '/assets/enemies-ruins.webp' },
+  { start: 48, columns: 4, url: '/assets/enemies-ice.webp' },
+  { start: 56, columns: 4, url: '/assets/enemies-marsh.webp' },
+  { start: 64, columns: 4, url: '/assets/enemies-nether.webp' },
+  { start: 72, columns: 4, url: '/assets/enemies-heaven.webp' },
+  { start: 80, columns: 1, url: '/assets/boss-immortal.webp' },
+  { start: 81, columns: 1, size: 1254, url: '/assets/boss-tribulation.webp' },
 ];
 export function spriteFrame(index: number) {
   const atlas = SPRITE_ATLASES.filter((sheet) => index >= sheet.start).length - 1;

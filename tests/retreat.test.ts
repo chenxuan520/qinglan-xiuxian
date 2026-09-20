@@ -28,7 +28,7 @@ test('闭关免费度过年岁，获得少量随机修为，三属性均可随�
   assert.equal(result!.years, 10);
   assert.deepEqual(result!.gains, { vitality: 0, power: 3, speed: 0 });
   assert.equal(result!.cultivation, 4);
-  assert.equal(save.age, 10);
+  assert.equal(save.age, 25);
   assert.equal(save.stones, 80);
   assert.equal(save.cultivation, 4);
   assert.deepEqual(save.training, { vitality: 0, power: 0, speed: 0 });
@@ -86,6 +86,7 @@ test('闭关加成作用于实际气血、伤害与移速，续局及导入保�
 test('大乘闭关在天劫处截停，通关后的渡劫境自由快进，两者不再抽取收益', () => {
   for (const completed of [[], [6]]) {
     const save = freshSave();
+    save.age = 0; // 既有存档的天劫计时从零岁开始。
     save.cultivation = 1e9;
     save.completed = completed;
     syncTribulationClock(save);
@@ -154,10 +155,12 @@ test('七个有限寿元境界即便全投闭关或拆分闭关，也无法从�
         const save = freshSave();
         save.cultivation = start;
         save.spiritRoot = root.id;
-        const years = Math.floor(((lifespanInfo(save).limit - 0.1) / parts) * 10) / 10;
-        for (let i = 0; i < parts; i++) assert.ok(retreat(save, years, () => 0.999999));
+        const years = Math.floor(((lifespanInfo(save).remaining - 0.1) / parts) * 10) / 10;
+        const gainPerRetreat = retreatPlan(save, years)!.cultivation.max;
+        for (let i = 0; i < parts; i++)
+          assert.equal(retreat(save, years, () => 0.999999)?.cultivation, gainPerRetreat);
         assert.equal(realmInfo(save.cultivation).step, major * 3);
-        assert.ok(save.cultivation > start);
+        assert.equal(save.cultivation - start, gainPerRetreat * parts);
         assert.ok(
           save.cultivation - start < bossCultivationReward(Math.max(0, major - 1)) * root.rate,
         );

@@ -23,6 +23,8 @@
 | `src/main.ts`                         | 界面、输入、音频、存档写入与状态衔接      |
 | `src/render.ts`、`src/style.css`      | Canvas 绘制、桌面和移动布局               |
 | `src/item-art.ts`、`src/sprites.ts`   | 统一图集映射，列表和战场共用              |
+| `src/town.ts`、`src/town-scene.ts`    | 城镇坐标、行走与交互、模块地图及镜头      |
+| `src/scene-assets.ts`                 | 按关卡生成预载素材清单                    |
 | `src/asset-url.ts`                    | 静态素材的部署基础路径处理                |
 | `src/guide.ts`                        | 游戏内说明，玩法变化时同步维护            |
 | `public/assets/`                      | 已生成的图片及背景音乐                    |
@@ -43,6 +45,7 @@ npm run format:check
 - 修改战斗或成长后，运行相关测试；涉及整体难度时再运行 `npm run balance`、`npm run balance:trial` 或 `npm run balance:tribulation`。音频和文档改动无需重跑全部平衡模拟。
 - 视觉及交互改动需用真实页面验证，桌面和手机布局都要检查。开发模式可用 `window.__qinglan`；生产构建没有此入口。
 - 存档键为 `qinglan-immortal-v1`。兼容旧档，保留玩家进度，注意永久结算不能重复入账。测试使用隔离存档，禁止清空用户真实 localStorage。
+- 新图片生成后运行 `python3 scripts/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。
 - 动态素材 URL 使用 `assetUrl()`，兼容 GitHub Pages 子路径。新增素材先生成并检查，再接入。法宝图标沿用统一图集，避免混用图片和 SVG。
 - 背景音乐在首次真实点击或按键后启动，与音效共用总音量和静音；只创建一个播放实例，不在渲染循环中创建音源。保留用户静音偏好，音乐加载不得阻塞开局。生成方法见 [素材说明](docs/assets.md)。
 - 玩法变化同步 [README](README.md) 和游戏内指南；实际验证记录写入 [docs/verification.md](docs/verification.md)，不要把预计结果写成已通过。

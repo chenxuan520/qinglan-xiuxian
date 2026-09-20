@@ -212,9 +212,10 @@ export class Game {
     return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id));
   }
   private get maximumHealth() {
-    const base = this.baseHp + this.passivePower('guard') * 20 + this.passivePower('bone') * 14;
+    const base = this.baseHp + this.passivePower('guard') * 20;
     return Math.round(
       base *
+        (1 + this.passivePower('bone') * 0.14) *
         (this.path === 'orthodox' ? 1.12 : 1) *
         (1 + this.save.tribulations * 0.03) *
         (1 + this.save.retreatBonus.vitality / 100),
@@ -314,7 +315,7 @@ export class Game {
       area: 1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.1,
       duration: 1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.12,
       speed:
-        175 *
+        spiritRootInfo(this.spiritRoot).baseSpeed *
         (1 +
           this.save.training.speed * 0.02 +
           this.passivePower('crit') * 0.03 +
@@ -322,7 +323,9 @@ export class Game {
         (1 + this.save.retreatBonus.speed / 100),
       crit: Math.min(
         0.85,
-        0.07 + this.passivePower('crit') * 0.07 + this.passivePower('curse') * 0.06,
+        spiritRootInfo(this.spiritRoot).baseCrit +
+          this.passivePower('crit') * 0.07 +
+          this.passivePower('curse') * 0.06,
       ),
       criticalDamage: 1.8 + this.passivePower('curse') * 0.1,
       armor: Math.max(
@@ -2027,7 +2030,7 @@ export class Game {
       this.areaDamage(
         this.player,
         115 * this.stats.area,
-        this.passivePower('bone') * 12 * this.stats.damage,
+        this.player.maxHp * this.passivePower('bone') * 0.12 * this.stats.damage,
         'bone',
       );
       this.effect(this.player.x, this.player.y, 0.4, 115 * this.stats.area, '#dbcfb9', 'bone');
