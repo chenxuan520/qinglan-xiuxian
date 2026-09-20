@@ -76,7 +76,7 @@ import { MobileDisplay } from './mobile-display.ts';
 import { TownScene } from './town-scene.ts';
 import { TOWN_START, townClockRunning } from './town.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
-import { closeNpcChat, mountNpcChat } from './npc-chat.ts';
+import { closeNpcChat, mountNpcChat, mountTeaStory } from './npc-chat.ts';
 import { townVisit } from './town-history.ts';
 import { chooseSmithStory } from './town-story.ts';
 
@@ -318,7 +318,7 @@ function renderLobby() {
         <button class="realm-preview" data-action="cultivation"><span class="vertical-poem">万法归一 · 道心长存</span><span class="realm-circle"><small>当前境界</small><strong>${realm.ascending ? '渡劫' : REALMS[realm.index]}</strong><span>${realm.ascending ? '待破七境' : ['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>
       </section>`
       }
-      ${chronicleEntrance(save)}${spiritRootSummary()}${lifespanSummary()}${mortalEntrance(save)}
+      ${spiritRootSummary(true)}${mortalEntrance(save)}
       <section class="expedition" aria-label="选择秘境">
         ${pendingRun ? `<div class="resume-banner"><div><span class="status-dot"></span>尚有一段仙缘未了<small>${pendingRun.encounterName} · ${formatTime(pendingRun.time)} · ${pathInfo(pendingRun.path).name} · 局内 ${pendingRun.level} 级</small></div><button class="secondary-button" data-action="restore">继续上次历练 ${smallIcon('arrow')}</button></div>` : ''}
         <div class="section-heading"><div><span class="section-number">${completed ? '圆满' : '壹 / 柒'}</span><h2>${completed ? '故地重游，山河依旧' : '择一秘境，启程修行'}</h2></div><span class="muted">已探索 ${save.completed.length} / ${STAGES.length} 处秘境</span></div>
@@ -328,7 +328,7 @@ function renderLobby() {
         <div class="depart-row"><div class="difficulty-wrap"><span class="field-label">历练难度</span><div class="difficulty-switch" role="group" aria-label="历练难度">${DIFFICULTIES.map((d, i) => `<button data-action="difficulty" data-id="${i}" class="${i === difficulty ? 'active' : ''}" aria-pressed="${i === difficulty}">${d.name}<small>${i === 0 ? '推荐初修' : `收益 ×${d.reward}`}</small></button>`).join('')}</div></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? (completed ? '再入山河' : '踏入秘境') : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button></div>
       </section>
     </main>
-    <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><span><span class="status-dot"></span>${storageAvailable ? '修行进度自动保存于本机' : '本机存档不可用'}</span><span class="footer-tag">${completed ? '七境已破 · 天地逍遥' : '心有所向 · 道阻且长'}</span></footer>`;
+    <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><span><span class="status-dot"></span>${storageAvailable ? '修行进度自动保存于本机' : '本机存档不可用'}</span>${chronicleEntrance(save)}</footer>`;
   if (sectDuesPending(save)) renderSectDues();
 }
 function renderPrologue() {
@@ -377,6 +377,20 @@ function showTownEvent(npc: TownResident) {
   panel = 'town-event';
   panelFrame(npc.name, `${npc.place} · ${npc.role}`, townEventContent(save, npc));
   mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
+}
+function showTeaStory() {
+  panel = 'tea-story';
+  panelFrame(
+    '一盏茶，半卷仙途',
+    '听雨茶馆 · 仙途旧闻',
+    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">醒木初落，且候这一回故事…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div></section><p class="panel-note">阅读与朗读时不计龄；回到城镇后继续半载听书委托，完成时有 30% 概率获赠 8 灵石。说书暂歇也不影响原有机缘。</p><button class="primary-button" data-action="close">回到街巷</button>',
+  );
+  void mountTeaStory(modal.querySelector<HTMLElement>('.tea-story')!, save, () => {
+    save.sound = true;
+    if (save.volume === 0) save.volume = 0.6;
+    unlockAudio();
+    persist();
+  });
 }
 function renderMortal(enter = false) {
   releaseTownScene();
@@ -442,9 +456,10 @@ function tickMortal(now: number) {
     nextMortalStatus = now + 1000;
   }
 }
-function spiritRootSummary() {
+function spiritRootSummary(showAge = false) {
+  const life = lifespanInfo(save);
   const root = spiritRootInfo(save.spiritRoot);
-  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div></div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>基础暴击 <b>${Math.round(root.baseCrit * 100)}%</b> · 基础移速 <b>${root.baseSpeed}</b><br>悟道每阶 <b>+${root.powerPerLevel}%</b><small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
+  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div>${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>基础暴击 <b>${Math.round(root.baseCrit * 100)}%</b> · 基础移速 <b>${root.baseSpeed}</b><br>悟道每阶独立增伤 <b>+${root.powerPerLevel}%</b><small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
 }
 function lifespanSummary() {
   const life = lifespanInfo(save);
@@ -461,7 +476,7 @@ function retreatSection() {
   const years = immortal
     ? 1000
     : Math.max(0.1, Math.floor(Math.min(life.limit * 0.1, life.remaining / 2) * 10) / 10);
-  return `<div class="section-heading"><h3>闭关修炼</h3><span>只耗年岁 · 不花灵石</span></div><p class="panel-note">${immortal ? (save.completed.includes(FINAL_TRIAL_STAGE) ? '七境已破，天劫不再降临。闭关只推进年岁，不获得修为或属性；可按填写年数出关。' : '大乘起闭关不再获得修为或属性，只推进年岁；到达天劫时立即出关迎劫。') : '闭关获得少量随机修为：按投入年数占寿元上限的比例计算，灵根越好收益越高，明显慢于历练。一世寿元全部用于闭关，也不足以从大境界初期突破至中期；接近突破时可以补足修为。另按相同比例抽取属性提升，例如寿元 100 年闭关 50 年，有 50% 概率随机提升气血、法宝伤害或移速中的一项 1%～3%。不增加根基阶数。'}</p><div class="retreat-form"><label for="retreat-years">闭关年数<input id="retreat-years" type="number" inputmode="decimal" min="0.1" step="0.1" value="${years}" required aria-describedby="retreat-estimate"></label><button class="secondary-button" data-action="retreat" ${retreatPlan(save, years) ? '' : 'disabled'}>开始闭关</button></div><p class="panel-note" id="retreat-estimate" role="status">${retreatEstimate(years)}</p><p class="panel-note">闭关累计：气血 +${save.retreatBonus.vitality}% · 法宝伤害 +${save.retreatBonus.power}% · 移速 +${save.retreatBonus.speed}%。轮回后清空。</p>`;
+  return `<div class="section-heading"><h3>闭关修炼</h3><span>只耗年岁 · 不花灵石</span></div><p class="panel-note">${immortal ? (save.completed.includes(FINAL_TRIAL_STAGE) ? '七境已破，天劫不再降临。闭关只推进年岁，不获得修为或属性；可按填写年数出关。' : '大乘起闭关不再获得修为或属性，只推进年岁；到达天劫时立即出关迎劫。') : '闭关获得少量随机修为：按投入年数占寿元上限的比例计算，灵根越好收益越高，明显慢于历练。长时间闭关有机会推进小阶段；一世寿元全部闭关仍不足以跨越一个完整大境界。另按相同比例抽取属性提升，例如寿元 100 年闭关 50 年，有 50% 概率随机提升气血、法宝伤害或移速中的一项 1%～3%。不增加根基阶数。'}</p><div class="retreat-form"><label for="retreat-years">闭关年数<input id="retreat-years" type="number" inputmode="decimal" min="0.1" step="0.1" value="${years}" required aria-describedby="retreat-estimate"></label><button class="secondary-button" data-action="retreat" ${retreatPlan(save, years) ? '' : 'disabled'}>开始闭关</button></div><p class="panel-note" id="retreat-estimate" role="status">${retreatEstimate(years)}</p><p class="panel-note">闭关累计：气血 +${save.retreatBonus.vitality}% · 法宝伤害 +${save.retreatBonus.power}% · 移速 +${save.retreatBonus.speed}%。轮回后清空。</p>`;
 }
 function weaponAffinity(
   item: Treasure,
@@ -572,8 +587,8 @@ function renderPanel() {
             id: 'power',
             name: '悟道',
             icon: 'power',
-            desc: `每阶法宝伤害 +${spiritRootInfo(save.spiritRoot).powerPerLevel}%`,
-            detail: `${spiritRootInfo(save.spiritRoot).name} · 参悟万法`,
+            desc: `每阶独立增伤 +${spiritRootInfo(save.spiritRoot).powerPerLevel}%`,
+            detail: `${spiritRootInfo(save.spiritRoot).name} · 当前增伤 +${Number((save.training.power * spiritRootInfo(save.spiritRoot).powerPerLevel).toFixed(1))}%`,
           },
           {
             id: 'speed',
@@ -590,7 +605,7 @@ function renderPanel() {
         )
         .join(
           '',
-        )}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p>${retreatSection()}<div class="reincarnation-row"><div><h3>存档备份</h3><p>导出 JSON 保存全部进度，可在其他设备或网址导入。</p></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出存档</button><button class="secondary-button" data-action="import-save">导入存档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
+        )}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；前十阶费用保持，后十阶涨幅放缓，单项修满共需 47373 灵石。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p>${retreatSection()}<div class="reincarnation-row"><div><h3>存档备份</h3><p>导出 JSON 保存全部进度，可在其他设备或网址导入。</p></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出存档</button><button class="secondary-button" data-action="import-save">导入存档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
       true,
     );
   } else if (panel === 'chronicle') {
@@ -936,7 +951,7 @@ function renderRootPicker() {
   const container = modal.querySelector('#root-picker');
   if (!container) return;
   const root = spiritRootInfo(adRoot);
-  container.innerHTML = `<div class="root-quality-options" role="group" aria-label="灵根资质">${SPIRIT_ROOTS.map((r) => `<button class="secondary-button ${r.id === adRoot ? 'selected' : ''}" data-action="ad-root-quality" data-id="${r.id}" aria-pressed="${r.id === adRoot}">${r.name}${r.count > 1 ? `·${r.count}系` : ''}</button>`).join('')}</div><p>选择 ${root.count} 种五行 · 已选 ${adElements.length} / ${root.count} · 对应法宝伤害 +${root.damageBonus}%<br>灵气与修为 ${Math.round(root.rate * 100)}%，基础气血 ${root.baseHp}，基础回血 ${root.baseRegen.toFixed(2)}/秒，悟道每阶 +${root.powerPerLevel}%。<br>基础暴击 ${Math.round(root.baseCrit * 100)}% · 基础移速 ${root.baseSpeed} 地图像素/秒。<br>首位五行决定默认本命。</p><div class="root-element-options" role="group" aria-label="灵根五行">${ELEMENTS.map((e) => `<button class="secondary-button ${adElements.includes(e.id) ? 'selected' : ''}" data-action="ad-root-element" data-id="${e.id}" aria-pressed="${adElements.includes(e.id)}" ${root.count ? '' : 'disabled'}>${e.name}${adElements[0] === e.id ? ' · 首位' : ''}</button>`).join('')}</div><small>入门法宝：${ROOT_STARTERS[adElements[0] ?? 'metal'].map((id) => treasure(id).name).join(' / ')}；领取后设为当前路线本命，已有收藏与炼器保留。</small>`;
+  container.innerHTML = `<div class="root-quality-options" role="group" aria-label="灵根资质">${SPIRIT_ROOTS.map((r) => `<button class="secondary-button ${r.id === adRoot ? 'selected' : ''}" data-action="ad-root-quality" data-id="${r.id}" aria-pressed="${r.id === adRoot}">${r.name}${r.count > 1 ? `·${r.count}系` : ''}</button>`).join('')}</div><p>选择 ${root.count} 种五行 · 已选 ${adElements.length} / ${root.count} · 对应法宝伤害 +${root.damageBonus}%<br>灵气与修为 ${Math.round(root.rate * 100)}%，基础气血 ${root.baseHp}，基础回血 ${root.baseRegen.toFixed(2)}/秒，悟道每阶独立增伤 +${root.powerPerLevel}%。<br>基础暴击 ${Math.round(root.baseCrit * 100)}% · 基础移速 ${root.baseSpeed} 地图像素/秒。<br>首位五行决定默认本命。</p><div class="root-element-options" role="group" aria-label="灵根五行">${ELEMENTS.map((e) => `<button class="secondary-button ${adElements.includes(e.id) ? 'selected' : ''}" data-action="ad-root-element" data-id="${e.id}" aria-pressed="${adElements.includes(e.id)}" ${root.count ? '' : 'disabled'}>${e.name}${adElements[0] === e.id ? ' · 首位' : ''}</button>`).join('')}</div><small>入门法宝：${ROOT_STARTERS[adElements[0] ?? 'metal'].map((id) => treasure(id).name).join(' / ')}；领取后设为当前路线本命，已有收藏与炼器保留。</small>`;
 }
 function rememberRewardReturn() {
   rewardReturnPanel = panel;
@@ -1465,6 +1480,7 @@ function handleAction(action: string, id?: string) {
           treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
         }
         syncMortalChange();
+        if (fromTown && action === 'mortal-activity' && id === 'tea') showTeaStory();
         if (fromTown && (action === 'mortal-buy' || action === 'mortal-sell') && townNpc)
           showTownEvent(townNpc);
         if (action === 'mortal-join' || action === 'mortal-leave') toast(save.mortal.events[0]);

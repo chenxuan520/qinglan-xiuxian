@@ -21,4 +21,11 @@ export const NPC_AI_SETTINGS = {
   temperature: 0.7,
 } as const;
 
+export const TEA_STORY_SETTINGS = {
+  maxReplyLength: 900,
+  maxOutputTokens: 1400,
+  requestTimeoutMs: 22000,
+  inferenceTimeoutMs: 20000,
+} as const;
+
 // 域名绑定、来源白名单和边缘限流绑定属于部署设置，见 workers/npc-ai/wrangler.jsonc。

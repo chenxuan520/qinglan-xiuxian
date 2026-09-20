@@ -219,7 +219,8 @@ export class Game {
     const base = this.baseHp + this.passivePower('guard') * 20;
     return Math.round(
       base *
-        (1 + this.passivePower('bone') * 0.14) *
+        (1 + this.passivePower('bone') * 0.18) *
+        (1 - (this.passives.frenzy || 0) * 0.02) *
         (this.path === 'orthodox' ? 1.12 : 1) *
         (1 + this.save.tribulations * 0.03) *
         (1 + this.save.retreatBonus.vitality / 100),
@@ -301,13 +302,14 @@ export class Game {
     return {
       damage:
         (1 +
-          (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100 +
           realmBonuses(this.realm).damage +
           this.passivePower('power') * 0.12 +
           this.passivePower('spirit') * 0.04 +
-          this.passivePower('blood') * 0.15 +
-          this.passivePower('forbidden') * 0.06 +
+          this.passivePower('blood') * 0.18 +
+          this.passivePower('forbidden') * 0.08 +
           (this.path === 'demonic' ? 0.12 : 0)) *
+        (1 - (this.passives.abyss || 0) * 0.02) *
+        (1 + (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
         realmDamageMultiplier(this.realm),
@@ -315,29 +317,32 @@ export class Game {
         0.3,
         1 -
           this.passivePower('haste') * 0.07 -
-          this.passivePower('frenzy') * (this.player.hp < this.player.maxHp / 2 ? 0.08 : 0.03),
+          this.passivePower('frenzy') * (this.player.hp < this.player.maxHp / 2 ? 0.1 : 0.08) +
+          (this.passives.soul || 0) * 0.01,
       ),
-      area: 1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.1,
-      duration: 1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.12,
+      area: 1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.16,
+      duration: 1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.2,
       speed:
         spiritRootInfo(this.spiritRoot).baseSpeed *
         (1 +
           this.save.training.speed * 0.02 +
           this.passivePower('crit') * 0.03 +
           (this.player.hp < this.player.maxHp / 2 ? this.passivePower('frenzy') * 0.04 : 0)) *
-        (1 + this.save.retreatBonus.speed / 100),
+        (1 + this.save.retreatBonus.speed / 100) *
+        (1 - (this.passives.bone || 0) * 0.01),
       crit: Math.min(
         0.85,
         spiritRootInfo(this.spiritRoot).baseCrit +
           this.passivePower('crit') * 0.07 +
-          this.passivePower('curse') * 0.06,
+          this.passivePower('curse') * 0.08,
       ),
-      criticalDamage: 1.8 + this.passivePower('curse') * 0.1,
+      criticalDamage: 1.8 + this.passivePower('curse') * 0.12,
       armor: Math.max(
         0.3,
         1 -
           this.passivePower('guard') * 0.06 +
           (this.passives.blood || 0) * 0.03 +
+          (this.passives.curse || 0) * 0.015 +
           (this.passives.forbidden || 0) * 0.015,
       ),
       magnet: 85 * (1 + this.passivePower('magnet') * 0.28),
@@ -345,15 +350,16 @@ export class Game {
         ((1 +
           this.passivePower('spirit') * 0.15 +
           this.passivePower('magnet') * 0.08 +
-          this.passivePower('soul') * 0.06 +
-          this.passivePower('forbidden') * 0.12) /
+          this.passivePower('soul') * 0.1 +
+          this.passivePower('forbidden') * 0.18) /
           DIFFICULTIES[this.difficulty].amount) *
         0.9 *
         spiritRootInfo(this.spiritRoot).rate,
       regen:
         (spiritRootInfo(this.spiritRoot).baseRegen + this.passivePower('duration') * 0.2) *
-        (this.path === 'orthodox' ? 1.2 : 1),
-      killHeal: this.passivePower('devour') * 0.15,
+        (this.path === 'orthodox' ? 1.2 : 1) *
+        (1 - (this.passives.devour || 0) * 0.04),
+      killHeal: this.passivePower('devour') * (0.18 + this.player.maxHp * 0.0002),
     };
   }
   announce(message: string) {
@@ -1983,7 +1989,7 @@ export class Game {
           pull:
             !!this.passives.soul &&
             distance(e, this.player) <=
-              (80 + this.passives.soul * 40) * (1 + masteryBonus(this.save, 'soul')),
+              (110 + this.passives.soul * 50) * (1 + masteryBonus(this.save, 'soul')),
         });
       if (
         (e.elite && (!this.isFinalTrial || this.random() < 0.06)) ||
@@ -2143,10 +2149,12 @@ export class Game {
     }
     if (c.type === 'passive') {
       this.passives[c.id] = c.level;
-      if (c.id === 'guard' || c.id === 'bone') {
+      if (c.id === 'guard' || c.id === 'bone' || c.id === 'frenzy') {
+        const oldMax = this.player.maxHp;
         const increase = this.maximumHealth - this.player.maxHp;
         this.player.maxHp = this.maximumHealth;
-        this.heal(increase);
+        if (increase >= 0) this.heal(increase);
+        else this.player.hp *= this.player.maxHp / oldMax;
       }
     }
     if (c.type === 'heal') {

@@ -77,14 +77,14 @@ test('36 件法宝未觉醒与觉醒的实际伤害按灵根百分比加持，�
           Math.abs(
             damage / baseline -
               ((1 + root.damageBonus / 100) * (1 + (5 * root.powerPerLevel) / 100)) /
-                (1 + 5 * 0.01),
+                (1 + 5 * 0.012),
           ) < 1e-8,
           `${item.id} ${root.id} ${evolved}: ${damage / baseline}`,
         );
       }
       const other = ELEMENTS.find((e) => e.id !== item.element)!.id;
       assert.ok(
-        Math.abs(battle(item, 'heaven', [other], evolved) / baseline - 1.25 / 1.05) < 1e-8,
+        Math.abs(battle(item, 'heaven', [other], evolved) / baseline - 1.1 / 1.06) < 1e-8,
         item.id,
       );
     }

@@ -317,17 +317,17 @@ test('旧版元婴对局补齐境界加成，保留已损失气血，重复读�
   legacy.player.hp = legacy.player.maxHp - 37;
   const restored = Game.restore(save, legacy)!;
   assert.ok(restored);
-  assert.equal(restored.player.maxHp, 380);
-  assert.equal(restored.player.hp, 343);
+  assert.equal(restored.player.maxHp, 393);
+  assert.equal(restored.player.hp, 356);
   assert.equal(restored.stats.damage, 2.4);
   const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
-  assert.equal(again.player.hp, 343);
-  assert.equal(again.player.maxHp, 380);
+  assert.equal(again.player.hp, 356);
+  assert.equal(again.player.maxHp, 393);
   assert.equal(again.stats.damage, 2.4);
   again.state = 'upgrade';
   again.choices = [{ type: 'passive', id: 'guard', level: 3 }];
   again.choose(0);
-  assert.equal(again.player.maxHp, 402);
+  assert.equal(again.player.maxHp, 417);
 });
 test('通关奖励跨大境界后，下次开局获得完整加成且没有额外修为', () => {
   const save = freshSave();

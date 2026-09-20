@@ -106,10 +106,10 @@ test('年龄与借寿保存恢复不重复扣减，旧档不追扣游戏时间',
   assert.equal(legacy.lifespanBonus, 0);
 });
 
-test('悟道每阶收益按天异普通伪无分别5/4/3/2/1%，旧等级保留且当前局锁定资质', () => {
+test('悟道每阶收益按天异普通伪无分别2/1.8/1.6/1.4/1.2%，旧等级保留且当前局锁定资质', () => {
   assert.deepEqual(
     SPIRIT_ROOTS.map((r) => r.powerPerLevel),
-    [5, 4, 3, 3, 2, 2, 1],
+    [2, 1.8, 1.6, 1.6, 1.4, 1.4, 1.2],
   );
   for (const root of SPIRIT_ROOTS) {
     const save = freshSave(root.id);
@@ -119,6 +119,6 @@ test('悟道每阶收益按天异普通伪无分别5/4/3/2/1%，旧等级保留�
     attuneSpiritRoot(save, 'heaven', ['metal']);
     assert.equal(save.training.power, 10);
     assert.equal(g.stats.damage, 1 + (10 * root.powerPerLevel) / 100);
-    assert.equal(new Game(save, 0, 0).stats.damage, 1.5);
+    assert.equal(new Game(save, 0, 0).stats.damage, 1.2);
   }
 });

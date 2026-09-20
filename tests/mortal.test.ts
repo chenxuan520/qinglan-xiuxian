@@ -266,6 +266,24 @@ test('委托收入只领取一次，坊市不能无成本套利，茶馆不是�
   advanceMortal(s, 30, () => 0.9);
   assert.equal(s.stones, 22);
 });
+test('听书原有机缘在半载委托完成时判定，30% 边界与一次结算保留', () => {
+  for (const roll of [0, 0.299999, 0.3, 0.9]) {
+    const s = freshSave();
+    assert.equal(startActivity(s, 'tea'), true);
+    assert.equal(startActivity(s, 'tea'), false);
+    advanceMortal(s, 29, () => roll);
+    assert.equal(s.stones, 0);
+    assert.equal(s.mortal.activity?.kind, 'tea');
+    advanceMortal(s, 1, () => roll);
+    assert.equal(s.stones, roll < 0.3 ? 8 : 0);
+    assert.equal(s.mortal.activity, null);
+    near(s.age, 15.5);
+    advanceMortal(s, 60, () => 0);
+    assert.equal(s.stones, roll < 0.3 ? 8 : 0);
+    assert.equal(s.iron, 0);
+    assert.equal(s.cultivation, 0);
+  }
+});
 test('精研增强正向功法效果，保留原魔道代价与局内等级', () => {
   const s = wealthy(24);
   joinSect(s, 'power');
@@ -279,7 +297,7 @@ test('精研增强正向功法效果，保留原魔道代价与局内等级', ()
   joinSect(s, 'blood');
   s.mortal.mastery.blood = 10;
   g.passives = { blood: 1 };
-  near(g.stats.damage, (1 + realmBonuses(24).damage + 0.15 * 1.3) * 2);
+  near(g.stats.damage, (1 + realmBonuses(24).damage + 0.18 * 1.3) * 2);
   near(g.stats.armor, 1.03);
 });
 test('所有宗门均增强对应功法，气血变化可安全恢复续局', () => {
@@ -388,7 +406,7 @@ test('十六宗门开局各送对应一重，占原有功法槽，旧续局不�
     const g = new Game(s, 0, 0);
     assert.deepEqual(g.passives, { [sect.id]: 1 });
     if (sect.id === 'guard') assert.equal(g.player.maxHp, 134);
-    if (sect.id === 'bone') assert.equal(g.player.maxHp, 114);
+    if (sect.id === 'bone') assert.equal(g.player.maxHp, 118);
     const restored = Game.restore(s, g.snapshot())!;
     assert.deepEqual(restored.passives, g.passives);
     const ids = PASSIVES.filter((p) => p.id !== sect.id)

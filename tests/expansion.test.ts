@@ -139,13 +139,13 @@ test('魔道功法分别触发残血加速、承伤代价、骨刺反击、减�
   assert.equal(e.hp, hp, '无敌间隔内不能重复反击');
   g.passives = { soul: 2, devour: 2 };
   const near = target(g, 150),
-    far = target(g, 200),
+    far = target(g, 240),
     playerHp = g.player.hp;
   g.hitEnemy(near, 20000);
   g.hitEnemy(far, 20000);
-  assert.ok(Math.abs(g.player.hp - playerHp - 0.6) < 1e-9);
+  assert.ok(Math.abs(g.player.hp - playerHp - 2 * g.stats.killHeal) < 1e-9);
   assert.equal(g.pickups.find((p) => p.x === 150 && p.kind === 'xp')?.pull, true);
-  assert.equal(g.pickups.find((p) => p.x === 200 && p.kind === 'xp')?.pull, false);
+  assert.equal(g.pickups.find((p) => p.x === 240 && p.kind === 'xp')?.pull, false);
 });
 
 test('玄天伞清除近身敌弹并反击，失效敌弹不能伤害角色', () => {

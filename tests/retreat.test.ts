@@ -27,10 +27,10 @@ test('闭关免费度过年岁，获得少量随机修为，三属性均可随�
   const result = retreat(save, 10, () => values.shift()!);
   assert.equal(result!.years, 10);
   assert.deepEqual(result!.gains, { vitality: 0, power: 3, speed: 0 });
-  assert.equal(result!.cultivation, 4);
+  assert.equal(result!.cultivation, 8);
   assert.equal(save.age, 25);
   assert.equal(save.stones, 80);
-  assert.equal(save.cultivation, 4);
+  assert.equal(save.cultivation, 8);
   assert.deepEqual(save.training, { vitality: 0, power: 0, speed: 0 });
   assert.deepEqual(retreat(save, 10, () => 0.1)?.gains, { vitality: 0, power: 0, speed: 0 });
   assert.deepEqual(save.retreatBonus, { vitality: 0, power: 3, speed: 0 });
@@ -127,12 +127,14 @@ test('100年寿元投入50年为50%整次成功率，临界抽签失败；投入
 });
 
 test('相同投入的闭关修为随资质递减，收益符合预览的随机百分比范围', () => {
-  const expected = [21, 17, 14, 11, 8, 6, 4];
+  const expected = [42, 35, 29, 23, 16, 12, 8];
   for (const [i, root] of SPIRIT_ROOTS.entries()) {
     for (const roll of [0, 0.5, 0.999999]) {
       const save = freshSave();
       save.spiritRoot = root.id;
       const plan = retreatPlan(save, 50)!;
+      assert.equal(plan.cultivation.minPercent, 8 * root.rate);
+      assert.equal(plan.cultivation.maxPercent, 16 * root.rate);
       const rolls = [0.9, roll]; // 属性未提升时，仍可获得修为。
       const result = retreat(save, 50, () => rolls.shift()!)!;
       assert.ok(result.cultivation >= plan.cultivation.min);
@@ -144,7 +146,7 @@ test('相同投入的闭关修为随资质递减，收益符合预览的随机�
   }
 });
 
-test('七个有限寿元境界即便全投闭关或拆分闭关，也无法从初期突破至中期，收益低于对应妖王', () => {
+test('七个有限寿元境界整段或拆分闭关最多推进一个小阶段，不能跨大境界且收益低于对应妖王', () => {
   for (let major = 0; major < 7; major++) {
     const start = Array.from({ length: major * 3 }, (_, i) => realmCost(i)).reduce(
       (a, b) => a + b,
@@ -159,7 +161,8 @@ test('七个有限寿元境界即便全投闭关或拆分闭关，也无法从�
         const gainPerRetreat = retreatPlan(save, years)!.cultivation.max;
         for (let i = 0; i < parts; i++)
           assert.equal(retreat(save, years, () => 0.999999)?.cultivation, gainPerRetreat);
-        assert.equal(realmInfo(save.cultivation).step, major * 3);
+        const step = realmInfo(save.cultivation).step;
+        assert.ok(step >= major * 3 && step <= major * 3 + 1);
         assert.equal(save.cultivation - start, gainPerRetreat * parts);
         assert.ok(
           save.cultivation - start < bossCultivationReward(Math.max(0, major - 1)) * root.rate,
