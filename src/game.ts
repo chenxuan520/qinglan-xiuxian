@@ -1,3 +1,4 @@
+import { masteryBonus } from './mortal.ts';
 import {
   TREASURES,
   PASSIVES,
@@ -181,7 +182,7 @@ export class Game {
     stage: number,
     difficulty: number,
     random: () => number = Math.random,
-    path: CultivationPath = save.path,
+    path: CultivationPath = save.mortal.member ? passive(save.mortal.member.id).school : save.path,
   ) {
     this.save = save;
     syncTribulationClock(save);
@@ -197,6 +198,7 @@ export class Game {
       spiritRootInfo(this.spiritRoot).baseHp +
       save.training.vitality * 10 +
       realmBonuses(this.realm).hp;
+    if (save.mortal.member) this.passives[save.mortal.member.id] = 1;
     this.player.hp = this.player.maxHp = this.maximumHealth;
     const starter =
       TREASURES.find(
@@ -206,8 +208,11 @@ export class Game {
     this.weapons.push({ id: starter.id, level: 1, evolved: false, timer: 0 });
     this.announce('踏入秘境 · 妖物将至');
   }
+  private passivePower(id: string) {
+    return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id));
+  }
   private get maximumHealth() {
-    const base = this.baseHp + (this.passives.guard || 0) * 20 + (this.passives.bone || 0) * 14;
+    const base = this.baseHp + this.passivePower('guard') * 20 + this.passivePower('bone') * 14;
     return Math.round(
       base *
         (this.path === 'orthodox' ? 1.12 : 1) *
@@ -288,54 +293,59 @@ export class Game {
     return Math.max(0, STAGES[this.stage].minutes * 60 - this.time);
   }
   get stats() {
-    const p = this.passives;
     return {
       damage:
         (1 +
           (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100 +
           realmBonuses(this.realm).damage +
-          (p.power || 0) * 0.12 +
-          (p.spirit || 0) * 0.04 +
-          (p.blood || 0) * 0.15 +
-          (p.forbidden || 0) * 0.06 +
+          this.passivePower('power') * 0.12 +
+          this.passivePower('spirit') * 0.04 +
+          this.passivePower('blood') * 0.15 +
+          this.passivePower('forbidden') * 0.06 +
           (this.path === 'demonic' ? 0.12 : 0)) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100),
       cooldown: Math.max(
         0.3,
         1 -
-          (p.haste || 0) * 0.07 -
-          (p.frenzy || 0) * (this.player.hp < this.player.maxHp / 2 ? 0.08 : 0.03),
+          this.passivePower('haste') * 0.07 -
+          this.passivePower('frenzy') * (this.player.hp < this.player.maxHp / 2 ? 0.08 : 0.03),
       ),
-      area: 1 + (p.area || 0) * 0.12 + (p.abyss || 0) * 0.1,
-      duration: 1 + (p.duration || 0) * 0.18 + (p.devour || 0) * 0.12,
+      area: 1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.1,
+      duration: 1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.12,
       speed:
         175 *
         (1 +
           this.save.training.speed * 0.02 +
-          (p.crit || 0) * 0.03 +
-          (this.player.hp < this.player.maxHp / 2 ? (p.frenzy || 0) * 0.04 : 0)) *
+          this.passivePower('crit') * 0.03 +
+          (this.player.hp < this.player.maxHp / 2 ? this.passivePower('frenzy') * 0.04 : 0)) *
         (1 + this.save.retreatBonus.speed / 100),
-      crit: Math.min(0.85, 0.07 + (p.crit || 0) * 0.07 + (p.curse || 0) * 0.06),
-      criticalDamage: 1.8 + (p.curse || 0) * 0.1,
+      crit: Math.min(
+        0.85,
+        0.07 + this.passivePower('crit') * 0.07 + this.passivePower('curse') * 0.06,
+      ),
+      criticalDamage: 1.8 + this.passivePower('curse') * 0.1,
       armor: Math.max(
         0.3,
-        1 - (p.guard || 0) * 0.06 + (p.blood || 0) * 0.03 + (p.forbidden || 0) * 0.015,
+        1 -
+          this.passivePower('guard') * 0.06 +
+          (this.passives.blood || 0) * 0.03 +
+          (this.passives.forbidden || 0) * 0.015,
       ),
-      magnet: 85 * (1 + (p.magnet || 0) * 0.28),
+      magnet: 85 * (1 + this.passivePower('magnet') * 0.28),
       xp:
         ((1 +
-          (p.spirit || 0) * 0.15 +
-          (p.magnet || 0) * 0.08 +
-          (p.soul || 0) * 0.06 +
-          (p.forbidden || 0) * 0.12) /
+          this.passivePower('spirit') * 0.15 +
+          this.passivePower('magnet') * 0.08 +
+          this.passivePower('soul') * 0.06 +
+          this.passivePower('forbidden') * 0.12) /
           DIFFICULTIES[this.difficulty].amount) *
         0.9 *
         spiritRootInfo(this.spiritRoot).rate,
       regen:
-        (spiritRootInfo(this.spiritRoot).baseRegen + (p.duration || 0) * 0.2) *
+        (spiritRootInfo(this.spiritRoot).baseRegen + this.passivePower('duration') * 0.2) *
         (this.path === 'orthodox' ? 1.2 : 1),
-      killHeal: (p.devour || 0) * 0.15,
+      killHeal: this.passivePower('devour') * 0.15,
     };
   }
   announce(message: string) {
@@ -1898,7 +1908,7 @@ export class Game {
       if (!damage) return;
       this.tribulationOpeningDamage += damage;
     }
-    if (this.passives.abyss) e.slow = Math.max(e.slow, this.passives.abyss * 0.15);
+    if (this.passives.abyss) e.slow = Math.max(e.slow, this.passivePower('abyss') * 0.15);
     if (!e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5) damage *= 0.45;
     const actual = Math.min(e.hp, damage);
     e.hp -= damage;
@@ -1958,7 +1968,10 @@ export class Game {
           y: e.y,
           kind: 'xp',
           value: xp,
-          pull: !!this.passives.soul && distance(e, this.player) <= 80 + this.passives.soul * 40,
+          pull:
+            !!this.passives.soul &&
+            distance(e, this.player) <=
+              (80 + this.passives.soul * 40) * (1 + masteryBonus(this.save, 'soul')),
         });
       if (
         (e.elite && (!this.isFinalTrial || this.random() < 0.06)) ||
@@ -2014,7 +2027,7 @@ export class Game {
       this.areaDamage(
         this.player,
         115 * this.stats.area,
-        this.passives.bone * 12 * this.stats.damage,
+        this.passivePower('bone') * 12 * this.stats.damage,
         'bone',
       );
       this.effect(this.player.x, this.player.y, 0.4, 115 * this.stats.area, '#dbcfb9', 'bone');
