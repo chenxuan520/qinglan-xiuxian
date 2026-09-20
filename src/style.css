@@ -5284,6 +5284,12 @@ body.journey-complete:not(.in-game) {
 }
 .immortal-home #ui button:not(:disabled):not(.journey-portrait):hover {
   color: #173e2d;
+}
+.immortal-home
+  #ui
+  :is(.secondary-button, .round-button, .stage-card, .path-card, .difficulty-switch button):not(
+    :disabled
+  ):hover {
   background-color: #d9e8ce;
 }
 .immortal-home #ui .primary-button:hover {
