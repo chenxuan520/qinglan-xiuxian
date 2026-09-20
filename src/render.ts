@@ -2,6 +2,7 @@ import { ENEMIES, STAGES, TAU } from './data.ts';
 import type { Game, Point } from './game.ts';
 import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
+import { sceneAssets } from './scene-assets.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -12,40 +13,64 @@ export class Renderer {
   width = 0;
   height = 0;
   scale = 1;
-  ready: Promise<void>;
+  private imageRequests = new Map<string, Promise<void>>();
+  private loadedImages = new Set<string>();
   private tiles: CanvasPattern[] = [];
   constructor(public canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
-    this.ready = Promise.all([
-      ...STAGES.map(
-        (stage, index) =>
-          new Promise<void>((resolve, reject) => {
-            const terrain = new Image();
-            terrain.onload = () => {
-              const texture = document.createElement('canvas');
-              texture.width = texture.height = 850;
-              texture.getContext('2d')!.drawImage(terrain, 0, 0, 850, 850);
-              this.tiles[index] = this.ctx.createPattern(texture, 'repeat')!;
-              resolve();
-            };
-            terrain.onerror = reject;
-            terrain.src = assetUrl(stage.terrain);
-          }),
-      ),
-      ...SPRITE_ATLASES.map(
-        (sheet, index) =>
-          new Promise<void>((resolve, reject) => {
-            const atlas = new Image();
-            this.atlases[index] = atlas;
-            atlas.onload = () => {
-              resolve();
-            };
-            atlas.onerror = reject;
-            atlas.src = assetUrl(sheet.url);
-          }),
-      ),
-    ]).then(() => {});
     this.resize();
+  }
+  hasScene(
+    stage: number,
+    tribulation = false,
+    extraSprites: number[] = [],
+    extraImages: string[] = [],
+  ) {
+    return [...sceneAssets(stage, tribulation, extraSprites), ...extraImages].every((url) =>
+      this.loadedImages.has(url),
+    );
+  }
+  async prepareScene(
+    stage: number,
+    tribulation: boolean,
+    extraSprites: number[],
+    progress: (done: number, total: number) => void,
+    extraImages: string[] = [],
+  ) {
+    const urls = [...sceneAssets(stage, tribulation, extraSprites), ...extraImages];
+    let done = 0;
+    progress(0, urls.length);
+    await Promise.all(
+      urls.map(async (url) => {
+        let request = this.imageRequests.get(url);
+        if (!request) {
+          request = new Promise<void>((resolve, reject) => {
+            const image = new Image();
+            image.onload = () => {
+              const atlas = SPRITE_ATLASES.findIndex((sheet) => sheet.url === url);
+              if (atlas >= 0) this.atlases[atlas] = image;
+              const terrain = STAGES.findIndex((s) => s.terrain === url);
+              if (terrain >= 0) {
+                const texture = document.createElement('canvas');
+                texture.width = texture.height = 850;
+                texture.getContext('2d')!.drawImage(image, 0, 0, 850, 850);
+                this.tiles[terrain] = this.ctx.createPattern(texture, 'repeat')!;
+              }
+              this.loadedImages.add(url);
+              resolve();
+            };
+            image.onerror = () => {
+              this.imageRequests.delete(url);
+              reject(new Error(url));
+            };
+            image.src = assetUrl(url);
+          });
+          this.imageRequests.set(url, request);
+        }
+        await request;
+        progress(++done, urls.length);
+      }),
+    );
   }
   resize() {
     this.width = window.innerWidth;

@@ -325,11 +325,12 @@ test('散射发出三弹、环射发出八弹，亮盾减伤而暗盾可被全�
   assert.equal(new Set([...ENEMIES, ...STAGES].map((e) => e.sprite)).size, 79);
 });
 
-test('所有场景和人物图集真实存在且为有效 PNG，新增引用不会缺图', () => {
+test('所有场景和人物图集真实存在且为有效 WebP，新增引用不会缺图', () => {
   for (const url of [...STAGES.map((s) => s.terrain), ...SPRITE_ATLASES.map((s) => s.url)]) {
     assert.ok(existsSync(`public${url}`), url);
-    const png = readFileSync(`public${url}`);
-    assert.equal(png.subarray(1, 4).toString(), 'PNG', url);
-    assert.ok(png.readUInt32BE(16) > 0 && png.readUInt32BE(20) > 0, url);
+    const image = readFileSync(`public${url}`);
+    assert.equal(image.subarray(0, 4).toString(), 'RIFF', url);
+    assert.equal(image.subarray(8, 12).toString(), 'WEBP', url);
+    assert.equal(image.readUInt32LE(4) + 8, image.length, url);
   }
 });

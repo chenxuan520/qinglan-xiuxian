@@ -11,8 +11,10 @@ import { lifespanInfo, realmInfo, tribulationDue, type SaveData } from './progre
 import {
   SECTS,
   SECT_DUES,
+  MAX_SECT_DUES,
   SECT_ROLES,
   MAX_MASTERY,
+  MASTERY_REALMS,
   MASTERY_PER_LEVEL,
   TOWN_JOBS,
   type TownJob,
@@ -34,14 +36,24 @@ export function entryCost(save: SaveData) {
     save.spiritRoot
   ];
 }
+function masteryLimit(save: SaveData) {
+  const step = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
+  return MASTERY_REALMS.filter((r) => r.step <= step).length;
+}
 export function masteryBonus(save: SaveData, id: string) {
-  return save.mortal.member?.id === id ? (save.mortal.mastery[id] || 0) * MASTERY_PER_LEVEL : 0;
+  const level = save.mortal.mastery[id] || 0;
+  if (save.mortal.member?.id !== id || !level) return 0;
+  return Math.min(level, masteryLimit(save)) * MASTERY_PER_LEVEL;
 }
 export function studyPlan(save: SaveData) {
   const id = save.mortal.member?.id;
   const level = id ? save.mortal.mastery[id] || 0 : 0;
+  const limit = masteryLimit(save);
   return {
     level,
+    limit,
+    eligible: level < limit,
+    requiredRealm: MASTERY_REALMS[level]?.name ?? '',
     stones: 30 + level * 20,
     years: Math.round(((1 + level * 0.4) / spiritRootInfo(save.spiritRoot).rate) * 10) / 10,
   };
@@ -92,7 +104,7 @@ export function startActivity(save: SaveData, kind: string) {
   if (!canAct(save) || save.mortal.activity) return false;
   if (kind === 'study') {
     const plan = studyPlan(save);
-    if (!save.mortal.member || plan.level >= MAX_MASTERY || save.stones < plan.stones) return false;
+    if (!save.mortal.member || !plan.eligible || save.stones < plan.stones) return false;
     save.stones -= plan.stones;
     save.mortal.activity = {
       kind,
@@ -118,10 +130,11 @@ export function tradeIron(save: SaveData, buy: boolean) {
   save.iron += buy ? 1 : -1;
   return true;
 }
-// 调用方仅传入人间界面处于前台的时间；不使用墙钟，不补算离线收益或供奉。
+// 调用方仅传入城镇场景就绪且处于前台的时间；不使用墙钟，不补算离线收益或供奉。
 export function advanceMortal(save: SaveData, seconds: number, random = Math.random) {
   if (!Number.isFinite(seconds) || seconds <= 0 || !canAct(save)) return false;
   const world = save.mortal;
+  const studyPaused = world.activity?.kind === 'study' && !studyPlan(save).eligible;
   if (world.member && sectDues(save).stones === 0) {
     world.member.dues = 0;
     world.member.dueAt = 0;
@@ -138,15 +151,16 @@ export function advanceMortal(save: SaveData, seconds: number, random = Math.ran
     const step = Math.min(
       remaining,
       world.member?.dues ? Math.max(0, world.member.dueAt - world.years) : Infinity,
-      world.activity?.remaining ?? Infinity,
+      studyPaused ? Infinity : (world.activity?.remaining ?? Infinity),
     );
     world.years += step;
     save.age += step;
     remaining -= step;
-    if (world.activity) world.activity.remaining -= step;
+    if (world.activity && !studyPaused) world.activity.remaining -= step;
     // 同时到期先扣供奉，不能用尚未完成的委托收入透支门费。
     if (world.member?.dues && world.years >= world.member.dueAt - 1e-9) {
       const member = world.member;
+      member.dues = Math.min(member.dues, MAX_SECT_DUES);
       if (save.stones < member.dues) leaveSect(save, true);
       else {
         save.stones -= member.dues;
@@ -158,7 +172,7 @@ export function advanceMortal(save: SaveData, seconds: number, random = Math.ran
       changed = true;
     }
     const activity = world.activity;
-    if (activity && activity.remaining <= 1e-9) {
+    if (activity && !studyPaused && activity.remaining <= 1e-9) {
       world.activity = null;
       if (activity.kind === 'study') {
         const id = activity.sect!;

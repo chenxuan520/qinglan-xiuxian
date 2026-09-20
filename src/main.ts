@@ -71,9 +71,20 @@ import { GUIDE_TABS, guideContent } from './guide.ts';
 import { spriteStyle } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
+import { TownScene } from './town-scene.ts';
+import { TOWN_START, nearbyTownNpc, townClockRunning, type TownNpc } from './town.ts';
 
 import { advanceMortal, joinSect, leaveSect, startActivity, tradeIron } from './mortal.ts';
-import { mortalEntrance, mortalPage, mortalStatus, masteryDescription } from './mortal-ui.ts';
+import {
+  mortalEntrance,
+  mortalPage,
+  mortalStatus,
+  townPage,
+  townStatus,
+  mortalTabContent,
+  townEventContent,
+  masteryDescription,
+} from './mortal-ui.ts';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `<canvas id="world" aria-label="修仙战斗场景"></canvas><div class="screen-grain"></div><div id="ui"></div><div id="modal-root"></div><div id="joystick"><span></span></div><div id="toast" role="status"></div>`;
@@ -81,6 +92,7 @@ const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const modal = document.querySelector<HTMLDivElement>('#modal-root')!;
 const joystick = document.querySelector<HTMLDivElement>('#joystick')!;
 const renderer = new Renderer(document.querySelector<HTMLCanvasElement>('#world')!);
+let sceneLoading = false;
 let storageAvailable = true;
 let raw: string | null = null;
 try {
@@ -89,6 +101,7 @@ try {
   storageAvailable = false;
 }
 const save = parseSave(raw);
+const PROLOGUE_IMAGE = '/assets/qinglan-prologue.webp';
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
 const catalogTreasures = [...TREASURES];
 catalogTreasures.splice(
@@ -115,6 +128,11 @@ let panel = '',
   settled = false;
 let inMortalWorld = false;
 let mortalFilter = 'all';
+let mortalTab: 'town' | 'sects' = 'town';
+let inTown = false;
+let townScene: TownScene | null = null;
+let townPosition = { ...TOWN_START };
+let townNpc: TownNpc | null = null;
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 let guideTab = 'basics';
@@ -140,7 +158,8 @@ let adReadyAt = 0;
 let adTimer: number | undefined;
 let victoryTimer: number | undefined;
 let rewardAd: 'root' | 'supplies' | null = null;
-let rewardAdFromCultivation = false;
+let rewardReturnPanel = '';
+let rewardReturnScroll = 0;
 let adRoot: SpiritRootId = 'heaven';
 let adElements: ElementId[] = [];
 let pendingImport: ReturnType<typeof importSave> | null = null;
@@ -240,13 +259,23 @@ const currency = () =>
 function autoplayButton() {
   return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；点击切换手动">AI 代打 · ${save.autoplay ? '开' : '关'}</button>`;
 }
+function fullscreenButton() {
+  return mobileDisplay.available
+    ? `<button class="round-button fullscreen-button" data-action="fullscreen" aria-label="${mobileDisplay.active ? '退出全屏' : '进入全屏'}" aria-pressed="${mobileDisplay.active}">${mobileDisplay.active ? '还原' : '全屏'}</button>`
+    : '';
+}
 function controls(inGame = false) {
-  return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${mobileDisplay.available ? `<button class="round-button fullscreen-button" data-action="fullscreen" aria-label="${mobileDisplay.active ? '退出全屏' : '进入全屏'}" aria-pressed="${mobileDisplay.active}">${mobileDisplay.active ? '还原' : '全屏'}</button>` : ''}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
+  return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton()}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 function completedJourney(realmName: string) {
   return `<section class="hero journey-hero" aria-label="仙途通关"><div class="hero-copy"><div class="eyebrow"><span></span>终章 · 仙途圆满</div><h1>七境皆过客<span>天地一逍遥</span></h1><p>曾执一剑入青岚，今携万法越重山。<br>七境已破，天劫已散。往后山河，任你来去。</p><div class="journey-badges"><span>七境通关</span><span>天劫止息</span><span>修行永存</span></div><div class="journey-actions"><button class="primary-button" data-action="revisit">重游七境 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="arsenal">查看珍藏</button></div></div><button class="journey-portrait" data-action="cultivation" aria-label="当前${realmName}，进入洞府修炼"><span class="journey-orbit" aria-hidden="true"></span><span class="journey-poem" aria-hidden="true">山河无恙 · 道心长明</span><span class="journey-character" style="${spriteStyle(0)}" aria-hidden="true"></span><span class="journey-realm"><small>此世道果</small><strong>${realmName}</strong><span>进入洞府 ${smallIcon('arrow')}</span></span></button></section><section class="journey-records" aria-label="此世修行成果"><div><span>累积修为</span><strong title="${save.cultivation.toLocaleString('zh-CN')}">${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.cultivation)}</strong><small>一念一境，皆成过往</small></div><div><span>此世年岁</span><strong>${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.age)}<em>年</em></strong><small>岁月悠长，道心未改</small></div><div><span>法宝珍藏</span><strong>${save.artifacts.length}<em>/ ${TREASURES.length}</em></strong><small>万般法器，随心而御</small></div><div><span>历劫留印</span><strong>${save.tribulations}<em>枚</em></strong><small>气血 +${save.tribulations * 3}% · 伤害 +${save.tribulations * 2}%</small></div></section>`;
 }
 function renderLobby() {
+  leaveTown();
+  if (assetsReady && !renderer.hasScene(selectedStage)) {
+    ensureScene(selectedStage, renderLobby);
+    return;
+  }
   if (inMortalWorld) persist();
   inMortalWorld = false;
   document.body.classList.remove('in-mortal');
@@ -286,10 +315,46 @@ function renderLobby() {
     </main>
     <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><span><span class="status-dot"></span>${storageAvailable ? '修行进度自动保存于本机' : '本机存档不可用'}</span><span class="footer-tag">${completed ? '七境已破 · 天地逍遥' : '心有所向 · 道阻且长'}</span></footer>`;
 }
+function renderPrologue() {
+  if (save.prologueSeen || game || inMortalWorld || panel) return;
+  panel = 'prologue';
+  ui.inert = true;
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title"><button class="prologue-skip" data-action="prologue-enter">略过序章 ${smallIcon('arrow')}</button><div class="prologue-heading"><span class="eyebrow">青岚仙途 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从人间而来，将向山海深处去。前路或有长生，或只余白骨；但今夜的万家灯火，仍值得你回头一望。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">入此山河 ${smallIcon('arrow')}</button></footer></section></div>`;
+  modal
+    .querySelector<HTMLElement>('.prologue-scene')!
+    .style.setProperty('--prologue-image', `url("${assetUrl(PROLOGUE_IMAGE)}")`);
+  modal.querySelector<HTMLButtonElement>('.prologue-skip')?.focus({ preventScroll: true });
+}
+function releaseTownScene() {
+  if (!townScene) return;
+  townPosition = { ...townScene.position };
+  townScene.destroy();
+  townScene = null;
+}
+function leaveTown() {
+  releaseTownScene();
+  if (inTown) void mobileDisplay.leave();
+  document.body.classList.remove('in-town');
+  inTown = false;
+  lastMortalTick = performance.now();
+}
+function mountTownScene() {
+  const host = document.getElementById('town-view');
+  if (inTown && host) townScene = new TownScene(host, { ...townPosition }, showTownEvent);
+}
+function showTownEvent(npc: TownNpc) {
+  if (!inTown || nearbyTownNpc(townScene?.position ?? townPosition)?.id !== npc.id) return;
+  townNpc = npc;
+  panel = 'town-event';
+  panelFrame(npc.place, npc.name, townEventContent(save, npc));
+}
 function renderMortal(enter = false) {
+  releaseTownScene();
   const scroll = enter ? 0 : ui.scrollTop;
   if (enter) {
     inMortalWorld = true;
+    inTown = false;
+    mortalTab = 'town';
     lastMortalTick = performance.now();
     panel = '';
     modal.innerHTML = '';
@@ -298,8 +363,12 @@ function renderMortal(enter = false) {
   }
   document.body.classList.remove('in-game', 'journey-complete');
   document.body.classList.add('in-mortal');
-  ui.innerHTML = mortalPage(save, mortalFilter, pendingRun?.path);
-  ui.scrollTop = scroll;
+  document.body.classList.toggle('in-town', inTown);
+  ui.innerHTML = inTown
+    ? townPage(save, fullscreenButton())
+    : mortalPage(save, mortalTab, mortalFilter, pendingRun?.path);
+  ui.scrollTop = inTown ? 0 : scroll;
+  mountTownScene();
 }
 function syncMortalChange() {
   if (pendingRun) pendingRun = Game.restore(save, pendingRun.snapshot());
@@ -307,7 +376,10 @@ function syncMortalChange() {
   renderMortal();
 }
 function tickMortal(now: number) {
-  if (!inMortalWorld || document.hidden || !document.hasFocus() || panel) {
+  if (
+    !inMortalWorld ||
+    !townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel)
+  ) {
     lastMortalTick = now;
     return;
   }
@@ -328,12 +400,14 @@ function tickMortal(now: number) {
   } else if (now >= nextMortalStatus) {
     const status = document.getElementById('mortal-status');
     if (status) status.innerHTML = mortalStatus(save);
+    const townHud = document.getElementById('town-status');
+    if (townHud) townHud.innerHTML = townStatus(save);
     nextMortalStatus = now + 1000;
   }
 }
 function spiritRootSummary() {
   const root = spiritRootInfo(save.spiritRoot);
-  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div></div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>悟道每阶 <b>+${root.powerPerLevel}%</b><small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="watch-supplies-ad">看广告 · 领取物资<small>${AD_SUPPLIES.stones} 灵石 + ${AD_SUPPLIES.iron} 玄铁</small></button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
+  return `<div class="spirit-root-summary"><div><small>此世灵根${root.count ? ` · ${root.count} 系` : ''}</small><strong>${root.name}</strong><div class="root-elements">${save.rootElements.length ? save.rootElements.map((id) => `<span class="element-affinity resonant" style="--element-color:${elementInfo(id).color}">${elementInfo(id).name}灵根</span>`).join('') : '<small>五行未显</small>'}</div></div><p>灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>基础暴击 <b>${Math.round(root.baseCrit * 100)}%</b> · 基础移速 <b>${root.baseSpeed}</b><br>悟道每阶 <b>+${root.powerPerLevel}%</b><small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
 }
 function lifespanSummary() {
   const life = lifespanInfo(save);
@@ -402,7 +476,7 @@ function renderPanel() {
       owned = save.artifacts.includes(t.id);
     const detail =
       bookTab === 'treasures'
-        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法三重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需拾取妖王遗宝解锁' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" ${!owned || level >= MAX_FORGE_LEVEL || save.iron < cost.iron || save.stones < cost.stones ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>每阶永久增加 8% 伤害 · 当前 +${level * 8}%</small></div></div>`
+        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法三重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需拾取妖王遗宝解锁' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>每阶永久增加 8% 伤害 · 当前 +${level * 8}%</small></div></div>`
         : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修至三重，可使六重法宝进化为仙器。</p>';
     panelFrame(
       '万般法宝，皆可入道',
@@ -474,7 +548,7 @@ function renderPanel() {
       )
         .map(
           (t) =>
-            `<article class="training-card">${icon(t.icon, '#cfcb9c')}<h3>${t.name}<small>${save.training[t.id]} / 20 阶</small></h3><p>${t.detail}</p><strong>${t.desc}</strong><button class="secondary-button" data-action="train" data-id="${t.id}" ${save.training[t.id] >= 20 || save.stones < trainingCost(save.training[t.id]) || lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? 'disabled' : ''}>${save.training[t.id] >= 20 ? '修习圆满' : lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? '寿元不足' : `修炼 · ${trainingCost(save.training[t.id])} 灵石 · ${trainingYears(save)} 年`}</button></article>`,
+            `<article class="training-card">${icon(t.icon, '#cfcb9c')}<h3>${t.name}<small>${save.training[t.id]} / 20 阶</small></h3><p>${t.detail}</p><strong>${t.desc}</strong><button class="secondary-button" data-action="train" data-id="${t.id}" data-cost-stones="${trainingCost(save.training[t.id])}" ${save.training[t.id] >= 20 || lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? 'disabled' : ''}>${save.training[t.id] >= 20 ? '修习圆满' : lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? '寿元不足' : `修炼 · ${trainingCost(save.training[t.id])} 灵石 · ${trainingYears(save)} 年`}</button></article>`,
         )
         .join(
           '',
@@ -819,11 +893,29 @@ function renderRootPicker() {
   const container = modal.querySelector('#root-picker');
   if (!container) return;
   const root = spiritRootInfo(adRoot);
-  container.innerHTML = `<div class="root-quality-options" role="group" aria-label="灵根资质">${SPIRIT_ROOTS.map((r) => `<button class="secondary-button ${r.id === adRoot ? 'selected' : ''}" data-action="ad-root-quality" data-id="${r.id}" aria-pressed="${r.id === adRoot}">${r.name}${r.count > 1 ? `·${r.count}系` : ''}</button>`).join('')}</div><p>选择 ${root.count} 种五行 · 已选 ${adElements.length} / ${root.count} · 对应法宝伤害 +${root.damageBonus}%<br>灵气与修为 ${Math.round(root.rate * 100)}%，基础气血 ${root.baseHp}，基础回血 ${root.baseRegen.toFixed(2)}/秒，悟道每阶 +${root.powerPerLevel}%。<br>首位五行决定默认本命。</p><div class="root-element-options" role="group" aria-label="灵根五行">${ELEMENTS.map((e) => `<button class="secondary-button ${adElements.includes(e.id) ? 'selected' : ''}" data-action="ad-root-element" data-id="${e.id}" aria-pressed="${adElements.includes(e.id)}" ${root.count ? '' : 'disabled'}>${e.name}${adElements[0] === e.id ? ' · 首位' : ''}</button>`).join('')}</div><small>入门法宝：${ROOT_STARTERS[adElements[0] ?? 'metal'].map((id) => treasure(id).name).join(' / ')}；领取后设为当前路线本命，已有收藏与炼器保留。</small>`;
+  container.innerHTML = `<div class="root-quality-options" role="group" aria-label="灵根资质">${SPIRIT_ROOTS.map((r) => `<button class="secondary-button ${r.id === adRoot ? 'selected' : ''}" data-action="ad-root-quality" data-id="${r.id}" aria-pressed="${r.id === adRoot}">${r.name}${r.count > 1 ? `·${r.count}系` : ''}</button>`).join('')}</div><p>选择 ${root.count} 种五行 · 已选 ${adElements.length} / ${root.count} · 对应法宝伤害 +${root.damageBonus}%<br>灵气与修为 ${Math.round(root.rate * 100)}%，基础气血 ${root.baseHp}，基础回血 ${root.baseRegen.toFixed(2)}/秒，悟道每阶 +${root.powerPerLevel}%。<br>基础暴击 ${Math.round(root.baseCrit * 100)}% · 基础移速 ${root.baseSpeed} 地图像素/秒。<br>首位五行决定默认本命。</p><div class="root-element-options" role="group" aria-label="灵根五行">${ELEMENTS.map((e) => `<button class="secondary-button ${adElements.includes(e.id) ? 'selected' : ''}" data-action="ad-root-element" data-id="${e.id}" aria-pressed="${adElements.includes(e.id)}" ${root.count ? '' : 'disabled'}>${e.name}${adElements[0] === e.id ? ' · 首位' : ''}</button>`).join('')}</div><small>入门法宝：${ROOT_STARTERS[adElements[0] ?? 'metal'].map((id) => treasure(id).name).join(' / ')}；领取后设为当前路线本命，已有收藏与炼器保留。</small>`;
+}
+function rememberRewardReturn() {
+  rewardReturnPanel = panel;
+  rewardReturnScroll = modal.querySelector('.panel')?.scrollTop ?? 0;
+}
+function showSuppliesShortage(stones: number, iron: number) {
+  if (game || (save.stones >= stones && save.iron >= iron)) return false;
+  rememberRewardReturn();
+  const missing = [
+    stones > save.stones ? `${stones - save.stones} 灵石` : '',
+    iron > save.iron ? `${iron - save.iron} 玄铁` : '',
+  ]
+    .filter(Boolean)
+    .join('、');
+  panel = 'supplies-shortage';
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。<br>可观看 5 秒广告，领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁。领取后返回原页面，再选择要进行的操作。</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad">看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
+  modal.querySelector<HTMLButtonElement>('[data-action="cancel-supplies"]')?.focus();
+  return true;
 }
 function showRewardAd(kind: 'root' | 'supplies') {
   if (game || rewardAd) return;
-  rewardAdFromCultivation = panel === 'cultivation';
+  if (panel !== 'supplies-shortage') rememberRewardReturn();
   rewardAd = kind;
   adRoot = 'heaven';
   adElements = rootElementsFor(adRoot, save.rootElements);
@@ -845,8 +937,13 @@ function closeRewardAd() {
   rewardAd = null;
   panel = '';
   modal.innerHTML = '';
-  renderLobby();
-  if (rewardAdFromCultivation) showPanel('cultivation');
+  if (inMortalWorld) renderMortal();
+  else renderLobby();
+  if (rewardReturnPanel) {
+    if (rewardReturnPanel === 'town-event' && townNpc) showTownEvent(townNpc);
+    else showPanel(rewardReturnPanel);
+    modal.querySelector('.panel')?.scrollTo(0, rewardReturnScroll);
+  }
 }
 function renderResult() {
   if (!game || !rewards) return;
@@ -856,6 +953,60 @@ function renderResult() {
     realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name;
   modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${won && game.isFinalTrial ? 'result-complete' : ''}" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? (game.isFinalTrial ? '圆满' : '破境') : '归来'}</div><div class="eyebrow">${game.encounterName} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? (game.isFinalTrial ? '仙途圆满，自在长生' : '一剑荡妖尘') : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七境已破，周期天劫就此止息。修为达标即可突破渡劫，既有修行与劫印长存。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN')}<small>已计入本局总修为</small></p>` : ''}${damageReport()}${artifactLoot()}<div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+}
+function ensureScene(stage: number, next: () => void, run?: Game | null, tribulation = false) {
+  const extra =
+    run?.enemies.map((e) =>
+      e.boss ? STAGES[e.bossStage ?? run.stage].sprite : ENEMIES[e.type].sprite,
+    ) ?? [];
+  const isTribulation = tribulation || !!run?.tribulation;
+  const extraImages = save.prologueSeen ? [] : [PROLOGUE_IMAGE];
+  if (renderer.hasScene(stage, isTribulation, extra, extraImages)) return true;
+  if (sceneLoading) return false;
+  sceneLoading = true;
+  const loading = document.createElement('div');
+  loading.className = 'scene-loading';
+  loading.setAttribute('role', 'dialog');
+  loading.setAttribute('aria-label', '场景资源加载');
+  loading.setAttribute('aria-modal', 'true');
+  loading.innerHTML = `<section><div class="eyebrow">青岚仙途</div><h2>${isTribulation ? '天劫将至' : STAGES[stage].name}</h2><p>正在准备地图、人物与法宝</p><progress max="1" value="0" aria-label="素材加载进度"></progress><p class="load-progress" role="status">0%</p><button class="secondary-button" hidden>重新加载</button></section>`;
+  app.append(loading);
+  let failed = false;
+  renderer
+    .prepareScene(
+      stage,
+      isTribulation,
+      extra,
+      (done, total) => {
+        if (failed) return;
+        const progress = loading.querySelector('progress')!;
+        progress.max = total;
+        progress.value = done;
+        loading.querySelector('.load-progress')!.textContent =
+          `${Math.round((done / total) * 100)}% · ${done} / ${total} 项资源`;
+      },
+      extraImages,
+    )
+    .then(() => {
+      loading.remove();
+      sceneLoading = false;
+      assetsReady = true;
+      next();
+    })
+    .catch(() => {
+      failed = true;
+      loading.querySelector('.load-progress')!.textContent =
+        '素材加载失败，请检查网络后重试。尚未进入场景。';
+      const retry = loading.querySelector('button')!;
+      retry.hidden = false;
+      retry.onclick = () => {
+        loading.remove();
+        sceneLoading = false;
+        ensureScene(stage, next, run, tribulation);
+      };
+      retry.focus();
+    });
+  return false;
 }
 function startRun() {
   if (!assetsReady || selectedStage > save.unlocked) return;
@@ -870,6 +1021,10 @@ function startRun() {
       '上次历练尚未结束',
       '<p class="panel-note">新开历练会放弃尚未结算的那一局。已经获得的永久修为、灵石和炼器进度不受影响。</p><div class="pause-actions"><button class="secondary-button" data-action="restore">继续上次历练</button><button class="primary-button" data-action="new-run">放弃旧局并开始</button></div>',
     );
+    return;
+  }
+  if (!ensureScene(selectedStage, startRun)) {
+    void mobileDisplay.enter();
     return;
   }
   clearInput();
@@ -893,6 +1048,10 @@ function startRun() {
 }
 function restoreRun() {
   if (!pendingRun || !assetsReady) return;
+  if (!ensureScene(pendingRun.stage, restoreRun, pendingRun)) {
+    void mobileDisplay.enter();
+    return;
+  }
   game = pendingRun;
   pendingRun = null;
   settled = false;
@@ -935,8 +1094,12 @@ function resetLifetime() {
   game = null;
   pendingRun = null;
   rewards = null;
-  const { sound: soundEnabled, volume } = save;
-  Object.assign(save, freshSave(root, rootElementsFor(root)), { sound: soundEnabled, volume });
+  const { sound: soundEnabled, volume, prologueSeen } = save;
+  Object.assign(save, freshSave(root, rootElementsFor(root)), {
+    sound: soundEnabled,
+    volume,
+    prologueSeen,
+  });
   unlockAudio();
   selectedStage = difficulty = treasurePage = 0;
   selectedTreasure = save.starter;
@@ -963,6 +1126,10 @@ function beginTribulation() {
   if (!assetsReady || !tribulationDue(save)) return;
   if (pendingRun?.tribulation) {
     restoreRun();
+    return;
+  }
+  if (!ensureScene(6, beginTribulation, null, true)) {
+    void mobileDisplay.enter();
     return;
   }
   const source = game && !settled ? game : pendingRun;
@@ -1052,7 +1219,18 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function handleAction(action: string, id?: string) {
-  if (action === 'fullscreen' && game) {
+  if (panel === 'prologue') {
+    if (action === 'prologue-enter' || action === 'close') {
+      save.prologueSeen = true;
+      ui.inert = false;
+      panel = '';
+      modal.innerHTML = '';
+      persist();
+      ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
+    }
+    return;
+  }
+  if (action === 'fullscreen' && (game || inTown)) {
     void (mobileDisplay.active ? mobileDisplay.leave() : mobileDisplay.enter());
     return;
   }
@@ -1130,8 +1308,44 @@ function handleAction(action: string, id?: string) {
     persist();
     return;
   }
-  if (action.startsWith('mortal-') && inMortalWorld && !game && !panel) {
-    if (action === 'mortal-filter' && ['all', 'orthodox', 'demonic'].includes(id ?? '')) {
+  if (action.startsWith('town-') && inMortalWorld && !game && !panel) {
+    if (action === 'town-enter' && mortalTab === 'town') {
+      void mobileDisplay.enter();
+      inTown = true;
+      lastMortalTick = performance.now();
+      renderMortal();
+      document.getElementById('town-view')?.focus({ preventScroll: true });
+    } else if (action === 'town-retry' && inTown) {
+      renderMortal();
+    } else if (action === 'town-exit') {
+      leaveTown();
+      persist();
+      renderMortal();
+      document.querySelector<HTMLButtonElement>('[data-action="town-enter"]')?.focus();
+    } else if (action === 'town-talk') townScene?.talk();
+    return;
+  }
+  if (
+    action.startsWith('mortal-') &&
+    inMortalWorld &&
+    !game &&
+    (!panel || panel === 'town-event')
+  ) {
+    if (action === 'mortal-tab' && (id === 'town' || id === 'sects')) {
+      leaveTown();
+      mortalTab = id;
+      document.getElementById('mortal-content')!.innerHTML = mortalTabContent(
+        save,
+        mortalTab,
+        mortalFilter,
+        pendingRun?.path,
+      );
+      ui.querySelectorAll<HTMLButtonElement>('[data-action="mortal-tab"]').forEach((button) => {
+        const active = button.dataset.id === mortalTab;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+    } else if (action === 'mortal-filter' && ['all', 'orthodox', 'demonic'].includes(id ?? '')) {
       mortalFilter = id!;
       renderMortal();
     } else {
@@ -1148,11 +1362,18 @@ function handleAction(action: string, id?: string) {
                   ? tradeIron(save, false)
                   : false;
       if (changed) {
+        const fromTown = panel === 'town-event';
+        if (fromTown) {
+          panel = '';
+          modal.innerHTML = '';
+        }
         if (action === 'mortal-join') {
           selectedTreasure = save.starter;
           treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
         }
         syncMortalChange();
+        if (fromTown && (action === 'mortal-buy' || action === 'mortal-sell') && townNpc)
+          showTownEvent(townNpc);
         if (action === 'mortal-join' || action === 'mortal-leave') toast(save.mortal.events[0]);
       }
     }
@@ -1235,7 +1456,14 @@ function handleAction(action: string, id?: string) {
       return;
     }
   }
-  if (action === 'watch-root-ad' || action === 'watch-supplies-ad') {
+  if (panel === 'supplies-shortage' && ['close', 'cancel-supplies'].includes(action)) {
+    closeRewardAd();
+    return;
+  }
+  if (
+    action === 'watch-root-ad' ||
+    (action === 'watch-supplies-ad' && panel === 'supplies-shortage')
+  ) {
     showRewardAd(action === 'watch-root-ad' ? 'root' : 'supplies');
     return;
   }
@@ -1419,7 +1647,7 @@ function handleAction(action: string, id?: string) {
   if (action === 'stage') {
     if (Number(id) <= save.unlocked) {
       selectedStage = Number(id);
-      renderLobby();
+      if (ensureScene(selectedStage, renderLobby)) renderLobby();
     }
   }
   if (action === 'path' && !game && !save.mortal.member && isCultivationPath(id)) {
@@ -1576,6 +1804,14 @@ document.addEventListener('click', (event) => {
   const target = (event.target as Element).closest<HTMLElement>('[data-action]');
   if (!target || target.hasAttribute('disabled')) return;
   event.preventDefault();
+  if (
+    (target.dataset.costStones || target.dataset.costIron) &&
+    showSuppliesShortage(
+      Number(target.dataset.costStones || 0),
+      Number(target.dataset.costIron || 0),
+    )
+  )
+    return;
   handleAction(target.dataset.action!, target.dataset.id);
 });
 document.addEventListener('input', (event) => {
@@ -1832,6 +2068,10 @@ function tick(now: number, draw: boolean) {
   }
 }
 function frame(now: number) {
+  townScene?.update(
+    now,
+    townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel),
+  );
   tickMortal(now);
   tick(now, true);
   requestAnimationFrame(frame);
@@ -1853,13 +2093,11 @@ renderLobby();
 if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
 else if (tribulationDue(save)) renderTribulationPending();
 persist();
-renderer.ready
-  .then(() => {
-    assetsReady = true;
-    if (!game && !inMortalWorld) renderLobby();
-    if (panel === 'tribulation-pending') renderTribulationPending();
-  })
-  .catch(() => toast('场景素材加载失败，请刷新页面重试'));
+ensureScene(selectedStage, () => {
+  if (!game && !inMortalWorld) renderLobby();
+  if (panel === 'tribulation-pending') renderTribulationPending();
+  renderPrologue();
+});
 requestAnimationFrame(frame);
 
 // Development-only access for deterministic browser verification; omitted from production.

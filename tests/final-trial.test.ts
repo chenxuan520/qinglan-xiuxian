@@ -84,7 +84,7 @@ test('仙尊新增横扫、精英天兵与预警突进，基础伤害提高到�
 test('第七关未通关时修为再高也停在大乘，通关后才解除渡劫瓶颈', () => {
   assert.equal(realmInfo(1e9, false).name, '大乘后期');
   assert.equal(realmInfo(1e9, false).locked, true);
-  assert.equal(realmInfo(1e9, true).name, '渡劫后期');
+  assert.equal(realmInfo(1e9, true).name, '渡劫');
   const g = trial();
   const before = g.save.cultivation;
   assert.equal(g.player.maxHp, 463);
@@ -108,8 +108,8 @@ test('第七关未通关时修为再高也停在大乘，通关后才解除渡�
     iron: 0,
     victory: true,
   });
-  assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '渡劫后期');
-  assert.equal(new Game(g.save, 6, 0).player.maxHp, 514);
+  assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '渡劫');
+  assert.equal(new Game(g.save, 6, 0).player.maxHp, 563);
 });
 
 test('旧版已过第六关的存档自动解锁终关，已有修为不丢失', () => {

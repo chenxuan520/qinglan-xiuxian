@@ -889,6 +889,209 @@ kbd {
   padding: 32px;
   animation: appear 0.2s ease;
 }
+.modal-backdrop.prologue-backdrop {
+  padding: 0;
+  background: #e5eee1;
+  backdrop-filter: none;
+  animation: none;
+}
+.prologue-scene {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 480px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 24px 8vw;
+  width: 100%;
+  height: 100svh;
+  padding: 100px 8vw 48px;
+  overflow: hidden;
+  color: #203e39;
+  background: #e5eee1 var(--prologue-image) left center / cover no-repeat;
+}
+.prologue-scene::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #eff3df08 20%, #eef3e477 48%, #f2f3e9eb 75%);
+}
+.prologue-scene::after {
+  content: '';
+  position: absolute;
+  inset: 20px;
+  border: 1px solid #617d6266;
+  pointer-events: none;
+}
+.prologue-skip {
+  position: absolute;
+  top: 28px;
+  right: 8vw;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+.prologue-scene button:focus-visible,
+.prologue-story:focus-visible {
+  outline: 2px solid #39664e;
+  outline-offset: 5px;
+}
+.prologue-heading {
+  align-self: start;
+  text-shadow:
+    0 1px 16px #f7f6da,
+    0 1px 3px #fff;
+}
+.prologue-heading .eyebrow {
+  color: #355d4c;
+}
+.prologue-heading h1 {
+  margin: 30px 0 24px;
+  font-size: clamp(64px, 6.8vw, 104px);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0.16em;
+  text-shadow: inherit;
+}
+.prologue-heading h1 span {
+  display: block;
+  color: #365b49;
+}
+.prologue-heading p {
+  font-size: 15px;
+  letter-spacing: 4px;
+}
+.prologue-seal {
+  display: inline-block;
+  margin-top: 30px;
+  padding: 9px 7px;
+  border: 1px solid #ac674f;
+  color: #9c4935;
+  background: #faf0dcb8;
+  writing-mode: vertical-rl;
+  letter-spacing: 4px;
+  font-size: 14px;
+  text-shadow: none;
+}
+.prologue-story {
+  min-height: 0;
+  align-self: center;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 4px 12px 4px 0;
+  font-size: 16px;
+  line-height: 2.2;
+  letter-spacing: 1px;
+  scrollbar-width: thin;
+  scrollbar-color: #7f997b #e6ebdc;
+}
+.prologue-story p + p {
+  margin-top: 20px;
+}
+.prologue-story .prologue-last {
+  margin-top: 28px;
+  color: #7b5130;
+}
+.prologue-footer {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #6e8a6940;
+}
+.prologue-footer > span {
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.prologue-footer .primary-button {
+  color: #f6f2dc;
+  background: #365b49;
+  border-color: #365b49;
+  box-shadow: inset 0 0 0 3px #cbd6ba38;
+  white-space: nowrap;
+}
+.prologue-footer .primary-button:hover {
+  background: #244c3c;
+}
+@media (max-width: 650px) {
+  .prologue-scene {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 24px;
+    padding: 76px 30px 30px;
+  }
+  .prologue-scene::before {
+    background: linear-gradient(#f2f3e43b, #f2f3e4e8 40%, #f2f3e4f5);
+  }
+  .prologue-scene::after {
+    inset: 12px;
+  }
+  .prologue-heading h1 {
+    font-size: 42px;
+    margin: 14px 0;
+    letter-spacing: 5px;
+  }
+  .prologue-heading h1 span {
+    display: inline;
+  }
+  .prologue-heading p {
+    font-size: 12px;
+    letter-spacing: 2px;
+  }
+  .prologue-seal {
+    display: none;
+  }
+  .prologue-story {
+    font-size: 14px;
+    line-height: 2.1;
+  }
+  .prologue-story p + p {
+    margin-top: 16px;
+  }
+  .prologue-footer {
+    grid-column: 1;
+    gap: 10px;
+    padding-top: 16px;
+  }
+  .prologue-footer > span {
+    max-width: 85px;
+    line-height: 1.8;
+  }
+}
+@media (max-height: 600px) and (min-width: 651px) {
+  .prologue-scene {
+    padding: 60px 6vw 28px;
+    column-gap: 4vw;
+    grid-template-columns: 1fr minmax(320px, 1.5fr);
+    row-gap: 14px;
+  }
+  .prologue-heading h1 {
+    font-size: 54px;
+    margin: 14px 0;
+  }
+  .prologue-heading p {
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .prologue-seal {
+    display: none;
+  }
+  .prologue-story {
+    font-size: 14px;
+  }
+  .prologue-skip {
+    top: 16px;
+  }
+  .prologue-footer {
+    padding-top: 12px;
+  }
+}
 .panel {
   width: min(700px, 100%);
   max-height: 90svh;
@@ -1277,7 +1480,7 @@ kbd {
 .sprite-thumb {
   width: 82px;
   height: 108px;
-  background-image: url('/assets/characters.png');
+  background-image: url('/assets/characters.webp');
   background-size: 400% 200%;
   flex-shrink: 0;
 }
@@ -4757,4 +4960,40 @@ body.journey-complete:not(.in-game) {
   .pause-build {
     margin: 15px 0;
   }
+}
+.scene-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: #102a24f8;
+}
+.scene-loading section {
+  width: min(460px, 100%);
+  text-align: center;
+}
+.scene-loading h2 {
+  margin: 24px 0;
+  color: var(--gold);
+  font-size: 30px;
+  font-weight: 500;
+}
+.scene-loading p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 2;
+  margin: 16px 0;
+}
+.scene-loading progress,
+.town-loading progress {
+  width: 100%;
+  height: 10px;
+  accent-color: #ccd9a2;
+}
+.town-loading > div {
+  width: min(300px, 85%);
+  text-align: center;
+  line-height: 2.5;
 }

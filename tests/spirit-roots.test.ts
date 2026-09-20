@@ -10,6 +10,7 @@ import {
   bossCultivationReward,
   realmBonuses,
   realmInfo,
+  attuneSpiritRoot,
 } from '../src/progress.ts';
 
 test('七档灵根按公开概率抽取，新档随机，已存档与旧档读取不重抽', () => {
@@ -74,7 +75,7 @@ test('灵根基础气血依次100/95/90/85/80，正道、境界与淬体在基�
       g.state = 'upgrade';
       g.choices = [{ type: 'passive', id: path === 'demonic' ? 'bone' : 'guard', level: 1 }];
       g.choose(0);
-      assert.equal(g.player.maxHp, Math.round((hp + (path === 'demonic' ? 14 : 20)) * factor));
+      assert.equal(g.player.maxHp, Math.round((path === 'demonic' ? hp * 1.14 : hp + 20) * factor));
     }
   }
 });
@@ -119,6 +120,48 @@ test('灵根基础回血分档，功法正常叠加，正道合计加20%，洗�
       }
     }
   }
+});
+
+test('灵根基础暴击与移速分档，实际移动使用各自速度并正常叠加根基与功法', () => {
+  const crits = [0.07, 0.07, 0.05, 0.05, 0.03, 0.03, 0.01];
+  const speeds = [175, 175, 160, 160, 150, 150, 140];
+  for (const [i, root] of SPIRIT_ROOTS.entries()) {
+    const save = freshSave(root.id);
+    const g = new Game(save, 0, 0);
+    assert.equal(g.stats.crit, crits[i]);
+    assert.equal(g.stats.speed, speeds[i]);
+    g.input = { x: 1, y: 0 };
+    g.update(0.05);
+    assert.equal(g.player.x, speeds[i] * 0.05);
+    save.training.speed = 5;
+    save.retreatBonus.speed = 10;
+    g.passives = { crit: 2, curse: 3, frenzy: 1 };
+    g.player.hp = g.player.maxHp * 0.4;
+    assert.ok(Math.abs(g.stats.crit - (crits[i] + 0.14 + 0.18)) < 1e-10);
+    assert.ok(Math.abs(g.stats.speed - speeds[i] * 1.2 * 1.1) < 1e-10);
+    g.passives.crit = g.passives.curse = 10;
+    assert.equal(g.stats.crit, 0.85);
+    assert.equal(g.stats.criticalDamage, 2.8);
+  }
+});
+
+test('洗根只改变后续新局的暴击与移速，旧续局继续按原资质计算', () => {
+  const save = freshSave('none');
+  const g = new Game(save, 0, 0);
+  assert.equal(attuneSpiritRoot(save, 'heaven', ['metal']), true);
+  for (const run of [g, Game.restore(save, g.snapshot())!]) {
+    assert.equal(run.stats.crit, 0.01);
+    assert.equal(run.stats.speed, 140);
+  }
+  const next = new Game(save, 0, 0);
+  assert.equal(next.stats.crit, 0.07);
+  assert.equal(next.stats.speed, 175);
+  const legacy = JSON.parse(JSON.stringify(g.snapshot()));
+  delete legacy.spiritRoot;
+  delete legacy.rootElements;
+  const restored = Game.restore(save, legacy)!;
+  assert.equal(restored.stats.crit, 0.07);
+  assert.equal(restored.stats.speed, 175);
 });
 
 test('妖王直接吸收的局内经验也受灵根资质影响', () => {

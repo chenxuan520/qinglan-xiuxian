@@ -18,7 +18,7 @@ import {
   REALM_LIFESPANS,
 } from './data.ts';
 import type { CultivationPath, SpiritRootId, ElementId } from './data.ts';
-import { freshMortal, validMortal, SECTS, type MortalState } from './mortal-data.ts';
+import { freshMortal, validMortal, SECTS, MAX_SECT_DUES, type MortalState } from './mortal-data.ts';
 
 export interface SaveData {
   version: 1;
@@ -38,6 +38,7 @@ export interface SaveData {
   sound: boolean;
   volume: number;
   autoplay: boolean;
+  prologueSeen: boolean;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
   rootElements: ElementId[];
@@ -56,7 +57,7 @@ export function freshSave(
   return {
     version: 1,
     mortal: freshMortal(),
-    age: 0,
+    age: 15,
     lifespanBonus: 0,
     tribulations: 0,
     nextTribulationAge: 0,
@@ -77,6 +78,7 @@ export function freshSave(
     sound: true,
     volume: 0.6,
     autoplay: false,
+    prologueSeen: false,
     path: 'dual',
     spiritRoot,
     rootElements: [...rootElements],
@@ -94,6 +96,8 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
     if (validMortal(s.mortal)) base.mortal = s.mortal;
+    if (base.mortal.member)
+      base.mortal.member.dues = Math.min(base.mortal.member.dues, MAX_SECT_DUES);
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     base.lifespanBonus = int(s.lifespanBonus);
     base.tribulations = int(s.tribulations);
@@ -142,6 +146,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     if (typeof s.volume === 'number' && Number.isFinite(s.volume))
       base.volume = Math.min(1, Math.max(0, s.volume));
     base.autoplay = s.autoplay === true;
+    base.prologueSeen = s.prologueSeen === true;
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
     const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);
     if (sect) base.path = sect.school;
@@ -175,17 +180,18 @@ export function attuneSpiritRoot(save: SaveData, root: SpiritRootId, elements: E
 export function realmInfo(cultivation: number, finalTrialCleared = false) {
   let remaining = cultivation;
   let step = 0;
-  while (step < (finalTrialCleared ? 26 : 23) && remaining >= realmCost(step)) {
+  while (step < (finalTrialCleared ? 24 : 23) && remaining >= realmCost(step)) {
     remaining -= realmCost(step);
     step++;
   }
   return {
     step,
     index: Math.floor(step / 3),
-    name: `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
+    name:
+      step === 24 ? '渡劫' : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
     progress: remaining,
     needed: realmCost(step),
-    max: step === 26,
+    max: step === 24,
     locked: step === 23 && !finalTrialCleared,
   };
 }
@@ -300,7 +306,11 @@ export function bossCultivationReward(stage: number, bossStage = stage) {
     ),
   );
 }
-export function realmBonuses(step: number) {
+export function realmBonuses(step: number): { hp: number; damage: number } {
+  if (step >= 24) {
+    const previous = realmBonuses(23);
+    return { hp: previous.hp + 100, damage: previous.damage + 0.5 };
+  }
   const major = Math.floor(step / 3);
   const minor = step - major;
   return { hp: major * 45 + minor * 3, damage: (major * 35 + minor * 2.5) / 100 };

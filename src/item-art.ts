@@ -9,8 +9,8 @@ export function itemArt(id: string) {
   return {
     src:
       weapon >= 0
-        ? `/assets/treasures-${Math.floor(weapon / 12) + 1}.png`
-        : '/assets/cultivation-manuals.png',
+        ? `/assets/treasures-${Math.floor(weapon / 12) + 1}.webp`
+        : '/assets/cultivation-manuals.webp',
     column: index % 4,
     row: Math.floor(index / 4),
     rows: weapon >= 0 ? 3 : 4,
