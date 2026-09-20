@@ -18,6 +18,7 @@ import {
   REALM_LIFESPANS,
 } from './data.ts';
 import type { CultivationPath, SpiritRootId, ElementId } from './data.ts';
+import { freshMortal, validMortal, SECTS, type MortalState } from './mortal-data.ts';
 
 export interface SaveData {
   version: 1;
@@ -45,6 +46,7 @@ export interface SaveData {
   tribulations: number;
   nextTribulationAge: number;
   tribulationReturn: unknown | null;
+  mortal: MortalState;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 export function freshSave(
@@ -53,6 +55,7 @@ export function freshSave(
 ): SaveData {
   return {
     version: 1,
+    mortal: freshMortal(),
     age: 0,
     lifespanBonus: 0,
     tribulations: 0,
@@ -90,6 +93,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
+    if (validMortal(s.mortal)) base.mortal = s.mortal;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     base.lifespanBonus = int(s.lifespanBonus);
     base.tribulations = int(s.tribulations);
@@ -139,6 +143,8 @@ export function parseSave(raw: string | null, random: () => number = Math.random
       base.volume = Math.min(1, Math.max(0, s.volume));
     base.autoplay = s.autoplay === true;
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
+    const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);
+    if (sect) base.path = sect.school;
     if (
       !base.artifacts.includes(base.starter) ||
       !allowsSchool(base.path, treasure(base.starter).school)

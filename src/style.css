@@ -1472,6 +1472,34 @@ kbd {
   font-size: 11px;
   letter-spacing: 0;
 }
+.fullscreen-button {
+  display: none;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+@media (pointer: coarse) {
+  .fullscreen-button {
+    display: grid;
+  }
+  .combat-actions .round-button {
+    padding: 0;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+@media (pointer: coarse) and (max-width: 650px) and (orientation: portrait) {
+  .game-hud .combat-actions {
+    max-width: 144px;
+  }
+  .game-hud .kill-counter,
+  .game-hud .damage-button {
+    order: 0;
+  }
+  .game-hud .kill-counter {
+    padding: 6px 8px;
+    gap: 5px;
+  }
+}
 .combat-actions .round-button.auto-button {
   width: auto;
 }
@@ -4450,5 +4478,283 @@ body.journey-complete:not(.in-game) {
   .journey-lobby .section-heading h2 {
     font-size: 13px;
     letter-spacing: 0;
+  }
+}
+
+/* 手机横屏留出战场中央，兼容刘海和底部手势区。 */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+  .game-hud {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    display: grid;
+    grid-template-columns: minmax(140px, 175px) minmax(90px, 1fr) 210px;
+    gap: 12px;
+  }
+  .player-panel {
+    width: 100%;
+    padding: 8px 10px;
+  }
+  .player-heading {
+    gap: 6px;
+  }
+  .player-heading > span {
+    font-size: 17px;
+    letter-spacing: 1px;
+  }
+  .player-heading b {
+    font-size: 9px;
+  }
+  .health-label {
+    margin: 6px 0 4px;
+    font-size: 9px;
+  }
+  .health-bar {
+    height: 4px;
+  }
+  .cultivation-label {
+    margin-top: 5px;
+    font-size: 8px;
+  }
+  .lifespan-hud {
+    margin-top: 3px;
+    font-size: 8px;
+  }
+  .stage-timer {
+    position: static;
+    transform: none;
+    padding-top: 3px;
+    white-space: normal;
+  }
+  .stage-timer > div {
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .stage-timer i {
+    margin: 0 3px;
+  }
+  .stage-timer strong {
+    font-size: 27px;
+    letter-spacing: 2px;
+  }
+  .stage-timer > span {
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .stage-timer > small {
+    font-size: 8px;
+    letter-spacing: 0;
+    margin-top: 3px;
+  }
+  .combat-actions {
+    flex-wrap: wrap;
+    max-width: 210px;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+  .combat-actions .round-button {
+    width: 34px;
+    height: 34px;
+  }
+  .combat-actions .round-button.auto-button {
+    order: 0;
+    width: auto;
+    height: 34px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+  .combat-actions .damage-button {
+    order: 0;
+  }
+  .kill-counter {
+    order: 0;
+    height: 34px;
+    padding: 4px 8px;
+    gap: 5px;
+    font-size: 9px;
+  }
+  .kill-counter b {
+    font-size: 17px;
+  }
+  .battle-controls,
+  .battle-objective {
+    display: none;
+  }
+  .battle-bottom {
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    justify-content: center;
+  }
+  .equipped-slots {
+    width: 100%;
+    gap: 5px;
+  }
+  .equipped-slot {
+    flex: 1;
+    min-width: 0;
+    max-width: 110px;
+    width: auto;
+    height: 44px;
+    padding: 4px;
+    gap: 3px;
+    flex-direction: row;
+  }
+  .equipped-slot .icon {
+    width: 25px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+  .equipped-slot strong {
+    display: block;
+    font-size: 9px;
+    letter-spacing: 0;
+    text-align: left;
+  }
+  .equipped-slot span {
+    font-size: 8px;
+    margin-top: 2px;
+    text-align: left;
+  }
+  .equipped-slot i {
+    display: none;
+  }
+  .equipped-slot.empty small {
+    font-size: 7px;
+    letter-spacing: 0;
+  }
+  .passive-slots {
+    bottom: calc(61px + env(safe-area-inset-bottom));
+    gap: 5px;
+    max-width: 96%;
+    flex-wrap: wrap;
+  }
+  .passive-slots > span {
+    font-size: 8px;
+    padding: 2px 4px;
+  }
+  .passive-slots .icon {
+    width: 15px;
+    height: 18px;
+  }
+  .boss-bar {
+    top: 106px;
+    width: 45%;
+    padding: 6px 10px;
+  }
+  .boss-bar > div:first-child {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .boss-bar small {
+    font-size: 8px;
+  }
+  .battle-notice {
+    top: 37%;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 7px 16px;
+  }
+  .in-game .modal-backdrop {
+    padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+  }
+  .in-game .panel,
+  .upgrade-panel {
+    max-height: calc(100dvh - 24px);
+  }
+  .in-game .panel {
+    padding: 18px;
+  }
+  .upgrade-heading {
+    margin-bottom: 10px;
+  }
+  .upgrade-heading h2 {
+    font-size: 24px;
+    margin-top: 5px;
+  }
+  .upgrade-heading p {
+    margin-top: 5px;
+    font-size: 10px;
+  }
+  .choice-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .choice-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+    min-height: 0;
+  }
+  .choice-top {
+    font-size: 8px;
+    margin-bottom: 4px;
+  }
+  .choice-art {
+    position: static;
+    width: auto;
+    height: 42px;
+  }
+  .choice-art .icon {
+    width: 30px;
+    height: 38px;
+  }
+  .choice-card h3 {
+    font-size: 16px;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+  .choice-level {
+    font-size: 8px;
+    margin-top: 4px;
+    text-align: center;
+  }
+  .choice-card p {
+    font-size: 10px;
+    line-height: 1.5;
+    min-height: 0;
+    margin-top: 8px;
+  }
+  .choice-card .element-affinity {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+  .choice-card .evolution-recipe {
+    font-size: 9px;
+    line-height: 1.5;
+    margin: 6px 0;
+    padding: 5px 0;
+  }
+  .choice-benefit {
+    min-height: 0;
+    padding: 5px 0;
+    font-size: 8px;
+  }
+  .choice-select {
+    padding-top: 6px;
+    font-size: 10px;
+  }
+  .upgrade-footer {
+    margin-top: 10px;
+    gap: 10px;
+  }
+  .pause-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+    gap: 8px;
+    margin-top: 15px;
+  }
+  .pause-actions > button,
+  .pause-actions > .auto-button {
+    height: 44px;
+    min-height: 44px;
+    padding: 8px 4px;
+    font-size: 10px;
+    white-space: normal;
+  }
+  .pause-build {
+    margin: 15px 0;
   }
 }

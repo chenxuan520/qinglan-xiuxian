@@ -1,0 +1,560 @@
+.mortal-entrance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 26px 30px;
+  margin: 16px 0 30px;
+  border: 1px solid var(--border);
+  background: linear-gradient(120deg, #163c33e8, #33402cdc);
+}
+.mortal-entrance small,
+.mortal-entrance p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 2;
+}
+.mortal-entrance h2 {
+  font-size: 26px;
+  color: var(--gold);
+  margin: 4px 0;
+  letter-spacing: 4px;
+}
+.mortal-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  font-size: 12px;
+}
+.mortal-identity span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.mortal-identity strong {
+  color: var(--gold);
+  font-weight: 500;
+}
+.mortal-identity b {
+  color: var(--gold);
+  border: 1px solid var(--border);
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.mortal-entrance button {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mortal-entrance button span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.in-mortal #ui {
+  background: linear-gradient(130deg, #102b27ed, #112421f2 65%, #22261fe8);
+}
+.mortal-header {
+  padding: 24px 5%;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.mortal-brand {
+  color: var(--gold);
+  font-size: 24px;
+  letter-spacing: 5px;
+}
+#mortal-currency {
+  color: var(--gold);
+  font-size: 13px;
+}
+.mortal-main {
+  width: min(1250px, 90%);
+  margin: auto;
+}
+.mortal-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 350px;
+  padding: 35px 0;
+  overflow: hidden;
+}
+.mortal-hero > div:first-child {
+  position: relative;
+  z-index: 1;
+}
+.mortal-hero h1 {
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 6px;
+  margin: 18px 0;
+}
+.mortal-hero h1 span {
+  display: block;
+  color: var(--gold);
+}
+.mortal-hero p {
+  color: var(--muted);
+  line-height: 1.9;
+  font-size: 14px;
+}
+.mortal-hero p.mortal-clock-note {
+  font-size: 11px;
+  margin-top: 18px;
+}
+.mortal-hero-art {
+  position: absolute;
+  display: flex;
+  width: 53%;
+  right: 0;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.sect-art {
+  display: block;
+  background-repeat: no-repeat;
+  background-size: 400% 200%;
+  aspect-ratio: 3 / 4;
+  clip-path: inset(0 0 4% 0);
+  width: 100%;
+}
+.mortal-hero-art .sect-art {
+  width: 40%;
+}
+.mortal-hero-art .sect-art:first-child {
+  transform: translateY(12px);
+}
+.mortal-status {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 22px 0;
+  border-block: 1px solid var(--border);
+  background: #12392b66;
+}
+.mortal-status > div {
+  padding: 0 22px;
+  border-right: 1px solid var(--border);
+}
+.mortal-status > div:last-child {
+  border: 0;
+}
+.mortal-status small,
+.mortal-status span {
+  color: var(--muted);
+  font-size: 11px;
+  display: block;
+  line-height: 1.8;
+}
+.mortal-status strong {
+  font-size: 21px;
+  font-weight: 500;
+  display: block;
+  color: var(--gold);
+  margin: 8px 0;
+  font-variant-numeric: tabular-nums;
+}
+.mortal-status em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mortal-membership {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 28px;
+  margin: 25px 0 36px;
+  border: 1px solid var(--border);
+  background: #20443880;
+}
+.mortal-membership > div:first-child {
+  flex: 1;
+}
+.mortal-membership h2,
+.mortal-rules h2,
+.mortal-journal h2 {
+  font-size: 22px;
+  color: var(--gold);
+  font-weight: 500;
+  margin: 7px 0 12px;
+}
+.mortal-membership p,
+.mortal-rules p,
+.mortal-sect-note {
+  font-size: 12px;
+  line-height: 2;
+  color: var(--muted);
+}
+.mortal-membership small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.mortal-study {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 300px;
+  justify-content: center;
+}
+.mortal-study .primary-button {
+  min-height: 48px;
+  font-size: 14px;
+  padding: 12px 20px;
+}
+.mortal-study small {
+  line-height: 1.8;
+}
+.mortal-leave {
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  color: #ce9d94;
+  padding: 8px;
+  align-self: flex-end;
+}
+.mortal-main .section-heading {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.mortal-main .section-heading h2 {
+  font-size: 23px;
+}
+.town-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 20px 0 45px;
+}
+.town-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 23px;
+  border: 1px solid var(--border);
+  background: #192f28bb;
+  gap: 12px;
+}
+.town-mark {
+  font-size: 25px;
+  color: var(--gold);
+  border: 1px solid #b3aa705c;
+  padding: 7px 12px;
+}
+.town-card h3 {
+  font-size: 19px;
+  font-weight: 500;
+}
+.town-card p,
+.town-card small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.9;
+}
+.town-card > .secondary-button,
+.town-trades {
+  margin-top: auto;
+  width: 100%;
+}
+.mortal-main .secondary-button {
+  min-height: 43px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.town-trades {
+  display: flex;
+  gap: 6px;
+}
+.town-trades button {
+  flex: 1;
+  padding-inline: 5px !important;
+}
+.mortal-filters {
+  display: flex;
+  border: 1px solid var(--border);
+}
+.mortal-filters button {
+  padding: 10px 20px;
+  font-size: 12px;
+}
+.mortal-filters .active {
+  background: #a5b78c33;
+  color: var(--gold);
+}
+.mortal-sect-note {
+  margin: 10px 0 22px;
+}
+.sect-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.sect-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  background: radial-gradient(ellipse at 50% 20%, #3a55384a, transparent 60%), #102d26;
+  overflow: hidden;
+}
+.sect-card.demonic {
+  background: radial-gradient(ellipse at 50% 20%, #56345066, transparent 65%), #24282a;
+}
+.sect-card.joined {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px #cabe7c33;
+}
+.sect-card > .sect-art {
+  width: 80%;
+  margin: 10px auto 0;
+}
+.sect-copy {
+  padding: 0 20px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1;
+  gap: 10px;
+}
+.sect-school {
+  color: #adcbaa;
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.demonic .sect-school {
+  color: #c29dac;
+}
+.sect-copy h3 {
+  font-size: 24px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  font-weight: 500;
+}
+.sect-copy p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.9;
+}
+.sect-manual {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.sect-manual .icon {
+  width: 35px;
+  height: 35px;
+}
+.sect-manual strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.sect-manual small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.sect-mastery {
+  color: var(--gold);
+  font-size: 10px;
+  margin-top: auto;
+  padding-top: 5px;
+}
+.mortal-rules,
+.mortal-journal {
+  border-top: 1px solid var(--border);
+  margin-top: 36px;
+  padding-top: 24px;
+}
+.dues-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 18px 0;
+}
+.dues-grid span {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+}
+.dues-grid b {
+  color: var(--gold);
+  font-weight: 400;
+}
+.mortal-rules > small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 2;
+}
+.mortal-journal ol {
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 2.3;
+}
+.mortal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 30px 0 45px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mortal-footer button {
+  color: var(--gold);
+  padding: 14px;
+}
+@media (max-width: 1000px) {
+  .sect-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sect-card > .sect-art {
+    max-width: 200px;
+  }
+  .town-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .mortal-status {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 22px;
+  }
+  .mortal-status > div:nth-child(2) {
+    border: 0;
+  }
+}
+@media (max-width: 600px) {
+  .mortal-entrance {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 20px;
+    gap: 16px;
+  }
+  .mortal-header {
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 16px 5%;
+  }
+  .mortal-header .secondary-button {
+    min-height: 36px;
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+  .mortal-brand {
+    font-size: 19px;
+    letter-spacing: 2px;
+  }
+  #mortal-currency {
+    width: 100%;
+    font-size: 11px;
+  }
+  .mortal-hero {
+    min-height: 330px;
+    padding-block: 28px;
+  }
+  .mortal-hero h1 {
+    font-size: 32px;
+    letter-spacing: 3px;
+  }
+  .mortal-hero-art {
+    width: 55%;
+    right: -8%;
+    opacity: 0.3;
+    top: 20px;
+  }
+  .mortal-hero-art .sect-art:first-child {
+    display: none;
+  }
+  .mortal-hero-art .sect-art {
+    width: 100%;
+  }
+  .mortal-status > div {
+    padding: 0 12px;
+  }
+  .mortal-status strong {
+    font-size: 17px;
+  }
+  .mortal-status small,
+  .mortal-status span {
+    font-size: 10px;
+  }
+  .mortal-membership {
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+  }
+  .mortal-study {
+    max-width: none;
+  }
+  .mortal-main .section-heading h2 {
+    font-size: 20px;
+  }
+  .mortal-main .section-heading .muted {
+    font-size: 11px;
+  }
+  .town-grid {
+    gap: 10px;
+  }
+  .town-card {
+    padding: 15px;
+    gap: 10px;
+  }
+  .town-card h3 {
+    font-size: 17px;
+  }
+  .town-trades {
+    flex-direction: column;
+  }
+  .sect-grid {
+    gap: 12px;
+  }
+  .sect-copy {
+    padding: 0 12px 16px;
+    gap: 8px;
+  }
+  .sect-copy h3 {
+    font-size: 20px;
+    letter-spacing: 1px;
+  }
+  .sect-copy .sect-motto {
+    min-height: 42px;
+  }
+  .sect-manual {
+    gap: 6px;
+  }
+  .sect-manual .icon {
+    width: 28px;
+    height: 28px;
+  }
+  .sect-manual strong {
+    font-size: 11px;
+  }
+  .sect-copy .secondary-button {
+    font-size: 11px;
+    padding-inline: 8px;
+  }
+  .dues-grid {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+}
+@media (max-width: 360px) {
+  .sect-grid {
+    grid-template-columns: 1fr;
+  }
+  .town-grid {
+    grid-template-columns: 1fr;
+  }
+}

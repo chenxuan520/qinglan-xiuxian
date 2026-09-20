@@ -1,5 +1,25 @@
 # 素材与生成提示词
 
+## 人间十六宗门（2026-09-20）
+
+正魔两张图集均由内置 imagegen 生成，1536 × 1024 RGBA、4 列 × 2 行。直接复制原图，未经裁切或缩放；运行时 CSS 背景定位。建筑带半透明环境光晕，16 个格子按 `SECTS` / `PASSIVES` 顺序映射，每门有不同造型。魔道图按实际建筑左右边界设置不等宽取景，避免邻格碎片串入；底边少量裁除图集跨行尖角。后续两次背景修正生成了不透明棋盘底，未纳入项目，最终采用最初的 RGBA 原图。仅进入人间时加载，不加入战斗素材预加载。
+
+### 正道宗门
+
+项目路径：`public/assets/sects-orthodox.png`。
+
+```text
+Use case: stylized-concept. Asset type: one production-ready transparent PNG architecture sprite atlas for a polished Chinese xianxia web game. EXACTLY 4 columns by 2 rows, eight separate orthodox cultivation sect headquarters, row-major order. Landscape 1536x1024, each cell equal 384x512, each whole miniature building ensemble centered inside its own cell with 15 percent empty padding on every side. Authentic Chinese fantasy architecture, hand-painted richly detailed 2.5D isometric miniatures seen from a consistent three-quarter overhead view, elegant jade-green, ivory, antique gold, restrained magical glow, crisp readable silhouettes. Same perspective, scale and lighting across all eight; each sect architecturally DISTINCT, not recolors. Genuine alpha-transparent background, soft contained contact shadows, NO grid, NO labels, NO text, NO UI, NO people, no surrounding rectangular landscape panels. Row-major subjects: 1 Taixuan Sword sect: tall azure sword-shaped stone mountain pavilion, bronze sword monument and narrow ascending stair; 2 Celestial Star observatory: round blue celestial observatory with large brass armillary sphere, constellation disc and terraced roof; 3 Qiankun formation sect: octagonal jade temple on a circular yin-yang stone formation platform, concentric rune geometry without lettering; 4 Vajra sanctuary: broad sturdy golden Buddhist-style monastery, imposing serene guardian statue, squat bell tower, no sword spires; 5 Longevity valley: low timber herbal pavilions nestled around a large ancient sacred green tree, tiny medicine garden and stream contained on the miniature base; 6 Insight Mirror academy: slender white stone sanctuary with a large upright circular bronze mirror and angular crystal reflecting pools; 7 Spirit Gathering pavilion: turquoise pagoda surrounding a luminous jade basin with a spiraling ribbon of gathered spiritual mist, no giant tree; 8 Purple Palace sect: regal multi-tier palace elevated upon lavender crystal rock, luminous purple lotus courtyard. Every ensemble completely contained within its cell, no overlaps, no clipped finials, no connecting scenery between cells. Polished painterly video-game environment assets, not flat SVG or generic symbols.
+```
+
+### 魔道宗门
+
+项目路径：`public/assets/sects-demonic.png`。
+
+```text
+Use case: stylized-concept. Asset type: one production-ready transparent PNG architecture sprite atlas for a polished Chinese xianxia web game. EXACTLY 4 columns by 2 rows, eight separate demonic cultivation sect headquarters, row-major order. Landscape 1536x1024, each cell equal 384x512, each whole miniature building ensemble centered inside its own cell with 15 percent empty padding on every side. Authentic Chinese fantasy architecture, hand-painted richly detailed 2.5D isometric miniatures seen from a consistent three-quarter overhead view, aged obsidian, deep crimson, violet, tarnished bronze, restrained magical glow, crisp readable silhouettes. Match sophisticated jade-and-gold Chinese fantasy game craftsmanship, strong architectural variety, not repeated recolors. Genuine alpha-transparent background, soft contained contact shadows, NO grid, NO labels, NO text, NO UI, NO people, NO gore, no surrounding rectangular landscape panels. Row-major subjects: 1 Blood Scripture palace: dignified crimson temple surrounding a red crystal ritual pool, a pair of dark sweeping roof wings; 2 Heavenly Demon sect: towering black basalt fortress with imposing horned guardian statue and cracked violet glowing stone steps; 3 Nine Nether gate: monumental dark Chinese ceremonial gate spanning a miniature sunken chasm, cyan ghost lanterns, arched stone bridge; 4 White Bone citadel: pale ivory rib-like architectural buttresses supporting a black jade tiled keep, sculpted fantasy bone motif, no gore; 5 Soul Devouring abbey: round violet sanctuary with a floating hollow soul orb above its roof, pale wisps drawn into its center; 6 Curse altar: low hexagonal obsidian ritual courtyard with six leaning black curse pillars tied with crimson ribbons and a bronze ritual bell; 7 Soul Binding tower: tall narrow midnight-blue tower wrapped in bronze chains, hanging luminous lanterns and sealed spirit urns; 8 Fate Defying pavilion: sharply angular dark red pavilion raised on broken levitating stone terraces, immense fractured celestial wheel behind it, gold and violet rift glow. Every ensemble completely contained within its cell, no overlaps, no clipped finials, no connecting scenery between cells. Polished painterly video-game environment assets, not flat SVG or generic symbols.
+```
+
 ## 仙侠背景音乐（2026-09-20）
 
 项目路径：`public/assets/audio/qinglan-mist.m4a`，曲名「青岚烟渚」。本项目原创五声音阶编曲，离线合成拨弦、笛箫与轻柔铺底音色，没有使用外部歌曲、录音或采样。72 BPM，24 小节，80 秒立体声循环，AAC 96 kbps，约 0.96 MB。混响与音符尾音回卷到开头，保持循环衔接；播放不参与战斗计算，也不阻塞场景加载。
