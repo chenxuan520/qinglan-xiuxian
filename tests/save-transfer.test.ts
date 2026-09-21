@@ -1,8 +1,48 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { exportSave, importSave, MAX_SAVE_FILE_BYTES } from '../src/save-transfer.ts';
-import { freshSave, parseSave } from '../src/progress.ts';
+import { freshSave, parseSave, enterImmortalGate } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
+
+test('仙门仅真仙可入，旧档不自动完结，叩门记下当时年岁且不重复记账', () => {
+  const save = freshSave();
+  assert.equal(save.journeyEnded, false);
+  assert.equal(parseSave(JSON.stringify({ ...save, journeyEnded: undefined })).journeyEnded, false);
+  const before = JSON.stringify(save);
+  assert.equal(enterImmortalGate(save), false);
+  assert.equal(JSON.stringify(save), before);
+  save.cultivation = 1e9;
+  assert.equal(enterImmortalGate(save), false);
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  save.age = 26522.9;
+  assert.equal(parseSave(JSON.stringify(save)).journeyEnded, false);
+  save.autoplay = true;
+  assert.equal(enterImmortalGate(save), true);
+  assert.equal(save.autoplay, false);
+  assert.equal(save.chronicle.milestones['immortal-gate'], 26522.9);
+  assert.equal(enterImmortalGate(save), false);
+  assert.equal(save.chronicle.entries.filter((e) => e.title === '叩入仙门').length, 1);
+  Object.assign(save, freshSave());
+  assert.equal(save.journeyEnded, false);
+  assert.equal(save.age, 15);
+  assert.equal(save.chronicle.milestones['immortal-gate'], undefined);
+});
+
+test('终章状态读档和导入后仍封存此世，旧续局不会恢复', () => {
+  const save = freshSave();
+  save.cultivation = 1e9;
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  const run = new Game(save, 0, 0);
+  enterImmortalGate(save);
+  assert.equal(parseSave(JSON.stringify(save)).journeyEnded, true);
+  const file = exportSave(save, run);
+  assert.equal(JSON.parse(file).save.activeRun, null);
+  const restored = importSave(file);
+  assert.equal(restored.save.journeyEnded, true);
+  assert.equal(restored.run, null);
+  assert.equal(importSave(JSON.stringify({ ...save, activeRun: run.snapshot() })).run, null);
+  assert.equal(importSave(exportSave(restored.save, null)).save.journeyEnded, true);
+});
 
 test('序章已读状态保留于存档和导入，未读或缺失字段时保持未读', () => {
   const save = freshSave();
@@ -97,6 +137,7 @@ test('导入拒绝错误格式、版本、缺失字段、非法数值、损坏�
     { ...save, rootElements: ['fire', 'fire'] },
     { ...save, spiritRoot: 'unknown' },
     { ...save, prologueSeen: 'yes' },
+    { ...save, journeyEnded: 'yes' },
     { ...save, activeRun: {} },
     { format: 'foreign', version: 1, save },
     { format: 'qinglan-save', version: 2, save },

@@ -3,12 +3,10 @@ type FullscreenDocument = Document & {
   webkitFullscreenElement?: Element | null;
   webkitExitFullscreen?: () => Promise<void> | void;
 };
-type LockableOrientation = ScreenOrientation & { lock?: (mode: 'landscape') => Promise<void> };
 
 export class MobileDisplay {
   private wanted = false;
   private ownsFullscreen = false;
-  private ownsOrientation = false;
   private pending: Promise<void> | null = null;
 
   constructor(onChange: () => void) {
@@ -16,7 +14,6 @@ export class MobileDisplay {
       if (!this.active) {
         this.wanted = false;
         this.ownsFullscreen = false;
-        this.unlock();
       }
       onChange();
     };
@@ -55,20 +52,8 @@ export class MobileDisplay {
         return;
       }
     }
-    if (!this.wanted) {
-      await this.release();
-      return;
-    }
-    const orientation = screen.orientation as LockableOrientation | undefined;
-    if (!this.active || !orientation?.lock || this.ownsOrientation) return;
-    try {
-      await orientation.lock('landscape');
-      this.ownsOrientation = true;
-      // 请求期间可能已返回首页或手动退出全屏。
-      if (!this.wanted || !this.active) this.unlock();
-    } catch {
-      // 不支持横屏锁定时保留当前方向，继续正常游戏。
-    }
+    // 方向由设备与系统设置决定，仅管理本次自动全屏。
+    if (!this.wanted) await this.release();
   }
 
   leave() {
@@ -76,14 +61,7 @@ export class MobileDisplay {
     return this.release();
   }
 
-  private unlock() {
-    if (!this.ownsOrientation) return;
-    this.ownsOrientation = false;
-    screen.orientation?.unlock?.();
-  }
-
   private async release() {
-    this.unlock();
     if (!this.ownsFullscreen || !this.active) return;
     this.ownsFullscreen = false;
     const doc = document as FullscreenDocument;

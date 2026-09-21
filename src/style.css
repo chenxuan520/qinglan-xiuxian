@@ -1231,6 +1231,40 @@ kbd {
 .prologue-footer .primary-button:hover {
   background: #426358;
 }
+.epilogue-scene {
+  color: #34574b;
+  background-color: #eaf1e6;
+}
+.epilogue-scene::before {
+  background: linear-gradient(90deg, #f2f6e820 20%, #f0f4e6b8 48%, #f0f4e6f2 75%);
+}
+.epilogue-scene::after {
+  border-color: #68837455;
+}
+.epilogue-scene .prologue-heading {
+  text-shadow: 0 2px 20px #fffef0;
+}
+.epilogue-scene :is(.eyebrow, .prologue-heading h1, .prologue-heading h1 span) {
+  color: #315747;
+}
+.epilogue-scene .prologue-last {
+  color: #476647;
+}
+.epilogue-scene .prologue-seal {
+  background: #fbf5df99;
+  color: #9b6747;
+}
+.epilogue-scene .prologue-story {
+  scrollbar-color: #879b80 #dee6d7;
+}
+.epilogue-scene .prologue-footer {
+  border-color: #68837455;
+}
+.epilogue-scene .prologue-footer > span {
+  max-width: none;
+  letter-spacing: 1px;
+  line-height: 1.8;
+}
 @media (max-width: 650px) {
   .prologue-scene {
     grid-template-columns: minmax(0, 1fr);
@@ -1240,6 +1274,9 @@ kbd {
   }
   .prologue-scene::before {
     background: linear-gradient(#102a2c55, #102a2ce8 40%, #102a2cf5);
+  }
+  .epilogue-scene::before {
+    background: linear-gradient(#f0f4e659, #f0f4e6ec 36%, #f0f4e6f7);
   }
   .prologue-scene::after {
     inset: 12px;

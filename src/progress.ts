@@ -46,6 +46,7 @@ export interface SaveData {
   volume: number;
   autoplay: boolean;
   prologueSeen: boolean;
+  journeyEnded: boolean;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
   rootElements: ElementId[];
@@ -88,6 +89,7 @@ export function freshSave(
     volume: 0.6,
     autoplay: false,
     prologueSeen: false,
+    journeyEnded: false,
     path: 'dual',
     spiritRoot,
     rootElements: [...rootElements],
@@ -163,6 +165,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     )
       base.starter = rootStarter(base.rootElements, base.path);
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
+    base.journeyEnded = s.journeyEnded === true && realm.max;
     if (base.mortal.member)
       base.mortal.member.dues = Math.min(base.mortal.member.dues, SECT_DUES[realm.index].stones);
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
@@ -172,6 +175,18 @@ export function parseSave(raw: string | null, random: () => number = Math.random
   } catch {
     return base;
   }
+}
+export function enterImmortalGate(save: SaveData) {
+  if (
+    save.journeyEnded ||
+    !realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max
+  )
+    return false;
+  save.journeyEnded = true;
+  save.autoplay = false;
+  save.tribulationReturn = null;
+  recordChronicle(save, '叩入仙门', '此世仙途圆满，携人间旧忆走向大道深处。', 'immortal-gate');
+  return true;
 }
 export function attuneSpiritRoot(save: SaveData, root: SpiritRootId, elements: ElementId[]) {
   const info = SPIRIT_ROOTS.find((r) => r.id === root);

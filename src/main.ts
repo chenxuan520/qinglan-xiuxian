@@ -44,6 +44,7 @@ import {
 import {
   parseSave,
   freshSave,
+  enterImmortalGate,
   SAVE_KEY,
   realmInfo,
   realmBonuses,
@@ -117,7 +118,7 @@ try {
 const save = parseSave(raw);
 // 每次进入先静音，保留音量，只有明确开启声音后才播放。
 save.sound = false;
-resolveActivity(save);
+if (!save.journeyEnded) resolveActivity(save);
 const PROLOGUE_IMAGE = '/assets/qinglan-prologue-dark.webp';
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
 const catalogTreasures = [...TREASURES];
@@ -284,10 +285,14 @@ function fullscreenButton() {
 function controls(inGame = false) {
   return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton()}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
-function completedJourney(realmName: string) {
-  return `<section class="hero journey-hero" aria-label="仙途通关"><div class="hero-copy"><div class="eyebrow"><span></span>终章 · 仙途圆满</div><h1>七境皆过客<span>天地一逍遥</span></h1><p>曾执一剑入青岚，今携万法越重山。<br>七境已破，天劫已散。往后山河，任你来去。</p><div class="journey-badges"><span>七境通关</span><span>天劫止息</span><span>修行永存</span></div><div class="journey-actions"><button class="primary-button" data-action="revisit">重游七境 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="arsenal">查看珍藏</button></div></div><button class="journey-portrait" data-action="cultivation" aria-label="当前${realmName}，进入洞府修炼"><span class="journey-orbit" aria-hidden="true"></span><span class="journey-poem" aria-hidden="true">山河无恙 · 道心长明</span><span class="journey-character" style="${spriteStyle(0)}" aria-hidden="true"></span><span class="journey-realm"><small>此世道果</small><strong>${realmName}</strong><span>进入洞府 ${smallIcon('arrow')}</span></span></button></section><section class="journey-records" aria-label="此世修行成果"><div><span>累积修为</span><strong title="${save.cultivation.toLocaleString('zh-CN')}">${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.cultivation)}</strong><small>一念一境，皆成过往</small></div><div><span>此世年岁</span><strong>${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.age)}<em>年</em></strong><small>岁月悠长，道心未改</small></div><div><span>法宝珍藏</span><strong>${save.artifacts.length}<em>/ ${TREASURES.length}</em></strong><small>万般法器，随心而御</small></div><div><span>历劫留印</span><strong>${save.tribulations}<em>枚</em></strong><small>气血 +${save.tribulations * 3}% · 伤害 +${save.tribulations * 2}%</small></div></section>`;
+function completedJourney(realmName: string, immortal: boolean) {
+  return `<section class="hero journey-hero" aria-label="仙途通关"><div class="hero-copy"><div class="eyebrow"><span></span>七境已破 · 山河可期</div><h1>七境皆过客<span>天地一逍遥</span></h1><p>曾执一剑入青岚，今携万法越重山。<br>七境已破，天劫已散。往后山河，任你来去。</p><div class="journey-badges"><span>七境通关</span><span>天劫止息</span><span>修行永存</span></div><div class="journey-actions">${immortal ? `<button class="primary-button" data-action="immortal-gate">叩入仙门 ${smallIcon('arrow')}</button>` : ''}<button class="${immortal ? 'secondary-button' : 'primary-button'}" data-action="revisit">重游七境 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="arsenal">查看珍藏</button></div></div><button class="journey-portrait" data-action="cultivation" aria-label="当前${realmName}，进入洞府修炼"><span class="journey-orbit" aria-hidden="true"></span><span class="journey-poem" aria-hidden="true">山河无恙 · 道心长明</span><span class="journey-character" style="${spriteStyle(0)}" aria-hidden="true"></span><span class="journey-realm"><small>此世道果</small><strong>${realmName}</strong><span>进入洞府 ${smallIcon('arrow')}</span></span></button></section><section class="journey-records" aria-label="此世修行成果"><div><span>累积修为</span><strong title="${save.cultivation.toLocaleString('zh-CN')}">${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.cultivation)}</strong><small>一念一境，皆成过往</small></div><div><span>此世年岁</span><strong>${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.age)}<em>年</em></strong><small>岁月悠长，道心未改</small></div><div><span>法宝珍藏</span><strong>${save.artifacts.length}<em>/ ${TREASURES.length}</em></strong><small>万般法器，随心而御</small></div><div><span>历劫留印</span><strong>${save.tribulations}<em>枚</em></strong><small>气血 +${save.tribulations * 3}% · 伤害 +${save.tribulations * 2}%</small></div></section>`;
 }
 function renderLobby() {
+  if (save.journeyEnded) {
+    renderEpilogue();
+    return;
+  }
   leaveTown();
   if (assetsReady && !renderer.hasScene(selectedStage)) {
     ensureScene(selectedStage, renderLobby);
@@ -313,7 +318,7 @@ function renderLobby() {
     <main class="lobby-main ${completed ? 'journey-lobby' : ''}">
       ${
         completed
-          ? completedJourney(realm.name)
+          ? completedJourney(realm.name, realm.max)
           : `<section class="hero">
         <div class="hero-copy"><div class="eyebrow"><span></span>青岚少年 · 觅长生 · 寻大道</div><h1>御剑问长生<span>青岚入仙途</span></h1><p>在青岚镇长大，十五岁踏上仙途。<br>为觅长生，为追寻大道，向山海深处去。</p>
           <div class="hero-features"><span>三十六法宝</span><i>·</i><span>七重秘境</span><i>·</i><span>正魔兼修</span></div>
@@ -334,7 +339,26 @@ function renderLobby() {
     <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><span><span class="status-dot"></span>${storageAvailable ? '修行进度自动保存于本机' : '本机存档不可用'}</span>${chronicleEntrance(save)}</footer>`;
   if (sectDuesPending(save)) renderSectDues();
 }
+function renderEpilogue() {
+  leaveTown();
+  inMortalWorld = false;
+  game = pendingRun = null;
+  clearInput();
+  void mobileDisplay.leave();
+  document.body.classList.remove('in-game', 'in-mortal', 'journey-complete', 'immortal-home');
+  ui.innerHTML = '';
+  ui.inert = true;
+  panel = 'epilogue';
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene epilogue-scene" role="dialog" aria-modal="true" aria-labelledby="epilogue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="epilogue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button></div><div class="prologue-heading"><span class="eyebrow">青岚仙途 · 终章</span><h1 id="epilogue-title">云开<span>见长生</span></h1><p>此去长生，亦记人间。</p><span class="prologue-seal">此世圆满</span></div><div class="prologue-story" tabindex="0" aria-label="终章正文"><p>青岚山下，又是一年春水。炊烟漫过新修的青瓦，渡口有人挑起归灯。茶馆里醒木一响，说书人讲起一位从小镇走出的少年——讲到后来，连他的姓名，也渐渐成了传说。</p><p>你立在云海尽头，身后七境归于寂静。曾经惊心的雷声，已远得像一场旧雨。眼前仙门缓缓开启，没有谁问你斩过多少妖、炼成多少法，只见门上浮光如水，映出十五岁那年的衣衫。</p><p>那时行囊很轻，前路很远。你听闻天地间有长生，便以为走得足够远，就能将离别留在身后。直到春秋从指间流过，旧桥几度重修，熟悉的声音一个个散入晚风，才懂得：有些相逢虽只一瞬，也足以陪人走完漫长的一生。</p><p>如今岁月已不能催老你的眉眼。你终于抵达当年仰望的地方，却仍记得灶间的热气、渡船的橹声，记得有人在你出发那日，只说了一句：路远，记得添衣。</p><p>你没有向仙门讨回旧日。只将那些名字与灯火，静静收进心中。此后行过无边星海，见过万千世界，也会知道，最初照亮这条路的，是青岚镇一盏寻常的灯。</p><p>叩门之前，你曾最后回了一趟青岚。渡口坐着一个十五岁的少年，望着远山，问你外面的天地究竟有多大。你便在他身旁坐下，说起竹海之外的山川、云海尽头的星辰，也说起求道路上的风雪与险恶。末了，你告诉他：山河之外，还有求长生、问大道的路。</p><p>少年听得出神，眼里有一簇你熟悉的光。你忽然想起，许多年前，也有一位过路修士，在这里向你说过同样的话。临别时你替他拢好被风吹开的衣襟，只道：路远，记得添衣。</p><p>一步踏出，仙门在身后合拢。凡间不再有你的归舟，山河却仍循着自己的时序，迎春，送雪。而那个少年，终于背起轻轻的行囊，朝青岚山深处走去。</p><p class="prologue-last">山河未老，故人先秋。<br>幸而此心未改，来路仍明。<br><br>这一程山水，至此落笔。<br>长生已觅，大道无涯。</p></div><footer class="prologue-footer"><span>此世已结束 · 真仙<br>叩门于 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 岁</span><button class="primary-button" data-action="epilogue-reincarnate">轮回转世 ${smallIcon('arrow')}</button></footer></section></div>`;
+  const scene = modal.querySelector<HTMLElement>('.epilogue-scene')!;
+  scene.style.setProperty(
+    '--prologue-image',
+    `url("${assetUrl('/assets/qinglan-prologue.webp')}")`,
+  );
+  scene.focus({ preventScroll: true });
+}
 function renderPrologue() {
+  if (save.journeyEnded) return;
   if (save.prologueSeen || game || inMortalWorld || panel) return;
   panel = 'prologue';
   ui.inert = true;
@@ -1342,6 +1366,28 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function handleAction(action: string, id?: string) {
+  if (save.journeyEnded) {
+    if (action === 'epilogue-reincarnate' && panel === 'epilogue') {
+      panel = 'epilogue-reincarnate';
+      panelFrame(
+        '再问长生',
+        '轮回转世 · 开启新的一世',
+        '<p class="pause-description">此世已在仙门前落幕。轮回将清空此世修为、年岁、法宝、物资与履历，重新抽取灵根，从十五岁启程。</p><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回</button></div>',
+      );
+    } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
+      ui.inert = false;
+      resetLifetime('前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。');
+    } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
+    else if (action === 'epilogue-sound' && panel === 'epilogue') {
+      save.sound = !save.sound;
+      unlockAudio();
+      persist();
+      const button = modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!;
+      button.innerHTML = `${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span>`;
+      button.setAttribute('aria-pressed', String(save.sound));
+    }
+    return;
+  }
   if (panel === 'root-reveal') {
     if (action === 'reroll-root') resetLifetime();
     else if (action === 'accept-root' || action === 'close') {
@@ -1371,6 +1417,34 @@ function handleAction(action: string, id?: string) {
       renderLobby();
       ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
     }
+    return;
+  }
+  if (
+    action === 'immortal-gate' &&
+    !game &&
+    !inMortalWorld &&
+    realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max
+  ) {
+    panel = 'immortal-gate';
+    panelFrame(
+      '叩入仙门',
+      '越过此门，此世落幕',
+      '<p class="pause-description">确认后进入终章，此世将永久结束。历练、洞府和青岚镇均不可再返回，未完成的历练也会终止；刷新页面仍保留结束状态。</p><p class="panel-note">之后只能轮回转世，清空此世进度，从十五岁重新启程。也可暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 结束此世</button></div>',
+    );
+    return;
+  }
+  if (action === 'confirm-immortal-gate' && panel === 'immortal-gate' && !game) {
+    const ended = structuredClone(save);
+    if (!enterImmortalGate(ended)) return;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ ...ended, activeRun: null }));
+    } catch {
+      toast('浏览器无法保存终章，此世尚未结束，请释放存储空间后重试');
+      return;
+    }
+    Object.assign(save, ended);
+    pendingRun = null;
+    renderEpilogue();
     return;
   }
   if (action === 'fullscreen' && (game || inTown)) {
@@ -1601,7 +1675,7 @@ function handleAction(action: string, id?: string) {
       return;
     }
     Object.assign(save, candidate.save, { sound: save.sound });
-    resolveActivity(save);
+    if (!save.journeyEnded) resolveActivity(save);
     pendingRun = candidate.run ? Game.restore(save, candidate.run.snapshot()) : null;
     storageAvailable = true;
     persist();
@@ -1614,6 +1688,7 @@ function handleAction(action: string, id?: string) {
     bookTab = 'treasures';
     unlockAudio();
     returnLobby();
+    if (save.journeyEnded) return;
     if (lifespanInfo(save).remaining === 0) {
       renderLifespanEnd();
       return;
@@ -2268,6 +2343,10 @@ function tick(now: number, draw: boolean) {
   }
 }
 function frame(now: number) {
+  if (save.journeyEnded) {
+    requestAnimationFrame(frame);
+    return;
+  }
   townScene?.update(
     now,
     townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel),
