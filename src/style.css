@@ -5293,6 +5293,19 @@ body.journey-complete:not(.in-game) {
   line-height: 2.5;
 }
 
+.prologue-revisit {
+  display: block;
+  margin: 0 auto 18px;
+  padding: 8px 12px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+.prologue-revisit:hover {
+  color: var(--gold);
+}
 .chronicle-link {
   min-height: 40px;
   padding: 10px 0;
