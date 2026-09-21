@@ -34,9 +34,9 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
         assert.equal(e.charge, 0);
       } else if (skill === 'dash') assert.ok(e.charge > 0.55);
       else if (['ranged', 'volley', 'nova', 'soul'].includes(skill)) {
-        assert.equal(g.shots.length, 0);
-        advance(g, 0.7);
         assert.ok(g.shots.length > 0);
+        assert.equal(e.windup, undefined);
+        assert.equal(e.pendingSkill, undefined);
       } else if (skill === 'summon') {
         assert.equal(g.enemies.filter((v) => v.summonedBy === e.id).length, 3);
       } else assert.ok(g.zones.some((z) => z.kind === `enemy-${skill}` && z.delay > 0));
@@ -50,9 +50,9 @@ test('前六境地域法师恢复蓄势直线灵弹，不再在玩家脚下生�
     for (const elite of [false, true]) {
       const { g, e } = encounter(stage, type, elite);
       g.update(0.01);
-      assert.equal(e.pendingSkill, 'ranged');
+      assert.equal(e.pendingSkill, undefined);
+      assert.equal(e.windup, undefined);
       assert.equal(g.zones.length, 0);
-      advance(g, 0.7);
       assert.equal(g.shots.length, 1);
     }
   }
@@ -69,23 +69,13 @@ test('狼群分别包抄两翼，保持原速度；首境菇妖仍直接追击',
   assert.equal(mushroom.charge, 0);
 });
 
-test('灵弹蓄势后才发射，方向提前锁定，击杀施法者可以打断', () => {
+test('灵弹冷却结束后直接发射，不显示锁定路径', () => {
   const { g, e } = encounter(0, 2);
   g.update(0.01);
-  assert.equal(g.shots.length, 0);
-  g.player.y = 180;
-  advance(g, 0.5);
-  assert.equal(g.shots.length, 0);
-  advance(g, 0.2);
-  assert.ok(g.shots.length > 0);
+  assert.equal(g.shots.length, 1);
   assert.equal(g.shots[0].vy, 0);
-  e.cooldown = 0;
-  g.shots = [];
-  g.update(0.01);
-  assert.ok(e.pendingSkill);
-  e.dead = true;
-  advance(g, 0.7);
-  assert.equal(g.shots.length, 0);
+  assert.equal(e.windup, undefined);
+  assert.equal(e.pendingSkill, undefined);
 });
 
 test('普通怪和精英不再生成地域法阵，重甲近身震地保留', () => {
@@ -156,6 +146,9 @@ test('前六境大量精英施法受限：弹幕64、召唤护卫12，法师不�
 test('旧档补默认迟滞字段，蓄势续局不丢技能，无效技能状态拒绝恢复', () => {
   const { g } = encounter(4, 61, true);
   g.update(0.01);
+  g.shots = [];
+  g.enemies[0].windup = 0.5;
+  g.enemies[0].pendingSkill = 'ranged';
   const restored = Game.restore(g.save, g.snapshot())!;
   assert.ok(restored);
   restored.resume();
