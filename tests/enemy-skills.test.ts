@@ -56,6 +56,10 @@ test('前六境地域法师恢复蓄势直线灵弹，不再在玩家脚下生�
       assert.equal(g.shots.length, 0);
       advance(g, 0.7);
       assert.equal(g.shots.length, stage === 4 ? (elite ? 4 : 2) : 1);
+      if (stage === 4) {
+        assert.ok(g.shots.some((shot) => shot.vy < 0));
+        assert.ok(g.shots.some((shot) => shot.vy > 0));
+      }
     }
   }
 });
@@ -71,16 +75,26 @@ test('狼群分别包抄两翼，保持原速度；首境菇妖仍直接追击',
   assert.equal(mushroom.charge, 0);
 });
 
-test('灵弹保留蓄势但不生成地面区域', () => {
+test('灵弹蓄势后沿锁定方向发射，施法者死亡可以打断', () => {
   const { g, e } = encounter(0, 2);
   g.update(0.01);
   assert.equal(g.shots.length, 0);
   assert.equal(e.pendingSkill, 'ranged');
   assert.ok(e.windup! > 0);
+  g.player.y = 180;
+  advance(g, 0.5);
+  assert.equal(g.shots.length, 0);
   advance(g, 0.7);
   assert.equal(g.shots.length, 1);
   assert.equal(g.shots[0].vy, 0);
   assert.equal(g.zones.length, 0);
+  e.cooldown = 0;
+  g.shots = [];
+  g.update(0.01);
+  assert.equal(e.pendingSkill, 'ranged');
+  e.dead = true;
+  advance(g, 0.7);
+  assert.equal(g.shots.length, 0);
 });
 
 test('普通怪和精英不再生成地域法阵，重甲近身震地保留', () => {
@@ -151,14 +165,11 @@ test('前六境大量精英施法受限：弹幕64、召唤护卫12，法师不�
 test('旧档补默认迟滞字段，蓄势续局不丢技能，无效技能状态拒绝恢复', () => {
   const { g } = encounter(4, 61, true);
   g.update(0.01);
-  g.shots = [];
-  g.enemies[0].windup = 0.5;
-  g.enemies[0].pendingSkill = 'ranged';
   const restored = Game.restore(g.save, g.snapshot())!;
   assert.ok(restored);
   restored.resume();
   advance(restored, 0.7);
-  assert.ok(restored.shots.length > 0);
+  assert.equal(restored.shots.length, 4);
   const legacy = g.snapshot();
   delete legacy.slowed;
   delete legacy.nextEnemySkillAt;
