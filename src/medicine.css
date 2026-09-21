@@ -1,0 +1,219 @@
+.medicine-entrance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 0;
+  border-block: 1px solid #b4c79b30;
+}
+.medicine-entrance p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0 0;
+}
+.medicine-entrance button {
+  flex-shrink: 0;
+}
+.medicine-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.medicine-toolbar span {
+  display: block;
+  margin-top: 8px;
+  color: #acbda8;
+  font-size: 12px;
+}
+.medicine-tabs {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.medicine-tabs button {
+  padding: 10px 14px;
+  border-bottom: 1px solid #aebc9955;
+  font-size: 13px;
+}
+.medicine-tabs button[aria-pressed='true'] {
+  color: #ecdcaa;
+  border-color: #ecdcaa;
+}
+.medicine-tier-tabs {
+  margin: 20px 0;
+}
+.medicine-tier-tabs span {
+  margin-left: 8px;
+  opacity: 0.65;
+  font-size: 11px;
+}
+.medicine-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.medicine-card {
+  border: 1px solid #b4c79b35;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.medicine-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.medicine-card header small {
+  color: #bfcba7;
+  font-size: 11px;
+}
+.medicine-card h3 {
+  font-size: 19px;
+  font-weight: 400;
+  margin: 7px 0;
+}
+.medicine-card header span:not(.medicine-art) {
+  font-size: 12px;
+  color: #acbda8;
+}
+.medicine-card p {
+  font-size: 13px;
+  line-height: 1.9;
+  margin: 0;
+}
+.medicine-art {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  background-size: 800% 400%;
+  border-radius: 8px;
+}
+.medicine-source,
+.medicine-duration,
+.medicine-recipe {
+  font-size: 11px;
+  line-height: 1.8;
+}
+.medicine-source {
+  color: #acbda8;
+}
+.medicine-duration {
+  color: #d5d7b5;
+}
+.medicine-card .secondary-button {
+  margin-top: auto;
+  font-size: 12px;
+  min-height: 44px;
+  padding: 10px;
+  line-height: 1.7;
+}
+.medicine-quantity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  font-size: 12px;
+  color: #acbda8;
+}
+.medicine-quantity input {
+  width: 84px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid #b4c79b55;
+  border-radius: 4px;
+  color: #ecdcaa;
+  background: #102d2980;
+  font: inherit;
+}
+.medicine-quantity + .secondary-button {
+  margin-top: 0;
+}
+.medicine-permanent {
+  border-color: #d5ba784f;
+}
+.medicine-active {
+  border-block: 1px solid #b4c79b35;
+  padding: 14px 0;
+  margin: 20px 0;
+}
+.medicine-active > strong {
+  font-weight: 400;
+  color: #e0d39d;
+}
+.medicine-active > p {
+  font-size: 12px;
+  color: #acbda8;
+}
+.medicine-active > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  font-size: 13px;
+}
+.medicine-active .medicine-art {
+  width: 36px;
+  height: 36px;
+}
+.medicine-active small {
+  display: block;
+  font-size: 11px;
+  margin-top: 4px;
+  color: #acbda8;
+}
+.medicine-active button {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 8px;
+}
+.stage-years {
+  display: block;
+  font-size: 9px;
+  margin-top: 5px;
+  color: inherit;
+  letter-spacing: 0;
+}
+.stage-grid > .stage-card:not(:last-child) {
+  min-height: 114px;
+}
+.immortal-home #ui .medicine-entrance {
+  color: #456452;
+  border-color: #45645244;
+}
+@media (max-width: 760px) {
+  .medicine-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .medicine-grid {
+    grid-template-columns: 1fr;
+  }
+  .medicine-entrance {
+    gap: 12px;
+  }
+  .medicine-entrance .secondary-button {
+    padding: 12px;
+    font-size: 12px;
+  }
+  .medicine-tabs button {
+    padding: 9px;
+    font-size: 12px;
+  }
+}
+
+#medicine-hud {
+  display: block;
+  max-width: 250px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #ddcf9c;
+}
+#medicine-hud:empty {
+  display: none;
+}

@@ -18,6 +18,7 @@ export function sceneAssets(stage: number, tribulation = false, extraSprites: nu
       '/assets/treasures-2.webp',
       '/assets/treasures-3.webp',
       '/assets/cultivation-manuals.webp',
+      '/assets/medicines.webp',
     ]),
   ];
 }

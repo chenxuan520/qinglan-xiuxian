@@ -1,3 +1,4 @@
+import { validMedicine } from './medicine-data.ts';
 import {
   ELEMENTS,
   SPIRIT_ROOTS,
@@ -53,10 +54,14 @@ export function exportSave(save: SaveData, run: Game | null) {
 }
 
 export function importSave(text: string) {
-  if (text.length > MAX_SAVE_FILE_BYTES) throw new Error('存档文件过大，请选择 10 MB 以内的文件');
+  if (
+    text.length > MAX_SAVE_FILE_BYTES ||
+    new TextEncoder().encode(text).byteLength > MAX_SAVE_FILE_BYTES
+  )
+    throw new Error('存档文件过大，请选择 10 MB 以内的文件');
   let file;
   try {
-    file = JSON.parse(text);
+    file = JSON.parse(text.replace(/^\uFEFF/, ''));
   } catch {
     throw new Error('文件不是有效的 JSON 存档');
   }
@@ -71,6 +76,7 @@ export function importSave(text: string) {
   if (
     !record(data) ||
     data.version !== 1 ||
+    (data.medicine !== undefined && !validMedicine(data.medicine)) ||
     (data.chronicle !== undefined && !validChronicle(data.chronicle, Number(data.age ?? 15))) ||
     (data.mortal !== undefined && !validMortal(data.mortal, Number(data.age ?? 15))) ||
     (data.lifespanBonus !== undefined && !integer(data.lifespanBonus)) ||

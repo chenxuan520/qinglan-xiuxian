@@ -1,3 +1,5 @@
+import { syncHumanStories } from './human-stories.ts';
+import { freshMedicine, validMedicine, type MedicineState } from './medicine-data.ts';
 import {
   REALMS,
   STAGES,
@@ -28,6 +30,7 @@ import {
 } from './chronicle.ts';
 
 export interface SaveData {
+  medicine: MedicineState;
   version: 1;
   stones: number;
   iron: number;
@@ -65,6 +68,7 @@ export function freshSave(
 ): SaveData {
   return {
     version: 1,
+    medicine: freshMedicine(),
     mortal: freshMortal(),
     chronicle: freshChronicle(),
     age: 15,
@@ -107,6 +111,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
+    if (validMedicine(s.medicine)) base.medicine = s.medicine;
     if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
     base.lifespanBonus = int(s.lifespanBonus);
     base.tribulations = int(s.tribulations);
@@ -169,6 +174,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     if (base.mortal.member)
       base.mortal.member.dues = Math.min(base.mortal.member.dues, SECT_DUES[realm.index].stones);
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
+    syncHumanStories(base);
     claimArtifacts(base);
     syncTribulationClock(base);
     return base;

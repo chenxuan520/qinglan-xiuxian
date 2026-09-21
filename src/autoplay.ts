@@ -100,7 +100,7 @@ export function autoplayInput(g: Game) {
   }
   const norm = Math.hypot(dx, dy) || 1;
   const preferred = { x: dx / norm, y: dy / norm };
-  const charges = g.enemies.filter((e) => e.boss && !e.dead && e.charge > 0);
+  const charges = g.enemies.filter((e) => (e.boss || g.stage < 6) && !e.dead && e.charge > 0);
   if (!charges.length) return preferred;
   const speed = g.stats.speed;
   // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
@@ -108,7 +108,10 @@ export function autoplayInput(g: Game) {
   const distanceToPath = (x: number, y: number, e: (typeof charges)[number]) => {
     const along = Math.max(
       0,
-      Math.min(Math.min(0.7, e.charge) * 820, (x - e.x) * e.dx + (y - e.y) * e.dy),
+      Math.min(
+        Math.min(e.boss ? 0.7 : 0.55, e.charge) * (e.boss ? 820 : 380),
+        (x - e.x) * e.dx + (y - e.y) * e.dy,
+      ),
     );
     return Math.hypot(x - e.x - e.dx * along, y - e.y - e.dy * along);
   };

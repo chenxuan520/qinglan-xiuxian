@@ -1,3 +1,5 @@
+import { medicineEffects, medicineLoot } from './medicine-data.ts';
+import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
 import {
   TREASURES,
@@ -9,6 +11,7 @@ import {
   TRIAL_BOSS_TIMES,
   DIFFICULTIES,
   ENEMIES,
+  ENEMY_TACTICS,
   STAGE_ENEMIES,
   enemyRoster,
   enemyWave,
@@ -35,7 +38,7 @@ import {
   STAGE_YEARS_PER_MINUTE,
   tribulationRules,
 } from './data.ts';
-import type { CultivationPath, WeaponKind, SpiritRootId, ElementId } from './data.ts';
+import type { CultivationPath, WeaponKind, SpiritRootId, ElementId, EnemySkill } from './data.ts';
 import {
   cultivationReward,
   realmInfo,
@@ -75,6 +78,9 @@ export interface Enemy extends Point {
   bossStage?: number;
   skillStep?: number;
   pursuitCooldown?: number;
+  windup?: number;
+  pendingSkill?: EnemySkill;
+  summonedBy?: number;
   cooldown: number;
   slow: number;
   flash: number;
@@ -156,6 +162,7 @@ export class Game {
   input: Point = { x: 0, y: 0 };
   notice = '';
   noticeTime = 0;
+  slowed = 0;
   bossSpawned = false;
   trialBossesDefeated = 0;
   trialBossesSpawned = 0;
@@ -172,6 +179,9 @@ export class Game {
   onEvent: (name: string, items?: string[]) => void = () => {};
   private spawnBudget = 0;
   private serial = 0;
+  private nextEnemySkillAt = 0;
+  private medicine: ReturnType<typeof medicineEffects>;
+  private nextMedicinePulse = 0;
   private baseHp: number;
   private realm: number;
   save: SaveData;
@@ -189,6 +199,7 @@ export class Game {
     path: CultivationPath = save.mortal.member ? passive(save.mortal.member.id).school : save.path,
   ) {
     this.save = save;
+    this.medicine = medicineEffects(save.medicine, save.age);
     syncTribulationClock(save);
     this.stage = stage;
     this.nextElite = this.eliteInterval;
@@ -220,10 +231,11 @@ export class Game {
     return Math.round(
       base *
         (1 + this.passivePower('bone') * 0.18) *
-        (1 - (this.passives.frenzy || 0) * 0.02) *
+        (1 - (this.passives.frenzy || 0) * 0.02 * this.medicine.drawback) *
         (this.path === 'orthodox' ? 1.12 : 1) *
         (1 + this.save.tribulations * 0.03) *
-        (1 + this.save.retreatBonus.vitality / 100),
+        (1 + this.save.retreatBonus.vitality / 100) *
+        this.medicine.hp,
     );
   }
   get boss() {
@@ -246,6 +258,7 @@ export class Game {
     if (years && expired && this.state === 'lost') {
       this.player.hp = this.player.maxHp;
       this.player.invincible = 3;
+      this.slowed = 0;
       this.state = 'paused';
       this.announce(`向天借寿 · 寿元 +${years} 年`);
     }
@@ -308,20 +321,26 @@ export class Game {
           this.passivePower('blood') * 0.18 +
           this.passivePower('forbidden') * 0.08 +
           (this.path === 'demonic' ? 0.12 : 0)) *
-        (1 - (this.passives.abyss || 0) * 0.02) *
+        (1 - (this.passives.abyss || 0) * 0.02 * this.medicine.drawback) *
         (1 + (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
-        realmDamageMultiplier(this.realm),
-      cooldown: Math.max(
-        0.3,
-        1 -
-          this.passivePower('haste') * 0.07 -
-          this.passivePower('frenzy') * (this.player.hp < this.player.maxHp / 2 ? 0.1 : 0.08) +
-          (this.passives.soul || 0) * 0.01,
-      ),
-      area: 1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.16,
-      duration: 1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.2,
+        realmDamageMultiplier(this.realm) *
+        this.medicine.damage,
+      cooldown:
+        Math.max(
+          0.3,
+          1 -
+            this.passivePower('haste') * 0.07 -
+            this.passivePower('frenzy') * (this.player.hp < this.player.maxHp / 2 ? 0.1 : 0.08) +
+            (this.passives.soul || 0) * 0.01 * this.medicine.drawback,
+        ) * this.medicine.cooldown,
+      area:
+        (1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.16) *
+        this.medicine.area,
+      duration:
+        (1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.2) *
+        this.medicine.duration,
       speed:
         spiritRootInfo(this.spiritRoot).baseSpeed *
         (1 +
@@ -329,23 +348,27 @@ export class Game {
           this.passivePower('crit') * 0.03 +
           (this.player.hp < this.player.maxHp / 2 ? this.passivePower('frenzy') * 0.04 : 0)) *
         (1 + this.save.retreatBonus.speed / 100) *
-        (1 - (this.passives.bone || 0) * 0.01),
+        (1 - (this.passives.bone || 0) * 0.01 * this.medicine.drawback) *
+        (this.slowed > 0 ? 1 - 0.25 * this.medicine.drawback : 1) *
+        this.medicine.speed,
       crit: Math.min(
         0.85,
         spiritRootInfo(this.spiritRoot).baseCrit +
           this.passivePower('crit') * 0.07 +
-          this.passivePower('curse') * 0.08,
+          this.passivePower('curse') * 0.08 +
+          this.medicine.crit,
       ),
       criticalDamage: 1.8 + this.passivePower('curse') * 0.12,
-      armor: Math.max(
-        0.3,
-        1 -
-          this.passivePower('guard') * 0.06 +
-          (this.passives.blood || 0) * 0.03 +
-          (this.passives.curse || 0) * 0.015 +
-          (this.passives.forbidden || 0) * 0.015,
-      ),
-      magnet: 85 * (1 + this.passivePower('magnet') * 0.28),
+      armor:
+        Math.max(
+          0.3,
+          1 -
+            this.passivePower('guard') * 0.06 +
+            (this.passives.blood || 0) * 0.03 * this.medicine.drawback +
+            (this.passives.curse || 0) * 0.015 * this.medicine.drawback +
+            (this.passives.forbidden || 0) * 0.015 * this.medicine.drawback,
+        ) * this.medicine.armor,
+      magnet: 85 * (1 + this.passivePower('magnet') * 0.28) * this.medicine.magnet,
       xp:
         ((1 +
           this.passivePower('spirit') * 0.15 +
@@ -356,9 +379,10 @@ export class Game {
         0.9 *
         spiritRootInfo(this.spiritRoot).rate,
       regen:
-        (spiritRootInfo(this.spiritRoot).baseRegen + this.passivePower('duration') * 0.2) *
+        (spiritRootInfo(this.spiritRoot).baseRegen * this.medicine.regen +
+          this.passivePower('duration') * 0.2) *
         (this.path === 'orthodox' ? 1.2 : 1) *
-        (1 - (this.passives.devour || 0) * 0.04),
+        (1 - (this.passives.devour || 0) * 0.04 * this.medicine.drawback),
       killHeal: this.passivePower('devour') * (0.18 + this.player.maxHp * 0.0002),
     };
   }
@@ -431,6 +455,10 @@ export class Game {
       tribulationOpeningDamage: this.tribulationOpeningDamage,
       spawnBudget: this.spawnBudget,
       serial: this.serial,
+      slowed: this.slowed,
+      nextEnemySkillAt: this.nextEnemySkillAt,
+      nextMedicinePulse: this.nextMedicinePulse,
+      medicineHpFactor: this.medicine.hp,
     };
   }
   static restore(save: SaveData, raw: unknown): Game | null {
@@ -540,6 +568,13 @@ export class Game {
       )
         return null;
       if (
+        (s.slowed !== undefined &&
+          (!Number.isFinite(s.slowed) || s.slowed < 0 || s.slowed > 0.65)) ||
+        (s.nextEnemySkillAt !== undefined &&
+          (!Number.isFinite(s.nextEnemySkillAt) || s.nextEnemySkillAt < 0))
+      )
+        return null;
+      if (
         !Array.isArray(s.weapons) ||
         !s.weapons.length ||
         s.weapons.length > MAX_WEAPONS ||
@@ -591,6 +626,12 @@ export class Game {
               'dy',
             ]) &&
             ENEMIES[e.type] &&
+            (e.windup === undefined ||
+              (Number.isFinite(e.windup) && e.windup >= 0 && e.windup <= 1.2)) &&
+            (e.pendingSkill === undefined ||
+              ['ranged', 'volley', 'nova', 'soul'].includes(e.pendingSkill)) &&
+            (e.summonedBy === undefined ||
+              (Number.isSafeInteger(e.summonedBy) && e.summonedBy > 0)) &&
             (e.pursuitCooldown === undefined || Number.isFinite(e.pursuitCooldown)) &&
             (e.bossStage === undefined ||
               (Number.isInteger(e.bossStage) &&
@@ -679,11 +720,26 @@ export class Game {
       g.iron = s.iron;
       g.rerolls = s.rerolls;
       g.player = { ...s.player, moving: false };
+      g.slowed = s.slowed ?? 0;
+      if (
+        s.nextMedicinePulse !== undefined &&
+        (!Number.isFinite(s.nextMedicinePulse) || s.nextMedicinePulse < 0)
+      )
+        return null;
+      g.nextMedicinePulse = s.nextMedicinePulse ?? 0;
+      g.nextEnemySkillAt = s.nextEnemySkillAt ?? 0;
       g.weapons = s.weapons.map((w) => ({ ...w }));
       g.passives = { ...s.passives };
       const maxHp = g.maximumHealth;
+      if (
+        s.medicineHpFactor !== undefined &&
+        (!Number.isFinite(s.medicineHpFactor) || s.medicineHpFactor <= 0)
+      )
+        return null;
+      const growth =
+        Math.round((maxHp * (s.medicineHpFactor ?? 1)) / g.medicine.hp) - g.player.maxHp;
       // 旧对局补齐境界收益，保留已损失气血；新快照的差额为零。
-      g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + (maxHp - g.player.maxHp)));
+      g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + growth));
       g.player.maxHp = maxHp;
       g.enemies = s.enemies.map((e) => ({ ...e }));
       for (const e of g.enemies) if (e.boss && !e.dead && e.charge > 0.7) g.bossChargeWarning(e);
@@ -788,8 +844,21 @@ export class Game {
       this.onEvent('lose');
       return;
     }
+    if (this.save.age >= this.medicine.expiresAt) {
+      this.medicine = medicineEffects(this.save.medicine, this.save.age);
+      this.player.maxHp = this.maximumHealth;
+      this.player.hp = Math.min(this.player.hp, this.player.maxHp);
+    }
+    if (this.medicine.frost && this.time >= this.nextMedicinePulse) {
+      this.nextMedicinePulse = this.time + 8;
+      for (const enemy of this.enemies)
+        if (!enemy.dead && distance(enemy, this.player) <= 180)
+          enemy.slow = Math.max(enemy.slow, 2);
+      this.effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'pulse');
+    }
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     this.noticeTime -= dt;
+    this.slowed = Math.max(0, this.slowed - dt);
     const p = this.player,
       stats = this.stats;
     p.invincible = Math.max(0, p.invincible - dt);
@@ -1074,11 +1143,22 @@ export class Game {
         }
       }
       const charging = e.charge > 0;
-      if (e.charge > 0) {
+      const winding = !e.boss && this.stage < FINAL_TRIAL_STAGE && (e.windup ?? 0) > 0;
+      if (winding) {
+        e.windup = Math.max(0, e.windup! - dt);
+        if (e.windup === 0 && e.pendingSkill) {
+          this.fireEnemyVolley(e, e.pendingSkill);
+          e.pendingSkill = undefined;
+        }
+      } else if (e.charge > 0) {
         const before = e.charge;
         e.charge = Math.max(0, e.charge - dt);
         if (e.boss) {
           const movement = (Math.min(0.7, before) - Math.min(0.7, e.charge)) * 820;
+          e.x += e.dx * movement;
+          e.y += e.dy * movement;
+        } else if (this.stage < FINAL_TRIAL_STAGE) {
+          const movement = (Math.min(0.55, before) - Math.min(0.55, e.charge)) * 380;
           e.x += e.dx * movement;
           e.y += e.dy * movement;
         } else if (e.charge < 0.55) {
@@ -1093,11 +1173,28 @@ export class Game {
               : 0
             : 1;
         const speed = e.speed * (e.slow > 0 ? 0.35 : 1) * move;
-        e.x += nx * speed * dt;
-        e.y += ny * speed * dt;
+        if (
+          !e.boss &&
+          this.stage < FINAL_TRIAL_STAGE &&
+          ENEMY_TACTICS[e.type].flank &&
+          d > 100 &&
+          d < 420
+        ) {
+          // 狼与剑卒分左右绕行，接近后收拢；不会额外提高移动速度。
+          const side = e.id % 2 ? 0.65 : -0.65;
+          const norm = Math.hypot(1, side);
+          e.x += ((nx - ny * side) / norm) * speed * dt;
+          e.y += ((ny + nx * side) / norm) * speed * dt;
+        } else {
+          e.x += nx * speed * dt;
+          e.y += ny * speed * dt;
+        }
       }
       if (e.boss && !charging && e.cooldown <= 0) {
         this.castBossSkill(e, nx, ny);
+      } else if (!e.boss && this.stage < FINAL_TRIAL_STAGE) {
+        if (!charging && !winding && e.cooldown <= 0 && this.time >= this.nextEnemySkillAt)
+          this.castEnemySkill(e, d, nx, ny);
       } else if (!e.boss && e.cooldown <= 0) {
         e.cooldown = this.isFinalTrial
           ? 4.2 - progress * 2.1 + this.random() * 1.2
@@ -1189,6 +1286,133 @@ export class Game {
       e.x + e.dx * 574,
       e.y + e.dy * 574,
     );
+  }
+  private castEnemySkill(e: Enemy, distance: number, nx: number, ny: number) {
+    const tactics = ENEMY_TACTICS[e.type];
+    const skill = e.elite ? tactics.eliteSkill : tactics.skill;
+    if (
+      !skill ||
+      distance > 540 ||
+      (skill === 'stomp' && distance > 180) ||
+      (skill === 'dash' && distance > 360)
+    )
+      return;
+    const projectile = ['ranged', 'volley', 'nova', 'soul'].includes(skill);
+    const circles = ['roots', 'firepath', 'frost', 'miasma', 'storm', 'stomp'].includes(skill);
+    // 前六境技能共享弹幕与地面区域预算；妖王独立施法，避免小怪挤满画面。
+    if (projectile && this.shots.filter((b) => b.kind === 'hostile').length >= 60) return;
+    if (circles && this.zones.filter((z) => z.hostile).length > 9) return;
+    if (
+      skill === 'summon' &&
+      this.enemies.filter((v) => !v.dead && v.summonedBy !== undefined).length >= 12
+    )
+      return;
+    e.cooldown = (e.elite ? 5.5 : 4.5) + this.random() * 2;
+    this.nextEnemySkillAt = this.time + 0.18;
+    e.dx = nx;
+    e.dy = ny;
+    if (skill === 'dash') {
+      e.charge = 1.25;
+      return;
+    }
+    if (projectile) {
+      e.windup = 0.65;
+      e.pendingSkill = skill;
+      return;
+    }
+    if (skill === 'summon') {
+      const count = Math.min(
+        e.elite ? 3 : 2,
+        240 - this.enemies.length,
+        12 - this.enemies.filter((v) => !v.dead && v.summonedBy !== undefined).length,
+      );
+      const pool = enemyRoster(this.stage, this.time).slice(0, 2);
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * TAU;
+        const summoned = this.spawnEnemy(pool[i % pool.length], false, false, {
+          x: e.x + Math.cos(a) * 40,
+          y: e.y + Math.sin(a) * 40,
+        });
+        summoned.summonedBy = e.id;
+      }
+      this.effect(e.x, e.y, 0.7, 60, '#c8b9df', 'pulse');
+      e.windup = 0.7;
+      return;
+    }
+    e.windup = 0.9;
+    const p = { x: this.player.x, y: this.player.y };
+    const circle = (
+      x: number,
+      y: number,
+      radius: number,
+      life: number,
+      color: string,
+      delay = 0.9,
+    ) => this.zone(x, y, radius, life, e.damage * 0.8, color, `enemy-${skill}`, delay, true);
+    if (skill === 'stomp') {
+      circle(e.x, e.y, 92, 0.25, '#e9bf85');
+      if (e.elite) circle(e.x + nx * 115, e.y + ny * 115, 92, 0.25, '#e9bf85', 1.4);
+    } else if (skill === 'firepath') {
+      const count = e.elite ? 3 : 2;
+      for (let i = 0; i < count; i++) {
+        const along = (i - (count - 1) / 2) * 75;
+        circle(p.x + nx * along, p.y + ny * along, 42, 2.5, '#ef9c6c');
+      }
+    } else if (skill === 'storm') {
+      circle(p.x, p.y, 52, 0.25, '#e9d391');
+      if (e.elite)
+        for (const side of [-1, 1])
+          circle(
+            p.x - ny * side * 95,
+            p.y + nx * side * 95,
+            48,
+            0.25,
+            '#e9d391',
+            side < 0 ? 1.2 : 1.5,
+          );
+    } else {
+      const color = skill === 'frost' ? '#a8e1f4' : skill === 'roots' ? '#a2dba4' : '#bdcc79';
+      for (const side of e.elite ? [-45, 45] : [0])
+        circle(
+          p.x - ny * side,
+          p.y + nx * side,
+          skill === 'miasma' ? 54 : 48,
+          skill === 'miasma' ? 3.2 : 1.6,
+          color,
+        );
+    }
+  }
+  private fireEnemyVolley(e: Enemy, skill: EnemySkill) {
+    const count =
+      skill === 'nova'
+        ? e.elite
+          ? 10
+          : 8
+        : skill === 'volley'
+          ? e.elite
+            ? 5
+            : 3
+          : skill === 'soul'
+            ? e.elite
+              ? 4
+              : 2
+            : 1;
+    const available = 64 - this.shots.filter((b) => b.kind === 'hostile').length;
+    const angle = Math.atan2(e.dy, e.dx);
+    for (let i = 0; i < Math.min(count, available); i++) {
+      if (skill === 'soul') {
+        const side = (i - (count - 1) / 2) * 65;
+        const from = { x: e.x - e.dy * side, y: e.y + e.dx * side };
+        const dx = e.dx * 300 + e.dy * side,
+          dy = e.dy * 300 - e.dx * side;
+        const length = Math.hypot(dx, dy);
+        this.hostileShot(from, dx / length, dy / length, 165, e.damage * 0.8);
+      } else {
+        const a =
+          skill === 'nova' ? angle + (i / count) * TAU : angle + (i - (count - 1) / 2) * 0.24;
+        this.hostileShot(e, Math.cos(a), Math.sin(a), skill === 'nova' ? 120 : 165, e.damage * 0.8);
+      }
+    }
   }
   private startBossCharge(e: Enemy, nx: number, ny: number, warning = 0.85) {
     e.charge = warning + 0.7;
@@ -1742,6 +1966,15 @@ export class Game {
       }
       z.life -= dt;
       z.tick -= dt;
+      if (
+        this.stage < FINAL_TRIAL_STAGE &&
+        z.hostile &&
+        z.life > 0 &&
+        ['enemy-roots', 'enemy-frost'].includes(z.kind) &&
+        this.player.invincible <= 0 &&
+        distance(z, this.player) < z.radius + 8
+      )
+        this.slowed = 0.65;
       if (z.kind === 'vortex')
         for (const e of this.enemies) {
           const d = distance(e, z);
@@ -1753,7 +1986,11 @@ export class Game {
       if (z.tick <= 0) {
         z.tick = 0.5;
         if (z.hostile) {
-          if (distance(z, this.player) < z.radius + 8) this.hurtPlayer(z.damage);
+          if (distance(z, this.player) < z.radius + 8)
+            this.hurtPlayer(
+              z.damage *
+                (z.kind === 'poison' || z.kind === 'enemy-miasma' ? this.medicine.poison : 1),
+            );
         } else if (z.kind === 'pagoda') {
           const target = this.nearest(z, new Set(), z.radius);
           if (target) {
@@ -1917,6 +2154,7 @@ export class Game {
   }
   hitEnemy(e: Enemy, damage: number, crit = false, source = 'other') {
     if (e.dead) return;
+    if (e.elite || e.boss) damage *= this.medicine.eliteDamage;
     if (this.tribulation) {
       if (!this.tribulationVulnerable) return;
       damage = Math.min(
@@ -1957,7 +2195,10 @@ export class Game {
         : Math.round(ENEMIES[e.type].xp * (1 + this.stage * 0.16) * (e.elite ? 8 : 1));
       // 基础击杀收益保留，额外修为按地域与怪物强度结算；旧快照不追溯虚构击杀。
       const cultivationScale = cultivationFactor(this.realm);
-      const bossReward = e.boss ? bossCultivationReward(this.stage, e.bossStage ?? this.stage) : 0;
+      const bossReward = e.boss
+        ? bossCultivationReward(this.stage, e.bossStage ?? this.stage) *
+          this.medicine.bossCultivation
+        : 0;
       this.bossCultivation +=
         bossReward * DIFFICULTIES[this.difficulty].reward * spiritRootInfo(this.spiritRoot).rate;
       this.combatCultivation += e.boss
@@ -1968,6 +2209,26 @@ export class Game {
               cultivationScale -
               0.7,
           );
+      if (!e.boss)
+        this.combatCultivation +=
+          Math.max(
+            0.7,
+            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * (e.elite ? 4 : 1)) /
+              cultivationScale,
+          ) *
+          (this.medicine.cultivation - 1);
+      const lastBoss =
+        !this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length - 1;
+      const loot = e.boss
+        ? medicineLoot(
+            this.save.medicine,
+            this.stage,
+            lastBoss && this.player.hp > 0 && !this.save.completed.includes(this.stage),
+            this.isFinalTrial && e.bossStage === FINAL_TRIAL_STAGE,
+            this.random,
+          )
+        : [];
+      if (loot.length && e.boss) recordChronicle(this.save, '妖王丹缘', loot.join('、'));
       this.creditCultivation();
       this.heal(this.stats.killHeal);
       let collected: string[] = [];
@@ -2033,6 +2294,7 @@ export class Game {
   revive() {
     if (this.state !== 'lost' || this.revivesUsed >= MAX_REVIVES || this.expired) return false;
     this.revivesUsed++;
+    this.slowed = 0;
     this.player.hp = this.player.maxHp;
     this.player.invincible = 3;
     const cleared = this.isFinalTrial

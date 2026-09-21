@@ -4,6 +4,7 @@ import { realmInfo, type SaveData } from './progress.ts';
 import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from './setting.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 import { smithStoryLine } from './town-story.ts';
+import { humanStoryGreeting } from './human-stories.ts';
 import { StorySpeech } from './story-speech.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
@@ -114,12 +115,15 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
 export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResident) {
   closeNpcChat();
   const population = save.mortal.population!;
-  const identity = `${population.seed}:${population.since}:${npc.id}:${npc.generation}:${JSON.stringify(save.mortal.smithStory ?? null)}`;
+  const memory = humanStoryGreeting(save, npc.id);
+  const identity = `${population.seed}:${population.since}:${npc.id}:${npc.generation}:${JSON.stringify(save.mortal.smithStory ?? null)}:${memory}`;
   const fallback =
-    smithStoryLine(population, save.age, save.mortal.smithStory, npc.id) || npcDefaultLine(npc.id);
+    memory ||
+    smithStoryLine(population, save.age, save.mortal.smithStory, npc.id) ||
+    npcDefaultLine(npc.id);
   let conversation = conversations.get(npc.id);
   if (conversation?.identity !== identity) {
-    conversation = { identity, messages: [] };
+    conversation = { identity, messages: memory ? [{ role: 'assistant', content: memory }] : [] };
     conversations.set(npc.id, conversation);
   }
   const messages = conversation.messages;

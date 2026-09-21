@@ -1,3 +1,4 @@
+import { townMedicineReward } from './medicine-data.ts';
 import {
   FINAL_TRIAL_STAGE,
   spiritRootInfo,
@@ -233,9 +234,10 @@ function completeActivity(save: SaveData, random: () => number) {
       const stones = activity.kind === 'tea' ? (random() < 0.3 ? 8 : 0) : job.stones;
       save.stones += stones;
       save.iron += job.iron;
+      const medicine = townMedicineReward(save.medicine, activity.kind, random);
       log(
         save,
-        `${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事，未遇机缘'}。`,
+        `${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事'}${medicine ? `、${medicine}` : ''}。`,
       );
     }
     return true;

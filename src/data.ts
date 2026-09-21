@@ -878,6 +878,18 @@ export function evolutionPassives(t: Treasure, path: CultivationPath = 'dual') {
   );
 }
 export const REALMS = ['炼气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '大乘', '真仙'];
+export const REALM_VERSES: Record<string, string> = {
+  炼气: '一息引灵 · 初叩仙途',
+  筑基: '道基初定 · 凡骨渐蜕',
+  金丹: '金丹照命 · 始知春短',
+  元婴: '婴成紫府 · 回首千秋',
+  化神: '神游天地 · 一念山河',
+  炼虚: '虚中问道 · 不逐浮尘',
+  合体: '身与道合 · 万象归心',
+  大乘: '岁月无侵 · 大道未尽',
+  渡劫: '雷叩仙关 · 生死一念',
+  真仙: '长生已证 · 犹念人间',
+};
 export const REALM_LIFESPANS = [100, 250, 500, 1000, 2000, 5000, 10000, Infinity, Infinity];
 export const STAGE_YEARS_PER_MINUTE = [10, 25, 50, 100, 200, 500, 1000];
 export const FINAL_TRIAL_STAGE = 6;
@@ -1001,9 +1013,23 @@ export const STAGES = [
   },
 ];
 export const DIFFICULTIES = [
-  { name: '初入仙途', label: '从容修行', hp: 0.85, damage: 0.72, amount: 0.9, reward: 1 },
-  { name: '问道试炼', label: '妖潮渐涌', hp: 1.12, damage: 1, amount: 1.13, reward: 1.5 },
-  { name: '天劫降临', label: '险中求道', hp: 1.9, damage: 1.45, amount: 1.35, reward: 2.2 },
+  {
+    name: '初入仙途',
+    label: '从容修行',
+    hp: 0.85 * 1.03,
+    damage: 0.72 * 1.02,
+    amount: 0.9,
+    reward: 1,
+  },
+  { name: '问道试炼', label: '妖潮渐涌', hp: 1.12 * 1.03, damage: 1.02, amount: 1.13, reward: 1.5 },
+  {
+    name: '天劫降临',
+    label: '险中求道',
+    hp: 1.9 * 1.03,
+    damage: 1.45 * 1.02,
+    amount: 1.35,
+    reward: 2.2,
+  },
 ];
 export const ENEMIES = [
   {
@@ -1389,6 +1415,61 @@ export const STAGE_ENEMIES = [
   [64, 65, 66, 67, 69, 70, 24, 25, 68, 26, 27, 71],
   [65, 66, 59, 67, 61, 62, 69, 24, 25, 27, 63, 71],
 ];
+export const ENEMY_SKILLS = {
+  ranged: {
+    name: '灵弹狙击',
+    hint: '蓄势后定向发弹，横移避开',
+    eliteHint: '蓄势后定向发弹，横移避开',
+  },
+  volley: { name: '裂羽散射', hint: '三枚扇形灵弹，穿过间隙', eliteHint: '五枚扇形灵弹，留意侧翼' },
+  nova: { name: '灵轮震荡', hint: '八枚灵弹向外扩散', eliteHint: '十枚灵弹环射，保持距离' },
+  dash: {
+    name: '蓄势扑杀',
+    hint: '锁定直线后扑击，侧向避让',
+    eliteHint: '锁定直线后扑击，侧向避让',
+  },
+  stomp: { name: '撼地重击', hint: '近身蓄力震地，离开红圈', eliteHint: '原地及前方连续震击' },
+  summon: { name: '唤卫护阵', hint: '召来两名护卫，优先击杀', eliteHint: '召来三名护卫，优先击杀' },
+  roots: { name: '青藤缠足', hint: '藤阵伤害并短暂减速', eliteHint: '双阵缠足，移速降低 25%' },
+  firepath: { name: '离火封路', hint: '两段火径，侧向脱离', eliteHint: '三段火径封路，侧向脱离' },
+  frost: { name: '寒霜凝阵', hint: '寒阵伤害并短暂减速', eliteHint: '双阵夹击，移速降低 25%' },
+  miasma: { name: '瘴池蔓延', hint: '预警后留下持续毒池', eliteHint: '双池封路，绕开毒圈' },
+  soul: { name: '摄魂交射', hint: '两侧灵弹向前交汇', eliteHint: '四道交叉灵弹，穿过间隙' },
+  storm: {
+    name: '引雷落印',
+    hint: '落雷锁定旧位置，及时离开',
+    eliteHint: '三处错时落雷，持续移动',
+  },
+};
+export type EnemySkill = keyof typeof ENEMY_SKILLS;
+// 前六境使用地域技能；终关继续沿用原有行为，不继承这里的强化。
+export const ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
+  const region = STAGE_ENEMIES.slice(0, 6).findIndex((pool) => pool.includes(type));
+  const regional: EnemySkill = (['roots', 'firepath', 'frost', 'miasma', 'soul', 'storm'] as const)[
+    Math.max(0, region)
+  ];
+  const flank = enemy.behavior === 'chase' && /狼|獒|剑卒/.test(enemy.name);
+  const skills: Record<string, EnemySkill | null> = {
+    chase: null,
+    ranged: /咒师|祭师|巫师|毒巫|咒鬼|法使/.test(enemy.name) ? regional : 'ranged',
+    dash: 'dash',
+    tank: 'stomp',
+    shield: 'stomp',
+    explode: null,
+    summon: 'summon',
+    poison: 'miasma',
+    volley: 'volley',
+    nova: 'nova',
+  };
+  const skill = skills[enemy.behavior];
+  const eliteSkill: EnemySkill =
+    enemy.behavior === 'chase'
+      ? 'dash'
+      : enemy.behavior === 'ranged'
+        ? regional
+        : (skill ?? regional);
+  return { flank, skill, eliteSkill };
+});
 export function enemyWave(stage: number, seconds: number) {
   if (stage === FINAL_TRIAL_STAGE)
     return TRIAL_ENEMY_TIMES.filter((time) => time <= Math.max(0, seconds)).length - 1;
