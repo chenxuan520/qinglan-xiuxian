@@ -34,9 +34,9 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
         assert.equal(e.charge, 0);
       } else if (skill === 'dash') assert.ok(e.charge > 0.55);
       else if (['ranged', 'volley', 'nova', 'soul'].includes(skill)) {
+        assert.equal(g.shots.length, 0);
+        advance(g, 0.7);
         assert.ok(g.shots.length > 0);
-        assert.equal(e.windup, undefined);
-        assert.equal(e.pendingSkill, undefined);
       } else if (skill === 'summon') {
         assert.equal(g.enemies.filter((v) => v.summonedBy === e.id).length, 3);
       } else assert.ok(g.zones.some((z) => z.kind === `enemy-${skill}` && z.delay > 0));
@@ -50,10 +50,12 @@ test('前六境地域法师恢复蓄势直线灵弹，不再在玩家脚下生�
     for (const elite of [false, true]) {
       const { g, e } = encounter(stage, type, elite);
       g.update(0.01);
-      assert.equal(e.pendingSkill, undefined);
-      assert.equal(e.windup, undefined);
+      assert.equal(e.pendingSkill, stage === 4 ? 'soul' : 'ranged');
+      assert.ok(e.windup! > 0);
       assert.equal(g.zones.length, 0);
-      assert.equal(g.shots.length, 1);
+      assert.equal(g.shots.length, 0);
+      advance(g, 0.7);
+      assert.equal(g.shots.length, stage === 4 ? (elite ? 4 : 2) : 1);
     }
   }
 });
@@ -69,13 +71,16 @@ test('狼群分别包抄两翼，保持原速度；首境菇妖仍直接追击',
   assert.equal(mushroom.charge, 0);
 });
 
-test('灵弹冷却结束后直接发射，不显示锁定路径', () => {
+test('灵弹保留蓄势但不生成地面区域', () => {
   const { g, e } = encounter(0, 2);
   g.update(0.01);
+  assert.equal(g.shots.length, 0);
+  assert.equal(e.pendingSkill, 'ranged');
+  assert.ok(e.windup! > 0);
+  advance(g, 0.7);
   assert.equal(g.shots.length, 1);
   assert.equal(g.shots[0].vy, 0);
-  assert.equal(e.windup, undefined);
-  assert.equal(e.pendingSkill, undefined);
+  assert.equal(g.zones.length, 0);
 });
 
 test('普通怪和精英不再生成地域法阵，重甲近身震地保留', () => {

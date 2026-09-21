@@ -1338,7 +1338,8 @@ export class Game {
       return;
     }
     if (projectile) {
-      this.fireEnemyVolley(e, skill);
+      e.windup = 0.65;
+      e.pendingSkill = skill;
       return;
     }
     if (skill === 'summon') {

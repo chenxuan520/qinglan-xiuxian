@@ -1443,11 +1443,13 @@ export const ENEMY_SKILLS = {
 };
 export type EnemySkill = keyof typeof ENEMY_SKILLS;
 // 前六境法师保留弹道攻击；重甲近身震地，追击精英蓄势扑杀。
-export const ENEMY_TACTICS = ENEMIES.map((enemy) => {
+export const ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
+  const soulCaster =
+    STAGE_ENEMIES[4].includes(type) && /咒师|祭师|巫师|毒巫|咒鬼|法使/.test(enemy.name);
   const flank = enemy.behavior === 'chase' && /狼|獒|剑卒/.test(enemy.name);
   const skills: Record<string, EnemySkill | null> = {
     chase: null,
-    ranged: 'ranged',
+    ranged: soulCaster ? 'soul' : 'ranged',
     dash: 'dash',
     tank: 'stomp',
     shield: 'stomp',
