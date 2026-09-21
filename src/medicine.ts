@@ -100,6 +100,8 @@ export function useMedicine(
   }
   save.medicine.bag[id] -= quantity;
   recordChronicle(save, '丹药入体', `${message}。`);
+  if (!m.years)
+    recordChronicle(save, '丹成造化', `首次服用永久珍品${m.name}。`, 'permanent-medicine');
   return { ok: true, message };
 }
 export function buyMedicine(save: SaveData, id: string) {

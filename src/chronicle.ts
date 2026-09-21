@@ -1,4 +1,5 @@
-import { REALMS, STAGES, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { REALMS, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { MAX_MASTERY } from './mortal-data.ts';
 import type { SaveData } from './progress.ts';
 
 export interface Chronicle {
@@ -50,9 +51,27 @@ export function realmTitle(step: number) {
     ? REALMS[8]
     : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`;
 }
+function restorePersistentAchievements(save: SaveData, milestones: Chronicle['milestones']) {
+  if (Object.values(save.mortal.mastery).some((level) => level >= MAX_MASTERY))
+    milestones.mastery ??= null;
+  if (save.tribulations >= 5) milestones['five-tribulations'] ??= null;
+  if (Object.values(save.training).every((level) => level >= 20))
+    milestones['training-master'] ??= null;
+  if (
+    Object.entries(save.medicine.used).some(
+      ([id, count]) =>
+        count > 0 && (id === 'huiyang' || id === 'peiying' || id.startsWith('jiuqu-')),
+    ) ||
+    save.chronicle.entries.some(
+      (entry) => entry.title === '丹药入体' && entry.detail.includes('补天有成'),
+    )
+  )
+    milestones['permanent-medicine'] ??= null;
+}
 export function restoreChronicle(save: SaveData, value: unknown, step: number, ascending: boolean) {
   if (validChronicle(value, save.age)) {
     save.chronicle = value;
+    restorePersistentAchievements(save, save.chronicle.milestones);
     return;
   }
   // 旧档只能证明已有成果，不能还原过去的突破时间。
@@ -65,6 +84,7 @@ export function restoreChronicle(save: SaveData, value: unknown, step: number, a
   if (Object.values(save.forge).some((v) => v >= MAX_FORGE_LEVEL)) milestones.forge = null;
   if (save.artifacts.length >= TREASURES.length) milestones.collection = null;
   if (save.mortal.smithStory?.completed) milestones.story = null;
+  restorePersistentAchievements(save, milestones);
   save.chronicle = {
     milestones,
     entries: [
@@ -78,26 +98,22 @@ export function restoreChronicle(save: SaveData, value: unknown, step: number, a
 }
 export function chronicleAchievements(save: SaveData) {
   return [
-    { id: 'departure', title: '青岚启程', detail: '踏上仙途' },
-    ...REALMS.slice(1).map((name, index) => ({
-      id: `realm-${(index + 1) * 3}`,
-      title: name,
-      detail: `突破至${name}`,
-    })),
-    ...STAGES.map((stage, index) => ({
-      id: `stage-${index}`,
-      title: stage.name,
-      detail: '首次通关',
-    })),
-    { id: 'sect', title: '仙门有道', detail: '首次拜入宗门' },
     { id: 'forge', title: '炉火纯青', detail: '一件法宝炼器十阶' },
-    { id: 'collection', title: '万宝归藏', detail: '收齐三十六件法宝' },
-    { id: 'tribulation', title: '逆天留印', detail: '首次通过两万年天劫' },
+    { id: 'three-paths', title: '三道皆证', detail: '以正道、魔道和兼修分别通关' },
+    { id: 'permanent-medicine', title: '丹成造化', detail: '首次服用永久珍品丹药' },
     {
       id: 'story',
       title: Object.hasOwn(save.chronicle.milestones, 'story') ? '炉火长明' : '未遇之缘',
       detail: '留下一段人间旧事',
     },
+    { id: 'collection', title: '万宝归藏', detail: '收齐三十六件法宝' },
+    { id: 'level-100', title: '百级归真', detail: '单局达到一百级' },
+    { id: 'mastery', title: '仙门有道', detail: '一部宗门宝典精研十阶' },
+    { id: 'training-master', title: '三元归一', detail: '淬体、悟道与身法皆修至二十阶' },
+    { id: 'six-immortals', title: '六仙同御', detail: '单局同时觉醒六件仙器' },
+    { id: 'five-tribulations', title: '五劫不灭', detail: '累计渡过五次天劫' },
+    { id: 'hard-immortal', title: '逆境问道', detail: '以天劫降临难度成就真仙' },
+    { id: 'rootless-immortal', title: '凡骨登仙', detail: '以无灵根成就真仙' },
   ].map((a) => ({
     ...a,
     achieved: Object.hasOwn(save.chronicle.milestones, a.id),

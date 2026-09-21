@@ -55,6 +55,7 @@ test('品级筛选不混入其他品级，未得永久丹药完全隐藏，吃�
   }
   s.medicine.bag.peiying = 1;
   assert.equal(useMedicine(s, 'peiying').ok, true);
+  assert.equal(s.chronicle.milestones['permanent-medicine'], s.age);
   const restored = parseSave(JSON.stringify(s));
   const visible = medicineContent(restored, 0, 'bag', false, false, '珍品');
   assert.match(visible, /培婴丹/);
@@ -250,6 +251,8 @@ test('永久丹药每世次数与境界门槛生效，培婴百分比作用于�
   assert.equal(useMedicine(s, 'jiuqu').ok, true);
   assert.equal(useMedicine(s, 'jiuqu').ok, false);
   assert.equal(s.cultivation, Math.floor((realmCost(0) + realmCost(1) + realmCost(2)) * 0.08));
+  assert.ok(Object.hasOwn(s.chronicle.milestones, 'permanent-medicine'));
+  assert.equal(s.chronicle.entries.filter((entry) => entry.title === '丹药入体').length, 6);
   s.cultivation = 1e9;
   assert.equal(useMedicine(s, 'jiuqu').ok, false);
 });

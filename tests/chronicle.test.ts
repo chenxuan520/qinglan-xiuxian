@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshSave, gainCultivation, realmCost, settleRun, forge } from '../src/progress.ts';
+import {
+  freshSave,
+  parseSave,
+  gainCultivation,
+  realmCost,
+  settleRun,
+  forge,
+} from '../src/progress.ts';
 import { recordChronicle, chronicleAchievements, CHRONICLE_LIMIT } from '../src/chronicle.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { chronicleContent } from '../src/chronicle-ui.ts';
@@ -37,7 +44,10 @@ test('旧档补录不编造年龄，长时间游玩限制年表但不丢成就�
   const old = { ...s, chronicle: undefined };
   const restored = importSave(JSON.stringify(old)).save;
   assert.equal(restored.chronicle.milestones['realm-24'], null);
-  assert.equal(chronicleAchievements(restored).find((a) => a.id === 'realm-24')!.achieved, true);
+  assert.equal(
+    chronicleAchievements(restored).some((a) => a.id === 'realm-24'),
+    false,
+  );
   for (let i = 0; i < 250; i++) recordChronicle(restored, '游历', `第 ${i} 次驻足`);
   assert.equal(restored.chronicle.entries.length, CHRONICLE_LIMIT);
   assert.equal(restored.chronicle.milestones['realm-24'], null);
@@ -47,6 +57,62 @@ test('旧档补录不编造年龄，长时间游玩限制年表但不丢成就�
   restored.chronicle.entries[0].age = -1;
   assert.throws(() => importSave(JSON.stringify(restored)));
   assert.equal(freshSave().chronicle.entries.length, 1);
+});
+
+test('成就栏只保留非必经目标，并补录可由旧档确认的成就', () => {
+  const s = freshSave();
+  assert.deepEqual(
+    chronicleAchievements(s).map((achievement) => achievement.id),
+    [
+      'forge',
+      'three-paths',
+      'permanent-medicine',
+      'story',
+      'collection',
+      'level-100',
+      'mastery',
+      'training-master',
+      'six-immortals',
+      'five-tribulations',
+      'hard-immortal',
+      'rootless-immortal',
+    ],
+  );
+  s.mortal.mastery.power = 10;
+  s.tribulations = 5;
+  s.training = { vitality: 20, power: 20, speed: 20 };
+  s.medicine.used.peiying = 1;
+  const restored = parseSave(JSON.stringify(s));
+  assert.equal(restored.chronicle.milestones.mastery, null);
+  assert.equal(restored.chronicle.milestones['five-tribulations'], null);
+  assert.equal(restored.chronicle.milestones['training-master'], null);
+  assert.equal(restored.chronicle.milestones['permanent-medicine'], null);
+
+  const butian = freshSave();
+  recordChronicle(butian, '丹药入体', '补天有成 · 异灵根 · 火灵根。');
+  assert.equal(parseSave(JSON.stringify(butian)).chronicle.milestones['permanent-medicine'], null);
+});
+
+test('正道、魔道与兼修各通关一次后记录三道皆证', () => {
+  const s = freshSave();
+  const run = (path: 'orthodox' | 'demonic' | 'dual') =>
+    settleRun(s, {
+      stage: 0,
+      difficulty: 0,
+      kills: 0,
+      time: 180,
+      victory: true,
+      iron: 0,
+      level: 1,
+      path,
+    });
+  run('orthodox');
+  run('demonic');
+  assert.equal(Object.hasOwn(s.chronicle.milestones, 'three-paths'), false);
+  run('dual');
+  assert.equal(s.chronicle.milestones['three-paths'], s.age);
+  run('dual');
+  assert.equal(s.chronicle.entries.filter((entry) => entry.title === '三道皆证').length, 1);
 });
 
 test('宗门、炼器与人间故事进入年表，未遇故事不提前剧透', () => {

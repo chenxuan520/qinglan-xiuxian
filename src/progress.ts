@@ -5,6 +5,7 @@ import {
   STAGES,
   TREASURES,
   DIFFICULTIES,
+  CULTIVATION_PATHS,
   isCultivationPath,
   allowsSchool,
   treasure,
@@ -62,10 +63,44 @@ export interface SaveData {
   chronicle: Chronicle;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
+function initialStarter(
+  elements: ElementId[],
+  path: CultivationPath,
+  random: () => number = Math.random,
+) {
+  if (elements.length) return rootStarter(elements, path);
+  const pairs = Object.values(ROOT_STARTERS);
+  const candidates =
+    path === 'dual' ? pairs.flat() : pairs.map((pair) => pair[path === 'demonic' ? 1 : 0]);
+  return candidates[Math.floor(random() * candidates.length)];
+}
+function recordCollectionAchievement(save: SaveData) {
+  if (save.artifacts.length >= TREASURES.length)
+    recordChronicle(save, '万宝归藏', '三十六件法宝尽入珍藏。', 'collection');
+}
+export function alignStarterWithPath(save: SaveData) {
+  if (
+    save.artifacts.includes(save.starter) &&
+    allowsSchool(save.path, treasure(save.starter).school)
+  )
+    return false;
+  const starter = rootStarter(
+    save.rootElements.length ? save.rootElements : [treasure(save.starter).element],
+    save.path,
+  );
+  save.artifacts = [...new Set([...save.artifacts, ...ROOT_STARTERS[treasure(starter).element]])];
+  save.artifactDrops = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
+  save.starter = starter;
+  recordCollectionAchievement(save);
+  return true;
+}
 export function freshSave(
   spiritRoot: SpiritRootId = 'heaven',
   rootElements = rootElementsFor(spiritRoot, [], () => 0),
+  path: CultivationPath = 'dual',
+  random: () => number = Math.random,
 ): SaveData {
+  const starter = initialStarter(rootElements, path, random);
   return {
     version: 1,
     medicine: freshMedicine(),
@@ -86,15 +121,15 @@ export function freshSave(
     training: { vitality: 0, power: 0, speed: 0 },
     retreatBonus: { vitality: 0, power: 0, speed: 0 },
     forge: {},
-    artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[rootElements[0] ?? 'metal']])],
+    artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[treasure(starter).element]])],
     artifactDrops: [],
-    starter: rootStarter(rootElements, 'dual'),
+    starter,
     sound: false,
     volume: 0.6,
     autoplay: false,
     prologueSeen: false,
     journeyEnded: false,
-    path: 'dual',
+    path,
     spiritRoot,
     rootElements: [...rootElements],
   };
@@ -106,7 +141,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
   try {
     if (!raw) {
       const root = rollSpiritRoot(random);
-      return freshSave(root, rootElementsFor(root, [], random));
+      return freshSave(root, rootElementsFor(root, [], random), 'orthodox', random);
     }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return base;
@@ -164,11 +199,10 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
     const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);
     if (sect) base.path = sect.school;
-    if (
-      !base.artifacts.includes(base.starter) ||
-      !allowsSchool(base.path, treasure(base.starter).school)
-    )
-      base.starter = rootStarter(base.rootElements, base.path);
+    const migrateEarthStarter = base.path === 'demonic' && base.starter === 'meteor';
+    alignStarterWithPath(base);
+    if (migrateEarthStarter)
+      base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
     base.journeyEnded = s.journeyEnded === true && realm.max;
     if (base.mortal.member)
@@ -194,7 +228,12 @@ export function enterImmortalGate(save: SaveData) {
   recordChronicle(save, '叩入仙门', '此世仙途圆满，携人间旧忆走向大道深处。', 'immortal-gate');
   return true;
 }
-export function attuneSpiritRoot(save: SaveData, root: SpiritRootId, elements: ElementId[]) {
+export function attuneSpiritRoot(
+  save: SaveData,
+  root: SpiritRootId,
+  elements: ElementId[],
+  random: () => number = Math.random,
+) {
   const info = SPIRIT_ROOTS.find((r) => r.id === root);
   if (
     !info ||
@@ -203,11 +242,13 @@ export function attuneSpiritRoot(save: SaveData, root: SpiritRootId, elements: E
     !elements.every((id) => ELEMENTS.some((e) => e.id === id))
   )
     return false;
+  const starter = initialStarter(elements, save.path, random);
   save.rootElements = [...elements];
   save.spiritRoot = root;
-  save.artifacts = [...new Set([...save.artifacts, ...ROOT_STARTERS[elements[0] ?? 'metal']])];
+  save.artifacts = [...new Set([...save.artifacts, ...ROOT_STARTERS[treasure(starter).element]])];
   save.artifactDrops = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
-  save.starter = rootStarter(elements, save.path);
+  save.starter = starter;
+  recordCollectionAchievement(save);
   return true;
 }
 export function realmInfo(cultivation: number, finalTrialCleared = false) {
@@ -277,6 +318,8 @@ export function completeTribulation(save: SaveData, round: number) {
     '雷霆散尽，道心仍在。',
     round === 1 ? 'tribulation' : undefined,
   );
+  if (round === 5)
+    recordChronicle(save, '五劫不灭', '五度踏破天劫，雷霆不能损其道心。', 'five-tribulations');
   return true;
 }
 export const trainingYears = (save: SaveData) =>
@@ -379,7 +422,11 @@ export function realmBonuses(step: number): { hp: number; damage: number } {
   return { hp: hp + minor * 3, damage: (damage + minor * 2.5) / 100 };
 }
 export const realmDamageMultiplier = (step: number) => (step >= 24 ? 2 : 1);
-function recordRealmChange(save: SaveData, before: ReturnType<typeof realmInfo>) {
+function recordRealmChange(
+  save: SaveData,
+  before: ReturnType<typeof realmInfo>,
+  spiritRoot = save.spiritRoot,
+) {
   const after = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   for (let step = before.step + 1; step <= after.step; step++)
     recordChronicle(
@@ -388,13 +435,15 @@ function recordRealmChange(save: SaveData, before: ReturnType<typeof realmInfo>)
       step === 24 ? '七境皆破，渡劫功成，证得真仙。' : '修为凝成新境，气血与法宝威力提升。',
       `realm-${step}`,
     );
+  if (after.step === 24 && before.step < 24 && spiritRoot === 'none')
+    recordChronicle(save, '凡骨登仙', '无灵根亦证得真仙。', 'rootless-immortal');
   if (!before.ascending && after.ascending)
     recordChronicle(save, '渡劫待成仙', '修为已足，尚待踏破第七境。', 'ascension');
 }
-export function gainCultivation(save: SaveData, amount: number) {
+export function gainCultivation(save: SaveData, amount: number, spiritRoot = save.spiritRoot) {
   const before = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   save.cultivation += amount;
-  recordRealmChange(save, before);
+  recordRealmChange(save, before, spiritRoot);
 }
 export function cultivationReward(
   run: {
@@ -440,6 +489,8 @@ export function train(save: SaveData, kind: keyof SaveData['training']) {
     '修习根基',
     `${{ vitality: '锻体', power: '悟道', speed: '身法' }[kind]}修至 ${save.training[kind]} 阶，耗时 ${years} 年。`,
   );
+  if (Object.values(save.training).every((level) => level >= 20))
+    recordChronicle(save, '三元归一', '淬体、悟道与身法皆修至二十阶。', 'training-master');
   return true;
 }
 export function forge(save: SaveData, id: string) {
@@ -474,8 +525,7 @@ export function claimArtifacts(save: SaveData) {
   save.artifactDrops = [];
   if (claimed.length)
     recordChronicle(save, '妖王遗宝', `收藏${claimed.map((id) => treasure(id).name).join('、')}。`);
-  if (save.artifacts.length >= TREASURES.length)
-    recordChronicle(save, '万宝归藏', '三十六件法宝尽入珍藏。', 'collection');
+  recordCollectionAchievement(save);
   return claimed;
 }
 export function settleRun(
@@ -491,6 +541,8 @@ export function settleRun(
     creditedCultivation?: number;
     combatCultivation?: number;
     spiritRoot?: SpiritRootId;
+    path?: CultivationPath;
+    startedImmortal?: boolean;
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
@@ -509,7 +561,7 @@ export function settleRun(
   };
   save.stones += rewards.stones;
   save.iron += rewards.iron;
-  gainCultivation(save, rewards.cultivationRemaining);
+  gainCultivation(save, rewards.cultivationRemaining, run.spiritRoot ?? save.spiritRoot);
   save.runs++;
   save.bestKills = Math.max(save.bestKills, run.kills);
   if (run.victory) {
@@ -522,7 +574,18 @@ export function settleRun(
       `击败${STAGES[run.stage].boss}，首次通关此境。`,
       `stage-${run.stage}`,
     );
-    recordRealmChange(save, before);
+    const path = isCultivationPath(run.path) ? run.path : save.path;
+    save.chronicle.milestones[`path-${path}`] ??= save.age;
+    if (CULTIVATION_PATHS.every(({ id }) => `path-${id}` in save.chronicle.milestones))
+      recordChronicle(save, '三道皆证', '正道、魔道与兼修皆有通关之证。', 'three-paths');
+    recordRealmChange(save, before, run.spiritRoot ?? save.spiritRoot);
+    if (
+      run.stage === FINAL_TRIAL_STAGE &&
+      run.difficulty === DIFFICULTIES.length - 1 &&
+      !(run.startedImmortal ?? before.step >= 24) &&
+      realmInfo(save.cultivation, true).step === 24
+    )
+      recordChronicle(save, '逆境问道', '以天劫降临难度踏破第七境，证得真仙。', 'hard-immortal');
   }
   syncTribulationClock(save);
   return rewards;
