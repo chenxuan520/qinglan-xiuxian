@@ -78,6 +78,17 @@ npm run deploy:npc-ai
 
 GitHub Pages 和 localhost 是不同来源，浏览器存档各自独立，不会自动同步。
 
+## GitHub Release · 离线版
+
+推送 `v*` 标签会触发 `.github/workflows/release.yml`。流水线依次执行格式检查、全量测试、Worker 类型检查和生产构建，然后创建 GitHub Release，并附带离线包及 SHA-256 校验文件。
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+离线包只包含生产构建后的静态文件，不包含后端。解压后在该目录启动任意 HTTP 静态服务器并打开其本地地址；不要直接双击 `index.html`。战斗、成长、城镇、图片、音乐和本地存档可断网运行；NPC AI 闲谈与茶馆故事仍需联网，普通闲谈失败时使用本地对白。
+
 ## 项目结构
 
 | 文件                 | 职责                                  |
