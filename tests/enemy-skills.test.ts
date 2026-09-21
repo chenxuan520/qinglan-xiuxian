@@ -22,15 +22,17 @@ function advance(g: Game, seconds: number) {
   for (let i = 0; i < Math.round(seconds * 100); i++) g.update(0.01);
 }
 
-test('前六境72种精英均有实际主动技能，原地追击的杂兵也能蓄力扑杀', () => {
+test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近身自爆', () => {
   let count = 0;
   for (let stage = 0; stage < 6; stage++)
     for (const type of STAGE_ENEMIES[stage]) {
       const { g, e } = encounter(stage, type, true, 140);
       const skill = ENEMY_TACTICS[type].eliteSkill;
       g.update(0.01);
-      assert.ok(e.charge > 0 || e.windup! > 0, `${stage}: ${ENEMIES[type].name} / ${skill}`);
-      if (skill === 'dash') assert.ok(e.charge > 0.55);
+      if (!skill) {
+        assert.equal(ENEMIES[type].behavior, 'explode');
+        assert.equal(e.charge, 0);
+      } else if (skill === 'dash') assert.ok(e.charge > 0.55);
       else if (['ranged', 'volley', 'nova', 'soul'].includes(skill)) {
         assert.equal(g.shots.length, 0);
         advance(g, 0.7);
@@ -43,22 +45,15 @@ test('前六境72种精英均有实际主动技能，原地追击的杂兵也能
   assert.equal(count, 72);
 });
 
-test('六境法师分别缠足、火径、寒阵、毒池、交射与落雷，普通怪和精英均有地域差异', () => {
+test('前六境地域法师恢复蓄势直线灵弹，不再在玩家脚下生成地域法阵', () => {
   for (const [stage, type] of [5, 33, 45, 53, 61, 69].entries()) {
     for (const elite of [false, true]) {
       const { g, e } = encounter(stage, type, elite);
-      const hp = g.player.hp;
       g.update(0.01);
-      if (stage === 4) {
-        assert.equal(e.pendingSkill, 'soul');
-        advance(g, 0.7);
-        assert.equal(g.shots.length, elite ? 4 : 2);
-      } else {
-        const kind = ['roots', 'firepath', 'frost', 'miasma', '', 'storm'][stage];
-        assert.ok(g.zones.every((z) => z.kind === `enemy-${kind}` && z.delay > 0));
-        advance(g, 0.4);
-        assert.equal(g.player.hp, hp, '预警期不伤害玩家');
-      }
+      assert.equal(e.pendingSkill, 'ranged');
+      assert.equal(g.zones.length, 0);
+      advance(g, 0.7);
+      assert.equal(g.shots.length, 1);
     }
   }
 });
@@ -93,39 +88,20 @@ test('灵弹蓄势后才发射，方向提前锁定，击杀施法者可以打�
   assert.equal(g.shots.length, 0);
 });
 
-test('藤阵寒阵可躲，迟滞最多25%，离阵后消退，暂停续局保留且复活清除', () => {
-  for (const [stage, type] of [
-    [0, 5],
-    [2, 45],
-  ]) {
-    const { g } = encounter(stage, type);
+test('普通怪和精英不再生成地域法阵，重甲近身震地保留', () => {
+  for (const stage of [0, 1, 2, 3, 4, 5]) {
+    const caster = [5, 33, 45, 53, 61, 69][stage];
+    for (const elite of [false, true]) {
+      const { g } = encounter(stage, caster, elite);
+      g.update(0.01);
+      assert.equal(g.zones.length, 0);
+    }
+  }
+  const tank = STAGE_ENEMIES[0].find((type) => ENEMIES[type].behavior === 'tank')!;
+  for (const elite of [false, true]) {
+    const { g } = encounter(0, tank, elite, 100);
     g.update(0.01);
-    const base = g.stats.speed;
-    advance(g, 1);
-    assert.ok(g.player.hp < g.player.maxHp);
-    assert.equal(g.stats.speed, base * 0.75);
-    const snapshot = g.snapshot();
-    const restored = Game.restore(g.save, snapshot)!;
-    assert.ok(restored);
-    const slowed = restored.slowed;
-    advance(restored, 1);
-    assert.equal(restored.slowed, slowed);
-    restored.resume();
-    restored.player.x = 600;
-    advance(restored, 0.7);
-    assert.equal(restored.slowed, 0);
-    assert.equal(restored.stats.speed, base);
-    g.state = 'lost';
-    g.player.hp = 0;
-    assert.ok(g.revive());
-    assert.equal(g.slowed, 0);
-
-    const safe = encounter(stage, type).g;
-    safe.update(0.01);
-    safe.player.x = 400;
-    advance(safe, 1.7);
-    assert.equal(safe.player.hp, safe.player.maxHp);
-    assert.equal(safe.slowed, 0);
+    assert.ok(g.zones.some((zone) => zone.kind === 'enemy-stomp'));
   }
 });
 
@@ -149,7 +125,7 @@ test('精英冲刺AI侧移避开，续局后仍可辨认锁定路线', () => {
   }
 });
 
-test('前六境大量精英施法受限：弹幕64、地面技能12、召唤护卫12，不同步爆发', () => {
+test('前六境大量精英施法受限：弹幕64、召唤护卫12，法师不生成地域法阵', () => {
   const { g } = encounter(5, 69, true);
   g.enemies = [];
   g.player.invincible = 999;
@@ -174,7 +150,7 @@ test('前六境大量精英施法受限：弹幕64、地面技能12、召唤护�
     assert.ok(g.zones.length <= 12);
     assert.ok(g.enemies.filter((e) => e.summonedBy !== undefined).length <= 12);
   }
-  assert.ok(maxShots > 0 && maxZones > 0 && maxSummons > 0);
+  assert.ok(maxShots > 0 && maxZones === 0 && maxSummons > 0);
 });
 
 test('旧档补默认迟滞字段，蓄势续局不丢技能，无效技能状态拒绝恢复', () => {
