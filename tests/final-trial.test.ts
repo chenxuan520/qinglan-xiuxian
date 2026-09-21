@@ -114,6 +114,122 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
   assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '真仙');
   assert.equal(realmInfo(g.save.cultivation, true).ascending, false);
   assert.equal(new Game(g.save, 6, 0).player.maxHp, 893);
+  assert.equal(Object.hasOwn(g.save.chronicle.milestones, 'hard-immortal'), false);
+
+  const rootless = freshSave('none', [], 'dual', () => 0);
+  rootless.unlocked = 6;
+  rootless.completed = [0, 1, 2, 3, 4, 5];
+  rootless.cultivation = 1e9;
+  rootless.spiritRoot = 'heaven';
+  settleRun(rootless, {
+    stage: 6,
+    difficulty: 0,
+    kills: 0,
+    level: 1,
+    time: 420,
+    iron: 0,
+    victory: true,
+    spiritRoot: 'none',
+  });
+  assert.equal(rootless.chronicle.milestones['rootless-immortal'], rootless.age);
+
+  const washedToNone = freshSave('none', [], 'dual', () => 0);
+  washedToNone.unlocked = 6;
+  washedToNone.completed = [0, 1, 2, 3, 4, 5];
+  washedToNone.cultivation = 1e9;
+  settleRun(washedToNone, {
+    stage: 6,
+    difficulty: 0,
+    kills: 0,
+    level: 1,
+    time: 420,
+    iron: 0,
+    victory: true,
+    spiritRoot: 'heaven',
+  });
+  assert.equal(Object.hasOwn(washedToNone.chronicle.milestones, 'rootless-immortal'), false);
+
+  const hard = freshSave();
+  hard.unlocked = 6;
+  hard.completed = [0, 1, 2, 3, 4, 5];
+  hard.cultivation = 1e9;
+  settleRun(hard, {
+    stage: 6,
+    difficulty: 2,
+    kills: 0,
+    level: 1,
+    time: 420,
+    iron: 0,
+    victory: true,
+  });
+  assert.equal(hard.chronicle.milestones['hard-immortal'], hard.age);
+  settleRun(hard, {
+    stage: 6,
+    difficulty: 2,
+    kills: 0,
+    level: 1,
+    time: 420,
+    iron: 0,
+    victory: true,
+  });
+  assert.equal(hard.chronicle.entries.filter((entry) => entry.title === '逆境问道').length, 1);
+
+  const total = Array.from({ length: 24 }, (_, index) => realmCost(index)).reduce(
+    (sum, cost) => sum + cost,
+    0,
+  );
+  const late = freshSave();
+  late.unlocked = 6;
+  late.completed = [0, 1, 2, 3, 4, 5, 6];
+  late.cultivation = total - 1;
+  settleRun(late, {
+    stage: 6,
+    difficulty: 2,
+    kills: 0,
+    level: 1,
+    time: 420,
+    iron: 0,
+    victory: true,
+    startedImmortal: false,
+  });
+  assert.equal(late.chronicle.milestones['hard-immortal'], late.age);
+
+  const already = freshSave();
+  already.unlocked = 6;
+  already.completed = [0, 1, 2, 3, 4, 5, 6];
+  already.cultivation = total;
+  settleRun(already, {
+    stage: 6,
+    difficulty: 2,
+    kills: 0,
+    level: 1,
+    time: 420,
+    iron: 0,
+    victory: true,
+    startedImmortal: true,
+  });
+  assert.equal(Object.hasOwn(already.chronicle.milestones, 'hard-immortal'), false);
+
+  const oldEligible = freshSave();
+  oldEligible.unlocked = 6;
+  oldEligible.completed = [0, 1, 2, 3, 4, 5, 6];
+  oldEligible.cultivation = total - 1;
+  const oldEligibleRun = new Game(oldEligible, 6, 2);
+  oldEligible.cultivation = total;
+  oldEligibleRun.creditedCultivation = 1;
+  const oldEligibleSnapshot = oldEligibleRun.snapshot();
+  delete (oldEligibleSnapshot as Partial<typeof oldEligibleSnapshot>).startedImmortal;
+  assert.equal(Game.restore(oldEligible, oldEligibleSnapshot)!.startedImmortal, false);
+
+  const oldImmortal = freshSave();
+  oldImmortal.unlocked = 6;
+  oldImmortal.completed = [0, 1, 2, 3, 4, 5, 6];
+  oldImmortal.cultivation = total + 1;
+  const oldImmortalRun = new Game(oldImmortal, 6, 2);
+  oldImmortalRun.creditedCultivation = 1;
+  const oldImmortalSnapshot = oldImmortalRun.snapshot();
+  delete (oldImmortalSnapshot as Partial<typeof oldImmortalSnapshot>).startedImmortal;
+  assert.equal(Game.restore(oldImmortal, oldImmortalSnapshot)!.startedImmortal, true);
 });
 
 test('旧版已过第六关的存档自动解锁终关，已有修为不丢失', () => {

@@ -172,7 +172,7 @@ export const ROOT_STARTERS: Record<ElementId, [WeaponKind, WeaponKind]> = {
   wood: ['orbit', 'poison'],
   water: ['ice', 'bloodpool'],
   fire: ['lightning', 'fire'],
-  earth: ['pagoda', 'meteor'],
+  earth: ['pagoda', 'vortex'],
 };
 export const rootStarter = (elements: ElementId[], path: CultivationPath) =>
   ROOT_STARTERS[elements[0] ?? 'metal'][path === 'demonic' ? 1 : 0];

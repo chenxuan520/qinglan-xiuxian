@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { freshSave, parseSave, realmCost } from '../src/progress.ts';
+import { freshSave, parseSave, realmCost, train } from '../src/progress.ts';
 import {
   advanceMortal,
   joinSect,
@@ -104,4 +104,15 @@ test('新角色、随机灵根和轮回起始十五岁，已有年岁与导入�
   for (const age of [0, 12.5, 99, 10000])
     assert.equal(parseSave(JSON.stringify({ ...freshSave(), age })).age, age);
   assert.equal(parseSave(JSON.stringify({ ...freshSave(), age: undefined })).age, 15);
+});
+
+test('三项根基全部二十阶后记录三元归一', () => {
+  const s = freshSave();
+  s.cultivation = 1e9;
+  s.completed = [6];
+  s.stones = 1e9;
+  s.training = { vitality: 20, power: 20, speed: 19 };
+  assert.equal(train(s, 'speed'), true);
+  assert.equal(s.chronicle.milestones['training-master'], s.age);
+  assert.equal(s.chronicle.entries.filter((entry) => entry.title === '三元归一').length, 1);
 });

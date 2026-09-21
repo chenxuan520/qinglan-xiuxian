@@ -1,14 +1,12 @@
 import { townMedicineReward } from './medicine-data.ts';
+import { FINAL_TRIAL_STAGE, spiritRootInfo, passive, type CultivationPath } from './data.ts';
 import {
-  FINAL_TRIAL_STAGE,
-  spiritRootInfo,
-  passive,
-  allowsSchool,
-  treasure,
-  rootStarter,
-  type CultivationPath,
-} from './data.ts';
-import { lifespanInfo, realmInfo, tribulationDue, type SaveData } from './progress.ts';
+  alignStarterWithPath,
+  lifespanInfo,
+  realmInfo,
+  tribulationDue,
+  type SaveData,
+} from './progress.ts';
 import { recordChronicle } from './chronicle.ts';
 import {
   SECTS,
@@ -98,8 +96,7 @@ export function joinSect(save: SaveData, id: string, unfinishedPath?: Cultivatio
     return false;
   save.stones -= entryCost(save);
   save.path = sect.school;
-  if (!allowsSchool(save.path, treasure(save.starter).school))
-    save.starter = rootStarter(save.rootElements, save.path);
+  alignStarterWithPath(save);
   const dues = sectDues(save);
   save.mortal.member = {
     id,
@@ -229,6 +226,8 @@ function completeActivity(save: SaveData, random: () => number) {
         save,
         `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。`,
       );
+      if (world.mastery[id] === MAX_MASTERY)
+        recordChronicle(save, '仙门有道', `${passive(id).name}已精研至十阶。`, 'mastery');
     } else {
       const job = TOWN_JOBS[activity.kind];
       const stones = activity.kind === 'tea' ? (random() < 0.3 ? 8 : 0) : job.stones;

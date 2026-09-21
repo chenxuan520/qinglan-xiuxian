@@ -190,6 +190,7 @@ export class Game {
   path: CultivationPath;
   spiritRoot: SpiritRootId;
   rootElements: ElementId[];
+  startedImmortal: boolean;
   random: () => number;
   constructor(
     save: SaveData,
@@ -209,6 +210,7 @@ export class Game {
     this.spiritRoot = save.spiritRoot;
     this.rootElements = [...save.rootElements];
     this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
+    this.startedImmortal = this.realm === 24;
     this.baseHp =
       spiritRootInfo(this.spiritRoot).baseHp +
       save.training.vitality * 10 +
@@ -390,13 +392,23 @@ export class Game {
     this.notice = message;
     this.noticeTime = 3;
   }
+  private recordRunAchievements() {
+    if (this.level >= MAX_RUN_LEVEL)
+      recordChronicle(this.save, '百级归真', '一场历练中修至一百级。', 'level-100');
+    if (
+      this.weapons.length === MAX_WEAPONS &&
+      new Set(this.weapons.map((weapon) => weapon.id)).size === MAX_WEAPONS &&
+      this.weapons.every((weapon) => weapon.evolved && weapon.level === MAX_WEAPON_LEVEL)
+    )
+      recordChronicle(this.save, '六仙同御', '单局六件法宝同时觉醒为仙器。', 'six-immortals');
+  }
   private creditCultivation() {
     if (this.tribulation) return;
     if (this.kills === 0 && this.level === 1) return;
     const earned = cultivationReward(this);
     const delta = earned - this.creditedCultivation;
     if (delta <= 0) return;
-    gainCultivation(this.save, delta);
+    gainCultivation(this.save, delta, this.spiritRoot);
     syncTribulationClock(this.save);
     this.creditedCultivation = earned;
     const realm = realmInfo(this.save.cultivation, this.save.completed.includes(FINAL_TRIAL_STAGE));
@@ -417,6 +429,7 @@ export class Game {
     return {
       spiritRoot: this.spiritRoot,
       rootElements: [...this.rootElements],
+      startedImmortal: this.startedImmortal,
       version: 1,
       stage: this.stage,
       stageDuration: STAGES[this.stage].minutes * 60,
@@ -696,7 +709,14 @@ export class Game {
         )
       )
         return null;
+      if (s.startedImmortal !== undefined && typeof s.startedImmortal !== 'boolean') return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.startedImmortal =
+        s.startedImmortal ??
+        realmInfo(
+          Math.max(0, save.cultivation - (s.creditedCultivation ?? 0)),
+          save.completed.includes(FINAL_TRIAL_STAGE),
+        ).step === 24;
       g.tribulation = s.tribulation ?? 0;
       g.tribulationStep = s.tribulationStep ?? 0;
       g.tribulationNextAt = s.tribulationNextAt ?? 1.2;
@@ -811,6 +831,7 @@ export class Game {
       }
       g.announce('重续仙缘 · 上次历练已恢复');
       g.creditCultivation();
+      g.recordRunAchievements();
       return g;
     } catch {
       return null;
@@ -950,6 +971,7 @@ export class Game {
       this.xp -= xpNeeded(this.level);
       this.level++;
       if (this.level === MAX_RUN_LEVEL) this.xp = 0;
+      this.recordRunAchievements();
       this.creditCultivation();
       this.state = 'upgrade';
       this.choices = this.makeChoices();
@@ -2244,6 +2266,7 @@ export class Game {
           this.level++;
         }
         if (this.level === MAX_RUN_LEVEL) this.xp = 0;
+        this.recordRunAchievements();
         this.creditCultivation();
         collected = dropArtifacts(this.save, this.random);
       } else if (this.level < MAX_RUN_LEVEL)
@@ -2413,6 +2436,7 @@ export class Game {
     if (c.type === 'evolve') {
       this.weapons.find((w) => w.id === c.id)!.evolved = true;
       this.announce(`仙器觉醒 · ${treasure(c.id).evolution}`);
+      this.recordRunAchievements();
     }
     if (c.type === 'passive') {
       this.passives[c.id] = c.level;

@@ -7,11 +7,12 @@ import {
   rootElementsFor,
   ROOT_STARTERS,
   rootStarter,
+  treasure,
   type SpiritRootId,
   type ElementId,
   type Treasure,
 } from '../src/data.ts';
-import { freshSave, parseSave, attuneSpiritRoot } from '../src/progress.ts';
+import { freshSave, parseSave, attuneSpiritRoot, alignStarterWithPath } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 
 test('灵根五行数量、去重与迁移正确，持久化后不重抽，旧资质和进度保留', () => {
@@ -123,6 +124,8 @@ test('广告自选资质与五行，无灵根可获单系，本局资质不随�
 
 test('五行对应不同正魔入门本命，自选可切换且不扣除已有收藏与炼器', () => {
   for (const element of ELEMENTS) {
+    assert.equal(treasure(ROOT_STARTERS[element.id][0]).school, 'orthodox');
+    assert.equal(treasure(ROOT_STARTERS[element.id][1]).school, 'demonic');
     for (const path of ['orthodox', 'demonic', 'dual'] as const) {
       const save = freshSave('heaven', [element.id]);
       save.path = path;
@@ -146,6 +149,77 @@ test('五行对应不同正魔入门本命，自选可切换且不扣除已有�
   assert.equal(attuneSpiritRoot(save, 'triple', ['water', 'fire']), false);
   assert.equal(attuneSpiritRoot(save, 'dual', ['water', 'water']), false);
   assert.equal(JSON.stringify(save), before);
-  assert.equal(attuneSpiritRoot(save, 'none', []), true);
-  assert.equal(save.starter, 'sword');
+  assert.equal(
+    attuneSpiritRoot(save, 'none', [], () => 0.99),
+    true,
+  );
+  assert.equal(save.starter, 'vortex');
+  assert.ok(save.artifacts.includes('pagoda'));
+  assert.ok(save.artifacts.includes('vortex'));
+});
+
+test('无灵根从当前路线的五行入门法宝中随机本命', () => {
+  const initial = parseSave(null, () => 0.99);
+  assert.equal(initial.path, 'orthodox');
+  assert.equal(initial.starter, 'pagoda');
+  assert.equal(freshSave('none', [], 'dual', () => 0).starter, 'sword');
+  assert.equal(freshSave('none', [], 'dual', () => 0.99).starter, 'vortex');
+  const save = freshSave('none', [], 'dual', () => 0.2);
+  assert.equal(save.starter, 'orbit');
+  assert.ok(save.artifacts.includes('orbit'));
+  assert.ok(save.artifacts.includes('poison'));
+  save.path = 'demonic';
+  assert.equal(
+    attuneSpiritRoot(save, 'none', [], () => 0.99),
+    true,
+  );
+  assert.equal(save.starter, 'vortex');
+  assert.equal(
+    freshSave('five', ['water', 'earth', 'fire', 'wood', 'metal'], 'dual', () => 0.99).starter,
+    'ice',
+  );
+});
+
+test('无灵根跨路线时解锁并使用原本命五行的配对法宝', () => {
+  const save = freshSave('none', [], 'dual', () => 0);
+  save.artifacts = ['sword', 'nail', 'ice'];
+  save.starter = 'ice';
+  save.path = 'demonic';
+  assert.equal(alignStarterWithPath(save), true);
+  assert.equal(save.starter, 'bloodpool');
+  assert.ok(save.artifacts.includes('bloodpool'));
+  assert.equal(new Game(save, 0, 0).weapons[0].id, 'bloodpool');
+  const restored = parseSave(JSON.stringify(save));
+  assert.equal(restored.starter, 'bloodpool');
+  assert.equal(new Game(restored, 0, 0).weapons[0].id, 'bloodpool');
+
+  const almostComplete = freshSave('none', [], 'dual', () => 0);
+  almostComplete.artifacts = TREASURES.filter((item) => item.id !== 'bloodpool').map(
+    (item) => item.id,
+  );
+  almostComplete.starter = 'ice';
+  almostComplete.path = 'demonic';
+  assert.equal(alignStarterWithPath(almostComplete), true);
+  assert.equal(almostComplete.artifacts.length, TREASURES.length);
+  assert.ok(Object.hasOwn(almostComplete.chronicle.milestones, 'collection'));
+});
+
+test('旧魔道番天印校正为阴阳盘并保留炼器阶数', () => {
+  const save = freshSave('heaven', ['earth']);
+  save.path = 'demonic';
+  save.starter = 'meteor';
+  save.forge.meteor = 7;
+  const restored = parseSave(JSON.stringify(save));
+  assert.equal(restored.starter, 'vortex');
+  assert.equal(restored.forge.meteor, 7);
+  assert.equal(restored.forge.vortex, 7);
+  assert.equal(new Game(restored, 0, 0).weapons[0].id, 'vortex');
+
+  const current = freshSave('heaven', ['earth']);
+  current.path = 'demonic';
+  current.starter = 'meteor';
+  current.forge.meteor = 7;
+  assert.equal(alignStarterWithPath(current), true);
+  assert.equal(current.starter, 'vortex');
+  assert.equal(current.forge.vortex || 0, 0);
 });

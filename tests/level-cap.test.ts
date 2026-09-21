@@ -32,6 +32,7 @@ test('第一百级只领取最后一次机缘，溢出经验与拾取不再反�
   assert.equal(g.xp, 0);
   assert.equal(g.iron, 1);
   assert.equal(g.state, 'playing');
+  assert.ok(Object.hasOwn(g.save.chronicle.milestones, 'level-100'));
 });
 
 test('最终首领直接结算经验也不能超过一百级，满级仍获永久击杀修为', () => {
@@ -65,4 +66,5 @@ test('超过上限的旧续局收敛到一百级，取消旧回血选项但保�
   assert.deepEqual(restored.choices, []);
   assert.equal(restored.iron, snapshot.iron);
   assert.ok(save.cultivation >= 50000);
+  assert.ok(Object.hasOwn(save.chronicle.milestones, 'level-100'));
 });

@@ -161,6 +161,13 @@ test('天劫护盾期间不能跳过招式，每次核心暴露伤害封顶；�
   assert.equal(freshSave().tribulations, 0);
 });
 
+test('第五次天劫记录五劫不灭成就', () => {
+  const save = immortal(5);
+  assert.equal(completeTribulation(save, 5), true);
+  assert.equal(save.chronicle.milestones['five-tribulations'], save.age);
+  assert.equal(save.chronicle.entries.filter((entry) => entry.title === '五劫不灭').length, 1);
+});
+
 test('第五劫强度跃升且第六劫继续增强，预警保底，输出窗口缩短，仍按实际胜负结算', () => {
   for (let round = 1; round <= 6; round++) {
     const rules = tribulationRules(round);

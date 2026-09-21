@@ -75,6 +75,22 @@ test('入门费随资质变化，天灵根最低；只能加入一个宗门', ()
   assert.equal(joinSect(s, 'power'), true);
   assert.equal(s.stones, 0);
   assert.equal(joinSect(s, 'blood'), false);
+  const rootless = freshSave('none', [], 'dual', () => 0);
+  rootless.artifacts = ['sword', 'nail', 'ice'];
+  rootless.starter = 'ice';
+  rootless.stones = entryCost(rootless);
+  assert.equal(joinSect(rootless, 'blood'), true);
+  assert.equal(rootless.starter, 'bloodpool');
+  assert.ok(rootless.artifacts.includes('bloodpool'));
+});
+
+test('任意宗门宝典精研十阶后记录仙门有道', () => {
+  const s = wealthy(24);
+  assert.equal(joinSect(s, 'power'), true);
+  for (let i = 0; i < MAX_MASTERY; i++) assert.equal(startActivity(s, 'study'), true);
+  assert.equal(s.mortal.mastery.power, MAX_MASTERY);
+  assert.equal(s.chronicle.milestones.mastery, s.age);
+  assert.equal(s.chronicle.entries.filter((entry) => entry.title === '仙门有道').length, 1);
 });
 test('供奉在边界准时扣除；不足暂停待补缴，放弃才清退', () => {
   const s = wealthy();

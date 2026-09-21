@@ -109,6 +109,35 @@ test('每个进化配方满足条件后都进入选择，未满足时不出现',
     assert.ok(!game.makeChoices().some((c) => c.type === 'evolve'));
   }
 });
+test('单局同时觉醒六件仙器后只记录一次成就', () => {
+  const game = createGame();
+  game.weapons = TREASURES.slice(0, 6).map((item, index) => ({
+    id: item.id,
+    level: 6,
+    timer: 0,
+    evolved: index < 5,
+  }));
+  game.state = 'upgrade';
+  game.choices = [{ type: 'evolve', id: game.weapons[5].id, level: 7 }];
+  assert.equal(game.choose(0), true);
+  assert.ok(Object.hasOwn(game.save.chronicle.milestones, 'six-immortals'));
+  assert.equal(game.save.chronicle.entries.filter((entry) => entry.title === '六仙同御').length, 1);
+
+  const restoredSave = freshSave();
+  const oldRun = new Game(restoredSave, 0, 0);
+  oldRun.weapons = TREASURES.slice(0, 6).map((item) => ({
+    id: item.id,
+    level: 6,
+    timer: 0,
+    evolved: true,
+  }));
+  const incomplete = oldRun.snapshot();
+  incomplete.weapons[0].level = 5;
+  assert.ok(Game.restore(restoredSave, incomplete));
+  assert.equal(Object.hasOwn(restoredSave.chronicle.milestones, 'six-immortals'), false);
+  assert.ok(Game.restore(restoredSave, oldRun.snapshot()));
+  assert.equal(restoredSave.chronicle.milestones['six-immortals'], restoredSave.age);
+});
 test('满负载不会提供第七件法宝或第五种功法，重悟次数有上限', () => {
   const game = createGame();
   game.weapons = TREASURES.slice(0, 6).map((t) => ({
