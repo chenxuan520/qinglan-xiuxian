@@ -423,6 +423,14 @@
 .town-story p {
   line-height: 1.9;
 }
+.immortal-encounter {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.immortal-encounter p + p {
+  margin-top: 16px;
+}
 .town-story blockquote {
   margin: 18px 0;
   padding: 4px 0 4px 16px;
@@ -729,6 +737,37 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 2.3;
+}
+.human-memories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 24px;
+  margin-top: 20px;
+}
+.human-memories article {
+  border-left: 1px solid var(--border);
+  padding: 0 18px;
+}
+.human-memories h3 {
+  margin: 8px 0;
+  color: var(--gold);
+  font-weight: 400;
+}
+.human-memories p,
+.human-memories small {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.9;
+}
+.human-memories button {
+  margin-top: 14px;
+}
+.human-letter footer {
+  margin-top: 16px;
+  text-align: right;
+}
+.human-keepsake {
+  color: var(--gold);
 }
 .mortal-footer {
   display: flex;

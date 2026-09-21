@@ -302,6 +302,25 @@ export class Renderer {
         c.lineWidth = 2;
       }
       c.stroke();
+      if (z.kind.startsWith('enemy-')) {
+        c.fillStyle = z.color;
+        c.font = 'bold 16px serif';
+        c.textAlign = 'center';
+        c.fillText(
+          (
+            {
+              'enemy-roots': '藤',
+              'enemy-firepath': '火',
+              'enemy-frost': '霜',
+              'enemy-miasma': '瘴',
+              'enemy-storm': '雷',
+              'enemy-stomp': '震',
+            } as Record<string, string>
+          )[z.kind] ?? '',
+          0,
+          6,
+        );
+      }
       this.zoneEmblem(z.kind, z.color, time, z.radius);
       if (z.kind === 'vortex') this.formation(0, 0, z.radius * 0.9, time, z.color, 0.6);
       if (z.delay <= 0 && z.kind !== 'vortex') {
@@ -361,6 +380,34 @@ export class Renderer {
       }
       c.restore();
     }
+    // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
+    if (game.stage < 6)
+      for (const e of game.enemies) {
+        if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
+        if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
+        c.save();
+        c.strokeStyle = '#ffc199';
+        c.fillStyle = '#e9836130';
+        c.lineWidth = 2;
+        if (e.charge > 0.55) {
+          c.translate(e.x, e.y);
+          c.rotate(Math.atan2(e.dy, e.dx));
+          const width = e.radius + 13;
+          c.fillRect(0, -width, 209, width * 2);
+          c.setLineDash([7, 5]);
+          c.strokeRect(0, -width, 209, width * 2);
+        } else {
+          c.beginPath();
+          c.arc(e.x, e.y, e.radius + 8, 0, TAU);
+          c.stroke();
+          c.setLineDash([5, 6]);
+          c.beginPath();
+          c.moveTo(e.x, e.y);
+          c.lineTo(e.x + e.dx * 230, e.y + e.dy * 230);
+          c.stroke();
+        }
+        c.restore();
+      }
     const entities = [
       ...game.enemies.filter((e) => !e.dead && this.visible(e, p)),
       {
@@ -391,6 +438,20 @@ export class Renderer {
           p.facing,
         );
         c.globalAlpha = 1;
+        if (game.slowed > 0) {
+          c.strokeStyle = '#a8e1f4';
+          c.lineWidth = 2;
+          c.beginPath();
+          c.ellipse(p.x, p.y + 12, 25, 10, 0, 0, TAU);
+          c.stroke();
+          c.font = 'bold 13px serif';
+          c.textAlign = 'center';
+          c.fillStyle = '#d3f1ff';
+          c.strokeStyle = '#173e4e';
+          c.lineWidth = 3;
+          c.strokeText('迟滞 · 移速 −25%', p.x, p.y + 46);
+          c.fillText('迟滞 · 移速 −25%', p.x, p.y + 46);
+        }
       } else {
         if (e.elite || e.boss)
           this.cachedFormation(

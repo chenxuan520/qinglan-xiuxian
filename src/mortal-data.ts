@@ -2,6 +2,8 @@ import { PASSIVES } from './data.ts';
 import { validTownPopulation, type TownPopulation } from './town-population.ts';
 import { validTownScenery, type TownScenery } from './town-history.ts';
 import { validSmithStory, smithStoryFits, type SmithStory } from './town-story.ts';
+import { validTownImmortal, type TownImmortal } from './town-immortal.ts';
+import { validHumanStories, type HumanStories } from './human-stories.ts';
 
 export const SECTS = PASSIVES.map((manual, index) => ({
   id: manual.id,
@@ -99,6 +101,8 @@ export interface MortalState {
   population?: TownPopulation;
   scenery?: TownScenery;
   smithStory?: SmithStory;
+  immortal?: TownImmortal | null;
+  humanStories?: HumanStories;
   member: { id: string; dueAt: number; dues: number } | null;
   mastery: Record<string, number>;
   activity: {
@@ -119,7 +123,9 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
   const sect = (id: unknown) => SECTS.some((s) => s.id === id);
   return (
     number(s.years) &&
+    (s.immortal == null || validTownImmortal(s.immortal, age)) &&
     (s.population === undefined || validTownPopulation(s.population)) &&
+    (s.humanStories === undefined || validHumanStories(s.humanStories, s.population, age)) &&
     (s.scenery === undefined || validTownScenery(s.scenery)) &&
     (s.smithStory === undefined ||
       (validSmithStory(s.smithStory) &&

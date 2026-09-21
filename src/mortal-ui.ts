@@ -15,6 +15,12 @@ import { type TownResident } from './town-population.ts';
 import { npcDefaultLine } from './npc-dialogue.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
 import { smithAt, smithStoryView } from './town-story.ts';
+import {
+  HUMAN_STORIES,
+  HUMAN_STORY_IDS,
+  humanStoryView,
+  type HumanStoryId,
+} from './human-stories.ts';
 
 const escape = (text: string) =>
   text.replace(
@@ -87,7 +93,7 @@ export function mortalPage(
       )
       .join('')}</nav>
     <div id="mortal-content">${mortalTabContent(save, tab, filter, unfinishedPath)}</div>
-    ${smithStoryJournal(save)}<section class="mortal-journal"><h2>人间见闻</h2><ol>${save.mortal.events.length ? save.mortal.events.map((event) => `<li>${escape(event)}</li>`).join('') : '<li>初入人间，山河待访。</li>'}</ol></section>
+    ${humanStoryJournal(save)}${smithStoryJournal(save)}<section class="mortal-journal"><h2>人间见闻</h2><ol>${save.mortal.events.length ? save.mortal.events.map((event) => `<li>${escape(event)}</li>`).join('') : '<li>初入人间，山河待访。</li>'}</ol></section>
     <footer class="mortal-footer">一程烟火，一卷仙缘。<button data-action="home">返回仙途 →</button></footer>
   </main>`;
 }
@@ -134,7 +140,35 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     const job = TOWN_JOBS[npc.id];
     actions = `<p>${job.desc}</p><p class="panel-note">消耗 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>点击即增加年岁并结算收益，完成后不自动重复。</p><button class="primary-button" data-action="mortal-activity" data-id="${npc.id}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '有事项待结算' : npc.id === 'tea' ? '入座听书' : '接下这件事'}</button>`;
   }
-  return `<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}<section class="npc-dialogue" aria-label="与${npc.name}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(npc.id)}</p></div><small class="npc-chat-status" role="status">街巷闲谈 · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="想对镇民说的话" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">闲谈不改变修为与物资，办事请用故事或委托按钮。</small></section>${actions}`;
+  if (npc.id === 'herbs')
+    actions +=
+      '<div class="save-actions"><button class="secondary-button" data-action="medicine-shop">药铺 · 看看本批丹药</button></div>';
+  return `<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}${HUMAN_STORY_IDS.filter(
+    (id) => HUMAN_STORIES[id].npcId === npc.id,
+  )
+    .map((id) => humanStoryContent(save, id, true))
+    .join(
+      '',
+    )}<section class="npc-dialogue" aria-label="与${npc.name}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(npc.id)}</p></div><small class="npc-chat-status" role="status">街巷闲谈 · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="想对镇民说的话" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">闲谈不改变修为与物资，办事请用故事或委托按钮。</small></section>${actions}`;
+}
+
+export function humanStoryContent(save: SaveData, id: HumanStoryId, atNpc = false) {
+  const view = humanStoryView(save, id);
+  if (!view) return '';
+  const story = save.mortal.humanStories?.[id];
+  const actions = view.actions.filter((action) => atNpc && action.id !== 'read');
+  return `<section class="town-story immortal-encounter" aria-label="${view.title}"><span class="eyebrow">人间旧事 · ${view.phase}</span><h3>${atNpc ? `${view.title} · ` : ''}${escape(view.name)}</h3>${story ? `<small>${story.metAt.toFixed(1)} 岁相识${story.chosenAt !== null && story.choice === 'bond' ? ` · ${story.chosenAt.toFixed(1)} 岁结为道侣` : ''}</small>` : ''}<p>${escape(view.text)}</p>${view.letter.length ? `<blockquote class="human-letter">${view.letter.map((p) => `<p>${escape(p)}</p>`).join('')}<footer>—— ${escape(view.name)}</footer></blockquote>` : `<blockquote>${escape(view.quote)}</blockquote>`}${view.keepsake ? `<p class="human-keepsake">旧物 · ${view.keepsake}<small>此世纪念，可在人间缘簿重读；随存档保留，轮回重启。</small></p>` : ''}${actions.length ? `<div class="story-choices">${actions.map((action) => `<button class="secondary-button" data-action="human-story" data-id="${id}:${action.id}">${action.label}</button>`).join('')}</div>` : ''}${story && !view.letter.length ? '<small>故人的年岁随历练、闭关与人间生活一同流逝，交谈不额外耗时。旧事与信物会留在缘簿中。</small>' : ''}</section>`;
+}
+function humanStoryJournal(save: SaveData) {
+  const known = HUMAN_STORY_IDS.filter((id) => save.mortal.humanStories?.[id]);
+  if (!known.length) return '';
+  return `<section class="mortal-journal human-journal"><span class="eyebrow">相逢有时 · 岁月留书</span><h2>人间缘簿</h2><div class="human-memories">${known
+    .map((id) => {
+      const story = save.mortal.humanStories![id]!;
+      const view = humanStoryView(save, id)!;
+      return `<article><small>${view.phase}${view.keepsake && !story.read ? ' · 有一封未读旧信' : ''}</small><h3>${escape(view.name)}</h3><p>${view.title} · ${story.metAt.toFixed(1)} 岁相识</p><p>${view.keepsake ? `留下「${view.keepsake}」` : story.choice === 'bond' ? '此世道侣 · 人间有一处归灯' : '故人尚在人间，别后亦可再访'}</p><button class="secondary-button" data-action="human-memory" data-id="${id}">${view.keepsake ? '展读旧信' : '重读相逢'} →</button></article>`;
+    })
+    .join('')}</div></section>`;
 }
 
 function smithStoryContent(save: SaveData) {

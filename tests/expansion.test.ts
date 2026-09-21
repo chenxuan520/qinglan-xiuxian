@@ -332,7 +332,7 @@ test('前六境各有十二种独立妖物，普通怪、精英和召唤物不�
   assert.ok(g.enemies.every((e) => e.type !== 0));
 });
 
-test('散射发出三弹、环射发出八弹，亮盾减伤而暗盾可被全额击伤', () => {
+test('散射与环射蓄势后发出三弹、八弹，亮盾减伤而暗盾可被全额击伤', () => {
   for (const [type, count] of [
     [13, 3],
     [15, 8],
@@ -342,6 +342,8 @@ test('散射发出三弹、环射发出八弹，亮盾减伤而暗盾可被全�
     const e = g.spawnEnemy(type, false, false, { x: 300, y: 0 });
     e.cooldown = 0;
     g.update(0.05);
+    assert.equal(g.shots.length, 0);
+    for (let i = 0; i < 14; i++) g.update(0.05);
     assert.equal(g.shots.filter((s) => s.kind === 'hostile').length, count);
   }
   const g = fixture(),

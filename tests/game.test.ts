@@ -422,8 +422,12 @@ test('灵石和玄铁不足不扣款，成功升级按对应成本扣款且有�
   assert.equal(forge(save, 'sword'), false);
 });
 test('损坏和越界存档不会破坏游戏初始化', () => {
-  assert.deepEqual(parseSave('{broken'), freshSave());
-  assert.deepEqual(parseSave('null'), freshSave());
+  for (const raw of ['{broken', 'null']) {
+    const parsed = parseSave(raw),
+      expected = freshSave();
+    expected.medicine.recipeSeed = parsed.medicine.recipeSeed;
+    assert.deepEqual(parsed, expected);
+  }
   const s = parseSave(
     JSON.stringify({
       version: 1,

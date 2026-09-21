@@ -63,7 +63,7 @@ test('仙尊新增横扫、精英天兵与预警突进，伤害随终关强度�
   const g = trial();
   g.weapons = [];
   const boss = g.spawnEnemy(10, false, true, { x: 300, y: 0 }, 6);
-  assert.ok(Math.abs(boss.damage - 297 * 0.72) < 1e-8);
+  assert.ok(Math.abs(boss.damage - 297 * 0.72 * 1.02) < 1e-8);
   boss.skillStep = 3;
   boss.cooldown = 0;
   g.update(0.01);
