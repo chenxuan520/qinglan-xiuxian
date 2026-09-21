@@ -1418,8 +1418,8 @@ export const STAGE_ENEMIES = [
 export const ENEMY_SKILLS = {
   ranged: {
     name: '灵弹狙击',
-    hint: '直线灵弹，横移避开',
-    eliteHint: '直线灵弹，横移避开',
+    hint: '蓄势后定向发弹，横移避开',
+    eliteHint: '蓄势后定向发弹，横移避开',
   },
   volley: { name: '裂羽散射', hint: '三枚扇形灵弹，穿过间隙', eliteHint: '五枚扇形灵弹，留意侧翼' },
   nova: { name: '灵轮震荡', hint: '八枚灵弹向外扩散', eliteHint: '十枚灵弹环射，保持距离' },
