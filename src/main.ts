@@ -761,11 +761,11 @@ function renderPanel() {
         .map((e) => {
           const tactics = ENEMY_TACTICS[ENEMIES.indexOf(e)];
           const skill = tactics.skill && ENEMY_SKILLS[tactics.skill];
-          const elite = ENEMY_SKILLS[tactics.eliteSkill];
+          const elite = tactics.eliteSkill && ENEMY_SKILLS[tactics.eliteSkill];
           const detail =
             bestiaryStage === FINAL_TRIAL_STAGE
               ? behavior[e.behavior]
-              : `${tactics.flank ? '包抄 · 两翼绕行，近身合围' : e.behavior === 'shield' ? '护盾 · 亮盾减伤 55%，暗盾时反击；近身震地' : skill ? `${skill.name} · ${skill.hint}` : behavior[e.behavior]}<small class="enemy-skill">精英：${elite.name} · ${elite.eliteHint}</small>`;
+              : `${tactics.flank ? '包抄 · 两翼绕行，近身合围' : e.behavior === 'shield' ? '护盾 · 亮盾减伤 55%，暗盾时反击；近身震地' : skill ? `${skill.name} · ${skill.hint}` : behavior[e.behavior]}<small class="enemy-skill">精英：${elite ? `${elite.name} · ${elite.eliteHint}` : behavior[e.behavior]}</small>`;
           return `<article class="enemy-card"><span class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}" style="${spriteStyle(e.sprite)}"></span><div><h3>${e.name}</h3><p class="${bestiaryStage === FINAL_TRIAL_STAGE ? '' : 'enemy-detail'}">${detail}</p><small>${bestiaryStage === FINAL_TRIAL_STAGE ? '终关以精英形态出现 · ' : ''}基础气血 ${e.hp} · 伤害 ${e.damage}</small></div></article>`;
         })
         .join(

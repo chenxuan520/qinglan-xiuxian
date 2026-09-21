@@ -1442,32 +1442,23 @@ export const ENEMY_SKILLS = {
   },
 };
 export type EnemySkill = keyof typeof ENEMY_SKILLS;
-// 前六境使用地域技能；终关继续沿用原有行为，不继承这里的强化。
-export const ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
-  const region = STAGE_ENEMIES.slice(0, 6).findIndex((pool) => pool.includes(type));
-  const regional: EnemySkill = (['roots', 'firepath', 'frost', 'miasma', 'soul', 'storm'] as const)[
-    Math.max(0, region)
-  ];
+// 前六境法师保留弹道攻击；重甲近身震地，追击精英蓄势扑杀。
+export const ENEMY_TACTICS = ENEMIES.map((enemy) => {
   const flank = enemy.behavior === 'chase' && /狼|獒|剑卒/.test(enemy.name);
   const skills: Record<string, EnemySkill | null> = {
     chase: null,
-    ranged: /咒师|祭师|巫师|毒巫|咒鬼|法使/.test(enemy.name) ? regional : 'ranged',
+    ranged: 'ranged',
     dash: 'dash',
     tank: 'stomp',
     shield: 'stomp',
     explode: null,
     summon: 'summon',
-    poison: 'miasma',
+    poison: 'ranged',
     volley: 'volley',
     nova: 'nova',
   };
   const skill = skills[enemy.behavior];
-  const eliteSkill: EnemySkill =
-    enemy.behavior === 'chase'
-      ? 'dash'
-      : enemy.behavior === 'ranged'
-        ? regional
-        : (skill ?? regional);
+  const eliteSkill = enemy.behavior === 'chase' ? 'dash' : skill;
   return { flank, skill, eliteSkill };
 });
 export function enemyWave(stage: number, seconds: number) {
