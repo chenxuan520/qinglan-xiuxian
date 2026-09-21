@@ -5293,19 +5293,19 @@ body.journey-complete:not(.in-game) {
   line-height: 2.5;
 }
 
-.prologue-revisit {
-  display: block;
-  margin: 0 auto 18px;
-  padding: 8px 12px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 2px;
+.lobby-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
 }
-.prologue-revisit:hover {
-  color: var(--gold);
+.lobby-save-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.prologue-revisit,
 .chronicle-link {
   min-height: 40px;
   padding: 10px 0;
@@ -5316,6 +5316,7 @@ body.journey-complete:not(.in-game) {
   font-size: 11px;
   white-space: nowrap;
 }
+.prologue-revisit:hover,
 .chronicle-link:hover {
   color: var(--gold);
 }
