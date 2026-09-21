@@ -45,18 +45,21 @@ function environment(t: test.TestContext, mobile = true) {
   return { calls, doc, root, orientation, events };
 }
 
-test('mobile entry requests fullscreen during the click, then landscape; leaving restores both', async (t) => {
-  const { calls } = environment(t);
-  const display = new MobileDisplay(() => {});
-  const entered = display.enter();
-  assert.deepEqual(calls, ['fullscreen']);
-  await entered;
-  assert.deepEqual(calls, ['fullscreen', 'landscape']);
-  assert.equal(display.active, true);
-  await display.leave();
-  assert.deepEqual(calls, ['fullscreen', 'landscape', 'unlock', 'exit']);
-  assert.equal(display.active, false);
-});
+for (const direction of ['portrait-primary', 'landscape-primary']) {
+  test(`mobile entry requests fullscreen during the click and preserves ${direction}`, async (t) => {
+    const { calls, orientation } = environment(t);
+    Object.assign(orientation, { type: direction });
+    const display = new MobileDisplay(() => {});
+    const entered = display.enter();
+    assert.deepEqual(calls, ['fullscreen']);
+    await entered;
+    assert.deepEqual(calls, ['fullscreen']);
+    assert.equal(display.active, true);
+    await display.leave();
+    assert.deepEqual(calls, ['fullscreen', 'exit']);
+    assert.equal(display.active, false);
+  });
+}
 
 test('desktop entry does not change fullscreen or orientation', async (t) => {
   const { calls } = environment(t, false);
@@ -64,11 +67,9 @@ test('desktop entry does not change fullscreen or orientation', async (t) => {
   assert.deepEqual(calls, []);
 });
 
-test('rejected landscape lock keeps fullscreen and does not interrupt entry', async (t) => {
-  const { calls, orientation } = environment(t);
-  orientation.lock = async () => {
-    throw new Error('NotSupportedError');
-  };
+test('missing screen orientation API does not interrupt fullscreen entry', async (t) => {
+  const { calls } = environment(t);
+  Reflect.deleteProperty(screen, 'orientation');
   const display = new MobileDisplay(() => {});
   await display.enter();
   assert.equal(display.active, true);
@@ -109,24 +110,7 @@ test('returning home during fullscreen request releases it without locking the h
   assert.deepEqual(calls, ['exit']);
 });
 
-test('a landscape lock resolving after return home is released', async (t) => {
-  const { calls, orientation } = environment(t);
-  let resolve!: () => void;
-  orientation.lock = () =>
-    new Promise<void>((done) => {
-      resolve = done;
-    });
-  const display = new MobileDisplay(() => {});
-  const entry = display.enter();
-  await Promise.resolve();
-  await display.leave();
-  resolve();
-  await entry;
-  assert.equal(display.active, false);
-  assert.deepEqual(calls, ['fullscreen', 'exit', 'unlock']);
-});
-
-test('manual fullscreen exit unlocks orientation and can be retried with a new click', async (t) => {
+test('manual fullscreen exit preserves orientation and can be retried with a new click', async (t) => {
   const { calls, doc } = environment(t);
   let updates = 0;
   const display = new MobileDisplay(() => {
@@ -134,7 +118,7 @@ test('manual fullscreen exit unlocks orientation and can be retried with a new c
   });
   await display.enter();
   await doc.exitFullscreen();
-  assert.deepEqual(calls, ['fullscreen', 'landscape', 'exit', 'unlock']);
+  assert.deepEqual(calls, ['fullscreen', 'exit']);
   assert.equal(display.active, false);
   await display.enter();
   assert.equal(display.active, true);
@@ -148,14 +132,14 @@ test('leaving preserves fullscreen already owned by the user', async (t) => {
   await display.enter();
   await display.leave();
   assert.equal(display.active, true);
-  assert.deepEqual(calls, ['landscape', 'unlock']);
+  assert.deepEqual(calls, []);
 });
 
 test('rapid repeated entry shares one fullscreen request', async (t) => {
   const { calls } = environment(t);
   const display = new MobileDisplay(() => {});
   await Promise.all([display.enter(), display.enter()]);
-  assert.deepEqual(calls, ['fullscreen', 'landscape']);
+  assert.deepEqual(calls, ['fullscreen']);
 });
 
 test('WebKit fullscreen works without a screen orientation lock API', async (t) => {

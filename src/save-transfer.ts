@@ -15,6 +15,10 @@ export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 
 // 本机读档与文件导入共用迁移：通关后解除旧天劫，恢复被其暂停的原历练。
 export function restoreSavedRun(save: SaveData, snapshot: unknown) {
+  if (save.journeyEnded) {
+    save.tribulationReturn = null;
+    return null;
+  }
   if (
     save.completed.includes(FINAL_TRIAL_STAGE) &&
     snapshot &&
@@ -41,7 +45,7 @@ export function exportSave(save: SaveData, run: Game | null) {
       format: 'qinglan-save',
       version: 1,
       exportedAt: new Date().toISOString(),
-      save: { ...save, activeRun: run?.snapshot() ?? null },
+      save: { ...save, activeRun: save.journeyEnded ? null : (run?.snapshot() ?? null) },
     },
     null,
     2,
@@ -98,7 +102,7 @@ export function importSave(text: string) {
     (data.spiritRoot !== undefined && !SPIRIT_ROOTS.some((r) => r.id === data.spiritRoot)) ||
     (data.artifacts !== undefined && !artifactIds(data.artifacts)) ||
     (data.artifactDrops !== undefined && !artifactIds(data.artifactDrops)) ||
-    ['sound', 'autoplay', 'prologueSeen'].some(
+    ['sound', 'autoplay', 'prologueSeen', 'journeyEnded'].some(
       (key) => data[key] !== undefined && typeof data[key] !== 'boolean',
     ) ||
     (data.volume !== undefined &&
