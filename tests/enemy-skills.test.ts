@@ -64,6 +64,23 @@ test('前六境地域法师恢复蓄势直线灵弹，不再在玩家脚下生�
   }
 });
 
+test('第五境无面幽魂与爆魂冥瓮精英保留交叉灵弹', () => {
+  for (const [type, elite, expectedSkill, shots] of [
+    [58, false, 'ranged', 1],
+    [58, true, 'soul', 4],
+    [61, false, 'soul', 2],
+    [61, true, 'soul', 4],
+    [62, false, undefined, 0],
+    [62, true, 'soul', 4],
+  ] as const) {
+    const { g, e } = encounter(4, type, elite);
+    g.update(0.01);
+    assert.equal(e.pendingSkill, expectedSkill);
+    advance(g, 0.7);
+    assert.equal(g.shots.length, shots);
+  }
+});
+
 test('狼群分别包抄两翼，保持原速度；首境菇妖仍直接追击', () => {
   const { g, e } = encounter(0, 1);
   const other = g.spawnEnemy(1, false, false, { x: e.x, y: e.y });
