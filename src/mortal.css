@@ -310,6 +310,7 @@
   position: absolute;
   background: url('/assets/town-ground.webp') repeat;
   background-size: 600px;
+  border-radius: 18px;
   box-shadow: 0 0 0 3px #b3aa8c88;
 }
 .town-street.town-dock {
@@ -323,6 +324,47 @@
   transform: translate(-50%, -100%);
   background: url('/assets/town-buildings.webp') no-repeat;
   background-size: 300% 300%;
+}
+.town-weathered {
+  --town-saturation: 0.48;
+  --town-brightness: 0.78;
+}
+.town-renewed {
+  --town-saturation: 1.2;
+  --town-brightness: 1.16;
+}
+.town-building-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  background: #21382be8;
+  border: 1px solid #b1a67988;
+  color: #e5d7ae;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.town-return-note {
+  position: absolute;
+  z-index: 2;
+  right: max(22px, env(safe-area-inset-right));
+  bottom: max(210px, calc(env(safe-area-inset-bottom) + 190px));
+  width: min(380px, calc(100% - 44px));
+  padding: 12px 16px;
+  border-left: 2px solid var(--gold);
+  background: #102d27ed;
+  color: #dfdec5;
+  font-size: 12px;
+  line-height: 1.9;
+  pointer-events: none;
+  animation: town-return-dismiss 0.4s 12s forwards;
+}
+@keyframes town-return-dismiss {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 .town-vacant-lot {
   position: absolute;

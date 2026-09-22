@@ -15,8 +15,14 @@ import { Game } from '../src/game.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
 import { advanceMortal, joinSect } from '../src/mortal.ts';
 import { SPIRIT_ROOTS, STAGE_ENEMIES, DIFFICULTIES } from '../src/data.ts';
-import { medicineContent } from '../src/medicine-ui.ts';
+import { medicineContent, medicineTime } from '../src/medicine-ui.ts';
 import { guideContent } from '../src/guide.ts';
+
+test('丹药时长明确为按秘境流速折算的药效时间，不是关卡倒计时', () => {
+  assert.equal(medicineTime(100, 0), '100 年 · 按所选秘境流速，药效约可持续 10分00秒');
+  assert.equal(medicineTime(100, 1), '100 年 · 按所选秘境流速，药效约可持续 04分00秒');
+  assert.equal(medicineTime(100, 6), '100 年 · 按所选秘境流速，药效约可持续 00分06秒');
+});
 
 const rich = () => {
   const s = freshSave();

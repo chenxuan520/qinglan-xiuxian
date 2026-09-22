@@ -51,6 +51,7 @@ export interface SaveData {
   autoplay: boolean;
   prologueSeen: boolean;
   journeyEnded: boolean;
+  pendingReincarnation: 'lifespan' | 'tribulation' | null;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
   rootElements: ElementId[];
@@ -129,6 +130,7 @@ export function freshSave(
     autoplay: false,
     prologueSeen: false,
     journeyEnded: false,
+    pendingReincarnation: null,
     path,
     spiritRoot,
     rootElements: [...rootElements],
@@ -205,12 +207,22 @@ export function parseSave(raw: string | null, random: () => number = Math.random
       base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
     base.journeyEnded = s.journeyEnded === true && realm.max;
-    if (base.mortal.member)
+    if (base.mortal.member) {
       base.mortal.member.dues = Math.min(base.mortal.member.dues, SECT_DUES[realm.index].stones);
+      if (realm.max) base.mortal.member.dueAt = 0;
+    }
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
     syncHumanStories(base);
     claimArtifacts(base);
     syncTribulationClock(base);
+    if (
+      !base.journeyEnded &&
+      ((s.pendingReincarnation === 'lifespan' &&
+        Number.isFinite(lifespanInfo(base).limit) &&
+        lifespanInfo(base).remaining === 0) ||
+        (s.pendingReincarnation === 'tribulation' && tribulationDue(base)))
+    )
+      base.pendingReincarnation = s.pendingReincarnation;
     return base;
   } catch {
     return base;
@@ -219,6 +231,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
 export function enterImmortalGate(save: SaveData) {
   if (
     save.journeyEnded ||
+    save.pendingReincarnation ||
     !realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max
   )
     return false;

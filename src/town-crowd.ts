@@ -1,4 +1,4 @@
-import type { TownPoint } from './town.ts';
+import { TOWN_STREETS, type TownPoint } from './town.ts';
 
 export interface TownPasserby extends TownPoint {
   art: number;
@@ -23,18 +23,23 @@ export function townCrowd(seed: number, buildings: readonly (TownPoint & { art: 
       phase: index * 3.7 + (seed % 61),
     });
   };
-  for (const streetY of [650, 1250, 1850])
-    for (let i = 0; i < 10; i++) {
-      const x = 220 + i * 280;
-      const y = streetY + (i % 2 ? 48 : -42);
-      add(x, y, { x: x + 210, y });
-    }
-  for (const streetX of [820, 1740, 2560])
-    for (let i = 0; i < 6; i++) {
-      const x = streetX + (i % 2 ? 36 : -36);
-      const y = 220 + i * 360;
-      add(x, y, { x, y: y + 220 });
-    }
+  // 每条往返路线收在同一段路面内，不用直线切过折角或穿越河道。
+  const horizontal = TOWN_STREETS.filter(([left, , right]) => left < 3150 && right - left >= 400);
+  for (let i = 0; i < 30; i++) {
+    const [left, top, right, bottom] = horizontal[i % horizontal.length];
+    const x = left + 40 + ((i * 137 + seed) % (right - left - 290));
+    const y = (top + bottom) / 2 + (i % 2 ? 24 : -24);
+    add(x, y, { x: x + 210, y });
+  }
+  const vertical = TOWN_STREETS.filter(
+    ([left, top, , bottom]) => left < 3150 && bottom - top >= 300,
+  );
+  for (let i = 0; i < 18; i++) {
+    const [left, top, right, bottom] = vertical[i % vertical.length];
+    const x = (left + right) / 2 + (i % 2 ? 22 : -22);
+    const y = top + 40 + ((i * 97 + seed) % (bottom - top - 300));
+    add(x, y, { x, y: y + 220 });
+  }
   // 顾客随当前店铺位置摆放，百年迁城后不留在空宅地前。
   for (const shop of buildings.filter((b) => b.art !== 3 && b.y < 1800).slice(0, 12))
     add(shop.x + 56, shop.y + 72);

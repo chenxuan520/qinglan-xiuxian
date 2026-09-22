@@ -65,6 +65,7 @@ test('兼容UTF-8字节标记，10MB按实际字节限制，旧档补新字段�
   };
   const restored = importSave(JSON.stringify(legacy)).save;
   assert.equal(restored.cultivation, 12345);
+  assert.equal(restored.pendingReincarnation, null);
   assert.deepEqual(restored.medicine.bag, {});
   assert.deepEqual(restored.medicine.recipes, []);
   assert.equal(restored.mortal.immortal, undefined);
@@ -82,6 +83,9 @@ test('仙门仅真仙可入，旧档不自动完结，叩门记下当时年岁�
   save.completed = [0, 1, 2, 3, 4, 5, 6];
   save.age = 26522.9;
   assert.equal(parseSave(JSON.stringify(save)).journeyEnded, false);
+  save.pendingReincarnation = 'tribulation';
+  assert.equal(enterImmortalGate(save), false);
+  save.pendingReincarnation = null;
   save.autoplay = true;
   assert.equal(enterImmortalGate(save), true);
   assert.equal(save.autoplay, false);
@@ -108,6 +112,28 @@ test('终章状态读档和导入后仍封存此世，旧续局不会恢复', ()
   assert.equal(restored.run, null);
   assert.equal(importSave(JSON.stringify({ ...save, activeRun: run.snapshot() })).run, null);
   assert.equal(importSave(exportSave(restored.save, null)).save.journeyEnded, true);
+});
+
+test('寿终与天劫落幕状态随刷新和导入保留，且不会恢复旧对局', () => {
+  const lifespan = freshSave();
+  lifespan.age = 100;
+  lifespan.pendingReincarnation = 'lifespan';
+  const lifespanRun = new Game(lifespan, 0, 0);
+  const lifespanFile = exportSave(lifespan, lifespanRun);
+  assert.equal(JSON.parse(lifespanFile).save.activeRun, null);
+  assert.equal(parseSave(JSON.stringify(lifespan)).pendingReincarnation, 'lifespan');
+  assert.equal(importSave(lifespanFile).save.pendingReincarnation, 'lifespan');
+  assert.equal(importSave(lifespanFile).run, null);
+
+  const tribulation = freshSave();
+  tribulation.cultivation = 1e9;
+  tribulation.age = tribulation.nextTribulationAge = 20000;
+  tribulation.pendingReincarnation = 'tribulation';
+  const tribulationFile = exportSave(tribulation, new Game(tribulation, 0, 0));
+  assert.equal(JSON.parse(tribulationFile).save.activeRun, null);
+  assert.equal(parseSave(JSON.stringify(tribulation)).pendingReincarnation, 'tribulation');
+  assert.equal(importSave(tribulationFile).save.pendingReincarnation, 'tribulation');
+  assert.equal(importSave(tribulationFile).run, null);
 });
 
 test('序章已读状态保留于存档和导入，未读或缺失字段时保持未读', () => {
@@ -204,6 +230,9 @@ test('导入拒绝错误格式、版本、缺失字段、非法数值、损坏�
     { ...save, spiritRoot: 'unknown' },
     { ...save, prologueSeen: 'yes' },
     { ...save, journeyEnded: 'yes' },
+    { ...save, pendingReincarnation: 'unknown' },
+    { ...save, pendingReincarnation: 'lifespan' },
+    { ...save, pendingReincarnation: 'tribulation' },
     { ...save, activeRun: {} },
     { format: 'foreign', version: 1, save },
     { format: 'qinglan-save', version: 2, save },

@@ -47,16 +47,61 @@ test('七境按战斗时间计龄，暂停、选技与死亡不计龄，年龄�
     const g = quietGame(stage);
     for (let i = 0; i < 20; i++) g.update(0.05);
     assert.ok(Math.abs(g.save.age - 15 - STAGE_YEARS_PER_MINUTE[stage] / 60) < 1e-8);
+    assert.ok(Math.abs(g.elapsedYears! - (g.save.age - 15)) < 1e-8);
     const age = g.save.age;
     for (const state of ['paused', 'upgrade', 'lost', 'won'] as const) {
       g.state = state;
       g.update(0.05);
       assert.equal(g.save.age, age);
+      assert.ok(Math.abs(g.elapsedYears! - (age - 15)) < 1e-8);
     }
     const next = new Game(g.save, stage, 0);
     next.update(0.05);
     assert.ok(g.save.age > age);
   }
+});
+
+test('本局年岁只累计实际战斗消耗，寿尽与天劫截停不多计', () => {
+  const g = quietGame();
+  g.update(0.05);
+  g.save.age += 10;
+  g.update(0.05);
+  assert.ok(Math.abs(g.elapsedYears! - 1 / 60) < 1e-8);
+  g.save.age = 99.999;
+  const before = g.elapsedYears!;
+  g.update(0.05);
+  assert.equal(g.save.age, 100);
+  assert.ok(Math.abs(g.elapsedYears! - before - 0.001) < 1e-8);
+  const t = quietGame(6);
+  t.save.cultivation = 1e9;
+  t.save.age = 19999.999;
+  t.save.nextTribulationAge = 20000;
+  t.update(0.05);
+  assert.equal(t.state, 'paused');
+  assert.ok(Math.abs(t.elapsedYears! - 0.001) < 1e-8);
+  const trial = Game.createTribulation(t.save, t);
+  const age = t.save.age;
+  trial.update(0.05);
+  assert.equal(trial.elapsedYears, 0);
+  assert.equal(t.save.age, age);
+});
+
+test('本局年岁随续局保存且不受旧时长缩放影响，缺失旧记录不虚构', () => {
+  const save = freshSave();
+  const g = new Game(save, 0, 0);
+  g.update(0.05);
+  const snapshot = g.snapshot();
+  const restored = Game.restore(save, { ...snapshot, stageDuration: snapshot.stageDuration * 2 })!;
+  assert.equal(restored.time, g.time / 2);
+  assert.equal(restored.elapsedYears, g.elapsedYears);
+  assert.equal(Game.restore(save, restored.snapshot())!.elapsedYears, g.elapsedYears);
+  const legacy = Game.restore(save, { ...snapshot, elapsedYears: undefined })!;
+  assert.equal(legacy.elapsedYears, undefined);
+  legacy.resume();
+  legacy.update(0.05);
+  assert.equal(legacy.elapsedYears, undefined);
+  for (const elapsedYears of [-1, NaN, Infinity, null, '1'])
+    assert.equal(Game.restore(save, { ...snapshot, elapsedYears }), null);
 });
 
 test('炼气在第一境从十五岁累计八分半寿尽，普通复活无效，借寿延长三成并保留战绩', () => {

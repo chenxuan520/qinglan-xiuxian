@@ -74,6 +74,7 @@ import {
   completeTribulation,
   retreatPlan,
   retreat,
+  type SaveData,
 } from './progress.ts';
 import { Game } from './game.ts';
 import { exportSave, importSave, restoreSavedRun, MAX_SAVE_FILE_BYTES } from './save-transfer.ts';
@@ -89,7 +90,7 @@ import { TownScene } from './town-scene.ts';
 import { TOWN_START, townClockRunning } from './town.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
 import { closeNpcChat, mountNpcChat, mountTeaStory } from './npc-chat.ts';
-import { townVisit } from './town-history.ts';
+import { townVisit, townReturnMemory } from './town-history.ts';
 import { visitTownImmortal, meetTownImmortal } from './town-immortal.ts';
 import { chooseSmithStory } from './town-story.ts';
 import {
@@ -97,6 +98,7 @@ import {
   chooseHumanStory,
   syncHumanStories,
   isHumanStoryId,
+  unreadHumanLetterKeys,
 } from './human-stories.ts';
 
 import {
@@ -118,6 +120,7 @@ import {
   mortalTabContent,
   townEventContent,
   humanStoryContent,
+  humanStoryJournal,
   masteryDescription,
 } from './mortal-ui.ts';
 
@@ -138,7 +141,7 @@ try {
 const save = parseSave(raw);
 // 每次进入先静音，保留音量，只有明确开启声音后才播放。
 save.sound = false;
-if (!save.journeyEnded) resolveActivity(save);
+if (!save.journeyEnded && !save.pendingReincarnation) resolveActivity(save);
 const PROLOGUE_IMAGE = '/assets/qinglan-prologue-dark.webp';
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
 const catalogTreasures = [...TREASURES];
@@ -164,6 +167,8 @@ let panel = '',
   bookTab = 'treasures',
   selectedTreasure = save.starter,
   settled = false;
+let journeyCardReturn: 'chronicle' | 'lifespan-farewell' | 'tribulation-farewell' | 'epilogue' =
+  'chronicle';
 let inMortalWorld = false;
 let mortalFilter = 'all';
 let mortalTab: 'town' | 'sects' = 'town';
@@ -171,6 +176,7 @@ let inTown = false;
 let townScene: TownScene | null = null;
 let townPosition = { ...TOWN_START };
 let townNpc: TownResident | null = null;
+const shownHumanLetters = new Set<string>();
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 let guideTab = 'basics';
@@ -216,12 +222,12 @@ function persist() {
     storageAvailable = false;
   }
 }
-function toast(text: string) {
+function toast(text: string, duration = 3200) {
   const el = document.querySelector<HTMLDivElement>('#toast')!;
   el.textContent = text;
   el.classList.add('visible');
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => el.classList.remove('visible'), 3200);
+  toastTimer = window.setTimeout(() => el.classList.remove('visible'), duration);
 }
 let toastTimer = 0;
 const mobileDisplay = new MobileDisplay(() => {
@@ -314,14 +320,14 @@ function realmVerse(realm: ReturnType<typeof realmInfo>) {
 function completedJourney(realmName: string, immortal: boolean, verse: string) {
   return `<section class="hero journey-hero" aria-label="仙途通关"><div class="hero-copy"><div class="eyebrow"><span></span>七境已破 · 山河可期</div><h1>七境皆过客<span>天地一逍遥</span></h1><p>曾执一剑入青岚，今携万法越重山。<br>七境已破，天劫已散。往后山河，任你来去。</p><div class="journey-badges"><span>七境通关</span><span>天劫止息</span><span>修行永存</span></div><div class="journey-actions">${immortal ? `<button class="primary-button" data-action="immortal-gate">叩入仙门 ${smallIcon('arrow')}</button>` : ''}<button class="${immortal ? 'secondary-button' : 'primary-button'}" data-action="revisit">重游七境 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="arsenal">查看珍藏</button></div></div><button class="journey-portrait" data-action="cultivation" aria-label="当前${realmName}，进入洞府修炼"><span class="journey-orbit" aria-hidden="true"></span><span class="journey-poem">${verse}</span><span class="journey-character" style="${spriteStyle(0)}" aria-hidden="true"></span><span class="journey-realm"><small>此世道果</small><strong>${realmName}</strong><span>进入洞府 ${smallIcon('arrow')}</span></span></button></section><section class="journey-records" aria-label="此世修行成果"><div><span>累积修为</span><strong title="${save.cultivation.toLocaleString('zh-CN')}">${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.cultivation)}</strong><small>一念一境，皆成过往</small></div><div><span>此世年岁</span><strong>${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(save.age)}<em>年</em></strong><small>岁月悠长，道心未改</small></div><div><span>法宝珍藏</span><strong>${save.artifacts.length}<em>/ ${TREASURES.length}</em></strong><small>万般法器，随心而御</small></div><div><span>历劫留印</span><strong>${save.tribulations}<em>枚</em></strong><small>气血 +${save.tribulations * 3}% · 伤害 +${save.tribulations * 2}%</small></div></section>`;
 }
-function renderLobby() {
+function renderLobby(returnYears?: number) {
   if (save.journeyEnded) {
     renderEpilogue();
     return;
   }
   leaveTown();
   if (assetsReady && !renderer.hasScene(selectedStage)) {
-    ensureScene(selectedStage, renderLobby);
+    ensureScene(selectedStage, () => renderLobby(returnYears));
     return;
   }
   if (inMortalWorld) persist();
@@ -337,7 +343,7 @@ function renderLobby() {
   document.body.classList.toggle('immortal-home', realm.max);
   ui.innerHTML = `
     <header class="lobby-header">
-      <a class="brand" href="#" data-action="home" aria-label="青岚仙途首页"><span class="brand-emblem">${icon('sword')}</span><span>青岚仙途</span><span class="seal">${completed ? '圆满' : '问道'}</span></a>
+      <a class="brand" href="#" data-action="home" aria-label="叩仙门：青岚纪首页"><span class="brand-emblem">${icon('sword')}</span><span class="brand-title">叩仙门<small>青岚纪</small></span><span class="seal">${completed ? '圆满' : '问道'}</span></a>
       <nav aria-label="修行菜单"><button class="nav-link active" data-action="home">${completed ? '七境巡游' : '秘境历练'}</button><button class="nav-link" data-action="cultivation">洞府修炼</button><button class="nav-link" data-action="arsenal">藏器阁</button><button class="nav-link" data-action="bestiary">妖物志</button><button class="nav-link" data-action="medicine">炼丹炉</button></nav>
       <div class="header-right">${currency()}${controls()}</div>
     </header>
@@ -365,6 +371,11 @@ function renderLobby() {
     </main>
     <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><span class="lobby-save-status"><span class="status-dot"></span>${storageAvailable ? '修行进度自动保存于本机' : '本机存档不可用'}</span><span class="lobby-footer-links"><button class="prologue-revisit" data-action="prologue-revisit">重温序章</button>${chronicleEntrance(save)}</span></footer>`;
   if (sectDuesPending(save)) renderSectDues();
+  else if (returnYears !== undefined && returnYears > 0)
+    toast(
+      `山中一程，人间已过 ${returnYears < 0.1 ? '不足 0.1' : Number(returnYears.toFixed(1))} 年。`,
+      3000,
+    );
 }
 function updateStorySoundButton(button: HTMLButtonElement) {
   const label = save.sound ? '关闭声音' : '开启声音';
@@ -383,7 +394,7 @@ function renderEpilogue() {
   ui.innerHTML = '';
   ui.inert = true;
   panel = 'epilogue';
-  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene epilogue-scene" role="dialog" aria-modal="true" aria-labelledby="epilogue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="epilogue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button></div><div class="prologue-heading"><span class="eyebrow">青岚仙途 · 终章</span><h1 id="epilogue-title">云开<span>见长生</span></h1><p>此去长生，亦记人间。</p><span class="prologue-seal">此世圆满</span></div><div class="prologue-story" tabindex="0" aria-label="终章正文"><p>青岚山下，又是一年春水。炊烟漫过新修的青瓦，渡口有人挑起归灯。茶馆里醒木一响，说书人讲起一位从小镇走出的少年——讲到后来，连他的姓名，也渐渐成了传说。</p><p>你立在云海尽头，身后七境归于寂静。曾经惊心的雷声，已远得像一场旧雨。眼前仙门缓缓开启，没有谁问你斩过多少妖、炼成多少法，只见门上浮光如水，映出十五岁那年的衣衫。</p><p>那时行囊很轻，前路很远。你听闻天地间有长生，便以为走得足够远，就能将离别留在身后。直到春秋从指间流过，旧桥几度重修，熟悉的声音一个个散入晚风，才懂得：有些相逢虽只一瞬，也足以陪人走完漫长的一生。</p><p>仙门外的风吹动衣襟，你下意识拢了拢。恍惚间，青岚渡口的旧风，又从岁月深处吹来。</p><p>叩门之前，你曾最后回了一趟青岚。渡口坐着一个十五岁的少年，望着远山，问你外面的天地究竟有多大。你便在他身旁坐下，说起竹海之外的山川、云海尽头的星辰，也说起求道路上的风雪与险恶。末了，你告诉他：山河之外，还有求长生、问大道的路。</p><p>少年听得出神，眼里有一簇你熟悉的光。你忽然想起，许多年前，也有一位过路修士，在这里向你说过同样的话。临别时你替他拢好被风吹开的衣襟，只道：路远，记得添衣。</p><p>一步踏出，仙门在身后合拢。凡间不再有你的归舟，山河却仍循着自己的时序，迎春，送雪。而那个少年，终于背起轻轻的行囊，朝青岚山深处走去。</p><p class="prologue-last">山河未老，故人先秋。<br>幸而此心未改，来路仍明。<br><br>这一程山水，至此落笔。<br>长生已觅，大道无涯。</p></div><footer class="prologue-footer"><span>此世已结束 · 真仙<br>叩门于 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 岁</span><button class="primary-button" data-action="epilogue-reincarnate">轮回转世 ${smallIcon('arrow')}</button></footer></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene epilogue-scene" role="dialog" aria-modal="true" aria-labelledby="epilogue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="epilogue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="journey-card">留存此世</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 终章</span><h1 id="epilogue-title">云开<span>见长生</span></h1><p>此去长生，亦记人间。</p><span class="prologue-seal">此世圆满</span></div><div class="prologue-story" tabindex="0" aria-label="终章正文"><p>青岚山下，又是一年春水。炊烟漫过新修的青瓦，渡口有人挑起归灯。茶馆里醒木一响，说书人讲起一位从小镇走出的少年——讲到后来，连他的姓名，也渐渐成了传说。</p><p>你立在云海尽头，身后七境归于寂静。曾经惊心的雷声，已远得像一场旧雨。眼前仙门缓缓开启，没有谁问你斩过多少妖、炼成多少法，只见门上浮光如水，映出十五岁那年的衣衫。</p><p>那时行囊很轻，前路很远。你听闻天地间有长生，便以为走得足够远，就能将离别留在身后。直到春秋从指间流过，旧桥几度重修，熟悉的声音一个个散入晚风，才懂得：有些相逢虽只一瞬，也足以陪人走完漫长的一生。</p><p>仙门外的风吹动衣襟，你下意识拢了拢。恍惚间，青岚渡口的旧风，又从岁月深处吹来。</p><p>叩门之前，你曾最后回了一趟青岚。渡口坐着一个十五岁的少年，望着远山，问你外面的天地究竟有多大。你便在他身旁坐下，说起竹海之外的山川、云海尽头的星辰，也说起求道路上的风雪与险恶。末了，你告诉他：山河之外，还有求长生、问大道的路。</p><p>少年听得出神，眼里有一簇你熟悉的光。你忽然想起，许多年前，也有一位过路修士，在这里向你说过同样的话。临别时你替他拢好被风吹开的衣襟，只道：路远，记得添衣。</p><p>一步踏出，仙门在身后合拢。凡间不再有你的归舟，山河却仍循着自己的时序，迎春，送雪。而那个少年，终于背起轻轻的行囊，朝青岚山深处走去。</p><p class="prologue-last">山河未老，故人先秋。<br>幸而此心未改，来路仍明。<br><br>这一程山水，至此落笔。<br>长生已觅，大道无涯。</p></div><footer class="prologue-footer"><span>此世已结束 · 真仙<br>叩门于 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 岁</span><button class="primary-button" data-action="epilogue-reincarnate">轮回转世 ${smallIcon('arrow')}</button></footer></section></div>`;
   updateStorySoundButton(modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!);
   const scene = modal.querySelector<HTMLElement>('.epilogue-scene')!;
   scene.style.setProperty(
@@ -397,7 +408,7 @@ function renderPrologue(replay = false) {
   if ((!replay && save.prologueSeen) || game || inMortalWorld || panel) return;
   panel = 'prologue';
   ui.inert = true;
-  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="prologue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="prologue-enter">${replay ? '返回仙途' : '略过序章'} ${smallIcon('arrow')}</button></div><div class="prologue-heading"><span class="eyebrow">青岚仙途 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">${replay ? '返回仙途' : '入此山河'} ${smallIcon('arrow')}</button></footer></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="prologue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="prologue-enter">${replay ? '返回仙途' : '略过序章'} ${smallIcon('arrow')}</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">${replay ? '返回仙途' : '入此山河'} ${smallIcon('arrow')}</button></footer></section></div>`;
   updateStorySoundButton(modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!);
   modal
     .querySelector<HTMLElement>('.prologue-scene')!
@@ -431,7 +442,7 @@ function mountTownScene() {
     save.mortal.population,
     save.age,
     showTownEvent,
-    save.mortal.scenery?.revision ?? 0,
+    save.mortal.scenery,
   );
 }
 function showTownEvent(npc: TownResident) {
@@ -501,6 +512,18 @@ function renderMortal(enter = false) {
   if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
   else if (tribulationDue(save)) renderTribulationPending();
   else if (sectDuesPending(save)) renderSectDues();
+  else if (enter) {
+    const letters = unreadHumanLetterKeys(save);
+    if (letters.some((key) => !shownHumanLetters.has(key))) {
+      panel = 'human-journal';
+      panelFrame(
+        '人间缘簿',
+        `故人来信 · ${letters.length} 封未读旧信`,
+        humanStoryJournal(save, false),
+      );
+      letters.forEach((key) => shownHumanLetters.add(key));
+    }
+  }
 }
 function syncMortalChange() {
   resolveActivity(save);
@@ -632,6 +655,46 @@ function panelFrame(title: string, subtitle: string, body: string, wide = false)
       ?.focus({ preventScroll: true });
   } else section.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
 }
+async function renderJourneyCard() {
+  if (
+    panel === 'chronicle' ||
+    panel === 'lifespan-farewell' ||
+    panel === 'tribulation-farewell' ||
+    panel === 'epilogue'
+  )
+    journeyCardReturn = panel;
+  panel = 'journey-card';
+  panelFrame(
+    '此世留影',
+    '留存此世 · 本地生成',
+    '<div class="journey-card-preview"><p class="panel-note" role="status">正在生成此世留影，请稍候……可随时关闭。</p></div>',
+  );
+  const host = modal.querySelector<HTMLElement>('.journey-card-preview')!;
+  modal.querySelector('.panel')?.scrollTo(0, 0);
+  modal.querySelector<HTMLButtonElement>('[data-action="close"]')?.focus({ preventScroll: true });
+  try {
+    const snapshot = structuredClone(save);
+    const { createJourneyCard } = await import('./journey-card.ts');
+    if (!host.isConnected) return;
+    const url = await createJourneyCard(
+      snapshot,
+      journeyCardReturn === 'lifespan-farewell'
+        ? 'lifespan'
+        : journeyCardReturn === 'tribulation-farewell'
+          ? 'tribulation'
+          : undefined,
+    );
+    if (!host.isConnected) return;
+    host.innerHTML =
+      '<img alt="此世留影纪念卡预览"><a class="primary-button" download="叩仙门：青岚纪-此世留影.png" tabindex="0">下载 PNG 图片</a><p class="panel-note">手机可长按图片保存。纪念图仅供留影，不能用于恢复存档；二维码直达官网，不携带存档数据。</p>';
+    host.querySelector('img')!.src = url;
+    host.querySelector('a')!.href = url;
+  } catch {
+    if (!host.isConnected) return;
+    host.innerHTML =
+      '<p class="panel-note" role="alert">此世留影生成失败，未能生成图片。请重试，或关闭后稍后再来；此世进度不受影响。</p><button class="secondary-button" data-action="journey-card">重新生成</button>';
+  }
+}
 function renderPanel() {
   if (panel === 'medicine') {
     if (medicineView === 'shop' && refreshMedicineShop(save.medicine, save.age)) persist();
@@ -738,7 +801,13 @@ function renderPanel() {
       true,
     );
   } else if (panel === 'chronicle') {
-    panelFrame('仙途履历', '岁月留痕 · 此世道果', chronicleContent(save), true);
+    panelFrame(
+      '仙途履历',
+      '岁月留痕 · 此世道果',
+      chronicleContent(save) +
+        '<button class="secondary-button journey-card-entry" data-action="journey-card">留存此世</button>',
+      true,
+    );
   } else if (panel === 'bestiary') {
     const behavior: Record<string, string> = {
       chase: '追击 · 保持距离',
@@ -1069,7 +1138,7 @@ function renderDeath() {
     return;
   }
   panel = 'death';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="重燃道心"><div class="eyebrow">仙途未尽</div><h2>重燃道心</h2><p>观看广告后原地满血复活，获得 3 秒护体。<br>每局最多复活 ${MAX_REVIVES} 次，法宝、等级和战绩全部保留。${game.tribulation ? '<br>放弃本次天劫将强制轮回，清空这一世进度。' : ''}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-ad">看广告复活 · 剩余 ${MAX_REVIVES - game.revivesUsed} 次</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 轮回' : '直接结算'}</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="重燃道心"><div class="eyebrow">仙途未尽</div><h2>重燃道心</h2><p>观看广告后原地满血复活，获得 3 秒护体。<br>每局最多复活 ${MAX_REVIVES} 次，法宝、等级和战绩全部保留。${game.tribulation ? '<br>放弃本次天劫后可先留存此世，再确认轮回。' : ''}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-ad">看广告复活 · 剩余 ${MAX_REVIVES - game.revivesUsed} 次</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '直接结算'}</button></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('button')?.focus();
 }
 function showReviveAd() {
@@ -1082,7 +1151,7 @@ function showReviveAd() {
   )
     return;
   panel = 'revive-ad';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div><div class="revive-ad">广告位招租</div><p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>5 秒后可复活</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 轮回' : '放弃复活并结算'}</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div><div class="revive-ad">广告位招租</div><p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>5 秒后可复活</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
   startAdCountdown('ad-revive', '满血复活');
 }
 function startAdCountdown(action: string, label: string) {
@@ -1196,7 +1265,7 @@ function ensureScene(stage: number, next: () => void, run?: Game | null, tribula
   loading.setAttribute('role', 'dialog');
   loading.setAttribute('aria-label', '场景资源加载');
   loading.setAttribute('aria-modal', 'true');
-  loading.innerHTML = `<section><div class="eyebrow">青岚仙途</div><h2>${isTribulation ? '天劫将至' : STAGES[stage].name}</h2><p>正在准备地图、人物与法宝</p><progress max="1" value="0" aria-label="素材加载进度"></progress><p class="load-progress" role="status">0%</p><button class="secondary-button" hidden>重新加载</button></section>`;
+  loading.innerHTML = `<section><div class="eyebrow">叩仙门：青岚纪</div><h2>${isTribulation ? '天劫将至' : STAGES[stage].name}</h2><p>正在准备地图、人物与法宝</p><progress max="1" value="0" aria-label="素材加载进度"></progress><p class="load-progress" role="status">0%</p><button class="secondary-button" hidden>重新加载</button></section>`;
   app.append(loading);
   let failed = false;
   renderer
@@ -1303,12 +1372,14 @@ function restoreRun() {
   persist();
 }
 function returnLobby() {
+  const years =
+    game && settled && save.runs === 1 && !game.tribulation ? game.elapsedYears : undefined;
   game = null;
   panel = '';
   modal.innerHTML = '';
   previousState = '';
   clearInput();
-  renderLobby();
+  renderLobby(years);
 }
 function renderRootReveal(previousLife = '前尘已散，新一世从十五岁启程。', firstLife = false) {
   const starter = treasure(save.starter);
@@ -1328,6 +1399,7 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   section.focus({ preventScroll: true });
 }
 function resetLifetime(previousLife?: string) {
+  shownHumanLetters.clear();
   const root = rollSpiritRoot();
   clearInterval(adTimer);
   window.clearTimeout(victoryTimer);
@@ -1362,7 +1434,7 @@ function renderTribulationPending() {
   panelFrame(
     '天劫将至',
     `第 ${save.tribulations + 1} 次天劫 · 两万年一劫`,
-    `<p class="pause-description">当前历练已保存。渡劫场只有一位「天劫」，看清预警、侧移避雷，在核心显露时反击。</p><p class="panel-note">携带当前搭配；无未完成历练时，本命在渡劫场临时觉醒。渡劫期间不计龄、不掉经验或回血宝物。战败可使用本次天劫的 ${MAX_REVIVES} 次广告复活；放弃则强制轮回，清空本世全部进度。</p><p class="boss-reward">渡劫成功：永久气血 +3% · 法宝伤害 +2%<small>劫印按次数累加，轮回清空；胜利后返回原历练。</small></p><div class="save-actions"><button class="primary-button" data-action="tribulation-start" ${assetsReady ? '' : 'disabled'}>${pendingRun?.tribulation ? '继续迎劫' : '迎战天劫'}</button><button class="secondary-button" data-action="tribulation-forfeit">放弃渡劫 · 轮回</button></div>`,
+    `<p class="pause-description">当前历练已保存。渡劫场只有一位「天劫」，看清预警、侧移避雷，在核心显露时反击。</p><p class="panel-note">携带当前搭配；无未完成历练时，本命在渡劫场临时觉醒。渡劫期间不计龄、不掉经验或回血宝物。战败可使用本次天劫的 ${MAX_REVIVES} 次广告复活；放弃后可先留存此世，再确认轮回。</p><p class="boss-reward">渡劫成功：永久气血 +3% · 法宝伤害 +2%<small>劫印按次数累加，轮回清空；胜利后返回原历练。</small></p><div class="save-actions"><button class="primary-button" data-action="tribulation-start" ${assetsReady ? '' : 'disabled'}>${pendingRun?.tribulation ? '继续迎劫' : '迎战天劫'}</button><button class="secondary-button" data-action="tribulation-forfeit">放弃渡劫 · 此世落幕</button></div>`,
   );
   modal.querySelector('[data-action="close"]')?.remove();
 }
@@ -1403,7 +1475,7 @@ function renderTribulationForfeit() {
   panelFrame(
     '弃劫即轮回',
     '确认放弃这一世修行',
-    `<p class="pause-description">放弃天劫后，境界、物资、法宝收藏、炼器、根基、劫印和已保存的原历练都会清空，重新随机灵根。</p><p class="panel-note">${game?.tribulation && game.revivesUsed >= MAX_REVIVES ? '本次天劫的广告复活次数已用尽。' : '可以继续迎劫；已阵亡时可看广告复活。'}确认后无法撤销。</p><div class="save-actions"><button class="secondary-button" data-action="cancel-forfeit">继续迎劫</button><button class="primary-button" data-action="confirm-forfeit">确认弃劫 · 轮回转世</button></div>`,
+    `<p class="pause-description">确认轮回后，境界、物资、法宝收藏、炼器、根基、劫印和已保存的原历练都会清空，并重新随机灵根。</p><p class="panel-note">${game?.tribulation && game.revivesUsed >= MAX_REVIVES ? '本次天劫的广告复活次数已用尽。' : '可以继续迎劫；已阵亡时可看广告复活。'}确认放弃后可先留存此世，再决定轮回。</p><div class="save-actions"><button class="secondary-button" data-action="cancel-forfeit">继续迎劫</button><button class="primary-button" data-action="confirm-forfeit">确认弃劫 · 此世落幕</button></div>`,
   );
   modal.querySelector('[data-action="close"]')?.remove();
 }
@@ -1434,6 +1506,36 @@ function endLifetime() {
     `前世止于${realm}，享年 ${life.age.toFixed(1)} 年。尘缘已了，今世从十五岁再启仙途。`,
   );
 }
+function renderJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation']>) {
+  clearInput();
+  const tribulation = reason === 'tribulation';
+  panel = tribulation ? 'tribulation-farewell' : 'lifespan-farewell';
+  const life = lifespanInfo(save);
+  const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name;
+  panelFrame(
+    tribulation ? '止于天劫' : '此世寿终',
+    tribulation ? '劫雷未息 · 一生落笔' : '寿数已尽 · 一生落笔',
+    `<div class="lifespan-story"><p>${tribulation ? '劫雷落尽，这一世的问道路止于仙关之前。' : '这一世已行至尽头。'}山河仍在，旧事、故人与求道路上的每一步，也都留在身后。</p><p>可将此世修行留作一幅纪念；无论是否留存，确认轮回后都将从十五岁重新启程。</p></div><p class="pause-description">此世止于${tribulation ? `第 ${save.tribulations + 1} 次天劫` : realm} · 享年 ${life.age.toFixed(1)} 年。</p><div class="save-actions"><button class="secondary-button" data-action="journey-card">留存此世</button><button class="primary-button" data-action="confirm-journey-reincarnate">轮回转世 ${smallIcon('arrow')}</button></div>`,
+  );
+  modal.querySelector('[data-action="close"]')?.remove();
+}
+function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation']>) {
+  const ended = structuredClone(save);
+  ended.pendingReincarnation = reason;
+  ended.autoplay = false;
+  ended.tribulationReturn = null;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...ended, activeRun: null }));
+  } catch {
+    toast('浏览器无法保存本世落幕，请释放存储空间后重试');
+    return;
+  }
+  Object.assign(save, ended);
+  game = pendingRun = null;
+  settled = false;
+  renderLobby();
+  renderJourneyFarewell(reason);
+}
 function renderLifespanEnd() {
   clearInput();
   panel = 'lifespan-ended';
@@ -1441,7 +1543,7 @@ function renderLifespanEnd() {
   panelFrame(
     '一生将尽，山河仍远',
     '寿元已尽 · 此世未了',
-    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。若心愿未了，便再向苍天借一程；若已倦了，来世的春风，也会吹过青岚。</p></div><p class="pause-description">此世行至${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 5 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。放弃续命将强制轮回，清空本世进度。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">放弃续命 · 轮回转世</button></div>`,
+    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。若心愿未了，便再向苍天借一程；若已倦了，来世的春风，也会吹过青岚。</p></div><p class="pause-description">此世行至${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 5 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
   );
   modal.querySelector('[data-action="close"]')?.remove();
 }
@@ -1461,7 +1563,11 @@ function clearInput() {
 }
 function handleAction(action: string, id?: string) {
   if (save.journeyEnded) {
-    if (action === 'epilogue-reincarnate' && panel === 'epilogue') {
+    if (action === 'journey-card' && (panel === 'epilogue' || panel === 'journey-card')) {
+      void renderJourneyCard();
+    } else if (action === 'close' && panel === 'journey-card') {
+      renderEpilogue();
+    } else if (action === 'epilogue-reincarnate' && panel === 'epilogue') {
       panel = 'epilogue-reincarnate';
       panelFrame(
         '再问长生',
@@ -1479,6 +1585,14 @@ function handleAction(action: string, id?: string) {
       updateStorySoundButton(
         modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
       );
+    }
+    return;
+  }
+  if (panel === 'lifespan-farewell' || panel === 'tribulation-farewell') {
+    if (action === 'journey-card') void renderJourneyCard();
+    else if (action === 'confirm-journey-reincarnate') {
+      if (panel === 'lifespan-farewell') endLifetime();
+      else resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
     }
     return;
   }
@@ -1564,7 +1678,7 @@ function handleAction(action: string, id?: string) {
   }
   if (panel === 'tribulation-forfeit') {
     if (action === 'confirm-forfeit') {
-      resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
+      beginJourneyFarewell('tribulation');
     } else if (action === 'cancel-forfeit' || action === 'close') {
       if (game?.tribulation) game.state === 'lost' ? renderDeath() : renderPause();
       else renderTribulationPending();
@@ -1590,7 +1704,7 @@ function handleAction(action: string, id?: string) {
     panel === 'lifespan-ended' &&
     lifespanInfo(save).remaining === 0
   ) {
-    endLifetime();
+    beginJourneyFarewell('lifespan');
     return;
   }
   if (action === 'watch-lifespan-ad') {
@@ -1660,7 +1774,7 @@ function handleAction(action: string, id?: string) {
     action === 'human-memory' &&
     inMortalWorld &&
     !game &&
-    !panel &&
+    (!panel || panel === 'human-journal') &&
     id &&
     isHumanStoryId(id) &&
     save.mortal.humanStories?.[id]
@@ -1689,12 +1803,10 @@ function handleAction(action: string, id?: string) {
   if (action.startsWith('town-') && inMortalWorld && !game && !panel) {
     if (action === 'town-enter' && mortalTab === 'town') {
       const previous = save.mortal.scenery;
+      save.mortal.population ??= freshTownPopulation(save.age);
       visitTownImmortal(save, previous?.lastVisitAge);
       const scenery = (save.mortal.scenery = townVisit(previous, save.age));
-      const changed = previous && scenery.revision !== previous.revision;
-      const memory = changed
-        ? `一别 ${Math.floor(save.age - previous.lastVisitAge)} 年，青岚旧铺迁址，故宅成庭。河水依旧，已是另一番人间。`
-        : '';
+      const memory = townReturnMemory(save.mortal.population.seed, previous, scenery);
       if (memory) {
         save.mortal.events.unshift(memory);
         save.mortal.events.splice(6);
@@ -1705,9 +1817,11 @@ function handleAction(action: string, id?: string) {
       lastMortalTick = performance.now();
       renderMortal();
       document.getElementById('town-view')?.focus({ preventScroll: true });
-      if (memory) toast(memory);
+      if (memory) townScene?.showArrival(memory);
     } else if (action === 'town-retry' && inTown) {
+      const memory = document.querySelector('.town-return-note')?.textContent;
       renderMortal();
+      if (memory) townScene?.showArrival(memory);
     } else if (action === 'town-exit') {
       leaveTown();
       persist();
@@ -1786,7 +1900,7 @@ function handleAction(action: string, id?: string) {
     );
     const link = document.createElement('a');
     link.href = url;
-    link.download = `青岚仙途存档-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    link.download = `叩仙门：青岚纪存档-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     document.body.append(link);
     link.click();
     link.remove();
@@ -1810,7 +1924,7 @@ function handleAction(action: string, id?: string) {
       return;
     }
     Object.assign(save, candidate.save, { sound: save.sound });
-    if (!save.journeyEnded) resolveActivity(save);
+    if (!save.journeyEnded && !save.pendingReincarnation) resolveActivity(save);
     pendingRun = candidate.run ? Game.restore(save, candidate.run.snapshot()) : null;
     storageAvailable = true;
     persist();
@@ -1824,6 +1938,10 @@ function handleAction(action: string, id?: string) {
     unlockAudio();
     returnLobby();
     if (save.journeyEnded) return;
+    if (save.pendingReincarnation) {
+      renderJourneyFarewell(save.pendingReincarnation);
+      return;
+    }
     if (lifespanInfo(save).remaining === 0) {
       renderLifespanEnd();
       return;
@@ -1981,6 +2099,12 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'close') {
+    if (panel === 'journey-card') {
+      if (journeyCardReturn === 'lifespan-farewell') renderJourneyFarewell('lifespan');
+      else if (journeyCardReturn === 'tribulation-farewell') renderJourneyFarewell('tribulation');
+      else showPanel('chronicle');
+      return;
+    }
     closeNpcChat();
     const wasHumanMemory = panel === 'human-memory';
     if (game?.state === 'lost' && !settled) return;
@@ -2097,6 +2221,10 @@ function handleAction(action: string, id?: string) {
     guideTab = id!;
     renderPanel();
     modal.querySelector('.panel')?.scrollTo(0, 0);
+    return;
+  }
+  if (action === 'journey-card' && (panel === 'chronicle' || panel === 'journey-card')) {
+    void renderJourneyCard();
     return;
   }
   if (
@@ -2569,7 +2697,8 @@ backgroundClock.onmessage = () => {
   }
 };
 renderLobby();
-if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
+if (save.pendingReincarnation) renderJourneyFarewell(save.pendingReincarnation);
+else if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
 else if (tribulationDue(save)) renderTribulationPending();
 persist();
 ensureScene(selectedStage, () => {

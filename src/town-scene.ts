@@ -11,7 +11,7 @@ import {
   type TownNpc,
 } from './town.ts';
 import { townResidents, type TownPopulation, type TownResident } from './town-population.ts';
-import { townLayout } from './town-history.ts';
+import { townSceneryLayout, type TownScenery } from './town-history.ts';
 import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts';
 
 const TOWN_IMAGES = [
@@ -41,7 +41,7 @@ export class TownScene {
   private walkingSeconds = 0;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   private villagers: Array<{ npc: TownNpc; element: HTMLElement }> = [];
-  private layout: ReturnType<typeof townLayout>;
+  private layout: ReturnType<typeof townSceneryLayout>;
   private lastTransform = '';
   private crowd: Array<{ npc: TownPasserby; element: HTMLElement; art: HTMLElement }> = [];
   private lastCrowdSeconds = -1;
@@ -52,13 +52,14 @@ export class TownScene {
     private population: TownPopulation,
     age: number,
     private interact: (npc: TownResident) => void,
-    revision = 0,
+    scenery?: TownScenery,
   ) {
-    this.layout = townLayout(population.seed, revision);
-    host.dataset.townRevision = String(revision);
+    this.layout = townSceneryLayout(population.seed, scenery);
+    host.dataset.townRevision = String(scenery?.revision ?? 0);
+    host.dataset.townEra = String(this.layout.era);
     this.residents = townResidents(population, age, this.layout.npcs);
     this.nextSuccession = Math.min(...this.residents.map((npc) => npc.leavesAt));
-    host.innerHTML = `<div class="town-map" aria-hidden="true" style="width:${TOWN_WIDTH}px;height:${TOWN_HEIGHT}px"><div class="town-water"></div>${TOWN_STREETS.map(([x, y, right, bottom]) => `<div class="town-street ${x >= 3150 ? 'town-dock' : ''}" style="left:${x}px;top:${y}px;width:${right - x}px;height:${bottom - y}px"></div>`).join('')}${this.layout.vacantLots.map((lot) => `<div class="town-vacant-lot" style="left:${lot.x}px;top:${lot.y}px"></div>`).join('')}${this.layout.buildings.map((b) => `<div class="town-building" style="${revision ? 'width:270px;height:270px;' : ''}left:${b.x}px;top:${b.y}px;z-index:${b.y - 20};background-position:${(b.art % 3) * 50}% ${Math.floor(b.art / 3) * 50}%;filter:hue-rotate(${b.tint}deg)">${b.art === 1 || b.art === 4 ? '<i class="town-smoke"></i>' : ''}</div>`).join('')}${this.layout.props
+    host.innerHTML = `<div class="town-map" aria-hidden="true" style="width:${TOWN_WIDTH}px;height:${TOWN_HEIGHT}px"><div class="town-water"></div>${TOWN_STREETS.map(([x, y, right, bottom]) => `<div class="town-street ${x >= 3150 ? 'town-dock' : ''}" style="left:${x}px;top:${y}px;width:${right - x}px;height:${bottom - y}px"></div>`).join('')}${this.layout.vacantLots.map((lot) => `<div class="town-vacant-lot" style="left:${lot.x}px;top:${lot.y}px"><span class="town-building-caption">旧址</span></div>`).join('')}${this.layout.buildings.map((b) => `<div class="town-building ${b.condition ? `town-${b.condition}` : ''}" style="${scenery?.revision ? 'width:270px;height:270px;' : ''}left:${b.x}px;top:${b.y}px;z-index:${b.y - 20};background-position:${(b.art % 3) * 50}% ${Math.floor(b.art / 3) * 50}%;filter:hue-rotate(${b.tint}deg) saturate(var(--town-saturation,1)) brightness(var(--town-brightness,1))">${b.art === 1 || b.art === 4 ? '<i class="town-smoke"></i>' : ''}${b.caption ? `<span class="town-building-caption">${b.caption}</span>` : ''}</div>`).join('')}${this.layout.props
       .map((p) => {
         // 渔船横向跨过规则格子边界，按实际取景避免栈桥串入船头碎片。
         const x = p.art === 4 ? 600 : (p.art % 3) * 512;
@@ -163,12 +164,22 @@ export class TownScene {
         if (this.events.signal.aborted) return;
         this.ready = true;
         host.querySelector('.town-loading')?.remove();
+        const arrival = host.querySelector<HTMLElement>('.town-return-note');
+        if (arrival) arrival.hidden = false;
       })
       .catch(() => {
         if (this.events.signal.aborted) return;
         host.querySelector('.town-loading')!.innerHTML =
           '<div>城镇素材加载失败，当前不计龄。<br><button class="secondary-button" data-action="town-retry">重新加载</button></div>';
       });
+  }
+  showArrival(text: string) {
+    const notice = document.createElement('p');
+    notice.className = 'town-return-note';
+    notice.setAttribute('role', 'status');
+    notice.textContent = text;
+    notice.hidden = !this.ready;
+    this.host.append(notice);
   }
   private clearInput() {
     this.keys.clear();

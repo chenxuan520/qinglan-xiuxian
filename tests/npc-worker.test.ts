@@ -199,6 +199,7 @@ test('角色提示使用当前镇民身份，下一任没有前任私人记忆�
   const first = townResidents(input.population, input.age).find((n) => n.id === 'smith')!;
   const second = townResidents(input.population, first.leavesAt).find((n) => n.id === 'smith')!;
   const prompt = dialogueMessages({ ...input, age: first.leavesAt })[0].content;
+  assert.ok(prompt.includes('《叩仙门：青岚纪》'));
   assert.ok(prompt.includes(second.name));
   assert.ok(!prompt.includes(first.name));
   assert.ok(prompt.includes('不继承前任的私人记忆'));
@@ -274,6 +275,7 @@ test('茶馆说书使用独立完整故事提示和输出预算，不把长篇�
     env(async (_model, options) => {
       assert.equal(options.max_tokens, TEA_STORY_SETTINGS.maxOutputTokens);
       const prompt = options.messages[0].content;
+      assert.ok(prompt.includes('《叩仙门：青岚纪》'));
       for (const word of ['听雨茶馆', '觅长生', '险恶', '艰难', '无情', '完整', '不改变游戏数值'])
         assert.ok(prompt.includes(word), word);
       assert.ok(!prompt.includes('每次一至三句'));

@@ -27,6 +27,7 @@ import {
 import { PASSIVES, SPIRIT_ROOTS, treasure, evolutionPassives } from '../src/data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { Game } from '../src/game.ts';
+import { MEDICINES } from '../src/medicine-data.ts';
 
 function wealthy(step = 0) {
   const s = freshSave();
@@ -205,6 +206,79 @@ test('低资质精研消耗更多年岁，立即完成且读档不重复扣除',
   near(s.age, 15 + years);
   assert.equal(s.mortal.activity, null);
   assert.deepEqual(parseSave(JSON.stringify(s)).mortal, s.mortal);
+});
+test('十六宗门精研五阶赠凡品、十阶赠灵品，其余阶数不赠药', () => {
+  for (const sect of SECTS)
+    for (const roll of [0, 0.999999]) {
+      const s = wealthy(24);
+      assert.equal(joinSect(s, sect.id), true);
+      for (let level = 1; level <= MAX_MASTERY; level++) {
+        assert.equal(
+          startActivity(s, 'study', () => roll),
+          true,
+        );
+        assert.equal(
+          Object.values(s.medicine.bag).reduce((sum, n) => sum + n, 0),
+          Math.floor(level / 5),
+        );
+        if (level === 5 || level === 10) {
+          const pool = MEDICINES.filter((m) => m.tier === (level === 5 ? '凡品' : '灵品'));
+          const reward = pool[Math.floor(roll * pool.length)];
+          assert.equal(s.medicine.bag[reward.id], 1);
+          assert.ok(s.mortal.events[0].includes(reward.name));
+        }
+      }
+      const bag = structuredClone(s.medicine.bag);
+      assert.equal(startActivity(s, 'study'), false);
+      leaveSect(s);
+      assert.equal(joinSect(s, sect.id), true);
+      assert.equal(resolveActivity(s), false);
+      assert.deepEqual(importSave(exportSave(s, null)).save.medicine.bag, bag);
+    }
+});
+test('精研赠药等待供奉处理后才发放，放弃研习不领药', () => {
+  for (const decline of [false, true]) {
+    const s = wealthy(12);
+    joinSect(s, 'power');
+    s.mortal.mastery.power = 4;
+    s.mortal.years = s.mortal.member!.dueAt - 0.5;
+    s.stones = studyPlan(s).stones;
+    assert.equal(
+      startActivity(s, 'study', () => 0),
+      true,
+    );
+    assert.equal(sectDuesPending(s), true);
+    assert.deepEqual(s.medicine.bag, {});
+    s.stones = s.mortal.member!.dues;
+    assert.equal(
+      settleSectDues(s, decline, () => 0),
+      true,
+    );
+    assert.deepEqual(s.medicine.bag, decline ? {} : { huanglong: 1 });
+    assert.equal(resolveActivity(s), false);
+  }
+});
+test('旧档不追补精研丹药，待完成研习只发一次且读档导入不重复', () => {
+  for (const level of [5, 10]) {
+    const s = wealthy(24);
+    joinSect(s, 'power');
+    s.mortal.mastery.power = level;
+    assert.deepEqual(importSave(exportSave(s, null)).save.medicine.bag, {});
+    assert.equal(resolveActivity(s), false);
+  }
+  const s = wealthy(24);
+  joinSect(s, 'power');
+  s.mortal.mastery.power = 9;
+  s.mortal.activity = { kind: 'study', sect: 'power', total: 1, remaining: 0.25 };
+  const restored = importSave(exportSave(s, null)).save;
+  assert.equal(
+    resolveActivity(restored, () => 0),
+    true,
+  );
+  assert.deepEqual(restored.medicine.bag, { heqi: 1 });
+  const again = parseSave(JSON.stringify(restored));
+  assert.equal(resolveActivity(again), false);
+  assert.deepEqual(importSave(exportSave(again, null)).save.medicine.bag, { heqi: 1 });
 });
 test('退宗保留精研，只有当前宗门加成；重新入宗恢复', () => {
   const s = wealthy(24);
@@ -466,6 +540,31 @@ test('借寿计入下一账期，大乘五千年，真仙即时免供奉且保�
   assert.equal(s.mortal.member?.id, 'power');
   near(masteryBonus(s, 'power'), 0.3);
   assert.deepEqual(importSave(exportSave(s, null)).save.mortal, s.mortal);
+});
+
+test('真仙免供奉迁移同步清除账期，反复读档和导入不丢人间进度', () => {
+  const s = wealthy(24);
+  s.completed = [];
+  assert.equal(joinSect(s, 'power'), true);
+  s.mortal.mastery.power = 9;
+  s.mortal.population = { seed: 12345, since: 15 };
+  s.mortal.scenery = { lastVisitAge: 15, revision: 2 };
+  s.mortal.years = 12;
+  s.age = 27;
+  s.completed = [6];
+  assert.deepEqual(s.mortal.member, { id: 'power', dueAt: 5000, dues: 500 });
+  const expected = structuredClone(s.mortal);
+  expected.member!.dues = 0;
+  expected.member!.dueAt = 0;
+  for (const restored of [parseSave(JSON.stringify(s)), importSave(exportSave(s, null)).save]) {
+    assert.deepEqual(restored.mortal, expected);
+    assert.equal(restored.age, s.age);
+    assert.equal(restored.stones, s.stones);
+    assert.equal(restored.cultivation, s.cultivation);
+    assert.equal(sectDuesPending(restored), false);
+    assert.deepEqual(parseSave(JSON.stringify(restored)).mortal, expected);
+    assert.deepEqual(importSave(exportSave(restored, null)).save.mortal, expected);
+  }
 });
 
 test('十六宗门开局各送对应一重，占原有功法槽，旧续局不补送', () => {

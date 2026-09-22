@@ -22,7 +22,7 @@ const art = (m: Medicine) => {
   return `<span class="medicine-art" aria-hidden="true" style="background-image:url('${assetUrl('/assets/medicines.webp')}');background-position:${((i % 8) / 7) * 100}% ${(Math.floor(i / 8) / 3) * 100}%"></span>`;
 };
 export function medicineTime(years: number, stage: number) {
-  return `${years.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 年 · 本关约 ${formatTime((years / STAGE_YEARS_PER_MINUTE[stage]) * 60)}`;
+  return `${years.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 年 · 按所选秘境流速，药效约可持续 ${formatTime((years / STAGE_YEARS_PER_MINUTE[stage]) * 60).replace(':', '分')}秒`;
 }
 export function medicineEntrance(save: SaveData, stage: number) {
   const active = activeMedicines(save.medicine, save.age);

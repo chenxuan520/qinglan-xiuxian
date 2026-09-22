@@ -16,7 +16,7 @@ export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 
 // 本机读档与文件导入共用迁移：通关后解除旧天劫，恢复被其暂停的原历练。
 export function restoreSavedRun(save: SaveData, snapshot: unknown) {
-  if (save.journeyEnded) {
+  if (save.journeyEnded || save.pendingReincarnation) {
     save.tribulationReturn = null;
     return null;
   }
@@ -46,7 +46,11 @@ export function exportSave(save: SaveData, run: Game | null) {
       format: 'qinglan-save',
       version: 1,
       exportedAt: new Date().toISOString(),
-      save: { ...save, activeRun: save.journeyEnded ? null : (run?.snapshot() ?? null) },
+      save: {
+        ...save,
+        activeRun:
+          save.journeyEnded || save.pendingReincarnation ? null : (run?.snapshot() ?? null),
+      },
     },
     null,
     2,
@@ -111,6 +115,10 @@ export function importSave(text: string) {
     ['sound', 'autoplay', 'prologueSeen', 'journeyEnded'].some(
       (key) => data[key] !== undefined && typeof data[key] !== 'boolean',
     ) ||
+    (data.pendingReincarnation !== undefined &&
+      data.pendingReincarnation !== null &&
+      data.pendingReincarnation !== 'lifespan' &&
+      data.pendingReincarnation !== 'tribulation') ||
     (data.volume !== undefined &&
       (typeof data.volume !== 'number' || !Number.isFinite(data.volume)))
   )
@@ -126,6 +134,11 @@ export function importSave(text: string) {
     throw new Error('存档中的灵根属性无效，当前进度未更改');
   // 使用独立对象校验和迁移，确认覆盖之前不修改当前进度。
   const save = parseSave(JSON.stringify(data));
+  if (
+    data.pendingReincarnation !== undefined &&
+    data.pendingReincarnation !== save.pendingReincarnation
+  )
+    throw new Error('存档中的本世落幕状态无效，当前进度未更改');
   const run = restoreSavedRun(save, data.activeRun);
   return { save, run };
 }
