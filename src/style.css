@@ -2771,6 +2771,13 @@ kbd {
   font-size: 12px;
   color: #b3c5a8;
 }
+.result-years {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-align: center;
+}
 .reward-row > span {
   display: flex;
   align-items: center;

@@ -22,7 +22,7 @@ test('纪念卡只写当前资质与真实成果，不把年岁写成寿终或�
   assert.equal(card.root.elements.filter((element) => element.active).length, 0);
   assert.equal(card.weapon.name, '青霄剑');
   assert.equal(card.weapon.forge, 0);
-  assert.ok(card.memories.length >= 1 && card.memories.length <= 3);
+  assert.ok(card.memories.length >= 1 && card.memories.length <= 4);
   assert.ok(!JSON.stringify(card).includes('道侣'));
   assert.ok(!JSON.stringify(card).includes('六仙同御'));
   assert.equal(JSON.stringify(save), before);
@@ -101,6 +101,21 @@ test('天劫殒命留影标记止于天劫，保留待轮回的本世数据', ()
   assert.equal(card.ending, 'tribulation');
   assert.equal(card.ended, false);
   assert.equal(JSON.stringify(save), before);
+});
+
+test('已达成成就优先于六仙同御和渡劫记录，留痕最多两行四条', () => {
+  const save = freshSave();
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  save.tribulations = 1;
+  save.chronicle.milestones.forge = 16;
+  save.chronicle.milestones.collection = 20;
+  save.chronicle.milestones['six-immortals'] = 30;
+  save.chronicle.milestones['three-paths'] = 40;
+  save.chronicle.milestones['hard-immortal'] = 50;
+  assert.deepEqual(
+    journeyCardData(save).memories.map((memory) => memory.title),
+    ['逆境问道', '三道皆证', '万宝归藏', '炉火纯青'],
+  );
 });
 
 test('纪念卡米金墨绿二维码保留浅色静区并能解码为官网，不携带玩家数据', () => {

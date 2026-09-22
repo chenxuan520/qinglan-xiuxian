@@ -43,6 +43,18 @@ const REALM_COLORS = [
   '#f6dd97',
   '#d9e8ff',
 ];
+const ACHIEVEMENT_PRIORITY = [
+  'hard-immortal',
+  'rootless-immortal',
+  'three-paths',
+  'training-master',
+  'mastery',
+  'collection',
+  'level-100',
+  'permanent-medicine',
+  'forge',
+  'story',
+];
 
 function loadImage(path: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -199,6 +211,11 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
   const root = spiritRootInfo(save.spiritRoot);
   const weapon = treasure(save.starter);
   const memories: Array<{ title: string; detail: string }> = [];
+  const home = save.mortal.hometown;
+  if (home?.letterRead)
+    memories.push({ title: '家书犹存', detail: '归乡展读家书，仍记门前的叮嘱' });
+  else if (home && Object.hasOwn(save.chronicle.milestones, 'home-reunion'))
+    memories.push({ title: '曾归故里', detail: '修行途中，曾回青岚与亲人相见' });
   const companion = save.mortal.humanStories?.companion;
   if (companion?.choice === 'bond') {
     const view = humanStoryView(save, 'companion')!;
@@ -216,6 +233,11 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
       });
     }
   }
+  for (const feat of chronicleAchievements(save).sort(
+    (a, b) => ACHIEVEMENT_PRIORITY.indexOf(a.id) - ACHIEVEMENT_PRIORITY.indexOf(b.id),
+  ))
+    if (feat.achieved && feat.id !== 'six-immortals' && feat.id !== 'five-tribulations')
+      memories.push({ title: feat.title, detail: feat.detail });
   if (Object.hasOwn(save.chronicle.milestones, 'six-immortals'))
     memories.push({ title: '六仙同御', detail: '曾在一场历练中同时觉醒六件仙器' });
   if (save.tribulations > 0)
@@ -223,9 +245,6 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
       title: `历劫 ${save.tribulations.toLocaleString('zh-CN')} 次`,
       detail: '渡过的天劫，已化作此世劫印',
     });
-  for (const feat of chronicleAchievements(save))
-    if (feat.achieved && feat.id !== 'six-immortals' && feat.id !== 'five-tribulations')
-      memories.push({ title: feat.title, detail: feat.detail });
   if (save.completed.length)
     memories.push({ title: `踏破 ${save.completed.length} 境`, detail: '山河走过，皆为此世来路' });
   memories.push({
@@ -267,7 +286,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
           ? ('lifespan' as const)
           : ('ongoing' as const)),
     ended: save.journeyEnded && realm.max,
-    memories: memories.slice(0, 3),
+    memories: memories.slice(0, 4),
   };
 }
 
@@ -290,7 +309,18 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   const c = canvas.getContext('2d')!;
   c.fillStyle = '#102b28';
   c.fillRect(0, 0, canvas.width, canvas.height);
-  c.drawImage(image, 48, 48, 984, 554);
+  const imageHeight = 500;
+  c.drawImage(
+    image,
+    0,
+    0,
+    image.naturalWidth,
+    (image.naturalWidth * imageHeight) / 984,
+    48,
+    48,
+    984,
+    imageHeight,
+  );
   const shade = c.createLinearGradient(0, 48, 0, 700);
   shade.addColorStop(0, '#102b2820');
   shade.addColorStop(0.3, '#102b2870');
@@ -375,15 +405,19 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   c.strokeRect(616, 602, weaponSize + 8, weaponSize + 8);
   text(card.weapon.name, 814, 657, 32, '#ece7d1', 184);
   text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 814, 700, 20, '#bcc7af', 184);
-  text(card.identity, 80, 814, 26, '#ece7d1', 900);
+  c.save();
+  c.textAlign = 'center';
+  text(card.identity, 286, 814, 26, '#ece7d1', 430);
+  c.restore();
   line(840);
   text('此 世 留 痕', 80, 868, 25, '#d8c998');
   for (const [i, memory] of card.memories.entries()) {
-    const y = 914 + i * 58;
+    const x = 84 + (i % 2) * 450;
+    const y = 920 + Math.floor(i / 2) * 82;
     c.fillStyle = '#cfbc87';
-    c.fillRect(84, y - 17, 5, 32);
-    text(memory.title, 114, y, 25, '#e5d7ad', 560);
-    text(memory.detail, 114, y + 27, 18, '#b9c7b1', 560);
+    c.fillRect(x, y - 18, 5, 48);
+    text(memory.title, x + 30, y, 25, '#e5d7ad', 380);
+    text(memory.detail, x + 30, y + 28, 18, '#b9c7b1', 380);
   }
   const moduleSize = 8;
   const qrSize = JOURNEY_CARD_QR.size * moduleSize;
@@ -407,7 +441,7 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   text('山河未老，故人先秋。', 82, 1224, 25, '#c1cbb6', 620);
   c.save();
   c.textAlign = 'center';
-  text(new URL(GAME_SITE_URL).host, 365, 1368, 18, '#aabda8', 520);
+  text(new URL(GAME_SITE_URL).host, 540, 1368, 18, '#aabda8', 520);
   c.restore();
 
   // 整数像素绘制并保留四格浅色静区，二维码只编码官网，不携带存档。

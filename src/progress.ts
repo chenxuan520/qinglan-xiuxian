@@ -1,4 +1,5 @@
 import { syncHumanStories } from './human-stories.ts';
+import { freshHometown, validHometown } from './hometown.ts';
 import { freshMedicine, validMedicine, type MedicineState } from './medicine-data.ts';
 import {
   REALMS,
@@ -50,6 +51,7 @@ export interface SaveData {
   volume: number;
   autoplay: boolean;
   prologueSeen: boolean;
+  hometownSeen: boolean;
   journeyEnded: boolean;
   pendingReincarnation: 'lifespan' | 'tribulation' | null;
   path: CultivationPath;
@@ -105,7 +107,7 @@ export function freshSave(
   return {
     version: 1,
     medicine: freshMedicine(),
-    mortal: freshMortal(),
+    mortal: { ...freshMortal(), hometown: freshHometown(random) },
     chronicle: freshChronicle(),
     age: 15,
     lifespanBonus: 0,
@@ -129,6 +131,7 @@ export function freshSave(
     volume: 0.6,
     autoplay: false,
     prologueSeen: false,
+    hometownSeen: false,
     journeyEnded: false,
     pendingReincarnation: null,
     path,
@@ -149,7 +152,19 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     if (!s || s.version !== 1) return base;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
+    // 旧档本世不补父母；损坏的故乡字段不连带丢弃其余人间进度。
+    delete base.mortal.hometown;
+    if (
+      s.mortal &&
+      typeof s.mortal === 'object' &&
+      !Array.isArray(s.mortal) &&
+      s.mortal.hometown !== undefined &&
+      !validHometown(s.mortal.hometown, base.age)
+    )
+      delete s.mortal.hometown;
     if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
+    base.hometownSeen =
+      typeof s.hometownSeen === 'boolean' ? s.hometownSeen : !base.mortal.hometown;
     base.lifespanBonus = int(s.lifespanBonus);
     base.tribulations = int(s.tribulations);
     if (typeof s.nextTribulationAge === 'number' && Number.isFinite(s.nextTribulationAge))

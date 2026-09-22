@@ -308,14 +308,6 @@
 }
 .town-street {
   position: absolute;
-  background: url('/assets/town-ground.webp') repeat;
-  background-size: 600px;
-  border-radius: 18px;
-  box-shadow: 0 0 0 3px #b3aa8c88;
-}
-.town-street.town-dock {
-  background: none;
-  box-shadow: none;
 }
 .town-building {
   position: absolute;
@@ -441,6 +433,51 @@
 .town-npc.nearby .town-npc-name {
   border-color: #efdd9e;
   background: #385339;
+}
+.town-parent .town-npc-name {
+  top: -29px;
+}
+.hometown-departure .town-npc:not(.town-parent) .town-npc-name {
+  display: none;
+}
+.hometown-farewell {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(520px, calc(100% - 32px));
+  padding: 22px 26px;
+  border: 1px solid var(--border);
+  background: #102d27f5;
+  box-shadow: 0 12px 40px #0006;
+  animation: hometown-appear 0.25s ease-out;
+}
+.hometown-farewell p {
+  color: #e3dfc9;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.hometown-farewell small {
+  color: var(--muted);
+  margin-right: 12px;
+}
+.hometown-farewell button {
+  margin-top: 10px;
+  min-height: 44px;
+}
+@keyframes hometown-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hometown-farewell {
+    animation: none;
+  }
 }
 .npc-dialogue {
   margin: 20px 0 28px;

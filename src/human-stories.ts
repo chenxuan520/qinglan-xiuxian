@@ -68,12 +68,20 @@ export interface HumanStory {
 export type HumanStories = Partial<Record<HumanStoryId, HumanStory>>;
 export const HUMAN_STORY_IDS = Object.keys(HUMAN_STORIES) as HumanStoryId[];
 export function unreadHumanLetterKeys(save: SaveData) {
-  return HUMAN_STORY_IDS.flatMap((id) => {
-    const story = save.mortal.humanStories?.[id];
-    return story && !story.read && save.age >= story.endsAt
-      ? [`${save.mortal.population?.seed}:${id}:${story.metAt}:${story.endsAt}`]
-      : [];
-  });
+  const home = save.mortal.hometown;
+  return [
+    ...(home?.letterFoundAt != null && !home.letterRead
+      ? [
+          `${save.mortal.population?.seed}:home:${home.parents.father.diesAt}:${home.parents.mother.diesAt}:${home.letterFoundAt}`,
+        ]
+      : []),
+    ...HUMAN_STORY_IDS.flatMap((id) => {
+      const story = save.mortal.humanStories?.[id];
+      return story && !story.read && save.age >= story.endsAt
+        ? [`${save.mortal.population?.seed}:${id}:${story.metAt}:${story.endsAt}`]
+        : [];
+    }),
+  ];
 }
 export function isHumanStoryId(id: string): id is HumanStoryId {
   return Object.hasOwn(HUMAN_STORIES, id);

@@ -455,6 +455,7 @@ test('损坏和越界存档不会破坏游戏初始化', () => {
     const parsed = parseSave(raw),
       expected = freshSave();
     expected.medicine.recipeSeed = parsed.medicine.recipeSeed;
+    expected.mortal.hometown = parsed.mortal.hometown;
     assert.deepEqual(parsed, expected);
   }
   const s = parseSave(

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { townSceneryLayout } from '../src/town-history.ts';
 import {
   TOWN_START,
   TOWN_NPCS,
@@ -12,7 +13,101 @@ import {
   nearbyTownNpc,
   townClockRunning,
   townNpcPosition,
+  townDockPath,
+  HOMETOWN_START,
+  HOMETOWN_DOCK,
 } from '../src/town.ts';
+
+test('房前屋后与两侧空地可走，不再把整块宅地当作空气墙', () => {
+  for (const p of [
+    { x: 600, y: 470 },
+    { x: 770, y: 350 },
+    { x: 600, y: 125 },
+    { x: 600, y: 680 },
+  ])
+    assert.equal(townWalkable(p), true, `${p.x},${p.y} 是房屋外的空地`);
+  assert.equal(townWalkable({ x: 600, y: 400 }), false);
+  assert.equal(townWalkable({ x: 3300, y: 1000 }), false);
+});
+
+test('渡口自动寻路从故居、屋后、窄隙及其他栈桥绕开房屋和河面', () => {
+  for (const start of [
+    HOMETOWN_START,
+    { x: 600, y: 125 },
+    { x: 440, y: 350 },
+    { x: 440, y: 300 },
+    { x: 439, y: 324 },
+    { x: 445, y: 264 },
+    { x: 447.4, y: 264 },
+    { x: 770, y: 350 },
+    { x: 3300, y: 650 },
+    { x: 3500, y: 1850 },
+  ]) {
+    const original = { ...start };
+    const path = townDockPath(start);
+    assert.ok(path.length > 0, JSON.stringify(start));
+    assert.deepEqual(path.at(-1), HOMETOWN_DOCK);
+    assert.deepEqual(start, original);
+    for (const dt of [1 / 60, 0.05]) {
+      let p = { ...start };
+      let seconds = 0;
+      for (const target of path) {
+        for (
+          let step = 0;
+          step < 2000 && Math.hypot(target.x - p.x, target.y - p.y) > 0.01;
+          step++
+        ) {
+          const time = Math.min(dt, Math.hypot(target.x - p.x, target.y - p.y) / 180);
+          const remaining = Math.hypot(target.x - p.x, target.y - p.y);
+          p = moveInTown(
+            p,
+            { x: (target.x - p.x) / remaining, y: (target.y - p.y) / remaining },
+            time,
+          );
+          seconds += dt;
+          assert.ok(townWalkable(p), '自动走动不能穿过房屋或进入河面');
+        }
+        assert.ok(
+          Math.hypot(target.x - p.x, target.y - p.y) <= 0.01,
+          `不能卡住：${JSON.stringify(start)} -> ${JSON.stringify(target)}`,
+        );
+      }
+      assert.ok(seconds < 40);
+    }
+  }
+});
+
+test('自动走动在路点前保持正常速度，不在最后不足一像素处停顿', () => {
+  const start = { x: 600, y: 597 },
+    target = { x: 720, y: 720 };
+  const expected = Math.hypot(target.x - start.x, target.y - start.y) / 180;
+  for (const dt of [1 / 60, 0.05]) {
+    let p = { ...start },
+      frames = 0;
+    while (Math.hypot(target.x - p.x, target.y - p.y) > 0.01 && frames < 200) {
+      const distance = Math.hypot(target.x - p.x, target.y - p.y);
+      p = moveInTown(
+        p,
+        { x: (target.x - p.x) / distance, y: (target.y - p.y) / distance },
+        Math.min(dt, distance / 180),
+      );
+      frames++;
+    }
+    assert.ok(frames * dt <= expected + dt);
+    assert.ok(Math.hypot(target.x - p.x, target.y - p.y) <= 0.01);
+  }
+  for (const x of [432.6, 439, 440, 445, 447.4])
+    for (let y = 145; y <= 450; y += 13) assert.ok(townDockPath({ x, y }).length > 0);
+});
+
+test('渡口寻路遵循当前城景房屋，非法起点不生成路线', () => {
+  const layout = townSceneryLayout(12345, { revision: 2, since: 315, lastVisitAge: 415 });
+  const path = townDockPath(TOWN_START, layout.buildings, 270);
+  assert.ok(path.length > 0);
+  assert.ok(path.every((p) => townWalkable(p, layout.buildings, 270)));
+  assert.deepEqual(townDockPath({ x: 600, y: 400 }), []);
+  assert.deepEqual(townDockPath({ x: NaN, y: 400 }), []);
+});
 
 test('只有载入完成、前台有焦点的城镇场景且无弹窗才计时', () => {
   assert.equal(townClockRunning(true, true, true, true, ''), true);
@@ -33,7 +128,7 @@ test('城镇移动归一化且不穿墙，长帧不会跨过建筑', () => {
         (TOWN_START.y - straight.y),
     ) < 1e-8,
   );
-  assert.deepEqual(moveInTown({ x: 1670, y: 2200 }, { x: -1, y: 0 }, 100), { x: 1670, y: 2200 });
+  assert.deepEqual(moveInTown({ x: 600, y: 450 }, { x: 0, y: -1 }, 100), { x: 600, y: 450 });
   assert.deepEqual(moveInTown(TOWN_START, { x: 0, y: 0 }, 1), TOWN_START);
 });
 test('九位职业镇民与十二位村民均在可达街巷，走近可触发对应交谈', () => {
@@ -140,11 +235,45 @@ test('宅地错落排列、主街分段折转，街口宽窄不同且房屋不�
   assert.ok(widths.size >= 4);
   for (const y of [650, 1250, 1850])
     assert.ok(
-      Array.from({ length: 60 }, (_, i) => ({ x: 150 + i * 50, y })).some((p) => !townWalkable(p)),
+      Array.from({ length: 60 }, (_, i) => ({ x: 150 + i * 50, y })).some(
+        (p) => !TOWN_STREETS.some(([l, t, r, b]) => p.x >= l && p.x <= r && p.y >= t && p.y <= b),
+      ),
       '不能退回三条横贯全镇的整齐直街',
     );
   assert.equal(townWalkable({ x: 3300, y: 1000 }), false);
   for (const y of [650, 1250, 1850]) assert.ok(townWalkable({ x: 3500, y }));
+});
+
+test('空院不保留旧房空气墙，迁城碰撞跟随实际位置与缩小后的图框', () => {
+  assert.equal(townWalkable({ x: 600, y: 400 }, []), true);
+  const houses = [{ x: 1200, y: 900 }];
+  assert.equal(townWalkable({ x: 600, y: 400 }, houses, 270), true);
+  assert.equal(townWalkable({ x: 1200, y: 850 }, houses, 270), false);
+  assert.equal(townWalkable({ x: 1340, y: 850 }, houses, 270), true);
+  assert.deepEqual(moveInTown({ x: 1200, y: 900 }, { x: 0, y: -1 }, 0.05, houses, 270), {
+    x: 1200,
+    y: 900,
+  });
+  for (const p of [
+    { x: -1, y: 500 },
+    { x: 3601, y: 500 },
+    { x: 500, y: NaN },
+    { x: Infinity, y: 500 },
+  ])
+    assert.equal(townWalkable(p), false);
+});
+
+test('空院重建后旧停留点不可走，原街道起点仍可安全落脚并继续移动', () => {
+  const oldPosition = { x: 1467, y: 1111 };
+  const before = townSceneryLayout(12345, { revision: 2, since: 315, lastVisitAge: 315 });
+  const after = townSceneryLayout(12345, { revision: 2, since: 315, lastVisitAge: 415 });
+  assert.equal(townWalkable(oldPosition, before.buildings, 270), true);
+  assert.equal(townWalkable(oldPosition, after.buildings, 270), false);
+  assert.equal(townWalkable(TOWN_START, after.buildings, 270), true);
+  assert.notDeepEqual(
+    moveInTown(TOWN_START, { x: 0, y: 1 }, 0.05, after.buildings, 270),
+    TOWN_START,
+  );
 });
 
 test('旧迁城地块门口保留抖动余量，职业身份顺序及对应店铺不变', () => {

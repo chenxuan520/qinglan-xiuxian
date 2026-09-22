@@ -1,6 +1,13 @@
 import { assetUrl } from './asset-url.ts';
-import { passive, REALMS, spiritRootInfo, type CultivationPath } from './data.ts';
-import { lifespanInfo, type SaveData } from './progress.ts';
+import {
+  passive,
+  REALMS,
+  FINAL_TRIAL_STAGE,
+  spiritRootInfo,
+  type CultivationPath,
+} from './data.ts';
+import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
+import { hometownParents, hometownLetter, type ParentId } from './hometown.ts';
 import {
   SECTS,
   SECT_DUES,
@@ -71,6 +78,8 @@ export function townStatus(save: SaveData) {
   return `<strong>年岁 ${life.age.toFixed(2)} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong><span>灵石 ${save.stones.toLocaleString('zh-CN')} · 玄铁 ${save.iron}</span>${activity ? `<span>${activity.kind === 'study' ? (study!.eligible ? '功法研习' : `研习暂停 · 需${study!.requiredRealm}`) : TOWN_JOBS[activity.kind].name} · 尚需消耗 ${activity.remaining.toFixed(2)} 年</span>` : ''}`;
 }
 export function townPage(save: SaveData, fullscreenButton: string) {
+  if (save.mortal.hometown && save.mortal.hometown.stage !== 'departed')
+    return `<main class="town-scene hometown-departure" aria-label="十五岁离乡"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，方向键或触屏拖动移动，也可点击前往渡口自动走动"></div><header class="town-scene-heading"><div class="town-hud"><small>十五岁 · 青岚镇</small><h2>前往渡口</h2><small>沿街向东，循河到渡口</small></div><div class="town-scene-actions">${fullscreenButton}</div></header><footer class="town-scene-controls"><p>WASD / 方向键 · 触屏拖动<br>手动移动可接管自动前往</p><button class="primary-button" data-action="town-talk">前往渡口</button></footer></main>`;
   return `<main class="town-scene" aria-label="青岚镇游历"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，可用方向键移动，靠近镇民按 E 交谈"></div><header class="town-scene-heading"><div class="town-hud"><h2>青岚镇</h2>${save.mortal.scenery?.since !== undefined ? `<small>自记城景 · 已过 ${Math.floor(save.mortal.scenery.lastVisitAge - save.mortal.scenery.since)} 年</small>` : ''}<small>现实 1 分钟 = 1 年</small><div id="town-status">${townStatus(save)}</div></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="town-exit">离开城镇</button></div></header><footer class="town-scene-controls"><p>WASD / 方向键 · 触屏拖动<br>靠近镇民，按 E 或点击交谈</p><button class="primary-button" data-action="town-talk" disabled>走近镇民可交谈</button></footer></main>`;
 }
 export function mortalPage(
@@ -161,14 +170,52 @@ export function humanStoryContent(save: SaveData, id: HumanStoryId, atNpc = fals
 }
 export function humanStoryJournal(save: SaveData, heading = true) {
   const known = HUMAN_STORY_IDS.filter((id) => save.mortal.humanStories?.[id]);
-  if (!known.length) return '';
-  return `<section class="mortal-journal human-journal">${heading ? '<span class="eyebrow">相逢有时 · 岁月留书</span><h2>人间缘簿</h2>' : ''}<div class="human-memories">${known
+  const home = save.mortal.hometown;
+  const familyLetter = home?.letterFoundAt != null;
+  if (!known.length && !familyLetter) return '';
+  return `<section class="mortal-journal human-journal">${heading ? '<span class="eyebrow">相逢有时 · 岁月留书</span><h2>人间缘簿</h2>' : ''}<div class="human-memories">${familyLetter ? `<article><small>青岚故居${home.letterRead ? '' : ' · 有一封未读家书'}</small><h3>故居家书</h3><p>${home.letterFoundAt!.toFixed(1)} 岁归乡时寻得</p><p>${escape(hometownLetter(home).lines[0])}</p><button class="secondary-button" data-action="hometown-letter">展读家书 →</button></article>` : ''}${known
     .map((id) => {
       const story = save.mortal.humanStories![id]!;
       const view = humanStoryView(save, id)!;
       return `<article><small>${view.phase}${view.keepsake && !story.read ? ' · 有一封未读旧信' : ''}</small><h3>${escape(view.name)}</h3><p>${view.title} · ${story.metAt.toFixed(1)} 岁相识</p><p>${view.keepsake ? `留下「${view.keepsake}」` : story.choice === 'bond' ? '此世道侣 · 人间有一处归灯' : '故人尚在人间，别后亦可再访'}</p><button class="secondary-button" data-action="human-memory" data-id="${id}">${view.keepsake ? '展读旧信' : '重读相逢'} →</button></article>`;
     })
     .join('')}</div></section>`;
+}
+
+export function hometownContent(save: SaveData, parent?: ParentId) {
+  const home = save.mortal.hometown!;
+  const parents = hometownParents(home, save.age);
+  const alive = parents.filter((p) => p.alive);
+  if (parent) {
+    const person = alive.find((p) => p.id === parent);
+    if (!person) return '';
+    const years = Math.floor(save.age - (home.lastVisitAge ?? 15));
+    const other = parents.find((p) => p.id !== parent)!;
+    const quote = !other.alive
+      ? `${parent === 'mother' ? '他' : '她'}走得安稳，叫你不必挂念。山外路远，照顾好自己。`
+      : person.old && realmInfo(save.cultivation).index >= 3
+        ? '你倒还是走时的模样。'
+        : parent === 'mother'
+          ? '山里夜凉，记得添衣。'
+          : '山外怎么样？回来就好。';
+    return `<div class="town-story"><p>${person.old ? '鬓边已见白发，熟悉的声音却没有变。' : '门前仍是熟悉的身影。'}</p><blockquote><p>你回来了。</p>${years >= 1 ? `<p>一别 ${years} 年了。</p>` : ''}<p>${quote}</p></blockquote></div><button class="secondary-button" data-action="hometown-home">回到门前</button>`;
+  }
+  const longGone =
+    save.age >=
+    Math.max(...Object.values(home.parents).map((p) => 15 + p.diesAt - p.ageAtStart)) + 200;
+  const text = alive.length
+    ? '门前灯火如旧。你可以停下来，说几句家常。'
+    : realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max
+      ? '许多年前，你从这里出发。那年你十五岁。'
+      : longGone
+        ? '此处早已另住他人。屋瓦几经翻修，门前的路仍在原处。'
+        : '门扉紧闭，院中草木已深。你离乡时，母亲说“有空便回来”。';
+  return `<div class="town-story"><p>${text}</p>${!alive.length ? '<p>当年的叮嘱，留在一封家书里。</p>' : ''}</div><div class="save-actions">${alive.map((p) => `<button class="secondary-button" data-action="hometown-parent" data-id="${p.id}">与${p.name}交谈</button>`).join('')}${!alive.length ? '<button class="secondary-button" data-action="hometown-letter">展读家书</button>' : ''}<button class="primary-button" data-action="close">继续走走</button></div>`;
+}
+
+export function hometownLetterContent(save: SaveData) {
+  const letter = hometownLetter(save.mortal.hometown!);
+  return `<div class="town-story"><blockquote class="human-letter">${letter.lines.map((line) => `<p>${escape(line)}</p>`).join('')}<footer>${letter.name}</footer></blockquote><p class="panel-note">家书已珍藏于人间缘簿，此后仍可重读。</p></div>`;
 }
 
 function smithStoryContent(save: SaveData) {
