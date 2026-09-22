@@ -276,7 +276,11 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   const playerFrame = spriteFrame(0);
   const weaponArt = itemArt(card.weapon.id)!;
   const [image, playerImage, weaponImage] = await Promise.all([
-    loadImage('/assets/qinglan-prologue-dark.webp'),
+    loadImage(
+      card.ending === 'immortal'
+        ? '/assets/qinglan-prologue.webp'
+        : '/assets/qinglan-prologue-dark.webp',
+    ),
     loadImage(playerFrame.url),
     loadImage(weaponArt.src),
   ]);
@@ -374,13 +378,13 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   text('此刻身份', 80, 805, 20, '#b2c0a9');
   text(card.identity, 220, 807, 26, '#ece7d1', 760);
   line(836);
-  text('此 世 留 痕', 80, 880, 25, '#d8c998');
+  text('此 世 留 痕', 80, 868, 25, '#d8c998');
   for (const [i, memory] of card.memories.entries()) {
-    const y = 905 + i * 62;
+    const y = 914 + i * 58;
     c.fillStyle = '#cfbc87';
-    c.fillRect(84, y - 18, 5, 34);
-    text(memory.title, 114, y, 26, '#e5d7ad', 560);
-    text(memory.detail, 114, y + 28, 19, '#b9c7b1', 560);
+    c.fillRect(84, y - 17, 5, 32);
+    text(memory.title, 114, y, 25, '#e5d7ad', 560);
+    text(memory.detail, 114, y + 27, 18, '#b9c7b1', 560);
   }
   const moduleSize = 8;
   const qrSize = JOURNEY_CARD_QR.size * moduleSize;
@@ -402,9 +406,7 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
     620,
   );
   text('山河未老，故人先秋。', 82, 1224, 25, '#c1cbb6', 620);
-  text('一款修仙生存游戏', 82, 1280, 22, '#b2c0a9', 620);
-  text(new URL(GAME_SITE_URL).host, 82, 1322, 27, '#eee8cf', 620);
-  text('扫码即可进入官网，无需登录', 82, 1362, 19, '#aabda8', 620);
+  text(new URL(GAME_SITE_URL).host, 82, 1360, 18, '#aabda8', 520);
 
   // 整数像素绘制并保留四格浅色静区，二维码只编码官网，不携带存档。
   c.fillStyle = JOURNEY_CARD_QR_COLORS.light;
@@ -415,6 +417,5 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
       if (black) c.fillRect(qrX + x * moduleSize, qrY + y * moduleSize, moduleSize, moduleSize);
     });
   });
-  text('扫码入此山河', qrX + 25, 1390, 19, '#d8c998', qrSize - 40);
   return canvas.toDataURL('image/png');
 }
