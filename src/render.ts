@@ -400,11 +400,6 @@ export class Renderer {
           c.beginPath();
           c.arc(e.x, e.y, e.radius + 8, 0, TAU);
           c.stroke();
-          c.setLineDash([5, 6]);
-          c.beginPath();
-          c.moveTo(e.x, e.y);
-          c.lineTo(e.x + e.dx * 230, e.y + e.dy * 230);
-          c.stroke();
         }
         c.restore();
       }

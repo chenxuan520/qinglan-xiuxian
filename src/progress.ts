@@ -163,6 +163,7 @@ export function parseSave(raw: string | null, random: () => number = Math.random
     )
       delete s.mortal.hometown;
     if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
+    if (base.mortal.hometown?.stage === 'root') base.mortal.hometown.stage = 'farewell';
     base.hometownSeen =
       typeof s.hometownSeen === 'boolean' ? s.hometownSeen : !base.mortal.hometown;
     base.lifespanBonus = int(s.lifespanBonus);

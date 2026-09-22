@@ -416,7 +416,7 @@ export function medicineLoot(
   if (guarantee) s.firstClears.push(stage);
   const roll = random();
   const permanent =
-    stage === 4 || stage === 5 ? roll < 0.01 : stage === 6 && finalSovereign && roll < 0.03;
+    (stage === 6 && finalSovereign) || ((stage === 4 || stage === 5) && roll < 0.01);
   const give = (tier: Medicine['tier'], timed: boolean) => {
     const pool = MEDICINES.filter(
       (m) => m.stage <= Math.max(1, stage) && m.tier === tier && !!m.years === timed,

@@ -1468,6 +1468,13 @@ kbd {
   height: 48px;
   filter: drop-shadow(0 0 8px color-mix(in srgb, var(--item-color), transparent 80%));
 }
+.collection-card.is-unowned .icon {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.collection-card.is-unowned strong {
+  color: #a7b1aa;
+}
 .collection-card strong {
   display: block;
   font-size: 14px;
@@ -2777,6 +2784,57 @@ kbd {
   font-size: 12px;
   letter-spacing: 1px;
   text-align: center;
+}
+.result-loot {
+  margin: 20px 0;
+  text-align: left;
+}
+.result-loot h3 {
+  margin: 0 0 10px;
+  color: var(--gold);
+  font-size: 15px;
+}
+.result-loot-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.result-loot-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--border);
+}
+.result-loot-item .icon,
+.result-loot-item .medicine-art {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+}
+.result-loot-copy {
+  flex: 1;
+  min-width: 0;
+}
+.result-loot-copy strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.result-loot-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.result-loot-item b {
+  font-size: 13px;
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .result-loot-items {
+    grid-template-columns: 1fr;
+  }
 }
 .reward-row > span {
   display: flex;

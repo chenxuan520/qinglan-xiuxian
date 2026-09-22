@@ -22,6 +22,8 @@ test('丹药时长明确为按秘境流速折算的药效时间，不是关卡�
   assert.equal(medicineTime(100, 0), '100 年 · 按所选秘境流速，药效约可持续 10分00秒');
   assert.equal(medicineTime(100, 1), '100 年 · 按所选秘境流速，药效约可持续 04分00秒');
   assert.equal(medicineTime(100, 6), '100 年 · 按所选秘境流速，药效约可持续 00分06秒');
+  assert.equal(medicineTime(1234, 0), '1234 年 · 按所选秘境流速，药效约可持续 123分24秒');
+  assert.equal(medicineTime(1234.56, 0), '1234.6 年 · 按所选秘境流速，药效约可持续 123分27秒');
 });
 
 const rich = () => {
@@ -459,6 +461,25 @@ test('妖王灵品概率、限时首通保底与永久稀有池独立，终关�
   const none = freshMedicine(() => 0);
   medicineLoot(none, 4, false, false, () => 0.9);
   assert.deepEqual(none.bag, {});
+});
+test('最后仙尊每次击败必掉恰好一枚永久珍品，首通限时保底另算', () => {
+  for (const roll of [0, 0.029, 0.03, 0.5, 0.999999]) {
+    for (const first of [false, true]) {
+      const s = freshMedicine(() => 0);
+      medicineLoot(s, 6, first, true, () => roll);
+      const permanent = Object.entries(s.bag).filter(
+        ([id]) => !MEDICINES.find((m) => m.id === id)!.years,
+      );
+      assert.equal(permanent.length, 1);
+      assert.equal(permanent[0][1], 1);
+      assert.equal(
+        Object.values(s.bag).reduce((sum, n) => sum + n, 0),
+        first ? 2 : 1,
+      );
+      medicineLoot(s, 6, false, true, () => roll);
+      assert.equal(s.bag[permanent[0][0]], 2);
+    }
+  }
 });
 test('旧档补默认丹囊，异常导入拒绝而不吞进度，库存与药效完整往返', () => {
   const old = rich();

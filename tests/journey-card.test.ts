@@ -49,8 +49,21 @@ test('真仙与叩门状态分开，历史未知年岁不编造，六仙器只�
   assert.equal(card.ended, true);
   assert.equal(card.ending, 'immortal');
   assert.equal(card.lifespan, '寿元无尽');
-  assert.equal(card.age, '17,421');
+  assert.equal(card.age, '17421');
   assert.ok(!JSON.stringify(card).includes('大乘后期'));
+});
+
+test('留影年岁、寿限与历劫次数不加千分位，保留年岁小数精度', () => {
+  const save = freshSave();
+  save.age = 17421.26;
+  save.lifespanBonus = 20000;
+  save.tribulations = 1234;
+  const before = JSON.stringify(save);
+  const card = journeyCardData(save);
+  assert.equal(card.age, '17421.3');
+  assert.equal(card.lifespan, '寿限 20100 年');
+  assert.ok(card.memories.some((memory) => memory.title === '历劫 1234 次'));
+  assert.equal(JSON.stringify(save), before);
 });
 
 test('道侣与旧信来自真实缘簿，只写当前宗门，不猜测已经遗失的历史', () => {

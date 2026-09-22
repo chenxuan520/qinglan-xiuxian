@@ -6,6 +6,7 @@ import { FINAL_TRIAL_STAGE } from './data.ts';
 import { smithStoryLine } from './town-story.ts';
 import { humanStoryGreeting } from './human-stories.ts';
 import { StorySpeech } from './story-speech.ts';
+import { hometownParents } from './hometown.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
@@ -112,14 +113,33 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   });
   stop.addEventListener('click', () => reader.stop());
 }
-export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResident) {
+export function mountNpcChat(
+  host: HTMLElement,
+  save: SaveData,
+  npc: Pick<TownResident, 'name' | 'generation'> & { id: NpcDialogueRequest['npcId'] },
+) {
   closeNpcChat();
   const population = save.mortal.population!;
-  const memory = humanStoryGreeting(save, npc.id);
-  const identity = `${population.seed}:${population.since}:${npc.id}:${npc.generation}:${JSON.stringify(save.mortal.smithStory ?? null)}:${memory}`;
+  const townId = npc.id === 'father' || npc.id === 'mother' ? null : npc.id;
+  const home = save.mortal.hometown;
+  if (
+    !townId &&
+    (!home ||
+      home.stage !== 'departed' ||
+      !hometownParents(home, save.age).some((p) => p.id === npc.id && p.alive))
+  )
+    return;
+  const memory = townId ? humanStoryGreeting(save, townId) : '';
+  const identity = `${population.seed}:${population.since}:${npc.id}:${npc.generation}:${JSON.stringify(townId ? (save.mortal.smithStory ?? null) : null)}:${memory}${
+    !townId
+      ? `:${JSON.stringify(home!.parents)}:${hometownParents(home!, save.age)
+          .map((p) => p.alive)
+          .join(':')}`
+      : ''
+  }`;
   const fallback =
     memory ||
-    smithStoryLine(population, save.age, save.mortal.smithStory, npc.id) ||
+    (townId ? smithStoryLine(population, save.age, save.mortal.smithStory, townId) : '') ||
     npcDefaultLine(npc.id);
   let conversation = conversations.get(npc.id);
   if (conversation?.identity !== identity) {
@@ -163,7 +183,7 @@ export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResiden
         realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
         message,
         history,
-        smithStory: save.mortal.smithStory,
+        ...(townId ? { smithStory: save.mortal.smithStory } : { hometown: home }),
       },
       controller.signal,
     );
@@ -174,7 +194,13 @@ export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResiden
     render();
     button.disabled = input.disabled = false;
     log.setAttribute('aria-busy', 'false');
-    status.textContent = reply ? '街巷闲谈 · 随口聊聊' : '闲谈暂歇 · 仍可照常买卖、接取委托';
+    status.textContent = townId
+      ? reply
+        ? '街巷闲谈 · 随口聊聊'
+        : '闲谈暂歇 · 仍可照常买卖、接取委托'
+      : reply
+        ? '家中叙话 · 随口聊聊'
+        : '家常依旧 · 暂用本地对白';
     if (!greeting) input.focus({ preventScroll: true });
   };
   form.addEventListener('submit', (event) => {
@@ -185,5 +211,11 @@ export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResiden
     void send(message);
   });
   render();
-  if (!messages.length) void send('有位修士来到你跟前，请以自己的身份打个招呼。', true);
+  if (!messages.length)
+    void send(
+      townId
+        ? '有位修士来到你跟前，请以自己的身份打个招呼。'
+        : '你的孩子回到青岚故居，请以自己的身份和孩子打个招呼。',
+      true,
+    );
 }

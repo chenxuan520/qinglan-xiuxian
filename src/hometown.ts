@@ -3,7 +3,7 @@ import type { SaveData } from './progress.ts';
 
 export type ParentId = 'father' | 'mother';
 export interface HometownState {
-  stage: 'root' | 'farewell' | 'walk' | 'departed';
+  stage: 'root' | 'farewell' | 'walk' | 'reveal' | 'departed';
   parents: Record<ParentId, { ageAtStart: number; diesAt: number }>;
   lastVisitAge: number | null;
   letterFoundAt: number | null;
@@ -12,7 +12,7 @@ export interface HometownState {
 
 export function freshHometown(random = Math.random): HometownState {
   return {
-    stage: 'root',
+    stage: 'farewell',
     parents: {
       mother: { ageAtStart: 34 + Math.floor(random() * 6), diesAt: 75 + Math.floor(random() * 16) },
       father: { ageAtStart: 37 + Math.floor(random() * 7), diesAt: 75 + Math.floor(random() * 16) },
@@ -31,7 +31,7 @@ export function validHometown(value: unknown, age: number): value is HometownSta
   if (
     !Number.isFinite(age) ||
     age < 15 ||
-    !['root', 'farewell', 'walk', 'departed'].includes(home.stage) ||
+    !['root', 'farewell', 'walk', 'reveal', 'departed'].includes(home.stage) ||
     !home.parents ||
     typeof home.parents !== 'object' ||
     Array.isArray(home.parents) ||
@@ -87,7 +87,7 @@ export function hometownParents(home: HometownState, age: number) {
 export function departHometown(save: SaveData): boolean {
   const home = save.mortal.hometown;
   if (!home || (home.stage !== 'farewell' && home.stage !== 'walk')) return false;
-  home.stage = 'departed';
+  home.stage = 'reveal';
   save.hometownSeen = true;
   if (!Object.hasOwn(save.chronicle.milestones, 'home-departure')) {
     const detail = `你在${save.age.toFixed(1)}岁这年辞别父母，走出故乡，踏上觅长生、追寻大道的路。`;
@@ -98,6 +98,14 @@ export function departHometown(save: SaveData): boolean {
       save.chronicle.milestones['home-departure'] = save.age;
     } else recordChronicle(save, '青岚启程', detail, 'home-departure');
   }
+  return true;
+}
+
+export function acceptHometownRoot(save: SaveData): boolean {
+  const home = save.mortal.hometown;
+  if (!home || home.stage !== 'reveal') return false;
+  home.stage = 'departed';
+  save.hometownSeen = true;
   return true;
 }
 

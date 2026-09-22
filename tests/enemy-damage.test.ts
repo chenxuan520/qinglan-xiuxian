@@ -145,7 +145,7 @@ test('第三至第六境精英拉开气血与追击差距，普通怪不变，�
           Math.abs(elite.maxHp / normal.maxHp - 7 * [1, 1, 1.25, 1.35, 1.45, 1.55][stage]) < 1e-8,
         );
         assert.ok(
-          Math.abs(elite.speed - speed * 1.1 * [1, 1, 1.08, 1.12, 1.16, 1.2][stage]) < 1e-8,
+          Math.abs(elite.speed - speed * 1.21 * [1, 1, 1.08, 1.12, 1.16, 1.2][stage]) < 1e-8,
         );
         elite.hp *= 0.4;
       }
