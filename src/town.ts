@@ -2,6 +2,20 @@ export type TownPoint = { x: number; y: number };
 export const TOWN_WIDTH = 3600;
 export const TOWN_HEIGHT = 2500;
 export const TOWN_START = { x: 1740, y: 1250 };
+export const HOMETOWN_HOUSE = { x: 600, y: 450 };
+export const HOMETOWN_START = { x: 600, y: 600 };
+export const HOMETOWN_DOCK = { x: 3360, y: 1250 };
+export const HOMETOWN_ROUTE = [
+  HOMETOWN_START,
+  { x: 600, y: 560 },
+  { x: 885, y: 560 },
+  { x: 885, y: 750 },
+  { x: 1740, y: 750 },
+  { x: 1740, y: 1150 },
+  { x: 2580, y: 1150 },
+  { x: 2580, y: 1250 },
+  HOMETOWN_DOCK,
+];
 const STREET_ENDS = [870, 1740, 2580, 3150];
 const STREET_ROWS = [
   [560, 750, 590, 680],
@@ -101,20 +115,124 @@ export const TOWN_PROPS = [
   ...[1350, 2200, 2830].map((x) => ({ x, y: 1410, art: 1, size: 200, rotation: 0 })),
   ...[400, 1330, 2250].map((x) => ({ x, y: 2090, art: 5, size: 210, rotation: 0 })),
 ];
-export function townWalkable(p: TownPoint) {
-  return TOWN_STREETS.some(
-    ([left, top, right, bottom]) => p.x >= left && p.x <= right && p.y >= top && p.y <= bottom,
+export function townWalkable(
+  p: TownPoint,
+  buildings: readonly TownPoint[] = TOWN_BUILDINGS,
+  buildingSize = 305,
+) {
+  if (!(p.x >= 16 && p.x <= TOWN_WIDTH - 16 && p.y >= 16 && p.y <= TOWN_HEIGHT - 16)) return false;
+  if (
+    p.x >= 3180 &&
+    !TOWN_STREETS.some(
+      ([left, top, right, bottom]) =>
+        left >= 3150 && p.x >= left && p.x <= right && p.y >= top && p.y <= bottom,
+    )
+  )
+    return false;
+  // 按当前实际房屋图框挡住脚点，街道之外的空地不是障碍。
+  return !buildings.some(
+    (b) =>
+      p.x > b.x - buildingSize / 2 &&
+      p.x < b.x + buildingSize / 2 &&
+      p.y > b.y - buildingSize &&
+      p.y < b.y,
   );
 }
-export function moveInTown(position: TownPoint, input: TownPoint, seconds: number) {
+export function moveInTown(
+  position: TownPoint,
+  input: TownPoint,
+  seconds: number,
+  buildings: readonly TownPoint[] = TOWN_BUILDINGS,
+  buildingSize = 305,
+) {
   const length = Math.hypot(input.x, input.y);
   if (!length || !Number.isFinite(seconds) || seconds <= 0) return { ...position };
   const distance = (180 * Math.min(seconds, 0.05)) / Math.max(1, length);
   const next = { ...position };
-  if (townWalkable({ x: next.x + input.x * distance, y: next.y })) next.x += input.x * distance;
-  if (townWalkable({ x: next.x, y: next.y + input.y * distance })) next.y += input.y * distance;
+  if (townWalkable({ x: next.x + input.x * distance, y: next.y }, buildings, buildingSize))
+    next.x += input.x * distance;
+  if (townWalkable({ x: next.x, y: next.y + input.y * distance }, buildings, buildingSize))
+    next.y += input.y * distance;
   return next;
 }
+export function townDockPath(
+  position: TownPoint,
+  buildings: readonly TownPoint[] = TOWN_BUILDINGS,
+  buildingSize = 305,
+): TownPoint[] {
+  if (!townWalkable(position, buildings, buildingSize)) return [];
+  const spacing = 30;
+  const columns = Math.floor(TOWN_WIDTH / spacing) + 1;
+  const rows = Math.floor(TOWN_HEIGHT / spacing) + 1;
+  const point = (index: number) => ({
+    x: (index % columns) * spacing,
+    y: Math.floor(index / columns) * spacing,
+  });
+  const end =
+    Math.round(HOMETOWN_DOCK.y / spacing) * columns + Math.round(HOMETOWN_DOCK.x / spacing);
+  const previous = new Int32Array(columns * rows).fill(-2);
+  previous[end] = -1;
+  const queue = [end];
+  const clearLine = (from: TownPoint, to: TownPoint) => {
+    const steps = Math.max(1, Math.ceil(Math.hypot(to.x - from.x, to.y - from.y) / 2));
+    for (let step = 1; step <= steps; step++)
+      if (
+        !townWalkable(
+          {
+            x: from.x + ((to.x - from.x) * step) / steps,
+            y: from.y + ((to.y - from.y) * step) / steps,
+          },
+          buildings,
+          buildingSize,
+        )
+      )
+        return false;
+    return true;
+  };
+  // 只在点击时寻路；从渡口反向搜索，并让窄屋隙中的脚点接上可见路点。
+  for (const index of queue) {
+    const p = point(index);
+    const distance = Math.hypot(p.x - position.x, p.y - position.y);
+    if (distance <= buildingSize + spacing * 2) {
+      // 窄隙可能没有格点，先沿原横/纵坐标走出屋隙，再转入格网。
+      const bend = [position, { x: position.x, y: p.y }, { x: p.x, y: position.y }].find(
+        (bend) => clearLine(position, bend) && clearLine(bend, p),
+      );
+      if (bend) {
+        const path: TownPoint[] = bend === position ? [] : [bend];
+        for (let at = index; at !== -1; at = previous[at]) path.push(point(at));
+        return [
+          ...path.filter(
+            (p, i) =>
+              i === 0 ||
+              i === path.length - 1 ||
+              !(
+                (path[i - 1].x === p.x && path[i + 1].x === p.x) ||
+                (path[i - 1].y === p.y && path[i + 1].y === p.y)
+              ),
+          ),
+          { ...HOMETOWN_DOCK },
+        ];
+      }
+    }
+    for (const [dx, dy] of [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ]) {
+      const x = (index % columns) + dx,
+        y = Math.floor(index / columns) + dy;
+      if (x < 0 || x >= columns || y < 0 || y >= rows) continue;
+      const next = y * columns + x;
+      if (previous[next] !== -2 || !townWalkable(point(next), buildings, buildingSize)) continue;
+      previous[next] = index;
+      queue.push(next);
+    }
+  }
+  return [];
+}
+
 export function townNpcPosition(npc: TownNpc, seconds = 0): TownPoint {
   if (!npc.id.startsWith('villager-')) return { x: npc.x, y: npc.y };
   const index = Number(npc.id.slice('villager-'.length));

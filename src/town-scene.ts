@@ -3,8 +3,14 @@ import { spriteStyle } from './sprites.ts';
 import {
   TOWN_WIDTH,
   TOWN_HEIGHT,
+  TOWN_START,
   TOWN_STREETS,
+  HOMETOWN_START,
+  HOMETOWN_DOCK,
+  HOMETOWN_ROUTE,
   moveInTown,
+  townWalkable,
+  townDockPath,
   nearbyTownNpc,
   townNpcPosition,
   type TownPoint,
@@ -13,6 +19,7 @@ import {
 import { townResidents, type TownPopulation, type TownResident } from './town-population.ts';
 import { townSceneryLayout, type TownScenery } from './town-history.ts';
 import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts';
+import { hometownParents, type HometownState } from './hometown.ts';
 
 const TOWN_IMAGES = [
   'town-ground.webp',
@@ -45,6 +52,11 @@ export class TownScene {
   private lastTransform = '';
   private crowd: Array<{ npc: TownPasserby; element: HTMLElement; art: HTMLElement }> = [];
   private lastCrowdSeconds = -1;
+  private homeTarget: 'home' | 'dock' | null = null;
+  private homeAppearance = '';
+  private buildingSize = 305;
+  private route: TownPoint[] = [];
+  private routeShown = false;
 
   constructor(
     private host: HTMLElement,
@@ -53,8 +65,16 @@ export class TownScene {
     age: number,
     private interact: (npc: TownResident) => void,
     scenery?: TownScenery,
+    private hometown?: {
+      state: HometownState;
+      interact: (target: 'home' | 'dock') => void;
+      ready: () => void;
+    },
   ) {
-    this.layout = townSceneryLayout(population.seed, scenery);
+    this.layout = townSceneryLayout(population.seed, scenery, !!hometown);
+    this.buildingSize = scenery?.revision ? 270 : 305;
+    if (!townWalkable(this.position, this.layout.buildings, this.buildingSize))
+      this.position = { ...TOWN_START };
     host.dataset.townRevision = String(scenery?.revision ?? 0);
     host.dataset.townEra = String(this.layout.era);
     this.residents = townResidents(population, age, this.layout.npcs);
@@ -71,6 +91,28 @@ export class TownScene {
       )}<div class="town-player" style="${spriteStyle(0)}"><span>你</span></div>${this.residents.map((npc) => `<div class="town-npc ${npc.id.startsWith('villager-') ? 'town-villager' : ''}" data-npc="${npc.id}" data-resident="${npc.id}:${npc.generation}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="town-npc-art" style="background-position:${(npc.art % 3) * 50}% ${Math.floor(npc.art / 3) * 50}%;filter:hue-rotate(${npc.tint}deg)"></span><span class="town-npc-name">${npc.name}<small>${npc.place} · ${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${TOWN_WIDTH} ${TOWN_HEIGHT}" aria-label="青岚镇方位图"><rect width="3600" height="2500" fill="#253b2d"/><rect x="3180" width="420" height="2500" fill="#315658"/>${TOWN_STREETS.map(([x, y, r, b]) => `<rect x="${x}" y="${y}" width="${r - x}" height="${b - y}" fill="#8b8d72"/>`).join('')}${this.layout.npcs.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="37" fill="#dbc17a"/>`).join('')}<circle class="town-map-marker" r="45" fill="#fff" stroke="#315e41" stroke-width="16"/></svg><div class="town-loading" role="status"><div>青岚镇 · 街巷铺展中<progress max="${TOWN_IMAGES.length}" value="0" aria-label="城镇加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.town-map')!;
     this.player = host.querySelector('.town-player')!;
+    if (hometown) {
+      const group = document.createElement('div');
+      group.className = 'town-parents';
+      this.map.append(group);
+      const minimap = host.querySelector('.town-minimap')!;
+      if (hometown.state.stage !== 'departed') {
+        const route = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        route.setAttribute('points', HOMETOWN_ROUTE.map((p) => `${p.x},${p.y}`).join(' '));
+        route.setAttribute('fill', 'none');
+        route.setAttribute('stroke', '#fff1bd');
+        route.setAttribute('stroke-width', '35');
+        minimap.append(route);
+      }
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', String(HOMETOWN_START.x));
+      label.setAttribute('y', String(HOMETOWN_START.y - 100));
+      label.setAttribute('fill', '#fff1bd');
+      label.setAttribute('font-size', '240');
+      label.textContent = '故居';
+      minimap.append(label);
+      this.refreshParents(age);
+    }
     this.crowd = townCrowd(population.seed, this.layout.buildings).map((npc) => {
       const element = document.createElement('div');
       element.className = 'town-crowd';
@@ -100,11 +142,16 @@ export class TownScene {
         const key = e.key.toLowerCase();
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
           e.preventDefault();
+          this.route = [];
           this.keys.add(key);
         }
-        if (key === 'e' && !e.repeat && this.nearby) {
+        if (
+          key === 'e' &&
+          !e.repeat &&
+          (this.nearby || this.homeTarget || this.hometown?.state.stage === 'walk')
+        ) {
           e.preventDefault();
-          this.interact(this.nearby);
+          this.talk();
         }
       },
       options,
@@ -116,6 +163,7 @@ export class TownScene {
       (e) => {
         if (!this.enabled || this.pointer) return;
         e.preventDefault();
+        this.route = [];
         host.focus({ preventScroll: true });
         this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
         host.setPointerCapture(e.pointerId);
@@ -166,6 +214,7 @@ export class TownScene {
         host.querySelector('.town-loading')?.remove();
         const arrival = host.querySelector<HTMLElement>('.town-return-note');
         if (arrival) arrival.hidden = false;
+        this.hometown?.ready();
       })
       .catch(() => {
         if (this.events.signal.aborted) return;
@@ -187,6 +236,7 @@ export class TownScene {
     this.pointer = null;
   }
   refreshResidents(age: number) {
+    this.refreshParents(age);
     if (age < this.nextSuccession) return;
     const next = townResidents(this.population, age, this.layout.npcs);
     this.nextSuccession = Math.min(...next.map((npc) => npc.leavesAt));
@@ -210,40 +260,94 @@ export class TownScene {
     const id = nearbyTownNpc(this.position, this.walkingSeconds, this.layout.npcs)?.id;
     return this.residents.find((npc) => npc.id === id);
   }
+  private refreshParents(age: number) {
+    if (!this.hometown) return;
+    const parents = hometownParents(this.hometown.state, age).filter((p) => p.alive);
+    const appearance = parents.map((p) => p.name).join(':');
+    if (appearance === this.homeAppearance) return;
+    this.homeAppearance = appearance;
+    this.host.querySelector('.town-parents')!.innerHTML = parents
+      .map((p) => {
+        const art = p.id === 'father' ? 6 : 8;
+        const x = HOMETOWN_START.x + (p.id === 'father' ? -70 : 70);
+        const y = HOMETOWN_START.y - 55;
+        return `<div class="town-npc town-parent" data-parent="${p.id}" style="left:${x}px;top:${y}px;z-index:${y}"><span class="town-npc-art" style="background-position:${(art % 3) * 50}% ${Math.floor(art / 3) * 50}%;filter:saturate(${p.old ? 0.4 : 1})"></span><span class="town-npc-name">${p.name}</span></div>`;
+      })
+      .join('');
+  }
   update(now: number, enabled: boolean) {
     const dt = this.last ? (now - this.last) / 1000 : 0;
     this.last = now;
     this.enabled = enabled && this.ready;
     this.host.classList.toggle('town-paused', !this.enabled);
+    const target = this.route[0];
+    const remaining = target
+      ? Math.hypot(target.x - this.position.x, target.y - this.position.y)
+      : 0;
     if (!this.enabled) this.clearInput();
     else
       this.position = moveInTown(
         this.position,
-        {
-          x:
-            Number(this.keys.has('d') || this.keys.has('arrowright')) -
-            Number(this.keys.has('a') || this.keys.has('arrowleft')) +
-            this.touch.x,
-          y:
-            Number(this.keys.has('s') || this.keys.has('arrowdown')) -
-            Number(this.keys.has('w') || this.keys.has('arrowup')) +
-            this.touch.y,
-        },
-        dt,
+        target
+          ? {
+              x: (target.x - this.position.x) / (remaining || 1),
+              y: (target.y - this.position.y) / (remaining || 1),
+            }
+          : {
+              x:
+                Number(this.keys.has('d') || this.keys.has('arrowright')) -
+                Number(this.keys.has('a') || this.keys.has('arrowleft')) +
+                this.touch.x,
+              y:
+                Number(this.keys.has('s') || this.keys.has('arrowdown')) -
+                Number(this.keys.has('w') || this.keys.has('arrowup')) +
+                this.touch.y,
+            },
+        target ? Math.min(dt, remaining / 180) : dt,
+        this.layout.buildings,
+        this.buildingSize,
       );
+    if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
+      this.route.shift();
     if (this.enabled && !this.reducedMotion.matches) this.walkingSeconds += Math.min(dt, 0.05);
     for (const { npc, element } of this.villagers) {
       const point = townNpcPosition(npc, this.walkingSeconds);
       element.style.transform = `translate(calc(-50% + ${point.x - npc.x}px), -100%)`;
     }
     const nearId = nearbyTownNpc(this.position, this.walkingSeconds, this.layout.npcs)?.id;
-    const near = this.residents.find((npc) => npc.id === nearId);
-    if (this.nearby !== near) {
+    const departure = this.hometown && this.hometown.state.stage !== 'departed';
+    const homeTarget = this.hometown
+      ? departure
+        ? Math.hypot(this.position.x - HOMETOWN_DOCK.x, this.position.y - HOMETOWN_DOCK.y) <= 125
+          ? 'dock'
+          : null
+        : Math.hypot(this.position.x - HOMETOWN_START.x, this.position.y - HOMETOWN_START.y) <= 160
+          ? 'home'
+          : null
+      : null;
+    const near =
+      departure || homeTarget ? undefined : this.residents.find((npc) => npc.id === nearId);
+    if (homeTarget === 'dock') this.route = [];
+    const navigating = this.route.length > 0;
+    if (this.nearby !== near || this.homeTarget !== homeTarget || this.routeShown !== navigating) {
       this.nearby = near;
+      this.homeTarget = homeTarget;
+      this.routeShown = navigating;
       const button = document.querySelector<HTMLButtonElement>('[data-action="town-talk"]');
       if (button) {
-        button.disabled = !near;
-        button.textContent = near ? `与${near.name}交谈 · E` : '走近镇民可交谈';
+        button.disabled = !near && !homeTarget && !departure;
+        button.textContent =
+          homeTarget === 'dock'
+            ? '离开青岚 · E'
+            : homeTarget === 'home'
+              ? '故居 · E'
+              : near
+                ? `与${near.name}交谈 · E`
+                : departure
+                  ? navigating
+                    ? '自动前往 · 点击停下'
+                    : '前往渡口'
+                  : '走近镇民可交谈';
       }
       this.host
         .querySelectorAll<HTMLElement>('.town-npc')
@@ -291,7 +395,17 @@ export class TownScene {
     this.host.dataset.y = this.position.y.toFixed(1);
   }
   talk() {
-    if (this.enabled && this.nearby) this.interact(this.nearby);
+    if (!this.enabled) return;
+    if (this.homeTarget) this.hometown?.interact(this.homeTarget);
+    else if (this.hometown?.state.stage === 'walk') this.toggleDockNavigation();
+    else if (this.nearby) this.interact(this.nearby);
+  }
+  toggleDockNavigation() {
+    if (!this.ready || this.hometown?.state.stage !== 'walk') return;
+    this.clearInput();
+    this.route = this.route.length
+      ? []
+      : townDockPath(this.position, this.layout.buildings, this.buildingSize);
   }
   destroy() {
     this.events.abort();

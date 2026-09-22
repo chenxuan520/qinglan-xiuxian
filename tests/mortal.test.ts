@@ -8,7 +8,7 @@ import {
   extendLifespan,
   completeTribulation,
 } from '../src/progress.ts';
-import { SECTS, SECT_DUES, MAX_MASTERY } from '../src/mortal-data.ts';
+import { SECTS, SECT_DUES, MAX_MASTERY, freshMortal } from '../src/mortal-data.ts';
 import {
   advanceMortal,
   entryCost,
@@ -64,7 +64,7 @@ test('旧档补空人间数据，导出导入保留身份、账期、研习与�
   advanceMortal(s, 12);
   assert.deepEqual(importSave(exportSave(s, null)).save.mortal, s.mortal);
   const old = { ...s, mortal: undefined };
-  assert.deepEqual(parseSave(JSON.stringify(old)).mortal, freshSave().mortal);
+  assert.deepEqual(parseSave(JSON.stringify(old)).mortal, freshMortal());
   assert.throws(() => importSave(JSON.stringify({ ...s, mortal: { ...s.mortal, years: -1 } })));
 });
 test('入门费随资质变化，天灵根最低；只能加入一个宗门', () => {

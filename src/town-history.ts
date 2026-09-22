@@ -1,4 +1,11 @@
-import { TOWN_BUILDINGS, TOWN_NPCS, TOWN_PROPS, type TownNpc, type TownPoint } from './town.ts';
+import {
+  HOMETOWN_HOUSE,
+  TOWN_BUILDINGS,
+  TOWN_NPCS,
+  TOWN_PROPS,
+  type TownNpc,
+  type TownPoint,
+} from './town.ts';
 import { TOWN_SETTINGS } from './setting.ts';
 
 export interface TownScenery {
@@ -91,7 +98,7 @@ export function townLayout(seed: number, revision: number) {
 }
 
 // 旧版迁城布局作为固定基底保留；新岁月只改变原址房舍，不再搬动整条街。
-export function townSceneryLayout(seed: number, scenery?: TownScenery) {
+export function townSceneryLayout(seed: number, scenery?: TownScenery, hometown = false) {
   const base = townLayout(seed, scenery?.revision ?? 0);
   const era = Math.floor(
     (scenery && scenery.since !== undefined ? scenery.lastVisitAge - scenery.since : 0) /
@@ -99,12 +106,17 @@ export function townSceneryLayout(seed: number, scenery?: TownScenery) {
   );
   const buildings: Array<
     (typeof TOWN_BUILDINGS)[number] & { condition?: 'weathered' | 'renewed'; caption?: string }
-  > = [...base.buildings];
+  > = base.buildings.map((b) =>
+    hometown && b.x === HOMETOWN_HOUSE.x && b.y === HOMETOWN_HOUSE.y
+      ? { ...b, caption: '故居' }
+      : b,
+  );
   if (!era) return { ...base, buildings, era };
   const key = (p: TownPoint) => `${p.x},${p.y}`;
   const oldVacant = new Set(base.vacantLots.map(key));
   const plots = [...base.buildings, ...base.vacantLots.map((p) => ({ ...p, art: 3, tint: 0 }))];
   const shops = new Set(base.npcs.map((n) => `${n.x},${n.y - 110}`));
+  if (hometown) shops.add(key(HOMETOWN_HOUSE));
   const changingLots = new Set(
     (base.vacantLots.length
       ? base.vacantLots
@@ -117,11 +129,12 @@ export function townSceneryLayout(seed: number, scenery?: TownScenery) {
   const vacantLots: TownPoint[] = [];
   buildings.length = 0;
   for (const [index, plot] of plots.entries()) {
+    const home = hometown && key(plot) === key(HOMETOWN_HOUSE);
     const vacant = oldVacant.has(key(plot));
     const turns = Math.floor((era + (index % 4)) / 4);
     if (!turns) {
       if (vacant) vacantLots.push({ x: plot.x, y: plot.y });
-      else buildings.push(plot);
+      else buildings.push(home ? { ...plot, caption: '故居' } : plot);
       continue;
     }
     const phase = (turns + (vacant ? 2 : 0)) % 3;
@@ -139,6 +152,7 @@ export function townSceneryLayout(seed: number, scenery?: TownScenery) {
       tint: plot.tint + (paint ? [-32, 24, 48, -16][(seed + index + paint) % 4] : 0),
       condition: phase === 1 ? 'weathered' : 'renewed',
       ...(changing ? { caption: phase === 1 ? (art === 3 ? '旧居' : '旧铺') : '新铺' } : {}),
+      ...(home ? { caption: '故居' } : {}),
     });
   }
   // 旧空院中的点缀树随原址重建移除，其余老树、井台、渡口保持原位。
@@ -158,10 +172,11 @@ export function townReturnMemory(
   seed: number,
   previous: TownScenery | undefined,
   current: TownScenery,
+  hometown = false,
 ) {
   if (!previous) return '';
-  const before = townSceneryLayout(seed, previous);
-  const after = townSceneryLayout(seed, current);
+  const before = townSceneryLayout(seed, previous, hometown);
+  const after = townSceneryLayout(seed, current, hometown);
   if (before.era === after.era) return '';
   const same = (a: TownPoint, b: TownPoint) => a.x === b.x && a.y === b.y;
   const address = (p: TownPoint) =>

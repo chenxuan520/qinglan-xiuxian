@@ -86,8 +86,16 @@ import { GUIDE_TABS, guideContent } from './guide.ts';
 import { spriteStyle } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
+import { shareImage } from './image-share.ts';
 import { TownScene } from './town-scene.ts';
-import { TOWN_START, townClockRunning } from './town.ts';
+import { TOWN_START, HOMETOWN_START, townClockRunning } from './town.ts';
+import {
+  departHometown,
+  hometownParents,
+  visitHometown,
+  readHometownLetter,
+  type ParentId,
+} from './hometown.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
 import { closeNpcChat, mountNpcChat, mountTeaStory } from './npc-chat.ts';
 import { townVisit, townReturnMemory } from './town-history.ts';
@@ -121,6 +129,8 @@ import {
   townEventContent,
   humanStoryContent,
   humanStoryJournal,
+  hometownContent,
+  hometownLetterContent,
   masteryDescription,
 } from './mortal-ui.ts';
 
@@ -325,6 +335,7 @@ function renderLobby(returnYears?: number) {
     renderEpilogue();
     return;
   }
+  if (resumeHometown()) return;
   leaveTown();
   if (assetsReady && !renderer.hasScene(selectedStage)) {
     ensureScene(selectedStage, () => renderLobby(returnYears));
@@ -443,6 +454,108 @@ function mountTownScene() {
     save.age,
     showTownEvent,
     save.mortal.scenery,
+    save.mortal.hometown
+      ? {
+          state: save.mortal.hometown,
+          interact: (target) => (target === 'dock' ? finishDeparture() : showHometown()),
+          ready: () => {
+            if (panel !== 'hometown-loading') return;
+            if (save.mortal.hometown?.stage === 'farewell') {
+              panel = 'hometown-farewell';
+              ui.inert = true;
+              modal.innerHTML =
+                '<section class="hometown-farewell" role="dialog" aria-modal="true" aria-label="家门告别"><p><small>母亲</small>山里夜凉，记得添衣。</p><p><small>父亲</small>既选了这条路，便好好走。</p><p><small>母亲</small>有空便回来。</p><button class="primary-button" data-action="hometown-continue">记下叮嘱 · 前往渡口</button></section>';
+              modal.querySelector<HTMLButtonElement>('button')?.focus();
+            } else {
+              panel = '';
+              document.getElementById('town-view')?.focus({ preventScroll: true });
+            }
+          },
+        }
+      : undefined,
+  );
+}
+function resumeHometown() {
+  const home = save.mortal.hometown;
+  if (
+    !home ||
+    home.stage === 'departed' ||
+    (!save.prologueSeen && home.stage === 'root') ||
+    save.pendingReincarnation ||
+    game ||
+    pendingRun ||
+    lifespanInfo(save).remaining === 0 ||
+    tribulationDue(save)
+  )
+    return false;
+  if (home.stage === 'root')
+    renderRootReveal('此世从十五岁启程，青岚家门仍有归灯。', !save.hometownSeen);
+  else if (home.stage === 'farewell' && save.hometownSeen) {
+    panel = 'hometown-choice';
+    ui.inert = true;
+    panelFrame(
+      '再别青岚',
+      '新一世 · 十五岁',
+      '<p>故居门前，仍有这一世的亲人。你可以再走一程，也可以径直启程。</p><div class="save-actions"><button class="primary-button" data-action="hometown-skip">径直启程</button><button class="secondary-button" data-action="hometown-walk">走一程故乡</button></div>',
+    );
+    modal.querySelector('[data-action="close"]')?.remove();
+  } else renderDeparture();
+  return true;
+}
+function renderDeparture() {
+  leaveTown();
+  closeNpcChat();
+  inMortalWorld = inTown = true;
+  townPosition = { ...HOMETOWN_START };
+  save.mortal.population ??= freshTownPopulation(15);
+  save.mortal.scenery ??= townVisit(undefined, 15);
+  persist();
+  panel = 'hometown-loading';
+  modal.innerHTML = '';
+  ui.inert = false;
+  clearInput();
+  document.body.classList.remove('in-game', 'journey-complete', 'immortal-home');
+  document.body.classList.add('in-mortal', 'in-town');
+  ui.innerHTML = townPage(save, fullscreenButton());
+  mountTownScene();
+}
+function finishDeparture() {
+  const next = structuredClone(save);
+  if (!departHometown(next)) return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...next, activeRun: null }));
+  } catch {
+    toast('浏览器暂时无法保存离乡进度，请重试');
+    return;
+  }
+  Object.assign(save, next);
+  ui.inert = false;
+  panel = '';
+  modal.innerHTML = '';
+  renderLobby();
+  toast('十五岁，离乡问道。', 1800);
+}
+function showHometown(parent?: ParentId) {
+  const home = save.mortal.hometown;
+  if (
+    !home ||
+    home.stage !== 'departed' ||
+    !inTown ||
+    !townScene ||
+    Math.hypot(townScene.position.x - HOMETOWN_START.x, townScene.position.y - HOMETOWN_START.y) >
+      160
+  )
+    return;
+  const parents = hometownParents(home, save.age);
+  if (parent && !parents.some((p) => p.id === parent && p.alive)) return;
+  closeNpcChat();
+  const content = hometownContent(save, parent);
+  if ((parent || parents.every((p) => !p.alive)) && visitHometown(save, parent)) persist();
+  panel = 'hometown-home';
+  panelFrame(
+    parent ? parents.find((p) => p.id === parent)!.name : '故居',
+    '青岚镇 · 门前旧路',
+    content,
   );
 }
 function showTownEvent(npc: TownResident) {
@@ -534,6 +647,7 @@ function syncMortalChange() {
 function tickMortal(now: number) {
   if (
     !inMortalWorld ||
+    (save.mortal.hometown && save.mortal.hometown.stage !== 'departed') ||
     !townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel)
   ) {
     lastMortalTick = now;
@@ -686,9 +800,30 @@ async function renderJourneyCard() {
     );
     if (!host.isConnected) return;
     host.innerHTML =
-      '<img alt="此世留影纪念卡预览"><a class="primary-button" download="叩仙门：青岚纪-此世留影.png" tabindex="0">下载 PNG 图片</a><p class="panel-note">手机可长按图片保存。纪念图仅供留影，不能用于恢复存档；二维码直达官网，不携带存档数据。</p>';
+      '<img alt="此世留影纪念卡预览"><div class="save-actions"><button class="primary-button">分享此世</button><a class="secondary-button" download="叩仙门：青岚纪-此世留影.png" tabindex="0">保存图片</a></div><p class="panel-note" role="status">支持时打开系统分享面板，不支持时保存 PNG；手机也可长按图片。纪念图不能用于恢复存档，二维码不携带存档数据。</p>';
     host.querySelector('img')!.src = url;
-    host.querySelector('a')!.href = url;
+    const download = host.querySelector('a')!;
+    download.href = url;
+    const file = new File(
+      [Uint8Array.from(atob(url.split(',')[1]), (char) => char.charCodeAt(0))],
+      download.download,
+      { type: 'image/png' },
+    );
+    const button = host.querySelector('button')!;
+    button.onclick = async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      const result = await shareImage(file);
+      if (!host.isConnected) return;
+      button.disabled = false;
+      if (result === 'save') download.click();
+      host.querySelector('[role="status"]')!.textContent =
+        result === 'shared'
+          ? '已交给系统分享面板。'
+          : result === 'cancelled'
+            ? '已取消分享，图片仍在，可再次分享或保存。'
+            : '系统图片分享不可用，已尝试保存 PNG；也可点击保存图片或长按图片。';
+    };
   } catch {
     if (!host.isConnected) return;
     host.innerHTML =
@@ -858,7 +993,7 @@ function renderPanel() {
     panelFrame(
       '修行指南',
       '道法有迹 / THE CULTIVATOR’S HANDBOOK',
-      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">新一世确认命盘后，从故居告别，步行到渡口离乡；这段不计龄，刷新保留告别进度。此后入镇从故居门前开始，不强制交谈。父母随你的总年岁老去，故居原址保留，交谈不加好感或奖励。亲历的家事写入履历，发现的家书可在人间缘簿重读。轮回重新生成这一世的家庭，已走过离乡可径直启程。旧档本世保持原样，下次轮回接入。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
     );
   }
 }
@@ -1245,7 +1380,16 @@ function renderResult() {
   panel = '';
   const won = game.state === 'won',
     realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name;
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${won && game.isFinalTrial ? 'result-complete' : ''}" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? (game.isFinalTrial ? '圆满' : '破境') : '归来'}</div><div class="eyebrow">${game.encounterName} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? (game.isFinalTrial ? '仙途圆满，自在长生' : '一剑荡妖尘') : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七境已破，周期天劫就此止息。修为达标即可突破真仙，既有修行与劫印长存。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN')}<small>已计入本局总修为</small></p>` : ''}${damageReport()}<div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
+  const firstReturn = save.mortal.hometown && save.runs === 1 && !game.tribulation;
+  const journeyYears =
+    game.elapsedYears === undefined
+      ? '此行年岁未载'
+      : game.elapsedYears < 0.1
+        ? '此行不足 0.1 年'
+        : firstReturn
+          ? `此行 ${game.elapsedYears.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 年<br>离乡时十五，如今 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 岁。`
+          : `此行 ${game.elapsedYears.toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 年`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${won && game.isFinalTrial ? 'result-complete' : ''}" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? (game.isFinalTrial ? '圆满' : '破境') : '归来'}</div><div class="eyebrow">${game.encounterName} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? (game.isFinalTrial ? '仙途圆满，自在长生' : '一剑荡妖尘') : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七境已破，周期天劫就此止息。修为达标即可突破真仙，既有修行与劫印长存。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="result-years">${journeyYears}</p><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN')}<small>已计入本局总修为</small></p>` : ''}${damageReport()}<div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
 }
 function ensureScene(stage: number, next: () => void, run?: Game | null, tribulation = false) {
@@ -1410,11 +1554,12 @@ function resetLifetime(previousLife?: string) {
   game = null;
   pendingRun = null;
   rewards = null;
-  const { sound: soundEnabled, volume, prologueSeen } = save;
+  const { sound: soundEnabled, volume, prologueSeen, hometownSeen } = save;
   Object.assign(save, freshSave(root, rootElementsFor(root), 'orthodox'), {
     sound: soundEnabled,
     volume,
     prologueSeen,
+    hometownSeen,
   });
   unlockAudio();
   selectedStage = difficulty = treasurePage = 0;
@@ -1600,6 +1745,10 @@ function handleAction(action: string, id?: string) {
       ui.inert = false;
       panel = '';
       modal.innerHTML = '';
+      if (save.mortal.hometown?.stage === 'root') {
+        save.mortal.hometown.stage = 'farewell';
+        persist();
+      }
       renderLobby();
       ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
     }
@@ -1633,6 +1782,52 @@ function handleAction(action: string, id?: string) {
   }
   if (action === 'prologue-revisit') {
     renderPrologue(true);
+    return;
+  }
+  if (
+    save.mortal.hometown &&
+    ['farewell', 'walk'].includes(save.mortal.hometown.stage) &&
+    !save.pendingReincarnation &&
+    !game &&
+    !pendingRun &&
+    lifespanInfo(save).remaining > 0 &&
+    !tribulationDue(save)
+  ) {
+    if (action === 'hometown-walk' && panel === 'hometown-choice') renderDeparture();
+    else if (action === 'hometown-skip' && panel === 'hometown-choice') finishDeparture();
+    else if (action === 'hometown-continue' && panel === 'hometown-farewell') {
+      save.mortal.hometown.stage = 'walk';
+      persist();
+      ui.inert = false;
+      panel = '';
+      modal.innerHTML = '';
+      document.getElementById('town-view')?.focus({ preventScroll: true });
+      townScene?.toggleDockNavigation();
+    } else if (action === 'town-retry') renderDeparture();
+    else if (action === 'town-talk' && !panel) townScene?.talk();
+    if (action !== 'fullscreen') return;
+  }
+  if (action === 'hometown-home' && panel === 'hometown-home') {
+    showHometown();
+    return;
+  }
+  if (
+    action === 'hometown-parent' &&
+    panel === 'hometown-home' &&
+    (id === 'father' || id === 'mother')
+  ) {
+    showHometown(id);
+    return;
+  }
+  if (
+    action === 'hometown-letter' &&
+    inMortalWorld &&
+    save.mortal.hometown?.letterFoundAt != null &&
+    ['hometown-home', 'human-journal', 'human-memory', ''].includes(panel)
+  ) {
+    if (readHometownLetter(save)) persist();
+    panel = 'human-memory';
+    panelFrame('故居家书', '人间缘簿 · 家中旧字', hometownLetterContent(save));
     return;
   }
   if (
@@ -1804,7 +1999,12 @@ function handleAction(action: string, id?: string) {
       save.mortal.population ??= freshTownPopulation(save.age);
       visitTownImmortal(save, previous?.lastVisitAge);
       const scenery = (save.mortal.scenery = townVisit(previous, save.age));
-      const memory = townReturnMemory(save.mortal.population.seed, previous, scenery);
+      const memory = townReturnMemory(
+        save.mortal.population.seed,
+        previous,
+        scenery,
+        !!save.mortal.hometown,
+      );
       if (memory) {
         save.mortal.events.unshift(memory);
         save.mortal.events.splice(6);
@@ -1812,6 +2012,7 @@ function handleAction(action: string, id?: string) {
       persist();
       void mobileDisplay.enter();
       inTown = true;
+      if (save.mortal.hometown) townPosition = { ...HOMETOWN_START };
       lastMortalTick = performance.now();
       renderMortal();
       document.getElementById('town-view')?.focus({ preventScroll: true });
