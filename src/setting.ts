@@ -1,3 +1,5 @@
+export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
+
 // NPC 相关常量集中在这里；改动后重新构建前端，并部署 npc-ai Worker。
 export const NPC_SETTINGS = {
   lifespanMinYears: 50,

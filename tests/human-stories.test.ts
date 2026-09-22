@@ -9,7 +9,9 @@ import {
   humanStoryView,
   humanStoryGreeting,
   syncHumanStories,
+  unreadHumanLetterKeys,
 } from '../src/human-stories.ts';
+import { humanStoryJournal } from '../src/mortal-ui.ts';
 
 function resident(age = 20) {
   const save = freshSave();
@@ -17,6 +19,32 @@ function resident(age = 20) {
   save.mortal.population = { seed: 12345, since: 15 };
   return save;
 }
+
+test('未读旧信按真实人物标识，展示缘簿不标已读，新来信可独立提示', () => {
+  const save = resident();
+  assert.deepEqual(unreadHumanLetterKeys(save), []);
+  chooseHumanStory(save, 'friend', 'meet');
+  assert.deepEqual(unreadHumanLetterKeys(save), []);
+  save.age = save.mortal.humanStories!.friend!.endsAt;
+  const before = JSON.stringify(save);
+  const keys = unreadHumanLetterKeys(save);
+  assert.equal(keys.length, 1);
+  const shown = new Set(keys);
+  assert.equal(
+    unreadHumanLetterKeys(save).some((key) => !shown.has(key)),
+    false,
+  );
+  assert.ok(humanStoryJournal(save, false).includes('有一封未读旧信'));
+  assert.equal(JSON.stringify(save), before);
+  assert.deepEqual(unreadHumanLetterKeys(importSave(exportSave(save, null)).save), keys);
+  chooseHumanStory(save, 'student', 'meet');
+  save.age = save.mortal.humanStories!.student!.endsAt;
+  assert.equal(unreadHumanLetterKeys(save).length, 2);
+  assert.equal(unreadHumanLetterKeys(save).filter((key) => !shown.has(key)).length, 1);
+  assert.equal(chooseHumanStory(save, 'friend', 'read'), true);
+  assert.equal(unreadHumanLetterKeys(save).length, 1);
+  assert.equal(save.mortal.humanStories!.student!.read, false);
+});
 
 test('三段旧事只在对应人物处结识，不自动结缘；未成年不出现道侣故事', () => {
   const save = resident(15);

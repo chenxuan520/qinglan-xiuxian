@@ -163,7 +163,6 @@ export function mountNpcChat(host: HTMLElement, save: SaveData, npc: TownResiden
         realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
         message,
         history,
-        townRevision: save.mortal.scenery?.revision ?? 0,
         smithStory: save.mortal.smithStory,
       },
       controller.signal,

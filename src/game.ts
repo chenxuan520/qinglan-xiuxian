@@ -142,6 +142,7 @@ const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 export class Game {
   state: GameState = 'playing';
   time = 0;
+  elapsedYears: number | undefined = 0;
   level = 1;
   xp = 0;
   kills = 0;
@@ -437,6 +438,7 @@ export class Game {
       path: this.path,
       state: this.state,
       time: this.time,
+      elapsedYears: this.elapsedYears,
       level: this.level,
       xp: this.xp,
       kills: this.kills,
@@ -710,7 +712,10 @@ export class Game {
       )
         return null;
       if (s.startedImmortal !== undefined && typeof s.startedImmortal !== 'boolean') return null;
+      if (s.elapsedYears !== undefined && (!Number.isFinite(s.elapsedYears) || s.elapsedYears < 0))
+        return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.elapsedYears = s.elapsedYears;
       g.startedImmortal =
         s.startedImmortal ??
         realmInfo(
@@ -849,22 +854,29 @@ export class Game {
   update(dt: number) {
     if (this.state !== 'playing' || dt <= 0) return;
     dt = Math.min(dt, 0.05);
+    const ageBefore = this.save.age;
     this.time += dt;
     if (!this.tribulation) {
       this.save.age += (dt * STAGE_YEARS_PER_MINUTE[this.stage]) / 60;
       if (tribulationDue(this.save)) {
         this.save.age = this.save.nextTribulationAge;
+        if (this.elapsedYears !== undefined)
+          this.elapsedYears += Math.max(0, this.save.age - ageBefore);
         this.pause();
         return;
       }
     }
     if (this.save.age >= this.lifespan - 1e-9) {
       this.save.age = this.lifespan;
+      if (this.elapsedYears !== undefined)
+        this.elapsedYears += Math.max(0, this.save.age - ageBefore);
       this.player.hp = 0;
       this.state = 'lost';
       this.onEvent('lose');
       return;
     }
+    if (this.elapsedYears !== undefined)
+      this.elapsedYears += Math.max(0, this.save.age - ageBefore);
     if (this.save.age >= this.medicine.expiresAt) {
       this.medicine = medicineEffects(this.save.medicine, this.save.age);
       this.player.maxHp = this.maximumHealth;

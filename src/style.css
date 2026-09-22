@@ -510,6 +510,17 @@ button:not(:disabled):hover {
   background: #a5b7890c;
   color: var(--gold);
 }
+.brand-title {
+  display: grid;
+  gap: 4px;
+  line-height: 1.15;
+}
+.brand-title small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 4px;
+}
 .brand-emblem .icon {
   width: 36px;
   height: 42px;
@@ -5331,6 +5342,21 @@ body.journey-complete:not(.in-game) {
 .spirit-root-summary .root-age {
   margin-top: 10px;
   font-size: 12px;
+}
+.journey-card-entry {
+  margin-top: 18px;
+}
+.journey-card-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 16px;
+}
+.journey-card-preview img {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
 }
 .chronicle-power > strong {
   display: block;

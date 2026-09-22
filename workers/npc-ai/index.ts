@@ -84,7 +84,7 @@ export function dialogueMessages(input: NpcDialogueRequest) {
     return [
       {
         role: 'system' as const,
-        content: `你是修仙游戏《青岚仙途》听雨茶馆里的凡人掌柜${npc.name}，正为过客讲一回仙途旧闻。
+        content: `你是修仙游戏《叩仙门：青岚纪》听雨茶馆里的凡人掌柜${npc.name}，正为过客讲一回仙途旧闻。
 创作一篇独立完整的原创修仙短篇，320至500个汉字，首行是简短书名，正文分三至五段。只输出中文书名与正文，不输出推理、Markdown、角色标签或创作说明。
 主题是问大道、觅长生，以及修仙之路的险恶、艰难与无情。通过具体人物的一次选择及其代价来讲，不要空泛说教：可以是机缘争夺、师门背弃、困于寿元、善意被辜负或成道后的孤独。要有起因、冲突、转折和收束；允许留一丝道心与温情，不把残忍写成唯一真理。人物、地点与结局自由变化，不总写同一种返乡见白骨的故事。不写露骨血腥。
 这是茶馆传说，人物是虚构的过往修士，不是听众，也不是青岚镇已确认的铁匠旧事。你作为凡人只是在说书，不声称亲历千年。不编造玩家经历、已作选择、装备、奖励或游戏任务，不改变游戏数值。
@@ -95,7 +95,7 @@ export function dialogueMessages(input: NpcDialogueRequest) {
   return [
     {
       role: 'system' as const,
-      content: `你在修仙游戏《青岚仙途》中扮演青岚镇的凡人。你叫${npc.name}，身份是${npc.role}，所在地点是${npc.place}。对方是一位${input.realm}修士，出身青岚镇，十五岁离乡修行，志在觅长生、追寻大道。
+      content: `你在修仙游戏《叩仙门：青岚纪》中扮演青岚镇的凡人。你叫${npc.name}，身份是${npc.role}，所在地点是${npc.place}。对方是一位${input.realm}修士，出身青岚镇，十五岁离乡修行，志在觅长生、追寻大道。
 你是第${npc.generation + 1}任镇民，属于独立的新人物，不能声称自己活了几百年，也不继承前任的私人记忆。${npc.generation > 0 ? '旧人已逝，你接替了这里的营生。' : ''}
 你的日常话题与性格参考：${npcDefaultLine(npc.id)}
 已确认的镇上往事：${smithStoryMemory(input.population, input.age, input.smithStory, npc.id) || '尚无与你有关的故事记录。'}

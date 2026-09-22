@@ -1,4 +1,4 @@
-import { townMedicineReward } from './medicine-data.ts';
+import { grantMedicine, MEDICINES, townMedicineReward } from './medicine-data.ts';
 import { FINAL_TRIAL_STAGE, spiritRootInfo, passive, type CultivationPath } from './data.ts';
 import {
   alignStarterWithPath,
@@ -222,9 +222,16 @@ function completeActivity(save: SaveData, random: () => number) {
     if (activity.kind === 'study') {
       const id = activity.sect!;
       world.mastery[id] = Math.min(MAX_MASTERY, (world.mastery[id] || 0) + 1);
+      let reward = '';
+      if (world.mastery[id] === 5 || world.mastery[id] === 10) {
+        const tier = world.mastery[id] === 5 ? '凡品' : '灵品';
+        const pool = MEDICINES.filter((m) => m.tier === tier);
+        const name = grantMedicine(save.medicine, pool[Math.floor(random() * pool.length)].id);
+        reward = `宗门赐下${tier}「${name}」一颗，已收入丹囊。`;
+      }
       log(
         save,
-        `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。`,
+        `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。${reward}`,
       );
       if (world.mastery[id] === MAX_MASTERY)
         recordChronicle(save, '仙门有道', `${passive(id).name}已精研至十阶。`, 'mastery');

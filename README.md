@@ -1,6 +1,6 @@
-# 青岚仙途
+# 叩仙门：青岚纪
 
-![青岚仙途 · 晨光云海与烟火人间](public/assets/qinglan-prologue.webp)
+![叩仙门：青岚纪 · 晨光云海与烟火人间](public/assets/qinglan-prologue.webp)
 
 > 山河未老，故人先秋。此去青岚，愿你历尽千劫，仍记得为何出发。
 

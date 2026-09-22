@@ -47,4 +47,4 @@ jobs:
             "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip.sha256#SHA-256 checksum" \
             --verify-tag \
             --generate-notes \
-            --title "青岚仙途 ${{ github.ref_name }}"
+            --title "叩仙门：青岚纪 ${{ github.ref_name }}"

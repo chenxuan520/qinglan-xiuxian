@@ -46,7 +46,7 @@ function environment(t: test.TestContext, mobile = true) {
 }
 
 for (const direction of ['portrait-primary', 'landscape-primary']) {
-  test(`mobile entry requests fullscreen during the click and preserves ${direction}`, async (t) => {
+  test(`手机点击入场立即请求全屏，保持${direction === 'portrait-primary' ? '竖屏' : '横屏'}`, async (t) => {
     const { calls, orientation } = environment(t);
     Object.assign(orientation, { type: direction });
     const display = new MobileDisplay(() => {});
@@ -61,13 +61,13 @@ for (const direction of ['portrait-primary', 'landscape-primary']) {
   });
 }
 
-test('desktop entry does not change fullscreen or orientation', async (t) => {
+test('桌面端入场不改变全屏状态或屏幕方向', async (t) => {
   const { calls } = environment(t, false);
   await new MobileDisplay(() => {}).enter();
   assert.deepEqual(calls, []);
 });
 
-test('missing screen orientation API does not interrupt fullscreen entry', async (t) => {
+test('缺少屏幕方向接口不影响进入全屏', async (t) => {
   const { calls } = environment(t);
   Reflect.deleteProperty(screen, 'orientation');
   const display = new MobileDisplay(() => {});
@@ -77,7 +77,7 @@ test('missing screen orientation API does not interrupt fullscreen entry', async
   assert.deepEqual(calls, ['fullscreen', 'exit']);
 });
 
-test('missing APIs and rejected fullscreen are harmless', async (t) => {
+test('缺少全屏接口或全屏请求被拒绝时安全降级', async (t) => {
   const { calls, root } = environment(t);
   root.requestFullscreen = async () => {
     throw new Error('NotAllowedError');
@@ -91,7 +91,7 @@ test('missing APIs and rejected fullscreen are harmless', async (t) => {
   assert.deepEqual(calls, []);
 });
 
-test('returning home during fullscreen request releases it without locking the home screen', async (t) => {
+test('全屏请求期间返回首页会在请求完成后退出全屏，不锁定首页', async (t) => {
   const { calls, root, doc } = environment(t);
   let resolve!: () => void;
   root.requestFullscreen = () =>
@@ -110,7 +110,7 @@ test('returning home during fullscreen request releases it without locking the h
   assert.deepEqual(calls, ['exit']);
 });
 
-test('manual fullscreen exit preserves orientation and can be retried with a new click', async (t) => {
+test('手动退出全屏不改变屏幕方向，再次点击可重新进入', async (t) => {
   const { calls, doc } = environment(t);
   let updates = 0;
   const display = new MobileDisplay(() => {
@@ -125,7 +125,7 @@ test('manual fullscreen exit preserves orientation and can be retried with a new
   assert.equal(updates, 3);
 });
 
-test('leaving preserves fullscreen already owned by the user', async (t) => {
+test('离场时保留用户原有的全屏状态', async (t) => {
   const { doc, calls } = environment(t);
   doc.fullscreenElement = {};
   const display = new MobileDisplay(() => {});
@@ -135,14 +135,14 @@ test('leaving preserves fullscreen already owned by the user', async (t) => {
   assert.deepEqual(calls, []);
 });
 
-test('rapid repeated entry shares one fullscreen request', async (t) => {
+test('快速重复入场共用同一个全屏请求', async (t) => {
   const { calls } = environment(t);
   const display = new MobileDisplay(() => {});
   await Promise.all([display.enter(), display.enter()]);
   assert.deepEqual(calls, ['fullscreen']);
 });
 
-test('WebKit fullscreen works without a screen orientation lock API', async (t) => {
+test('缺少屏幕方向锁定接口时仍可使用 WebKit 全屏', async (t) => {
   const { doc, root, calls, orientation, events } = environment(t);
   const webkitDoc = Object.assign(doc, { webkitFullscreenElement: null as object | null });
   Object.assign(root, {
