@@ -290,14 +290,14 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   const c = canvas.getContext('2d')!;
   c.fillStyle = '#102b28';
   c.fillRect(0, 0, canvas.width, canvas.height);
-  c.drawImage(image, 0, 0, 1080, 608);
-  const shade = c.createLinearGradient(0, 0, 0, 700);
+  c.drawImage(image, 48, 48, 984, 554);
+  const shade = c.createLinearGradient(0, 48, 0, 700);
   shade.addColorStop(0, '#102b2820');
   shade.addColorStop(0.3, '#102b2870');
   shade.addColorStop(0.75, '#102b28e8');
   shade.addColorStop(1, '#102b28');
   c.fillStyle = shade;
-  c.fillRect(0, 0, 1080, 700);
+  c.fillRect(48, 48, 984, 652);
   c.strokeStyle = '#c2b78680';
   c.lineWidth = 2;
   c.strokeRect(38, 38, 1004, 1364);
@@ -375,8 +375,7 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   c.strokeRect(616, 602, weaponSize + 8, weaponSize + 8);
   text(card.weapon.name, 814, 657, 32, '#ece7d1', 184);
   text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 814, 700, 20, '#bcc7af', 184);
-  text('此刻身份', 80, 812, 20, '#b2c0a9');
-  text(card.identity, 220, 814, 26, '#ece7d1', 760);
+  text(card.identity, 80, 814, 26, '#ece7d1', 900);
   line(840);
   text('此 世 留 痕', 80, 868, 25, '#d8c998');
   for (const [i, memory] of card.memories.entries()) {
@@ -389,7 +388,7 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   const moduleSize = 8;
   const qrSize = JOURNEY_CARD_QR.size * moduleSize;
   const qrX = 1000 - qrSize;
-  const qrY = 1368 - qrSize;
+  const qrY = 1392 - qrSize;
   line(qrY);
   text(
     card.ending === 'immortal'
@@ -406,7 +405,10 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
     620,
   );
   text('山河未老，故人先秋。', 82, 1224, 25, '#c1cbb6', 620);
-  text(new URL(GAME_SITE_URL).host, 82, 1360, 18, '#aabda8', 520);
+  c.save();
+  c.textAlign = 'center';
+  text(new URL(GAME_SITE_URL).host, 365, 1368, 18, '#aabda8', 520);
+  c.restore();
 
   // 整数像素绘制并保留四格浅色静区，二维码只编码官网，不携带存档。
   c.fillStyle = JOURNEY_CARD_QR_COLORS.light;
