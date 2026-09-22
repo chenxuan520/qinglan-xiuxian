@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost } from '../src/progress.ts';
-import { departHometown, visitHometown, readHometownLetter } from '../src/hometown.ts';
-import { hometownContent, humanStoryJournal, townPage } from '../src/mortal-ui.ts';
+import {
+  departHometown,
+  acceptHometownRoot,
+  visitHometown,
+  readHometownLetter,
+} from '../src/hometown.ts';
+import {
+  hometownContent,
+  humanStoryJournal,
+  townPage,
+  townEventContent,
+} from '../src/mortal-ui.ts';
 import { unreadHumanLetterKeys } from '../src/human-stories.ts';
 import { journeyCardData } from '../src/journey-card.ts';
 import { HOMETOWN_HOUSE, HOMETOWN_ROUTE, townWalkable, TOWN_NPCS } from '../src/town.ts';
@@ -13,6 +23,7 @@ function departed() {
   const save = freshSave('heaven', undefined, 'orthodox', () => 0);
   save.mortal.hometown!.stage = 'walk';
   departHometown(save);
+  acceptHometownRoot(save);
   return save;
 }
 
@@ -53,6 +64,7 @@ test('离乡只展示渡口目标，正式入城才显示人间资源与出口',
   assert.doesNotMatch(townPage(save, ''), /灵石|现实 1 分钟|town-exit/);
   save.mortal.hometown!.stage = 'walk';
   departHometown(save);
+  acceptHometownRoot(save);
   assert.match(townPage(save, ''), /town-exit/);
   assert.match(townPage(save, ''), /现实 1 分钟/);
 });
@@ -107,4 +119,30 @@ test('不同此世家书提醒不碰撞，缘簿摘要使用实际写信人的�
   assert.match(humanStoryJournal(father), /出门在外，记得好好吃饭/);
   assert.doesNotMatch(humanStoryJournal(father), /山里若冷/);
   assert.match(humanStoryJournal(mother), /山里若冷/);
+});
+
+test('在世父母可闲谈，故居和离世父母不提供聊天表单', () => {
+  const save = departed();
+  for (const parent of ['father', 'mother'] as const) {
+    assert.match(hometownContent(save, parent), /npc-chat-form/);
+    assert.match(hometownContent(save, parent), /想对家人说的话/);
+  }
+  assert.doesNotMatch(hometownContent(save), /npc-chat-form/);
+  save.age = 100;
+  assert.equal(hometownContent(save, 'father'), '');
+  assert.equal(hometownContent(save, 'mother'), '');
+});
+
+test('药铺采药与买药按钮归入同组，待办仅禁用采药不禁用药铺', () => {
+  const save = departed();
+  const npc = townResidents({ seed: 42, since: 15 }, 15).find((n) => n.id === 'herbs')!;
+  const html = townEventContent(save, npc);
+  assert.match(
+    html,
+    /class="town-event-actions"><button[^>]*data-action="mortal-activity"[^>]*>接下这件事<\/button><button[^>]*data-action="medicine-shop"/,
+  );
+  save.mortal.activity = { kind: 'herbs', remaining: 1, total: 1, sect: null };
+  const busy = townEventContent(save, npc);
+  assert.match(busy, /data-action="mortal-activity"[^>]*disabled/);
+  assert.doesNotMatch(busy, /data-action="medicine-shop"[^>]*disabled/);
 });

@@ -19,7 +19,7 @@ import {
 import { entryCost, masteryBonus, sectDues, sectRole, studyPlan } from './mortal.ts';
 import { icon } from './icons.ts';
 import { type TownResident } from './town-population.ts';
-import { npcDefaultLine } from './npc-dialogue.ts';
+import { npcDefaultLine, type NpcDialogueRequest } from './npc-dialogue.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
 import { smithAt, smithStoryView } from './town-story.ts';
 import {
@@ -75,7 +75,7 @@ export function townStatus(save: SaveData) {
   const life = lifespanInfo(save);
   const activity = save.mortal.activity;
   const study = activity?.kind === 'study' ? studyPlan(save) : null;
-  return `<strong>年岁 ${life.age.toFixed(2)} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong><span>灵石 ${save.stones.toLocaleString('zh-CN')} · 玄铁 ${save.iron}</span>${activity ? `<span>${activity.kind === 'study' ? (study!.eligible ? '功法研习' : `研习暂停 · 需${study!.requiredRealm}`) : TOWN_JOBS[activity.kind].name} · 尚需消耗 ${activity.remaining.toFixed(2)} 年</span>` : ''}`;
+  return `<strong>年岁 ${life.age.toFixed(2)} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong><span>灵石 ${save.stones.toLocaleString('zh-CN', { useGrouping: false })} · 玄铁 ${save.iron}</span>${activity ? `<span>${activity.kind === 'study' ? (study!.eligible ? '功法研习' : `研习暂停 · 需${study!.requiredRealm}`) : TOWN_JOBS[activity.kind].name} · 尚需消耗 ${activity.remaining.toFixed(2)} 年</span>` : ''}`;
 }
 export function townPage(save: SaveData, fullscreenButton: string) {
   if (save.mortal.hometown && save.mortal.hometown.stage !== 'departed')
@@ -88,7 +88,7 @@ export function mortalPage(
   filter: string,
   unfinishedPath?: CultivationPath,
 ) {
-  return `<header class="mortal-header"><button class="mortal-back secondary-button" data-action="home">← 返回仙途</button><a class="mortal-brand" href="#" data-action="mortal-enter">青岚 · 人间</a><div id="mortal-currency">灵石 ${save.stones.toLocaleString('zh-CN')} · 玄铁 ${save.iron}</div></header>
+  return `<header class="mortal-header"><button class="mortal-back secondary-button" data-action="home">← 返回仙途</button><a class="mortal-brand" href="#" data-action="mortal-enter">青岚 · 人间</a><div id="mortal-currency">灵石 ${save.stones.toLocaleString('zh-CN', { useGrouping: false })} · 玄铁 ${save.iron}</div></header>
   <main class="mortal-main">
     <section class="mortal-hero"><div><div class="eyebrow"><span></span>山河万象 · 烟火人间</div><h1>且向人间<span>借一程烟火</span></h1><p>行过市井长街，听一段山河旧事。<br>走访城镇、拜入仙门，皆是人间修行。</p><p class="mortal-clock-note">城镇内现实 1 分钟 = 1 年 · 办事直接消耗对应年岁<br>浏览入口、宗门页签与弹窗不计时；切后台暂停。</p></div></section>
     <section id="mortal-status" class="mortal-status" aria-label="人间年岁与供奉">${mortalStatus(save)}</section>
@@ -147,18 +147,18 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     actions = `<p>每枚玄铁：买入 30 灵石 · 卖出 12 灵石</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。</p><div class="save-actions"><button class="secondary-button" data-action="mortal-buy" data-cost-stones="30">购入 1 枚玄铁</button><button class="secondary-button" data-action="mortal-sell" ${save.iron < 1 ? 'disabled' : ''}>售出 1 枚玄铁</button></div>`;
   } else if (npc.id === 'herbs' || npc.id === 'tea' || npc.id === 'escort') {
     const job = TOWN_JOBS[npc.id];
-    actions = `<p>${job.desc}</p><p class="panel-note">消耗 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>点击即增加年岁并结算收益，完成后不自动重复。</p><button class="primary-button" data-action="mortal-activity" data-id="${npc.id}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '有事项待结算' : npc.id === 'tea' ? '入座听书' : '接下这件事'}</button>`;
+    actions = `<p>${job.desc}</p><p class="panel-note">消耗 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>点击即增加年岁并结算收益，完成后不自动重复。</p>${npc.id === 'herbs' ? '<div class="town-event-actions">' : ''}<button class="primary-button" data-action="mortal-activity" data-id="${npc.id}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '有事项待结算' : npc.id === 'tea' ? '入座听书' : '接下这件事'}</button>${npc.id === 'herbs' ? '<button class="secondary-button" data-action="medicine-shop">药铺 · 看看本批丹药</button></div>' : ''}`;
   }
-  if (npc.id === 'herbs')
-    actions +=
-      '<div class="save-actions"><button class="secondary-button" data-action="medicine-shop">药铺 · 看看本批丹药</button></div>';
   return `<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}${HUMAN_STORY_IDS.filter(
     (id) => HUMAN_STORIES[id].npcId === npc.id,
   )
     .map((id) => humanStoryContent(save, id, true))
-    .join(
-      '',
-    )}<section class="npc-dialogue" aria-label="与${npc.name}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(npc.id)}</p></div><small class="npc-chat-status" role="status">街巷闲谈 · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="想对镇民说的话" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">闲谈不改变修为与物资，办事请用故事或委托按钮。</small></section>${actions}`;
+    .join('')}${npcDialogueContent(npc.id, npc.name)}${actions}`;
+}
+
+function npcDialogueContent(id: NpcDialogueRequest['npcId'], name: string) {
+  const family = id === 'father' || id === 'mother';
+  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(id)}</p></div><small class="npc-chat-status" role="status">${family ? '家中叙话' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '说些家常，无任务或奖励；暂时无法回应时沿用本地对白。' : '闲谈不改变修为与物资，办事请用故事或委托按钮。'}</small></section>`;
 }
 
 export function humanStoryContent(save: SaveData, id: HumanStoryId, atNpc = false) {
@@ -196,9 +196,9 @@ export function hometownContent(save: SaveData, parent?: ParentId) {
       : person.old && realmInfo(save.cultivation).index >= 3
         ? '你倒还是走时的模样。'
         : parent === 'mother'
-          ? '山里夜凉，记得添衣。'
+          ? '路远，记得添衣。'
           : '山外怎么样？回来就好。';
-    return `<div class="town-story"><p>${person.old ? '鬓边已见白发，熟悉的声音却没有变。' : '门前仍是熟悉的身影。'}</p><blockquote><p>你回来了。</p>${years >= 1 ? `<p>一别 ${years} 年了。</p>` : ''}<p>${quote}</p></blockquote></div><button class="secondary-button" data-action="hometown-home">回到门前</button>`;
+    return `<div class="town-story"><p>${person.old ? '鬓边已见白发，熟悉的声音却没有变。' : '门前仍是熟悉的身影。'}</p><blockquote><p>你回来了。</p>${years >= 1 ? `<p>一别 ${years} 年了。</p>` : ''}<p>${quote}</p></blockquote></div>${npcDialogueContent(parent, person.name)}<button class="secondary-button" data-action="hometown-home">回到门前</button>`;
   }
   const longGone =
     save.age >=

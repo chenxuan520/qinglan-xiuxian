@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { Game } from '../src/game.ts';
 import { ENEMIES, ENEMY_TACTICS, STAGE_ENEMIES } from '../src/data.ts';
 import { autoplayInput } from '../src/autoplay.ts';
@@ -21,6 +23,107 @@ function encounter(stage: number, type: number, elite = false, distance = 200) {
 function advance(g: Game, seconds: number) {
   for (let i = 0; i < Math.round(seconds * 100); i++) g.update(0.01);
 }
+
+test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制', async () => {
+  const renderUrl = new URL('../src/render.ts', import.meta.url);
+  // Renderer 的构造参数属性需要转换，测试加载时处理，不改生产代码。
+  const hook = registerHooks({
+    load(url, context, nextLoad) {
+      if (url !== renderUrl.href) return nextLoad(url, context);
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: stripTypeScriptTypes(readFileSync(renderUrl, 'utf8'), { mode: 'transform' }),
+      };
+    },
+  });
+  const { Renderer } = await import('../src/render.ts').finally(() => hook.deregister());
+  function draw(g: Game) {
+    const calls: { method: string; args: unknown[] }[] = [];
+    const ctx = new Proxy({} as CanvasRenderingContext2D, {
+      get:
+        (_, method: string) =>
+        (...args: unknown[]) =>
+          calls.push({ method, args }),
+    });
+    // 只跳过无关图集与装饰，直接执行原 drawGame 和弹丸绘制。
+    const renderer = Object.assign(Object.create(Renderer.prototype), {
+      ctx,
+      width: 1280,
+      height: 800,
+      scale: 1,
+      sprite() {},
+      formation() {},
+      cachedFormation() {},
+      glowSprite(_key: string, _width: number, _height: number, paint: (c: typeof ctx) => void) {
+        paint(ctx);
+      },
+    });
+    renderer.drawGame(g, g.time);
+    return calls;
+  }
+
+  for (let stage = 0; stage < 6; stage++)
+    for (const type of STAGE_ENEMIES[stage])
+      for (const elite of [false, true]) {
+        const tactics = ENEMY_TACTICS[type];
+        if (
+          !['ranged', 'volley', 'nova', 'soul'].includes(
+            (elite ? tactics.eliteSkill : tactics.skill)!,
+          )
+        )
+          continue;
+        const { g, e } = encounter(stage, type, elite);
+        g.update(0.01);
+        assert.equal(e.windup, 0.65);
+        const calls = draw(g);
+        assert.ok(
+          calls.some((c) => c.method === 'arc' && c.args[0] === e.x && c.args[2] === e.radius + 8),
+        );
+        assert.deepEqual(
+          calls.filter((c) => c.method === 'lineTo'),
+          [],
+        );
+        advance(g, 0.5);
+        assert.equal(g.shots.length, 0);
+        advance(g, 0.2);
+        assert.ok(g.shots.length > 0);
+        assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 5));
+      }
+
+  for (const elite of [false, true]) {
+    const dasher = ENEMY_TACTICS.findIndex((t) => (elite ? t.eliteSkill : t.skill) === 'dash');
+    const dash = encounter(0, dasher, elite);
+    dash.g.update(0.01);
+    assert.ok(dash.e.charge > 0.55);
+    assert.ok(draw(dash.g).some((c) => c.method === 'strokeRect' && c.args[2] === 209));
+    const tank = STAGE_ENEMIES[0].find((type) => ENEMIES[type].behavior === 'tank')!;
+    const stomp = encounter(0, tank, elite, 100);
+    stomp.g.update(0.01);
+    assert.ok(stomp.g.zones[0].delay > 0);
+    assert.ok(draw(stomp.g).some((c) => c.method === 'arc' && c.args[2] === 92));
+  }
+
+  const { g } = encounter(1, 0);
+  g.enemies = [];
+  const boss = g.spawnEnemy(10, false, true, { x: -500, y: 0 });
+  boss.pursuitCooldown = 0;
+  g.update(0.01);
+  const warning = g.effects.find((e) => e.kind === 'line')!;
+  assert.ok(warning);
+  assert.ok(
+    draw(g).some(
+      (c) => c.method === 'lineTo' && c.args[0] === warning.x2 && c.args[1] === warning.y2,
+    ),
+  );
+  boss.charge = 0;
+  boss.pursuitCooldown = 999;
+  boss.cooldown = 0;
+  boss.skillStep = 1;
+  g.update(0.01);
+  assert.ok(g.zones.some((z) => z.delay > 0));
+  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 50));
+});
 
 test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近身自爆', () => {
   let count = 0;

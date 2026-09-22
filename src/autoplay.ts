@@ -1,4 +1,4 @@
-import { treasure, evolutionPassives, MAX_WEAPON_LEVEL } from './data.ts';
+import { treasure, evolutionPassives, MAX_WEAPON_LEVEL, FINAL_TRIAL_STAGE } from './data.ts';
 import type { Choice, Game } from './game.ts';
 
 const favored = [
@@ -90,19 +90,14 @@ export function autoplayInput(g: Game) {
       dy -= ((b.y - p.y) / d) * 2;
     }
   }
-  for (const z of g.zones) {
-    if (!z.hostile) continue;
-    const d = Math.hypot(z.x - p.x, z.y - p.y) || 1;
-    if (d < z.radius + 45) {
-      dx += d < 1.01 ? 3 : ((p.x - z.x) / d) * 3;
-      dy += ((p.y - z.y) / d) * 3;
-    }
-  }
   const norm = Math.hypot(dx, dy) || 1;
   const preferred = { x: dx / norm, y: dy / norm };
   const charges = g.enemies.filter((e) => (e.boss || g.stage < 6) && !e.dead && e.charge > 0);
-  if (!charges.length) return preferred;
   const speed = g.stats.speed;
+  const zones = g.zones.filter(
+    (z) => z.hostile && z.life > 0 && Math.hypot(z.x - p.x, z.y - p.y) < z.radius + 8 + speed * 1.6,
+  );
+  if (!charges.length && !zones.length) return preferred;
   // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
   const clearance = (e: (typeof charges)[number]) => e.radius + 13 + speed * 0.24;
   const distanceToPath = (x: number, y: number, e: (typeof charges)[number]) => {
@@ -115,14 +110,67 @@ export function autoplayInput(g: Game) {
     );
     return Math.hypot(x - e.x - e.dx * along, y - e.y - e.dy * along);
   };
-  if (!charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e))) return preferred;
+  if (!zones.length && !charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e)))
+    return preferred;
   let best = preferred;
   let bestScore = Infinity;
-  // 只在冲撞路径附近比较方向；同时评估所有妖王，交叉预警不会抵消成原地不动。
-  for (let i = 0; i < 16; i++) {
-    const x = Math.cos((i * Math.PI) / 8),
-      y = Math.sin((i * Math.PI) / 8);
+  // 危险附近才比较方向；毒圈还比较原方向和等待，不能把所有有风险的方向一律拒绝。
+  for (let i = 0; i < (zones.length ? 18 : 16); i++) {
+    const x = i === 17 ? 0 : i === 16 ? preferred.x : Math.cos((i * Math.PI) / 8),
+      y = i === 17 ? 0 : i === 16 ? preferred.y : Math.sin((i * Math.PI) / 8);
     let score = -(x * preferred.x + y * preferred.y) * 0.08;
+    if (zones.length) {
+      score -= (x * g.input.x + y * g.input.y) * 0.02;
+      let risk = 0;
+      for (const z of zones) {
+        const zx = p.x - z.x,
+          zy = p.y - z.y,
+          radius = z.radius + 8;
+        let enter = 0,
+          exit = Infinity;
+        if (x || y) {
+          const along = zx * x + zy * y;
+          const crossing = radius * radius - zx * zx - zy * zy + along * along;
+          if (crossing <= 0) continue;
+          const half = Math.sqrt(crossing);
+          enter = Math.max(0, (-along - half) / speed);
+          exit = (-along + half) / speed;
+        } else if (zx * zx + zy * zy >= radius * radius) continue;
+        // 先确认穿圈区间内有未消散的伤害tick；保留一轮决策余量。
+        const delay = Math.max(0, z.delay);
+        const tick = Math.max(0, z.tick);
+        const nextTick = tick + Math.max(0, Math.ceil((enter - 0.12 - delay - tick) / 0.5)) * 0.5;
+        // 缚根与寒霜在伤害间隔中仍持续减速，不能当作无害残影。
+        if (
+          !(g.stage < FINAL_TRIAL_STAGE && ['enemy-roots', 'enemy-frost'].includes(z.kind)) &&
+          (nextTick > z.life || delay + nextTick > exit + 0.12)
+        )
+          continue;
+        const exposure = Math.max(
+          0,
+          Math.min(exit, delay + z.life) - Math.max(enter, Math.max(0, delay - 0.12)),
+        );
+        risk += (exposure / 0.5) * (z.damage / Math.max(1, p.hp)) * 4;
+      }
+      for (const e of g.enemies) {
+        if (e.dead) continue;
+        const distance = Math.hypot(e.x - p.x, e.y - p.y) || 1;
+        if (distance > e.radius + 13 + (speed + e.speed) * 0.36) continue;
+        for (const seconds of [0.12, 0.24, 0.36]) {
+          const approach = Math.min(distance, e.speed * seconds) / distance;
+          const separation = Math.hypot(
+            p.x + x * speed * seconds - e.x - (p.x - e.x) * approach,
+            p.y + y * speed * seconds - e.y - (p.y - e.y) * approach,
+          );
+          risk +=
+            Math.max(0, 1 - separation / (e.radius + 13 + speed * 0.12)) *
+            (e.damage / Math.max(1, p.hp)) *
+            4;
+        }
+      }
+      // 无伤路线优先于拾取；所有方向都有风险时仍按累计损失选，而非停住。
+      score += risk > 0 ? 1 + risk : 0;
+    }
     for (const e of charges) {
       for (const seconds of [0.12, 0.24, 0.36]) {
         const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);

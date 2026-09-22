@@ -1,4 +1,4 @@
-import { medicineEffects, medicineLoot } from './medicine-data.ts';
+import { medicineEffects, medicineLoot, medicineInfo } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
 import {
@@ -143,6 +143,7 @@ export class Game {
   state: GameState = 'playing';
   time = 0;
   elapsedYears: number | undefined = 0;
+  loot = { artifacts: [] as string[], medicines: {} as Record<string, number>, complete: true };
   level = 1;
   xp = 0;
   kills = 0;
@@ -439,6 +440,11 @@ export class Game {
       state: this.state,
       time: this.time,
       elapsedYears: this.elapsedYears,
+      loot: {
+        artifacts: [...this.loot.artifacts],
+        medicines: { ...this.loot.medicines },
+        complete: this.loot.complete,
+      },
       level: this.level,
       xp: this.xp,
       kills: this.kills,
@@ -714,8 +720,33 @@ export class Game {
       if (s.startedImmortal !== undefined && typeof s.startedImmortal !== 'boolean') return null;
       if (s.elapsedYears !== undefined && (!Number.isFinite(s.elapsedYears) || s.elapsedYears < 0))
         return null;
+      if (
+        s.loot !== undefined &&
+        (!s.loot ||
+          typeof s.loot !== 'object' ||
+          Array.isArray(s.loot) ||
+          typeof s.loot.complete !== 'boolean' ||
+          !Array.isArray(s.loot.artifacts) ||
+          s.loot.artifacts.length > TREASURES.length ||
+          new Set(s.loot.artifacts).size !== s.loot.artifacts.length ||
+          !s.loot.artifacts.every((id) => TREASURES.some((t) => t.id === id)) ||
+          !s.loot.medicines ||
+          typeof s.loot.medicines !== 'object' ||
+          Array.isArray(s.loot.medicines) ||
+          !Object.entries(s.loot.medicines).every(
+            ([id, count]) => medicineInfo(id) && Number.isSafeInteger(count) && count > 0,
+          ))
+      )
+        return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.elapsedYears = s.elapsedYears;
+      g.loot = s.loot
+        ? {
+            artifacts: [...s.loot.artifacts],
+            medicines: { ...s.loot.medicines },
+            complete: s.loot.complete,
+          }
+        : { artifacts: [], medicines: {}, complete: false };
       g.startedImmortal =
         s.startedImmortal ??
         realmInfo(
@@ -1103,7 +1134,9 @@ export class Game {
           ? bossStage === FINAL_TRIAL_STAGE
             ? 560000
             : 120000 + bossStage * 35000
-          : 16000 + this.stage * 11000) * difficulty.hp
+          : (16000 + this.stage * 11000) *
+            (this.tribulation ? 1 : this.stage === 4 ? 1.3 : this.stage === 5 ? 1.5 : 1)) *
+        difficulty.hp
       : template.hp * strength * difficulty.hp * (elite ? 7 : 1) * (eliteScaling?.hp ?? 1);
     const enemy: Enemy = {
       id: ++this.serial,
@@ -1118,12 +1151,13 @@ export class Game {
           : 48
         : template.radius * (elite ? 1.55 : 1),
       speed: boss
-        ? 70 + this.stage * 4
+        ? (70 + this.stage * 4) *
+          (this.tribulation ? 1 : this.stage === 4 ? 1.15 : this.stage === 5 ? 1.2 : 1)
         : (this.isFinalTrial
             ? Math.max(95 + progress * 35, template.speed * (1.05 + progress * 0.3))
             : template.speed) *
           (1 + progress * 0.3) *
-          (elite ? 1.1 : 1) *
+          (elite ? 1.21 : 1) *
           (eliteScaling?.speed ?? 1),
       damage:
         (boss
@@ -2253,6 +2287,7 @@ export class Game {
           (this.medicine.cultivation - 1);
       const lastBoss =
         !this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length - 1;
+      const medicineBefore = e.boss ? { ...this.save.medicine.bag } : null;
       const loot = e.boss
         ? medicineLoot(
             this.save.medicine,
@@ -2262,7 +2297,13 @@ export class Game {
             this.random,
           )
         : [];
-      if (loot.length && e.boss) recordChronicle(this.save, '妖王丹缘', loot.join('、'));
+      if (loot.length && e.boss) {
+        recordChronicle(this.save, '妖王丹缘', loot.join('、'));
+        for (const [id, count] of Object.entries(this.save.medicine.bag)) {
+          const received = count - (medicineBefore?.[id] ?? 0);
+          if (received > 0) this.loot.medicines[id] = (this.loot.medicines[id] ?? 0) + received;
+        }
+      }
       this.creditCultivation();
       this.heal(this.stats.killHeal);
       let collected: string[] = [];
@@ -2281,6 +2322,7 @@ export class Game {
         this.recordRunAchievements();
         this.creditCultivation();
         collected = dropArtifacts(this.save, this.random);
+        this.loot.artifacts.push(...collected);
       } else if (this.level < MAX_RUN_LEVEL)
         this.pickups.push({
           x: e.x,

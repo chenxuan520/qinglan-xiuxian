@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { requestNpcDialogue, NPC_AI_BASE, mountTeaStory, closeNpcChat } from '../src/npc-chat.ts';
+import {
+  requestNpcDialogue,
+  NPC_AI_BASE,
+  mountTeaStory,
+  mountNpcChat,
+  closeNpcChat,
+} from '../src/npc-chat.ts';
 import { freshSave } from '../src/progress.ts';
+import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
+import { chooseSmithStory } from '../src/town-story.ts';
 
 const input = {
   population: { seed: 12345, since: 15 },
@@ -58,6 +66,101 @@ test('等待超时与关闭对话均中止 NPC 请求，不无限等待', async 
     }),
     null,
   );
+});
+
+test('父母请求只带家事上下文，AI成功使用回复，失败仍交回本地对白', async () => {
+  const save = freshSave();
+  departHometown(save);
+  acceptHometownRoot(save);
+  const before = JSON.stringify(save);
+  const parentInput = { ...input, npcId: 'mother', hometown: save.mortal.hometown };
+  const signal = new AbortController().signal;
+  assert.equal(
+    await requestNpcDialogue(parentInput, signal, async (_url, options) => {
+      const sent = JSON.parse(options.body);
+      assert.deepEqual(sent.hometown, save.mortal.hometown);
+      assert.equal(sent.npcId, 'mother');
+      assert.equal(sent.stones, undefined);
+      assert.equal(sent.cultivation, undefined);
+      return Response.json({ reply: '孩子，路远，记得添衣。' });
+    }),
+    '孩子，路远，记得添衣。',
+  );
+  assert.equal(
+    await requestNpcDialogue(parentInput, signal, async () => new Response(null, { status: 503 })),
+    null,
+  );
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('推进铁匠故事不会清空父母闲谈或重复请求自动问候', async (t) => {
+  const originalDocument = globalThis.document;
+  const node = () => ({
+    textContent: '',
+    children: [],
+    append(...children) {
+      this.children.push(...children);
+    },
+  });
+  globalThis.document = { createElement: node, createTextNode: (textContent) => ({ textContent }) };
+  t.after(() => {
+    closeNpcChat();
+    if (originalDocument) globalThis.document = originalDocument;
+    else delete globalThis.document;
+  });
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    return Response.json({ reply: '孩子，回来就好。' });
+  });
+  const host = () => {
+    const log = {
+      ...node(),
+      replaceChildren() {
+        this.children = [];
+      },
+      setAttribute() {},
+      scrollHeight: 0,
+      scrollTop: 0,
+    };
+    const input = { value: '', disabled: false, focus() {} };
+    const button = { disabled: false };
+    const status = { textContent: '' };
+    const form = {
+      submit: null,
+      querySelector: (selector) => (selector === 'input' ? input : button),
+      addEventListener(_event, handler) {
+        this.submit = handler;
+      },
+    };
+    return {
+      isConnected: true,
+      log,
+      input,
+      form,
+      querySelector: (selector) =>
+        ({ '.npc-chat-log': log, form, '.npc-chat-status': status })[selector],
+    };
+  };
+  const save = freshSave();
+  save.mortal.population = { seed: 87654, since: 15 };
+  departHometown(save);
+  acceptHometownRoot(save);
+  const person = { id: 'mother', name: '母亲', generation: 0 };
+  const first = host();
+  mountNpcChat(first, save, person);
+  await new Promise((resolve) => setImmediate(resolve));
+  first.input.value = '家里可好？';
+  first.form.submit({ preventDefault() {} });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(requests, 2);
+  assert.equal(first.log.children.length, 3);
+  assert.equal(chooseSmithStory(save, 'bellows'), true);
+  const reopened = host();
+  mountNpcChat(reopened, save, person);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(requests, 2);
+  assert.equal(reopened.log.children.length, 3);
 });
 
 test('说书接受较长正文，断网、空值与超限仅返回空结果', async () => {

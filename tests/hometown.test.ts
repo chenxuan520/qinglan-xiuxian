@@ -5,18 +5,20 @@ import {
   validHometown,
   hometownParents,
   departHometown,
+  acceptHometownRoot,
   visitHometown,
   readHometownLetter,
   hometownLetter,
 } from '../src/hometown.ts';
+import { SPIRIT_ROOTS, rootElementsFor } from '../src/data.ts';
 import { freshMortal, validMortal, SECTS } from '../src/mortal-data.ts';
 import { freshSave, parseSave } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 
 const traveller = () => {
   const save = freshSave('heaven', ['fire'], 'orthodox', () => 0);
-  save.mortal.hometown!.stage = 'farewell';
   assert.equal(departHometown(save), true);
+  assert.equal(acceptHometownRoot(save), true);
   return save;
 };
 
@@ -27,7 +29,7 @@ test('故乡固定随机、新档年龄寿数上下界与初始状态', () => {
   ]) {
     const home = freshHometown(() => roll);
     assert.deepEqual(home, {
-      stage: 'root',
+      stage: 'farewell',
       parents: {
         mother: { ageAtStart: mother, diesAt },
         father: { ageAtStart: father, diesAt },
@@ -84,12 +86,11 @@ test('离乡只在告别或行走阶段生效，预填departure不算完成且�
     const save = freshSave();
     assert.equal(save.hometownSeen, false);
     assert.equal(save.chronicle.milestones.departure, 15);
-    assert.equal(departHometown(save), false);
     assert.equal(visitHometown(save), false);
     assert.equal(readHometownLetter(save), false);
     save.mortal.hometown!.stage = stage;
     assert.equal(departHometown(save), true);
-    assert.equal(save.mortal.hometown!.stage, 'departed');
+    assert.equal(save.mortal.hometown!.stage, 'reveal');
     assert.equal(save.hometownSeen, true);
     assert.equal(save.chronicle.milestones['home-departure'], 15);
     assert.equal(save.chronicle.milestones.departure, 15);
@@ -100,10 +101,75 @@ test('离乡只在告别或行走阶段生效，预填departure不算完成且�
     assert.equal(JSON.stringify(save), before);
   }
   const save = freshSave();
-  save.mortal.hometown!.stage = 'farewell';
   save.chronicle.entries = [];
   assert.equal(departHometown(save), true);
   assert.equal(save.chronicle.entries.length, 1);
+});
+
+test('新档告别、行走、离乡揭示到接受命盘，固定灵根不重抽且不额外结算', (t) => {
+  for (const { id } of SPIRIT_ROOTS) {
+    const elements = rootElementsFor(id, [], () => 0.5);
+    const save = freshSave(id, elements, 'orthodox', () => 0.5);
+    const random = t.mock.method(Math, 'random', () => {
+      throw new Error('故乡阶段流转不得抽取随机数');
+    });
+    assert.equal(save.spiritRoot, id);
+    assert.deepEqual(save.rootElements, elements);
+    assert.equal(save.mortal.hometown!.stage, 'farewell');
+    const initial = structuredClone(save);
+    save.mortal.hometown!.stage = 'walk';
+    assert.equal(departHometown(save), true);
+    assert.equal(save.mortal.hometown!.stage, 'reveal');
+    const expected = structuredClone(save);
+    expected.mortal.hometown!.stage = 'departed';
+    assert.equal(acceptHometownRoot(save), true);
+    assert.deepEqual(save, expected);
+    expected.mortal.hometown!.stage = initial.mortal.hometown!.stage;
+    expected.hometownSeen = initial.hometownSeen;
+    expected.chronicle = initial.chronicle;
+    assert.deepEqual(expected, initial);
+    random.mock.restore();
+  }
+});
+
+test('乱序或重复接受命盘与离乡均拒绝，接受只改阶段及离乡标记', () => {
+  for (const stage of ['root', 'farewell', 'walk', 'departed'] as const) {
+    const save = freshSave();
+    save.mortal.hometown!.stage = stage;
+    const before = structuredClone(save);
+    assert.equal(acceptHometownRoot(save), false);
+    assert.deepEqual(save, before);
+    if (stage === 'root' || stage === 'departed') {
+      assert.equal(departHometown(save), false);
+      assert.deepEqual(save, before);
+    }
+  }
+  for (const hometownSeen of [false, true]) {
+    const save = freshSave();
+    assert.equal(departHometown(save), true);
+    save.hometownSeen = hometownSeen;
+    const expected = structuredClone(save);
+    expected.mortal.hometown!.stage = 'departed';
+    expected.hometownSeen = true;
+    assert.equal(acceptHometownRoot(save), true);
+    assert.deepEqual(save, expected);
+    assert.equal(acceptHometownRoot(save), false);
+    assert.equal(departHometown(save), false);
+    assert.deepEqual(save, expected);
+  }
+});
+
+test('离乡后未接受命盘不记录返乡、重逢、亡故或家书', () => {
+  const save = freshSave('heaven', ['fire'], 'orthodox', () => 0);
+  assert.equal(departHometown(save), true);
+  for (const age of [15, 100]) {
+    save.age = age;
+    const before = structuredClone(save);
+    for (const parent of [undefined, 'father', 'mother'] as const)
+      assert.equal(visitHometown(save, parent), false);
+    assert.equal(readHometownLetter(save), false);
+    assert.deepEqual(save, before);
+  }
 });
 
 test('查看故居不虚构重逢，交谈只记录实际相见的父母且同岁重复幂等', () => {
@@ -185,6 +251,7 @@ test('短信由最后去世者留下而非单看享年，同时去世固定母�
 test('读信必须已离乡、发现且双亲俱逝', () => {
   for (const patch of [
     { stage: 'walk', letterFoundAt: 56, age: 100 },
+    { stage: 'reveal', letterFoundAt: 56, age: 100 },
     { stage: 'departed', letterFoundAt: null, age: 100 },
     { stage: 'departed', letterFoundAt: 53, age: 53 },
   ] as const) {
@@ -208,6 +275,7 @@ test('故乡所有动作不改变年岁、经济、宗门、物品及奖励字�
   const before = structuredClone(save);
   save.mortal.hometown!.stage = 'walk';
   departHometown(save);
+  acceptHometownRoot(save);
   visitHometown(save, 'mother');
   assert.equal(save.age, 15);
   save.age = 100;
@@ -223,7 +291,7 @@ test('故乡所有动作不改变年岁、经济、宗门、物品及奖励字�
 });
 
 test('各阶段支持JSON及导出往返，不因直接修改玩家年岁而丢人间进度', () => {
-  for (const stage of ['root', 'farewell', 'walk', 'departed'] as const) {
+  for (const stage of ['farewell', 'walk', 'reveal', 'departed'] as const) {
     const save = freshSave();
     save.age = 1015;
     save.mortal.hometown!.stage = stage;
@@ -231,6 +299,62 @@ test('各阶段支持JSON及导出往返，不因直接修改玩家年岁而丢�
     assert.ok(validHometown(save.mortal.hometown, save.age));
     assert.deepEqual(parseSave(JSON.stringify(save)).mortal, save.mortal);
     assert.deepEqual(importSave(exportSave(save, null)).save.mortal, save.mortal);
+  }
+});
+
+test('reveal刷新与导入往返保留命盘、父母及离乡履历，接受后不再揭示', () => {
+  const save = freshSave('triple', ['metal', 'fire', 'water'], 'orthodox', () => 0.5);
+  assert.equal(departHometown(save), true);
+  let restored = parseSave(JSON.stringify(save));
+  restored = importSave(exportSave(restored, null)).save;
+  assert.deepEqual(restored.mortal.hometown, save.mortal.hometown);
+  assert.equal(restored.mortal.hometown!.stage, 'reveal');
+  assert.equal(restored.hometownSeen, true);
+  assert.equal(restored.spiritRoot, save.spiritRoot);
+  assert.deepEqual(restored.rootElements, save.rootElements);
+  assert.deepEqual(restored.chronicle, save.chronicle);
+  const expected = structuredClone(restored);
+  expected.mortal.hometown!.stage = 'departed';
+  assert.equal(acceptHometownRoot(restored), true);
+  assert.deepEqual(restored, expected);
+  restored = importSave(exportSave(parseSave(JSON.stringify(restored)), null)).save;
+  assert.deepEqual(restored, expected);
+  assert.equal(acceptHometownRoot(restored), false);
+});
+
+test('旧root仅迁移为farewell，旧告别行走续走、已离乡不退回，资质父母物资不变', () => {
+  for (const stage of ['root', 'farewell', 'walk', 'departed'] as const) {
+    const save =
+      stage === 'departed' ? traveller() : freshSave('heaven', ['fire'], 'orthodox', () => 0);
+    save.mortal.hometown!.stage = stage;
+    save.hometownSeen = stage === 'departed';
+    save.prologueSeen = true;
+    save.stones = 321;
+    save.iron = 19;
+    save.cultivation = 45;
+    const raw = JSON.stringify(save);
+    const home = { ...save.mortal.hometown, stage: stage === 'root' ? 'farewell' : stage };
+    for (const restored of [
+      parseSave(raw, () => 0.999999),
+      importSave(exportSave(save, null)).save,
+    ]) {
+      assert.deepEqual(restored.mortal.hometown, home);
+      for (const key of [
+        'spiritRoot',
+        'rootElements',
+        'starter',
+        'artifacts',
+        'age',
+        'stones',
+        'iron',
+        'cultivation',
+        'chronicle',
+        'hometownSeen',
+        'prologueSeen',
+      ] as const)
+        assert.deepEqual(restored[key], save[key], key);
+      assert.equal(acceptHometownRoot(restored), false);
+    }
   }
 });
 
@@ -244,6 +368,7 @@ test('旧档缺故乡或缺整个人间字段不补本世父母，下轮新档�
       assert.equal(restored.hometownSeen, true);
       assert.equal(restored.cultivation, 12345);
       assert.equal(departHometown(restored), false);
+      assert.equal(acceptHometownRoot(restored), false);
       assert.equal(visitHometown(restored), false);
       assert.equal(readHometownLetter(restored), false);
     }
@@ -285,6 +410,9 @@ test('故乡校验拒绝损坏形状、随机范围、非法年岁顺序及无�
     { ...home, lastVisitAge: 20 },
     { ...home, letterFoundAt: 100 },
     { ...home, letterRead: true },
+    { ...home, stage: 'reveal', lastVisitAge: 20 },
+    { ...home, stage: 'reveal', letterFoundAt: 100 },
+    { ...home, stage: 'reveal', letterRead: true },
     { ...departed, letterFoundAt: 55 },
     { ...departed, lastVisitAge: 56, letterFoundAt: 57 },
     { ...departed, lastVisitAge: null, letterFoundAt: 56 },

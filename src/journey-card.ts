@@ -242,7 +242,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     memories.push({ title: '六仙同御', detail: '曾在一场历练中同时觉醒六件仙器' });
   if (save.tribulations > 0)
     memories.push({
-      title: `历劫 ${save.tribulations.toLocaleString('zh-CN')} 次`,
+      title: `历劫 ${save.tribulations.toLocaleString('zh-CN', { useGrouping: false })} 次`,
       detail: '渡过的天劫，已化作此世劫印',
     });
   if (save.completed.length)
@@ -259,9 +259,9 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     realm: realm.name,
     realmIndex: realm.index,
     realmVerse: REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]],
-    age: save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1 }),
+    age: save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false }),
     lifespan: Number.isFinite(life.limit)
-      ? `寿限 ${life.limit.toLocaleString('zh-CN')} 年`
+      ? `寿限 ${life.limit.toLocaleString('zh-CN', { useGrouping: false })} 年`
       : '寿元无尽',
     root: {
       name: root.name,
