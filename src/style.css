@@ -1231,8 +1231,10 @@ kbd {
   font-size: 16px;
   line-height: 2.2;
   letter-spacing: 1px;
-  scrollbar-width: thin;
-  scrollbar-color: #879b80 #183537;
+  scrollbar-width: none;
+}
+.prologue-story::-webkit-scrollbar {
+  display: none;
 }
 .prologue-story p + p {
   margin-top: 20px;
@@ -1286,9 +1288,6 @@ kbd {
 .epilogue-scene .prologue-seal {
   background: #fbf5df99;
   color: #9b6747;
-}
-.epilogue-scene .prologue-story {
-  scrollbar-color: #879b80 #dee6d7;
 }
 .epilogue-scene .prologue-footer {
   border-color: #68837455;
