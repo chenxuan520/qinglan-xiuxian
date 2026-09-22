@@ -89,6 +89,29 @@ export interface Enemy extends Point {
   dy: number;
   dead: boolean;
 }
+const BOSS_FOLLOWUP: Partial<Record<WeaponKind, number>> = {
+  sword: 0.45,
+  fire: 0.45,
+  fan: 0.45,
+  blade: 0.45,
+  pearl: 0.45,
+  dragon: 0.45,
+  qin: 0.45,
+  talisman: 0.45,
+  beads: 0.45,
+  shard: 0.45,
+  orbit: 0.45,
+  arrow: 0.6,
+  flute: 0.6,
+  nail: 0.6,
+  skull: 0.6,
+  compass: 0.4,
+  lightning: 0.4,
+};
+interface BossAttack {
+  volley: { weapon: WeaponKind; hitBosses: number[] };
+  multipliers: Record<number, number>;
+}
 export interface Shot extends Point {
   vx: number;
   vy: number;
@@ -103,6 +126,7 @@ export interface Shot extends Point {
   age: number;
   bounce: number;
   crit: boolean;
+  bossAttack?: BossAttack;
 }
 export interface Zone extends Point {
   radius: number;
@@ -428,6 +452,9 @@ export class Game {
     }
   }
   snapshot() {
+    const bossVolleys = [
+      ...new Set(this.shots.flatMap((b) => (b.bossAttack ? [b.bossAttack.volley] : []))),
+    ];
     return {
       spiritRoot: this.spiritRoot,
       rootElements: [...this.rootElements],
@@ -456,7 +483,19 @@ export class Game {
       weapons: this.weapons.map((w) => ({ ...w })),
       passives: { ...this.passives },
       enemies: this.enemies.map((e) => ({ ...e })),
-      shots: this.shots.map((s) => ({ ...s, hit: [...s.hit] })),
+      bossVolleys: bossVolleys.map((v) => ({ weapon: v.weapon, hitBosses: [...v.hitBosses] })),
+      shots: this.shots.map(({ bossAttack, ...s }) => ({
+        ...s,
+        hit: [...s.hit],
+        ...(bossAttack
+          ? {
+              bossAttack: {
+                volley: bossVolleys.indexOf(bossAttack.volley),
+                multipliers: { ...bossAttack.multipliers },
+              },
+            }
+          : {}),
+      })),
       zones: this.zones.map((z) => ({ ...z })),
       pickups: this.pickups.map((p) => ({ ...p })),
       choices: this.choices.map((c) => ({ ...c })),
@@ -685,6 +724,50 @@ export class Game {
       )
         return null;
       if (
+        s.bossVolleys !== undefined &&
+        (!Array.isArray(s.bossVolleys) ||
+          s.bossVolleys.length > s.shots.length ||
+          !s.bossVolleys.every(
+            (v) =>
+              v &&
+              typeof v === 'object' &&
+              !Array.isArray(v) &&
+              Object.hasOwn(BOSS_FOLLOWUP, v.weapon) &&
+              Array.isArray(v.hitBosses) &&
+              v.hitBosses.length <= 500 &&
+              new Set(v.hitBosses).size === v.hitBosses.length &&
+              v.hitBosses.every((id) => Number.isSafeInteger(id) && id > 0),
+          ))
+      )
+        return null;
+      for (const b of s.shots) {
+        const attack = b.bossAttack;
+        if (attack === undefined) continue;
+        if (
+          !attack ||
+          typeof attack !== 'object' ||
+          Array.isArray(attack) ||
+          !Number.isSafeInteger(attack.volley) ||
+          attack.volley < 0
+        )
+          return null;
+        const volley = s.bossVolleys?.[attack.volley];
+        if (
+          !volley ||
+          volley.weapon !== b.kind ||
+          !attack.multipliers ||
+          typeof attack.multipliers !== 'object' ||
+          Array.isArray(attack.multipliers) ||
+          !Object.entries(attack.multipliers).every(
+            ([id, multiplier]) =>
+              String(Number(id)) === id &&
+              volley.hitBosses.includes(Number(id)) &&
+              (multiplier === 1 || multiplier === BOSS_FOLLOWUP[volley.weapon]),
+          )
+        )
+          return null;
+      }
+      if (
         !Array.isArray(s.zones) ||
         s.zones.length > 500 ||
         !s.zones.every(
@@ -799,7 +882,22 @@ export class Game {
       g.player.maxHp = maxHp;
       g.enemies = s.enemies.map((e) => ({ ...e }));
       for (const e of g.enemies) if (e.boss && !e.dead && e.charge > 0.7) g.bossChargeWarning(e);
-      g.shots = s.shots.map((b) => ({ ...b, hit: new Set(b.hit) }));
+      const bossVolleys = (s.bossVolleys ?? []).map((v) => ({
+        weapon: v.weapon,
+        hitBosses: [...v.hitBosses],
+      }));
+      g.shots = s.shots.map(({ bossAttack, ...b }) => ({
+        ...b,
+        hit: new Set(b.hit),
+        ...(bossAttack
+          ? {
+              bossAttack: {
+                volley: bossVolleys[bossAttack.volley],
+                multipliers: { ...bossAttack.multipliers },
+              },
+            }
+          : {}),
+      }));
       g.zones = s.zones.map((z) => ({ ...z }));
       g.pickups = s.pickups
         .filter((p) => !g.isFinalTrial || p.kind !== 'heal')
@@ -1618,6 +1716,11 @@ export class Game {
       (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t));
     const a = target ? Math.atan2(target.y - p.y, target.x - p.x) : this.time;
     const radius = (95 + w.level * 7) * s.area;
+    const volley: BossAttack['volley'] | undefined =
+      w.evolved && !this.tribulation && BOSS_FOLLOWUP[w.id] !== undefined
+        ? { weapon: w.id, hitBosses: [] }
+        : undefined;
+    const attack = (): BossAttack | undefined => (volley ? { volley, multipliers: {} } : undefined);
     const launch = (angle: number, from: Point = p, options: Partial<Shot> = {}) => {
       const crit = this.random() < s.crit;
       this.shots.push({
@@ -1636,6 +1739,7 @@ export class Game {
         age: 0,
         bounce: 0,
         crit,
+        ...(volley ? { bossAttack: attack() } : {}),
         ...options,
       });
     };
@@ -1665,6 +1769,8 @@ export class Game {
           32 * s.area,
           dmg,
           'orbit',
+          'orbit',
+          attack(),
         );
       }
       return;
@@ -1767,6 +1873,8 @@ export class Game {
           dmg,
           t.color,
           w.id,
+          false,
+          attack(),
         );
       }
       return;
@@ -1885,7 +1993,7 @@ export class Game {
         .slice(0, count);
       for (const e of selected) {
         this.effect(e.x, e.y, 0.45, 60, t.color, 'lightning');
-        this.areaDamage(e, 65 * s.area, dmg, 'lightning');
+        this.areaDamage(e, 65 * s.area, dmg, 'lightning', 'lightning', attack());
       }
       this.onEvent('lightning');
       return;
@@ -1930,6 +2038,7 @@ export class Game {
         age: 0,
         bounce: w.id === 'pearl' ? count + 2 : 0,
         crit,
+        ...(volley ? { bossAttack: attack() } : {}),
       });
     }
     this.onEvent('cast');
@@ -1979,7 +2088,7 @@ export class Game {
         if (e.dead || b.hit.has(e.id) || distanceSquared(b, e) > (b.radius + e.radius) ** 2)
           continue;
         b.hit.add(e.id);
-        this.hitEnemy(e, b.damage, b.crit, b.kind);
+        this.hitEnemy(e, b.damage, b.crit, b.kind, b.bossAttack);
         b.pierce--;
         if (b.kind === 'shard' && b.bounce === -1) {
           b.bounce = 0;
@@ -1995,11 +2104,14 @@ export class Game {
               damage: b.damage * 0.6,
               radius: b.radius * 0.75,
               origin: { x: b.x, y: b.y },
+              ...(b.bossAttack
+                ? { bossAttack: { volley: b.bossAttack.volley, multipliers: {} } }
+                : {}),
             });
           }
         }
         if (b.kind === 'fire') {
-          this.areaDamage(b, 62 * this.stats.area, b.damage * 0.65, 'fire');
+          this.areaDamage(b, 62 * this.stats.area, b.damage * 0.65, 'fire', 'fire', b.bossAttack);
           this.effect(b.x, b.y, 0.45, 62, b.color, 'pulse');
         }
         if (b.kind === 'dragon') {
@@ -2180,10 +2292,11 @@ export class Game {
     damage: number,
     kind: string,
     source = kind === 'grave' ? 'coffin' : kind,
+    attack?: BossAttack,
   ) {
     for (const e of this.enemies) {
       if (e.dead || distanceSquared(at, e) > (radius + e.radius) ** 2) continue;
-      this.hitEnemy(e, damage, false, source);
+      this.hitEnemy(e, damage, false, source, attack);
       if (['ice', 'banner', 'nest'].includes(kind)) e.slow = 2.5 * this.stats.duration;
       if ((kind === 'pulse' || kind === 'axe') && !e.boss) {
         const d = distance(e, at) || 1;
@@ -2200,6 +2313,7 @@ export class Game {
     color: string,
     source: WeaponKind,
     pull = false,
+    attack?: BossAttack,
   ) {
     this.effect(from.x, from.y, 0.45, width, color, 'line', undefined, to.x, to.y);
     const dx = to.x - from.x,
@@ -2211,7 +2325,7 @@ export class Game {
         Math.min(1, ((e.x - from.x) * dx + (e.y - from.y) * dy) / lengthSquared),
       );
       if (distance(e, { x: from.x + dx * t, y: from.y + dy * t }) > width + e.radius) continue;
-      this.hitEnemy(e, damage, false, source);
+      this.hitEnemy(e, damage, false, source, attack);
       if (pull && !e.boss) {
         const d = distance(e, from) || 1;
         e.x += ((from.x - e.x) / d) * 40;
@@ -2220,8 +2334,20 @@ export class Game {
       }
     }
   }
-  hitEnemy(e: Enemy, damage: number, crit = false, source = 'other') {
+  hitEnemy(e: Enemy, damage: number, crit = false, source = 'other', attack?: BossAttack) {
     if (e.dead) return;
+    if (e.boss && !this.tribulation && attack) {
+      let multiplier = attack.multipliers[e.id];
+      if (multiplier === undefined) {
+        multiplier = attack.volley.hitBosses.includes(e.id)
+          ? BOSS_FOLLOWUP[attack.volley.weapon]!
+          : 1;
+        attack.multipliers[e.id] = multiplier;
+        if (multiplier === 1) attack.volley.hitBosses.push(e.id);
+      }
+      // 同一火球的直击与爆炸共用系数，不改弹丸本身伤害，以免削弱周围小怪群伤。
+      damage *= multiplier;
+    }
     if (e.elite || e.boss) damage *= this.medicine.eliteDamage;
     if (this.tribulation) {
       if (!this.tribulationVulnerable) return;

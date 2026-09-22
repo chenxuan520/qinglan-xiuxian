@@ -1008,7 +1008,7 @@ function renderPanel() {
     panelFrame(
       '修行指南',
       '道法有迹 / THE CULTIVATOR’S HANDBOOK',
-      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">新一世先读序章、从故居告别，可自动前往渡口；离开青岚后揭示命盘，确认后进入首页。离乡不计龄，刷新保留阶段，灵根不重抽。此后入镇从故居门前开始，不强制交谈。父母随你的总年岁老去，故居原址保留，交谈不加好感或奖励。亲历的家事写入履历，发现的家书可在人间缘簿重读。轮回重新生成这一世的家庭，已走过离乡可径直启程，再查看新命盘。旧档本世保持原样，下次轮回接入。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">首次人生先读序章、从故居告别，可自动前往渡口；离开青岚后揭示命盘，确认后进入首页。离乡不计龄，刷新保留阶段，灵根不重抽。此后入镇从故居门前开始，不强制交谈。父母随你的总年岁老去，故居原址保留，交谈不加好感或奖励。亲历的家事写入履历，发现的家书可在人间缘簿重读。命盘重抽、主动轮回及寿终／弃劫轮回直接看新命盘；只有圆满终章轮回保留故乡选择。父母仍按新一世生成。旧档本世保持原样。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
     );
   }
 }
@@ -1545,7 +1545,7 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   section.tabIndex = -1;
   section.focus({ preventScroll: true });
 }
-function resetLifetime(previousLife?: string) {
+function resetLifetime(previousLife?: string, revisitHometown = false) {
   shownHumanLetters.clear();
   const root = rollSpiritRoot();
   clearInterval(adTimer);
@@ -1564,6 +1564,10 @@ function resetLifetime(previousLife?: string) {
     prologueSeen,
     hometownSeen,
   });
+  if (!revisitHometown) {
+    save.prologueSeen = true;
+    departHometown(save);
+  }
   unlockAudio();
   selectedStage = difficulty = treasurePage = 0;
   selectedTreasure = save.starter;
@@ -1727,7 +1731,7 @@ function handleAction(action: string, id?: string) {
       );
     } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
       ui.inert = false;
-      resetLifetime('前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。');
+      resetLifetime('前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。', true);
     } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
     else if (action === 'epilogue-sound' && panel === 'epilogue') {
       save.sound = !save.sound;
