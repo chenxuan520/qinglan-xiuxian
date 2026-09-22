@@ -129,20 +129,20 @@ function drawRootDisc(
   root: ReturnType<typeof journeyCardData>['root'],
 ) {
   const x = 286;
-  const y = 687;
-  const radius = 92;
+  const y = 674;
+  const radius = 82;
   const vertices = root.elements.map((element, i) => {
     const angle = (i * 72 - 90) * (Math.PI / 180);
     return { ...element, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
   });
   c.save();
   c.translate(x, y);
-  const glow = c.createRadialGradient(0, 0, 15, 0, 0, 138);
+  const glow = c.createRadialGradient(0, 0, 15, 0, 0, 125);
   glow.addColorStop(0, '#d4cd9b18');
   glow.addColorStop(1, '#d4cd9b00');
   c.fillStyle = glow;
   c.beginPath();
-  c.arc(0, 0, 138, 0, Math.PI * 2);
+  c.arc(0, 0, 125, 0, Math.PI * 2);
   c.fill();
   c.strokeStyle = '#c2ce9d50';
   c.lineWidth = 1.5;
@@ -166,7 +166,7 @@ function drawRootDisc(
     c.fillStyle = point.active ? point.color : '#203e36';
     c.strokeStyle = point.active ? point.color : '#6f8379';
     c.beginPath();
-    c.arc(point.x, point.y, 14, 0, Math.PI * 2);
+    c.arc(point.x, point.y, 13, 0, Math.PI * 2);
     c.fill();
     c.stroke();
     c.shadowBlur = 0;
@@ -174,21 +174,21 @@ function drawRootDisc(
     c.font = '600 18px "Noto Serif SC", "Songti SC", serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(point.name, point.x * 1.28, point.y * 1.28);
+    c.fillText(point.name, point.x * 1.34, point.y * 1.34);
   }
   c.fillStyle = '#102b28e8';
   c.beginPath();
-  c.arc(0, 0, 50, 0, Math.PI * 2);
+  c.arc(0, 0, 46, 0, Math.PI * 2);
   c.fill();
   c.fillStyle = '#b2c0a9';
   c.font = '400 13px "Noto Serif SC", "Songti SC", serif';
-  c.fillText('此世灵根', 0, -23);
+  c.fillText('此世灵根', 0, -21);
   c.fillStyle = '#e1d3a4';
   c.font = '600 38px "Noto Serif SC", "Songti SC", serif';
-  c.fillText(root.seal, 0, 8);
+  c.fillText(root.seal, 0, 7);
   c.fillStyle = '#bcc7af';
   c.font = '400 15px "Noto Serif SC", "Songti SC", serif';
-  c.fillText(root.name, 0, 35);
+  c.fillText(root.name, 0, 33);
   c.restore();
 }
 
@@ -354,12 +354,12 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   drawRealmFigure(c, playerImage, card.realmIndex);
   line(548);
   drawRootDisc(c, card.root);
-  text('本 命 法 宝', 620, 592, 20, '#b2c0a9');
-  const weaponSize = 170;
+  text('本 命 法 宝', 620, 580, 20, '#b2c0a9');
+  const weaponSize = 166;
   const weaponWidth = weaponImage.naturalWidth / 4;
   const weaponHeight = weaponImage.naturalHeight / weaponArt.rows;
   c.fillStyle = '#0b332d';
-  c.fillRect(616, 612, weaponSize + 8, weaponSize + 8);
+  c.fillRect(616, 602, weaponSize + 8, weaponSize + 8);
   c.drawImage(
     weaponImage,
     weaponArt.column * weaponWidth,
@@ -367,17 +367,17 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
     weaponWidth,
     weaponHeight,
     620,
-    616,
+    606,
     weaponSize,
     weaponSize,
   );
   c.strokeStyle = '#c2b78670';
-  c.strokeRect(616, 612, weaponSize + 8, weaponSize + 8);
-  text(card.weapon.name, 820, 660, 32, '#ece7d1', 178);
-  text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 820, 701, 20, '#bcc7af', 178);
-  text('此刻身份', 80, 805, 20, '#b2c0a9');
-  text(card.identity, 220, 807, 26, '#ece7d1', 760);
-  line(836);
+  c.strokeRect(616, 602, weaponSize + 8, weaponSize + 8);
+  text(card.weapon.name, 814, 657, 32, '#ece7d1', 184);
+  text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 814, 700, 20, '#bcc7af', 184);
+  text('此刻身份', 80, 812, 20, '#b2c0a9');
+  text(card.identity, 220, 814, 26, '#ece7d1', 760);
+  line(840);
   text('此 世 留 痕', 80, 868, 25, '#d8c998');
   for (const [i, memory] of card.memories.entries()) {
     const y = 914 + i * 58;
