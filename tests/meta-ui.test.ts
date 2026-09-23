@@ -64,5 +64,7 @@ test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
     /key === 'e' && !event\.repeat && !save\.autoplay && game\?\.state === 'playing'/,
   );
   assert.match(source, /autoplayButton\(inGame\)/);
+  assert.match(source, /inGame\s+\? '按 E 或点击开启自动走位、拾取与选择升级'/);
+  assert.match(source, /点击或移动键切回手动/);
   assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });
