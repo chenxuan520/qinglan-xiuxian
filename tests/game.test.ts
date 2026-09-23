@@ -678,7 +678,7 @@ test('AI 为六重法宝优先补齐一至三重配套功法，其他选技保�
     }
   }
 });
-test('代打开关保存在浏览器存档，旧存档默认手动', () => {
+test('自动历练开关保存在浏览器存档，旧存档默认手动', () => {
   assert.equal(parseSave(null).autoplay, false);
   assert.equal(parseSave(JSON.stringify({ version: 1 })).autoplay, false);
   assert.equal(parseSave(JSON.stringify({ ...freshSave(), autoplay: true })).autoplay, true);

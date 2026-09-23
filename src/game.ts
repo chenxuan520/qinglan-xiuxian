@@ -2480,7 +2480,7 @@ export class Game {
           this.announce(
             this.trialBossesDefeated === TRIAL_BOSS_STAGES.length
               ? '七劫尽破 · 成仙瓶颈解除'
-              : `已破 ${this.trialBossesDefeated} / 7 劫 · 妖王灵气入体 · 遗宝自动入库`,
+              : `已破 ${this.trialBossesDefeated} / 7 劫 · 妖王灵气入体 · 遗宝收入藏器阁`,
           );
         }
         if (

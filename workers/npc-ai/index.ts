@@ -1,11 +1,16 @@
 import { TOWN_NPCS } from '../../src/town.ts';
 import { townResidents, validTownPopulation } from '../../src/town-population.ts';
 import { npcDefaultLine, type NpcDialogueRequest } from '../../src/npc-dialogue.ts';
-import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from '../../src/setting.ts';
+import {
+  NPC_AI_SETTINGS,
+  TEA_STORY_IMAGE_SETTINGS,
+  TEA_STORY_SETTINGS,
+} from '../../src/setting.ts';
 import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town-story.ts';
 import { hometownParents, validHometown } from '../../src/hometown.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
+export const STORY_IMAGE_MODEL = TEA_STORY_IMAGE_SETTINGS.model;
 function allowedOrigin(origin: string, configured: string) {
   try {
     const url = new URL(origin);
@@ -60,6 +65,33 @@ export function validDialogue(value: unknown): value is NpcDialogueRequest {
         m.content.length <= NPC_AI_SETTINGS.maxReplyLength,
     )
   );
+}
+export function validStoryImage(value: unknown): value is { story: string } {
+  return (
+    record(value) &&
+    typeof value.story === 'string' &&
+    value.story.trim().length > 0 &&
+    value.story.length <= TEA_STORY_SETTINGS.maxReplyLength
+  );
+}
+function storyImageBytes(value: unknown) {
+  if (!record(value) || typeof value.image !== 'string') return null;
+  try {
+    const encoded = value.image.trim();
+    if (
+      !encoded ||
+      encoded.length > Math.ceil((TEA_STORY_IMAGE_SETTINGS.maxImageBytes * 4) / 3) + 4
+    )
+      return null;
+    const binary = atob(encoded);
+    if (!binary.length || binary.length > TEA_STORY_IMAGE_SETTINGS.maxImageBytes) return null;
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  } catch {
+    return null;
+  }
+}
+function storyImagePrompt(story: string) {
+  return `Atmospheric Chinese xianxia ink-wash game illustration, dark jade and muted gold palette, misty mountains, ancient Chinese robes, cinematic composition, painterly detail, subdued contrast, no text, no letters, no calligraphy, no logo, no watermark, no frame, no interface, no explicit gore. Depict one decisive scene from this story:\n${story.trim()}`;
 }
 async function readBody(request: Request): Promise<unknown> {
   const reader = request.body?.getReader();
@@ -148,7 +180,8 @@ export function extractReply(output: unknown, story = false) {
     }
   }
   if (typeof content !== 'string') return '';
-  const reply = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
+  let reply = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
+  if (story) reply = reply.replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '');
   if (story && reply.length > maxLength) return '';
   return reply.slice(0, maxLength);
 }
@@ -166,8 +199,13 @@ export default {
     const json = (body: unknown, status = 200) => Response.json(body, { status, headers });
     const path = new URL(request.url).pathname;
     if (path === '/health' && request.method === 'GET')
-      return json({ service: 'qinglan-npc-ai', model: NPC_MODEL, version: 1 });
-    if (path !== '/chat') return json({ error: 'not-found' }, 404);
+      return json({
+        service: 'qinglan-npc-ai',
+        model: NPC_MODEL,
+        imageModel: STORY_IMAGE_MODEL,
+        version: 2,
+      });
+    if (path !== '/chat' && path !== '/story-image') return json({ error: 'not-found' }, 404);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST') return json({ error: 'method' }, 405);
     if (!request.headers.get('Content-Type')?.startsWith('application/json'))
@@ -177,6 +215,35 @@ export default {
       input = await readBody(request);
     } catch {
       return json({ error: 'invalid-body' }, 400);
+    }
+    if (path === '/story-image') {
+      if (!validStoryImage(input)) return json({ error: 'invalid-story' }, 400);
+      try {
+        const limit = await env.NPC_LIMITER.limit({
+          key: `story-image:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
+        });
+        if (!limit.success) return json({ error: 'busy' }, 429);
+        const output = await env.AI.run(
+          STORY_IMAGE_MODEL,
+          {
+            prompt: storyImagePrompt(input.story),
+            steps: TEA_STORY_IMAGE_SETTINGS.steps,
+          },
+          {
+            signal: AbortSignal.any([
+              request.signal,
+              AbortSignal.timeout(TEA_STORY_IMAGE_SETTINGS.inferenceTimeoutMs),
+            ]),
+          },
+        );
+        const image = storyImageBytes(output);
+        if (!image) return json({ error: 'empty-image' }, 502);
+        headers.set('Content-Type', 'image/jpeg');
+        return new Response(image, { status: 200, headers });
+      } catch {
+        console.warn(JSON.stringify({ event: 'npc-story-image-unavailable' }));
+        return json({ error: 'unavailable' }, 503);
+      }
     }
     if (!validDialogue(input)) return json({ error: 'invalid-dialogue' }, 400);
     const settings = input.mode === 'tea-story' ? TEA_STORY_SETTINGS : NPC_AI_SETTINGS;

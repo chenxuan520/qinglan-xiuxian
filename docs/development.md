@@ -45,7 +45,7 @@ npm run deploy:cloudflare
 
 ## NPC 对话 · Cloudflare Workers AI
 
-独立 Worker 名称为 `qinglan-npc-ai`，配置在 `workers/npc-ai/wrangler.jsonc`。默认入口为 `https://qinglan-npc-ai.011203.xyz`，`GET /health` 检查服务信息，`POST /chat` 生成对白；两者都必须携带受支持的 `Origin`。自定义域名已写入 routes，后续发布保留绑定；模型使用 `@cf/zai-org/glm-4.7-flash`，通过原生 `AI` binding 调用，前端没有 API 密钥。
+独立 Worker 名称为 `qinglan-npc-ai`，配置在 `workers/npc-ai/wrangler.jsonc`。默认入口为 `https://qinglan-npc-ai.011203.xyz`，`GET /health` 检查服务信息，`POST /chat` 生成对白，`POST /story-image` 生成茶馆故事配图；所有入口都必须携带受支持的 `Origin`。自定义域名已写入 routes，后续发布保留绑定；文字使用 `@cf/zai-org/glm-4.7-flash`，配图使用 `@cf/black-forest-labs/flux-1-schnell`，均通过原生 `AI` binding 调用，前端没有 API 密钥。
 
 ```bash
 npm run check:npc-ai
@@ -57,6 +57,8 @@ npm run deploy:npc-ai
 服务端按 `Origin` 完整匹配公网来源：`https://xiuxian.011203.xyz`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；按来源 IP 每 60 秒允许 12 次请求，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 超时 12 秒，客户端 14 秒；任何失败均回退本地台词。关闭对话会取消客户端请求，返回的文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
 
 茶馆听书复用 `POST /chat`，请求带 `mode: "tea-story"`，仅接受 `npcId: "tea"` 和空历史；与闲谈共用来源检查和每 IP 限流。`TEA_STORY_SETTINGS` 单独设置 1400 tokens、900 字上限、服务端 20 秒 / 客户端 22 秒超时，提示生成 320–500 字的完整修仙故事；超长、截断或失败返回不展示故事，前端提示暂歇。正文以 `textContent` 展示，不写入存档，不控制奖励；点击听书时直接增加半载年岁并判定 30% 概率获赠 8 灵石，再异步生成故事；AI 失败不影响已结算收益。
+
+正文写入页面后，前端才异步请求 `POST /story-image`，因此图片生成不会阻塞故事。Worker 固定使用 `FLUX.1-schnell` 的 4 步推理和无文字、无标志的国风修仙画风，客户端不能指定模型或提示模板；返回 Base64 图片会在 Worker 内转为 JPEG，前端限制为 5 MB，并以临时 Blob URL 淡入故事背景。图片限流、超时、生成失败、错误格式或关闭弹窗均静默放弃，不修改正文、奖励或存档；关闭及替换弹窗会取消请求并释放临时 URL。
 
 `src/story-speech.ts` 使用浏览器 `speechSynthesis`，优先设备本地的简体中文声音，需点击才朗读。遵循存档音量；静音或零音量时按钮明确提示开启声音，点击后才启用（零音量恢复为 60%）。不支持 API、无中文声音或播放失败时保留文字。关闭或替换面板会取消请求、停止朗读，并忽略迟到响应；故事弹窗期间沿用城镇暂停计龄规则，不再等待委托计时。没有新增音频资源或语音后端。
 

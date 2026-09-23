@@ -275,7 +275,7 @@ export const MEDICINES: Medicine[] = [
     name: '培婴丹',
     tier: '珍品',
     years: 0,
-    desc: '永久气血上限、基础恢复速度各 +5%，每世最多三次。',
+    desc: '本世气血上限、基础恢复速度各 +5%，每世最多三次。',
     stage: 4,
     price: 0,
     craftYears: 0,

@@ -75,7 +75,7 @@ test('旧续局标记收获未载，之后新掉落仍记录，不凭整个背�
   assert.equal(restored.loot.complete, false);
 });
 
-test('最后仙尊永久珍品进入本局收获，重复命中死者不重复发放', () => {
+test('最后仙尊本世珍品进入本局收获，重复命中死者不重复发放', () => {
   const { save, game } = trial();
   game.time = 420;
   game.update(0.01);
@@ -86,7 +86,7 @@ test('最后仙尊永久珍品进入本局收获，重复命中死者不重复�
   );
   assert.equal(permanent.length, 1);
   assert.equal(permanent[0][1], 1);
-  assert.match(runLootContent(game.loot), /永久珍品丹药/);
+  assert.match(runLootContent(game.loot), /本世珍品丹药/);
   const before = JSON.stringify([game.loot, save.medicine.bag]);
   game.hitEnemy(boss, 1e9);
   assert.equal(JSON.stringify([game.loot, save.medicine.bag]), before);
