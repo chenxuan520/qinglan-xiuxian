@@ -73,9 +73,9 @@ test('三条路线同时筛选法宝和功法；各流派法宝满足配方后�
       const h = fixture(t.id, path);
       h.weapons[0].level = 6;
       for (const id of evolutionPassives(t, path)) {
-        h.passives = { [id]: 2 };
+        h.passives = { [id]: 4 };
         assert.ok(!h.makeChoices().some((c) => c.type === 'evolve'));
-        h.passives[id] = 3;
+        h.passives[id] = 5;
         assert.ok(h.makeChoices().some((c) => c.type === 'evolve' && c.id === t.id));
       }
     }
@@ -253,9 +253,10 @@ test('吸血、持续恢复与地面丹药都不能让致死伤害后的角色�
 test('AI 识别魔道配套功法并优先仙器进化', () => {
   const g = fixture('poison', 'demonic');
   g.weapons[0].level = 6;
+  g.passives.devour = 4;
   g.choices = [
     { type: 'weapon', id: 'sand', level: 1 },
-    { type: 'passive', id: 'devour', level: 3 },
+    { type: 'passive', id: 'devour', level: 5 },
     { type: 'passive', id: 'curse', level: 1 },
   ];
   assert.equal(autoplayChoice(g)?.index, 1);

@@ -99,7 +99,9 @@ test('每个进化配方满足条件后都进入选择，未满足时不出现',
     const game = createGame();
     game.weapons = [{ id: t.id, level: 6, timer: 0, evolved: false }];
     assert.ok(!game.makeChoices().some((c) => c.type === 'evolve'));
-    game.passives[t.passive] = 3;
+    game.passives[t.passive] = 4;
+    assert.ok(!game.makeChoices().some((c) => c.type === 'evolve'));
+    game.passives[t.passive] = 5;
     game.state = 'upgrade';
     game.choices = game.makeChoices();
     assert.equal(game.choices[0].type, 'evolve');
@@ -117,6 +119,7 @@ test('单局同时觉醒六件仙器后只记录一次成就', () => {
     timer: 0,
     evolved: index < 5,
   }));
+  game.passives[TREASURES[5].passive] = 5;
   game.state = 'upgrade';
   game.choices = [{ type: 'evolve', id: game.weapons[5].id, level: 7 }];
   assert.equal(game.choose(0), true);
@@ -548,6 +551,25 @@ test('升级中的存档保留原有三选一和重悟次数，不会刷新选�
   if (selection.type === 'weapon')
     assert.ok(restored.weapons.some((w) => w.id === selection.id && w.level === selection.level));
 });
+test('旧三重觉醒选项恢复时失效，选择时仍须满足五重门槛', () => {
+  const game = createGame();
+  game.weapons[0].level = 6;
+  game.passives.power = 3;
+  game.state = 'upgrade';
+  game.choices = [
+    { type: 'evolve', id: 'sword', level: 7 },
+    { type: 'heal', id: 'heal', level: 1 },
+  ];
+  const restored = Game.restore(game.save, JSON.parse(JSON.stringify(game.snapshot())))!;
+  assert.equal(restored.state, 'upgrade');
+  assert.ok(!restored.choices.some((choice) => choice.type === 'evolve' && choice.id === 'sword'));
+  restored.choices = [{ type: 'evolve', id: 'sword', level: 7 }];
+  assert.equal(restored.choose(0), false);
+  assert.equal(restored.weapons[0].evolved, false);
+  restored.passives.power = 5;
+  assert.equal(restored.choose(0), true);
+  assert.equal(restored.weapons[0].evolved, true);
+});
 test('已结束或损坏的对局不恢复，永久进度仍可读取', () => {
   const game = createGame();
   const snapshot = game.snapshot();
@@ -634,7 +656,7 @@ test('AI 优先进化与配套功法，低血量选恢复，劣质选项使用�
   game.choices = [];
   assert.equal(autoplayChoice(game), null);
 });
-test('AI 为六重法宝优先补齐一至三重配套功法，其他选技保持原样', () => {
+test('AI 为六重法宝优先补满一至五重配套功法，其他选技保持原样', () => {
   for (const path of ['orthodox', 'demonic', 'dual'] as const) {
     const save = freshSave();
     save.path = path;
@@ -656,7 +678,7 @@ test('AI 为六重法宝优先补齐一至三重配套功法，其他选技保�
     g.weapons[0].level = 5;
     assert.equal(autoplayChoice(g)?.index, 0);
     g.weapons[0].level = 6;
-    for (const level of [1, 2, 3]) {
+    for (const level of [1, 2, 3, 4, 5]) {
       g.choices[1].level = level;
       g.passives[id] = level - 1;
       assert.deepEqual(autoplayChoice(g), { index: 1, reroll: false });
@@ -667,13 +689,13 @@ test('AI 为六重法宝优先补齐一至三重配套功法，其他选技保�
     const missing = g.choices.pop()!;
     assert.deepEqual(autoplayChoice(g), { index: 0, reroll: false });
     g.choices.push(missing);
-    g.choices[1].level = 3;
-    g.passives[id] = 2;
+    g.choices[1].level = 5;
+    g.passives[id] = 4;
     g.weapons[0].evolved = true;
     assert.equal(autoplayChoice(g)?.index, 0);
     if (path === 'dual') {
       g.weapons[0].evolved = false;
-      g.passives.blood = 3;
+      g.passives.blood = 5;
       assert.equal(autoplayChoice(g)?.index, 0);
     }
   }

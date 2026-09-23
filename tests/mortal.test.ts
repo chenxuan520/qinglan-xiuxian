@@ -461,7 +461,7 @@ test('所有宗门均增强对应功法，气血变化可安全恢复续局', ()
   }
 });
 
-test('精研不能代替功法三重，也不会绕过历练路线', () => {
+test('精研不能代替功法满五重，也不会绕过历练路线', () => {
   const s = wealthy(24);
   const manual = evolutionPassives(treasure('sword'), 'orthodox')[0];
   joinSect(s, manual);
@@ -469,9 +469,9 @@ test('精研不能代替功法三重，也不会绕过历练路线', () => {
   s.path = 'orthodox';
   const g = new Game(s, 0, 0);
   g.weapons[0].level = 6;
-  g.passives[manual] = 2;
+  g.passives[manual] = 4;
   assert.ok(!g.makeChoices().some((c) => c.type === 'evolve'));
-  g.passives[manual] = 3;
+  g.passives[manual] = 5;
   assert.ok(g.makeChoices().some((c) => c.type === 'evolve' && c.id === 'sword'));
   leaveSect(s);
   joinSect(s, 'blood');

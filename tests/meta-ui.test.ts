@@ -68,3 +68,36 @@ test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
   assert.match(source, /点击或移动键切回手动/);
   assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });
+
+test('手机竖屏战斗按钮使用固定网格，不随斩妖数字换行', () => {
+  const start = styles.indexOf(
+    '@media (pointer: coarse) and (max-width: 650px) and (orientation: portrait)',
+  );
+  const end = styles.indexOf('\n}\n.combat-actions .round-button.auto-button', start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const portraitHud = styles.slice(start, end);
+  assert.match(
+    portraitHud,
+    /\.game-hud \.combat-actions \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(4, 32px\);/s,
+  );
+  assert.match(
+    portraitHud,
+    /\.game-hud \.kill-counter \{[^}]*grid-column: 1 \/ 4;[^}]*grid-row: 1;/s,
+  );
+  assert.match(portraitHud, /\.game-hud \.sound-control \{[^}]*grid-column: 4;[^}]*grid-row: 1;/s);
+  assert.match(portraitHud, /\.game-hud \.help-button \{[^}]*grid-column: 1;[^}]*grid-row: 2;/s);
+  assert.match(portraitHud, /\.game-hud \.damage-button \{[^}]*grid-column: 2;[^}]*grid-row: 2;/s);
+  assert.match(
+    portraitHud,
+    /\.game-hud \.fullscreen-button \{[^}]*grid-column: 3;[^}]*grid-row: 2;/s,
+  );
+  assert.match(
+    portraitHud,
+    /\.game-hud \[data-action='pause'\] \{[^}]*grid-column: 4;[^}]*grid-row: 2;/s,
+  );
+  assert.match(
+    portraitHud,
+    /\.game-hud \.auto-button \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 3;/s,
+  );
+});
