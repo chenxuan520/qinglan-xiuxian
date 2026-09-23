@@ -4622,22 +4622,39 @@ body:not(.in-game) #ui {
   }
 }
 
-.reincarnation-row {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #a9baa144;
+.save-record {
+  margin-top: 26px;
+  padding: 18px 20px;
+  border: 1px solid #a9baa12e;
+  background: linear-gradient(120deg, #aac3a408, #d5c58e08);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
 }
-.reincarnation-row h3 {
+.save-record-copy {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.save-record h3 {
   margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 2px;
 }
-.reincarnation-row p {
+.save-record p {
   margin: 0;
   color: #a6bdab;
+  font-size: 11px;
+  line-height: 1.8;
+}
+.save-record-copy > small {
+  display: block;
+  margin-top: 6px;
+  color: #a6bdab;
+  font-size: 9px;
+  letter-spacing: 1px;
 }
 .save-actions {
   display: flex;
@@ -4653,11 +4670,35 @@ body:not(.in-game) #ui {
   cursor: pointer;
 }
 .reincarnate-opening input {
+  appearance: none;
   flex: 0 0 18px;
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
+  display: grid;
+  place-content: center;
+  border: 1px solid #b7c29a99;
+  border-radius: 2px;
+  background: #0d302b;
+  box-shadow: inset 0 0 0 2px #173e34;
   accent-color: var(--gold);
+  cursor: pointer;
+}
+.reincarnate-opening input::before {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid #e6d598;
+  border-bottom: 2px solid #e6d598;
+  transform: translateY(-1px) rotate(45deg) scale(0);
+  transition: transform 0.15s ease;
+}
+.reincarnate-opening input:checked::before {
+  transform: translateY(-1px) rotate(45deg) scale(1);
+}
+.reincarnate-opening input:focus-visible {
+  outline: 2px solid #e8d294;
+  outline-offset: 4px;
 }
 .reincarnate-opening small {
   display: block;
@@ -4669,6 +4710,14 @@ body:not(.in-game) #ui {
 .save-actions button {
   flex: 1 1 auto;
   min-height: 48px;
+}
+.save-record .save-actions {
+  flex: 0 1 auto;
+}
+.save-record .save-actions button {
+  min-height: 40px;
+  padding: 9px 16px;
+  font-size: 11px;
 }
 .retreat-form {
   display: flex;
@@ -5410,6 +5459,22 @@ body.journey-complete:not(.in-game) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.lobby-about {
+  min-height: 40px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.lobby-about:hover {
+  color: var(--gold);
+}
+.lobby-about.storage-warning {
+  color: #cbb48e;
+}
 .prologue-revisit,
 .chronicle-link {
   min-height: 40px;
@@ -5424,6 +5489,85 @@ body.journey-complete:not(.in-game) {
 .prologue-revisit:hover,
 .chronicle-link:hover {
   color: var(--gold);
+}
+.about-copy {
+  display: grid;
+  gap: 18px;
+}
+.about-lead {
+  color: #dce3cc;
+  font-size: 15px;
+  line-height: 1.9;
+}
+.about-maker {
+  padding: 18px 20px;
+  border-left: 2px solid #d5c58e88;
+  background: #acc1a408;
+}
+.about-maker > span,
+.about-meta span {
+  color: #9eb29f;
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+.about-maker strong {
+  display: block;
+  margin-top: 8px;
+  color: #e2dbb8;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.8;
+}
+.about-maker p {
+  margin-top: 8px;
+  color: #a9baaa;
+  font-size: 11px;
+  line-height: 1.9;
+}
+.about-meta {
+  display: grid;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #a9baa12e;
+}
+.about-meta p {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  color: #c5ceb9;
+  font-size: 11px;
+}
+.about-meta span {
+  width: 58px;
+  flex: 0 0 auto;
+}
+.about-meta a:hover {
+  color: var(--gold);
+}
+.about-actions {
+  margin-top: 2px;
+}
+.about-actions a {
+  flex: 1;
+}
+@media (max-width: 360px) {
+  .lobby-footer,
+  .lobby-footer-links {
+    gap: 8px;
+  }
+  .lobby-about,
+  .prologue-revisit,
+  .chronicle-link {
+    font-size: 9px;
+  }
+  .about-actions {
+    gap: 8px;
+  }
+  .about-actions a {
+    padding-inline: 8px;
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
 }
 .spirit-root-summary .root-age {
   margin-top: 10px;
