@@ -4,7 +4,7 @@ import worker, { dialogueMessages, NPC_MODEL, validDialogue } from '../workers/n
 import { type HometownState, type ParentId } from '../src/hometown.ts';
 import { npcDefaultLine, type NpcDialogueRequest } from '../src/npc-dialogue.ts';
 import { requestNpcDialogue } from '../src/npc-chat.ts';
-import { NPC_AI_SETTINGS } from '../src/setting.ts';
+import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { TOWN_NPCS } from '../src/town.ts';
 import { townResidents } from '../src/town-population.ts';
 
@@ -158,7 +158,12 @@ test('既有普通 NPC 和茶馆请求不带家事仍有效，提示词不混入
     assert.ok(npcDefaultLine(npc.id));
     assert.match(dialogueMessages(normal)[0].content, /只称“道友”/);
   }
-  const story = { ...body, npcId: 'tea' as const, mode: 'tea-story' as const };
+  const story = {
+    ...body,
+    npcId: 'tea' as const,
+    mode: 'tea-story' as const,
+    message: TEA_STORY_SETTINGS.requestMessage,
+  };
   assert.equal(validDialogue(story), true);
   assert.match(dialogueMessages(story)[0].content, /听雨茶馆/);
 });
