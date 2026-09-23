@@ -149,7 +149,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
       age: save.age,
       npcId: 'tea',
       realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
-      message: '请讲一回关于问大道、求长生，仙途险恶艰难与人心无情的完整旧闻。',
+      message: TEA_STORY_SETTINGS.requestMessage,
       history: [],
     },
     controller.signal,

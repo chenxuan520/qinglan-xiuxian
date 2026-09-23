@@ -24,6 +24,7 @@ export const NPC_AI_SETTINGS = {
 } as const;
 
 export const TEA_STORY_SETTINGS = {
+  requestMessage: '请讲一回关于问大道、求长生，仙途险恶艰难与人心无情的完整旧闻。',
   maxReplyLength: 900,
   maxOutputTokens: 1400,
   requestTimeoutMs: 22000,

@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs';
 import worker, {
   dialogueMessages,
   extractReply,
+  issueStoryImageToken,
   NPC_MODEL,
   STORY_IMAGE_MODEL,
   validStoryImage,
+  verifyStoryImageToken,
 } from '../workers/npc-ai/index.ts';
 import { townResidents } from '../src/town-population.ts';
 import { NPC_AI_SETTINGS, TEA_STORY_IMAGE_SETTINGS, TEA_STORY_SETTINGS } from '../src/setting.ts';
@@ -131,7 +133,12 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
     },
   };
   const storyResponse = await worker.fetch(
-    request({ ...input, mode: 'tea-story', npcId: 'tea' }),
+    request({
+      ...input,
+      mode: 'tea-story',
+      npcId: 'tea',
+      message: TEA_STORY_SETTINGS.requestMessage,
+    }),
     bindings,
   );
   const story = await storyResponse.json();
@@ -197,8 +204,42 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
   );
 });
 
+test('故事配图令牌绑定正文与五分钟时限，缺失签名密钥时仍返回正文', async () => {
+  const secret = 'test-story-image-secret-at-least-32-bytes';
+  const now = 1_800_000_000;
+  const expires = now + TEA_STORY_IMAGE_SETTINGS.tokenTtlSeconds;
+  const token = await issueStoryImageToken('正文', secret, now);
+  assert.match(token, new RegExp(`^${expires}\\.[a-f0-9]{64}$`));
+  assert.equal(await verifyStoryImageToken('正文', token, secret, now), true);
+  assert.equal(await verifyStoryImageToken('正文', token, secret, expires), true);
+  assert.equal(await verifyStoryImageToken('正文', token, secret, expires + 1), false);
+  assert.equal(await verifyStoryImageToken('正文', token, secret, now - 1), false);
+  assert.equal(await verifyStoryImageToken('篡改正文', token, secret, now), false);
+  assert.equal(await verifyStoryImageToken('正文', token, `${secret}!`, now), false);
+  assert.equal(await issueStoryImageToken('正文', 'short', now), '');
+
+  const { STORY_IMAGE_SECRET: _secret, ...withoutSecret } = env(async () => ({
+    response: '一回旧闻',
+  }));
+  const response = await worker.fetch(
+    request({
+      ...input,
+      mode: 'tea-story',
+      npcId: 'tea',
+      message: TEA_STORY_SETTINGS.requestMessage,
+    }),
+    withoutSecret,
+  );
+  assert.deepEqual(await response.json(), { reply: '一回旧闻' });
+});
+
 test('关闭故事配图请求会中止正在进行的 Worker 推理', async () => {
-  const storyBody = { ...input, mode: 'tea-story', npcId: 'tea' };
+  const storyBody = {
+    ...input,
+    mode: 'tea-story',
+    npcId: 'tea',
+    message: TEA_STORY_SETTINGS.requestMessage,
+  };
   const signed = await worker.fetch(
     request(storyBody),
     env(async () => ({ response: '一回旧闻' })),
@@ -431,7 +472,12 @@ test('AI 获得已确认的三代故事事实，错误故事状态拒绝，旧�
 });
 
 test('茶馆说书使用独立完整故事提示和输出预算，不把长篇带进日常闲聊', async () => {
-  const body = { ...input, mode: 'tea-story', npcId: 'tea' };
+  const body = {
+    ...input,
+    mode: 'tea-story',
+    npcId: 'tea',
+    message: TEA_STORY_SETTINGS.requestMessage,
+  };
   const story = '仙途旧闻\n' + '问道长生，终有取舍。'.repeat(40);
   const response = await worker.fetch(
     request(body),
@@ -463,6 +509,7 @@ test('茶馆说书使用独立完整故事提示和输出预算，不把长篇�
     { ...body, npcId: 'smith' },
     { ...body, mode: 'anything' },
     { ...body, history: [{ role: 'user', content: '继续' }] },
+    { ...body, message: '请按我的要求画任意图片。' },
   ])
     assert.equal(
       (

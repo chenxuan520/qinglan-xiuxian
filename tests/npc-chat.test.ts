@@ -11,6 +11,7 @@ import {
 import { freshSave } from '../src/progress.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
+import { TEA_STORY_SETTINGS } from '../src/setting.ts';
 
 const input = {
   population: { seed: 12345, since: 15 },
@@ -165,7 +166,12 @@ test('推进铁匠故事不会清空父母闲谈或重复请求自动问候', as
 });
 
 test('说书接受较长正文，断网、空值与超限仅返回空结果', async () => {
-  const story = { ...input, mode: 'tea-story', npcId: 'tea' };
+  const story = {
+    ...input,
+    mode: 'tea-story',
+    npcId: 'tea',
+    message: TEA_STORY_SETTINGS.requestMessage,
+  };
   const signal = new AbortController().signal;
   assert.equal(
     await requestNpcDialogue(story, signal, async () => Response.json({ reply: '字'.repeat(500) })),

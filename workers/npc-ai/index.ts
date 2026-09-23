@@ -22,9 +22,13 @@ async function storyImageKey(secret: string) {
     ['sign', 'verify'],
   );
 }
-async function issueStoryImageToken(story: string, secret: string) {
+export async function issueStoryImageToken(
+  story: string,
+  secret: string,
+  now = Math.floor(Date.now() / 1000),
+) {
   if (secret.length < 32) return '';
-  const expires = Math.floor(Date.now() / 1000) + TEA_STORY_IMAGE_SETTINGS.tokenTtlSeconds;
+  const expires = now + TEA_STORY_IMAGE_SETTINGS.tokenTtlSeconds;
   const signature = await crypto.subtle.sign(
     'HMAC',
     await storyImageKey(secret),
@@ -32,12 +36,16 @@ async function issueStoryImageToken(story: string, secret: string) {
   );
   return `${expires}.${[...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 }
-async function verifyStoryImageToken(story: string, token: string, secret = '') {
+export async function verifyStoryImageToken(
+  story: string,
+  token: string,
+  secret = '',
+  now = Math.floor(Date.now() / 1000),
+) {
   if (secret.length < 32) return false;
   const match = token.match(/^(\d{10})\.([a-f0-9]{64})$/);
   if (!match) return false;
   const expires = Number(match[1]);
-  const now = Math.floor(Date.now() / 1000);
   if (expires < now || expires > now + TEA_STORY_IMAGE_SETTINGS.tokenTtlSeconds) return false;
   try {
     const signature = Uint8Array.from(match[2].match(/../g)!, (byte) => Number.parseInt(byte, 16));
@@ -72,6 +80,7 @@ export function validDialogue(value: unknown): value is NpcDialogueRequest {
     (value.mode === undefined ||
       (value.mode === 'tea-story' &&
         value.npcId === 'tea' &&
+        value.message === TEA_STORY_SETTINGS.requestMessage &&
         Array.isArray(value.history) &&
         value.history.length === 0)) &&
     validTownPopulation(value.population) &&
@@ -223,7 +232,7 @@ export function extractReply(output: unknown, story = false) {
   }
   if (typeof content !== 'string') return '';
   let reply = content.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
-  if (story) reply = reply.replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '');
+  if (story) reply = reply.replace(/^[ \t]{0,3}#{1,6}[ \t]+/gm, '').trim();
   if (story && reply.length > maxLength) return '';
   return reply.slice(0, maxLength);
 }
