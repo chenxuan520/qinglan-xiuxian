@@ -58,10 +58,6 @@ export function masteryDescription(save: SaveData, id: string) {
     ? `宗门精研 ${level} 阶 · ${save.mortal.member?.id === id ? `当前生效 ${Math.min(level, studyPlan(save).limit)} 阶，正向效果 +${Math.round(bonus * 100)}%` : '未在本门，加成未生效'}`
     : '';
 }
-export function mortalEntrance(save: SaveData) {
-  const member = SECTS.find((s) => s.id === save.mortal.member?.id);
-  return `<section class="mortal-entrance"><div><small>山下有烟火，山上有仙门</small><h2>入世问道</h2><p>城镇烟火 · 山门问道 · 人间百态</p><div class="mortal-identity"><span>当前身份</span><strong>${member ? `${member.name} · ${member.school === 'orthodox' ? '正道' : '魔道'}` : '散修'}</strong>${member ? `<b>${sectRole(save)}</b>` : ''}</div></div><button class="secondary-button" data-action="mortal-enter">游历人间 <span>入城游历 →</span></button></section>`;
-}
 export function mortalStatus(save: SaveData) {
   const world = save.mortal;
   const life = lifespanInfo(save);

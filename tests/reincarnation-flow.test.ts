@@ -96,7 +96,7 @@ function harness(save: SaveData) {
             : null
           : element,
     },
-    window: { clearTimeout: noop },
+    window: { clearTimeout: noop, matchMedia: () => ({ matches: false }) },
     clearInterval: noop,
     clearInput: noop,
     unlockAudio: noop,
@@ -133,7 +133,7 @@ function harness(save: SaveData) {
         'realmVerse',
         'spriteStyle',
         'spiritRootSummary',
-        'mortalEntrance',
+        'journeyMap',
         'medicineEntrance',
         'chronicleEntrance',
         'icon',

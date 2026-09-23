@@ -9,6 +9,8 @@ import { activeMedicines, refreshMedicineShop, medicineInfo } from './medicine-d
 import { useMedicine, buyMedicine, craftMedicine, buyMedicineRecipe } from './medicine.ts';
 import './style.css';
 import './mortal.css';
+import './journey-map.css';
+import { journeyMap, JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
 import { chronicleEntrance, chronicleContent } from './chronicle-ui.ts';
 import {
   TREASURES,
@@ -123,7 +125,6 @@ import {
   settleSectDues,
 } from './mortal.ts';
 import {
-  mortalEntrance,
   mortalPage,
   mortalStatus,
   townPage,
@@ -377,15 +378,14 @@ function renderLobby(returnYears?: number) {
         <button class="realm-preview" data-action="cultivation"><span class="vertical-poem">${realmVerse(realm)}</span><span class="realm-circle"><small>当前境界</small><strong>${realm.ascending ? '渡劫' : REALMS[realm.index]}</strong><span>${realm.ascending ? '待破七境' : ['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>
       </section>`
       }
-      ${spiritRootSummary(true)}${mortalEntrance(save)}
+      ${spiritRootSummary(true)}
       <section class="expedition" aria-label="选择秘境">
         ${pendingRun ? `<div class="resume-banner"><div><span class="status-dot"></span>尚有一段仙缘未了<small>${pendingRun.encounterName} · ${formatTime(pendingRun.time)} · ${pathInfo(pendingRun.path).name} · 局内 ${pendingRun.level} 级</small></div><button class="secondary-button" data-action="restore">继续上次历练 ${smallIcon('arrow')}</button></div>` : ''}
-        <div class="section-heading"><div><span class="section-number">${completed ? '圆满' : '壹 / 柒'}</span><h2>${completed ? '故地重游，山河依旧' : '择一秘境，启程修行'}</h2></div><span class="muted">已探索 ${save.completed.length} / ${STAGES.length} 处秘境</span></div>
-        <div class="stage-grid">${STAGES.map((s, i) => `<button class="stage-card ${i === selectedStage ? 'selected' : ''} ${i > save.unlocked ? 'locked' : ''}" data-action="stage" data-id="${i}" ${i > save.unlocked ? 'disabled' : ''} style="--stage-color:${s.color}${completed ? `;--stage-image:url('${assetUrl(s.terrain)}')` : ''}"><span class="stage-top"><span>第${s.chapter}境</span>${i > save.unlocked ? smallIcon('lock') : save.completed.includes(i) ? '<span>已通关 ✓</span>' : '<span>可挑战</span>'}</span><strong>${s.name}</strong><span class="stage-bottom">${i > save.unlocked ? '通关前境解锁' : `${s.minutes} 分钟 · ${s.boss}`}<small class="stage-years">每分钟 ${STAGE_YEARS_PER_MINUTE[i]} 年</small></span><span class="stage-ornament">${s.chapter}</span></button>`).join('')}</div>
-        <div class="expedition-footer"><div class="stage-description"><span class="tiny-diamond">◇</span><p>${stage.description}</p></div><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div></div>
+        <div class="journey-selection"><div class="journey-destination" aria-live="polite"><small>第${stage.chapter}境 · ${save.completed.includes(selectedStage) ? '故地重游' : '此行将至'}</small><h3>${stage.name}</h3><p>${stage.description}</p><div class="journey-destination-facts"><span>历练 ${stage.minutes} 分钟</span><span>每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><span>妖王 · ${stage.boss}</span></div></div><div class="journey-depart"><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? (completed ? '再入山河' : '踏入秘境') : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button><small>${pathInfo(save.path).name} · ${DIFFICULTIES[difficulty].name}</small></div></div>
         <div class="path-selection"><span class="field-label">修行之道 · 本局法宝与功法路线</span><div class="path-grid" role="group" aria-label="选择修行路线">${CULTIVATION_PATHS.map((p) => `<button data-action="path" data-id="${p.id}" class="path-card ${save.path === p.id ? 'active' : ''}" aria-pressed="${save.path === p.id}" ${save.mortal.member && p.id !== save.path ? 'disabled' : ''} style="--path-color:${p.color}"><strong>${p.name}</strong><span>${p.desc}</span></button>`).join('')}</div><small>正道、魔道各 18 件法宝与 8 种功法，兼修可混搭。${save.mortal.member ? '宗门在籍：仅可修习本门路线，退宗后解锁其他路线。' : '路线仅影响新历练，续局保留原路线。'}</small></div>
         ${medicineEntrance(save, selectedStage)}
-        <div class="depart-row"><div class="difficulty-wrap"><span class="field-label">历练难度</span><div class="difficulty-switch" role="group" aria-label="历练难度">${DIFFICULTIES.map((d, i) => `<button data-action="difficulty" data-id="${i}" class="${i === difficulty ? 'active' : ''}" aria-pressed="${i === difficulty}">${d.name}<small>${i === 0 ? '推荐初修' : `收益 ×${d.reward}`}</small></button>`).join('')}</div></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? (completed ? '再入山河' : '踏入秘境') : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button></div>
+        <div class="depart-row"><div class="difficulty-wrap"><span class="field-label">历练难度</span><div class="difficulty-switch" role="group" aria-label="历练难度">${DIFFICULTIES.map((d, i) => `<button data-action="difficulty" data-id="${i}" class="${i === difficulty ? 'active' : ''}" aria-pressed="${i === difficulty}">${d.name}<small>${i === 0 ? '推荐初修' : `收益 ×${d.reward}`}</small></button>`).join('')}</div></div><button class="journey-map-link" data-action="journey-map">展开山河 · 另择秘境 <span aria-hidden="true">↓</span></button></div>
+        ${journeyMap(save, selectedStage, window.matchMedia('(max-width: 640px)').matches)}
       </section>
     </main>
     <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><button class="lobby-save-status lobby-about${storageAvailable ? '' : ' storage-warning'}" data-action="about">${storageAvailable ? '关于《叩仙门》 · GitHub' : '本机存档不可用 · 关于《叩仙门》'}</button><span class="lobby-footer-links"><button class="prologue-revisit" data-action="prologue-revisit">重温序章</button>${chronicleEntrance(save)}</span></footer>`;
@@ -736,7 +736,7 @@ function spiritRootSummary(showAge = false) {
 }
 function lifespanSummary() {
   const life = lifespanInfo(save);
-  return `<div class="lifespan-summary"><strong>年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</strong><span>${STAGES[selectedStage].name} · 战斗每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><small>年龄跨局累计，突破大境界延寿；大乘起长生。暂停不计龄，寿尽可广告续命，放弃则强制轮回清空本世进度。${save.lifespanBonus ? `已借寿 ${save.lifespanBonus} 年。` : ''}</small>${save.completed.includes(FINAL_TRIAL_STAGE) ? `<small>七境已通关 · 不再降临天劫 · 已获劫印保留：气血 +${save.tribulations * 3}% / 伤害 +${save.tribulations * 2}%</small>` : save.nextTribulationAge ? `<small>天劫每两万年一次 · 距下次 ${Math.max(0, save.nextTribulationAge - save.age).toFixed(1)} 年 · 已渡 ${save.tribulations} 劫 · 劫印气血 +${save.tribulations * 3}% / 伤害 +${save.tribulations * 2}%</small>` : ''}</div>`;
+  return `<div class="lifespan-summary"><strong>年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</strong><span>${STAGES[selectedStage].name} · 战斗每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><small>年龄跨局累计，突破大境界延寿；大乘起长生。暂停不计龄，寿尽迎来此世终章，轮回将清空本世进度。${save.lifespanBonus ? `已借寿 ${save.lifespanBonus} 年。` : ''}</small>${save.completed.includes(FINAL_TRIAL_STAGE) ? `<small>七境已通关 · 不再降临天劫 · 已获劫印保留：气血 +${save.tribulations * 3}% / 伤害 +${save.tribulations * 2}%</small>` : save.nextTribulationAge ? `<small>天劫每两万年一次 · 距下次 ${Math.max(0, save.nextTribulationAge - save.age).toFixed(1)} 年 · 已渡 ${save.tribulations} 劫 · 劫印气血 +${save.tribulations * 3}% / 伤害 +${save.tribulations * 2}%</small>` : ''}</div>`;
 }
 function retreatEstimate(years: number) {
   const plan = retreatPlan(save, years);
@@ -1414,7 +1414,10 @@ function ensureScene(stage: number, next: () => void, run?: Game | null, tribula
       e.boss ? STAGES[e.bossStage ?? run.stage].sprite : ENEMIES[e.type].sprite,
     ) ?? [];
   const isTribulation = tribulation || !!run?.tribulation;
-  const extraImages = save.prologueSeen ? [] : [PROLOGUE_IMAGE];
+  const extraImages = [
+    window.matchMedia('(max-width: 640px)').matches ? JOURNEY_MAP_MOBILE_IMAGE : JOURNEY_MAP_IMAGE,
+    ...(save.prologueSeen ? [] : [PROLOGUE_IMAGE]),
+  ];
   if (realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max)
     extraImages.push('/assets/qinglan-prologue.webp');
   if (renderer.hasScene(stage, isTribulation, extra, extraImages)) return true;
@@ -1896,11 +1899,26 @@ function handleAction(action: string, id?: string) {
     void (mobileDisplay.active ? mobileDisplay.leave() : mobileDisplay.enter());
     return;
   }
-  if (action === 'revisit' && !game) {
-    document.querySelector('.expedition')?.scrollIntoView({ block: 'start' });
-    document
-      .querySelector<HTMLButtonElement>('.stage-card.selected')
-      ?.focus({ preventScroll: true });
+  if (action === 'journey-map' && !game) {
+    ui.querySelector<HTMLButtonElement>('.journey-node.selected')?.focus({ preventScroll: true });
+    ui.querySelector('.journey-map-heading')?.scrollIntoView({
+      block: 'start',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    });
+    return;
+  }
+  if ((action === 'revisit' || action === 'journey-prepare') && !game) {
+    ui.querySelector<HTMLButtonElement>('.journey-depart [data-action="start"]')?.focus({
+      preventScroll: true,
+    });
+    ui.querySelector('.journey-selection')?.scrollIntoView({
+      block: 'start',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : 'smooth',
+    });
     return;
   }
   if (panel === 'tribulation-forfeit') {
@@ -2485,7 +2503,13 @@ function handleAction(action: string, id?: string) {
   if (action === 'stage') {
     if (Number(id) <= save.unlocked) {
       selectedStage = Number(id);
-      if (ensureScene(selectedStage, renderLobby)) renderLobby();
+      const showStage = () => {
+        renderLobby();
+        ui.querySelector<HTMLButtonElement>(`.journey-node[data-id="${selectedStage}"]`)?.focus({
+          preventScroll: true,
+        });
+      };
+      if (ensureScene(selectedStage, showStage)) showStage();
     }
   }
   if (action === 'path' && !game && !save.mortal.member && isCultivationPath(id)) {
