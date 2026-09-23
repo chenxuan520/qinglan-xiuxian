@@ -1,7 +1,7 @@
 import { npcDefaultLine, type NpcDialogueRequest, type NpcMessage } from './npc-dialogue.ts';
 import { type TownResident } from './town-population.ts';
 import { realmInfo, type SaveData } from './progress.ts';
-import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from './setting.ts';
+import { NPC_AI_SETTINGS, TEA_STORY_IMAGE_SETTINGS, TEA_STORY_SETTINGS } from './setting.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 import { smithStoryLine } from './town-story.ts';
 import { humanStoryGreeting } from './human-stories.ts';
@@ -50,15 +50,59 @@ export async function requestNpcDialogue(
   }
 }
 
+export async function requestTeaStoryImage(
+  story: string,
+  signal: AbortSignal,
+  fetcher: typeof fetch = fetch,
+  timeout = TEA_STORY_IMAGE_SETTINGS.requestTimeoutMs,
+): Promise<Blob | null> {
+  const text = story.trim();
+  if (!text || text.length > TEA_STORY_SETTINGS.maxReplyLength || signal.aborted) return null;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(abort, timeout);
+  try {
+    const response = await fetcher(`${NPC_AI_BASE}/story-image`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ story: text }),
+      signal: controller.signal,
+      credentials: 'omit',
+    });
+    const type = response.headers.get('Content-Type')?.split(';')[0] ?? '';
+    const declared = Number(response.headers.get('Content-Length') || 0);
+    if (
+      !response.ok ||
+      !type.startsWith('image/') ||
+      declared > TEA_STORY_IMAGE_SETTINGS.maxImageBytes
+    )
+      return null;
+    const image = await response.blob();
+    return image.size > 0 && image.size <= TEA_STORY_IMAGE_SETTINGS.maxImageBytes ? image : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', abort);
+  }
+}
+
 // 仅保留本次页面内每个位置当前人物的最近闲谈，不继承给下一任，也不上传完整存档。
 const conversations = new Map<string, { identity: string; messages: NpcMessage[] }>();
 let activeRequest: AbortController | null = null;
 let activeSpeech: StorySpeech | null = null;
+let activeStoryImageUrl = '';
+function clearStoryImage() {
+  if (activeStoryImageUrl) URL.revokeObjectURL(activeStoryImageUrl);
+  activeStoryImageUrl = '';
+}
 export function closeNpcChat() {
   activeRequest?.abort();
   activeRequest = null;
   activeSpeech?.stop();
   activeSpeech = null;
+  clearStoryImage();
 }
 
 export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSound: () => void) {
@@ -112,6 +156,17 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
     reader.play(reply, save.volume);
   });
   stop.addEventListener('click', () => reader.stop());
+  const imageController = new AbortController();
+  activeRequest = imageController;
+  void requestTeaStoryImage(reply, imageController.signal).then((image) => {
+    const current = activeRequest === imageController;
+    if (current) activeRequest = null;
+    if (!current || imageController.signal.aborted || !host.isConnected || !image) return;
+    clearStoryImage();
+    activeStoryImageUrl = URL.createObjectURL(image);
+    host.style.setProperty('--tea-story-image', `url("${activeStoryImageUrl}")`);
+    host.classList.add('has-story-image');
+  });
 }
 export function mountNpcChat(
   host: HTMLElement,

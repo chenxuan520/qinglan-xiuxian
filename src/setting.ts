@@ -30,4 +30,12 @@ export const TEA_STORY_SETTINGS = {
   inferenceTimeoutMs: 20000,
 } as const;
 
+export const TEA_STORY_IMAGE_SETTINGS = {
+  model: '@cf/black-forest-labs/flux-1-schnell',
+  steps: 4,
+  maxImageBytes: 5 * 1024 * 1024,
+  requestTimeoutMs: 30000,
+  inferenceTimeoutMs: 28000,
+} as const;
+
 // 域名绑定、来源白名单和边缘限流绑定属于部署设置，见 workers/npc-ai/wrangler.jsonc。

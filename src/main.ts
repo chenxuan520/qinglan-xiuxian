@@ -317,7 +317,7 @@ function unlockAudio() {
 const currency = () =>
   `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
 function autoplayButton() {
-  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；点击切换手动">AI 代打 · ${save.autoplay ? '开' : '关'}</button>`;
+  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；按 E 开启，移动键接管">自动历练 · ${save.autoplay ? '开' : '关'}</button>`;
 }
 function fullscreenButton() {
   return mobileDisplay.available
@@ -604,7 +604,7 @@ function showTeaStory() {
   panelFrame(
     '一盏茶，半卷仙途',
     '听雨茶馆 · 仙途旧闻',
-    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">醒木初落，且候这一回故事…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div></section><p class="panel-note">本次听书已消耗半载并判定机缘（30% 概率获赠 8 灵石）。阅读与朗读不再计龄；说书暂歇不影响已结算的收益。</p><button class="primary-button" data-action="close">回到街巷</button>',
+    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">醒木初落，且候这一回故事…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div></section><p class="panel-note">本次听书已消耗半载并判定机缘（30% 概率获赠 8 灵石）。故事正文先显示，配图生成成功后淡入；阅读与朗读不再计龄。</p><button class="primary-button" data-action="close">回到街巷</button>',
   );
   void mountTeaStory(modal.querySelector<HTMLElement>('.tea-story')!, save, () => {
     save.sound = true;
@@ -858,7 +858,7 @@ function renderPanel() {
     if (medicineView === 'shop' && refreshMedicineShop(save.medicine, save.age)) persist();
     panelFrame(
       '丹香入道',
-      '炼丹炉 / ALCHEMY',
+      '炼丹炉',
       medicineContent(
         save,
         selectedStage,
@@ -883,8 +883,8 @@ function renderPanel() {
         : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修至三重，可使六重法宝进化为仙器。</p>';
     panelFrame(
       '万般法宝，皆可入道',
-      '藏器阁 / ARTIFACT COLLECTION',
-      `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，自动入库后可设本命与炼器。</p><div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency()}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
+      '藏器阁',
+      `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency()}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
         bookTab === 'treasures'
           ? `<div class="guide-tabs collection-pages" role="group" aria-label="法宝分页">${Array.from(
               { length: Math.ceil(visibleTreasures.length / 12) },
@@ -915,7 +915,7 @@ function renderPanel() {
                   }</small></article>`,
               )
               .join('')
-      }</div>${detail}<p class="panel-note">当前路线：${pathInfo(save.path).name}。纯修只领悟本流派法宝和功法，兼修可混搭。出发携带 1 件本命法宝，局内最多 6 件。精英宝匣可直接提升法宝重数，妖王遗宝自动入库后可设本命与永久炼器；未收藏法宝仍可在局内领悟。</p>`,
+      }</div>${detail}<p class="panel-note">当前路线：${pathInfo(save.path).name}。纯修只领悟本流派法宝和功法，兼修可混搭。出发携带 1 件本命法宝，局内最多 6 件。精英宝匣可直接提升法宝重数，妖王遗宝收入藏器阁后可设本命与永久炼器；未收藏法宝仍可在局内领悟。</p>`,
       true,
     );
   } else if (panel === 'cultivation') {
@@ -923,7 +923,7 @@ function renderPanel() {
     const bonus = realmBonuses(r.step);
     panelFrame(
       '积一寸修为，近一寸长生',
-      '洞府 / CULTIVATION',
+      '洞府',
       `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，获得 +200 基础气血，法宝最终伤害翻倍；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><small>当前境界加成：基础气血 +${bonus.hp}，基础伤害加成 +${Math.round(bonus.damage * 1000) / 10}%${r.max ? '；真仙最终伤害另乘 2' : ''}<br>小阶段 +3 基础气血 / +2.5% 基础伤害加成；大境界增量逐步提高，详见修行指南。成就真仙另增 200 基础气血，同配置最终伤害翻倍。</small></div></div>${spiritRootSummary()}${lifespanSummary()}<div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
         [
           {
@@ -981,7 +981,7 @@ function renderPanel() {
     };
     panelFrame(
       '知妖性，方能破万劫',
-      '妖物志 / BESTIARY',
+      '妖物志',
       `<p class="panel-note">前六境各有 12 种专属妖物，共 72 种；普通秘境只出现本境妖物。下面普通与精英技能说明适用于前六境，切换终关可查看其原有行为。每关分四批加入强敌：前六境按时长 0%、25%、50%、75% 解锁，终关提前到 0:00、0:45、1:30、2:30，后续以新批次为主。第七境「万劫归墟」汇聚历境精英，六位妖王与九天执劫仙尊依次登场；全部击败才能通关并解除成仙瓶颈。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物池">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
         (_, index) => bestiaryStage < 0 || STAGE_ENEMIES[bestiaryStage].includes(index),
       )
@@ -1015,8 +1015,8 @@ function renderPanel() {
   } else if (panel === 'guide') {
     panelFrame(
       '修行指南',
-      '道法有迹 / THE CULTIVATOR’S HANDBOOK',
-      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">首次序章可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、自动前往渡口，离乡后再看命盘。两条路线不影响灵根和物资。离乡不计龄，刷新保留阶段。此后入镇从故居门前开始，不强制交谈。父母随年岁老去，交谈无任务或奖励，家事和家书可在履历与缘簿重读。轮回默认直接命盘；想从头体验，可在洞府轮回确认时勾选「从序章完整开始」，仍会清空本世进度。命盘重抽保持快捷，圆满终章保留故乡选择。重温序章只重看文字，不清档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+      '道法有迹',
+      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">首次序章可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、自动前往渡口，离乡后再看命盘。两条路线不影响灵根和物资。离乡不计龄，刷新保留阶段。此后入镇从故居门前开始，不强制交谈。父母随年岁老去，交谈无任务或奖励，家事和家书可在履历与缘簿重读。轮回默认直接命盘；想从头体验，可在洞府轮回确认时勾选「重走十五岁那一程」，仍会清空本世进度。命盘重抽保持快捷，圆满终章保留故乡选择。重温序章只重看文字，不清档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
     );
   }
 }
@@ -1025,7 +1025,7 @@ function renderHud() {
   document.body.classList.remove('immortal-home');
   lastLoadout = '';
   document.body.classList.add('in-game');
-  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small>触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
+  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
   updateHud();
 }
 let lastLoadout = '';
@@ -1136,7 +1136,7 @@ function updateHud() {
 }
 function renderChoices() {
   if (!game) return;
-  modal.innerHTML = `<div class="modal-backdrop upgrade-backdrop"><section class="upgrade-panel" role="dialog" aria-modal="true" aria-label="局内升级，选择一项机缘"><div class="upgrade-heading"><span class="eyebrow">灵气充盈 · 道法自成</span><h2>顿悟新机缘</h2><p>局内等级 <b>${game.level}</b> <span>·</span> 选择一项，续写你的修行之路</p></div><div class="choice-grid">${game.choices.map((c, i) => choiceCard(c, i)).join('')}</div><div class="upgrade-footer"><span>法宝 ${game.weapons.length} / 6 <i>·</i> 功法 ${Object.keys(game.passives).length} / 4</span><button class="secondary-button" data-action="reroll" ${game.rerolls === 0 ? 'disabled' : ''}>${smallIcon('refresh')}重悟机缘 <span>${game.rerolls} / 3</span></button>${autoplayButton()}<small>${save.autoplay ? 'AI 正在挑选适合当前搭配的机缘…' : '按 1 / 2 / 3 选择'}</small></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop upgrade-backdrop"><section class="upgrade-panel" role="dialog" aria-modal="true" aria-label="局内升级，选择一项机缘"><div class="upgrade-heading"><span class="eyebrow">灵气充盈 · 道法自成</span><h2>顿悟新机缘</h2><p>局内等级 <b>${game.level}</b> <span>·</span> 选择一项，续写你的修行之路</p></div><div class="choice-grid">${game.choices.map((c, i) => choiceCard(c, i)).join('')}</div><div class="upgrade-footer"><span>法宝 ${game.weapons.length} / 6 <i>·</i> 功法 ${Object.keys(game.passives).length} / 4</span><button class="secondary-button" data-action="reroll" ${game.rerolls === 0 ? 'disabled' : ''}>${smallIcon('refresh')}重悟机缘 <span>${game.rerolls} / 3</span></button>${autoplayButton()}<small>${save.autoplay ? '自动历练正在挑选适合当前搭配的机缘…' : '按 1 / 2 / 3 选择'}</small></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('.choice-card')?.focus();
 }
 function choiceCard(c: Choice, i: number) {
@@ -1167,7 +1167,7 @@ function renderPause() {
   if (!game) return;
   panelFrame(
     '静心片刻',
-    '修行暂歇 / PAUSED',
+    '修行暂歇',
     `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · 已斩 ${game.kills} 妖</p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重 ${weaponAffinity(treasure(w.id), game!.spiritRoot, game!.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${game.tribulation ? '放弃本次天劫会强制轮回，清空这一世进度。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton()}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${game.tribulation ? '放弃渡劫 · 轮回' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
   );
 }
@@ -2295,7 +2295,7 @@ function handleAction(action: string, id?: string) {
     panelFrame(
       '轮回转世',
       '重启仙途',
-      '<p class="pause-description">将清空此浏览器在当前网址的全部进度：累计年岁、境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，保留青霄剑与追魂钉入门收藏，并解锁新灵根对应的入门法宝，重新随机灵根资质与五行，资质可能低于当前。</p><label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>从序章完整开始<small>重走序章、故居告别与离乡；不勾选则直接看新命盘。</small></span></label><div class="pause-actions"><button class="secondary-button" data-action="home">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>',
+      '<p class="pause-description">将清空此浏览器在当前网址的全部进度：累计年岁、境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，保留青霄剑与追魂钉入门收藏，并解锁新灵根对应的入门法宝，重新随机灵根资质与五行，资质可能低于当前。</p><label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>重走十五岁那一程<small>重走序章、故居告别与离乡；不勾选则直接看新命盘。</small></span></label><div class="pause-actions"><button class="secondary-button" data-action="home">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>',
     );
     return;
   }
@@ -2317,7 +2317,7 @@ function handleAction(action: string, id?: string) {
       if (game.state === 'upgrade') renderChoices();
       else if (game.state === 'paused' && panel !== 'guide') renderPause();
     } else renderLobby();
-    toast(save.autoplay ? 'AI 代打已开启 · 自动走位与选技' : '已切回手动操作');
+    toast(save.autoplay ? '自动历练已开启 · 自动走位与选技' : '已切回手动操作');
     return;
   }
   if (action === 'sound' || action === 'mute') {
@@ -2731,6 +2731,11 @@ document.addEventListener('keydown', (event) => {
   if (game?.state === 'upgrade' && ['1', '2', '3'].includes(key)) {
     event.preventDefault();
     handleAction('choose', `${Number(key) - 1}`);
+    return;
+  }
+  if (key === 'e' && !save.autoplay && game?.state === 'playing') {
+    event.preventDefault();
+    handleAction('autoplay');
     return;
   }
   if (

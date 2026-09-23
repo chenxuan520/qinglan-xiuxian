@@ -39,7 +39,7 @@ export function medicineContent(
   tier: MedicineTierFilter = 'all',
 ) {
   const active = activeMedicines(save.medicine, save.age);
-  // 库存为零仍保留键，已吃完的永久珍品继续留在药谱中。
+  // 库存为零仍保留键，已吃完的本世珍品继续留在药谱中。
   const discovered = MEDICINES.filter((m) => m.years || Object.hasOwn(save.medicine.bag, m.id));
   const available = discovered.filter((m) =>
     view === 'shop'
@@ -80,9 +80,9 @@ export function medicineContent(
             : view === 'craft'
               ? `<small class="medicine-recipe">${formula}<br>${medicineCraftStones(m.id)} 灵石 · ${m.craftYears} 年</small><button class="secondary-button" data-action="medicine-craft" data-id="${m.id}" ${craftReason ? 'disabled' : ''}>${craftReason || '合成 · 即时结算年岁'}</button>`
               : `${m.years ? `<label class="medicine-quantity" for="medicine-quantity-${m.id}">服用数量<input id="medicine-quantity-${m.id}" type="number" inputmode="numeric" min="1" max="${Math.max(1, owned)}" step="1" value="1" ${useReason ? 'disabled' : ''} aria-label="${m.name}服用数量"></label>` : ''}<button class="secondary-button" data-action="medicine-use" data-id="${m.id}" ${useReason ? 'disabled' : ''}>${useReason || ((save.medicine.active[m.id] || 0) > save.age ? '服用 · 延续药效' : '战前服用')}</button>`;
-      return `<article class="medicine-card ${!m.years ? 'medicine-permanent' : ''}"><header>${art(m)}<div><small>${m.tier}${!m.years ? ' · 永久机缘' : ''}</small><h3>${m.name}</h3><span>持有 ${owned} 份</span></div></header><p>${m.desc}</p><small class="medicine-duration">${m.years ? `每份 ${medicineTime(m.years, stage)}` : '即时生效 · 随此世保留'}${m.id === 'peiying' || m.id === 'huiyang' ? `<br>本世已用 ${save.medicine.used[m.id] || 0} / ${m.id === 'peiying' ? 3 : 2} 次` : ''}</small><small class="medicine-source">${source}</small>${action}</article>`;
+      return `<article class="medicine-card ${!m.years ? 'medicine-permanent' : ''}"><header>${art(m)}<div><small>${m.years ? m.tier : '本世珍品'}</small><h3>${m.name}</h3><span>持有 ${owned} 份</span></div></header><p>${m.desc}</p><small class="medicine-duration">${m.years ? `每份 ${medicineTime(m.years, stage)}` : '即时生效 · 随此世保留'}${m.id === 'peiying' || m.id === 'huiyang' ? `<br>本世已用 ${save.medicine.used[m.id] || 0} / ${m.id === 'peiying' ? 3 : 2} 次` : ''}</small><small class="medicine-source">${source}</small>${action}</article>`;
     })
     .join(
       '',
-    )}</div>${list.length ? '' : '<p class="panel-note">此处暂无该品级丹药。</p>'}<p class="panel-note">第三至第七境首次通关各保底一份限时珍品，不含永久珍品。凡品无需合成；灵品消耗三份凡品与 50 年，限时珍品消耗四份灵品与 500 年。药方仅购买获得，本世材料组合固定，轮回后重新生成。所有掉落自动入库；轮回清空此世丹囊与药效。</p>`;
+    )}</div>${list.length ? '' : '<p class="panel-note">此处暂无该品级丹药。</p>'}<p class="panel-note">第三至第七境首次通关各保底一份限时珍品，不含本世珍品。凡品无需合成；灵品消耗三份凡品与 50 年，限时珍品消耗四份灵品与 500 年。药方仅购买获得，本世材料组合固定，轮回后重新生成。所得丹药收入丹囊；轮回清空此世丹囊与药效。</p>`;
 }

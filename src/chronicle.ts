@@ -100,7 +100,7 @@ export function chronicleAchievements(save: SaveData) {
   return [
     { id: 'forge', title: '炉火纯青', detail: '一件法宝炼器十阶' },
     { id: 'three-paths', title: '三道皆证', detail: '以正道、魔道和兼修分别通关' },
-    { id: 'permanent-medicine', title: '丹成造化', detail: '首次服用永久珍品丹药' },
+    { id: 'permanent-medicine', title: '丹成造化', detail: '首次服用本世珍品丹药' },
     {
       id: 'story',
       title: Object.hasOwn(save.chronicle.milestones, 'story') ? '炉火长明' : '未遇之缘',

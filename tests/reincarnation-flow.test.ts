@@ -501,6 +501,7 @@ test('完整重开选项默认不勾选，选择后取消不改存档，再次�
   const before = JSON.stringify(save);
   context.handleAction('reincarnate');
   assert.match(context.modal.innerHTML, /id="reincarnate-full-opening" type="checkbox"/);
+  assert.match(context.modal.innerHTML, /重走十五岁那一程/);
   assert.doesNotMatch(context.modal.innerHTML, /type="checkbox"[^>]*checked/);
   assert.equal(context.openingChoice.checked, false);
   context.openingChoice.checked = true;

@@ -108,7 +108,7 @@ test('默认仅有青霄剑与追魂钉，未收藏法宝不能炼器但仍可�
   assert.equal(new Game(save, 0, 0).weapons[0].id, 'nail');
 });
 
-test('只有击败妖王才掉三件未拥有法宝，自动入库，收齐后不重复掉落', () => {
+test('只有击败妖王才掉三件未拥有法宝，收入藏器阁，收齐后不重复掉落', () => {
   const save = freshSave();
   const g = new Game(save, 6, 0, () => 0.5);
   const small = g.spawnEnemy(0, true);
@@ -127,7 +127,7 @@ test('只有击败妖王才掉三件未拥有法宝，自动入库，收齐后�
   assert.equal(reloaded.chronicle.entries.filter((e) => e.title === '万宝归藏').length, 1);
 });
 
-test('手动与代打击败妖王后立即解锁炼器，重复击杀和续局不重复入库', () => {
+test('手动与自动历练击败妖王后立即解锁炼器，重复击杀和续局不重复入库', () => {
   for (const autoplay of [false, true]) {
     const save = freshSave();
     save.autoplay = autoplay;

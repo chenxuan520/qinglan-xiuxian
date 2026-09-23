@@ -38,7 +38,7 @@ test('首次入镇与距上次不足千年不抽，满千年只判定一次且50
   assert.equal(save.mortal.immortal, null);
 });
 
-test('仙人赠药60%限时珍品、40%永久珍品，不受妖王关卡池限制', () => {
+test('仙人赠药60%限时珍品、40%本世珍品，不受妖王关卡池限制', () => {
   for (const [roll, timed] of [
     [0, true],
     [0.59999, true],

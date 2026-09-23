@@ -34,4 +34,31 @@ test('洞府使用此世存档文案并保留原导入导出动作', () => {
 test('完整重开使用游戏风格的自绘复选框', () => {
   assert.match(styles, /\.reincarnate-opening input \{[^}]*appearance: none;/s);
   assert.match(styles, /\.reincarnate-opening input:checked::before/);
+  assert.match(source, /自动历练 · \$\{save\.autoplay \? '开' : '关'\}/);
+  assert.match(source, /重走十五岁那一程/);
+  assert.doesNotMatch(source, /AI 代打|AI 正在挑选|从序章完整开始|自动入库|永久珍品/);
+});
+
+test('指南使用自动历练、归处与本世珍品的新称呼', () => {
+  const guide = ['basics', 'medicine', 'builds', 'mortal', 'save']
+    .map((tab) => guideContent(tab))
+    .join('');
+  assert.match(guide, /自动历练/);
+  assert.match(guide, /收入藏器阁/);
+  assert.match(guide, /收入丹囊/);
+  assert.match(guide, /本世珍品/);
+  assert.doesNotMatch(guide, /AI 代打|AI 模式|自动入库|永久珍品/);
+});
+
+test('弹窗眉题不混用英文副标题', () => {
+  assert.doesNotMatch(
+    source,
+    /炼丹炉 \/ ALCHEMY|藏器阁 \/ ARTIFACT COLLECTION|妖物志 \/ BESTIARY|洞府 \/ CULTIVATION|道法有迹 \/ THE CULTIVATOR’S HANDBOOK|修行暂歇 \/ PAUSED/,
+  );
+});
+
+test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
+  assert.match(source, /<kbd>E<\/kbd> 开启自动历练/);
+  assert.match(source, /key === 'e' && !save\.autoplay && game\?\.state === 'playing'/);
+  assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });

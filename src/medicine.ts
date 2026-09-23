@@ -29,7 +29,7 @@ export function medicineUseReason(save: SaveData, id: string, unfinished = false
   if (!(save.medicine.bag[id] > 0)) return '尚未获得';
   if (!Number.isSafeInteger(quantity) || quantity < 1) return '服用数量须为正整数';
   if (quantity > save.medicine.bag[id]) return '丹药数量不足';
-  if (!m.years && quantity !== 1) return '永久丹药须逐份服用';
+  if (!m.years && quantity !== 1) return '本世珍品须逐份服用';
   if (id === 'butian' && save.spiritRoot === 'heaven') return '已是天灵根';
   if (
     id === 'huiyang' &&
@@ -87,7 +87,7 @@ export function useMedicine(
     message += `，寿元增加 ${years} 年`;
   } else if (id === 'peiying') {
     save.medicine.used.peiying = (save.medicine.used.peiying || 0) + 1;
-    message += '，永久气血与基础恢复各 +5%';
+    message += '，本世气血与基础恢复各 +5%';
   } else if (id === 'jiuqu') {
     const major = realmInfo(save.cultivation).index;
     const amount = Math.floor(
@@ -101,7 +101,7 @@ export function useMedicine(
   save.medicine.bag[id] -= quantity;
   recordChronicle(save, '丹药入体', `${message}。`);
   if (!m.years)
-    recordChronicle(save, '丹成造化', `首次服用永久珍品${m.name}。`, 'permanent-medicine');
+    recordChronicle(save, '丹成造化', `首次服用本世珍品${m.name}。`, 'permanent-medicine');
   return { ok: true, message };
 }
 export function buyMedicine(save: SaveData, id: string) {

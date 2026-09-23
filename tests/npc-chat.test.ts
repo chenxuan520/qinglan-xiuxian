@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   requestNpcDialogue,
+  requestTeaStoryImage,
   NPC_AI_BASE,
   mountTeaStory,
   mountNpcChat,
@@ -178,6 +179,39 @@ test('说书接受较长正文，断网、空值与超限仅返回空结果', as
     assert.equal(await requestNpcDialogue(story, signal, async () => response), null);
 });
 
+test('故事配图只接受有限图片响应，失败与取消不影响正文', async () => {
+  const signal = new AbortController().signal;
+  const bytes = new Uint8Array([255, 216, 255, 217]);
+  const image = await requestTeaStoryImage(' 一回旧闻 ', signal, async (url, options) => {
+    assert.equal(url, `${NPC_AI_BASE}/story-image`);
+    assert.equal(options.credentials, 'omit');
+    assert.deepEqual(JSON.parse(options.body), { story: '一回旧闻' });
+    return new Response(bytes, {
+      headers: { 'Content-Type': 'image/jpeg', 'Content-Length': String(bytes.length) },
+    });
+  });
+  assert.equal(image?.type, 'image/jpeg');
+  assert.deepEqual(new Uint8Array(await image!.arrayBuffer()), bytes);
+  for (const response of [
+    Response.json({ error: 'unavailable' }, { status: 503 }),
+    new Response('not image', { headers: { 'Content-Type': 'text/plain' } }),
+    new Response(null, { headers: { 'Content-Type': 'image/jpeg', 'Content-Length': '6000000' } }),
+    new Response(null, { headers: { 'Content-Type': 'image/jpeg' } }),
+  ])
+    assert.equal(await requestTeaStoryImage('旧闻', signal, async () => response), null);
+  let fetched = false;
+  const aborted = new AbortController();
+  aborted.abort();
+  assert.equal(
+    await requestTeaStoryImage('旧闻', aborted.signal, async () => {
+      fetched = true;
+      return new Response(bytes);
+    }),
+    null,
+  );
+  assert.equal(fetched, false);
+});
+
 function storyHost() {
   const nodes = Object.fromEntries(
     ['text', 'status', 'play', 'stop'].map((name) => [
@@ -190,13 +224,65 @@ function storyHost() {
       },
     ]),
   );
+  const attributes = new Map();
+  const styles = new Map();
+  const classes = new Set();
   return {
     isConnected: true,
     querySelector: (selector: string) => nodes[selector],
-    setAttribute() {},
+    setAttribute: (name, value) => attributes.set(name, value),
+    style: { setProperty: (name, value) => styles.set(name, value) },
+    classList: { add: (name) => classes.add(name), contains: (name) => classes.has(name) },
+    attributes,
+    styles,
+    classes,
     nodes,
   };
 }
+
+test('故事正文不等待配图，关闭会取消图片请求，成功后才显示背景', async (t) => {
+  const save = freshSave();
+  save.mortal.population = input.population;
+  const snapshot = JSON.stringify(save);
+  const imageBytes = new Uint8Array([255, 216, 255, 217]);
+  let imageRequest = 0;
+  let resolveFirstImage;
+  let firstImageSignal;
+  t.mock.method(URL, 'createObjectURL', () => 'blob:story-image');
+  const revoke = t.mock.method(URL, 'revokeObjectURL', () => {});
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url).endsWith('/chat')) return Response.json({ reply: '正文已经落定。' });
+    imageRequest++;
+    if (imageRequest === 1) {
+      firstImageSignal = options.signal;
+      return new Promise((resolve) => {
+        resolveFirstImage = resolve;
+      });
+    }
+    return new Response(imageBytes, { headers: { 'Content-Type': 'image/jpeg' } });
+  });
+
+  const pendingHost = storyHost();
+  await mountTeaStory(pendingHost, save, () => assert.fail('不能自动开启声音'));
+  assert.equal(pendingHost.nodes['.tea-story-text'].textContent, '正文已经落定。');
+  assert.equal(pendingHost.attributes.get('aria-busy'), 'false');
+  assert.equal(pendingHost.classList.contains('has-story-image'), false);
+  closeNpcChat();
+  assert.equal(firstImageSignal.aborted, true);
+  resolveFirstImage(new Response(imageBytes, { headers: { 'Content-Type': 'image/jpeg' } }));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(pendingHost.classList.contains('has-story-image'), false);
+
+  const illustrated = storyHost();
+  await mountTeaStory(illustrated, save, () => assert.fail('不能自动开启声音'));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(illustrated.nodes['.tea-story-text'].textContent, '正文已经落定。');
+  assert.equal(illustrated.classList.contains('has-story-image'), true);
+  assert.equal(illustrated.styles.get('--tea-story-image'), 'url("blob:story-image")');
+  closeNpcChat();
+  assert.equal(revoke.mock.callCount(), 1);
+  assert.equal(JSON.stringify(save), snapshot);
+});
 
 test('说书正文只写入文本，失败不补固定故事，关闭后丢弃迟到结果且不修改存档', async (t) => {
   const save = freshSave();

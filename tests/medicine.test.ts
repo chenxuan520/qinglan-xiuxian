@@ -43,7 +43,7 @@ const quiet = (s = rich(), stage = 0) => {
 };
 const approx = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 
-test('品级筛选不混入其他品级，未得永久丹药完全隐藏，吃完仍保留药谱', () => {
+test('品级筛选不混入其他品级，未得本世珍品完全隐藏，吃完仍保留药谱', () => {
   const s = freshSave();
   const hidden = MEDICINES.filter((m) => !m.years);
   const html = medicineContent(s, 0, 'bag', false, false);
@@ -67,6 +67,8 @@ test('品级筛选不混入其他品级，未得永久丹药完全隐藏，吃�
   const restored = parseSave(JSON.stringify(s));
   const visible = medicineContent(restored, 0, 'bag', false, false, '珍品');
   assert.match(visible, /培婴丹/);
+  assert.match(visible, /本世珍品/);
+  assert.doesNotMatch(visible, /永久珍品|永久机缘/);
   assert.match(visible, /本世已用 1 \/ 3 次/);
   assert.equal((visible.match(/<article /g) || []).length, 9);
   for (const m of hidden.filter((m) => m.id !== 'peiying')) assert.ok(!visible.includes(m.name));
@@ -75,7 +77,7 @@ test('品级筛选不混入其他品级，未得永久丹药完全隐藏，吃�
   assert.equal((crafts.match(/<article /g) || []).length, 8);
 });
 
-test('28种丹药为8凡8灵8限时珍品4永久珍品，药方只消耗低一档成丹', () => {
+test('28种丹药为8凡8灵8限时珍品4本世珍品，药方只消耗低一档成丹', () => {
   assert.equal(new Set(MEDICINES.map((m) => m.id)).size, 28);
   assert.deepEqual(
     ['凡品', '灵品', '珍品'].map((tier) => MEDICINES.filter((m) => m.tier === tier).length),
@@ -172,7 +174,7 @@ test('药铺每批每种限购三份，读档不重置额度，十年换货后�
   legacy.medicine.shop!.bought = { [id]: 4 };
   assert.throws(() => importSave(JSON.stringify(legacy)));
 });
-test('买药方后合成，真实扣除对应成丹、灵石及50/500年；凡品与永久珍品不能合成', () => {
+test('买药方后合成，真实扣除对应成丹、灵石及50/500年；凡品与本世珍品不能合成', () => {
   for (const id of ['heqi', 'mingqing']) {
     const s = rich();
     assert.equal(craftMedicine(s, id).ok, false);
@@ -462,7 +464,7 @@ test('妖王灵品概率、限时首通保底与永久稀有池独立，终关�
   medicineLoot(none, 4, false, false, () => 0.9);
   assert.deepEqual(none.bag, {});
 });
-test('最后仙尊每次击败必掉恰好一枚永久珍品，首通限时保底另算', () => {
+test('最后仙尊每次击败必掉恰好一枚本世珍品，首通限时保底另算', () => {
   for (const roll of [0, 0.029, 0.03, 0.5, 0.999999]) {
     for (const first of [false, true]) {
       const s = freshMedicine(() => 0);

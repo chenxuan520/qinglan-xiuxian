@@ -14,11 +14,11 @@ export function runLootContent(loot: Game['loot']) {
       const item = medicineInfo(id)!;
       return {
         name: item.name,
-        detail: item.years ? `${item.tier}丹药` : '永久珍品丹药',
+        detail: item.years ? `${item.tier}丹药` : '本世珍品丹药',
         art: medicineArt(item),
         count,
       };
     }),
   ];
-  return `<section class="result-loot" aria-label="此行收获"><h3>此行收获</h3>${items.length ? `<div class="result-loot-items">${items.map((item) => `<div class="result-loot-item">${item.art}<div class="result-loot-copy"><strong>${item.name}</strong><small>${item.detail}</small></div><b>×${item.count}</b></div>`).join('')}</div>` : ''}<p class="panel-note">${!loot.complete ? '仅记录本次续局后的收获；旧续局之前的物品记录未载。' : items.length ? '物品已自动入库，此处仅展示，不会重复发放。' : '本局未获新的法宝或丹药。'}</p></section>`;
+  return `<section class="result-loot" aria-label="此行收获"><h3>此行收获</h3>${items.length ? `<div class="result-loot-items">${items.map((item) => `<div class="result-loot-item">${item.art}<div class="result-loot-copy"><strong>${item.name}</strong><small>${item.detail}</small></div><b>×${item.count}</b></div>`).join('')}</div>` : ''}<p class="panel-note">${!loot.complete ? '仅记录本次续局后的收获；旧续局之前的物品记录未载。' : items.length ? '法宝收入藏器阁，丹药收入丹囊；此处仅展示，不会重复发放。' : '本局未获新的法宝或丹药。'}</p></section>`;
 }
