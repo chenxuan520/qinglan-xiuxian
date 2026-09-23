@@ -53,7 +53,9 @@ const env = (
   success = true,
 ) => ({
   ALLOWED_ORIGINS: deployedOrigins,
+  STORY_IMAGE_SECRET: 'test-story-image-secret-at-least-32-bytes',
   NPC_LIMITER: { limit: async () => ({ success }) },
+  IMAGE_LIMITER: { limit: async () => ({ success }) },
   AI: { run },
 });
 
@@ -93,20 +95,23 @@ test('NPC Worker 允许游戏来源并生成对白，预检和健康检查不调
 test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不影响正文', async () => {
   assert.equal(STORY_IMAGE_MODEL, '@cf/black-forest-labs/flux-1-schnell');
   assert.match(workerConfig, /"enable_request_signal"/);
-  assert.equal(validStoryImage({ story: '一回旧闻' }), true);
+  assert.match(workerConfig, /"IMAGE_LIMITER"[\s\S]*"limit": 2/);
+  const tokenShape = `1234567890.${'a'.repeat(64)}`;
+  assert.equal(validStoryImage({ story: '一回旧闻', token: tokenShape }), true);
   for (const body of [
     null,
     {},
-    { story: '' },
-    { story: ' '.repeat(10) },
-    { story: '字'.repeat(901) },
+    { story: '', token: tokenShape },
+    { story: ' '.repeat(10), token: tokenShape },
+    { story: '字'.repeat(901), token: tokenShape },
+    { story: '一回旧闻', token: 'invalid' },
   ])
     assert.equal(validStoryImage(body), false);
   let limiterKey = '';
   const bytes = new Uint8Array([255, 216, 255, 217]);
   const bindings = {
     ...env(),
-    NPC_LIMITER: {
+    IMAGE_LIMITER: {
       limit: async ({ key }) => {
         limiterKey = key;
         return { success: true };
@@ -114,6 +119,7 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
     },
     AI: {
       run: async (model, options, settings) => {
+        if (model === NPC_MODEL) return { response: '一回旧闻' };
         assert.equal(model, STORY_IMAGE_MODEL);
         assert.equal(options.steps, TEA_STORY_IMAGE_SETTINGS.steps);
         assert.ok(options.prompt.includes('Chinese xianxia ink-wash'));
@@ -124,7 +130,17 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
       },
     },
   };
-  const response = await worker.fetch(imageRequest({ story: ' 一回旧闻 ' }), bindings);
+  const storyResponse = await worker.fetch(
+    request({ ...input, mode: 'tea-story', npcId: 'tea' }),
+    bindings,
+  );
+  const story = await storyResponse.json();
+  assert.equal(story.reply, '一回旧闻');
+  assert.match(story.imageToken, /^\d{10}\.[a-f0-9]{64}$/);
+  const response = await worker.fetch(
+    imageRequest({ story: ` ${story.reply} `, token: story.imageToken }),
+    bindings,
+  );
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Content-Type'), 'image/jpeg');
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
@@ -139,16 +155,30 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
     bindings,
   );
   assert.equal(preflight.status, 204);
-  for (const body of [{}, { story: '' }, { story: '字'.repeat(901) }])
+  for (const body of [
+    {},
+    { story: '', token: story.imageToken },
+    { story: '字'.repeat(901), token: story.imageToken },
+  ])
     assert.equal((await worker.fetch(imageRequest(body), bindings)).status, 400);
   assert.equal(
-    (await worker.fetch(imageRequest({ story: '旧闻' }), env(undefined, false))).status,
+    (
+      await worker.fetch(
+        imageRequest({ story: story.reply, token: story.imageToken }),
+        env(undefined, false),
+      )
+    ).status,
     429,
+  );
+  assert.equal(
+    (await worker.fetch(imageRequest({ story: '篡改后的旧闻', token: story.imageToken }), bindings))
+      .status,
+    403,
   );
   assert.equal(
     (
       await worker.fetch(
-        imageRequest({ story: '旧闻' }),
+        imageRequest({ story: story.reply, token: story.imageToken }),
         env(async () => ({ image: '' })),
       )
     ).status,
@@ -157,7 +187,7 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
   assert.equal(
     (
       await worker.fetch(
-        imageRequest({ story: '旧闻' }),
+        imageRequest({ story: story.reply, token: story.imageToken }),
         env(async () => {
           throw new Error('upstream');
         }),
@@ -168,25 +198,37 @@ test('故事配图使用固定画风与 Cloudflare 图片模型，失败时不�
 });
 
 test('关闭故事配图请求会中止正在进行的 Worker 推理', async () => {
+  const storyBody = { ...input, mode: 'tea-story', npcId: 'tea' };
+  const signed = await worker.fetch(
+    request(storyBody),
+    env(async () => ({ response: '一回旧闻' })),
+  );
+  const { imageToken } = await signed.json();
   const controller = new AbortController();
   let inferenceSignal;
+  let markInferenceStarted;
+  const inferenceStarted = new Promise((resolve) => {
+    markInferenceStarted = resolve;
+  });
   const pending = worker.fetch(
     new Request('https://npc.example/story-image', {
       method: 'POST',
       headers: { Origin: 'http://localhost:5173', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story: '一回旧闻' }),
+      body: JSON.stringify({ story: '一回旧闻', token: imageToken }),
       signal: controller.signal,
     }),
     env(async (_model, _options, settings) => {
       inferenceSignal = settings.signal;
+      markInferenceStarted();
       return new Promise((_resolve, reject) => {
+        if (inferenceSignal.aborted) return reject(new Error('aborted'));
         inferenceSignal.addEventListener('abort', () => reject(new Error('aborted')), {
           once: true,
         });
       });
     }),
   );
-  await new Promise((resolve) => setImmediate(resolve));
+  await inferenceStarted;
   controller.abort();
   assert.equal((await pending).status, 503);
   assert.equal(inferenceSignal.aborted, true);
@@ -404,7 +446,9 @@ test('茶馆说书使用独立完整故事提示和输出预算，不把长篇�
     }),
   );
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { reply: story });
+  const result = await response.json();
+  assert.equal(result.reply, story);
+  assert.match(result.imageToken, /^\d{10}\.[a-f0-9]{64}$/);
   assert.equal(
     extractReply({ response: '# 《枯骨登仙录》\n正文不带标题标记。' }, true),
     '《枯骨登仙录》\n正文不带标题标记。',

@@ -13,14 +13,15 @@ export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.
   '',
 );
 
-export async function requestNpcDialogue(
+type NpcDialogueResponse = { reply: string; imageToken?: string };
+async function requestNpcDialogueResponse(
   input: NpcDialogueRequest,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
   timeout: number = input.mode === 'tea-story'
     ? TEA_STORY_SETTINGS.requestTimeoutMs
     : NPC_AI_SETTINGS.requestTimeoutMs,
-): Promise<string | null> {
+): Promise<NpcDialogueResponse | null> {
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal.addEventListener('abort', abort, { once: true });
@@ -36,12 +37,21 @@ export async function requestNpcDialogue(
     });
     if (!response.ok) return null;
     const data = await response.json();
-    return typeof data?.reply === 'string' &&
+    const reply =
+      typeof data?.reply === 'string' &&
       data.reply.trim() &&
       data.reply.length <=
         (input.mode === 'tea-story' ? TEA_STORY_SETTINGS : NPC_AI_SETTINGS).maxReplyLength
-      ? data.reply.trim()
-      : null;
+        ? data.reply.trim()
+        : null;
+    if (!reply) return null;
+    const imageToken =
+      input.mode === 'tea-story' &&
+      typeof data.imageToken === 'string' &&
+      /^\d{10}\.[a-f0-9]{64}$/.test(data.imageToken)
+        ? data.imageToken
+        : undefined;
+    return { reply, imageToken };
   } catch {
     return null;
   } finally {
@@ -50,14 +60,32 @@ export async function requestNpcDialogue(
   }
 }
 
+export async function requestNpcDialogue(
+  input: NpcDialogueRequest,
+  signal: AbortSignal,
+  fetcher: typeof fetch = fetch,
+  timeout: number = input.mode === 'tea-story'
+    ? TEA_STORY_SETTINGS.requestTimeoutMs
+    : NPC_AI_SETTINGS.requestTimeoutMs,
+): Promise<string | null> {
+  return (await requestNpcDialogueResponse(input, signal, fetcher, timeout))?.reply ?? null;
+}
+
 export async function requestTeaStoryImage(
   story: string,
+  token: string,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
   timeout = TEA_STORY_IMAGE_SETTINGS.requestTimeoutMs,
 ): Promise<Blob | null> {
   const text = story.trim();
-  if (!text || text.length > TEA_STORY_SETTINGS.maxReplyLength || signal.aborted) return null;
+  if (
+    !text ||
+    text.length > TEA_STORY_SETTINGS.maxReplyLength ||
+    !/^\d{10}\.[a-f0-9]{64}$/.test(token) ||
+    signal.aborted
+  )
+    return null;
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal.addEventListener('abort', abort, { once: true });
@@ -66,7 +94,7 @@ export async function requestTeaStoryImage(
     const response = await fetcher(`${NPC_AI_BASE}/story-image`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ story: text }),
+      body: JSON.stringify({ story: text, token }),
       signal: controller.signal,
       credentials: 'omit',
     });
@@ -114,7 +142,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   const play = host.querySelector<HTMLButtonElement>('.tea-story-play')!;
   const stop = host.querySelector<HTMLButtonElement>('.tea-story-stop')!;
   host.setAttribute('aria-busy', 'true');
-  const reply = await requestNpcDialogue(
+  const story = await requestNpcDialogueResponse(
     {
       mode: 'tea-story',
       population: save.mortal.population!,
@@ -129,10 +157,11 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
   activeRequest = null;
   host.setAttribute('aria-busy', 'false');
-  if (!reply) {
+  if (!story) {
     status.textContent = '说书暂歇，下回再来听吧。';
     return;
   }
+  const { reply, imageToken } = story;
   text.textContent = reply;
   status.textContent = '茶馆传说 · 一回一故事';
   const reader = new StorySpeech((state) => {
@@ -156,9 +185,10 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
     reader.play(reply, save.volume);
   });
   stop.addEventListener('click', () => reader.stop());
+  if (!imageToken) return;
   const imageController = new AbortController();
   activeRequest = imageController;
-  void requestTeaStoryImage(reply, imageController.signal).then((image) => {
+  void requestTeaStoryImage(reply, imageToken, imageController.signal).then((image) => {
     const current = activeRequest === imageController;
     if (current) activeRequest = null;
     if (!current || imageController.signal.aborted || !host.isConnected || !image) return;

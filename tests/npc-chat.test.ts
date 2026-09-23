@@ -181,11 +181,12 @@ test('说书接受较长正文，断网、空值与超限仅返回空结果', as
 
 test('故事配图只接受有限图片响应，失败与取消不影响正文', async () => {
   const signal = new AbortController().signal;
+  const token = `1234567890.${'a'.repeat(64)}`;
   const bytes = new Uint8Array([255, 216, 255, 217]);
-  const image = await requestTeaStoryImage(' 一回旧闻 ', signal, async (url, options) => {
+  const image = await requestTeaStoryImage(' 一回旧闻 ', token, signal, async (url, options) => {
     assert.equal(url, `${NPC_AI_BASE}/story-image`);
     assert.equal(options.credentials, 'omit');
-    assert.deepEqual(JSON.parse(options.body), { story: '一回旧闻' });
+    assert.deepEqual(JSON.parse(options.body), { story: '一回旧闻', token });
     return new Response(bytes, {
       headers: { 'Content-Type': 'image/jpeg', 'Content-Length': String(bytes.length) },
     });
@@ -198,12 +199,12 @@ test('故事配图只接受有限图片响应，失败与取消不影响正文',
     new Response(null, { headers: { 'Content-Type': 'image/jpeg', 'Content-Length': '6000000' } }),
     new Response(null, { headers: { 'Content-Type': 'image/jpeg' } }),
   ])
-    assert.equal(await requestTeaStoryImage('旧闻', signal, async () => response), null);
+    assert.equal(await requestTeaStoryImage('旧闻', token, signal, async () => response), null);
   let fetched = false;
   const aborted = new AbortController();
   aborted.abort();
   assert.equal(
-    await requestTeaStoryImage('旧闻', aborted.signal, async () => {
+    await requestTeaStoryImage('旧闻', token, aborted.signal, async () => {
       fetched = true;
       return new Response(bytes);
     }),
@@ -251,7 +252,11 @@ test('故事正文不等待配图，关闭会取消图片请求，成功后才�
   t.mock.method(URL, 'createObjectURL', () => 'blob:story-image');
   const revoke = t.mock.method(URL, 'revokeObjectURL', () => {});
   t.mock.method(globalThis, 'fetch', async (url, options) => {
-    if (String(url).endsWith('/chat')) return Response.json({ reply: '正文已经落定。' });
+    if (String(url).endsWith('/chat'))
+      return Response.json({
+        reply: '正文已经落定。',
+        imageToken: `1234567890.${'a'.repeat(64)}`,
+      });
     imageRequest++;
     if (imageRequest === 1) {
       firstImageSignal = options.signal;

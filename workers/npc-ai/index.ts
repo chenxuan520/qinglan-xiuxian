@@ -11,6 +11,46 @@ import { hometownParents, validHometown } from '../../src/hometown.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
 export const STORY_IMAGE_MODEL = TEA_STORY_IMAGE_SETTINGS.model;
+type WorkerEnv = NpcAiEnv & { STORY_IMAGE_SECRET?: string };
+const textEncoder = new TextEncoder();
+async function storyImageKey(secret: string) {
+  return crypto.subtle.importKey(
+    'raw',
+    textEncoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  );
+}
+async function issueStoryImageToken(story: string, secret: string) {
+  if (secret.length < 32) return '';
+  const expires = Math.floor(Date.now() / 1000) + TEA_STORY_IMAGE_SETTINGS.tokenTtlSeconds;
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    await storyImageKey(secret),
+    textEncoder.encode(`${expires}\n${story}`),
+  );
+  return `${expires}.${[...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+async function verifyStoryImageToken(story: string, token: string, secret = '') {
+  if (secret.length < 32) return false;
+  const match = token.match(/^(\d{10})\.([a-f0-9]{64})$/);
+  if (!match) return false;
+  const expires = Number(match[1]);
+  const now = Math.floor(Date.now() / 1000);
+  if (expires < now || expires > now + TEA_STORY_IMAGE_SETTINGS.tokenTtlSeconds) return false;
+  try {
+    const signature = Uint8Array.from(match[2].match(/../g)!, (byte) => Number.parseInt(byte, 16));
+    return crypto.subtle.verify(
+      'HMAC',
+      await storyImageKey(secret),
+      signature,
+      textEncoder.encode(`${expires}\n${story}`),
+    );
+  } catch {
+    return false;
+  }
+}
 function allowedOrigin(origin: string, configured: string) {
   try {
     const url = new URL(origin);
@@ -66,12 +106,14 @@ export function validDialogue(value: unknown): value is NpcDialogueRequest {
     )
   );
 }
-export function validStoryImage(value: unknown): value is { story: string } {
+export function validStoryImage(value: unknown): value is { story: string; token: string } {
   return (
     record(value) &&
     typeof value.story === 'string' &&
     value.story.trim().length > 0 &&
-    value.story.length <= TEA_STORY_SETTINGS.maxReplyLength
+    value.story.length <= TEA_STORY_SETTINGS.maxReplyLength &&
+    typeof value.token === 'string' &&
+    /^\d{10}\.[a-f0-9]{64}$/.test(value.token)
   );
 }
 function storyImageBytes(value: unknown) {
@@ -187,7 +229,7 @@ export function extractReply(output: unknown, story = false) {
 }
 
 export default {
-  async fetch(request: Request, env: NpcAiEnv): Promise<Response> {
+  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
     const origin = request.headers.get('Origin') || '';
     const allowed = allowedOrigin(origin, env.ALLOWED_ORIGINS);
     const headers = new Headers({ 'Cache-Control': 'no-store', Vary: 'Origin' });
@@ -218,8 +260,10 @@ export default {
     }
     if (path === '/story-image') {
       if (!validStoryImage(input)) return json({ error: 'invalid-story' }, 400);
+      if (!(await verifyStoryImageToken(input.story.trim(), input.token, env.STORY_IMAGE_SECRET)))
+        return json({ error: 'invalid-token' }, 403);
       try {
-        const limit = await env.NPC_LIMITER.limit({
+        const limit = await env.IMAGE_LIMITER.limit({
           key: `story-image:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
         });
         if (!limit.success) return json({ error: 'busy' }, 429);
@@ -264,7 +308,13 @@ export default {
       );
       const reply = extractReply(output, input.mode === 'tea-story');
       if (!reply) return json({ error: 'empty-reply', fallback: true }, 502);
-      return json({ reply });
+      if (input.mode !== 'tea-story') return json({ reply });
+      try {
+        const imageToken = await issueStoryImageToken(reply, env.STORY_IMAGE_SECRET || '');
+        return json(imageToken ? { reply, imageToken } : { reply });
+      } catch {
+        return json({ reply });
+      }
     } catch {
       console.warn(JSON.stringify({ event: 'npc-ai-unavailable' }));
       return json({ error: 'unavailable', fallback: true }, 503);

@@ -316,8 +316,8 @@ function unlockAudio() {
 }
 const currency = () =>
   `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
-function autoplayButton() {
-  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；按 E 开启，移动键接管">自动历练 · ${save.autoplay ? '开' : '关'}</button>`;
+function autoplayButton(inGame = false) {
+  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；${inGame ? '按 E 开启，移动键接管' : '点击切换手动'}">自动历练 · ${save.autoplay ? '开' : '关'}</button>`;
 }
 function fullscreenButton() {
   return mobileDisplay.available
@@ -325,7 +325,7 @@ function fullscreenButton() {
     : '';
 }
 function controls(inGame = false) {
-  return `${autoplayButton()}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton()}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
+  return `${autoplayButton(inGame)}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton()}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 function realmVerse(realm: ReturnType<typeof realmInfo>) {
   return REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]];
@@ -2733,7 +2733,7 @@ document.addEventListener('keydown', (event) => {
     handleAction('choose', `${Number(key) - 1}`);
     return;
   }
-  if (key === 'e' && !save.autoplay && game?.state === 'playing') {
+  if (key === 'e' && !event.repeat && !save.autoplay && game?.state === 'playing') {
     event.preventDefault();
     handleAction('autoplay');
     return;
