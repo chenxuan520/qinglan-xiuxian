@@ -954,6 +954,11 @@ export class Game {
       g.serial = s.serial;
       g.state = s.state === 'upgrade' && s.level <= MAX_RUN_LEVEL ? 'upgrade' : 'paused';
       if (s.level > MAX_RUN_LEVEL) g.choices = [];
+      if (
+        g.state === 'upgrade' &&
+        g.choices.some((choice) => choice.type === 'evolve' && !g.canEvolve(choice.id))
+      )
+        g.choices = g.makeChoices();
       if (g.state === 'upgrade' && !g.choices.length) return null;
       if (g.state === 'upgrade' && g.choices.length === 1) {
         g.choose(0);
@@ -2543,17 +2548,24 @@ export class Game {
   private float(at: Point, text: string, color: string) {
     this.effect(at.x + (this.random() - 0.5) * 16, at.y - 22, 0.65, 0, color, 'text', text);
   }
+  private canEvolve(id: string) {
+    const item = TREASURES.find((treasure) => treasure.id === id);
+    const owned = this.weapons.find((weapon) => weapon.id === id);
+    return (
+      !!item &&
+      !!owned &&
+      owned.level === MAX_WEAPON_LEVEL &&
+      !owned.evolved &&
+      evolutionPassives(item, this.path).some(
+        (passiveId) => (this.passives[passiveId] || 0) >= MAX_PASSIVE_LEVEL,
+      )
+    );
+  }
   makeChoices(exclude: Choice[] = []): Choice[] {
     const pool: Choice[] = [];
     for (const t of TREASURES) {
       const owned = this.weapons.find((w) => w.id === t.id);
-      if (
-        owned &&
-        owned.level === MAX_WEAPON_LEVEL &&
-        !owned.evolved &&
-        evolutionPassives(t, this.path).some((id) => (this.passives[id] || 0) >= 3)
-      )
-        pool.push({ type: 'evolve', id: t.id, level: 7 });
+      if (this.canEvolve(t.id)) pool.push({ type: 'evolve', id: t.id, level: 7 });
       else if (owned && owned.level < MAX_WEAPON_LEVEL)
         pool.push({ type: 'weapon', id: t.id, level: owned.level + 1 });
       else if (!owned && allowsSchool(this.path, t.school) && this.weapons.length < MAX_WEAPONS)
@@ -2614,6 +2626,7 @@ export class Game {
       else this.weapons.push({ id: c.id as WeaponKind, level: 1, evolved: false, timer: 0 });
     }
     if (c.type === 'evolve') {
+      if (!this.canEvolve(c.id)) return false;
       this.weapons.find((w) => w.id === c.id)!.evolved = true;
       this.announce(`仙器觉醒 · ${treasure(c.id).evolution}`);
       this.recordRunAchievements();

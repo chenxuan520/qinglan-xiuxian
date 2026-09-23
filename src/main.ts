@@ -762,7 +762,7 @@ function weaponAffinity(
   return `<span class="element-affinity ${bonus ? 'resonant' : ''}" style="--element-color:${element.color}">${element.name}系${bonus ? ` · ${compact ? '' : '灵根加伤 '}+${bonus}%` : compact ? '' : ' · 无灵根加成'}</span>`;
 }
 function evolutionRecipe(t: Treasure, path: CultivationPath) {
-  const partners = evolutionPassives(t, path).map((id) => `${passive(id).name}三重`);
+  const partners = evolutionPassives(t, path).map((id) => `${passive(id).name}五重`);
   return `<div class="evolution-recipe"><span>仙器 · ${t.evolution}</span><div>${t.name}六重 ＋ ${partners.length > 1 ? `（${partners.join(' 或 ')}）` : partners[0]}</div></div>`;
 }
 function showPanel(name: string) {
@@ -884,8 +884,8 @@ function renderPanel() {
       owned = save.artifacts.includes(t.id);
     const detail =
       bookTab === 'treasures'
-        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法三重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需击败妖王获得遗宝' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>炼器伤害 +${Math.round(forgeDamageBonus(level) * 100)}%${level < MAX_FORGE_LEVEL ? ` · 下一阶 +${Math.round(forgeDamageBonus(level + 1) * 100)}%（较当前提升 ${(((1 + forgeDamageBonus(level + 1)) / (1 + forgeDamageBonus(level)) - 1) * 100).toFixed(1)}%）` : ' · 十阶圆满'}</small></div></div>`
-        : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修至三重，可使六重法宝进化为仙器。</p>';
+        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需击败妖王获得遗宝' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>炼器伤害 +${Math.round(forgeDamageBonus(level) * 100)}%${level < MAX_FORGE_LEVEL ? ` · 下一阶 +${Math.round(forgeDamageBonus(level + 1) * 100)}%（较当前提升 ${(((1 + forgeDamageBonus(level + 1)) / (1 + forgeDamageBonus(level)) - 1) * 100).toFixed(1)}%）` : ' · 十阶圆满'}</small></div></div>`
+        : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修满五重，才可使六重法宝进化为仙器。</p>';
     panelFrame(
       '万般法宝，皆可入道',
       '藏器阁',

@@ -1,4 +1,10 @@
-import { treasure, evolutionPassives, MAX_WEAPON_LEVEL, FINAL_TRIAL_STAGE } from './data.ts';
+import {
+  treasure,
+  evolutionPassives,
+  MAX_WEAPON_LEVEL,
+  MAX_PASSIVE_LEVEL,
+  FINAL_TRIAL_STAGE,
+} from './data.ts';
 import type { Choice, Game } from './game.ts';
 
 const favored = [
@@ -20,10 +26,10 @@ function choiceScore(c: Choice, g: Game) {
   if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
   if (c.type === 'weapon')
     return (favored.includes(c.id) ? 15 : 10) + (c.level > 1 ? 8 : 2) + c.level;
-  // 六重法宝优先从领悟起补齐三重配套功法；实际觉醒仍是最高优先级。
+  // 六重法宝优先从领悟起补满配套功法；实际觉醒仍是最高优先级。
   if (
     c.level >= 1 &&
-    c.level <= 3 &&
+    c.level <= MAX_PASSIVE_LEVEL &&
     (g.passives[c.id] || 0) === c.level - 1 &&
     g.weapons.some((w) => {
       const required = evolutionPassives(treasure(w.id), g.path);
@@ -31,7 +37,7 @@ function choiceScore(c: Choice, g: Game) {
         !w.evolved &&
         w.level === MAX_WEAPON_LEVEL &&
         required.includes(c.id) &&
-        !required.some((id) => (g.passives[id] || 0) >= 3)
+        !required.some((id) => (g.passives[id] || 0) >= MAX_PASSIVE_LEVEL)
       );
     })
   )
