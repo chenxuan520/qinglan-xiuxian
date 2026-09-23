@@ -216,6 +216,7 @@ test('故事配图令牌绑定正文与五分钟时限，缺失签名密钥时�
   assert.equal(await verifyStoryImageToken('正文', token, secret, now - 1), false);
   assert.equal(await verifyStoryImageToken('篡改正文', token, secret, now), false);
   assert.equal(await verifyStoryImageToken('正文', token, `${secret}!`, now), false);
+  assert.equal(await verifyStoryImageToken('正文', token, '', now), false);
   assert.equal(await issueStoryImageToken('正文', 'short', now), '');
 
   const { STORY_IMAGE_SECRET: _secret, ...withoutSecret } = env(async () => ({
@@ -231,6 +232,10 @@ test('故事配图令牌绑定正文与五分钟时限，缺失签名密钥时�
     withoutSecret,
   );
   assert.deepEqual(await response.json(), { reply: '一回旧闻' });
+  assert.equal(
+    (await worker.fetch(imageRequest({ story: '正文', token }), withoutSecret)).status,
+    403,
+  );
 });
 
 test('关闭故事配图请求会中止正在进行的 Worker 推理', async () => {

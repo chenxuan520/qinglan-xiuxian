@@ -317,7 +317,12 @@ function unlockAudio() {
 const currency = () =>
   `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
 function autoplayButton(inGame = false) {
-  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="自动走位、拾取与选择升级；${inGame ? '按 E 开启，移动键接管' : '点击切换手动'}">自动历练 · ${save.autoplay ? '开' : '关'}</button>`;
+  const title = save.autoplay
+    ? '自动走位、拾取与选择升级；点击或移动键切回手动'
+    : inGame
+      ? '按 E 或点击开启自动走位、拾取与选择升级'
+      : '点击开启自动走位、拾取与选择升级';
+  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="${title}">自动历练 · ${save.autoplay ? '开' : '关'}</button>`;
 }
 function fullscreenButton() {
   return mobileDisplay.available
