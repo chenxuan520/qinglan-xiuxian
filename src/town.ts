@@ -5,17 +5,8 @@ export const TOWN_START = { x: 1740, y: 1250 };
 export const HOMETOWN_HOUSE = { x: 600, y: 450 };
 export const HOMETOWN_START = { x: 600, y: 600 };
 export const HOMETOWN_DOCK = { x: 3360, y: 1250 };
-export const HOMETOWN_ROUTE = [
-  HOMETOWN_START,
-  { x: 600, y: 560 },
-  { x: 885, y: 560 },
-  { x: 885, y: 750 },
-  { x: 1740, y: 750 },
-  { x: 1740, y: 1150 },
-  { x: 2580, y: 1150 },
-  { x: 2580, y: 1250 },
-  HOMETOWN_DOCK,
-];
+export const TOWN_WALK_SPEED = 180;
+export const HOMETOWN_NAV_SPEED = 330;
 const STREET_ENDS = [870, 1740, 2580, 3150];
 const STREET_ROWS = [
   [560, 750, 590, 680],
@@ -144,10 +135,11 @@ export function moveInTown(
   seconds: number,
   buildings: readonly TownPoint[] = TOWN_BUILDINGS,
   buildingSize = 305,
+  speed = TOWN_WALK_SPEED,
 ) {
   const length = Math.hypot(input.x, input.y);
   if (!length || !Number.isFinite(seconds) || seconds <= 0) return { ...position };
-  const distance = (180 * Math.min(seconds, 0.05)) / Math.max(1, length);
+  const distance = (speed * Math.min(seconds, 0.05)) / Math.max(1, length);
   const next = { ...position };
   if (townWalkable({ x: next.x + input.x * distance, y: next.y }, buildings, buildingSize))
     next.x += input.x * distance;

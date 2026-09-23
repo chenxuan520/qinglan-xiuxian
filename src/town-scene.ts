@@ -7,7 +7,8 @@ import {
   TOWN_STREETS,
   HOMETOWN_START,
   HOMETOWN_DOCK,
-  HOMETOWN_ROUTE,
+  TOWN_WALK_SPEED,
+  HOMETOWN_NAV_SPEED,
   moveInTown,
   townWalkable,
   townDockPath,
@@ -56,6 +57,7 @@ export class TownScene {
   private homeAppearance = '';
   private buildingSize = 305;
   private route: TownPoint[] = [];
+  private routeGuide?: SVGPolylineElement;
   private routeShown = false;
 
   constructor(
@@ -98,11 +100,15 @@ export class TownScene {
       const minimap = host.querySelector('.town-minimap')!;
       if (hometown.state.stage !== 'departed') {
         const route = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-        route.setAttribute('points', HOMETOWN_ROUTE.map((p) => `${p.x},${p.y}`).join(' '));
+        route.classList.add('town-route-guide');
         route.setAttribute('fill', 'none');
         route.setAttribute('stroke', '#fff1bd');
         route.setAttribute('stroke-width', '35');
         minimap.append(route);
+        this.routeGuide = route;
+        this.updateDockRouteGuide(
+          townDockPath(this.position, this.layout.buildings, this.buildingSize),
+        );
       }
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       label.setAttribute('x', String(HOMETOWN_START.x));
@@ -142,7 +148,7 @@ export class TownScene {
         const key = e.key.toLowerCase();
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
           e.preventDefault();
-          this.route = [];
+          this.stopDockNavigation();
           this.keys.add(key);
         }
         if (
@@ -163,7 +169,7 @@ export class TownScene {
       (e) => {
         if (!this.enabled || this.pointer) return;
         e.preventDefault();
-        this.route = [];
+        this.stopDockNavigation();
         host.focus({ preventScroll: true });
         this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
         host.setPointerCapture(e.pointerId);
@@ -284,6 +290,7 @@ export class TownScene {
     const remaining = target
       ? Math.hypot(target.x - this.position.x, target.y - this.position.y)
       : 0;
+    const speed = target ? HOMETOWN_NAV_SPEED : TOWN_WALK_SPEED;
     if (!this.enabled) this.clearInput();
     else
       this.position = moveInTown(
@@ -303,9 +310,10 @@ export class TownScene {
                 Number(this.keys.has('w') || this.keys.has('arrowup')) +
                 this.touch.y,
             },
-        target ? Math.min(dt, remaining / 180) : dt,
+        target ? Math.min(dt, remaining / speed) : dt,
         this.layout.buildings,
         this.buildingSize,
+        speed,
       );
     if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
       this.route.shift();
@@ -327,7 +335,7 @@ export class TownScene {
       : null;
     const near =
       departure || homeTarget ? undefined : this.residents.find((npc) => npc.id === nearId);
-    if (homeTarget === 'dock') this.route = [];
+    if (homeTarget === 'dock' && this.route.length) this.stopDockNavigation();
     const navigating = this.route.length > 0;
     if (this.nearby !== near || this.homeTarget !== homeTarget || this.routeShown !== navigating) {
       this.nearby = near;
@@ -403,9 +411,20 @@ export class TownScene {
   toggleDockNavigation() {
     if (!this.ready || this.hometown?.state.stage !== 'walk') return;
     this.clearInput();
-    this.route = this.route.length
-      ? []
-      : townDockPath(this.position, this.layout.buildings, this.buildingSize);
+    if (this.route.length) this.stopDockNavigation();
+    else {
+      this.route = townDockPath(this.position, this.layout.buildings, this.buildingSize);
+      this.updateDockRouteGuide(this.route);
+    }
+  }
+  private updateDockRouteGuide(route: readonly TownPoint[]) {
+    this.routeGuide?.setAttribute(
+      'points',
+      route.length ? [this.position, ...route].map((p) => `${p.x},${p.y}`).join(' ') : '',
+    );
+  }
+  private stopDockNavigation() {
+    this.route = [];
   }
   destroy() {
     this.events.abort();

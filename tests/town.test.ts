@@ -16,6 +16,7 @@ import {
   townDockPath,
   HOMETOWN_START,
   HOMETOWN_DOCK,
+  HOMETOWN_NAV_SPEED,
 } from '../src/town.ts';
 
 test('房前屋后与两侧空地可走，不再把整块宅地当作空气墙', () => {
@@ -57,12 +58,18 @@ test('渡口自动寻路从故居、屋后、窄隙及其他栈桥绕开房屋�
           step < 2000 && Math.hypot(target.x - p.x, target.y - p.y) > 0.01;
           step++
         ) {
-          const time = Math.min(dt, Math.hypot(target.x - p.x, target.y - p.y) / 180);
+          const time = Math.min(
+            dt,
+            Math.hypot(target.x - p.x, target.y - p.y) / HOMETOWN_NAV_SPEED,
+          );
           const remaining = Math.hypot(target.x - p.x, target.y - p.y);
           p = moveInTown(
             p,
             { x: (target.x - p.x) / remaining, y: (target.y - p.y) / remaining },
             time,
+            TOWN_BUILDINGS,
+            305,
+            HOMETOWN_NAV_SPEED,
           );
           seconds += dt;
           assert.ok(townWalkable(p), '自动走动不能穿过房屋或进入河面');
@@ -77,10 +84,10 @@ test('渡口自动寻路从故居、屋后、窄隙及其他栈桥绕开房屋�
   }
 });
 
-test('自动走动在路点前保持正常速度，不在最后不足一像素处停顿', () => {
+test('自动走动按离乡速度前进且约十秒走完，不在最后不足一像素处停顿', () => {
   const start = { x: 600, y: 597 },
     target = { x: 720, y: 720 };
-  const expected = Math.hypot(target.x - start.x, target.y - start.y) / 180;
+  const expected = Math.hypot(target.x - start.x, target.y - start.y) / HOMETOWN_NAV_SPEED;
   for (const dt of [1 / 60, 0.05]) {
     let p = { ...start },
       frames = 0;
@@ -89,13 +96,25 @@ test('自动走动在路点前保持正常速度，不在最后不足一像素�
       p = moveInTown(
         p,
         { x: (target.x - p.x) / distance, y: (target.y - p.y) / distance },
-        Math.min(dt, distance / 180),
+        Math.min(dt, distance / HOMETOWN_NAV_SPEED),
+        TOWN_BUILDINGS,
+        305,
+        HOMETOWN_NAV_SPEED,
       );
       frames++;
     }
     assert.ok(frames * dt <= expected + dt);
     assert.ok(Math.hypot(target.x - p.x, target.y - p.y) <= 0.01);
   }
+  assert.equal(moveInTown(start, { x: 1, y: 0 }, 0.05).x - start.x, 9);
+  const route = townDockPath(HOMETOWN_START);
+  let distance = 0,
+    previous = HOMETOWN_START;
+  for (const point of route) {
+    distance += Math.hypot(point.x - previous.x, point.y - previous.y);
+    previous = point;
+  }
+  assert.ok(distance / HOMETOWN_NAV_SPEED >= 9 && distance / HOMETOWN_NAV_SPEED <= 11);
   for (const x of [432.6, 439, 440, 445, 447.4])
     for (let y = 145; y <= 450; y += 13) assert.ok(townDockPath({ x, y }).length > 0);
 });

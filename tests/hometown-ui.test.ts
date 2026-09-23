@@ -15,7 +15,14 @@ import {
 } from '../src/mortal-ui.ts';
 import { unreadHumanLetterKeys } from '../src/human-stories.ts';
 import { journeyCardData } from '../src/journey-card.ts';
-import { HOMETOWN_HOUSE, HOMETOWN_ROUTE, townWalkable, TOWN_NPCS } from '../src/town.ts';
+import {
+  HOMETOWN_HOUSE,
+  HOMETOWN_START,
+  HOMETOWN_NAV_SPEED,
+  townDockPath,
+  townWalkable,
+  TOWN_NPCS,
+} from '../src/town.ts';
 import { townSceneryLayout } from '../src/town-history.ts';
 import { townResidents } from '../src/town-population.ts';
 
@@ -27,11 +34,12 @@ function departed() {
   return save;
 }
 
-test('离乡路线全程可达且正常速度约二十秒，故居跨千年保留地块', () => {
+test('离乡指引复用自动路线且约十秒走完，故居跨千年保留地块', () => {
+  const route = [HOMETOWN_START, ...townDockPath(HOMETOWN_START)];
   let distance = 0;
-  for (let i = 1; i < HOMETOWN_ROUTE.length; i++) {
-    const from = HOMETOWN_ROUTE[i - 1],
-      to = HOMETOWN_ROUTE[i];
+  for (let i = 1; i < route.length; i++) {
+    const from = route[i - 1],
+      to = route[i];
     const length = Math.hypot(to.x - from.x, to.y - from.y);
     distance += length;
     for (let step = 0; step <= length; step += 2)
@@ -42,7 +50,7 @@ test('离乡路线全程可达且正常速度约二十秒，故居跨千年保�
         }),
       );
   }
-  assert.ok(distance / 180 >= 15 && distance / 180 <= 25);
+  assert.ok(distance / HOMETOWN_NAV_SPEED >= 9 && distance / HOMETOWN_NAV_SPEED <= 11);
   for (const age of [15, 115, 315, 1015, 100015]) {
     const scenery = { lastVisitAge: age, since: 15, revision: 0 };
     const layout = townSceneryLayout(42, scenery, true);
