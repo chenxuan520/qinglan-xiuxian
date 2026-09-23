@@ -4644,6 +4644,28 @@ body:not(.in-game) #ui {
   flex-wrap: wrap;
   gap: 12px;
 }
+.reincarnate-opening {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 20px 0;
+  font-size: 14px;
+  cursor: pointer;
+}
+.reincarnate-opening input {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--gold);
+}
+.reincarnate-opening small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
 .save-actions button {
   flex: 1 1 auto;
   min-height: 48px;

@@ -57,6 +57,7 @@ function harness(save: SaveData) {
   const writes: string[] = [];
   const routes: string[] = [];
   const messages: string[] = [];
+  const openingChoice = { checked: false };
   let rolls = 0;
   const context = createContext({
     ...data,
@@ -83,9 +84,18 @@ function harness(save: SaveData) {
     writes,
     routes,
     messages,
+    openingChoice,
     document: { body: element },
     ui: { innerHTML: '', inert: false, querySelector: () => element },
-    modal: { innerHTML: '', querySelector: () => element },
+    modal: {
+      innerHTML: '',
+      querySelector: (selector: string) =>
+        selector === '#reincarnate-full-opening'
+          ? context.modal.innerHTML.includes('id="reincarnate-full-opening"')
+            ? openingChoice
+            : null
+          : element,
+    },
     window: { clearTimeout: noop },
     clearInterval: noop,
     clearInput: noop,
@@ -139,6 +149,7 @@ function harness(save: SaveData) {
     },
     panelFrame(_title: string, _subtitle: string, content: string) {
       context.modal.innerHTML = content;
+      if (content.includes('id="reincarnate-full-opening"')) openingChoice.checked = false;
       routes.push(context.panel);
     },
     renderRootReveal() {
@@ -387,4 +398,165 @@ test('首次 freshSave 仍从序章和 farewell 离乡开始，不提前显示�
   assert.equal(save.mortal.hometown?.stage, 'farewell');
   assert.equal(context.panel, 'hometown-loading');
   assert.deepEqual(context.routes, ['hometown-loading']);
+});
+
+test('序章上下按钮语义不同，跳过开场直接命盘且不重抽灵根或父母', () => {
+  const save = freshSave('triple', ['wood', 'water', 'earth'], 'orthodox', () => 0.2);
+  const before = structuredClone(save);
+  const context = harness(save);
+  context.renderLobby();
+  context.renderPrologue();
+  assert.match(
+    context.modal.innerHTML,
+    /class="prologue-skip" data-action="prologue-skip">跳过开场/,
+  );
+  assert.match(
+    context.modal.innerHTML,
+    /class="primary-button" data-action="prologue-enter">入此山河/,
+  );
+  context.handleAction('prologue-skip');
+  assertNewReveal(context);
+  assert.deepEqual(context.routes, ['root-reveal']);
+  for (const key of [
+    'spiritRoot',
+    'rootElements',
+    'starter',
+    'artifacts',
+    'medicine',
+    'stones',
+    'iron',
+    'cultivation',
+  ] as const)
+    assert.deepEqual(save[key], before[key]);
+  assert.deepEqual(save.mortal.hometown!.parents, before.mortal.hometown!.parents);
+  assert.equal(save.chronicle.milestones['home-reunion'], undefined);
+  const after = JSON.stringify(save);
+  context.handleAction('prologue-skip');
+  assert.equal(JSON.stringify(save), after);
+  assert.equal(context.writes.length, 1);
+  const restored = harness(parseSave(context.writes[0]));
+  restored.renderLobby();
+  restored.renderPrologue();
+  assert.equal(restored.panel, 'root-reveal');
+  assert.equal(restored.save.spiritRoot, before.spiritRoot);
+});
+
+test('跳过开场保存失败时停在序章，重试仍使用同一灵根和父母', () => {
+  const save = freshSave();
+  const context = harness(save);
+  context.renderLobby();
+  context.renderPrologue();
+  const before = JSON.stringify(save);
+  const write = context.localStorage.setItem;
+  context.localStorage.setItem = () => {
+    throw new Error('quota');
+  };
+  context.handleAction('prologue-skip');
+  assert.equal(context.panel, 'prologue');
+  assert.equal(context.ui.inert, true);
+  assert.equal(JSON.stringify(save), before);
+  assert.equal(context.writes.length, 0);
+  assert.match(context.messages.at(-1), /无法保存离乡进度/);
+  context.localStorage.setItem = write;
+  context.handleAction('prologue-skip');
+  assertNewReveal(context);
+});
+
+test('重温序章两个按钮只返回原人生，旧档跳过文字不清除续局', () => {
+  const save = previousLife();
+  const context = harness(save);
+  context.renderLobby();
+  context.handleAction('prologue-revisit');
+  assert.equal(context.panel, 'prologue');
+  assert.doesNotMatch(context.modal.innerHTML, /data-action="prologue-skip"/);
+  assert.equal(context.modal.innerHTML.match(/>返回仙途 /g)?.length, 2);
+  const before = JSON.stringify(save);
+  context.handleAction('prologue-enter');
+  assert.equal(JSON.stringify(save), before);
+  assert.equal(context.panel, '');
+
+  save.prologueSeen = false;
+  delete save.mortal.hometown;
+  const legacy = harness(save);
+  const pending = {
+    snapshot: () => ({ previousRun: true }),
+    encounterName: '旧历练',
+    time: 60,
+    path: 'demonic',
+    level: 8,
+  };
+  legacy.pendingRun = pending;
+  legacy.renderPrologue();
+  legacy.handleAction('prologue-skip');
+  assert.equal(legacy.pendingRun, pending);
+  assert.equal(save.stones, 12345);
+  assert.equal(save.mortal.hometown, undefined);
+  assert.equal(save.prologueSeen, true);
+  assert.equal(JSON.parse(legacy.writes.at(-1)).activeRun.previousRun, true);
+});
+
+test('完整重开选项默认不勾选，选择后取消不改存档，再次打开仍默认快捷轮回', () => {
+  const save = previousLife();
+  const context = harness(save);
+  const before = JSON.stringify(save);
+  context.handleAction('reincarnate');
+  assert.match(context.modal.innerHTML, /id="reincarnate-full-opening" type="checkbox"/);
+  assert.doesNotMatch(context.modal.innerHTML, /type="checkbox"[^>]*checked/);
+  assert.equal(context.openingChoice.checked, false);
+  context.openingChoice.checked = true;
+  context.handleAction('home');
+  assert.equal(JSON.stringify(save), before);
+  assert.equal(context.writes.length, 0);
+  context.handleAction('reincarnate');
+  assert.equal(context.openingChoice.checked, false);
+  context.handleAction('confirm-reincarnate');
+  assertNewReveal(context);
+});
+
+test('勾选完整开始后从序章重开，刷新后入此山河直接告别而非再次选故乡', () => {
+  const save = previousLife();
+  const context = harness(save);
+  context.handleAction('reincarnate');
+  context.openingChoice.checked = true;
+  context.handleAction('confirm-reincarnate');
+  assert.equal(context.panel, 'prologue');
+  assert.equal(save.age, 15);
+  assert.equal(save.stones, 0);
+  assert.equal(save.cultivation, 0);
+  assert.equal(save.prologueSeen, false);
+  assert.equal(save.hometownSeen, false);
+  assert.equal(save.mortal.hometown?.stage, 'farewell');
+  assert.equal(context.pendingRun, null);
+  assert.ok(!context.routes.includes('hometown-choice'));
+  assert.ok(!context.routes.includes('root-reveal'));
+  assert.equal(context.ui.inert, true);
+  const restored = harness(parseSave(context.writes.at(-1)));
+  restored.renderLobby();
+  restored.renderPrologue();
+  assert.equal(restored.panel, 'prologue');
+  const root = restored.save.spiritRoot;
+  restored.handleAction('prologue-enter');
+  assert.equal(restored.panel, 'hometown-loading');
+  assert.equal(restored.save.hometownSeen, false);
+  assert.ok(!restored.routes.includes('hometown-choice'));
+  restored.save.mortal.hometown.stage = 'walk';
+  restored.finishDeparture();
+  assertNewReveal(restored);
+  assert.equal(restored.save.spiritRoot, root);
+});
+
+test('完整重开仍可主动跳过开场，此后命盘重抽不继承完整重开选择', () => {
+  const context = harness(previousLife());
+  context.handleAction('reincarnate');
+  context.openingChoice.checked = true;
+  context.handleAction('confirm-reincarnate');
+  const before = structuredClone(context.save);
+  context.handleAction('prologue-skip');
+  assertNewReveal(context);
+  assert.equal(context.save.spiritRoot, before.spiritRoot);
+  assert.deepEqual(context.save.mortal.hometown.parents, before.mortal.hometown.parents);
+  context.routes.length = 0;
+  context.handleAction('reroll-root');
+  assertNewReveal(context);
+  assert.deepEqual(context.routes, ['root-reveal']);
 });
