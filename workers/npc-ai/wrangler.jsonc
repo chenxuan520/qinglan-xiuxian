@@ -13,6 +13,11 @@
       "namespace_id": "202609201",
       "simple": { "limit": 12, "period": 60 },
     },
+    {
+      "name": "IMAGE_LIMITER",
+      "namespace_id": "202609232",
+      "simple": { "limit": 2, "period": 60 },
+    },
   ],
   "vars": {
     "ALLOWED_ORIGINS": "https://xiuxian.011203.xyz,https://chenxuan520.github.io",

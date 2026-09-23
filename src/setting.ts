@@ -34,6 +34,7 @@ export const TEA_STORY_IMAGE_SETTINGS = {
   model: '@cf/black-forest-labs/flux-1-schnell',
   steps: 4,
   maxImageBytes: 5 * 1024 * 1024,
+  tokenTtlSeconds: 300,
   requestTimeoutMs: 30000,
   inferenceTimeoutMs: 28000,
 } as const;

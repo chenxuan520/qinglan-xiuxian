@@ -59,6 +59,10 @@ test('弹窗眉题不混用英文副标题', () => {
 
 test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
   assert.match(source, /<kbd>E<\/kbd> 开启自动历练/);
-  assert.match(source, /key === 'e' && !save\.autoplay && game\?\.state === 'playing'/);
+  assert.match(
+    source,
+    /key === 'e' && !event\.repeat && !save\.autoplay && game\?\.state === 'playing'/,
+  );
+  assert.match(source, /autoplayButton\(inGame\)/);
   assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });
