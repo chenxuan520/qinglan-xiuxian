@@ -80,7 +80,7 @@ test('最后仙尊本世珍品进入本局收获，重复命中死者不重复�
   game.time = 420;
   game.update(0.01);
   const boss = game.enemies.find((e) => e.bossStage === 6)!;
-  game.hitEnemy(boss, 1e9);
+  game.hitEnemy(boss, boss.maxHp);
   const permanent = Object.entries(game.loot.medicines).filter(
     ([id]) => !MEDICINES.find((m) => m.id === id)!.years,
   );
@@ -88,7 +88,7 @@ test('最后仙尊本世珍品进入本局收获，重复命中死者不重复�
   assert.equal(permanent[0][1], 1);
   assert.match(runLootContent(game.loot), /本世珍品丹药/);
   const before = JSON.stringify([game.loot, save.medicine.bag]);
-  game.hitEnemy(boss, 1e9);
+  game.hitEnemy(boss, boss.maxHp);
   assert.equal(JSON.stringify([game.loot, save.medicine.bag]), before);
 });
 

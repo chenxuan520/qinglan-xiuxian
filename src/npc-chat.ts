@@ -14,6 +14,25 @@ export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.
 );
 
 type NpcDialogueResponse = { reply: string; imageToken?: string };
+type NpcDialogueFailure = { error: string; retryable: boolean };
+function dialogueErrorMessage(error: string) {
+  return (
+    (
+      {
+        'request-timeout': '等待服务响应超时',
+        'inference-timeout': 'AI 生成超时',
+        network: '网络连接失败',
+        busy: '请求过于频繁，请稍后再试',
+        unavailable: 'AI 服务暂时不可用',
+        'inference-failed': 'AI 服务生成失败',
+        'limiter-unavailable': '服务暂时无法处理请求',
+        'empty-reply': 'AI 未返回完整内容',
+        'invalid-response': '服务返回了无效内容',
+        'invalid-dialogue': '听书请求无效',
+      } as Record<string, string>
+    )[error] ?? '服务暂时无法完成这次请求'
+  );
+}
 async function requestNpcDialogueResponse(
   input: NpcDialogueRequest,
   signal: AbortSignal,
@@ -21,43 +40,79 @@ async function requestNpcDialogueResponse(
   timeout: number = input.mode === 'tea-story'
     ? TEA_STORY_SETTINGS.requestTimeoutMs
     : NPC_AI_SETTINGS.requestTimeoutMs,
-): Promise<NpcDialogueResponse | null> {
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  signal.addEventListener('abort', abort, { once: true });
-  const timer = setTimeout(abort, timeout);
-  try {
-    if (signal.aborted) return null;
-    const response = await fetcher(`${NPC_AI_BASE}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-      signal: controller.signal,
-      credentials: 'omit',
+  onRetry?: (attempt: number, error: string) => void,
+): Promise<NpcDialogueResponse | NpcDialogueFailure> {
+  const attempts = input.mode === 'tea-story' ? TEA_STORY_SETTINGS.maxAttempts : 1;
+  let failure: NpcDialogueFailure = { error: 'network', retryable: true };
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    if (signal.aborted) return { error: 'request-cancelled', retryable: false };
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    let timedOut = false;
+    signal.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(() => {
+      timedOut = true;
+      abort();
+    }, timeout);
+    try {
+      const response = await fetcher(`${NPC_AI_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+        signal: controller.signal,
+        credentials: 'omit',
+      });
+      const data = await response.json().catch(() => null);
+      if (controller.signal.aborted) throw new Error('request-aborted');
+      if (!response.ok) {
+        failure = {
+          error: typeof data?.error === 'string' ? data.error : 'unavailable',
+          retryable:
+            (response.status >= 500 || response.status === 408) && data?.retryable !== false,
+        };
+      } else {
+        const reply =
+          typeof data?.reply === 'string' &&
+          data.reply.trim() &&
+          data.reply.length <=
+            (input.mode === 'tea-story' ? TEA_STORY_SETTINGS : NPC_AI_SETTINGS).maxReplyLength
+            ? data.reply.trim()
+            : null;
+        if (reply) {
+          const imageToken =
+            input.mode === 'tea-story' &&
+            typeof data.imageToken === 'string' &&
+            /^\d{10}\.[a-f0-9]{64}$/.test(data.imageToken)
+              ? data.imageToken
+              : undefined;
+          return { reply, imageToken };
+        }
+        failure = { error: data ? 'empty-reply' : 'invalid-response', retryable: true };
+      }
+    } catch {
+      failure = {
+        error: signal.aborted ? 'request-cancelled' : timedOut ? 'request-timeout' : 'network',
+        retryable: !signal.aborted,
+      };
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', abort);
+    }
+    if (signal.aborted) return { error: 'request-cancelled', retryable: false };
+    if (!failure.retryable || attempt === attempts) return failure;
+    onRetry?.(attempt + 1, failure.error);
+    await new Promise<void>((resolve) => {
+      const finish = () => {
+        clearTimeout(delay);
+        signal.removeEventListener('abort', finish);
+        resolve();
+      };
+      const delay = setTimeout(finish, TEA_STORY_SETTINGS.retryDelayMs);
+      signal.addEventListener('abort', finish, { once: true });
+      if (signal.aborted) finish();
     });
-    if (!response.ok) return null;
-    const data = await response.json();
-    const reply =
-      typeof data?.reply === 'string' &&
-      data.reply.trim() &&
-      data.reply.length <=
-        (input.mode === 'tea-story' ? TEA_STORY_SETTINGS : NPC_AI_SETTINGS).maxReplyLength
-        ? data.reply.trim()
-        : null;
-    if (!reply) return null;
-    const imageToken =
-      input.mode === 'tea-story' &&
-      typeof data.imageToken === 'string' &&
-      /^\d{10}\.[a-f0-9]{64}$/.test(data.imageToken)
-        ? data.imageToken
-        : undefined;
-    return { reply, imageToken };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-    signal.removeEventListener('abort', abort);
   }
+  return failure;
 }
 
 export async function requestNpcDialogue(
@@ -68,7 +123,8 @@ export async function requestNpcDialogue(
     ? TEA_STORY_SETTINGS.requestTimeoutMs
     : NPC_AI_SETTINGS.requestTimeoutMs,
 ): Promise<string | null> {
-  return (await requestNpcDialogueResponse(input, signal, fetcher, timeout))?.reply ?? null;
+  const result = await requestNpcDialogueResponse(input, signal, fetcher, timeout);
+  return 'reply' in result ? result.reply : null;
 }
 
 export async function requestTeaStoryImage(
@@ -141,6 +197,21 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   const status = host.querySelector<HTMLElement>('.tea-story-status')!;
   const play = host.querySelector<HTMLButtonElement>('.tea-story-play')!;
   const stop = host.querySelector<HTMLButtonElement>('.tea-story-stop')!;
+  const retry = host.querySelector<HTMLButtonElement>('.tea-story-retry')!;
+  const next = host.querySelector<HTMLButtonElement>('.tea-story-next')!;
+  const imageStatus = host.querySelector<HTMLElement>('.tea-story-image-status')!;
+  text.textContent = '';
+  status.textContent = '正在生成故事，请稍候…';
+  status.setAttribute('role', 'status');
+  imageStatus.textContent = '';
+  host.classList.remove('has-story-image');
+  host.style.removeProperty('--tea-story-image');
+  play.hidden = stop.hidden = true;
+  play.disabled = stop.disabled = next.disabled = retry.disabled = true;
+  retry.hidden = true;
+  retry.onclick = () => {
+    if (host.isConnected && !retry.disabled) void mountTeaStory(host, save, enableSound);
+  };
   host.setAttribute('aria-busy', 'true');
   const story = await requestNpcDialogueResponse(
     {
@@ -153,17 +224,26 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
       history: [],
     },
     controller.signal,
+    undefined,
+    undefined,
+    (attempt, error) => {
+      if (host.isConnected && activeRequest === controller && !controller.signal.aborted)
+        status.textContent = `${dialogueErrorMessage(error)}，正在自动重试（${attempt}/${TEA_STORY_SETTINGS.maxAttempts}）…`;
+    },
   );
   if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
   activeRequest = null;
   host.setAttribute('aria-busy', 'false');
-  if (!story) {
-    status.textContent = '说书暂歇，下回再来听吧。';
+  if ('error' in story) {
+    status.setAttribute('role', 'alert');
+    status.textContent = `故事生成失败：${dialogueErrorMessage(story.error)}。可重试这一回，不会再次消耗年岁或判定机缘。`;
+    retry.hidden = retry.disabled = false;
     return;
   }
   const { reply, imageToken } = story;
   text.textContent = reply;
   status.textContent = '茶馆传说 · 一回一故事';
+  next.disabled = false;
   const reader = new StorySpeech((state) => {
     if (!host.isConnected) return;
     play.disabled = state === 'speaking';
@@ -177,25 +257,32 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   });
   activeSpeech = reader;
   play.hidden = stop.hidden = !reader.supported;
+  play.disabled = false;
   if (!reader.supported) status.textContent = '此设备暂不支持朗读，可阅读故事。';
   play.textContent = save.sound && save.volume > 0 ? '朗读故事' : '开启声音并朗读';
-  play.addEventListener('click', () => {
+  play.onclick = () => {
     if (!save.sound || save.volume === 0) enableSound();
     play.textContent = '朗读故事';
     reader.play(reply, save.volume);
-  });
-  stop.addEventListener('click', () => reader.stop());
+  };
+  stop.onclick = () => reader.stop();
   if (!imageToken) return;
   const imageController = new AbortController();
   activeRequest = imageController;
+  imageStatus.textContent = '配图生成中，不影响阅读。';
   void requestTeaStoryImage(reply, imageToken, imageController.signal).then((image) => {
     const current = activeRequest === imageController;
     if (current) activeRequest = null;
-    if (!current || imageController.signal.aborted || !host.isConnected || !image) return;
+    if (!current || imageController.signal.aborted || !host.isConnected) return;
+    if (!image) {
+      imageStatus.textContent = '配图暂未生成，不影响阅读和朗读。';
+      return;
+    }
     clearStoryImage();
     activeStoryImageUrl = URL.createObjectURL(image);
     host.style.setProperty('--tea-story-image', `url("${activeStoryImageUrl}")`);
     host.classList.add('has-story-image');
+    imageStatus.textContent = '';
   });
 }
 export function mountNpcChat(

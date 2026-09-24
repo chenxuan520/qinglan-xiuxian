@@ -219,8 +219,8 @@ test('终关取消回血丹掉落，前六境仍可掉落；终关旧续局的�
   }
 });
 
-test('终关丹药与宝匣均不回血，宝匣仍升阶法宝给玄铁，前六境效果不变', () => {
-  for (const stage of [0, 6]) {
+test('终关丹药与宝匣均不回血，前六境分别回30%与5%，宝匣仍升阶法宝给玄铁', () => {
+  for (const stage of [0, 1, 2, 3, 4, 5, 6]) {
     for (const kind of ['heal', 'chest'] as const) {
       const g = new Game(freshSave(), stage, 0, () => 0.5);
       g.player.hp = 10;
@@ -229,7 +229,11 @@ test('终关丹药与宝匣均不回血，宝匣仍升阶法宝给玄铁，前�
       const regen = g.stats.regen * 0.01;
       g.update(0.01);
       if (stage === 6) assert.ok(Math.abs(g.player.hp - 10 - regen) < 1e-6);
-      else assert.ok(g.player.hp > 20);
+      else
+        assert.ok(
+          Math.abs(g.player.hp - 10 - regen - g.player.maxHp * (kind === 'heal' ? 0.3 : 0.05)) <
+            1e-6,
+        );
       if (kind === 'chest') {
         assert.equal(g.weapons[0].level, 2);
         assert.equal(g.iron, 2);

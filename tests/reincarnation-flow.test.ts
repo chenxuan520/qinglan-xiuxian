@@ -17,6 +17,7 @@ import {
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
 import { sectDuesPending } from '../src/mortal.ts';
+import { Game } from '../src/game.ts';
 
 // 执行实际函数和调用入口，不导入 main 的游戏、音频、Worker 与页面初始化。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -32,13 +33,16 @@ const flow = new Script(
       'endLifetime',
       'beginJourneyFarewell',
       'renderJourneyFarewell',
+      'renderJourneyCard',
+      'renderDeath',
+      'finishRun',
       'renderLifespanEnd',
       'renderTribulationForfeit',
       'renderTribulationPending',
       'finishDeparture',
     ]
       .map((name) => {
-        const match = source.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
+        const match = source.match(new RegExp(`^(?:async )?function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match, `未找到 main.ts 实际函数 ${name}`);
         return match[0];
       })
@@ -51,6 +55,8 @@ function harness(save: SaveData) {
   const element = {
     remove: noop,
     focus: noop,
+    scrollTo: noop,
+    isConnected: false, // 留影路由使用真实函数，VM 不加载图片资源。
     style: { setProperty: noop },
     classList: { add: noop, remove: noop, toggle: noop },
   };
@@ -112,6 +118,7 @@ function harness(save: SaveData) {
     victoryTimer: undefined,
     adReadyAt: 0,
     panel: '',
+    journeyCardReturn: 'chronicle',
     settled: false,
     selectedStage: 0,
     difficulty: 0,
@@ -344,6 +351,67 @@ for (const reason of ['lifespan', 'tribulation'] as const) {
       context.messages.at(-1),
       reason === 'lifespan' ? /前世止于.*享年/ : /前世止于天劫/,
     );
+  });
+
+  test(`${reason === 'lifespan' ? '寿终' : '天劫殒命'}留影关闭与重试不重新开放游戏，读档后仍只能轮回`, () => {
+    const save = previousLife();
+    const context = harness(save);
+    if (reason === 'tribulation') {
+      save.cultivation = 1e9;
+      save.age = save.nextTribulationAge;
+      const battle = Game.createTribulation(save, null);
+      battle.revivesUsed = data.MAX_REVIVES;
+      battle.hurtPlayer(battle.player.maxHp * 2);
+      battle.update(0.01);
+      assert.equal(battle.state, 'lost');
+      context.game = battle;
+      context.renderDeath();
+      assert.equal(context.panel, 'tribulation-forfeit');
+      context.handleAction('cancel-forfeit');
+      assert.equal(context.game, battle);
+      assert.equal(battle.revivesUsed, data.MAX_REVIVES);
+      assert.equal(battle.state, 'lost');
+      context.handleAction('confirm-forfeit');
+    } else {
+      save.age = lifespanInfo(save).limit;
+      context.renderLifespanEnd();
+      context.handleAction('end-lifetime');
+    }
+    assert.equal(save.pendingReincarnation, reason);
+    assert.equal(context.game, null);
+    assert.equal(context.pendingRun, null);
+    const persisted = context.writes.at(-1);
+    assert.equal(JSON.parse(persisted).activeRun, null);
+    for (const state of [context, harness(parseSave(persisted))]) {
+      state.renderJourneyFarewell(reason);
+      const ended = JSON.stringify(state.save);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        state.handleAction('journey-card');
+        assert.equal(state.panel, 'journey-card');
+        assert.equal(state.journeyCardReturn, `${reason}-farewell`);
+        state.handleAction('close');
+        assert.equal(state.panel, `${reason}-farewell`);
+        assert.doesNotMatch(state.modal.innerHTML, /迎战天劫|继续迎劫/);
+        state.handleAction('journey-card');
+        state.handleAction('journey-card');
+        assert.equal(state.panel, 'journey-card');
+        for (const action of [
+          'tribulation-start',
+          'home',
+          'resume',
+          'confirm-journey-reincarnate',
+        ]) {
+          state.handleAction(action);
+          assert.equal(state.panel, 'journey-card');
+          assert.equal(state.game, null);
+          assert.equal(state.pendingRun, null);
+          assert.equal(JSON.stringify(state.save), ended);
+        }
+        state.handleAction('close');
+      }
+      state.handleAction('confirm-journey-reincarnate');
+      assertNewReveal(state);
+    }
   });
 }
 

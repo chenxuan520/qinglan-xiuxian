@@ -17,6 +17,7 @@ import {
   realmCost,
   realmBonuses,
   realmInfo,
+  realmHealthMultiplier,
 } from '../src/progress.ts';
 
 const create = () => new Game(freshSave(), 0, 0, () => 0.5);
@@ -163,7 +164,7 @@ test('Boss 经验至少三十只本关最强精英，永久突破奖励高于小
     const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, stage);
     if (stage === FINAL_TRIAL_STAGE) g.trialBossesDefeated = 6;
     const before = save.cultivation;
-    g.hitEnemy(boss, 1e9, false, 'sword');
+    g.hitEnemy(boss, boss.maxHp, false, 'sword');
     const reward = bossCultivationReward(stage) * DIFFICULTIES[0].reward;
     assert.equal(g.bossCultivation, reward);
     assert.ok(save.cultivation - before >= reward);
@@ -174,7 +175,7 @@ test('Boss 经验至少三十只本关最强精英，永久突破奖励高于小
     );
     assert.ok(earnedXp >= strongest * 30, `stage ${stage}`);
     const credited = save.cultivation;
-    g.hitEnemy(boss, 1e9);
+    g.hitEnemy(boss, boss.maxHp);
     assert.equal(save.cultivation, credited);
     const settled = settleRun(save, { ...g.snapshot(), victory: true });
     assert.equal(
@@ -198,7 +199,7 @@ test('与最后妖王同时倒下，复活后可正常通关，不丢失已击�
     g.bossSpawned = true;
     const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, stage);
     g.hurtPlayer(1e6);
-    g.hitEnemy(boss, 1e9, false, 'sword');
+    g.hitEnemy(boss, boss.maxHp, false, 'sword');
     g.update(0.01);
     assert.equal(g.state, 'lost');
     const resumed = Game.restore(save, g.snapshot())!;
@@ -214,16 +215,16 @@ test('正道最大气血按总值增加百分之十二，根基、境界与功�
   save.training.vitality = 10;
   save.cultivation = Array.from({ length: 23 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
   const g = new Game(save, 0, 0);
-  const base = 100 + 100 + realmBonuses(23).hp;
-  assert.equal(g.player.maxHp, Math.round(base * 1.12));
+  const base = (100 + realmBonuses(23).hp) * 1.5;
+  assert.equal(g.player.maxHp, Math.round(base * 1.12 * realmHealthMultiplier(23)));
   g.player.hp -= 37;
   g.state = 'upgrade';
   g.choices = [{ type: 'passive', id: 'guard', level: 1 }];
   assert.equal(g.choose(0), true);
-  assert.equal(g.player.maxHp, Math.round((base + 20) * 1.12));
+  assert.equal(g.player.maxHp, Math.round(base * 1.1 * 1.12 * realmHealthMultiplier(23)));
   assert.equal(g.player.hp, g.player.maxHp - 37);
   const dual = new Game({ ...save, path: 'dual' }, 0, 0);
-  assert.equal(dual.player.maxHp, base);
+  assert.equal(dual.player.maxHp, Math.round(base * realmHealthMultiplier(23)));
 });
 
 test('正道突破即时按百分比扩充气血，旧固定加成续局迁移不重复补血', () => {
@@ -236,7 +237,10 @@ test('正道突破即时按百分比扩充气血，旧固定加成续局迁移�
   g.hitEnemy(e, e.hp);
   const realm = realmInfo(save.cultivation).step;
   assert.ok(realm >= 3);
-  assert.equal(g.player.maxHp, Math.round((100 + realmBonuses(realm).hp) * 1.12));
+  assert.equal(
+    g.player.maxHp,
+    Math.round((100 + realmBonuses(realm).hp) * 1.12 * realmHealthMultiplier(realm)),
+  );
   assert.equal(g.player.hp, g.player.maxHp - 17);
   const old = g.snapshot();
   old.player.maxHp = 100 + realmBonuses(realm).hp + 12;
@@ -255,12 +259,13 @@ test('正道持续回血比相同基础快百分之二十，功法回复也乘�
   const dual = create();
   for (const level of [0, 3, 5]) {
     orthodox.passives.duration = demonic.passives.duration = dual.passives.duration = level;
-    const base = 0.18 + level * 0.2;
-    assert.equal(orthodox.stats.regen, base * 1.2);
+    const base = 0.18 + level * dual.player.maxHp * 0.001;
+    const orthodoxRegen = (0.18 + level * orthodox.player.maxHp * 0.001) * 1.2;
+    assert.equal(orthodox.stats.regen, orthodoxRegen);
     assert.equal(demonic.stats.regen, base);
     assert.equal(dual.stats.regen, base);
     orthodox.player.hp = 50;
     orthodox.update(0.05);
-    assert.ok(Math.abs(orthodox.player.hp - 50 - base * 1.2 * 0.05) < 1e-10);
+    assert.ok(Math.abs(orthodox.player.hp - 50 - orthodoxRegen * 0.05) < 1e-10);
   }
 });

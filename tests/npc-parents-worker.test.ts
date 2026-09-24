@@ -144,7 +144,12 @@ test('拒绝死亡、未完成离乡命盘、缺失或非法家庭、非法年�
     assert.equal(validDialogue(bad), false, JSON.stringify(bad));
     const response = await worker.fetch(request(bad), bindings);
     assert.equal(response.status, 400, JSON.stringify(bad));
-    assert.deepEqual(await response.json(), { error: 'invalid-dialogue' });
+    const failure = await response.json();
+    assert.equal(failure.error, 'invalid-dialogue');
+    assert.equal(failure.retryable, false);
+    assert.equal(failure.fallback, true);
+    assert.match(failure.message, /[\u4e00-\u9fff]/);
+    assert.match(failure.requestId, /^[a-f0-9-]{36}$/i);
   }
   assert.equal(calls, 0);
 });
@@ -222,10 +227,7 @@ test('另一位父母亡故时只说明已离世，不提供死亡时点或将�
 });
 
 test('父母 Worker 复用模型、限流与短回复预算，支持 CORS 且预检不调用 AI', async (t) => {
-  t.mock.method(AbortSignal, 'timeout', (ms) => {
-    assert.equal(ms, NPC_AI_SETTINGS.inferenceTimeoutMs);
-    return new AbortController().signal;
-  });
+  const timers = t.mock.method(globalThis, 'setTimeout');
   let calls = 0;
   let limits = 0;
   const bindings = {
@@ -282,6 +284,10 @@ test('父母 Worker 复用模型、限流与短回复预算，支持 CORS 且预
   assert.equal(await denied.text(), '');
   assert.equal(calls, 2);
   assert.equal(limits, 2);
+  assert.deepEqual(
+    timers.mock.calls.map((call) => call.arguments[1]),
+    [NPC_AI_SETTINGS.inferenceTimeoutMs, NPC_AI_SETTINGS.inferenceTimeoutMs],
+  );
 });
 
 test('父母 AI 限流、异常与空回复沿用 fallback，现有请求器返回空结果供默认台词兜底', async () => {
@@ -295,14 +301,19 @@ test('父母 AI 限流、异常与空回复沿用 fallback，现有请求器返�
           throw new Error('upstream');
         }),
         503,
-        'unavailable',
+        'inference-failed',
       ],
       [env(async () => ({ response: '<think>只有推理</think>' })), 502, 'empty-reply'],
     ] as const) {
       const response = await worker.fetch(request(body), bindings);
       assert.equal(response.status, status);
       assert.equal(response.headers.get('Access-Control-Allow-Origin'), origin);
-      assert.deepEqual(await response.clone().json(), { error, fallback: true });
+      const failure = await response.clone().json();
+      assert.equal(failure.error, error);
+      assert.equal(failure.fallback, true);
+      assert.equal(failure.retryable, true);
+      assert.match(failure.message, /[\u4e00-\u9fff]/);
+      assert.match(failure.requestId, /^[a-f0-9-]{36}$/i);
       const reply = await requestNpcDialogue(
         body,
         new AbortController().signal,

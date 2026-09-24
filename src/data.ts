@@ -479,7 +479,7 @@ export const TREASURES: Treasure[] = [
     mark: '鼎',
     color: '#c9da98',
     tag: '丹道 · 药域',
-    desc: '展开药火领域灼烧近敌，命中妖物时少量回复气血。',
+    desc: '展开药火领域灼烧近敌；药域命中时，每半秒回复最大气血的 0.15%。',
     evolution: '百草万灵鼎',
     passive: 'duration',
     damage: 12,
@@ -633,7 +633,7 @@ export const TREASURES: Treasure[] = [
     mark: '盏',
     color: '#db8298',
     tag: '血法 · 汲取',
-    desc: '在妖群中形成血池，持续伤敌并少量回复自身气血。',
+    desc: '在妖群中形成血池持续伤敌；血池命中时，每半秒回复最大气血的 0.1%。',
     evolution: '无边血海',
     passive: 'duration',
     damage: 10,
@@ -771,7 +771,7 @@ export const PASSIVES: Passive[] = [
     school: 'orthodox',
     name: '金刚不坏',
     mark: '罡',
-    desc: '每重气血上限 +20，承受伤害 -6%',
+    desc: '每重气血上限 +10%，承受伤害 -6%',
     color: '#e2c286',
   },
   {
@@ -779,7 +779,7 @@ export const PASSIVES: Passive[] = [
     school: 'orthodox',
     name: '长生真经',
     mark: '生',
-    desc: '每重法术持续时间 +18%，每秒回复气血 +0.2',
+    desc: '每重法术持续时间 +18%，每秒回复最大气血的 0.1%',
     color: '#b8d794',
   },
   {
@@ -835,7 +835,7 @@ export const PASSIVES: Passive[] = [
     id: 'bone',
     name: '白骨魔功',
     mark: '骨',
-    desc: '每重气血上限 +18%，移动速度 -1%；受伤时骨刺反击，每重基础伤害为最大气血的 12%',
+    desc: '每重气血上限 +18%，移动速度 -1%；受伤时骨刺反击，威力随气血、修为与功法重数提升',
     color: '#dbcfb9',
     school: 'demonic',
   },
@@ -843,7 +843,7 @@ export const PASSIVES: Passive[] = [
     id: 'devour',
     name: '噬魂大法',
     mark: '噬',
-    desc: '每重斩妖回复气血 0.18 + 最大气血的 0.02%，法术持续时间 +20%，自然恢复速度 -4%',
+    desc: '每重斩妖回复最大气血的 0.05%，法术持续时间 +20%，自然恢复速度 -4%',
     color: '#c29bd9',
     school: 'demonic',
   },
@@ -908,15 +908,17 @@ export function tribulationRules(round: number) {
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
+// 首境保留入门强度；后续秘境按天灵根逐关积累的境界定标，不追随玩家属性。
+export const STAGE_REALM_STEPS = [0, 9, 13, 16, 18, 20, 22];
 // 固定秘境强度，不随玩家境界或灵威追涨；普通怪的伤害增幅低于精英与妖王。
 export const STAGE_COMBAT_SCALING = [
   { hp: 1, damage: 1 },
   { hp: 1.08, damage: 1.08 },
   { hp: 1.16, damage: 1.16, elite: { hp: 1.25, damage: 1.2, speed: 1.08 } },
   { hp: 1.25, damage: 1.24, elite: { hp: 1.35, damage: 1.3, speed: 1.12 } },
-  { hp: 1.35, damage: 1.32, elite: { hp: 1.45, damage: 1.4, speed: 1.16 } },
-  { hp: 1.45, damage: 1.42, elite: { hp: 1.55, damage: 1.5, speed: 1.2 } },
-  { hp: 1.35, damage: 1.35 },
+  { hp: 1.85, damage: 1.85, elite: { hp: 1.45, damage: 1.4, speed: 1.16 } },
+  { hp: 2.05, damage: 1.9, elite: { hp: 1.55, damage: 1.5, speed: 1.2 } },
+  { hp: 2, damage: 2 },
 ];
 export const STAGES = [
   {

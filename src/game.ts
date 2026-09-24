@@ -1,11 +1,13 @@
 import { medicineEffects, medicineLoot, medicineInfo } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
+import { formatNumber } from './number-format.ts';
 import {
   TREASURES,
   PASSIVES,
   STAGES,
   STAGE_COMBAT_SCALING,
+  STAGE_REALM_STEPS,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
@@ -44,6 +46,7 @@ import {
   realmInfo,
   realmBonuses,
   realmDamageMultiplier,
+  realmHealthMultiplier,
   forgeDamageBonus,
   dropArtifacts,
   cultivationFactor,
@@ -237,12 +240,9 @@ export class Game {
     this.rootElements = [...save.rootElements];
     this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
     this.startedImmortal = this.realm === 24;
-    this.baseHp =
-      spiritRootInfo(this.spiritRoot).baseHp +
-      save.training.vitality * 10 +
-      realmBonuses(this.realm).hp;
+    this.baseHp = spiritRootInfo(this.spiritRoot).baseHp + realmBonuses(this.realm).hp;
     if (save.mortal.member) this.passives[save.mortal.member.id] = 1;
-    this.player.hp = this.player.maxHp = this.maximumHealth;
+    this.player.hp = this.player.maxHp = this.maximumHealth();
     const starter =
       TREASURES.find(
         (t) =>
@@ -254,8 +254,11 @@ export class Game {
   private passivePower(id: string) {
     return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id));
   }
-  private get maximumHealth() {
-    const base = this.baseHp + this.passivePower('guard') * 20;
+  private maximumHealth(medicineHp = this.medicine.hp) {
+    const base =
+      this.baseHp *
+      (1 + this.save.training.vitality * 0.05) *
+      (1 + this.passivePower('guard') * 0.1);
     return Math.round(
       base *
         (1 + this.passivePower('bone') * 0.18) *
@@ -263,7 +266,8 @@ export class Game {
         (this.path === 'orthodox' ? 1.12 : 1) *
         (1 + this.save.tribulations * 0.03) *
         (1 + this.save.retreatBonus.vitality / 100) *
-        this.medicine.hp,
+        realmHealthMultiplier(this.realm) *
+        medicineHp,
     );
   }
   get boss() {
@@ -323,13 +327,12 @@ export class Game {
       g.weapons[0].level = 6;
       g.weapons[0].evolved = true;
     }
-    g.baseHp =
-      spiritRootInfo(g.spiritRoot).baseHp + save.training.vitality * 10 + realmBonuses(g.realm).hp;
-    g.player.hp = g.player.maxHp = g.maximumHealth;
+    g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
+    g.player.hp = g.player.maxHp = g.maximumHealth();
     g.player.y = 240;
     g.bossSpawned = true;
     const boss = g.spawnEnemy(10, false, true, { x: 0, y: 0 }, 6);
-    boss.hp = boss.maxHp = tribulationRules(g.tribulation).hp;
+    boss.hp = boss.maxHp = tribulationRules(g.tribulation).hp * realmDamageMultiplier(23);
     boss.radius = 65;
     boss.speed = 0;
     boss.damage = g.player.maxHp * tribulationRules(g.tribulation).damage;
@@ -342,8 +345,8 @@ export class Game {
   get stats() {
     return {
       damage:
+        (1 + realmBonuses(this.realm).damage) *
         (1 +
-          realmBonuses(this.realm).damage +
           this.passivePower('power') * 0.12 +
           this.passivePower('spirit') * 0.04 +
           this.passivePower('blood') * 0.18 +
@@ -407,11 +410,13 @@ export class Game {
         0.9 *
         spiritRootInfo(this.spiritRoot).rate,
       regen:
-        (spiritRootInfo(this.spiritRoot).baseRegen * this.medicine.regen +
-          this.passivePower('duration') * 0.2) *
+        (spiritRootInfo(this.spiritRoot).baseRegen *
+          this.medicine.regen *
+          realmHealthMultiplier(this.realm) +
+          this.passivePower('duration') * this.player.maxHp * 0.001) *
         (this.path === 'orthodox' ? 1.2 : 1) *
         (1 - (this.passives.devour || 0) * 0.04 * this.medicine.drawback),
-      killHeal: this.passivePower('devour') * (0.18 + this.player.maxHp * 0.0002),
+      killHeal: this.passivePower('devour') * this.player.maxHp * 0.0005,
     };
   }
   announce(message: string) {
@@ -443,8 +448,8 @@ export class Game {
       const major = realm.index > Math.floor(this.realm / 3);
       this.realm = realm.step;
       this.baseHp += hp;
-      const increase = this.maximumHealth - this.player.maxHp;
-      this.player.maxHp = this.maximumHealth;
+      const increase = this.maximumHealth() - this.player.maxHp;
+      this.player.maxHp = this.maximumHealth();
       if (this.player.hp > 0) this.player.hp += increase;
       this.announce(`${major ? '大境界突破' : '境界突破'} · ${realm.name} · 气血与法宝威力提升`);
       this.effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
@@ -460,6 +465,7 @@ export class Game {
       rootElements: [...this.rootElements],
       startedImmortal: this.startedImmortal,
       version: 1,
+      realmScaling: 3,
       stage: this.stage,
       stageDuration: STAGES[this.stage].minutes * 60,
       difficulty: this.difficulty,
@@ -530,6 +536,7 @@ export class Game {
       const s = raw as ReturnType<Game['snapshot']>;
       if (!s || s.version !== 1 || !['playing', 'paused', 'upgrade', 'lost'].includes(s.state))
         return null;
+      if (s.realmScaling !== undefined && ![1, 2, 3].includes(s.realmScaling)) return null;
       if (
         s.stageDuration !== undefined &&
         (!Number.isFinite(s.stageDuration) || s.stageDuration <= 0)
@@ -841,10 +848,7 @@ export class Game {
       g.tribulationNextAt = s.tribulationNextAt ?? 1.2;
       g.tribulationOpeningDamage = s.tribulationOpeningDamage ?? 0;
       g.spiritRoot = s.spiritRoot ?? 'heaven';
-      g.baseHp =
-        spiritRootInfo(g.spiritRoot).baseHp +
-        save.training.vitality * 10 +
-        realmBonuses(g.realm).hp;
+      g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       const duration = STAGES[s.stage].minutes * 60;
       // 无时长标记的早期六境固定为 5–10 分钟，终关按旧十分钟迁移。
@@ -869,14 +873,13 @@ export class Game {
       g.nextEnemySkillAt = s.nextEnemySkillAt ?? 0;
       g.weapons = s.weapons.map((w) => ({ ...w }));
       g.passives = { ...s.passives };
-      const maxHp = g.maximumHealth;
+      const maxHp = g.maximumHealth();
       if (
         s.medicineHpFactor !== undefined &&
         (!Number.isFinite(s.medicineHpFactor) || s.medicineHpFactor <= 0)
       )
         return null;
-      const growth =
-        Math.round((maxHp * (s.medicineHpFactor ?? 1)) / g.medicine.hp) - g.player.maxHp;
+      const growth = g.maximumHealth(s.medicineHpFactor ?? 1) - g.player.maxHp;
       // 旧对局补齐境界收益，保留已损失气血；新快照的差额为零。
       g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + growth));
       g.player.maxHp = maxHp;
@@ -899,6 +902,39 @@ export class Game {
           : {}),
       }));
       g.zones = s.zones.map((z) => ({ ...z }));
+      if (s.realmScaling === undefined) {
+        const enemyHealth = realmDamageMultiplier(g.tribulation ? 23 : STAGE_REALM_STEPS[g.stage]);
+        const enemyDamage = realmHealthMultiplier(
+          g.tribulation ? g.realm : STAGE_REALM_STEPS[g.stage],
+        );
+        const playerDamage = realmDamageMultiplier(g.realm) / (g.realm >= 24 ? 2 : 1);
+        // 旧战场只换算一次，保留妖物剩余血量比例、弹幕与天劫窗口进度。
+        for (const enemy of g.enemies) {
+          enemy.hp *= enemyHealth;
+          enemy.maxHp *= enemyHealth;
+          enemy.damage *= enemyDamage;
+        }
+        for (const shot of g.shots)
+          shot.damage *= shot.kind === 'hostile' ? enemyDamage : playerDamage;
+        for (const zone of g.zones) zone.damage *= zone.hostile ? enemyDamage : playerDamage;
+        g.tribulationOpeningDamage *= enemyHealth;
+      } else if (s.realmScaling === 1 && g.realm >= 24) {
+        // 上一版真仙为两倍伤害，仅补齐场内己方攻击，不重复强化敌人。
+        for (const shot of g.shots) if (shot.kind !== 'hostile') shot.damage *= 5 / 2;
+        for (const zone of g.zones) if (!zone.hostile) zone.damage *= 5 / 2;
+      }
+      if (s.realmScaling !== 3) {
+        const realmDamage = 1 + realmBonuses(g.realm).damage;
+        const passiveDamage =
+          g.passivePower('power') * 0.12 +
+          g.passivePower('spirit') * 0.04 +
+          g.passivePower('blood') * 0.18 +
+          g.passivePower('forbidden') * 0.08 +
+          (g.path === 'demonic' ? 0.12 : 0);
+        const growth = (realmDamage * (1 + passiveDamage)) / (realmDamage + passiveDamage);
+        for (const shot of g.shots) if (shot.kind !== 'hostile') shot.damage *= growth;
+        for (const zone of g.zones) if (!zone.hostile) zone.damage *= growth;
+      }
       g.pickups = s.pickups
         .filter((p) => !g.isFinalTrial || p.kind !== 'heal')
         .map((p) => ({ ...p }));
@@ -1013,7 +1049,7 @@ export class Game {
       this.elapsedYears += Math.max(0, this.save.age - ageBefore);
     if (this.save.age >= this.medicine.expiresAt) {
       this.medicine = medicineEffects(this.save.medicine, this.save.age);
-      this.player.maxHp = this.maximumHealth;
+      this.player.maxHp = this.maximumHealth();
       this.player.hp = Math.min(this.player.hp, this.player.maxHp);
     }
     if (this.medicine.frost && this.time >= this.nextMedicinePulse) {
@@ -1021,7 +1057,7 @@ export class Game {
       for (const enemy of this.enemies)
         if (!enemy.dead && distance(enemy, this.player) <= 180)
           enemy.slow = Math.max(enemy.slow, 2);
-      this.effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'pulse');
+      this.effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'impact');
     }
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
     this.noticeTime -= dt;
@@ -1246,8 +1282,8 @@ export class Game {
       type,
       x: at?.x ?? this.player.x + Math.cos(angle) * (this.viewport.width / 2 + 70),
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
-      hp: hp * scaling.hp,
-      maxHp: hp * scaling.hp,
+      hp: hp * scaling.hp * realmDamageMultiplier(STAGE_REALM_STEPS[this.stage]),
+      maxHp: hp * scaling.hp * realmDamageMultiplier(STAGE_REALM_STEPS[this.stage]),
       radius: boss
         ? bossStage === FINAL_TRIAL_STAGE
           ? 62
@@ -1274,6 +1310,7 @@ export class Game {
         difficulty.damage *
         (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
         (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3) *
+        realmHealthMultiplier(STAGE_REALM_STEPS[this.stage]) *
         (eliteScaling?.damage ?? 1),
       elite,
       boss,
@@ -1781,7 +1818,7 @@ export class Game {
       return;
     }
     if (w.id === 'pulse' || w.id === 'ice') {
-      this.effect(p.x, p.y, 0.75, radius * 1.5, t.color, w.id);
+      this.effect(p.x, p.y, 0.75, radius * 1.5, t.color, w.id === 'pulse' ? 'impact' : w.id);
       this.areaDamage(p, radius * 1.5, dmg, w.id);
       return;
     }
@@ -2116,8 +2153,9 @@ export class Game {
           }
         }
         if (b.kind === 'fire') {
-          this.areaDamage(b, 62 * this.stats.area, b.damage * 0.65, 'fire', 'fire', b.bossAttack);
-          this.effect(b.x, b.y, 0.45, 62, b.color, 'pulse');
+          const radius = 62 * this.stats.area;
+          this.areaDamage(b, radius, b.damage * 0.65, 'fire', 'fire', b.bossAttack);
+          this.effect(b.x, b.y, 0.45, radius, b.color, 'impact');
         }
         if (b.kind === 'dragon') {
           const d = distance(e, this.player) || 1;
@@ -2171,6 +2209,8 @@ export class Game {
       if (z.tick <= 0) {
         z.tick = 0.5;
         if (z.hostile) {
+          if (this.tribulation && z.kind === 'blast' && z.life > 0)
+            this.effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
           if (distance(z, this.player) < z.radius + 8)
             this.hurtPlayer(
               z.damage *
@@ -2186,7 +2226,7 @@ export class Game {
           const hits = this.enemies.some((e) => !e.dead && distance(e, z) < z.radius + e.radius);
           this.areaDamage(z, z.radius, z.damage, z.kind);
           if (hits && (z.kind === 'cauldron' || z.kind === 'bloodpool'))
-            this.heal(z.kind === 'cauldron' ? 1 : 0.7);
+            this.heal(this.player.maxHp * (z.kind === 'cauldron' ? 0.0015 : 0.001));
         }
       }
     }
@@ -2219,7 +2259,7 @@ export class Game {
         }
         if (item.kind === 'chest') {
           this.iron += 2;
-          if (!this.isFinalTrial) this.heal(20);
+          if (!this.isFinalTrial) this.heal(this.player.maxHp * 0.05);
           const candidates = this.weapons.filter((w) => w.level < MAX_WEAPON_LEVEL);
           if (candidates.length) {
             const w = candidates[Math.floor(this.random() * candidates.length)];
@@ -2375,7 +2415,11 @@ export class Game {
     this.damageDealt += actual;
     this.damageBySource[source] = (this.damageBySource[source] || 0) + actual;
     if (this.effects.length < 100)
-      this.float(e, `${Math.ceil(damage)}${crit ? '!' : ''}`, crit ? '#f8db88' : '#e5edce');
+      this.float(
+        e,
+        `${formatNumber(Math.ceil(damage))}${crit ? '!' : ''}`,
+        crit ? '#f8db88' : '#e5edce',
+      );
     if (e.hp <= 0) {
       e.dead = true;
       this.kills++;
@@ -2520,7 +2564,10 @@ export class Game {
       this.areaDamage(
         this.player,
         115 * this.stats.area,
-        this.player.maxHp * this.passivePower('bone') * 0.12 * this.stats.damage,
+        (this.player.maxHp / realmHealthMultiplier(this.realm)) *
+          this.passivePower('bone') *
+          0.12 *
+          this.stats.damage,
         'bone',
       );
       this.effect(this.player.x, this.player.y, 0.4, 115 * this.stats.area, '#dbcfb9', 'bone');
@@ -2635,8 +2682,8 @@ export class Game {
       this.passives[c.id] = c.level;
       if (c.id === 'guard' || c.id === 'bone' || c.id === 'frenzy') {
         const oldMax = this.player.maxHp;
-        const increase = this.maximumHealth - this.player.maxHp;
-        this.player.maxHp = this.maximumHealth;
+        const increase = this.maximumHealth() - this.player.maxHp;
+        this.player.maxHp = this.maximumHealth();
         if (increase >= 0) this.heal(increase);
         else this.player.hp *= this.player.maxHp / oldMax;
       }

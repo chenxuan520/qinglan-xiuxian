@@ -41,7 +41,8 @@ test('最终首领直接结算经验也不能超过一百级，满级仍获永�
   g.level = 99;
   g.xp = 1e9;
   g.trialBossesDefeated = 6;
-  g.hitEnemy(g.spawnEnemy(10, false, true, undefined, 6), 1e9);
+  const boss = g.spawnEnemy(10, false, true, undefined, 6);
+  g.hitEnemy(boss, boss.maxHp);
   assert.equal(g.state, 'won');
   assert.equal(g.level, 100);
   assert.equal(g.xp, 0);

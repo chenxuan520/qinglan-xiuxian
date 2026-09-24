@@ -10,6 +10,7 @@ import {
   bossCultivationReward,
   realmBonuses,
   realmInfo,
+  realmHealthMultiplier,
   attuneSpiritRoot,
 } from '../src/progress.ts';
 
@@ -69,13 +70,17 @@ test('灵根基础气血依次100/95/90/85/80，正道、境界与淬体在基�
       assert.equal(new Game(save, 0, 0).player.maxHp, Math.round(expected[i] * factor));
       save.training.vitality = 10;
       save.cultivation = 12345;
-      const hp = expected[i] + 100 + realmBonuses(realmInfo(save.cultivation).step).hp;
+      const hp = (expected[i] + realmBonuses(realmInfo(save.cultivation).step).hp) * 1.5;
+      const healthFactor = realmHealthMultiplier(realmInfo(save.cultivation).step);
       const g = new Game(save, 0, 0);
-      assert.equal(g.player.maxHp, Math.round(hp * factor));
+      assert.equal(g.player.maxHp, Math.round(hp * factor * healthFactor));
       g.state = 'upgrade';
       g.choices = [{ type: 'passive', id: path === 'demonic' ? 'bone' : 'guard', level: 1 }];
       g.choose(0);
-      assert.equal(g.player.maxHp, Math.round((path === 'demonic' ? hp * 1.18 : hp + 20) * factor));
+      assert.equal(
+        g.player.maxHp,
+        Math.round(hp * (path === 'demonic' ? 1.18 : 1.1) * factor * healthFactor),
+      );
     }
   }
 });
@@ -109,7 +114,8 @@ test('灵根基础回血分档，功法正常叠加，正道合计加20%，洗�
         save.path = path;
         const g = new Game(save, 0, 0);
         g.passives.duration = level;
-        const expected = (rates[i] + level * 0.2) * (path === 'orthodox' ? 1.2 : 1);
+        const expected =
+          (rates[i] + level * g.player.maxHp * 0.001) * (path === 'orthodox' ? 1.2 : 1);
         assert.ok(Math.abs(g.stats.regen - expected) < 1e-10);
         g.player.hp -= 10;
         const before = g.player.hp;
