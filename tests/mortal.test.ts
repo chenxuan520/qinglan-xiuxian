@@ -5,6 +5,8 @@ import {
   parseSave,
   realmCost,
   realmBonuses,
+  realmDamageMultiplier,
+  realmHealthMultiplier,
   extendLifespan,
   completeTribulation,
 } from '../src/progress.ts';
@@ -433,15 +435,56 @@ test('精研增强正向功法效果，保留原魔道代价与局内等级', ()
   s.mortal.mastery.power = 10;
   const g = new Game(s, 0, 0);
   g.passives.power = 2;
-  near(g.stats.damage, (1 + realmBonuses(24).damage + 0.24 * 1.3) * 2);
+  near(
+    g.stats.damage,
+    (1 + realmBonuses(24).damage) * (1 + 0.24 * 1.3) * realmDamageMultiplier(24),
+  );
   assert.equal(g.passives.power, 2);
   leaveSect(s);
-  near(g.stats.damage, (1.24 + realmBonuses(24).damage) * 2);
+  near(g.stats.damage, (1 + realmBonuses(24).damage) * 1.24 * realmDamageMultiplier(24));
   joinSect(s, 'blood');
   s.mortal.mastery.blood = 10;
   g.passives = { blood: 1 };
-  near(g.stats.damage, (1 + realmBonuses(24).damage + 0.18 * 1.3) * 2);
+  near(
+    g.stats.damage,
+    (1 + realmBonuses(24).damage) * (1 + 0.18 * 1.3) * realmDamageMultiplier(24),
+  );
   near(g.stats.armor, 1.03);
+});
+test('金刚与回血功法满重精研按百分比增强，减伤及噬魂回复代价不变', () => {
+  for (const root of SPIRIT_ROOTS)
+    for (const step of [9, 24])
+      for (const id of ['guard', 'duration', 'devour']) {
+        const s = wealthy(step);
+        s.spiritRoot = root.id;
+        s.rootElements = freshSave(root.id).rootElements;
+        s.training.vitality = 20;
+        assert.equal(joinSect(s, id), true);
+        s.mortal.mastery[id] = 10;
+        const g = new Game(s, 0, 0);
+        g.state = 'upgrade';
+        g.choices = [{ type: 'passive', id, level: 5 }];
+        assert.equal(g.choose(0), true);
+        const mastery = 1 + (step === 24 ? 10 : 4) * 0.03;
+        const expectedHp = Math.round(
+          (root.baseHp + realmBonuses(step).hp) *
+            2 *
+            (id === 'guard' ? 1 + 5 * mastery * 0.1 : 1) *
+            (id === 'devour' ? 1 : 1.12) *
+            realmHealthMultiplier(step),
+        );
+        assert.equal(g.player.maxHp, expectedHp);
+        near(g.stats.armor, id === 'guard' ? 1 - 5 * mastery * 0.06 : 1);
+        near(
+          g.stats.regen,
+          (root.baseRegen * realmHealthMultiplier(step) +
+            (id === 'duration' ? 5 * mastery * expectedHp * 0.001 : 0)) *
+            (id === 'devour' ? 1 : 1.2) *
+            (id === 'devour' ? 0.8 : 1),
+        );
+        near(g.stats.killHeal, id === 'devour' ? 5 * mastery * expectedHp * 0.0005 : 0);
+        assert.equal(g.passives[id], 5);
+      }
 });
 test('所有宗门均增强对应功法，气血变化可安全恢复续局', () => {
   for (const sect of SECTS) {
@@ -497,7 +540,7 @@ test('九幽减速、拘魂吸取和白骨反击的实际技能获得精研增�
       assert.equal(g.pickups.find((p) => p.kind === 'xp')?.pull, true);
     } else {
       g.hurtPlayer(1);
-      near(e.maxHp - e.hp, g.player.maxHp * 0.156 * g.stats.damage);
+      near(e.maxHp - e.hp, (g.player.maxHp / realmHealthMultiplier(24)) * 0.156 * g.stats.damage);
     }
   }
 });
@@ -511,7 +554,11 @@ test('续局反复恢复不重复增加气血，退宗取消气血加成但不�
   joinSect(s, 'guard');
   s.mortal.mastery.guard = 10;
   const trained = Game.restore(s, base.snapshot())!;
-  assert.equal(trained.player.maxHp - base.player.maxHp, 6);
+  assert.equal(
+    trained.player.maxHp - base.player.maxHp,
+    Math.round((100 + realmBonuses(24).hp) * 1.13 * realmHealthMultiplier(24)) -
+      Math.round((100 + realmBonuses(24).hp) * 1.1 * realmHealthMultiplier(24)),
+  );
   assert.equal(trained.player.maxHp - trained.player.hp, 30);
   const again = Game.restore(s, trained.snapshot())!;
   assert.equal(again.player.hp, trained.player.hp);
@@ -573,7 +620,7 @@ test('十六宗门开局各送对应一重，占原有功法槽，旧续局不�
     joinSect(s, sect.id);
     const g = new Game(s, 0, 0);
     assert.deepEqual(g.passives, { [sect.id]: 1 });
-    if (sect.id === 'guard') assert.equal(g.player.maxHp, 134);
+    if (sect.id === 'guard') assert.equal(g.player.maxHp, 123);
     if (sect.id === 'bone') assert.equal(g.player.maxHp, 118);
     const restored = Game.restore(s, g.snapshot())!;
     assert.deepEqual(restored.passives, g.passives);

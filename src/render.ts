@@ -640,10 +640,10 @@ export class Renderer {
         const angle = Math.atan2(e.y2! - e.y, e.x2! - e.x);
         c.lineWidth = (10 * e.life) / e.maxLife + 1;
         c.beginPath();
-        c.arc(e.x, e.y, e.radius * (1 - (e.life / e.maxLife) * 0.35), angle - 1.7, angle + 1.7);
+        c.arc(e.x, e.y, e.radius, angle - 1.7, angle + 1.7);
         c.stroke();
       } else if (e.kind === 'umbrella' || e.kind === 'bone') {
-        const radius = e.radius * (1 - (e.life / e.maxLife) * 0.6);
+        const radius = e.radius;
         c.lineWidth = 2;
         c.beginPath();
         for (let i = 0; i <= 8; i++) {
@@ -698,7 +698,9 @@ export class Renderer {
           c.stroke();
         });
       } else {
-        const r = e.radius * (1 - e.life / e.maxLife);
+        // 瞬发效果首帧即覆盖判定范围，普通脉冲仍作为扩散装饰。
+        const r =
+          e.kind === 'impact' || e.kind === 'ice' ? e.radius : e.radius * (1 - e.life / e.maxLife);
         c.lineWidth = e.kind === 'ice' ? 4 : 3;
         c.beginPath();
         c.arc(e.x, e.y, r, 0, TAU);

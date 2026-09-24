@@ -2,13 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
-import { TREASURES, PASSIVES, STAGES, ENEMIES, xpNeeded } from '../src/data.ts';
+import {
+  TREASURES,
+  PASSIVES,
+  STAGES,
+  ENEMIES,
+  STAGE_REALM_STEPS,
+  tribulationRules,
+  xpNeeded,
+} from '../src/data.ts';
 import { spriteFrame } from '../src/sprites.ts';
+import { joinSect } from '../src/mortal.ts';
 import {
   freshSave,
   parseSave,
   realmCost,
   realmInfo,
+  realmBonuses,
+  realmHealthMultiplier,
+  realmDamageMultiplier,
+  syncTribulationClock,
   settleRun,
   train,
   forge,
@@ -226,12 +239,13 @@ test('旧渡劫三阶段归为真仙境界，保留修为与缺血，重复续�
     old.player.hp = old.player.maxHp - 37;
     const restored = Game.restore(save, old)!;
     assert.equal(restored.realm, 24);
-    assert.equal(restored.player.maxHp, 893);
-    assert.equal(restored.player.hp, 856);
-    assert.ok(Math.abs(restored.stats.damage - 12.3) < 1e-8);
+    const maxHp = Math.round(693 * realmHealthMultiplier(24));
+    assert.equal(restored.player.maxHp, maxHp);
+    assert.equal(restored.player.hp, maxHp - 37);
+    assert.ok(Math.abs(restored.stats.damage - 6.15 * realmDamageMultiplier(24)) < 1e-8);
     const again = Game.restore(save, restored.snapshot())!;
-    assert.equal(again.player.hp, 856);
-    assert.equal(again.player.maxHp, 893);
+    assert.equal(again.player.hp, maxHp - 37);
+    assert.equal(again.player.maxHp, maxHp);
     assert.equal(save.cultivation, cultivation);
     old.player.hp = 0;
     old.state = 'lost';
@@ -246,11 +260,12 @@ test('旧末境加成升级为真仙，续局补齐上限且保留缺血，刷�
   old.player.maxHp = 563;
   old.player.hp = 420;
   const restored = Game.restore(save, old)!;
-  assert.equal(restored.player.maxHp, 893);
-  assert.equal(restored.player.hp, 750);
-  assert.ok(Math.abs(restored.stats.damage - 12.3) < 1e-8);
+  const maxHp = Math.round(693 * realmHealthMultiplier(24));
+  assert.equal(restored.player.maxHp, maxHp);
+  assert.equal(restored.player.hp, maxHp - 143);
+  assert.ok(Math.abs(restored.stats.damage - 6.15 * realmDamageMultiplier(24)) < 1e-8);
   const again = Game.restore(save, restored.snapshot())!;
-  assert.equal(again.player.hp, 750);
+  assert.equal(again.player.hp, maxHp - 143);
   assert.equal(again.stats.damage, restored.stats.damage);
 });
 
@@ -265,9 +280,9 @@ test('斩妖和升级实时增加修为，突破立即提升气血与伤害', ()
   assert.equal(save.cultivation, 90);
   assert.equal(game.creditedCultivation, 10);
   assert.equal(realmInfo(save.cultivation).name, '炼气中期');
-  assert.equal(game.player.maxHp, 103);
-  assert.equal(game.player.hp, 103);
-  assert.equal(game.stats.damage, 1.025);
+  assert.equal(game.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
+  assert.equal(game.player.hp, game.player.maxHp);
+  assert.equal(game.stats.damage, 1.025 * realmDamageMultiplier(1));
   assert.match(game.notice, /突破.*炼气中期/);
   game.xp = xpNeeded(1);
   game.update(0.05);
@@ -275,7 +290,7 @@ test('斩妖和升级实时增加修为，突破立即提升气血与伤害', ()
   assert.equal(game.creditedCultivation, 18);
   game.choices = [{ type: 'passive', id: 'guard', level: 1 }];
   game.choose(0);
-  assert.equal(game.player.maxHp, 123);
+  assert.equal(game.player.maxHp, Math.round(103 * 1.1 * realmHealthMultiplier(1)));
 });
 test('各难度实时修为保留小数累计，失败和通关结算只补差额', () => {
   for (const difficulty of [0, 1, 2]) {
@@ -307,8 +322,8 @@ test('各难度实时修为保留小数累计，失败和通关结算只补差�
     }
   }
 });
-test('大境界增量随境界提高，真仙独立翻倍，当局突破与新开局一致', () => {
-  const health = [45, 50, 60, 70, 85, 105, 130, 200];
+test('大境界增量随境界提高，真仙气血三倍、伤害五倍，当局突破与新开局一致', () => {
+  const health = [45, 50, 60, 70, 85, 105, 130, 0];
   const attacks = [0.35, 0.4, 0.5, 0.6, 0.75, 0.95, 1.2];
   let threshold = 0;
   for (let step = 1; step <= 26; step++) {
@@ -324,10 +339,17 @@ test('大境界增量随境界提高，真仙独立翻倍，当局突破与新�
     const damage = game.stats.damage;
     const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
     game.hitEnemy(enemy, enemy.maxHp);
-    assert.equal(game.player.maxHp - maxHp, health[step / 3 - 1]);
-    assert.equal(game.player.hp - hp, health[step / 3 - 1]);
+    assert.equal(realmBonuses(step).hp - realmBonuses(step - 1).hp, health[step / 3 - 1]);
+    const increase =
+      Math.round((100 + realmBonuses(step).hp) * realmHealthMultiplier(step)) - maxHp;
+    assert.equal(game.player.maxHp - maxHp, increase);
+    assert.equal(game.player.hp - hp, increase);
     assert.ok(
-      Math.abs(game.stats.damage - damage - (step === 24 ? damage : attacks[step / 3 - 1])) < 1e-10,
+      Math.abs(
+        game.stats.damage -
+          (damage / realmDamageMultiplier(step - 1) + (step === 24 ? 0 : attacks[step / 3 - 1])) *
+            realmDamageMultiplier(step),
+      ) < 1e-10,
     );
     assert.match(game.notice, /大境界突破/);
     const next = new Game(save, 0, 0, seeded());
@@ -349,17 +371,23 @@ test('旧版元婴对局补齐境界加成，保留已损失气血，重复读�
   legacy.player.hp = legacy.player.maxHp - 37;
   const restored = Game.restore(save, legacy)!;
   assert.ok(restored);
-  assert.equal(restored.player.maxHp, 393);
-  assert.equal(restored.player.hp, 356);
-  assert.equal(restored.stats.damage, 2.4);
+  const maxHp = Math.round(
+    (100 + realmBonuses(9).hp) * 1.1 * 1.2 * 1.18 * realmHealthMultiplier(9),
+  );
+  assert.equal(restored.player.maxHp, maxHp);
+  assert.equal(restored.player.hp, maxHp - 37);
+  assert.equal(restored.stats.damage, 2.4 * realmDamageMultiplier(9));
   const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
-  assert.equal(again.player.hp, 356);
-  assert.equal(again.player.maxHp, 393);
-  assert.equal(again.stats.damage, 2.4);
+  assert.equal(again.player.hp, maxHp - 37);
+  assert.equal(again.player.maxHp, maxHp);
+  assert.equal(again.stats.damage, 2.4 * realmDamageMultiplier(9));
   again.state = 'upgrade';
   again.choices = [{ type: 'passive', id: 'guard', level: 3 }];
   again.choose(0);
-  assert.equal(again.player.maxHp, 417);
+  assert.equal(
+    again.player.maxHp,
+    Math.round((100 + realmBonuses(9).hp) * 1.1 * 1.3 * 1.18 * realmHealthMultiplier(9)),
+  );
 });
 test('通关奖励跨大境界后，下次开局获得完整加成且没有额外修为', () => {
   const save = freshSave();
@@ -377,8 +405,8 @@ test('通关奖励跨大境界后，下次开局获得完整加成且没有额�
   assert.equal(save.cultivation, threshold - 50 + reward.cultivation);
   const game = new Game(save, 0, 0, seeded());
   assert.equal(realmInfo(save.cultivation).name, '筑基初期');
-  assert.equal(game.player.maxHp, 151);
-  assert.equal(game.stats.damage, 1.4);
+  assert.equal(game.player.maxHp, Math.round(151 * realmHealthMultiplier(3)));
+  assert.equal(game.stats.damage, 1.4 * realmDamageMultiplier(3));
 });
 test('实时修为随存档恢复，不重复入账或重复增加气血', () => {
   const save = freshSave();
@@ -392,13 +420,13 @@ test('实时修为随存档恢复，不重复入账或重复增加气血', () =>
   assert.ok(restored);
   assert.equal(restoredSave.cultivation, 93);
   assert.equal(restored.creditedCultivation, 8);
-  assert.equal(restored.player.maxHp, 103);
+  assert.equal(restored.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
   assert.equal(restored.player.hp, game.player.hp);
   assert.equal(restored.stats.damage, game.stats.damage);
   restored.resume();
   restored.update(0.05);
   assert.equal(restoredSave.cultivation, 93);
-  assert.equal(restored.player.maxHp, 103);
+  assert.equal(restored.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
 });
 test('旧对局补发未结算修为，连续刷新只补发一次', () => {
   const game = createGame();
@@ -412,11 +440,11 @@ test('旧对局补发未结算修为，连续刷新只补发一次', () => {
   assert.equal(save.cultivation, 550);
   assert.equal(restored.creditedCultivation, 550);
   assert.equal(realmInfo(save.cultivation).name, '筑基中期');
-  assert.equal(restored.player.maxHp, 154);
+  assert.equal(restored.player.maxHp, Math.round(154 * realmHealthMultiplier(4)));
   const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
   assert.equal(save.cultivation, 550);
-  assert.equal(again.player.maxHp, 154);
-  assert.equal(again.stats.damage, 1.425);
+  assert.equal(again.player.maxHp, Math.round(154 * realmHealthMultiplier(4)));
+  assert.equal(again.stats.damage, 1.425 * realmDamageMultiplier(4));
 });
 test('失败保留收益但不解锁，通关逐境解锁并保存', () => {
   const save = freshSave();
@@ -551,6 +579,313 @@ test('升级中的存档保留原有三选一和重悟次数，不会刷新选�
   if (selection.type === 'weapon')
     assert.ok(restored.weapons.some((w) => w.id === selection.id && w.level === selection.level));
 });
+test('无境界标记旧局只迁移一次，保留缺血、敌人血量比例、双方弹幕领域和天劫窗口', () => {
+  for (const trained of [false, true])
+    for (const [step, stage, tribulation] of [
+      [9, 2, false],
+      [24, 6, false],
+      [21, 2, true],
+      [23, 6, true],
+    ] as const) {
+      const save = freshSave();
+      save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      save.training.vitality = trained ? 20 : 0;
+      save.unlocked = stage;
+      if (step === 24) save.completed = [6];
+      syncTribulationClock(save);
+      if (tribulation) save.age = save.nextTribulationAge;
+      const g = tribulation ? Game.createTribulation(save, null) : new Game(save, stage, 0);
+      if (trained) g.passives = { power: 4, spirit: 2, guard: 3, bone: 2 };
+      if (!tribulation) {
+        g.spawnEnemy(0, false, false, { x: 200, y: 0 });
+        g.spawnEnemy(1, true, false, { x: 300, y: 0 });
+        g.spawnEnemy(10, false, true, { x: 400, y: 0 }, stage);
+        g.bossSpawned = true;
+        if (stage === 6) g.trialBossesSpawned = 1;
+      }
+      g.time = 10;
+      g.tribulationNextAt = 12;
+      g.pause();
+      const legacy = JSON.parse(JSON.stringify(g.snapshot()));
+      assert.equal(legacy.realmScaling, 3);
+      delete legacy.realmScaling;
+      const realmDamage = 1 + realmBonuses(step).damage;
+      const passiveDamage = trained ? 4 * 0.12 + 2 * 0.04 : 0;
+      const passiveGrowth = (realmDamage * (1 + passiveDamage)) / (realmDamage + passiveDamage);
+      const oldDamage = (realmDamage + passiveDamage) * (step === 24 ? 2 : 1);
+      legacy.player.maxHp = Math.round(
+        (100 + realmBonuses(step).hp + (step === 24 ? 200 : 0) + (trained ? 260 : 0)) *
+          (trained ? 1.36 : 1),
+      );
+      legacy.player.hp = legacy.player.maxHp - 37;
+      for (const [i, enemy] of legacy.enemies.entries()) {
+        enemy.maxHp = tribulation ? tribulationRules(1).hp : 1000 + i * 100;
+        enemy.hp = enemy.maxHp * 0.37;
+        enemy.damage = tribulation ? legacy.player.maxHp * tribulationRules(1).damage : 7 + i;
+      }
+      legacy.shots = ['sword', 'hostile'].map((kind) => ({
+        x: 100,
+        y: 0,
+        vx: 10,
+        vy: 0,
+        life: 2,
+        radius: 8,
+        damage: kind === 'hostile' ? 13 : 13 * oldDamage,
+        color: '#fff',
+        kind,
+        pierce: 0,
+        hit: [777],
+        origin: { x: 0, y: 0 },
+        age: 0.5,
+        bounce: 0,
+        crit: false,
+      }));
+      legacy.zones = [false, true].map((hostile) => ({
+        x: 200,
+        y: 0,
+        radius: 60,
+        life: 2,
+        maxLife: 3,
+        damage: hostile ? 17 : 17 * oldDamage,
+        tick: 0.2,
+        color: '#fff',
+        kind: 'poison',
+        delay: 0.4,
+        hostile,
+      }));
+      legacy.tribulationOpeningDamage = tribulation
+        ? (tribulationRules(1).hp * tribulationRules(1).openingDamage) / 2
+        : 0;
+      const rawBefore = JSON.stringify(legacy);
+      const saveBefore = JSON.stringify(save);
+      const restored = Game.restore(save, legacy)!;
+      assert.ok(restored);
+      const enemyHealth = realmDamageMultiplier(tribulation ? 23 : STAGE_REALM_STEPS[stage]);
+      const enemyDamage = realmHealthMultiplier(tribulation ? step : STAGE_REALM_STEPS[stage]);
+      const playerDamage = realmDamageMultiplier(step) / (step === 24 ? 2 : 1);
+      assert.equal(
+        restored.player.maxHp,
+        Math.round(
+          (100 + realmBonuses(step).hp) *
+            (trained ? 2 : 1) *
+            (trained ? 1.3 : 1) *
+            (trained ? 1.36 : 1) *
+            realmHealthMultiplier(step),
+        ),
+      );
+      assert.equal(restored.player.maxHp - restored.player.hp, 37);
+      assert.deepEqual(
+        restored.enemies,
+        legacy.enemies.map((enemy) => ({
+          ...enemy,
+          hp: enemy.hp * enemyHealth,
+          maxHp: enemy.maxHp * enemyHealth,
+          damage: enemy.damage * enemyDamage,
+        })),
+      );
+      for (const enemy of restored.enemies)
+        assert.ok(Math.abs(enemy.hp / enemy.maxHp - 0.37) < 1e-12);
+      const migrated = restored.snapshot();
+      assert.equal(migrated.realmScaling, 3);
+      assert.deepEqual(
+        migrated.shots,
+        legacy.shots.map((shot) => ({
+          ...shot,
+          damage:
+            shot.kind === 'hostile'
+              ? shot.damage * enemyDamage
+              : shot.damage * playerDamage * passiveGrowth,
+        })),
+      );
+      assert.deepEqual(
+        migrated.zones,
+        legacy.zones.map((zone) => ({
+          ...zone,
+          damage: zone.hostile
+            ? zone.damage * enemyDamage
+            : zone.damage * playerDamage * passiveGrowth,
+        })),
+      );
+      assert.equal(
+        restored.tribulationOpeningDamage,
+        legacy.tribulationOpeningDamage * enemyHealth,
+      );
+      assert.equal(restored.time, 10);
+      assert.equal(restored.tribulationStep, legacy.tribulationStep);
+      assert.equal(restored.tribulationNextAt, 12);
+      let raw = migrated;
+      for (let i = 0; i < 3; i++) {
+        raw = Game.restore(save, JSON.parse(JSON.stringify(raw)))!.snapshot();
+        assert.deepEqual(raw, migrated);
+      }
+      assert.equal(JSON.stringify(legacy), rawBefore);
+      assert.equal(JSON.stringify(save), saveBefore);
+      if (tribulation) {
+        restored.resume();
+        const boss = restored.boss!;
+        const before = boss.hp;
+        const remaining =
+          boss.maxHp * tribulationRules(1).openingDamage - restored.tribulationOpeningDamage;
+        restored.hitEnemy(boss, boss.maxHp);
+        assert.ok(Math.abs(before - boss.hp - remaining) < 1e-8);
+        assert.equal(
+          restored.tribulationOpeningDamage,
+          boss.maxHp * tribulationRules(1).openingDamage,
+        );
+        restored.hitEnemy(boss, boss.maxHp);
+        assert.ok(Math.abs(before - boss.hp - remaining) < 1e-8);
+      }
+      legacy.state = 'lost';
+      legacy.player.hp = 0;
+      assert.equal(Game.restore(save, legacy)!.player.hp, 0);
+    }
+});
+test('标记1/2攻血功法旧局只迁移己方攻击，标记3不再迁移，保留缺血与敌方状态且幂等', () => {
+  for (const marker of [1, 2, 3])
+    for (const path of ['orthodox', 'demonic', 'dual'] as const)
+      for (const trained of [false, true])
+        for (const step of [0, 9, 23, 24]) {
+          const save = freshSave();
+          save.path = path;
+          save.training.vitality = trained ? 20 : 0;
+          save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+            (a, b) => a + b,
+            0,
+          );
+          save.unlocked = 2;
+          if (step === 24) save.completed = [6];
+          const mastery = trained && step === 24 ? 1.3 : 1;
+          if (mastery > 1) {
+            save.stones = 1000;
+            const sect = path === 'demonic' ? 'blood' : 'power';
+            assert.equal(joinSect(save, sect), true);
+            save.mortal.mastery[sect] = 10;
+          }
+          const game = new Game(save, 2, 0, seeded(), path);
+          if (trained) {
+            game.passives =
+              path === 'demonic'
+                ? { blood: 4, forbidden: 2, bone: 3 }
+                : { power: 4, spirit: 2, guard: 3 };
+          }
+          const enemy = game.spawnEnemy(0, false, false, { x: 200, y: 0 });
+          enemy.hp *= 0.37;
+          game.pause();
+          const legacy = JSON.parse(JSON.stringify(game.snapshot())) as ReturnType<
+            Game['snapshot']
+          >;
+          legacy.realmScaling = marker;
+          const realmDamage = 1 + realmBonuses(step).damage;
+          const passiveDamage =
+            (trained
+              ? path === 'demonic'
+                ? 4 * mastery * 0.18 + 2 * 0.08
+                : 4 * mastery * 0.12 + 2 * 0.04
+              : 0) + (path === 'demonic' ? 0.12 : 0);
+          const passiveGrowth =
+            marker === 3 ? 1 : (realmDamage * (1 + passiveDamage)) / (realmDamage + passiveDamage);
+          const immortalGrowth = marker === 1 && step === 24 ? 5 / 2 : 1;
+          const expectedMaxHp = Math.round(
+            (100 + realmBonuses(step).hp) *
+              (trained ? 2 : 1) *
+              (trained && path !== 'demonic' ? 1.3 : 1) *
+              (trained && path === 'demonic' ? 1.54 : 1) *
+              (path === 'orthodox' ? 1.12 : 1) *
+              realmHealthMultiplier(step),
+          );
+          legacy.player.maxHp =
+            marker === 3
+              ? expectedMaxHp
+              : Math.round(
+                  (100 +
+                    realmBonuses(step).hp +
+                    (marker === 1 && step === 24 ? 200 : 0) +
+                    (trained ? 200 + (path === 'demonic' ? 0 : 60) : 0)) *
+                    (trained && path === 'demonic' ? 1.54 : 1) *
+                    (path === 'orthodox' ? 1.12 : 1) *
+                    realmHealthMultiplier(marker === 1 && step === 24 ? 23 : step),
+                );
+          legacy.player.hp = legacy.player.maxHp - 37;
+          const oldDamage =
+            marker === 3
+              ? game.stats.damage
+              : ((realmDamage + passiveDamage) * realmDamageMultiplier(step)) / immortalGrowth;
+          legacy.shots = (['sword', 'hostile'] as const).map((kind) => ({
+            x: 100,
+            y: 0,
+            vx: 10,
+            vy: 0,
+            life: 2,
+            radius: 8,
+            damage: kind === 'hostile' ? 13 : 13 * oldDamage,
+            color: '#fff',
+            kind,
+            pierce: 0,
+            hit: [777],
+            origin: { x: 0, y: 0 },
+            age: 0.5,
+            bounce: 0,
+            crit: false,
+          }));
+          legacy.zones = [false, true].map((hostile) => ({
+            x: 200,
+            y: 0,
+            radius: 60,
+            life: 2,
+            maxLife: 3,
+            damage: hostile ? 17 : 17 * oldDamage,
+            tick: 0.2,
+            color: '#fff',
+            kind: 'poison',
+            delay: 0.4,
+            hostile,
+          }));
+          const rawBefore = JSON.stringify(legacy);
+          const saveBefore = JSON.stringify(save);
+          const restored = Game.restore(save, legacy)!;
+          assert.ok(restored);
+          assert.equal(restored.player.maxHp, expectedMaxHp);
+          assert.equal(restored.player.hp, expectedMaxHp - 37);
+          assert.equal(restored.stats.damage, game.stats.damage);
+          const migrated = restored.snapshot();
+          assert.equal(migrated.realmScaling, 3);
+          assert.deepEqual(migrated.enemies, legacy.enemies);
+          assert.deepEqual(
+            migrated.shots,
+            legacy.shots.map((shot) => ({
+              ...shot,
+              damage:
+                shot.kind === 'hostile'
+                  ? shot.damage
+                  : shot.damage * immortalGrowth * passiveGrowth,
+            })),
+          );
+          assert.deepEqual(
+            migrated.zones,
+            legacy.zones.map((zone) => ({
+              ...zone,
+              damage: zone.hostile ? zone.damage : zone.damage * immortalGrowth * passiveGrowth,
+            })),
+          );
+          assert.ok(Math.abs(migrated.shots[0].damage / (13 * restored.stats.damage) - 1) < 1e-12);
+          assert.ok(Math.abs(migrated.zones[0].damage / (17 * restored.stats.damage) - 1) < 1e-12);
+          let raw = migrated;
+          for (let i = 0; i < 3; i++) {
+            raw = Game.restore(save, JSON.parse(JSON.stringify(raw)))!.snapshot();
+            assert.deepEqual(raw, migrated);
+          }
+          assert.equal(JSON.stringify(legacy), rawBefore);
+          assert.equal(JSON.stringify(save), saveBefore);
+          legacy.state = 'lost';
+          legacy.player.hp = 0;
+          const dead = Game.restore(save, legacy)!;
+          assert.equal(dead.player.hp, 0);
+          assert.equal(Game.restore(save, dead.snapshot())!.player.hp, 0);
+        }
+});
 test('旧三重觉醒选项恢复时失效，选择时仍须满足五重门槛', () => {
   const game = createGame();
   game.weapons[0].level = 6;
@@ -580,6 +915,8 @@ test('已结束或损坏的对局不恢复，永久进度仍可读取', () => {
     null,
   );
   assert.equal(Game.restore(game.save, { ...snapshot, stage: 5 }), null);
+  for (const realmScaling of [0, 4, 1.5, null, '1'])
+    assert.equal(Game.restore(game.save, { ...snapshot, realmScaling }), null);
   assert.equal(Game.restore(game.save, null), null);
   const s = parseSave(JSON.stringify({ ...game.save, stones: 35, activeRun: { invalid: true } }));
   assert.equal(s.stones, 35);

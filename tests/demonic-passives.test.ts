@@ -35,7 +35,7 @@ test('八本魔功分别增强专长并承担代价，正道数值保留', () =>
     },
     devour: (g) => {
       near(g.stats.duration, 2);
-      near(g.stats.killHeal, 1);
+      near(g.stats.killHeal, 0.25);
       near(g.stats.regen, 0.144);
     },
     curse: (g) => {
@@ -64,8 +64,8 @@ test('八本魔功分别增强专长并承担代价，正道数值保留', () =>
   near(g.stats.damage, 1.6);
   near(g.stats.cooldown, 0.65);
   near(g.stats.armor, 0.7);
-  near(g.stats.regen, 1.18);
-  assert.equal(g.player.maxHp, 200);
+  near(g.stats.regen, 0.93);
+  assert.equal(g.player.maxHp, 150);
 });
 
 test('魔道精研只增强收益，不扩大气血、移速、承伤、恢复或施法代价', () => {

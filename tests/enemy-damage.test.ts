@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { DIFFICULTIES, ENEMIES, STAGES, STAGE_ENEMIES } from '../src/data.ts';
-import { freshSave } from '../src/progress.ts';
+import { DIFFICULTIES, ENEMIES, STAGES, STAGE_ENEMIES, STAGE_REALM_STEPS } from '../src/data.ts';
+import { freshSave, realmHealthMultiplier } from '../src/progress.ts';
 
 test('前六境各阶段刷新量增加25%，妖王阶段比例与同屏上限保留', () => {
   for (let stage = 0; stage < 6; stage++) {
@@ -43,7 +43,7 @@ test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣�
         g.time = STAGES[stage].minutes * 30;
         g.nextElite = 9999;
         g.passives.guard = 3;
-        g.player.hp = g.player.maxHp = 10000;
+        g.player.hp = g.player.maxHp = 100000;
         const type = STAGE_ENEMIES[stage][0];
         const e = g.spawnEnemy(type, elite, false, { x: 0, y: 0 });
         const expected =
@@ -52,7 +52,8 @@ test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣�
           1.175 *
           DIFFICULTIES[difficulty].damage *
           (elite ? 2.2 : 1.3) *
-          (1 + [0, 0.08, 0.16, 0.24, 0.32, 0.42][stage] * (elite ? 1 : 0.65)) *
+          (1 + [0, 0.08, 0.16, 0.24, 0.85, 0.9][stage] * (elite ? 1 : 0.65)) *
+          realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
           (elite ? [1, 1, 1.2, 1.3, 1.4, 1.5][stage] : 1);
         assert.ok(Math.abs(e.damage - expected) < 1e-8);
         const before = g.player.hp;
@@ -71,9 +72,13 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
       save.training.vitality = 20;
       const g = new Game(save, stage, difficulty, () => 0.5);
       g.weapons = [];
+      g.player.hp = g.player.maxHp = 100000;
       const boss = g.spawnEnemy(10, false, true, { x: 300, y: 0 });
       const expected =
-        damage[stage] * DIFFICULTIES[difficulty].damage * [1, 1.08, 1.16, 1.24, 1.32, 1.42][stage];
+        damage[stage] *
+        DIFFICULTIES[difficulty].damage *
+        [1, 1.08, 1.16, 1.24, 1.85, 1.9][stage] *
+        realmHealthMultiplier(STAGE_REALM_STEPS[stage]);
       assert.equal(boss.damage, expected);
       boss.skillStep = stage === 1 ? 0 : 1;
       boss.cooldown = 0;
@@ -95,7 +100,7 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
   }
 });
 
-test('第七境精英与七位妖王伤害提高35%，重复续局不会重复乘倍率', () => {
+test('第七境精英与七位妖王采用固定两倍强度，重复续局不会重复乘倍率', () => {
   for (let difficulty = 0; difficulty < 3; difficulty++) {
     for (const progress of [0, 0.5, 1]) {
       const save = freshSave();
@@ -109,7 +114,8 @@ test('第七境精英与七位妖王伤害提高35%，重复续局不会重复�
           1.72 *
           (1.1 + progress * 0.9) *
           DIFFICULTIES[difficulty].damage *
-          1.35;
+          2 *
+          realmHealthMultiplier(STAGE_REALM_STEPS[6]);
         assert.ok(e.elite);
         assert.ok(Math.abs(e.damage - expected) < 1e-8);
       }
@@ -117,7 +123,10 @@ test('第七境精英与七位妖王伤害提高35%，重复续局不会重复�
         const boss = g.spawnEnemy(10, false, true, undefined, stage);
         assert.equal(
           boss.damage,
-          (stage === 6 ? 220 : 85 + stage * 10) * DIFFICULTIES[difficulty].damage * 1.35,
+          (stage === 6 ? 220 : 85 + stage * 10) *
+            DIFFICULTIES[difficulty].damage *
+            2 *
+            realmHealthMultiplier(STAGE_REALM_STEPS[6]),
         );
       }
       const restored = Game.restore(g.save, g.snapshot())!;

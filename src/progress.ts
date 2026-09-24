@@ -439,10 +439,7 @@ export function bossCultivationReward(stage: number, bossStage = stage) {
 const REALM_HP_BONUSES = [0, 45, 95, 155, 225, 310, 415, 545];
 const REALM_DAMAGE_BONUSES = [0, 35, 75, 125, 185, 260, 355, 475];
 export function realmBonuses(step: number): { hp: number; damage: number } {
-  if (step >= 24) {
-    const previous = realmBonuses(23);
-    return { hp: previous.hp + 200, damage: previous.damage };
-  }
+  if (step >= 24) return realmBonuses(23);
   const major = Math.floor(step / 3);
   const minor = step - major;
   // 大境界累计收益；后期突破的增量随境界提高，避免被已有加成稀释。
@@ -450,7 +447,10 @@ export function realmBonuses(step: number): { hp: number; damage: number } {
   const damage = REALM_DAMAGE_BONUSES[major];
   return { hp: hp + minor * 3, damage: (damage + minor * 2.5) / 100 };
 }
-export const realmDamageMultiplier = (step: number) => (step >= 24 ? 2 : 1);
+export const realmHealthMultiplier = (step: number) =>
+  2 ** Math.floor(Math.min(step, 23) / 3) * 1.1 ** (Math.min(step, 23) % 3) * (step >= 24 ? 3 : 1);
+export const realmDamageMultiplier = (step: number) =>
+  3 ** Math.floor(Math.min(step, 23) / 3) * 1.1 ** (Math.min(step, 23) % 3) * (step >= 24 ? 5 : 1);
 function recordRealmChange(
   save: SaveData,
   before: ReturnType<typeof realmInfo>,

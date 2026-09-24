@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { freshSave, realmCost, realmBonuses } from '../src/progress.ts';
+import { freshSave, realmCost, realmBonuses, realmHealthMultiplier } from '../src/progress.ts';
 import { joinSect } from '../src/mortal.ts';
 
 const near = (actual: number, expected: number) =>
@@ -30,14 +30,23 @@ test('白骨每重按整体基础气血加18%，与正道、劫印、闭关及�
       learn(game, 'bone', level);
       assert.equal(
         game.player.maxHp,
-        Math.round((240 + realmBonuses(step).hp) * (1 + level * 0.18) * 1.12 * 1.06 * 1.07),
+        Math.round(
+          (100 + realmBonuses(step).hp) *
+            1.5 *
+            1.2 *
+            (1 + level * 0.18) *
+            1.12 *
+            1.06 *
+            1.07 *
+            realmHealthMultiplier(step),
+        ),
       );
       assert.equal(game.player.maxHp - game.player.hp, 30);
     }
   }
 });
 
-test('骨刺按最大气血12%每重反击并计入伤害统计，无敌期间与致命伤不触发', () => {
+test('骨刺按未加境界乘区的最大气血12%每重反击，无敌期间与致命伤不触发', () => {
   const save = freshSave();
   save.cultivation = 1e9;
   save.completed = [6];
@@ -48,7 +57,8 @@ test('骨刺按最大气血12%每重反击并计入伤害统计，无敌期间�
   learn(game, 'bone', 3);
   const enemy = game.spawnEnemy(1, false, false, { x: 80, y: 0 });
   enemy.hp = enemy.maxHp = 1e8;
-  const expected = game.player.maxHp * 0.12 * 3 * 1.3 * game.stats.damage;
+  const expected =
+    (game.player.maxHp / realmHealthMultiplier(24)) * 0.12 * 3 * 1.3 * game.stats.damage;
   game.hurtPlayer(1);
   near(enemy.maxHp - enemy.hp, expected);
   near(game.damageBySource.bone, expected);
@@ -68,9 +78,9 @@ test('固定气血白骨旧局迁移保留损失气血，重复续局不加血�
   old.player.maxHp = 428;
   old.player.hp = 391;
   const restored = Game.restore(save, old)!;
-  assert.equal(restored.player.maxHp, 544);
-  assert.equal(restored.player.hp, 507);
-  assert.equal(Game.restore(save, restored.snapshot())!.player.hp, 507);
+  assert.equal(restored.player.maxHp, 340);
+  assert.equal(restored.player.hp, 303);
+  assert.equal(Game.restore(save, restored.snapshot())!.player.hp, 303);
   old.state = 'lost';
   old.player.hp = 0;
   assert.equal(Game.restore(save, old)!.player.hp, 0);

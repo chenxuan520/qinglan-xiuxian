@@ -3,9 +3,40 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { guideContent } from '../src/guide.ts';
 import { GAME_SITE_URL } from '../src/setting.ts';
+import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
+import { spiritPower } from '../src/spirit-power.ts';
+import { chronicleContent } from '../src/chronicle-ui.ts';
+import { formatNumber } from '../src/number-format.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+
+test('境界展示直接给出气血与本命伤害，指南示例与实际入场一致', () => {
+  assert.match(source, /当前入场气血/);
+  assert.match(source, /下次突破后/);
+  assert.doesNotMatch(source, /境界独立倍率|当前境界加成/);
+  const guide = guideContent('builds');
+  assert.doesNotMatch(guide, /境界倍率|境界独立乘区|基础收益/);
+  for (const step of [0, 3, 6, 9, 12, 15, 18, 21]) {
+    const save = freshSave();
+    save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    const before = JSON.stringify(save);
+    const power = spiritPower(save);
+    const name = realmInfo(save.cultivation).name.replace('初期', '');
+    assert.ok(
+      guide.includes(
+        `<th scope="row">${name}</th><td>${formatNumber(power.hp)}</td><td>${formatNumber(Math.round(power.weaponDamage))}</td>`,
+      ),
+    );
+    const chronicle = chronicleContent(save);
+    assert.ok(chronicle.includes(`本命基础伤害约 ${formatNumber(Math.round(power.weaponDamage))}`));
+    assert.doesNotMatch(chronicle, /伤害倍率/);
+    assert.equal(JSON.stringify(save), before);
+  }
+});
 
 test('首页底部以轻量关于入口替代自动保存提示', () => {
   assert.match(source, /data-action="about">\$\{storageAvailable \? '关于《叩仙门》 · GitHub'/);

@@ -237,8 +237,48 @@ export function extractReply(output: unknown, story = false) {
   return reply.slice(0, maxLength);
 }
 
+class InferenceAbort extends Error {}
+async function runInference<T>(
+  requestSignal: AbortSignal,
+  timeoutMs: number,
+  run: (signal: AbortSignal) => Promise<T>,
+) {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancelRequest = () => {};
+  try {
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      const abort = (name: 'AbortError' | 'TimeoutError') => {
+        if (controller.signal.aborted) return;
+        const error = new InferenceAbort();
+        error.name = name;
+        // 先结束等待，再通知 binding；即使 binding 忽略 signal 也能返回。
+        reject(error);
+        controller.abort(error);
+      };
+      cancelRequest = () => abort('AbortError');
+      if (requestSignal.aborted) cancelRequest();
+      else {
+        requestSignal.addEventListener('abort', cancelRequest, { once: true });
+        timer = setTimeout(() => abort('TimeoutError'), timeoutMs);
+      }
+    });
+    return await Promise.race([
+      cancelled,
+      Promise.resolve().then(() => {
+        controller.signal.throwIfAborted();
+        return run(controller.signal);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    requestSignal.removeEventListener('abort', cancelRequest);
+  }
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+    const startedAt = Date.now();
     const origin = request.headers.get('Origin') || '';
     const allowed = allowedOrigin(origin, env.ALLOWED_ORIGINS);
     const headers = new Headers({ 'Cache-Control': 'no-store', Vary: 'Origin' });
@@ -246,77 +286,145 @@ export default {
     headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Content-Type');
+    headers.set('Access-Control-Expose-Headers', 'Retry-After');
     headers.set('Access-Control-Max-Age', '86400');
     const json = (body: unknown, status = 200) => Response.json(body, { status, headers });
     const path = new URL(request.url).pathname;
+    const ray = request.headers.get('CF-Ray') || '';
+    const requestId = /^[a-f0-9]{16}(?:-[a-z]{3})?$/i.test(ray) ? ray : crypto.randomUUID();
+    let mode = path === '/story-image' ? 'story-image' : 'dialogue';
+    let stage = 'request';
+    const fail = (
+      error: string,
+      status: number,
+      message: string,
+      retryable = false,
+      cause?: unknown,
+    ) => {
+      if (error === 'busy') headers.set('Retry-After', '60');
+      if (stage !== 'request') {
+        const detail = record(cause) ? cause : {};
+        const errorName =
+          typeof detail.name === 'string' &&
+          [
+            'Error',
+            'TypeError',
+            'RangeError',
+            'AbortError',
+            'TimeoutError',
+            'InferenceUpstreamError',
+            'AiInternalError',
+          ].includes(detail.name)
+            ? detail.name
+            : 'UnknownError';
+        console.warn(
+          JSON.stringify({
+            event: 'npc-ai-failure',
+            requestId,
+            path,
+            mode,
+            stage,
+            elapsedMs: Date.now() - startedAt,
+            error,
+            status,
+            errorName: cause === undefined ? undefined : errorName,
+            upstreamCode: Number.isSafeInteger(detail.code) ? detail.code : undefined,
+            upstreamStatus:
+              Number.isInteger(detail.status) &&
+              Number(detail.status) >= 100 &&
+              Number(detail.status) <= 599
+                ? detail.status
+                : undefined,
+          }),
+        );
+      }
+      return json({ error, message, retryable, requestId, fallback: true }, status);
+    };
+    const inferenceFailure = (cause: unknown) => {
+      if (cause instanceof InferenceAbort)
+        return cause.name === 'TimeoutError'
+          ? fail('inference-timeout', 504, '生成超时，请稍后重试。', true, cause)
+          : fail('request-cancelled', 499, '请求已取消。', false, cause);
+      return stage === 'limiter'
+        ? fail('limiter-unavailable', 503, '限流服务暂时不可用，请稍后重试。', true, cause)
+        : fail('inference-failed', 503, '生成服务暂时不可用，请稍后重试。', true, cause);
+    };
     if (path === '/health' && request.method === 'GET')
       return json({
         service: 'qinglan-npc-ai',
         model: NPC_MODEL,
         imageModel: STORY_IMAGE_MODEL,
-        version: 2,
+        version: 3,
       });
-    if (path !== '/chat' && path !== '/story-image') return json({ error: 'not-found' }, 404);
+    if (path !== '/chat' && path !== '/story-image') return fail('not-found', 404, '接口不存在。');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
-    if (request.method !== 'POST') return json({ error: 'method' }, 405);
+    if (request.method !== 'POST') return fail('method', 405, '请求方法不支持。');
     if (!request.headers.get('Content-Type')?.startsWith('application/json'))
-      return json({ error: 'content-type' }, 415);
+      return fail('content-type', 415, '请求须使用 JSON 格式。');
     let input: unknown;
     try {
       input = await readBody(request);
     } catch {
-      return json({ error: 'invalid-body' }, 400);
+      return fail('invalid-body', 400, '请求内容无效或过大。');
     }
     if (path === '/story-image') {
-      if (!validStoryImage(input)) return json({ error: 'invalid-story' }, 400);
+      if (!validStoryImage(input)) return fail('invalid-story', 400, '配图请求无效。');
       if (!(await verifyStoryImageToken(input.story.trim(), input.token, env.STORY_IMAGE_SECRET)))
-        return json({ error: 'invalid-token' }, 403);
+        return fail('invalid-token', 403, '配图凭证无效或已过期。');
       try {
+        stage = 'limiter';
         const limit = await env.IMAGE_LIMITER.limit({
           key: `story-image:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
         });
-        if (!limit.success) return json({ error: 'busy' }, 429);
-        const output = await env.AI.run(
-          STORY_IMAGE_MODEL,
-          {
-            prompt: storyImagePrompt(input.story),
-            steps: TEA_STORY_IMAGE_SETTINGS.steps,
-          },
-          {
-            signal: AbortSignal.any([
-              request.signal,
-              AbortSignal.timeout(TEA_STORY_IMAGE_SETTINGS.inferenceTimeoutMs),
-            ]),
-          },
+        if (!limit.success) return fail('busy', 429, '请求过于频繁，请在 60 秒后重试。', true);
+        stage = 'inference';
+        const output = await runInference(
+          request.signal,
+          TEA_STORY_IMAGE_SETTINGS.inferenceTimeoutMs,
+          (signal) =>
+            env.AI.run(
+              STORY_IMAGE_MODEL,
+              {
+                prompt: storyImagePrompt(input.story),
+                steps: TEA_STORY_IMAGE_SETTINGS.steps,
+              },
+              { signal },
+            ),
         );
+        stage = 'output';
         const image = storyImageBytes(output);
-        if (!image) return json({ error: 'empty-image' }, 502);
+        if (!image) return fail('empty-image', 502, '生成图片为空或无效，请稍后重试。', true);
         headers.set('Content-Type', 'image/jpeg');
         return new Response(image, { status: 200, headers });
-      } catch {
-        console.warn(JSON.stringify({ event: 'npc-story-image-unavailable' }));
-        return json({ error: 'unavailable' }, 503);
+      } catch (error) {
+        return inferenceFailure(error);
       }
     }
-    if (!validDialogue(input)) return json({ error: 'invalid-dialogue' }, 400);
+    if (!validDialogue(input)) return fail('invalid-dialogue', 400, '对话请求无效。');
+    mode = input.mode === 'tea-story' ? 'tea-story' : 'dialogue';
     const settings = input.mode === 'tea-story' ? TEA_STORY_SETTINGS : NPC_AI_SETTINGS;
     try {
+      stage = 'limiter';
       const limit = await env.NPC_LIMITER.limit({
         key: `npc:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
       });
-      if (!limit.success) return json({ error: 'busy', fallback: true }, 429);
-      const output = await env.AI.run(
-        NPC_MODEL,
-        {
-          messages: dialogueMessages(input),
-          max_tokens: settings.maxOutputTokens,
-          chat_template_kwargs: { enable_thinking: NPC_AI_SETTINGS.enableThinking },
-          temperature: NPC_AI_SETTINGS.temperature,
-        },
-        { signal: AbortSignal.timeout(settings.inferenceTimeoutMs) },
+      if (!limit.success) return fail('busy', 429, '请求过于频繁，请在 60 秒后重试。', true);
+      stage = 'inference';
+      const output = await runInference(request.signal, settings.inferenceTimeoutMs, (signal) =>
+        env.AI.run(
+          NPC_MODEL,
+          {
+            messages: dialogueMessages(input),
+            max_tokens: settings.maxOutputTokens,
+            chat_template_kwargs: { enable_thinking: NPC_AI_SETTINGS.enableThinking },
+            temperature: NPC_AI_SETTINGS.temperature,
+          },
+          { signal },
+        ),
       );
+      stage = 'output';
       const reply = extractReply(output, input.mode === 'tea-story');
-      if (!reply) return json({ error: 'empty-reply', fallback: true }, 502);
+      if (!reply) return fail('empty-reply', 502, '生成内容为空或不完整，请稍后重试。', true);
       if (input.mode !== 'tea-story') return json({ reply });
       try {
         const imageToken = await issueStoryImageToken(reply, env.STORY_IMAGE_SECRET || '');
@@ -324,9 +432,8 @@ export default {
       } catch {
         return json({ reply });
       }
-    } catch {
-      console.warn(JSON.stringify({ event: 'npc-ai-unavailable' }));
-      return json({ error: 'unavailable', fallback: true }, 503);
+    } catch (error) {
+      return inferenceFailure(error);
     }
   },
 } satisfies ExportedHandler<NpcAiEnv>;

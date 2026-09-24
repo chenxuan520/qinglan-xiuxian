@@ -12,6 +12,7 @@ import {
   tribulationDue,
   completeTribulation,
   settleRun,
+  realmDamageMultiplier,
 } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 
@@ -25,6 +26,101 @@ function immortal(round = 1) {
   save.age = save.nextTribulationAge;
   return save;
 }
+
+test('天劫地面预警结束后同帧落雷与扣血，暂停、续局和消散不重复触发', () => {
+  const save = immortal();
+  const original = Game.createTribulation(save, null);
+  original.weapons[0].timer = 9999;
+  original.tribulationNextAt = 9999;
+  original.zone(0, 240, 30, 0.5, original.boss!.damage, '#d2b5ff', 'blast', 0.03, true);
+  for (const game of [original, Game.restore(save, original.snapshot())!]) {
+    game.resume();
+    const hp = game.player.hp;
+    const bossHp = game.boss!.hp;
+    const hits: number[] = [];
+    game.onEvent = (event) => {
+      if (event === 'hurt') {
+        assert.equal(game.effects.filter((effect) => effect.kind === 'lightning').length, 1);
+        hits.push(game.time);
+      }
+    };
+    for (let i = 0; i < 3; i++) game.update(0.01);
+    assert.equal(game.player.hp, hp);
+    assert.ok(!game.effects.some((effect) => effect.kind === 'lightning'));
+    game.update(0.01);
+    assert.deepEqual(hits, [game.time]);
+    assert.equal(game.player.hp, hp - game.boss!.damage * game.stats.armor);
+    const bolt = game.effects.find((effect) => effect.kind === 'lightning')!;
+    assert.deepEqual(
+      [bolt.x, bolt.y, bolt.radius, bolt.color, bolt.maxLife],
+      [0, 240, 30, '#d2b5ff', 0.45],
+    );
+    const remaining = bolt.life;
+    game.pause();
+    game.update(0.05);
+    assert.equal(bolt.life, remaining);
+    game.resume();
+    for (let i = 0; i < 11; i++) game.update(0.05);
+    assert.equal(hits.length, 1);
+    assert.equal(game.zones.length, 0);
+    assert.ok(!game.effects.some((effect) => effect.kind === 'lightning'));
+    assert.equal(game.boss!.hp, bossHp);
+    assert.equal(game.damageDealt, 0);
+  }
+});
+
+test('天劫落雷覆盖未命中和无敌落点，每次伤害节拍触发且不波及普通爆炸与己方领域', () => {
+  for (const [tribulation, hostile, kind, outside, invincible, expected] of [
+    [true, true, 'blast', true, 0, 1],
+    [true, true, 'blast', false, 2, 1],
+    [false, true, 'blast', false, 2, 0],
+    [true, false, 'blast', false, 0, 0],
+    [true, true, 'poison', false, 2, 0],
+  ] as const) {
+    const game = tribulation
+      ? Game.createTribulation(immortal(), null)
+      : new Game(freshSave(), 0, 0);
+    game.weapons[0].timer = 9999;
+    game.tribulationNextAt = 9999;
+    game.player.invincible = invincible;
+    const hp = game.player.hp;
+    const x = game.player.x + (outside ? 39 : 0);
+    game.zone(x, game.player.y, 30, 1.1, 10, '#d2b5ff', kind, 0, hostile);
+    game.update(0.01);
+    const first = game.effects.filter((effect) => effect.kind === 'lightning');
+    assert.equal(first.length, expected);
+    assert.equal(game.player.hp, hp);
+    for (let i = 0; i < 49; i++) game.update(0.01);
+    assert.ok(!game.effects.some((effect) => effect.kind === 'lightning'));
+    game.update(0.01);
+    const second = game.effects.filter((effect) => effect.kind === 'lightning');
+    assert.equal(second.length, expected);
+    if (expected) {
+      assert.equal(second[0].x, x);
+      assert.equal(second[0].y, game.player.y);
+      assert.notEqual(second[0], first[0]);
+    }
+    assert.equal(game.player.hp, hp);
+  }
+});
+
+test('变步长跨过地面雷区寿命时不补发落雷，核心开放后无过期雷光', () => {
+  const game = Game.createTribulation(immortal(25), null);
+  game.weapons[0].timer = 9999;
+  game.tribulationNextAt = 9999;
+  game.zone(200, 240, 30, 0.5, 10, '#d2b5ff', 'blast', 0, true);
+  game.update(0.01);
+  assert.equal(game.effects.filter((effect) => effect.kind === 'lightning').length, 1);
+  game.update(0.02);
+  for (let i = 0; i < 10; i++) game.update(0.05);
+  assert.equal(game.zones.length, 0);
+  assert.ok(!game.effects.some((effect) => effect.kind === 'lightning'));
+  game.tribulationStep = 4;
+  game.tribulationNextAt = game.time;
+  game.update(0.01);
+  assert.equal(game.tribulationStep, 0);
+  assert.ok(!game.effects.some((effect) => effect.kind === 'lightning'));
+});
 
 test('每次天劫最多广告复活一次，续局不会重置机会', () => {
   const save = immortal();
@@ -176,7 +272,7 @@ test('第五劫强度跃升且第六劫继续增强，预警保底，输出窗�
     assert.ok(next.warning < rules.warning && next.opening < rules.opening);
     const save = immortal(round);
     const g = Game.createTribulation(save, null);
-    assert.equal(g.boss!.maxHp, rules.hp);
+    assert.equal(g.boss!.maxHp, rules.hp * realmDamageMultiplier(23));
     assert.equal(g.boss!.damage, g.player.maxHp * rules.damage);
     g.weapons[0].timer = 999;
     g.update(0.05);

@@ -60,6 +60,305 @@ const env = (
   IMAGE_LIMITER: { limit: async () => ({ success }) },
   AI: { run },
 });
+const teaInput = {
+  ...input,
+  mode: 'tea-story',
+  npcId: 'tea',
+  message: TEA_STORY_SETTINGS.requestMessage,
+};
+async function inferenceRequests() {
+  const story = '一回旧闻';
+  const token = await issueStoryImageToken(story, env().STORY_IMAGE_SECRET);
+  return [
+    [request(), NPC_AI_SETTINGS.inferenceTimeoutMs, 'dialogue'],
+    [request(teaInput), TEA_STORY_SETTINGS.inferenceTimeoutMs, 'tea-story'],
+    [imageRequest({ story, token }), TEA_STORY_IMAGE_SETTINGS.inferenceTimeoutMs, 'story-image'],
+  ] as const;
+}
+async function failure(response: Response, status: number, error: string, retryable = true) {
+  assert.equal(response.status, status);
+  const body = await response.json();
+  assert.deepEqual(Object.keys(body).sort(), [
+    'error',
+    'fallback',
+    'message',
+    'requestId',
+    'retryable',
+  ]);
+  assert.equal(body.error, error);
+  assert.equal(body.fallback, true);
+  assert.equal(body.retryable, retryable);
+  assert.match(body.message, /[\u4e00-\u9fff]/);
+  assert.match(body.requestId, /^(?:[a-f0-9-]{36}|[a-f0-9]{16}-[A-Z]{3})$/i);
+  return body;
+}
+
+test('文字、说书和配图即使 binding 忽略 signal 也按原预算超时，取消并清理监听器', async (t) => {
+  for (const [req, budget, mode] of await inferenceRequests()) {
+    await t.test(mode, { timeout: 2000 }, async (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+      const warning = t.mock.method(console, 'warn', () => {});
+      const added = t.mock.method(req.signal, 'addEventListener');
+      const removed = t.mock.method(req.signal, 'removeEventListener');
+      const cleared = t.mock.method(globalThis, 'clearTimeout');
+      let signal;
+      let calls = 0;
+      const started = Promise.withResolvers();
+      const upstream = Promise.withResolvers();
+      const pending = worker.fetch(
+        req,
+        env((_model, _options, settings) => {
+          calls++;
+          signal = settings.signal;
+          started.resolve();
+          return upstream.promise;
+        }),
+      );
+      await started.promise;
+      t.mock.timers.tick(budget - 1);
+      assert.equal(signal.aborted, false);
+      t.mock.timers.tick(1);
+      const response = await Promise.race([
+        pending,
+        new Promise<never>((_resolve, reject) =>
+          setImmediate(() => reject(new Error('未按预算结束'))),
+        ),
+      ]);
+      await failure(response, 504, 'inference-timeout');
+      const log = JSON.parse(warning.mock.calls[0].arguments[0]);
+      assert.equal(log.elapsedMs, budget);
+      assert.equal(log.errorName, 'TimeoutError');
+      assert.equal(signal.aborted, true);
+      assert.equal(signal.reason.name, 'TimeoutError');
+      assert.equal(calls, 1);
+      assert.equal(cleared.mock.callCount(), 1);
+      assert.equal(removed.mock.callCount(), 1);
+      assert.equal(removed.mock.calls[0].arguments[1], added.mock.calls[0].arguments[1]);
+      // 超时之后 binding 才拒绝，也不能出现未处理的 rejection。
+      upstream.reject(new Error('late upstream rejection'));
+      await new Promise((resolve) => setImmediate(resolve));
+    });
+  }
+});
+
+test('关闭文字、说书或配图会传递取消，即使 binding 不响应也返回不可重试错误', async (t) => {
+  for (const [base, , mode] of await inferenceRequests()) {
+    await t.test(mode, { timeout: 2000 }, async (t) => {
+      t.mock.method(console, 'warn', () => {});
+      const controller = new AbortController();
+      const req = new Request(base, { signal: controller.signal });
+      const removed = t.mock.method(req.signal, 'removeEventListener');
+      const cleared = t.mock.method(globalThis, 'clearTimeout');
+      let signal;
+      let calls = 0;
+      const started = Promise.withResolvers();
+      const pending = worker.fetch(
+        req,
+        env((_model, _options, settings) => {
+          calls++;
+          signal = settings.signal;
+          started.resolve();
+          return new Promise(() => {});
+        }),
+      );
+      await started.promise;
+      controller.abort(new Error('private client cancellation reason'));
+      const response = await Promise.race([
+        pending,
+        new Promise<never>((_resolve, reject) =>
+          setImmediate(() => reject(new Error('取消没有结束请求'))),
+        ),
+      ]);
+      await failure(response, 499, 'request-cancelled', false);
+      assert.equal(signal.aborted, true);
+      assert.equal(signal.reason.name, 'AbortError');
+      assert.equal(calls, 1);
+      assert.equal(cleared.mock.callCount(), 1);
+      assert.equal(removed.mock.callCount(), 1);
+    });
+  }
+});
+
+test('请求已取消或在限流时取消，不再启动推理', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  for (const alreadyCancelled of [true, false]) {
+    const controller = new AbortController();
+    if (alreadyCancelled) controller.abort();
+    const bindings = {
+      ...env(() => assert.fail('取消后不得调用模型')),
+      NPC_LIMITER: {
+        limit: async () => {
+          controller.abort();
+          return { success: true };
+        },
+      },
+    };
+    await failure(
+      await worker.fetch(new Request(request(), { signal: controller.signal }), bindings),
+      499,
+      'request-cancelled',
+      false,
+    );
+  }
+});
+
+test('推理成功或拒绝均清理 timer 和客户端监听，不在结束后继续取消模型', async (t) => {
+  for (const rejects of [false, true]) {
+    await t.test(String(rejects), async (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      t.mock.method(console, 'warn', () => {});
+      const controller = new AbortController();
+      const req = new Request(request(), { signal: controller.signal });
+      const removed = t.mock.method(req.signal, 'removeEventListener');
+      const cleared = t.mock.method(globalThis, 'clearTimeout');
+      let signal;
+      const response = await worker.fetch(
+        req,
+        env(async (_model, _options, settings) => {
+          signal = settings.signal;
+          if (rejects) throw new Error('upstream');
+          return { response: '火候正好。' };
+        }),
+      );
+      assert.equal(response.status, rejects ? 503 : 200);
+      assert.equal(cleared.mock.callCount(), 1);
+      assert.equal(removed.mock.callCount(), 1);
+      controller.abort();
+      t.mock.timers.tick(NPC_AI_SETTINGS.inferenceTimeoutMs);
+      assert.equal(signal.aborted, false);
+    });
+  }
+});
+
+test('限流、限流故障、模型拒绝和空输出分类明确，Retry-After 可跨域读取且不重试模型', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  for (const image of [false, true]) {
+    const story = '一回旧闻';
+    const token = await issueStoryImageToken(story, env().STORY_IMAGE_SECRET);
+    for (const [kind, status, error] of [
+      ['busy', 429, 'busy'],
+      ['limiter', 503, 'limiter-unavailable'],
+      ['reject', 503, 'inference-failed'],
+      ['throw', 503, 'inference-failed'],
+      ['empty', 502, image ? 'empty-image' : 'empty-reply'],
+      ['incomplete', 502, image ? 'empty-image' : 'empty-reply'],
+    ] as const) {
+      let calls = 0;
+      const bindings = env(() => {
+        calls++;
+        if (kind === 'throw') throw new Error('upstream');
+        if (kind === 'reject')
+          return Promise.reject(new DOMException('upstream abort, not client', 'AbortError'));
+        return Promise.resolve(
+          kind === 'incomplete'
+            ? {
+                choices: [{ finish_reason: 'length', message: { content: story } }],
+                image: 'not base64',
+              }
+            : { response: '<think>只有推理</think>', image: '' },
+        );
+      }, kind !== 'busy');
+      if (kind === 'limiter')
+        bindings[image ? 'IMAGE_LIMITER' : 'NPC_LIMITER'].limit = async () => {
+          throw new Error('limiter');
+        };
+      const response = await worker.fetch(
+        image ? imageRequest({ story, token }) : request(teaInput),
+        bindings,
+      );
+      const body = await failure(response, status, error);
+      if (error === 'empty-reply') assert.match(body.message, /生成内容为空或不完整/);
+      assert.equal(response.headers.get('Retry-After'), kind === 'busy' ? '60' : null);
+      assert.equal(response.headers.get('Access-Control-Expose-Headers'), 'Retry-After');
+      assert.equal(calls, kind === 'busy' || kind === 'limiter' ? 0 : 1);
+    }
+  }
+});
+
+test('诊断关联 requestId、mode、阶段及安全上游数字，不泄露正文、提示词、密钥或异常原文', async (t) => {
+  const logs: string[] = [];
+  t.mock.method(console, 'warn', (...args) => {
+    assert.equal(args.length, 1);
+    assert.equal(typeof args[0], 'string');
+    logs.push(args[0]);
+  });
+  const sensitive = [
+    env().STORY_IMAGE_SECRET,
+    input.message,
+    dialogueMessages(teaInput)[0].content,
+    'private-stack-secret',
+  ];
+  const ray = '1234567890abcdef-SJC';
+  for (const [index, [req, , mode]] of (await inferenceRequests()).entries()) {
+    req.headers.set('CF-Ray', index === 0 ? sensitive[0] : ray);
+    const cause = Object.assign(new Error(sensitive.join('\n')), {
+      name: index === 0 ? sensitive[0] : 'InferenceUpstreamError',
+      code: index === 0 ? sensitive[0] : 3040,
+      status: index === 0 ? Infinity : 502,
+      stack: sensitive.join('\n'),
+    });
+    const bindings = env(async () => {
+      throw cause;
+    });
+    if (index === 0)
+      bindings.NPC_LIMITER.limit = async () => {
+        throw cause;
+      };
+    const body = await failure(
+      await worker.fetch(req, bindings),
+      503,
+      index === 0 ? 'limiter-unavailable' : 'inference-failed',
+    );
+    if (index !== 0) assert.equal(body.requestId, ray);
+    const log = JSON.parse(logs.at(-1)!);
+    assert.equal(log.requestId, body.requestId);
+    assert.equal(log.mode, mode);
+    assert.equal(log.path, mode === 'story-image' ? '/story-image' : '/chat');
+    assert.equal(log.stage, index === 0 ? 'limiter' : 'inference');
+    assert.equal(log.errorName, index === 0 ? 'UnknownError' : 'InferenceUpstreamError');
+    assert.equal(log.upstreamCode, index === 0 ? undefined : 3040);
+    assert.equal(log.upstreamStatus, index === 0 ? undefined : 502);
+    assert.ok(Number.isFinite(log.elapsedMs) && log.elapsedMs >= 0);
+    for (const secret of sensitive) {
+      assert.ok(!JSON.stringify(body).includes(secret));
+      assert.ok(!logs.join('\n').includes(secret));
+    }
+    assert.equal('stack' in log, false);
+    assert.equal('message' in log, false);
+  }
+  assert.equal(logs.length, 3);
+});
+
+test('输入和路由错误保持不可重试，配图凭证校验不能绕过', async () => {
+  const bindings = env(() => assert.fail('无效请求不应调用模型'));
+  const headers = { Origin: origins[0], 'Content-Type': 'application/json' };
+  for (const [req, status, error] of [
+    [new Request('https://npc.example/unknown', { headers }), 404, 'not-found'],
+    [new Request('https://npc.example/chat', { headers }), 405, 'method'],
+    [
+      new Request('https://npc.example/chat', { method: 'POST', headers: { Origin: origins[0] } }),
+      415,
+      'content-type',
+    ],
+    [
+      new Request('https://npc.example/chat', { method: 'POST', headers, body: '{' }),
+      400,
+      'invalid-body',
+    ],
+    [request({ ...input, message: '' }), 400, 'invalid-dialogue'],
+    [imageRequest({}), 400, 'invalid-story'],
+    [
+      imageRequest({
+        story: '篡改的正文',
+        token: await issueStoryImageToken('原文', bindings.STORY_IMAGE_SECRET),
+      }),
+      403,
+      'invalid-token',
+    ],
+  ] as const) {
+    await failure(await worker.fetch(req, bindings), status, error, false);
+  }
+});
 
 test('NPC Worker 允许游戏来源并生成对白，预检和健康检查不调用模型', async () => {
   let calls = 0;
@@ -89,7 +388,7 @@ test('NPC Worker 允许游戏来源并生成对白，预检和健康检查不调
     service: 'qinglan-npc-ai',
     model: NPC_MODEL,
     imageModel: STORY_IMAGE_MODEL,
-    version: 2,
+    version: 3,
   });
   assert.equal(calls, 1);
 });
@@ -276,7 +575,7 @@ test('关闭故事配图请求会中止正在进行的 Worker 推理', async () 
   );
   await inferenceStarted;
   controller.abort();
-  assert.equal((await pending).status, 503);
+  await failure(await pending, 499, 'request-cancelled', false);
   assert.equal(inferenceSignal.aborted, true);
 });
 

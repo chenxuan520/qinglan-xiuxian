@@ -549,6 +549,9 @@
   color: #f0ead2;
   text-shadow: 0 1px 3px #031512;
 }
+.tea-story-status[role='alert'] {
+  color: #f1b6a2;
+}
 .town-story {
   border: 1px solid #c4b88266;
   background: #183b31;

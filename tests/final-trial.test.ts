@@ -1,8 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { STAGES, ENEMIES, TRIAL_BOSS_STAGES, TRIAL_BOSS_TIMES } from '../src/data.ts';
-import { freshSave, parseSave, realmInfo, realmCost, settleRun } from '../src/progress.ts';
+import {
+  STAGES,
+  ENEMIES,
+  TRIAL_BOSS_STAGES,
+  TRIAL_BOSS_TIMES,
+  STAGE_REALM_STEPS,
+} from '../src/data.ts';
+import {
+  freshSave,
+  parseSave,
+  realmInfo,
+  realmCost,
+  settleRun,
+  realmHealthMultiplier,
+} from '../src/progress.ts';
 
 function trial() {
   const save = freshSave();
@@ -63,7 +76,9 @@ test('仙尊新增横扫、精英天兵与预警突进，伤害随终关强度�
   const g = trial();
   g.weapons = [];
   const boss = g.spawnEnemy(10, false, true, { x: 300, y: 0 }, 6);
-  assert.ok(Math.abs(boss.damage - 297 * 0.72 * 1.02) < 1e-8);
+  assert.ok(
+    Math.abs(boss.damage - 440 * 0.72 * 1.02 * realmHealthMultiplier(STAGE_REALM_STEPS[6])) < 1e-8,
+  );
   boss.skillStep = 3;
   boss.cooldown = 0;
   g.update(0.01);
@@ -90,7 +105,7 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
   assert.equal(realmInfo(1e9, true).name, '真仙');
   const g = trial();
   const before = g.save.cultivation;
-  assert.equal(g.player.maxHp, 693);
+  assert.equal(g.player.maxHp, Math.round(693 * realmHealthMultiplier(23)));
   settleRun(g.save, {
     stage: 6,
     difficulty: 0,
@@ -102,6 +117,9 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
   });
   assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '渡劫');
   assert.ok(g.save.cultivation > before);
+  const waiting = new Game(g.save, 6, 0);
+  assert.equal(waiting.stats.damage, g.stats.damage);
+  assert.equal(waiting.player.maxHp, g.player.maxHp);
   settleRun(g.save, {
     stage: 6,
     difficulty: 0,
@@ -113,7 +131,10 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
   });
   assert.equal(realmInfo(g.save.cultivation, g.save.completed.includes(6)).name, '真仙');
   assert.equal(realmInfo(g.save.cultivation, true).ascending, false);
-  assert.equal(new Game(g.save, 6, 0).player.maxHp, 893);
+  const immortal = new Game(g.save, 6, 0);
+  assert.equal(immortal.player.maxHp, Math.round(693 * realmHealthMultiplier(24)));
+  assert.ok(Math.abs(immortal.player.maxHp - waiting.player.maxHp * 3) <= 1);
+  assert.ok(Math.abs(immortal.stats.damage / waiting.stats.damage - 5) < 1e-12);
   assert.equal(Object.hasOwn(g.save.chronicle.milestones, 'hard-immortal'), false);
 
   const rootless = freshSave('none', [], 'dual', () => 0);
@@ -286,14 +307,14 @@ test('旧十二分钟终关的末王续局不能跳过新仙尊', () => {
   const restored = Game.restore(g.save, legacy)!;
   assert.ok(restored);
   restored.resume();
-  restored.hitEnemy(restored.boss!, 1e9);
+  restored.hitEnemy(restored.boss!, restored.boss!.maxHp);
   assert.notEqual(restored.state, 'won');
   assert.equal(restored.trialBossesDefeated, 6);
   restored.xp = 0;
   restored.time = restored.nextTrialBossAt;
   restored.update(0.01);
   assert.equal(restored.boss!.bossStage, 6);
-  restored.hitEnemy(restored.boss!, 1e9);
+  restored.hitEnemy(restored.boss!, restored.boss!.maxHp);
   assert.equal(restored.state, 'won');
 });
 
@@ -323,7 +344,7 @@ test('七位首领按顺序轮战，首王与倒计时结束均不会提前通�
     assert.ok(g.boss);
     assert.equal(g.boss!.bossStage, TRIAL_BOSS_STAGES[wave]);
     assert.equal(g.enemies.filter((e) => e.boss && !e.dead).length, 1);
-    g.hitEnemy(g.boss!, 1e9);
+    g.hitEnemy(g.boss!, g.boss!.maxHp);
     assert.equal(g.trialBossesDefeated, wave + 1);
     assert.equal(g.state, wave === TRIAL_BOSS_STAGES.length - 1 ? 'won' : 'playing');
   }
@@ -348,7 +369,7 @@ test('终关到点继续出王，允许七王同时存在，乱序击杀全部�
   resumed.resume();
   const bosses = resumed.enemies.filter((e) => e.boss).reverse();
   for (let i = 0; i < bosses.length; i++) {
-    resumed.hitEnemy(bosses[i], 1e9);
+    resumed.hitEnemy(bosses[i], bosses[i].maxHp);
     assert.equal(resumed.trialBossesDefeated, i + 1);
     assert.equal(resumed.state, i === 6 ? 'won' : 'playing');
   }

@@ -15,6 +15,7 @@
     "balance": "node --experimental-strip-types scripts/balance.ts",
     "balance:passives": "node --experimental-strip-types scripts/passive-balance.ts",
     "balance:training": "node --experimental-strip-types scripts/training-balance.ts",
+    "balance:realms": "node --experimental-strip-types scripts/realm-balance.ts",
     "balance:tribulation": "node --experimental-strip-types scripts/tribulation-balance.ts",
     "balance:trial": "node --experimental-strip-types scripts/final-trial-balance.ts",
     "format": "prettier --write .",

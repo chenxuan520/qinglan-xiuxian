@@ -6,11 +6,12 @@ import {
   ENEMIES,
   FINAL_TRIAL_STAGE,
   STAGE_COMBAT_SCALING,
+  STAGE_REALM_STEPS,
   STAGES,
   TRIAL_BOSS_STAGES,
   tribulationRules,
 } from '../src/data.ts';
-import { freshSave } from '../src/progress.ts';
+import { freshSave, realmDamageMultiplier, realmHealthMultiplier } from '../src/progress.ts';
 
 test('三难度仅第五、第六关妖王增加气血与移速，前四关和终关复用妖王不变', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
@@ -25,7 +26,10 @@ test('三难度仅第五、第六关妖王增加气血与移速，前四关和�
               ? 560000
               : 120000 + bossStage * 35000
             : [16000, 27000, 38000, 49000, 78000, 106500][stage];
-        assert.equal(boss.hp, baseHp * rules.hp * scaling.hp);
+        assert.equal(
+          boss.hp,
+          baseHp * rules.hp * scaling.hp * realmDamageMultiplier(STAGE_REALM_STEPS[stage]),
+        );
         assert.equal(boss.maxHp, boss.hp);
         assert.ok(Math.abs(boss.speed - [70, 74, 78, 82, 98.9, 108, 94][stage]) < 1e-10);
         assert.equal(g.spawnEnemy(10, true, true, { x: 100, y: 0 }, bossStage).speed, boss.speed);
@@ -35,7 +39,10 @@ test('三难度仅第五、第六关妖王增加气血与移速，前四关和�
               ? 220
               : 85 + bossStage * 10
             : 52 + stage * 16;
-        assert.equal(boss.damage, damage * rules.damage * scaling.damage);
+        assert.equal(
+          boss.damage,
+          damage * rules.damage * scaling.damage * realmHealthMultiplier(STAGE_REALM_STEPS[stage]),
+        );
         assert.equal(boss.bossStage, bossStage);
         assert.equal(boss.radius, bossStage === FINAL_TRIAL_STAGE ? 62 : 48);
       }
@@ -63,7 +70,8 @@ test('三难度全部关卡仅非妖王精英移速再增10%，普通怪、气�
               rules.hp *
               (isElite ? 7 : 1) *
               (eliteScaling?.hp ?? 1) *
-              scaling.hp;
+              scaling.hp *
+              realmDamageMultiplier(STAGE_REALM_STEPS[stage]);
             const speed =
               (final
                 ? Math.max(95 + progress * 35, template.speed * (1.05 + progress * 0.3))
@@ -78,6 +86,7 @@ test('三难度全部关卡仅非妖王精英移速再增10%，普通怪、气�
               rules.damage *
               (isElite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
               (final ? 1 : isElite ? 2.2 : 1.3) *
+              realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
               (eliteScaling?.damage ?? 1);
             assert.deepEqual([enemy.hp, enemy.maxHp, enemy.damage], [hp, hp, damage]);
             assert.ok(Math.abs(enemy.speed - speed * (isElite ? 1.1 : 1)) < 1e-8);
@@ -131,10 +140,19 @@ test('第五、第六关编号的独立天劫不使用普通妖王强化', () =>
         const rules = tribulationRules(round);
         assert.deepEqual(
           [g.boss!.hp, g.boss!.maxHp, g.boss!.speed, g.boss!.damage],
-          [rules.hp, rules.hp, 0, g.player.maxHp * rules.damage],
+          [
+            rules.hp * realmDamageMultiplier(23),
+            rules.hp * realmDamageMultiplier(23),
+            0,
+            g.player.maxHp * rules.damage,
+          ],
         );
         const spawned = g.spawnEnemy(10, false, true, { x: 0, y: 0 }, FINAL_TRIAL_STAGE);
-        const hp = (16000 + stage * 11000) * DIFFICULTIES[0].hp * STAGE_COMBAT_SCALING[stage].hp;
+        const hp =
+          (16000 + stage * 11000) *
+          DIFFICULTIES[0].hp *
+          STAGE_COMBAT_SCALING[stage].hp *
+          realmDamageMultiplier(STAGE_REALM_STEPS[stage]);
         assert.deepEqual([spawned.hp, spawned.maxHp, spawned.speed], [hp, hp, 70 + stage * 4]);
       }
     }

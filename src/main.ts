@@ -12,6 +12,8 @@ import './mortal.css';
 import './journey-map.css';
 import { journeyMap, JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
 import { chronicleEntrance, chronicleContent } from './chronicle-ui.ts';
+import { spiritPower } from './spirit-power.ts';
+import { formatNumber } from './number-format.ts';
 import {
   TREASURES,
   CULTIVATION_PATHS,
@@ -60,7 +62,6 @@ import {
   enterImmortalGate,
   SAVE_KEY,
   realmInfo,
-  realmBonuses,
   trainingCost,
   forgeCost,
   forgeDamageBonus,
@@ -609,7 +610,7 @@ function showTeaStory() {
   panelFrame(
     '一盏茶，半卷仙途',
     '听雨茶馆 · 仙途旧闻',
-    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">醒木初落，且候这一回故事…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div></section><p class="panel-note">本次听书已消耗半载并判定机缘（30% 概率获赠 8 灵石）。故事正文先显示，配图生成成功后淡入；阅读与朗读不再计龄。</p><button class="primary-button" data-action="close">回到街巷</button>',
+    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">正在生成故事，请稍候…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div><p class="tea-story-image-status panel-note" role="status"></p><p class="panel-note">本次听书已消耗半载并判定机缘（30% 概率获赠 8 灵石）。失败重试不再扣年岁；再听一回会另耗半载并判定机缘。配图不阻塞正文，阅读与朗读不再计龄。</p><div class="save-actions"><button class="primary-button" data-action="close">回到街巷</button><button class="secondary-button tea-story-next" data-action="mortal-activity" data-id="tea" disabled>再听一回 · 半载</button><button class="secondary-button tea-story-retry" hidden disabled>重试这一回</button></div></section>',
   );
   void mountTeaStory(modal.querySelector<HTMLElement>('.tea-story')!, save, () => {
     save.sound = true;
@@ -925,17 +926,24 @@ function renderPanel() {
     );
   } else if (panel === 'cultivation') {
     const r = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
-    const bonus = realmBonuses(r.step);
+    const current = spiritPower(save);
+    const next = r.max
+      ? null
+      : spiritPower({
+          ...save,
+          cultivation: save.cultivation + Math.max(0, r.needed - r.progress),
+          completed: r.step === 23 ? [...save.completed, FINAL_TRIAL_STAGE] : save.completed,
+        });
     panelFrame(
       '积一寸修为，近一寸长生',
       '洞府',
-      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，获得 +200 基础气血，法宝最终伤害翻倍；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><small>当前境界加成：基础气血 +${bonus.hp}，基础伤害加成 +${Math.round(bonus.damage * 1000) / 10}%${r.max ? '；真仙最终伤害另乘 2' : ''}<br>小阶段 +3 基础气血 / +2.5% 基础伤害加成；大境界增量逐步提高，详见修行指南。成就真仙另增 200 基础气血，同配置最终伤害翻倍。</small></div></div>${spiritRootSummary()}${lifespanSummary()}<div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
+      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，气血与法宝威力大幅提升；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><p><strong>当前入场气血 ${formatNumber(current.hp)}</strong><br>${current.weapon}基础伤害约 ${formatNumber(Math.round(current.weaponDamage))}${next ? `<br>${r.step === 23 ? '修为达标并通关七境后' : '下次突破后'}：气血 ${formatNumber(next.hp)}（+${formatNumber(next.hp - current.hp)}），本命基础伤害约 ${formatNumber(Math.round(next.weaponDamage))}（+${formatNumber(Math.round(next.weaponDamage) - Math.round(current.weaponDamage))}）` : ''}</p><small>按当前根基、炼器、宗门与药效估算新历练；本命按一重、未觉醒、非暴击计算，具体招式与敌方减伤另计。灵根主要影响修炼速度，境界越高，气血与伤害越强。</small></div></div>${spiritRootSummary()}${lifespanSummary()}<div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
         [
           {
             id: 'vitality',
             name: '淬体',
             icon: 'guard',
-            desc: '每阶气血上限 +10',
+            desc: '每阶气血上限 +5%，满二十阶 +100%',
             detail: '筋骨如玉，百劫不摧',
           },
           {
@@ -1070,7 +1078,10 @@ function updateHud() {
       'urgent',
       life.remaining <= life.limit * 0.15 && Number.isFinite(life.limit),
     );
-  set('health-text', `${Math.ceil(game.player.hp)} / ${game.player.maxHp}`);
+  set(
+    'health-text',
+    `${formatNumber(Math.ceil(game.player.hp))} / ${formatNumber(game.player.maxHp)}`,
+  );
   document.querySelector<HTMLElement>('#health-fill')!.style.width =
     `${Math.max(0, game.player.hp / game.player.maxHp) * 100}%`;
   set('kills', `${game.kills}`);
@@ -1203,10 +1214,10 @@ function damageReport() {
   if (other > 0.01)
     rows.push({ id: '', name: '其他 / 旧记录未分类', color: '#a7bbae', damage: other });
   rows.sort((a, b) => b.damage - a.damage);
-  return `<section class="damage-report" aria-label="本局伤害统计"><div class="damage-heading"><h3>法宝伤害占比</h3><span>总伤害 ${Math.round(total).toLocaleString('zh-CN', { useGrouping: false })}</span></div>${rows
+  return `<section class="damage-report" aria-label="本局伤害统计"><div class="damage-heading"><h3>法宝伤害占比</h3><span>总伤害 ${formatNumber(Math.round(total))}</span></div>${rows
     .map((row) => {
       const percent = total > 0 ? (row.damage / total) * 100 : 0;
-      return `<div class="damage-row" style="--damage-color:${row.color}">${row.id ? icon(row.id, row.color) : '<span class="damage-other">✧</span>'}<div class="damage-detail"><div class="damage-label"><strong>${row.name}</strong><span>${Math.round(row.damage).toLocaleString('zh-CN', { useGrouping: false })} <b>${percent.toFixed(1)}%</b></span></div><div class="damage-bar"><i style="width:${percent}%"></i></div></div></div>`;
+      return `<div class="damage-row" style="--damage-color:${row.color}">${row.id ? icon(row.id, row.color) : '<span class="damage-other">✧</span>'}<div class="damage-detail"><div class="damage-label"><strong>${row.name}</strong><span>${formatNumber(Math.round(row.damage))} <b>${percent.toFixed(1)}%</b></span></div><div class="damage-bar"><i style="width:${percent}%"></i></div></div></div>`;
     })
     .join(
       '',
@@ -1762,9 +1773,15 @@ function handleAction(action: string, id?: string) {
     }
     return;
   }
-  if (panel === 'lifespan-farewell' || panel === 'tribulation-farewell') {
+  // 留影只切换面板，不能解除已结束的人生状态。
+  if (save.pendingReincarnation) {
     if (action === 'journey-card') void renderJourneyCard();
-    else if (action === 'confirm-journey-reincarnate') {
+    else if (action === 'close' && panel === 'journey-card')
+      renderJourneyFarewell(save.pendingReincarnation);
+    else if (
+      action === 'confirm-journey-reincarnate' &&
+      (panel === 'lifespan-farewell' || panel === 'tribulation-farewell')
+    ) {
       if (panel === 'lifespan-farewell') endLifetime();
       else resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
     }
@@ -2085,8 +2102,15 @@ function handleAction(action: string, id?: string) {
     action.startsWith('mortal-') &&
     inMortalWorld &&
     !game &&
-    (!panel || panel === 'town-event')
+    (!panel ||
+      panel === 'town-event' ||
+      (panel === 'tea-story' && action === 'mortal-activity' && id === 'tea'))
   ) {
+    if (
+      panel === 'tea-story' &&
+      modal.querySelector<HTMLButtonElement>('.tea-story-next')?.disabled !== false
+    )
+      return;
     if (action === 'mortal-tab' && (id === 'town' || id === 'sects')) {
       leaveTown();
       mortalTab = id;
@@ -2118,7 +2142,7 @@ function handleAction(action: string, id?: string) {
                   ? tradeIron(save, false)
                   : false;
       if (changed) {
-        const fromTown = panel === 'town-event';
+        const fromTown = panel === 'town-event' || panel === 'tea-story';
         if (fromTown) {
           closeNpcChat();
           panel = '';
@@ -2141,7 +2165,7 @@ function handleAction(action: string, id?: string) {
           showTownEvent(townNpc);
         if (action === 'mortal-join' || action === 'mortal-leave') toast(save.mortal.events[0]);
         if (action === 'mortal-activity' && !save.mortal.activity) toast(save.mortal.events[0]);
-      }
+      } else if (panel === 'tea-story') toast('暂时不能继续听书，请先处理寿元或未完成的事项。');
     }
     return;
   }
