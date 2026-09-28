@@ -5588,6 +5588,58 @@ body.journey-complete:not(.in-game) {
 .about-actions a {
   flex: 1;
 }
+.about-support {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #a9baa12e;
+}
+.about-support img {
+  flex: 0 0 auto;
+  width: 128px;
+  height: 128px;
+}
+.about-support strong {
+  display: block;
+  color: #e2dbb8;
+  font-size: 14px;
+  font-weight: 500;
+}
+.about-support p {
+  margin-top: 6px;
+  color: #a9baaa;
+  font-size: 11px;
+  line-height: 1.9;
+}
+.about-support small {
+  display: block;
+  margin-top: 4px;
+  color: #9eb29f;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.epilogue-support {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid #68837444;
+}
+.epilogue-support img {
+  flex: 0 0 auto;
+  width: 104px;
+  height: 104px;
+  border-radius: 8px;
+  background: #102e2b;
+}
+.epilogue-support figcaption {
+  color: #476647;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: 1px;
+}
 @media (max-width: 360px) {
   .lobby-footer,
   .lobby-footer-links {

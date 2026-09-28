@@ -1,4 +1,6 @@
 export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
+// 微信赞赏码是小程序码，二维码库无法重新生成；更换时直接替换这张图片。
+export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 
 // NPC 相关常量集中在这里；改动后重新构建前端，并部署 npc-ai Worker。
 export const NPC_SETTINGS = {

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { guideContent } from '../src/guide.ts';
-import { GAME_SITE_URL } from '../src/setting.ts';
+import { GAME_SITE_URL, SUPPORT_CODE_IMAGE } from '../src/setting.ts';
 import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { chronicleContent } from '../src/chronicle-ui.ts';
@@ -48,6 +48,22 @@ test('首页底部以轻量关于入口替代自动保存提示', () => {
   assert.equal(GAME_SITE_URL, 'https://xiuxian.011203.xyz/');
   assert.match(source, /href="\$\{GAME_SITE_URL\}"/);
   assert.match(source, /querySelector<HTMLButtonElement>\('\[data-action="about"\]'\)\?\.focus/);
+});
+
+test('关于面板与终章放置微信赞赏码，纯打赏不换取游戏内道具', () => {
+  assert.equal(SUPPORT_CODE_IMAGE, '/assets/support-wechat.webp');
+  assert.ok(existsSync(new URL(`../public${SUPPORT_CODE_IMAGE}`, import.meta.url)));
+  const support = source.match(/<div class="about-support">[^]*?<\/div><\/div>/)![0];
+  assert.match(support, /src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}" alt="微信赞赏码"/);
+  assert.match(support, /请道友喝杯茶/);
+  assert.match(support, /茶钱不换道具，也不换修为/);
+  assert.match(support, /先截图，再在「扫一扫」里从相册选取/);
+  assert.match(
+    source,
+    /<figure class="epilogue-support"><img src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}"/,
+  );
+  // 赞赏入口只是静态图片，不接任何按钮动作、奖励或弹窗。
+  assert.doesNotMatch(support, /data-action/);
 });
 
 test('洞府使用此世存档文案并保留原导入导出动作', () => {
