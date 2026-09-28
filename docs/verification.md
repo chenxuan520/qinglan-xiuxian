@@ -1,5 +1,12 @@
 # 验证记录
 
+## 关于面板版本上线（2026-09-28）
+
+- 提交 `6a374ca` 推送 `master` 前，本地格式、549 项测试、类型检查与差异检查通过。GitHub Pages 工作流 `36390422830` 成功，平台入口脚本 `index-BVkmVluD.js` 返回 200。Cloudflare 官网生产部署 `d7785992-a675-4392-bff6-98d77f8047cc` 来源为 `6a374ca`，根路径脚本 `index-BJFGkXyP.js` 返回 200。NPC Worker 未改动，未重新部署。
+- 上线后发现平台站关于面板只显示短哈希 `6a374ca`（Actions 默认浅克隆、无标签，`git describe` 回退），官网显示完整 `v0.0.2-7-g6a374ca`。补提交 `ed9e4e3` 为 Pages 工作流加 `fetch-depth: 0`，工作流 `36390823582` 成功，平台入口更新为 `index-ENsL7p0d.js`；另从干净工作区同步 Cloudflare 生产部署 `fa4065c9`，官网入口更新为 `index-UuHr45i4.js`。
+- Chrome DevTools MCP 使用独立隔离上下文与测试存档验证：两站关于面板均显示「版本 v0.0.2-8-ged9e4e3」，与当前 `master` 一致；控制台无 error／warn。
+- 本条记录为文档提交，不改变构建产物，官网未为其重新部署。未操作玩家页面或真实存档。
+
 ## 关于面板显示构建版本（2026-09-28）
 
 - 参考 roadbook 的版本口径：新建 `vite.config.ts`，构建时执行 `git describe --tags --always` 并经 `define` 注入；`src/version.ts` 对外暴露 `GAME_VERSION`，直接运行源码（测试）时回退为 `dev`。关于面板 `about-meta` 末尾新增「版本」行。构建选项仍由命令行参数决定，配置文件不覆盖。
