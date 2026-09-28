@@ -58,6 +58,7 @@ import {
 } from './data.ts';
 import {
   parseSave,
+  readSave,
   freshSave,
   enterImmortalGate,
   SAVE_KEY,
@@ -80,7 +81,13 @@ import {
   type SaveData,
 } from './progress.ts';
 import { Game } from './game.ts';
-import { exportSave, importSave, restoreSavedRun, MAX_SAVE_FILE_BYTES } from './save-transfer.ts';
+import {
+  exportSave,
+  importSave,
+  restoreSavedRun,
+  backupUnreadableSave,
+  MAX_SAVE_FILE_BYTES,
+} from './save-transfer.ts';
 import { autoplayChoice, autoplayInput } from './autoplay.ts';
 import type { Choice } from './game.ts';
 import { Renderer } from './render.ts';
@@ -153,7 +160,14 @@ try {
 } catch {
   storageAvailable = false;
 }
-const save = parseSave(raw);
+const saveRead = readSave(raw);
+// 读不懂的存档先另存原文，玩家确认前不写入；来自新版本的存档只读不写。
+let saveLock: 'unreadable' | 'newer' | 'stale' | null =
+  saveRead.status === 'unreadable' || saveRead.status === 'newer' ? saveRead.status : null;
+const unreadableBackedUp =
+  saveRead.status === 'unreadable' && raw !== null && backupUnreadableSave(localStorage, raw);
+let lastSaveText = raw;
+const save = saveRead.status === 'unreadable' ? parseSave(null) : saveRead.save;
 // 每次进入先静音，保留音量，只有明确开启声音后才播放。
 save.sound = false;
 if (!save.journeyEnded && !save.pendingReincarnation) resolveActivity(save);
@@ -171,7 +185,8 @@ catalogTreasures.splice(
 );
 let pendingRun: Game | null = null;
 try {
-  pendingRun = restoreSavedRun(save, JSON.parse(raw || '{}').activeRun);
+  if (saveRead.status !== 'unreadable')
+    pendingRun = restoreSavedRun(save, JSON.parse(raw || '{}').activeRun);
 } catch {
   /* 无有效对局时仍保留永久进度。 */
 }
@@ -224,18 +239,81 @@ let medicineTier: MedicineTierFilter = 'all';
 let adRoot: SpiritRootId = 'heaven';
 let adElements: ElementId[] = [];
 let pendingImport: ReturnType<typeof importSave> | null = null;
+// 只在存档仍是本页上次读写的内容时写入，其他窗口写过后本页停止保存。
+function writeSave(data: SaveData, run: Game | null) {
+  if (saveLock) throw new Error('存档已停止写入');
+  if (localStorage.getItem(SAVE_KEY) !== lastSaveText) {
+    lockStaleSave();
+    throw new Error('存档已在其他窗口更新');
+  }
+  const text = JSON.stringify({ ...data, activeRun: run?.snapshot() ?? null });
+  localStorage.setItem(SAVE_KEY, text);
+  lastSaveText = text;
+}
 function persist() {
+  if (saveLock) return;
   syncHumanStories(save);
   const active = game && !settled ? game : pendingRun;
   try {
-    localStorage.setItem(
-      SAVE_KEY,
-      JSON.stringify({ ...save, activeRun: active?.snapshot() ?? null }),
-    );
+    writeSave(save, active);
   } catch {
+    if (saveLock) return;
     if (storageAvailable) toast('浏览器暂时无法保存进度，请勿关闭当前页面');
     storageAvailable = false;
   }
+}
+function lockStaleSave() {
+  saveLock = 'stale';
+  clearInput();
+  game?.pause();
+  renderSaveLock();
+}
+function renderSaveLock() {
+  if (!saveLock) return;
+  const copy = {
+    stale: [
+      '此页已停止保存',
+      '存档已在其他窗口更新',
+      '同一存档刚在另一个窗口或标签页保存了新的进度。为免覆盖那边的修行，此页不再写入存档。',
+      '请关闭多余的窗口，或在此页载入最新进度继续。',
+      '<button class="primary-button" data-action="save-lock-reload">载入最新进度</button>',
+    ],
+    newer: [
+      '存档来自新版本',
+      '此页为旧版本 · 已停止保存',
+      '本机存档已由更新版本的游戏保存过。继续在旧版本中游玩可能丢失新版本记录的内容，因此此页不会写入存档。',
+      '请刷新页面载入新版本；也可先下载一份存档留底。',
+      '<button class="secondary-button" data-action="save-lock-download">下载存档留底</button><button class="primary-button" data-action="save-lock-reload">刷新页面</button>',
+    ],
+    unreadable: [
+      '存档无法读取',
+      unreadableBackedUp ? '原始数据已另存' : '原始数据尚未覆盖',
+      unreadableBackedUp
+        ? '本机存档已损坏或格式无法识别。原始数据已另存在此浏览器中，开始新的一世也不会删除它。'
+        : '本机存档已损坏或格式无法识别，且浏览器空间不足，未能另存原始数据。开始新的一世会覆盖它。',
+      '建议先下载原始数据留底，便于日后排查或找回。',
+      '<button class="secondary-button" data-action="save-lock-download">下载原始数据</button><button class="primary-button" data-action="save-lock-continue">开始新的一世</button>',
+    ],
+  }[saveLock];
+  panel = 'save-lock';
+  ui.inert = true;
+  panelFrame(
+    copy[0],
+    copy[1],
+    `<div class="save-lock"><p class="pause-description">${copy[2]}</p><p class="panel-note">${copy[3]}</p><div class="save-actions">${copy[4]}</div></div>`,
+  );
+  modal.querySelector('[data-action="close"]')?.remove();
+  modal.querySelector<HTMLButtonElement>('.save-lock .primary-button')?.focus();
+}
+function downloadJson(text: string, name: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `叩仙门：青岚纪${name}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function toast(text: string, duration = 3200) {
   const el = document.querySelector<HTMLDivElement>('#toast')!;
@@ -540,9 +618,9 @@ function finishDeparture(skipOpening = false) {
   if (skipOpening) next.prologueSeen = true;
   if (!departHometown(next)) return;
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...next, activeRun: null }));
+    writeSave(next, null);
   } catch {
-    toast('浏览器暂时无法保存离乡进度，请重试');
+    if (!saveLock) toast('浏览器暂时无法保存离乡进度，请重试');
     return;
   }
   Object.assign(save, next);
@@ -1029,7 +1107,7 @@ function renderPanel() {
     panelFrame(
       '修行指南',
       '道法有迹',
-      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">首次序章可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、自动前往渡口，离乡后再看命盘。两条路线不影响灵根和物资。离乡不计龄，刷新保留阶段。此后入镇从故居门前开始，不强制交谈。父母随年岁老去，交谈无任务或奖励，家事和家书可在履历与缘簿重读。轮回默认直接命盘；想从头体验，可在洞府轮回确认时勾选「重走十五岁那一程」，仍会清空本世进度。命盘重抽保持快捷，圆满终章保留故乡选择。重温序章只重看文字，不清档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，同样会清空本世进度。圆满终章后轮回，也可以选择再走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
     );
   }
 }
@@ -1710,9 +1788,9 @@ function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation
   ended.autoplay = false;
   ended.tribulationReturn = null;
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...ended, activeRun: null }));
+    writeSave(ended, null);
   } catch {
-    toast('浏览器无法保存本世落幕，请释放存储空间后重试');
+    if (!saveLock) toast('浏览器无法保存本世落幕，请释放存储空间后重试');
     return;
   }
   Object.assign(save, ended);
@@ -1747,6 +1825,20 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function handleAction(action: string, id?: string) {
+  if (saveLock) {
+    if (action === 'save-lock-reload') location.reload();
+    else if (action === 'save-lock-download')
+      downloadJson(localStorage.getItem(SAVE_KEY) ?? raw ?? '', '原始存档');
+    else if (action === 'save-lock-continue' && saveLock === 'unreadable') {
+      saveLock = null;
+      panel = '';
+      modal.innerHTML = '';
+      ui.inert = false;
+      persist();
+      renderPrologue();
+    }
+    return;
+  }
   if (save.journeyEnded) {
     if (action === 'journey-card' && (panel === 'epilogue' || panel === 'journey-card')) {
       void renderJourneyCard();
@@ -1902,9 +1994,9 @@ function handleAction(action: string, id?: string) {
     const ended = structuredClone(save);
     if (!enterImmortalGate(ended)) return;
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ ...ended, activeRun: null }));
+      writeSave(ended, null);
     } catch {
-      toast('浏览器无法保存终章，此世尚未结束，请释放存储空间后重试');
+      if (!saveLock) toast('浏览器无法保存终章，此世尚未结束，请释放存储空间后重试');
       return;
     }
     Object.assign(save, ended);
@@ -2170,16 +2262,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'export-save' && !game) {
-    const url = URL.createObjectURL(
-      new Blob([exportSave(save, pendingRun)], { type: 'application/json' }),
-    );
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `叩仙门：青岚纪存档-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadJson(exportSave(save, pendingRun), '存档');
     toast('已导出存档，请保留下载的 JSON 文件');
     return;
   }
@@ -2190,12 +2273,9 @@ function handleAction(action: string, id?: string) {
   if (action === 'confirm-import' && !game && panel === 'import-confirm' && pendingImport) {
     const candidate = pendingImport;
     try {
-      localStorage.setItem(
-        SAVE_KEY,
-        JSON.stringify({ ...candidate.save, activeRun: candidate.run?.snapshot() ?? null }),
-      );
+      writeSave(candidate.save, candidate.run);
     } catch {
-      toast('浏览器无法写入存档，当前进度未更改');
+      if (!saveLock) toast('浏览器无法写入存档，当前进度未更改');
       return;
     }
     Object.assign(save, candidate.save, { sound: save.sound });
@@ -2772,6 +2852,7 @@ document.addEventListener('keydown', (event) => {
     }
     return;
   }
+  if (saveLock) return;
   const key = event.key.toLowerCase();
   if (key === 'escape' || key === 'p') {
     if (event.repeat) return;
@@ -2857,6 +2938,10 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('pagehide', () => {
   if ((game && !settled) || inMortalWorld) persist();
+});
+window.addEventListener('storage', (event) => {
+  if (event.storageArea !== localStorage || (event.key !== SAVE_KEY && event.key !== null)) return;
+  if (saveLock !== 'stale' && saveLock !== 'newer') lockStaleSave();
 });
 window.setInterval(() => {
   if ((game && !settled) || inMortalWorld) persist();
@@ -2970,6 +3055,7 @@ function tick(now: number, draw: boolean) {
   }
 }
 function frame(now: number) {
+  if (saveLock && !modal.querySelector('.save-lock')) renderSaveLock();
   if (save.journeyEnded) {
     requestAnimationFrame(frame);
     return;
@@ -2999,9 +3085,14 @@ renderLobby();
 if (save.pendingReincarnation) renderJourneyFarewell(save.pendingReincarnation);
 else if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
 else if (tribulationDue(save)) renderTribulationPending();
+if (saveLock) renderSaveLock();
 persist();
 ensureScene(selectedStage, () => {
   if (!game && !inMortalWorld) renderLobby();
+  if (saveLock) {
+    renderSaveLock();
+    return;
+  }
   if (panel === 'tribulation-pending') renderTribulationPending();
   renderPrologue();
 });

@@ -30,6 +30,7 @@ const flow = new Script(
       'renderLobby',
       'renderPrologue',
       'persist',
+      'writeSave',
       'endLifetime',
       'beginJourneyFarewell',
       'renderJourneyFarewell',
@@ -82,11 +83,14 @@ function harness(save: SaveData) {
     SAVE_KEY,
     structuredClone,
     localStorage: {
+      getItem: () => writes.at(-1) ?? null,
       setItem(key: string, value: string) {
         assert.equal(key, SAVE_KEY);
         writes.push(value);
       },
     },
+    saveLock: null,
+    lastSaveText: null,
     writes,
     routes,
     messages,
