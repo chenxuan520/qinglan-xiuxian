@@ -1,5 +1,11 @@
 # 验证记录
 
+## 微信赞赏码上线（2026-09-28）
+
+- 提交 `d50f3f2` 推送 `master` 前，本地格式、550 项测试、类型检查、Worker 检查与差异检查通过。GitHub Pages 工作流 `36423157243` 成功，平台入口脚本 `index-Bbt1NSPh.js` 返回 200。Cloudflare 官网生产部署 `fb8f9fa5-deca-47ac-a3b9-011ff34a8e13` 来源为 `d50f3f2`，根路径脚本 `index-I0TayleN.js` 返回 200。两站 `support-wechat.webp` 均返回 200、23,010 字节，与仓库文件一致。NPC Worker 未改动，未重新部署。
+- Chrome DevTools MCP 使用独立隔离上下文与测试存档验证：官网与平台站关于面板均显示「版本 v0.0.2-10-gd50f3f2」，赞赏码原图 462px 加载完成，打赏文案为定稿版本；平台站子路径资源无失败；控制台无 error／warn。
+- 本条记录为文档提交，不改变构建产物，官网未为其重新部署，平台站会随推送重建为下一个版本号。未操作玩家页面或真实存档。
+
 ## 微信赞赏码入口（2026-09-28）
 
 - 作者提供的微信赞赏码是小程序码，`jsqr` 解码返回空，确认无法用 `uqr` 重新生成；从截图中按深色像素边界裁出码的部分并留约 8% 白边，经 `scripts/compress-assets.py` 转为 `public/assets/support-wechat.webp`（462 × 462，21,122 字节），路径集中在 `src/setting.ts` 的 `SUPPORT_CODE_IMAGE`。
