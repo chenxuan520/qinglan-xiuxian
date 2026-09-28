@@ -1,5 +1,12 @@
 # 验证记录
 
+## 关于面板显示构建版本（2026-09-28）
+
+- 参考 roadbook 的版本口径：新建 `vite.config.ts`，构建时执行 `git describe --tags --always` 并经 `define` 注入；`src/version.ts` 对外暴露 `GAME_VERSION`，直接运行源码（测试）时回退为 `dev`。关于面板 `about-meta` 末尾新增「版本」行。构建选项仍由命令行参数决定，配置文件不覆盖。
+- 新增 `tests/version.test.ts`（2 项）：回退值、构建注入口径与面板接线。完整 549 项测试、类型检查、格式检查与独立目录生产构建通过；构建产物中确认包含 `v0.0.2-6-gad433f8`。
+- 5173 保留 PID 92430 与旧 hash 资源，正常入口原子更新为 `index-DHoxwDIo.js`／`index-CNSCT9um.css`。Chrome DevTools MCP 使用隔离上下文与测试存档验证：桌面 1440×1000 与手机 390×844 关于面板均显示「版本 v0.0.2-6-gad433f8」，无横向溢出，控制台无 error／warn。
+- 版本字符串只反映构建时的提交，不标记工作区未提交改动（与 roadbook 同口径）；线上发布均从已提交状态构建。未操作玩家页面或真实存档，未提交或线上发布。
+
 ## 广告接口与共用片段上线（2026-09-28）
 
 - 提交 `351d1d2` 推送 `master` 前，本地格式、547 项测试、类型检查与差异检查通过。GitHub Pages 工作流 `36379610256` 对该提交成功完成检查、构建与部署，平台入口脚本 `index-DH4SLpvx.js`／样式 `index-Dye2QEVm.css` 返回 200。Cloudflare 官网生产部署 `4181223a-ada6-4f28-ad36-ebe4e903652a` 来源为 `351d1d2`，根路径脚本 `index-CtGzGhR_.js`／样式 `index-CNSCT9um.css` 返回 200，与本机验证的构建产物哈希一致。NPC Worker 未改动，未重新部署。
