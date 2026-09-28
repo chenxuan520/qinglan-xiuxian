@@ -110,6 +110,8 @@ git push origin v0.0.1
 | `src/progress.ts`    | 永久境界、资源、炼器、修炼与结算      |
 | `src/main.ts`        | 页面、输入、音效、存档、游戏状态衔接  |
 | `src/guide.ts`       | 游戏内修行指南                        |
+| `src/ads.ts`         | 激励广告位时长与占位，商业化替换点    |
+| `src/common-ui.ts`   | 首页、洞府与战斗共用的纯展示片段      |
 | `src/style.css`      | 桌面和移动布局                        |
 | `tests/game.test.ts` | 逻辑回归测试                          |
 | `scripts/balance.ts` | 可复现的自动战斗和成长模拟            |
@@ -117,6 +119,12 @@ git push origin v0.0.1
 使用 TypeScript、Canvas 2D 与 Vite，不依赖运行时游戏框架。战斗和存档在本地运行，NPC 闲谈使用可失败回退的独立 Worker。开发模式提供 `window.__qinglan` 以验证场景，生产构建会移除该入口。中文字体优先使用 Noto Serif SC，加载失败时回退到系统宋体。中文 UI 数字统一不使用千分位逗号，数值格式化设置 `useGrouping: false`，保留原有万 / 亿缩写。
 
 图片为本项目通过内置 imagegen 工具生成，运行素材统一压缩为 WebP，保留原尺寸和透明边缘，不携带未压缩 PNG。秘境预载当前地图、本境敌人和首领以及法宝图集，首页同时预载当前屏宽对应的仙途山河图；城镇地图及九职业 NPC 按进入场景加载。预加载显示进度条，全部就绪才开放场景，失败提供重试。背景音乐为本项目原创编曲并离线合成，已保存于 `public/assets/`。生成方法见 [素材说明](assets.md)，测试范围与限制见 [验证记录](verification.md)，开发及部署约定见 [AGENTS.md](../AGENTS.md)。
+
+## 激励广告位（占位实现）
+
+四处广告位共用 `src/ads.ts` 的时长与占位 Markup：复活（`showReviveAd`）、自选灵根与物资补给（`showRewardAd`）、借寿（`showLifespanAd`）。当前为 5 秒占位倒计时，由 `startAdCountdown` 播放、`adCompleted` 判定完成；奖励发放仍在各领取点（`game.revive`、灵根洗练、`AD_SUPPLIES`、借寿）。接入真实广告 SDK 时替换播放与完成判定即可，弹窗结构与奖励逻辑不变。物资补给暂无每日次数限制，上线真实广告前需按数值定。
+
+`src/common-ui.ts` 收纳首页、洞府与战斗共用的纯展示片段，只按参数渲染 HTML，不读写全局游戏状态。新增同类片段时优先放这里，保持 `main.ts` 只做状态衔接与事件路由。
 
 ## 开发时保护正在运行的游戏
 

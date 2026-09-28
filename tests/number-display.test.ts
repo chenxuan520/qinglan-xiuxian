@@ -9,6 +9,7 @@ import { spiritPower } from '../src/spirit-power.ts';
 import { mortalPage, townStatus } from '../src/mortal-ui.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, passive } from '../src/data.ts';
 import { Game } from '../src/game.ts';
+import { completedJourney, damageReport } from '../src/common-ui.ts';
 import { formatNumber } from '../src/number-format.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -123,19 +124,12 @@ test('HUD 仅缩写气血文字，保留当前气血向上取整与真实血条�
 });
 
 test('伤害统计总量、法宝、反伤与未分类条目共用简写，保留取整和百分比精度', () => {
-  const render = source.match(/function damageReport\([^]*?\n\}/)![0];
   for (const total of [36.75, 18421.25, 184210000.25, 1842100000000.25]) {
     const game = new Game(freshSave(), 0, 0, () => 0.5);
     game.damageDealt = total;
     game.damageBySource = { sword: total * 0.617, bone: total * 0.271 };
     const before = JSON.stringify(game.snapshot());
-    const html = runInNewContext(`${stripTypeScriptTypes(render)}; damageReport()`, {
-      game,
-      formatNumber,
-      treasure,
-      passive,
-      icon: () => '',
-    });
+    const html = damageReport(game);
     assert.ok(html.includes(`总伤害 ${formatNumber(Math.round(total))}</span>`));
     const { sword, bone } = game.damageBySource;
     for (const damage of [sword, bone, total - (sword + bone)]) {
@@ -200,8 +194,7 @@ test('洞府当前与突破预览沿用入场 helper，气血、伤害及增量�
 });
 
 test('通关页保留万、亿和万亿缩写及一位小数，完整数值提示不加千分位', () => {
-  // 单独执行原有纯模板函数，不启动 main 的 DOM、音频与存档流程。
-  const render = source.match(/function completedJourney\([^]*?\n\}/)![0];
+  // 直接执行共用纯模板函数，不启动 main 的 DOM、音频与存档流程。
   for (const [value, expected] of [
     [9999, '9999'],
     [18421, '1.8万'],
@@ -212,10 +205,7 @@ test('通关页保留万、亿和万亿缩写及一位小数，完整数值提�
     const save = freshSave();
     save.cultivation = save.age = value;
     const before = JSON.stringify(save);
-    const html = runInNewContext(
-      `${stripTypeScriptTypes(render)}; completedJourney('真仙', true, '')`,
-      { save, TREASURES, smallIcon: () => '', spriteStyle: () => '' },
-    );
+    const html = completedJourney(save, '真仙', true, '');
     assert.ok(html.includes(`<strong title="${value}">${expected}</strong>`));
     assert.ok(html.includes(`<strong>${expected}<em>年</em></strong>`));
     assert.equal(JSON.stringify(save), before);

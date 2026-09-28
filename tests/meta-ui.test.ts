@@ -6,6 +6,7 @@ import { GAME_SITE_URL } from '../src/setting.ts';
 import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { chronicleContent } from '../src/chronicle-ui.ts';
+import { autoplayButton, controls } from '../src/common-ui.ts';
 import { formatNumber } from '../src/number-format.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -65,7 +66,8 @@ test('洞府使用此世存档文案并保留原导入导出动作', () => {
 test('完整重开使用游戏风格的自绘复选框', () => {
   assert.match(styles, /\.reincarnate-opening input \{[^}]*appearance: none;/s);
   assert.match(styles, /\.reincarnate-opening input:checked::before/);
-  assert.match(source, /自动历练 · \$\{save\.autoplay \? '开' : '关'\}/);
+  assert.match(autoplayButton(true), /自动历练 · 开/);
+  assert.match(autoplayButton(false), /自动历练 · 关/);
   assert.match(source, /重走十五岁那一程/);
   assert.doesNotMatch(source, /AI 代打|AI 正在挑选|从序章完整开始|自动入库|永久珍品/);
 });
@@ -94,9 +96,12 @@ test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
     source,
     /key === 'e' && !event\.repeat && !save\.autoplay && game\?\.state === 'playing'/,
   );
-  assert.match(source, /autoplayButton\(inGame\)/);
-  assert.match(source, /inGame\s+\? '按 E 或点击开启自动走位、拾取与选择升级'/);
-  assert.match(source, /点击或移动键切回手动/);
+  assert.match(
+    controls(freshSave(), false, { available: false, active: false }, true),
+    /data-action="autoplay"/,
+  );
+  assert.match(autoplayButton(false, true), /按 E 或点击开启自动走位、拾取与选择升级/);
+  assert.match(autoplayButton(true), /点击或移动键切回手动/);
   assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });
 
