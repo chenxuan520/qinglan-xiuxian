@@ -10,6 +10,27 @@ import { useMedicine, buyMedicine, craftMedicine, buyMedicineRecipe } from './me
 import './style.css';
 import './mortal.css';
 import './journey-map.css';
+import { AD_DURATION_MS, AD_SECONDS, AD_PLACEHOLDER_HTML } from './ads.ts';
+import {
+  currency,
+  autoplayButton,
+  fullscreenButton,
+  controls,
+  realmVerse,
+  completedJourney,
+  ROOT_IMPRESSIONS,
+  spiritRootDiagram,
+  spiritRootEffects,
+  spiritRootSummary,
+  lifespanSummary,
+  retreatEstimate,
+  retreatSection,
+  weaponAffinity,
+  evolutionRecipe,
+  choiceCard,
+  damageReport,
+  updateStorySoundButton,
+} from './common-ui.ts';
 import { journeyMap, JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
 import { chronicleEntrance, chronicleContent } from './chronicle-ui.ts';
 import { spiritPower } from './spirit-power.ts';
@@ -28,7 +49,6 @@ import {
   TRIAL_BOSS_TIMES,
   DIFFICULTIES,
   REALMS,
-  REALM_VERSES,
   ENEMIES,
   ENEMY_TACTICS,
   ENEMY_SKILLS,
@@ -45,12 +65,9 @@ import {
   rollSpiritRoot,
   rootElementsFor,
   elementInfo,
-  weaponRootBonus,
   ELEMENTS,
   SPIRIT_ROOTS,
   ROOT_STARTERS,
-  type Treasure,
-  type CultivationPath,
   type SpiritRootId,
   type ElementId,
   AD_SUPPLIES,
@@ -89,7 +106,6 @@ import {
   MAX_SAVE_FILE_BYTES,
 } from './save-transfer.ts';
 import { autoplayChoice, autoplayInput } from './autoplay.ts';
-import type { Choice } from './game.ts';
 import { Renderer } from './render.ts';
 import { icon, smallIcon } from './icons.ts';
 import { GUIDE_TABS, guideContent } from './guide.ts';
@@ -394,30 +410,7 @@ function unlockAudio() {
       });
   }
 }
-const currency = () =>
-  `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
-function autoplayButton(inGame = false) {
-  const title = save.autoplay
-    ? '自动走位、拾取与选择升级；点击或移动键切回手动'
-    : inGame
-      ? '按 E 或点击开启自动走位、拾取与选择升级'
-      : '点击开启自动走位、拾取与选择升级';
-  return `<button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" title="${title}">自动历练 · ${save.autoplay ? '开' : '关'}</button>`;
-}
-function fullscreenButton() {
-  return mobileDisplay.available
-    ? `<button class="round-button fullscreen-button" data-action="fullscreen" aria-label="${mobileDisplay.active ? '退出全屏' : '进入全屏'}" aria-pressed="${mobileDisplay.active}">${mobileDisplay.active ? '还原' : '全屏'}</button>`
-    : '';
-}
-function controls(inGame = false) {
-  return `${autoplayButton(inGame)}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span><button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton()}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
-}
-function realmVerse(realm: ReturnType<typeof realmInfo>) {
-  return REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]];
-}
-function completedJourney(realmName: string, immortal: boolean, verse: string) {
-  return `<section class="hero journey-hero" aria-label="仙途通关"><div class="hero-copy"><div class="eyebrow"><span></span>七境已破 · 山河可期</div><h1>七境皆过客<span>天地一逍遥</span></h1><p>曾执一剑入青岚，今携万法越重山。<br>七境已破，天劫已散。往后山河，任你来去。</p><div class="journey-badges"><span>七境通关</span><span>天劫止息</span><span>修行永存</span></div><div class="journey-actions">${immortal ? `<button class="primary-button" data-action="immortal-gate">叩入仙门 ${smallIcon('arrow')}</button>` : ''}<button class="${immortal ? 'secondary-button' : 'primary-button'}" data-action="revisit">重游七境 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="arsenal">查看珍藏</button></div></div><button class="journey-portrait" data-action="cultivation" aria-label="当前${realmName}，进入洞府修炼"><span class="journey-orbit" aria-hidden="true"></span><span class="journey-poem">${verse}</span><span class="journey-character" style="${spriteStyle(0)}" aria-hidden="true"></span><span class="journey-realm"><small>此世道果</small><strong>${realmName}</strong><span>进入洞府 ${smallIcon('arrow')}</span></span></button></section><section class="journey-records" aria-label="此世修行成果"><div><span>累积修为</span><strong title="${save.cultivation.toLocaleString('zh-CN', { useGrouping: false })}">${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1, useGrouping: false }).format(save.cultivation)}</strong><small>一念一境，皆成过往</small></div><div><span>此世年岁</span><strong>${Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1, useGrouping: false }).format(save.age)}<em>年</em></strong><small>岁月悠长，道心未改</small></div><div><span>法宝珍藏</span><strong>${save.artifacts.length}<em>/ ${TREASURES.length}</em></strong><small>万般法器，随心而御</small></div><div><span>历劫留印</span><strong>${save.tribulations}<em>枚</em></strong><small>气血 +${save.tribulations * 3}% · 伤害 +${save.tribulations * 2}%</small></div></section>`;
-}
+
 function renderLobby(returnYears?: number) {
   if (save.journeyEnded) {
     renderEpilogue();
@@ -444,12 +437,12 @@ function renderLobby(returnYears?: number) {
     <header class="lobby-header">
       <a class="brand" href="#" data-action="home" aria-label="叩仙门：青岚纪首页"><span class="brand-emblem">${icon('sword')}</span><span class="brand-title">叩仙门<small>青岚纪</small></span><span class="seal">${completed ? '圆满' : '问道'}</span></a>
       <nav aria-label="修行菜单"><button class="nav-link active" data-action="home">${completed ? '七境巡游' : '秘境历练'}</button><button class="nav-link" data-action="cultivation">洞府修炼</button><button class="nav-link" data-action="arsenal">藏器阁</button><button class="nav-link" data-action="bestiary">妖物志</button><button class="nav-link" data-action="medicine">炼丹炉</button></nav>
-      <div class="header-right">${currency()}${controls()}</div>
+      <div class="header-right">${currency(save)}${controls(save, volumeOpen, mobileDisplay)}</div>
     </header>
     <main class="lobby-main ${completed ? 'journey-lobby' : ''}">
       ${
         completed
-          ? completedJourney(realm.name, realm.max, realmVerse(realm))
+          ? completedJourney(save, realm.name, realm.max, realmVerse(realm))
           : `<section class="hero">
         <div class="hero-copy"><div class="eyebrow"><span></span>青岚少年 · 觅长生 · 寻大道</div><h1>御剑问长生<span>青岚入仙途</span></h1><p>在青岚镇长大，十五岁踏上仙途。<br>为觅长生，为追寻大道，向山海深处去。</p>
           <div class="hero-features"><span>三十六法宝</span><i>·</i><span>七重秘境</span><i>·</i><span>正魔兼修</span></div>
@@ -457,7 +450,7 @@ function renderLobby(returnYears?: number) {
         <button class="realm-preview" data-action="cultivation"><span class="vertical-poem">${realmVerse(realm)}</span><span class="realm-circle"><small>当前境界</small><strong>${realm.ascending ? '渡劫' : REALMS[realm.index]}</strong><span>${realm.ascending ? '待破七境' : ['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>
       </section>`
       }
-      ${spiritRootSummary(true)}
+      ${spiritRootSummary(save, true)}
       <section class="expedition" aria-label="选择秘境">
         ${pendingRun ? `<div class="resume-banner"><div><span class="status-dot"></span>尚有一段仙缘未了<small>${pendingRun.encounterName} · ${formatTime(pendingRun.time)} · ${pathInfo(pendingRun.path).name} · 局内 ${pendingRun.level} 级</small></div><button class="secondary-button" data-action="restore">继续上次历练 ${smallIcon('arrow')}</button></div>` : ''}
         <div class="journey-selection"><div class="journey-destination" aria-live="polite"><small>第${stage.chapter}境 · ${save.completed.includes(selectedStage) ? '故地重游' : '此行将至'}</small><h3>${stage.name}</h3><p>${stage.description}</p><div class="journey-destination-facts"><span>历练 ${stage.minutes} 分钟</span><span>每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><span>妖王 · ${stage.boss}</span></div></div><div class="journey-depart"><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? (completed ? '再入山河' : '踏入秘境') : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button><small>${pathInfo(save.path).name} · ${DIFFICULTIES[difficulty].name}</small></div></div>
@@ -476,13 +469,7 @@ function renderLobby(returnYears?: number) {
       3000,
     );
 }
-function updateStorySoundButton(button: HTMLButtonElement) {
-  const label = save.sound ? '关闭声音' : '开启声音';
-  button.innerHTML = smallIcon(save.sound ? 'sound' : 'mute');
-  button.setAttribute('aria-label', label);
-  button.setAttribute('aria-pressed', String(save.sound));
-  button.title = label;
-}
+
 function renderEpilogue() {
   leaveTown();
   inMortalWorld = false;
@@ -494,7 +481,10 @@ function renderEpilogue() {
   ui.inert = true;
   panel = 'epilogue';
   modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene epilogue-scene" role="dialog" aria-modal="true" aria-labelledby="epilogue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="epilogue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="journey-card">留存此世</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 终章</span><h1 id="epilogue-title">云开<span>见长生</span></h1><p>此去长生，亦记人间。</p><span class="prologue-seal">此世圆满</span></div><div class="prologue-story" tabindex="0" aria-label="终章正文"><p>青岚山下，又是一年春水。炊烟漫过新修的青瓦，渡口有人挑起归灯。茶馆里醒木一响，说书人讲起一位从小镇走出的少年——讲到后来，连他的姓名，也渐渐成了传说。</p><p>你立在云海尽头，身后七境归于寂静。曾经惊心的雷声，已远得像一场旧雨。眼前仙门缓缓开启，没有谁问你斩过多少妖、炼成多少法，只见门上浮光如水，映出十五岁那年的衣衫。</p><p>那时行囊很轻，前路很远。你听闻天地间有长生，便以为走得足够远，就能将离别留在身后。直到春秋从指间流过，旧桥几度重修，熟悉的声音一个个散入晚风，才懂得：有些相逢虽只一瞬，也足以陪人走完漫长的一生。</p><p>仙门外的风吹动衣襟，你下意识拢了拢。恍惚间，青岚渡口的旧风，又从岁月深处吹来。</p><p>叩门之前，你曾最后回了一趟青岚。渡口坐着一个十五岁的少年，望着远山，问你外面的天地究竟有多大。你便在他身旁坐下，说起竹海之外的山川、云海尽头的星辰，也说起求道路上的风雪与险恶。末了，你告诉他：山河之外，还有求长生、问大道的路。</p><p>少年听得出神，眼里有一簇你熟悉的光。你忽然想起，许多年前，也有一位过路修士，在这里向你说过同样的话。临别时你替他拢好被风吹开的衣襟，只道：路远，记得添衣。</p><p>一步踏出，仙门在身后合拢。凡间不再有你的归舟，山河却仍循着自己的时序，迎春，送雪。而那个少年，终于背起轻轻的行囊，朝青岚山深处走去。</p><p class="prologue-last">山河未老，故人先秋。<br>幸而此心未改，来路仍明。<br><br>这一程山水，至此落笔。<br>长生已觅，大道无涯。</p></div><footer class="prologue-footer"><span>此世已结束 · 真仙<br>叩门于 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 岁</span><button class="primary-button" data-action="epilogue-reincarnate">轮回转世 ${smallIcon('arrow')}</button></footer></section></div>`;
-  updateStorySoundButton(modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!);
+  updateStorySoundButton(
+    modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
+    save.sound,
+  );
   const scene = modal.querySelector<HTMLElement>('.epilogue-scene')!;
   scene.style.setProperty(
     '--prologue-image',
@@ -508,7 +498,10 @@ function renderPrologue(replay = false) {
   panel = 'prologue';
   ui.inert = true;
   modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="prologue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="${replay ? 'prologue-enter' : 'prologue-skip'}">${replay ? '返回仙途' : '跳过开场'} ${smallIcon('arrow')}</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">${replay ? '返回仙途' : '入此山河'} ${smallIcon('arrow')}</button></footer></section></div>`;
-  updateStorySoundButton(modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!);
+  updateStorySoundButton(
+    modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!,
+    save.sound,
+  );
   modal
     .querySelector<HTMLElement>('.prologue-scene')!
     .style.setProperty('--prologue-image', `url("${assetUrl(PROLOGUE_IMAGE)}")`);
@@ -610,7 +603,7 @@ function renderDeparture() {
   clearInput();
   document.body.classList.remove('in-game', 'journey-complete', 'immortal-home');
   document.body.classList.add('in-mortal', 'in-town');
-  ui.innerHTML = townPage(save, fullscreenButton());
+  ui.innerHTML = townPage(save, fullscreenButton(mobileDisplay.available, mobileDisplay.active));
   mountTownScene();
 }
 function finishDeparture(skipOpening = false) {
@@ -719,7 +712,7 @@ function renderMortal(enter = false) {
   document.body.classList.add('in-mortal');
   document.body.classList.toggle('in-town', inTown);
   ui.innerHTML = inTown
-    ? townPage(save, fullscreenButton())
+    ? townPage(save, fullscreenButton(mobileDisplay.available, mobileDisplay.active))
     : mortalPage(save, mortalTab, mortalFilter, pendingRun?.path);
   ui.scrollTop = inTown ? 0 : scroll;
   mountTownScene();
@@ -782,68 +775,7 @@ function tickMortal(now: number) {
     nextMortalStatus = now + 1000;
   }
 }
-const ROOT_IMPRESSIONS: Record<SpiritRootId, { seal: string; verse: string }> = {
-  heaven: { seal: '天', verse: '一气天成，百脉皆通。长生路上，似有清风送君行。' },
-  variant: { seal: '异', verse: '灵机独异，不循常途。天地万法，或为你另开一门。' },
-  dual: { seal: '凡', verse: '两脉相依，资质平常。肯踏千山，凡根亦可问长生。' },
-  triple: { seal: '凡', verse: '三脉交织，仙路渐远。不借天资，便以岁月磨道心。' },
-  quad: { seal: '伪', verse: '四脉纷杂，聚气维艰。命数未许，仍可执灯向山行。' },
-  five: { seal: '伪', verse: '五行俱在，却难归一。大道无言，且看你如何叩门。' },
-  none: { seal: '废', verse: '五行沉寂，仙缘如尘。若道心不灭，凡骨也敢问苍天。' },
-};
-function spiritRootDiagram(reveal = false) {
-  const root = spiritRootInfo(save.spiritRoot);
-  const vertices = ELEMENTS.map((element, i) => {
-    const angle = ((i * 72 - 90) * Math.PI) / 180;
-    return {
-      ...element,
-      x: (50 + Math.cos(angle) * 40).toFixed(2),
-      y: (50 + Math.sin(angle) * 40).toFixed(2),
-      active: save.rootElements.includes(element.id),
-    };
-  });
-  const rootLabel = `${root.name}；${vertices.map((e) => `${e.name}灵根${e.active ? '已显现' : '未显现'}`).join('，')}`;
-  return `<div class="root-pentagon" role="img" aria-label="${rootLabel}"><svg class="root-pentagon-lines" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40"/><polygon points="${vertices.map((e) => `${e.x},${e.y}`).join(' ')}"/>${vertices.map((e) => `<path d="M50 50L${e.x} ${e.y}"/>`).join('')}</svg><div class="root-quality"><small>此世灵根</small><strong>${reveal ? ROOT_IMPRESSIONS[save.spiritRoot].seal : root.name}</strong><small>${reveal ? `${root.name} · ` : ''}${root.count ? `${root.count} 系共鸣` : '五行未显'}</small></div>${vertices.map((e) => `<span class="root-node${e.active ? ' is-active' : ''}" style="--root-x:${e.x}%;--root-y:${e.y}%;--element-color:${e.color}"><i class="root-orb"></i><span>${e.name}</span></span>`).join('')}</div>`;
-}
-function spiritRootEffects() {
-  const root = spiritRootInfo(save.spiritRoot);
-  return `灵气获取 · 修为积累 <b>${Math.round(root.rate * 100)}%</b><br>${root.count ? `对应属性法宝伤害 <b>+${root.damageBonus}%</b>` : '法宝伤害加成 <b>0%</b>'}<br>基础气血 <b>${root.baseHp}</b> · 基础回血 <b>${root.baseRegen.toFixed(2)}/秒</b><br>基础暴击 <b>${Math.round(root.baseCrit * 100)}%</b> · 基础移速 <b>${root.baseSpeed}</b><br>悟道每阶独立增伤 <b>+${root.powerPerLevel}%</b>`;
-}
-function spiritRootSummary(showAge = false) {
-  const life = lifespanInfo(save);
-  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram()}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects()}<small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
-}
-function lifespanSummary() {
-  const life = lifespanInfo(save);
-  return `<div class="lifespan-summary"><strong>年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</strong><span>${STAGES[selectedStage].name} · 战斗每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><small>年龄跨局累计，突破大境界延寿；大乘起长生。暂停不计龄，寿尽迎来此世终章，轮回将清空本世进度。${save.lifespanBonus ? `已借寿 ${save.lifespanBonus} 年。` : ''}</small>${save.completed.includes(FINAL_TRIAL_STAGE) ? `<small>七境已通关 · 不再降临天劫 · 已获劫印保留：气血 +${save.tribulations * 3}% / 伤害 +${save.tribulations * 2}%</small>` : save.nextTribulationAge ? `<small>天劫每两万年一次 · 距下次 ${Math.max(0, save.nextTribulationAge - save.age).toFixed(1)} 年 · 已渡 ${save.tribulations} 劫 · 劫印气血 +${save.tribulations * 3}% / 伤害 +${save.tribulations * 2}%</small>` : ''}</div>`;
-}
-function retreatEstimate(years: number) {
-  const plan = retreatPlan(save, years);
-  if (!plan) return '请输入正数年限（最多一位小数），并留有剩余寿元。';
-  return `实际度过 ${Number(plan.years.toFixed(1))} 年 · ${Number.isFinite(lifespanInfo(save).limit) ? `预计修为 +${plan.cultivation.min}～${plan.cultivation.max}（本大境界总修为的 ${Number(plan.cultivation.minPercent.toFixed(2))}%～${Number(plan.cultivation.maxPercent.toFixed(2))}%，不足 1 点舍去）· 另有 ${Number((plan.chance * 100).toFixed(2))}% 概率获得属性提升` : save.completed.includes(FINAL_TRIAL_STAGE) ? '无修为或属性收益 · 通关后不再受天劫截停' : '大乘起无修为或属性收益，到天劫自动出关'}`;
-}
-function retreatSection() {
-  const life = lifespanInfo(save);
-  const immortal = !Number.isFinite(life.limit);
-  const years = immortal
-    ? 1000
-    : Math.max(0.1, Math.floor(Math.min(life.limit * 0.1, life.remaining / 2) * 10) / 10);
-  return `<div class="section-heading"><h3>闭关修炼</h3><span>只耗年岁 · 不花灵石</span></div><p class="panel-note">${immortal ? (save.completed.includes(FINAL_TRIAL_STAGE) ? '七境已破，天劫不再降临。闭关只推进年岁，不获得修为或属性；可按填写年数出关。' : '大乘起闭关不再获得修为或属性，只推进年岁；到达天劫时立即出关迎劫。') : '闭关获得少量随机修为：按投入年数占寿元上限的比例计算，灵根越好收益越高，明显慢于历练。长时间闭关有机会推进小阶段；一世寿元全部闭关仍不足以跨越一个完整大境界。另按相同比例抽取属性提升，例如寿元 100 年闭关 50 年，有 50% 概率随机提升气血、法宝伤害或移速中的一项 1%～3%。不增加根基阶数。'}</p><div class="retreat-form"><label for="retreat-years">闭关年数<input id="retreat-years" type="number" inputmode="decimal" min="0.1" step="0.1" value="${years}" required aria-describedby="retreat-estimate"></label><button class="secondary-button" data-action="retreat" ${retreatPlan(save, years) ? '' : 'disabled'}>开始闭关</button></div><p class="panel-note" id="retreat-estimate" role="status">${retreatEstimate(years)}</p><p class="panel-note">闭关累计：气血 +${save.retreatBonus.vitality}% · 法宝伤害 +${save.retreatBonus.power}% · 移速 +${save.retreatBonus.speed}%。轮回后清空。</p>`;
-}
-function weaponAffinity(
-  item: Treasure,
-  root: SpiritRootId = save.spiritRoot,
-  elements: ElementId[] = save.rootElements,
-  compact = false,
-) {
-  const element = elementInfo(item.element);
-  const bonus = Math.round(weaponRootBonus(root, elements, item) * 100);
-  return `<span class="element-affinity ${bonus ? 'resonant' : ''}" style="--element-color:${element.color}">${element.name}系${bonus ? ` · ${compact ? '' : '灵根加伤 '}+${bonus}%` : compact ? '' : ' · 无灵根加成'}</span>`;
-}
-function evolutionRecipe(t: Treasure, path: CultivationPath) {
-  const partners = evolutionPassives(t, path).map((id) => `${passive(id).name}五重`);
-  return `<div class="evolution-recipe"><span>仙器 · ${t.evolution}</span><div>${t.name}六重 ＋ ${partners.length > 1 ? `（${partners.join(' 或 ')}）` : partners[0]}</div></div>`;
-}
+
 function showPanel(name: string) {
   panel = name;
   renderPanel();
@@ -963,12 +895,12 @@ function renderPanel() {
       owned = save.artifacts.includes(t.id);
     const detail =
       bookTab === 'treasures'
-        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需击败妖王获得遗宝' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>炼器伤害 +${Math.round(forgeDamageBonus(level) * 100)}%${level < MAX_FORGE_LEVEL ? ` · 下一阶 +${Math.round(forgeDamageBonus(level + 1) * 100)}%（较当前提升 ${(((1 + forgeDamageBonus(level + 1)) / (1 + forgeDamageBonus(level)) - 1) * 100).toFixed(1)}%）` : ' · 十阶圆满'}</small></div></div>`
+        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t, save.spiritRoot, save.rootElements)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需击败妖王获得遗宝' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>炼器伤害 +${Math.round(forgeDamageBonus(level) * 100)}%${level < MAX_FORGE_LEVEL ? ` · 下一阶 +${Math.round(forgeDamageBonus(level + 1) * 100)}%（较当前提升 ${(((1 + forgeDamageBonus(level + 1)) / (1 + forgeDamageBonus(level)) - 1) * 100).toFixed(1)}%）` : ' · 十阶圆满'}</small></div></div>`
         : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修满五重，才可使六重法宝进化为仙器。</p>';
     panelFrame(
       '万般法宝，皆可入道',
       '藏器阁',
-      `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency()}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
+      `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency(save)}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
         bookTab === 'treasures'
           ? `<div class="guide-tabs collection-pages" role="group" aria-label="法宝分页">${Array.from(
               { length: Math.ceil(visibleTreasures.length / 12) },
@@ -1015,7 +947,7 @@ function renderPanel() {
     panelFrame(
       '积一寸修为，近一寸长生',
       '洞府',
-      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，气血与法宝威力大幅提升；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><p><strong>当前入场气血 ${formatNumber(current.hp)}</strong><br>${current.weapon}基础伤害约 ${formatNumber(Math.round(current.weaponDamage))}${next ? `<br>${r.step === 23 ? '修为达标并通关七境后' : '下次突破后'}：气血 ${formatNumber(next.hp)}（+${formatNumber(next.hp - current.hp)}），本命基础伤害约 ${formatNumber(Math.round(next.weaponDamage))}（+${formatNumber(Math.round(next.weaponDamage) - Math.round(current.weaponDamage))}）` : ''}</p><small>按当前根基、炼器、宗门与药效估算新历练；本命按一重、未觉醒、非暴击计算，具体招式与敌方减伤另计。灵根主要影响修炼速度，境界越高，气血与伤害越强。</small></div></div>${spiritRootSummary()}${lifespanSummary()}<div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency()}</div></div><div class="training-grid">${(
+      `<div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，气血与法宝威力大幅提升；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><p><strong>当前入场气血 ${formatNumber(current.hp)}</strong><br>${current.weapon}基础伤害约 ${formatNumber(Math.round(current.weaponDamage))}${next ? `<br>${r.step === 23 ? '修为达标并通关七境后' : '下次突破后'}：气血 ${formatNumber(next.hp)}（+${formatNumber(next.hp - current.hp)}），本命基础伤害约 ${formatNumber(Math.round(next.weaponDamage))}（+${formatNumber(Math.round(next.weaponDamage) - Math.round(current.weaponDamage))}）` : ''}</p><small>按当前根基、炼器、宗门与药效估算新历练；本命按一重、未觉醒、非暴击计算，具体招式与敌方减伤另计。灵根主要影响修炼速度，境界越高，气血与伤害越强。</small></div></div>${spiritRootSummary(save)}${lifespanSummary(save, selectedStage)}<div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><div class="section-heading"><h3>修习根基</h3><div class="header-right">${currency(save)}</div></div><div class="training-grid">${(
         [
           {
             id: 'vitality',
@@ -1046,7 +978,7 @@ function renderPanel() {
         )
         .join(
           '',
-        )}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；前十阶费用保持，后十阶涨幅放缓，单项修满共需 47373 灵石。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p>${retreatSection()}<div class="save-record"><div class="save-record-copy"><h3>此世存档</h3><p>把这一世的修为、旧事与未尽历练收进行囊，日后仍可续上仙途。</p><small>本地保存为 JSON，不会上传。</small></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出此世</button><button class="secondary-button" data-action="import-save">导入旧档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
+        )}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；前十阶费用保持，后十阶涨幅放缓，单项修满共需 47373 灵石。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p>${retreatSection(save)}<div class="save-record"><div class="save-record-copy"><h3>此世存档</h3><p>把这一世的修为、旧事与未尽历练收进行囊，日后仍可续上仙途。</p><small>本地保存为 JSON，不会上传。</small></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出此世</button><button class="secondary-button" data-action="import-save">导入旧档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
       true,
     );
   } else if (panel === 'chronicle') {
@@ -1116,7 +1048,7 @@ function renderHud() {
   document.body.classList.remove('immortal-home');
   lastLoadout = '';
   document.body.classList.add('in-game');
-  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
+  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(save, volumeOpen, mobileDisplay, true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
   updateHud();
 }
 let lastLoadout = '';
@@ -1228,79 +1160,25 @@ function updateHud() {
       .join('');
   }
 }
+
 function renderChoices() {
   if (!game) return;
-  modal.innerHTML = `<div class="modal-backdrop upgrade-backdrop"><section class="upgrade-panel" role="dialog" aria-modal="true" aria-label="局内升级，选择一项机缘"><div class="upgrade-heading"><span class="eyebrow">灵气充盈 · 道法自成</span><h2>顿悟新机缘</h2><p>局内等级 <b>${game.level}</b> <span>·</span> 选择一项，续写你的修行之路</p></div><div class="choice-grid">${game.choices.map((c, i) => choiceCard(c, i)).join('')}</div><div class="upgrade-footer"><span>法宝 ${game.weapons.length} / 6 <i>·</i> 功法 ${Object.keys(game.passives).length} / 4</span><button class="secondary-button" data-action="reroll" ${game.rerolls === 0 ? 'disabled' : ''}>${smallIcon('refresh')}重悟机缘 <span>${game.rerolls} / 3</span></button>${autoplayButton()}<small>${save.autoplay ? '自动历练正在挑选适合当前搭配的机缘…' : '按 1 / 2 / 3 选择'}</small></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop upgrade-backdrop"><section class="upgrade-panel" role="dialog" aria-modal="true" aria-label="局内升级，选择一项机缘"><div class="upgrade-heading"><span class="eyebrow">灵气充盈 · 道法自成</span><h2>顿悟新机缘</h2><p>局内等级 <b>${game.level}</b> <span>·</span> 选择一项，续写你的修行之路</p></div><div class="choice-grid">${game.choices.map((c, i) => choiceCard(game, save, c, i)).join('')}</div><div class="upgrade-footer"><span>法宝 ${game.weapons.length} / 6 <i>·</i> 功法 ${Object.keys(game.passives).length} / 4</span><button class="secondary-button" data-action="reroll" ${game.rerolls === 0 ? 'disabled' : ''}>${smallIcon('refresh')}重悟机缘 <span>${game.rerolls} / 3</span></button>${autoplayButton(save.autoplay)}<small>${save.autoplay ? '自动历练正在挑选适合当前搭配的机缘…' : '按 1 / 2 / 3 选择'}</small></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('.choice-card')?.focus();
-}
-function choiceCard(c: Choice, i: number) {
-  const item =
-    c.type === 'passive'
-      ? passive(c.id)
-      : c.type === 'heal'
-        ? {
-            name: '回春灵露',
-            color: '#b6d8a5',
-            desc: `恢复 ${game?.isFinalTrial ? 15 : 40}% 最大气血，并获得 1 枚玄铁。`,
-            id: 'duration',
-          }
-        : treasure(c.id);
-  const tag =
-    c.type === 'evolve'
-      ? '仙器觉醒'
-      : c.type === 'passive'
-        ? `${pathInfo(passive(c.id).school).name}功法`
-        : c.type === 'heal'
-          ? '修行馈赠'
-          : c.level === 1
-            ? `${pathInfo(treasure(c.id).school).name}法宝`
-            : '法宝升阶';
-  return `<button class="choice-card ${c.type === 'evolve' ? 'evolution-choice' : ''}" data-action="choose" data-id="${i}" style="--item-color:${item.color}"><div class="choice-top"><span>${tag}</span><kbd>${i + 1}</kbd></div><div class="choice-art">${icon(item.id, item.color)}</div><h3>${c.type === 'evolve' ? treasure(c.id).evolution : item.name}</h3><div class="choice-level">${c.type === 'evolve' ? '六重 → 仙器' : c.type === 'heal' ? '固本培元' : c.level === 1 ? '领悟 · 一重' : `${c.level - 1} 重 → ${c.level} 重`}</div><p>${c.type === 'evolve' ? '伤害大幅提升，施法更快，并强化法术形态。' : item.desc}</p>${c.type === 'weapon' || c.type === 'evolve' ? weaponAffinity(treasure(c.id), game!.spiritRoot, game!.rootElements) + evolutionRecipe(treasure(c.id), game!.path) : ''}<div class="choice-benefit">${c.type === 'weapon' ? '配方齐备后，升级可选仙器觉醒' : c.type === 'passive' ? masteryDescription(save, c.id) || '功效按重数叠加' : c.type === 'evolve' ? '仙器之力，尽破妖潮' : '恢复状态，继续修行'}</div><span class="choice-select">领悟此法 ${smallIcon('arrow')}</span></button>`;
 }
 function renderPause() {
   if (!game) return;
   panelFrame(
     '静心片刻',
     '修行暂歇',
-    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · 已斩 ${game.kills} 妖</p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重 ${weaponAffinity(treasure(w.id), game!.spiritRoot, game!.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${game.tribulation ? '放弃本次天劫会强制轮回，清空这一世进度。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton()}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${game.tribulation ? '放弃渡劫 · 轮回' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
+    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · 已斩 ${game.kills} 妖</p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重 ${weaponAffinity(treasure(w.id), game!.spiritRoot, game!.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${game.tribulation ? '放弃本次天劫会强制轮回，清空这一世进度。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton(save.autoplay)}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${game.tribulation ? '放弃渡劫 · 轮回' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
   );
 }
 function gameEvent(name: string) {
   sound(name);
   if (name === 'loot') persist();
 }
-function damageReport() {
-  if (!game) return '';
-  const total = game.damageDealt;
-  const rows = game.weapons.map((w) => {
-    const item = treasure(w.id);
-    return {
-      id: w.id as string,
-      name: w.evolved ? item.evolution : item.name,
-      color: item.color,
-      damage: game!.damageBySource[w.id] || 0,
-    };
-  });
-  if (game.damageBySource.bone)
-    rows.push({
-      id: 'bone',
-      name: '白骨魔甲 · 反伤',
-      color: passive('bone').color,
-      damage: game.damageBySource.bone,
-    });
-  const other = Math.max(0, total - rows.reduce((sum, row) => sum + row.damage, 0));
-  if (other > 0.01)
-    rows.push({ id: '', name: '其他 / 旧记录未分类', color: '#a7bbae', damage: other });
-  rows.sort((a, b) => b.damage - a.damage);
-  return `<section class="damage-report" aria-label="本局伤害统计"><div class="damage-heading"><h3>法宝伤害占比</h3><span>总伤害 ${formatNumber(Math.round(total))}</span></div>${rows
-    .map((row) => {
-      const percent = total > 0 ? (row.damage / total) * 100 : 0;
-      return `<div class="damage-row" style="--damage-color:${row.color}">${row.id ? icon(row.id, row.color) : '<span class="damage-other">✧</span>'}<div class="damage-detail"><div class="damage-label"><strong>${row.name}</strong><span>${formatNumber(Math.round(row.damage))} <b>${percent.toFixed(1)}%</b></span></div><div class="damage-bar"><i style="width:${percent}%"></i></div></div></div>`;
-    })
-    .join(
-      '',
-    )}<p class="panel-note">按实际扣血统计，不含击杀时的溢出伤害；反伤单列。${other > 0.01 ? '旧版对局已造成的伤害无法追溯法宝归属。' : ''}</p></section>`;
-}
+
 function finishRun() {
   if (game?.tribulation) {
     if (game.state === 'won') finishTribulation();
@@ -1389,11 +1267,15 @@ function showReviveAd() {
   )
     return;
   panel = 'revive-ad';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div><div class="revive-ad">广告位招租</div><p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>5 秒后可复活</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div>${AD_PLACEHOLDER_HTML}<p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>${AD_SECONDS} 秒后可复活</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
   startAdCountdown('ad-revive', '满血复活');
 }
+// 广告是否已完整播放；接入真实 SDK 后改走 SDK 的完成回调。
+function adCompleted() {
+  return adReadyAt !== 0 && Date.now() >= adReadyAt;
+}
 function startAdCountdown(action: string, label: string) {
-  adReadyAt = Date.now() + 5000;
+  adReadyAt = Date.now() + AD_DURATION_MS;
   clearInterval(adTimer);
   adTimer = window.setInterval(() => {
     if (!refreshAdCountdown(action, label)) clearInterval(adTimer);
@@ -1440,7 +1322,7 @@ function showSuppliesShortage(stones: number, iron: number) {
     .filter(Boolean)
     .join('、');
   panel = 'supplies-shortage';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。<br>可观看 5 秒广告，领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁。领取后返回原页面，再选择要进行的操作。</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad">看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。<br>可观看 ${AD_SECONDS} 秒广告，领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁。领取后返回原页面，再选择要进行的操作。</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad">看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('[data-action="cancel-supplies"]')?.focus();
   return true;
 }
@@ -1455,7 +1337,7 @@ function showRewardAd(kind: 'root' | 'supplies') {
     kind === 'root'
       ? '自选灵根资质与五行，解锁对应入门法宝。后续新历练生效，未完成的历练保留原来的灵根和武器。'
       : `领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁，可再次观看领取。`;
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${kind === 'root' ? 'root-ad-panel' : ''}" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '自选灵根' : '仙缘补给'}</div><div class="revive-ad">广告位招租</div><p>${reward}<br>完整观看 5 秒后点击领取，中途离开不发放奖励。</p>${kind === 'root' ? '<div id="root-picker"></div>' : ''}<div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>5 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${kind === 'root' ? 'root-ad-panel' : ''}" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '自选灵根' : '仙缘补给'}</div>${AD_PLACEHOLDER_HTML}<p>${reward}<br>完整观看 ${AD_SECONDS} 秒后点击领取，中途离开不发放奖励。</p>${kind === 'root' ? '<div id="root-picker"></div>' : ''}<div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>${AD_SECONDS} 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
   if (kind === 'root') renderRootPicker();
   startAdCountdown('claim-ad-reward', '领取奖励');
   modal
@@ -1492,7 +1374,7 @@ function renderResult() {
         : firstReturn
           ? `此行 ${game.elapsedYears.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 年<br>离乡时十五，如今 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 岁。`
           : `此行 ${game.elapsedYears.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 年`;
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${won && game.isFinalTrial ? 'result-complete' : ''}" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? (game.isFinalTrial ? '圆满' : '破境') : '归来'}</div><div class="eyebrow">${game.encounterName} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? (game.isFinalTrial ? '仙途圆满，自在长生' : '一剑荡妖尘') : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七境已破，周期天劫就此止息。修为达标即可突破真仙，既有修行与劫印长存。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="result-years">${journeyYears}</p><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN', { useGrouping: false })}<small>已计入本局总修为</small></p>` : ''}${damageReport()}<div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${won && game.isFinalTrial ? 'result-complete' : ''}" role="dialog" aria-modal="true" aria-label="历练结算"><div class="result-seal">${won ? (game.isFinalTrial ? '圆满' : '破境') : '归来'}</div><div class="eyebrow">${game.encounterName} · ${pathInfo(game.path).name} · ${DIFFICULTIES[game.difficulty].name}</div><h2>${won ? (game.isFinalTrial ? '仙途圆满，自在长生' : '一剑荡妖尘') : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七境已破，周期天劫就此止息。修为达标即可突破真仙，既有修行与劫印长存。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="result-years">${journeyYears}</p><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p><div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN', { useGrouping: false })}<small>已计入本局总修为</small></p>` : ''}${damageReport(game)}<div class="result-actions"><button class="secondary-button" data-action="return">返回洞府</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button></div></section></div>`;
   modal.querySelector('.result-years')?.insertAdjacentHTML('afterend', runLootContent(game.loot));
   if (won && game.isFinalTrial) modal.querySelector('[data-action="retry"]')?.remove();
   modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
@@ -1640,7 +1522,7 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   panelFrame(
     firstLife ? '命盘初现，始问长生' : '一念轮回，再问长生',
     '命盘初现 · 此世资质',
-    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout"><div class="root-reveal-disc">${spiritRootDiagram(true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects()}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div></div><div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
+    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout"><div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div></div><div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
     true,
   );
   modal.querySelector('[data-action="close"]')?.remove();
@@ -1746,7 +1628,7 @@ function renderTribulationForfeit() {
 }
 function finishTribulation() {
   if (!game?.tribulation || game.state !== 'won') return;
-  const report = damageReport();
+  const report = damageReport(game);
   if (!completeTribulation(save, game.tribulation)) return;
   resolveActivity(save);
   const original = save.tribulationReturn;
@@ -1806,7 +1688,7 @@ function renderLifespanEnd() {
   panelFrame(
     '一生将尽，山河仍远',
     '寿元已尽 · 此世未了',
-    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。若心愿未了，便再向苍天借一程；若已倦了，来世的春风，也会吹过青岚。</p></div><p class="pause-description">此世行至${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 5 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
+    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。若心愿未了，便再向苍天借一程；若已倦了，来世的春风，也会吹过青岚。</p></div><p class="pause-description">此世行至${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
   );
   modal.querySelector('[data-action="close"]')?.remove();
 }
@@ -1814,7 +1696,7 @@ function showLifespanAd() {
   const life = lifespanInfo(save);
   if (!Number.isFinite(life.base) || life.remaining > 0 || panel !== 'lifespan-ended') return;
   panel = 'lifespan-ad';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div><div class="revive-ad">广告位招租</div><p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>再次寿尽时可再借，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>5 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div>${AD_PLACEHOLDER_HTML}<p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>再次寿尽时可再借，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>${AD_SECONDS} 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
   startAdCountdown('claim-lifespan', '领取寿元');
 }
 function clearInput() {
@@ -1861,6 +1743,7 @@ function handleAction(action: string, id?: string) {
       persist();
       updateStorySoundButton(
         modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
+        save.sound,
       );
     }
     return;
@@ -1898,6 +1781,7 @@ function handleAction(action: string, id?: string) {
       persist();
       updateStorySoundButton(
         modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!,
+        save.sound,
       );
       return;
     }
@@ -2067,7 +1951,7 @@ function handleAction(action: string, id?: string) {
   }
   if (panel === 'lifespan-ad' && ['close', 'cancel-lifespan', 'claim-lifespan'].includes(action)) {
     const claim = action === 'claim-lifespan';
-    if (claim && (!adReadyAt || Date.now() < adReadyAt)) return;
+    if (claim && !adCompleted()) return;
     const target = game ?? pendingRun;
     const years = claim ? (target ? target.borrowLife() : extendLifespan(save)) : 0;
     if (years) resolveActivity(save);
@@ -2349,7 +2233,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'claim-ad-reward') {
-    if (game || panel !== 'reward-ad' || !rewardAd || !adReadyAt || Date.now() < adReadyAt) return;
+    if (game || panel !== 'reward-ad' || !rewardAd || !adCompleted()) return;
     const kind = rewardAd;
     if (kind === 'root') {
       if (!attuneSpiritRoot(save, adRoot, adElements)) return;
@@ -2386,7 +2270,7 @@ function handleAction(action: string, id?: string) {
     panelFrame(
       '伤害统计',
       `${game.encounterName} · ${formatTime(game.time)} · 斩妖 ${game.kills}`,
-      `${damageReport()}<button class="primary-button guide-close" data-action="close">${resumeAfterDamage ? '继续修行' : '返回暂停界面'} ${smallIcon('arrow')}</button>`,
+      `${damageReport(game)}<button class="primary-button guide-close" data-action="close">${resumeAfterDamage ? '继续修行' : '返回暂停界面'} ${smallIcon('arrow')}</button>`,
     );
     persist();
     return;
@@ -2400,8 +2284,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'ad-revive') {
-    if (panel !== 'revive-ad' || !adReadyAt || Date.now() < adReadyAt || settled || !game?.revive())
-      return;
+    if (panel !== 'revive-ad' || !adCompleted() || settled || !game?.revive()) return;
     clearInterval(adTimer);
     adReadyAt = 0;
     clearInput();
@@ -2789,7 +2672,7 @@ document.addEventListener('input', (event) => {
   const retreatInput = event.target as HTMLInputElement;
   if (retreatInput.id === 'retreat-years') {
     const years = Number(retreatInput.value);
-    document.getElementById('retreat-estimate')!.textContent = retreatEstimate(years);
+    document.getElementById('retreat-estimate')!.textContent = retreatEstimate(save, years);
     document.querySelector<HTMLButtonElement>('[data-action="retreat"]')!.disabled = !retreatPlan(
       save,
       years,

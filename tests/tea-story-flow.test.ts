@@ -10,6 +10,7 @@ import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
 import { startActivity, resolveActivity, sectDuesPending, settleSectDues } from '../src/mortal.ts';
 import { TEA_STORY_SETTINGS } from '../src/setting.ts';
+import { AD_SECONDS } from '../src/ads.ts';
 
 // 不启动 main 的页面初始化；路由、结算、重试 onclick 和关闭清理均执行源码。
 const flow = new Script(
@@ -125,6 +126,7 @@ function harness(t: TestContext) {
     FINAL_TRIAL_STAGE,
     MAX_REVIVES,
     SAVE_KEY,
+    AD_SECONDS,
     TEA_STORY_SETTINGS,
     AbortController,
     game: null,
@@ -134,6 +136,8 @@ function harness(t: TestContext) {
     inMortalWorld: true,
     assetsReady: true,
     storageAvailable: true,
+    volumeOpen: false,
+    mobileDisplay: { available: false, active: false },
     activeRequest: null,
     activeSpeech: null,
     activeStoryImageUrl: '',

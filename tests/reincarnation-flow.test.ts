@@ -18,6 +18,7 @@ import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
 import { sectDuesPending } from '../src/mortal.ts';
 import { Game } from '../src/game.ts';
+import { AD_SECONDS } from '../src/ads.ts';
 
 // 执行实际函数和调用入口，不导入 main 的游戏、音频、Worker 与页面初始化。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -81,6 +82,7 @@ function harness(save: SaveData) {
     syncHumanStories,
     sectDuesPending,
     SAVE_KEY,
+    AD_SECONDS,
     structuredClone,
     localStorage: {
       getItem: () => writes.at(-1) ?? null,
@@ -110,7 +112,7 @@ function harness(save: SaveData) {
     clearInterval: noop,
     clearInput: noop,
     unlockAudio: noop,
-    mobileDisplay: { leave: noop },
+    mobileDisplay: { available: false, active: false, leave: noop },
     toast: (text: string) => messages.push(text),
     shownHumanLetters: new Set(['previous-life']),
     game: null,
@@ -134,6 +136,7 @@ function harness(save: SaveData) {
     inMortalWorld: false,
     assetsReady: false,
     storageAvailable: true,
+    volumeOpen: false,
     PROLOGUE_IMAGE: '',
     // 只替换展示叶节点，路由判断、存档写入和模型转换均执行源码。
     ...Object.fromEntries(
