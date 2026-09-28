@@ -22,6 +22,7 @@ const flow = new Script(
           'handleAction',
           'syncMortalChange',
           'persist',
+          'writeSave',
           'renderMortal',
           'renderLifespanEnd',
           'renderTribulationPending',
@@ -139,11 +140,14 @@ function harness(t: TestContext) {
     ui: { innerHTML: '', scrollTop: 0 },
     document: { body: node() },
     localStorage: {
+      getItem: () => writes.at(-1) ?? null,
       setItem(key: string, value: string) {
         assert.equal(key, SAVE_KEY);
         writes.push(value);
       },
     },
+    saveLock: null,
+    lastSaveText: null,
     toast: (message: string) => messages.push(message),
     panelFrame: (title: string, subtitle: string, body: string) => {
       modal.innerHTML = `${title}${subtitle}${body}`;

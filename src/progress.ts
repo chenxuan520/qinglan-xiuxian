@@ -34,6 +34,7 @@ import {
 export interface SaveData {
   medicine: MedicineState;
   version: 1;
+  schema: number;
   stones: number;
   iron: number;
   cultivation: number;
@@ -66,6 +67,9 @@ export interface SaveData {
   chronicle: Chronicle;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
+// 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
+export const SAVE_SCHEMA = 1;
+export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
   path: CultivationPath,
@@ -106,6 +110,7 @@ export function freshSave(
   const starter = initialStarter(rootElements, path, random);
   return {
     version: 1,
+    schema: SAVE_SCHEMA,
     medicine: freshMedicine(),
     mortal: { ...freshMortal(), hometown: freshHometown(random) },
     chronicle: freshChronicle(),
@@ -142,14 +147,25 @@ export function freshSave(
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
   typeof n === 'number' && Number.isFinite(n) ? Math.min(max, Math.max(0, Math.floor(n))) : 0;
 export function parseSave(raw: string | null, random: () => number = Math.random): SaveData {
+  return readSave(raw, random).save;
+}
+export function readSave(
+  raw: string | null,
+  random: () => number = Math.random,
+): { save: SaveData; status: SaveReadStatus } {
   const base = freshSave();
+  let newer = false;
   try {
     if (!raw) {
       const root = rollSpiritRoot(random);
-      return freshSave(root, rootElementsFor(root, [], random), 'orthodox', random);
+      return {
+        save: freshSave(root, rootElementsFor(root, [], random), 'orthodox', random),
+        status: 'empty',
+      };
     }
     const s = JSON.parse(raw);
-    if (!s || s.version !== 1) return base;
+    if (!s || s.version !== 1) return { save: base, status: 'unreadable' };
+    newer = Number.isSafeInteger(s.schema) && s.schema > SAVE_SCHEMA;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
     // 旧档本世不补父母；损坏的故乡字段不连带丢弃其余人间进度。
@@ -239,9 +255,9 @@ export function parseSave(raw: string | null, random: () => number = Math.random
         (s.pendingReincarnation === 'tribulation' && tribulationDue(base)))
     )
       base.pendingReincarnation = s.pendingReincarnation;
-    return base;
+    return { save: base, status: newer ? 'newer' : 'ok' };
   } catch {
-    return base;
+    return { save: base, status: newer ? 'newer' : 'unreadable' };
   }
 }
 export function enterImmortalGate(save: SaveData) {

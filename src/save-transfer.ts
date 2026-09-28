@@ -8,11 +8,30 @@ import {
   spiritRootInfo,
 } from './data.ts';
 import { Game } from './game.ts';
-import { parseSave, type SaveData } from './progress.ts';
+import { readSave, SAVE_KEY, type SaveData } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
 
 export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
+export const UNREADABLE_SAVE_PREFIX = `${SAVE_KEY}-unreadable-`;
+
+// 读不懂的原始存档另存一份再允许覆盖；同样内容只留一份。
+export function backupUnreadableSave(
+  storage: Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem'>,
+  raw: string,
+  now = Date.now(),
+) {
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key?.startsWith(UNREADABLE_SAVE_PREFIX) && storage.getItem(key) === raw) return true;
+    }
+    storage.setItem(`${UNREADABLE_SAVE_PREFIX}${now}`, raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // 本机读档与文件导入共用迁移：通关后解除旧天劫，恢复被其暂停的原历练。
 export function restoreSavedRun(save: SaveData, snapshot: unknown) {
@@ -133,7 +152,11 @@ export function importSave(text: string) {
   )
     throw new Error('存档中的灵根属性无效，当前进度未更改');
   // 使用独立对象校验和迁移，确认覆盖之前不修改当前进度。
-  const save = parseSave(JSON.stringify(data));
+  const read = readSave(JSON.stringify(data));
+  if (read.status === 'newer')
+    throw new Error('此存档来自更新的版本，请刷新页面载入新版本后再导入');
+  if (read.status !== 'ok') throw new Error('存档内容不完整或已损坏，当前进度未更改');
+  const save = read.save;
   if (
     data.pendingReincarnation !== undefined &&
     data.pendingReincarnation !== save.pendingReincarnation
