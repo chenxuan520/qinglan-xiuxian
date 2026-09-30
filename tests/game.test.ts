@@ -256,6 +256,33 @@ test('妖物掉落灵气可拾取，精英宝匣直接升阶并给玄铁', () =>
   assert.equal(game.iron, 2);
   assert.equal(game.level, 2);
 });
+test('拾取、宝匣与精英击杀各自发出音效事件，宝匣不再借用升级音效', () => {
+  const game = createGame();
+  const events: string[] = [];
+  game.onEvent = (name) => events.push(name);
+  game.player.hp = game.player.maxHp / 2;
+  const elite = game.spawnEnemy(0, true, false, { x: 0, y: 0 });
+  game.hitEnemy(elite, elite.maxHp);
+  assert.ok(events.includes('elite'));
+  for (const kind of ['heal', 'iron', 'magnet'] as const)
+    game.pickups.push({ x: 0, y: 0, kind, value: 1, pull: false });
+  game.update(0.05);
+  for (const name of ['pickup', 'chest', 'heal', 'iron', 'magnet'])
+    assert.ok(events.includes(name));
+  assert.equal(events.filter((name) => name === 'upgrade').length, 1);
+});
+test('气血低于三成时给出 0–1 的危急程度，满血与倒下时为 0', () => {
+  const game = createGame();
+  const at = (share: number) => {
+    game.player.hp = game.player.maxHp * share;
+    return game.lowHealth;
+  };
+  assert.equal(at(1), 0);
+  assert.equal(at(0.3), 0);
+  assert.ok(at(0.29) > 0 && at(0.29) < 0.05);
+  assert.ok(Math.abs(at(0.15) - 0.5) < 1e-9);
+  assert.equal(at(0), 0);
+});
 test('倒计时结束只召唤妖王，击败才通关', () => {
   const game = createGame();
   game.time = STAGES[0].minutes * 60 - 0.01;

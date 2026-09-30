@@ -23,6 +23,10 @@ import {
   MAX_RUN_LEVEL,
   MAX_REVIVES,
   MAX_PASSIVE_LEVEL,
+  EVOLVED_DAMAGE,
+  EVOLVED_COOLDOWN,
+  AWAKENING_BURST,
+  weaponLevelDamage,
   TAU,
   treasure,
   xpNeeded,
@@ -111,7 +115,6 @@ const BOSS_FOLLOWUP: Partial<Record<WeaponKind, number>> = {
   compass: 0.4,
   lightning: 0.4,
 };
-const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05 };
 interface BossAttack {
   volley: { weapon: WeaponKind; hitBosses: number[] };
   multipliers: Record<number, number>;
@@ -343,6 +346,11 @@ export class Game {
   }
   get remaining() {
     return Math.max(0, STAGES[this.stage].minutes * 60 - this.time);
+  }
+  // 气血低于三成时返回 0–1 的危急程度，越接近 1 越危险；其余情况为 0。
+  get lowHealth() {
+    const ratio = this.player.hp / this.player.maxHp;
+    return this.player.hp > 0 && ratio < 0.3 ? 1 - ratio / 0.3 : 0;
   }
   get stats() {
     return {
@@ -1133,7 +1141,7 @@ export class Game {
       w.timer -= dt;
       if (w.timer <= 0) {
         this.cast(w);
-        w.timer = treasure(w.id).cooldown * stats.cooldown * (w.evolved ? 0.7 : 1);
+        w.timer = treasure(w.id).cooldown * stats.cooldown * (w.evolved ? EVOLVED_COOLDOWN : 1);
       }
     }
     if (!this.tribulation) this.updateEnemies(dt);
@@ -1749,10 +1757,10 @@ export class Game {
     const t = treasure(w.id);
     return (
       t.damage *
-      (1 + (w.level - 1) * 0.32) *
+      weaponLevelDamage(w.level) *
       this.stats.damage *
       (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
-      (w.evolved ? 1.8 : 1) *
+      (w.evolved ? EVOLVED_DAMAGE : 1) *
       (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t))
     );
   }
@@ -2273,18 +2281,24 @@ export class Game {
         item.y += ((p.y - item.y) / (d || 1)) * step;
       }
       if (distance(item, p) < 20) {
-        if (item.kind === 'xp' && this.level < MAX_RUN_LEVEL) this.xp += item.value * s.xp;
+        if (item.kind === 'xp') {
+          if (this.level < MAX_RUN_LEVEL) this.xp += item.value * s.xp;
+          this.onEvent('pickup');
+        }
         if (item.kind === 'heal' && !this.isFinalTrial) {
           this.heal(p.maxHp * 0.3);
           this.float(p, '+气血', '#b4e4aa');
+          this.onEvent('heal');
         }
         if (item.kind === 'iron') {
           this.iron += item.value;
           this.float(p, '+玄铁', '#ded1b0');
+          this.onEvent('iron');
         }
         if (item.kind === 'magnet') {
           for (const gem of this.pickups) if (gem.kind === 'xp') gem.pull = true;
           this.announce('聚灵石 · 灵气归一');
+          this.onEvent('magnet');
         }
         if (item.kind === 'chest') {
           this.iron += 2;
@@ -2298,7 +2312,7 @@ export class Game {
             this.iron += 2;
             this.announce(`炼器宝匣 · 玄铁 +4${this.isFinalTrial ? '' : ' · 气血回复'}`);
           }
-          this.onEvent('upgrade');
+          this.onEvent('chest');
         }
         item.value = 0;
       }
@@ -2457,6 +2471,7 @@ export class Game {
         this.onEvent(this.state === 'won' ? 'win' : 'lose');
         return;
       }
+      if (e.elite) this.onEvent('elite');
       const xp = e.boss
         ? Math.max(
             1200 + this.stage * 600,

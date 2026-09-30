@@ -11,6 +11,7 @@ export class Renderer {
   private sprites = new Map<string, HTMLCanvasElement>();
   private formations = new Map<string, HTMLCanvasElement>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
+  private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   width = 0;
   height = 0;
   scale = 1;
@@ -114,6 +115,22 @@ export class Renderer {
     shade.addColorStop(1, '#041919c9');
     c.fillStyle = shade;
     c.fillRect(0, 0, w, h);
+    const danger = game?.lowHealth ?? 0;
+    if (danger > 0) {
+      const pulse = this.reducedMotion.matches ? 0.5 : 0.5 + Math.sin(time * 5) * 0.5;
+      const edge = c.createRadialGradient(
+        w / 2,
+        h / 2,
+        Math.min(w, h) * 0.25,
+        w / 2,
+        h / 2,
+        Math.hypot(w, h) * 0.55,
+      );
+      edge.addColorStop(0, 'rgba(190, 38, 30, 0)');
+      edge.addColorStop(1, `rgba(190, 38, 30, ${(0.38 + 0.37 * danger) * (0.7 + 0.3 * pulse)})`);
+      c.fillStyle = edge;
+      c.fillRect(0, 0, w, h);
+    }
     if (!game) {
       const g = c.createLinearGradient(0, 0, w, 0);
       g.addColorStop(0, '#0b252bea');
