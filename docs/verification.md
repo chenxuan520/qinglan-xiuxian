@@ -1,5 +1,13 @@
 # 验证记录
 
+## 匿名游玩统计上线（2026-10-01）
+
+- 发布顺序：先部署 Worker（版本 `0e03c8ba`），再推送提交 `4a06b11`。GitHub Pages 工作流 `36741274618` 成功，平台入口 `index-CKJ736s1.js`；Cloudflare 官网生产部署 `ce3a2fed-9b25-4f83-80c1-2736bbd700cb` 来源 `4a06b11`，入口 `index-CJDPHlzX.js`。两站关于面板显示「版本 v0.0.2-16-g4a06b11」与「匿名统计 已开启」。
+- Chrome DevTools MCP 隔离上下文，发送前把批次版本号改为 `verification`（其余内容与发送路径不变）：GitHub Pages 子路径与官网各自实际开局并主动结束，结算时一次发送 `session`、`run-start`、`run-end:abandon`，`POST /event` 返回 204，无失败资源，控制台无 error／warn。
+- 接口不可达：平台站把发送目标临时指向不存在的域名，再开局结算，游戏正常结算并返回洞府，无脚本异常；浏览器会自动记录一条 `net::ERR_NAME_NOT_RESOLVED` 网络失败日志，页面代码无法屏蔽，与 NPC 闲聊断网时相同。
+- 官网另有 Cloudflare 在边缘为浏览器请求自动注入的 Web Analytics（`/cdn-cgi/rum`），只含访问量与页面性能；GitHub Pages 没有。此前用不带浏览器请求头的 curl 检查未看到该脚本，判断有误。
+- 本条记录为文档提交，不改变构建产物，官网未为其重新部署，平台站会随推送重建为下一个版本号。未操作玩家页面或真实存档。
+
 ## 匿名游玩统计（2026-10-01）
 
 - 新增 `src/telemetry.ts`（事件校验、Analytics Engine 列映射、前端上报器）、Worker `POST /event`（数据集 `qinglan_events`、`EVENT_LIMITER` 每 IP 60 次／分钟）与 `npm run stats`。只在官网与 GitHub Pages 来源发送；匿名编号单独存储、不进存档；关于面板可关闭。静态构建与部署流程不变，前端无密钥。
