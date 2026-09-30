@@ -111,6 +111,7 @@ const BOSS_FOLLOWUP: Partial<Record<WeaponKind, number>> = {
   compass: 0.4,
   lightning: 0.4,
 };
+const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05 };
 interface BossAttack {
   volley: { weapon: WeaponKind; hitBosses: number[] };
   multipliers: Record<number, number>;
@@ -151,6 +152,7 @@ export interface Effect extends Point {
   text?: string;
   x2?: number;
   y2?: number;
+  element?: ElementId;
 }
 export interface Pickup extends Point {
   kind: 'xp' | 'heal' | 'magnet' | 'iron' | 'chest';
@@ -1743,19 +1745,46 @@ export class Game {
     }
     return result;
   }
+  private weaponHitDamage(w: Weapon) {
+    const t = treasure(w.id);
+    return (
+      t.damage *
+      (1 + (w.level - 1) * 0.32) *
+      this.stats.damage *
+      (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
+      (w.evolved ? 1.8 : 1) *
+      (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t))
+    );
+  }
+  private awaken(w: Weapon) {
+    const t = treasure(w.id),
+      p = this.player;
+    // 觉醒特效不受特效数量上限约束，后期满屏特效时也必须显示。
+    this.effects.push({
+      x: p.x,
+      y: p.y,
+      life: 1.6,
+      maxLife: 1.6,
+      radius: AWAKENING_BURST.radius,
+      color: t.color,
+      kind: 'awaken',
+      element: t.element,
+    });
+    this.onEvent('evolve');
+    const damage = this.weaponHitDamage(w) * AWAKENING_BURST.hits;
+    for (const e of this.enemies) {
+      if (e.dead || distance(e, p) > AWAKENING_BURST.radius + e.radius) continue;
+      const bossCap = (e.maxHp * AWAKENING_BURST.bossShare) / this.medicine.eliteDamage;
+      this.hitEnemy(e, e.boss ? Math.min(damage, bossCap) : damage, false, w.id);
+    }
+  }
   private cast(w: Weapon) {
     const t = treasure(w.id),
       p = this.player,
       s = this.stats,
       target = this.nearest(p);
     const count = 1 + Math.floor(w.level / 2) + (w.evolved ? 3 : 0);
-    const dmg =
-      t.damage *
-      (1 + (w.level - 1) * 0.32) *
-      s.damage *
-      (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
-      (w.evolved ? 1.8 : 1) *
-      (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t));
+    const dmg = this.weaponHitDamage(w);
     const a = target ? Math.atan2(target.y - p.y, target.x - p.x) : this.time;
     const radius = (95 + w.level * 7) * s.area;
     const volley: BossAttack['volley'] | undefined =
@@ -2667,6 +2696,7 @@ export class Game {
     if (this.state !== 'upgrade') return false;
     const c = this.choices[index];
     if (!c) return false;
+    let awakened: Weapon | undefined;
     if (c.type === 'weapon') {
       const w = this.weapons.find((w) => w.id === c.id);
       if (w) w.level = c.level;
@@ -2674,7 +2704,8 @@ export class Game {
     }
     if (c.type === 'evolve') {
       if (!this.canEvolve(c.id)) return false;
-      this.weapons.find((w) => w.id === c.id)!.evolved = true;
+      awakened = this.weapons.find((w) => w.id === c.id)!;
+      awakened.evolved = true;
       this.announce(`仙器觉醒 · ${treasure(c.id).evolution}`);
       this.recordRunAchievements();
     }
@@ -2697,7 +2728,9 @@ export class Game {
     }
     this.state = 'playing';
     this.choices = [];
-    this.onEvent('select');
+    // 觉醒一击可能击杀最后的妖王，必须在恢复战斗之后结算，才不会覆盖胜利状态。
+    if (awakened) this.awaken(awakened);
+    else this.onEvent('select');
     return true;
   }
 }

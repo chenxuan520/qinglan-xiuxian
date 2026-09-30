@@ -1,4 +1,5 @@
 import { ENEMIES, STAGES, TAU } from './data.ts';
+import type { ElementId } from './data.ts';
 import type { Game, Point } from './game.ts';
 import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
@@ -697,6 +698,8 @@ export class Renderer {
           c.ellipse(0, 0, 35, 18, 0, 0, TAU);
           c.stroke();
         });
+      } else if (e.kind === 'awaken') {
+        this.awakening(p.x, p.y, 1 - e.life / e.maxLife, e.radius, e.color, e.element);
       } else {
         // 瞬发效果首帧即覆盖判定范围，普通脉冲仍作为扩散装饰。
         const r =
@@ -950,6 +953,212 @@ export class Renderer {
       this.glowSprites.set(key, texture);
     }
     this.ctx.drawImage(texture, -width / 2, -height / 2, width, height);
+  }
+  private awakening(
+    x: number,
+    y: number,
+    progress: number,
+    radius: number,
+    color: string,
+    element?: ElementId,
+  ) {
+    const c = this.ctx;
+    const gold = '#f6dc8e';
+    const fade = Math.min(1, (1 - progress) * 1.8);
+    const burst = 1 - (1 - Math.min(1, progress / 0.35)) ** 3;
+    const spread = 1 - (1 - Math.min(1, progress / 0.5)) ** 2;
+    const ground = y + 9;
+    const seal = radius * 0.36;
+    c.globalCompositeOperation = 'lighter';
+    const top = y - 340 * Math.min(1, progress / 0.25);
+    const width = 56 * (1 - progress * 0.5);
+    for (const [beamWidth, core] of [
+      [width, '#f6dc8e70'],
+      [width * 0.34, '#fffbe8c0'],
+    ] as const) {
+      // 角色身高范围内保持透明，避免光柱盖住人物。
+      const beam = c.createLinearGradient(0, y + 14, 0, y - 340);
+      beam.addColorStop(0, '#f6dc8e00');
+      beam.addColorStop(0.2, '#f6dc8e18');
+      beam.addColorStop(0.34, core);
+      beam.addColorStop(1, '#f6dc8e00');
+      c.fillStyle = beam;
+      c.fillRect(x - beamWidth / 2, top, beamWidth, y + 14 - top);
+    }
+    this.formation(x, ground, seal * (0.25 + 0.75 * burst), progress * 2.4, gold, fade);
+    this.formation(x, ground, seal * (0.16 + 0.46 * burst), -progress * 3.2, color, fade * 0.9);
+    // 伤害在觉醒瞬间结算，冲击环扩散到的范围就是实际命中范围。
+    c.globalAlpha = fade * (1 - Math.min(1, progress / 0.45));
+    c.strokeStyle = color;
+    c.lineWidth = 6;
+    c.beginPath();
+    c.arc(x, ground, radius * Math.min(1, progress / 0.3), 0, TAU);
+    c.stroke();
+    c.globalAlpha = fade;
+    if (element === 'metal') {
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * TAU;
+        const r = radius * (0.1 + 0.85 * spread);
+        this.sword(x + Math.cos(a) * r, ground + Math.sin(a) * r, a, color, 1.3);
+      }
+    } else if (element === 'wood') {
+      c.strokeStyle = color;
+      c.fillStyle = color + 'c0';
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU,
+          curl = i % 2 ? 1.1 : -1.1,
+          length = radius * 0.75 * spread;
+        c.lineWidth = 3 - 2 * progress;
+        c.beginPath();
+        for (let step = 0; step <= 12; step++) {
+          const r = 30 + ((length - 30) * step) / 12,
+            turn = a + (curl * step) / 12;
+          c.lineTo(x + Math.cos(turn) * r, ground + Math.sin(turn) * r);
+        }
+        c.stroke();
+        for (const at of [0.35, 0.6, 0.85]) {
+          const r = length * at,
+            turn = a + curl * at;
+          c.beginPath();
+          c.ellipse(x + Math.cos(turn) * r, ground + Math.sin(turn) * r, 9, 4, turn + curl, 0, TAU);
+          c.fill();
+        }
+        this.lotus(
+          x + Math.cos(a + curl) * length,
+          ground + Math.sin(a + curl) * length,
+          progress * 3,
+          0.25 + 0.35 * spread,
+        );
+      }
+    } else if (element === 'water') {
+      c.strokeStyle = color;
+      c.lineWidth = 2;
+      c.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + progress,
+          arm = seal * 1.05 * burst;
+        c.moveTo(x + Math.cos(a) * 36, ground + Math.sin(a) * 36);
+        c.lineTo(x + Math.cos(a) * arm, ground + Math.sin(a) * arm);
+        for (const [at, side] of [
+          [0.45, 0.28],
+          [0.72, 0.2],
+        ]) {
+          const bx = x + Math.cos(a) * arm * at,
+            by = ground + Math.sin(a) * arm * at;
+          for (const sign of [-1, 1]) {
+            c.moveTo(bx, by);
+            c.lineTo(
+              bx + Math.cos(a + sign * 0.8) * arm * side,
+              by + Math.sin(a + sign * 0.8) * arm * side,
+            );
+          }
+        }
+      }
+      c.stroke();
+      c.fillStyle = color + 'd0';
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * TAU + 0.26,
+          r = radius * (0.14 + 0.8 * spread);
+        c.save();
+        c.translate(x + Math.cos(a) * r, ground + Math.sin(a) * r);
+        c.rotate(a);
+        c.beginPath();
+        c.moveTo(18, 0);
+        c.lineTo(-10, -5);
+        c.lineTo(-6, 0);
+        c.lineTo(-10, 5);
+        c.closePath();
+        c.fill();
+        c.restore();
+      }
+    } else if (element === 'fire') {
+      const core = c.createRadialGradient(x, ground, 0, x, ground, seal * 0.9 * burst + 1);
+      core.addColorStop(0, '#fff2c000');
+      core.addColorStop(0.45, '#ffcf8a60');
+      core.addColorStop(0.72, color + '60');
+      core.addColorStop(1, color + '00');
+      c.fillStyle = core;
+      c.beginPath();
+      c.arc(x, ground, seal * 0.9 * burst + 1, 0, TAU);
+      c.fill();
+      c.globalCompositeOperation = 'source-over';
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * TAU,
+          r = radius * (0.15 + 0.6 * spread),
+          length = 48 + Math.sin(i * 1.7 + progress * 20) * 12;
+        c.save();
+        c.translate(x + Math.cos(a) * r, ground + Math.sin(a) * r);
+        c.rotate(a);
+        for (const [scale, fill] of [
+          [1, color + 'a0'],
+          [0.55, '#ffb070a0'],
+        ] as const) {
+          c.fillStyle = fill;
+          c.beginPath();
+          c.moveTo(0, -12 * scale);
+          c.quadraticCurveTo(length * 0.5 * scale, -10 * scale, length * scale, 0);
+          c.quadraticCurveTo(length * 0.5 * scale, 10 * scale, 0, 12 * scale);
+          c.closePath();
+          c.fill();
+        }
+        c.restore();
+      }
+      c.globalCompositeOperation = 'lighter';
+    } else if (element === 'earth') {
+      c.globalCompositeOperation = 'source-over';
+      c.lineCap = 'round';
+      for (const [width, stroke] of [
+        [5, '#2b2016b0'],
+        [1.5, color],
+      ] as const) {
+        c.lineWidth = width;
+        c.strokeStyle = stroke;
+        c.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * TAU + 0.2,
+            length = radius * 0.85 * spread;
+          c.moveTo(x + Math.cos(a) * 28, ground + Math.sin(a) * 28);
+          for (let step = 1; step <= 6; step++) {
+            const r = (length * step) / 6,
+              turn = a + (step % 2 ? 0.12 : -0.1) * (1 + (i % 3) * 0.3);
+            c.lineTo(x + Math.cos(turn) * r, ground + Math.sin(turn) * r);
+          }
+        }
+        c.stroke();
+      }
+      c.fillStyle = '#8a7355';
+      c.strokeStyle = color;
+      c.lineWidth = 1.5;
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU + 0.5,
+          r = radius * (0.12 + 0.7 * spread),
+          size = 7 + (i % 3) * 3;
+        c.save();
+        c.translate(
+          x + Math.cos(a) * r,
+          ground + Math.sin(a) * r - Math.sin(Math.min(1, progress * 1.6) * Math.PI) * 46,
+        );
+        c.rotate(progress * 6 + i);
+        c.beginPath();
+        c.moveTo(-size, -size * 0.6);
+        c.lineTo(size * 0.7, -size);
+        c.lineTo(size, size * 0.5);
+        c.lineTo(-size * 0.4, size);
+        c.closePath();
+        c.fill();
+        c.stroke();
+        c.restore();
+      }
+      c.globalCompositeOperation = 'lighter';
+    }
+    for (let i = 0; i < 14; i++) {
+      const rise = (progress * 1.6 + i / 14) % 1;
+      c.globalAlpha = fade * (1 - rise);
+      c.fillStyle = i % 3 ? '#fff4cf' : color;
+      c.beginPath();
+      c.arc(x + Math.sin(i * 2.4) * (18 + (i % 4) * 7), y + 10 - rise * 300, 2 + (i % 3), 0, TAU);
+      c.fill();
+    }
   }
   private cachedFormation(
     x: number,
