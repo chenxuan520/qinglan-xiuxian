@@ -124,6 +124,77 @@ test('每个进化配方满足条件后都进入选择，未满足时不出现',
     assert.ok(!game.makeChoices().some((c) => c.type === 'evolve'));
   }
 });
+function awakeningGame() {
+  const g = new Game(
+    freshSave('none', [], 'dual', () => 0.99),
+    0,
+    0,
+    () => 0.99,
+  );
+  const sword = TREASURES.find((treasure) => treasure.id === 'sword')!;
+  g.weapons = [{ id: 'sword', level: 6, evolved: false, timer: 999 }];
+  g.passives = { [sword.passive]: 5 };
+  g.state = 'upgrade';
+  g.choices = [
+    { type: 'evolve', id: 'sword', level: 7 },
+    { type: 'heal', id: 'heal', level: 1 },
+  ];
+  return { g, sword, hit: sword.damage * 2.6 * g.stats.damage * 1.8 * 8 };
+}
+test('仙器觉醒释放觉醒一击：420 像素内按八倍单击伤害结算，妖王最多掉 5% 气血', () => {
+  const { g, sword, hit } = awakeningGame();
+  const near = g.spawnEnemy(0, false, false, { x: 200, y: 0 });
+  const elite = g.spawnEnemy(0, true, false, { x: 0, y: -300 });
+  const far = g.spawnEnemy(0, false, false, { x: 600, y: 0 });
+  const boss = g.spawnEnemy(10, false, true, { x: -250, y: 0 });
+  for (const e of [near, elite, far]) Object.assign(e, { hp: 1e9, maxHp: 1e9 });
+  Object.assign(boss, { hp: hit, maxHp: hit });
+  g.effects = Array.from({ length: 250 }, () => ({
+    x: 0,
+    y: 0,
+    life: 1,
+    maxLife: 1,
+    radius: 10,
+    color: '#fff',
+    kind: 'pulse',
+  }));
+  const events: string[] = [];
+  g.onEvent = (name) => events.push(name);
+  assert.equal(g.choose(0), true);
+  assert.equal(g.state, 'playing');
+  const close = (actual: number, expected: number) =>
+    assert.ok(Math.abs(actual - expected) < 1e-6 * expected, `${actual} != ${expected}`);
+  close(near.maxHp - near.hp, hit);
+  close(elite.maxHp - elite.hp, hit);
+  assert.equal(far.hp, far.maxHp);
+  close(boss.maxHp - boss.hp, hit * 0.05);
+  close(g.damageBySource.sword, hit * 2.05);
+  const awaken = g.effects.filter((effect) => effect.kind === 'awaken');
+  assert.equal(awaken.length, 1);
+  assert.equal(awaken[0].color, sword.color);
+  assert.equal(awaken[0].element, 'metal');
+  assert.equal(awaken[0].radius, 420);
+  assert.ok(events.includes('evolve'));
+  assert.ok(!events.includes('select'));
+
+  g.state = 'upgrade';
+  g.choices = [{ type: 'heal', id: 'heal', level: 1 }];
+  g.choose(0);
+  assert.equal(g.effects.filter((effect) => effect.kind === 'awaken').length, 1);
+  advance(g, 2);
+  assert.equal(g.effects.filter((effect) => effect.kind === 'awaken').length, 0);
+});
+test('觉醒一击击杀最后的妖王时进入胜利，不被恢复战斗覆盖', () => {
+  const { g, hit } = awakeningGame();
+  const boss = g.spawnEnemy(10, false, true, { x: 150, y: 0 });
+  Object.assign(boss, { maxHp: hit * 10, hp: hit * 0.4 });
+  const events: string[] = [];
+  g.onEvent = (name) => events.push(name);
+  assert.equal(g.choose(0), true);
+  assert.equal(boss.dead, true);
+  assert.equal(g.state, 'won');
+  assert.ok(events.includes('win'));
+});
 test('单局同时觉醒六件仙器后只记录一次成就', () => {
   const game = createGame();
   game.weapons = TREASURES.slice(0, 6).map((item, index) => ({

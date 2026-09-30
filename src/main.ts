@@ -352,6 +352,22 @@ function sound(name: string) {
   const now = audio.currentTime;
   if ((name === 'cast' && now - lastSound < 0.3) || now - lastSound < 0.035) return;
   lastSound = now;
+  if (name === 'evolve') {
+    for (const [index, note] of [659, 988, 1319].entries()) {
+      const start = now + index * 0.09;
+      const osc = audio.createOscillator(),
+        gain = audio.createGain();
+      osc.frequency.setValueAtTime(note, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.05, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.9);
+      osc.connect(gain);
+      gain.connect(masterGain!);
+      osc.start(start);
+      osc.stop(start + 0.92);
+    }
+    return;
+  }
   const notes: Record<string, number> = {
     cast: 440,
     hurt: 110,
@@ -2637,7 +2653,8 @@ function handleAction(action: string, id?: string) {
     clearInput();
     modal.innerHTML = '';
     updateHud();
-    persist();
+    if (game.state === 'won') finishRun();
+    else persist();
   }
   if (action === 'reroll' && game?.reroll()) {
     renderChoices();
