@@ -6,7 +6,8 @@ import { GAME_SITE_URL, SUPPORT_CODE_IMAGE } from '../src/setting.ts';
 import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { chronicleContent } from '../src/chronicle-ui.ts';
-import { autoplayButton, controls } from '../src/common-ui.ts';
+import { autoplayButton, choiceCard, controls } from '../src/common-ui.ts';
+import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -152,4 +153,17 @@ test('手机竖屏战斗按钮使用固定网格，不随斩妖数字换行', ()
     portraitHud,
     /\.game-hud \.auto-button \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 3;/s,
   );
+});
+
+test('升级卡片写出伤害倍率，觉醒卡片说明觉醒一击', () => {
+  const save = freshSave('none', [], 'dual', () => 0.99);
+  const game = new Game(save, 0, 0, () => 0.99);
+  const evolve = choiceCard(game, save, { type: 'evolve', id: 'sword', level: 7 }, 0);
+  assert.match(evolve, /觉醒一击/);
+  assert.match(evolve, /8 倍单次伤害，妖王至多损失 5% 气血/);
+  assert.match(evolve, /伤害 ×2\.60 → ×4\.68 · 施法间隔 −30%/);
+  const upgrade = choiceCard(game, save, { type: 'weapon', id: 'sword', level: 3 }, 1);
+  assert.match(upgrade, /伤害 ×1\.32 → ×1\.64/);
+  const fresh = choiceCard(game, save, { type: 'weapon', id: 'nail', level: 1 }, 2);
+  assert.match(fresh, /配方齐备后，升级可选仙器觉醒/);
 });

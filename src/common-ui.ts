@@ -14,6 +14,11 @@ import {
   treasure,
   passive,
   evolutionPassives,
+  weaponLevelDamage,
+  EVOLVED_DAMAGE,
+  EVOLVED_COOLDOWN,
+  AWAKENING_BURST,
+  MAX_WEAPON_LEVEL,
   type Treasure,
   type CultivationPath,
   type SpiritRootId,
@@ -145,7 +150,22 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
           : c.level === 1
             ? `${pathInfo(treasure(c.id).school).name}法宝`
             : '法宝升阶';
-  return `<button class="choice-card ${c.type === 'evolve' ? 'evolution-choice' : ''}" data-action="choose" data-id="${i}" style="--item-color:${item.color}"><div class="choice-top"><span>${tag}</span><kbd>${i + 1}</kbd></div><div class="choice-art">${icon(item.id, item.color)}</div><h3>${c.type === 'evolve' ? treasure(c.id).evolution : item.name}</h3><div class="choice-level">${c.type === 'evolve' ? '六重 → 仙器' : c.type === 'heal' ? '固本培元' : c.level === 1 ? '领悟 · 一重' : `${c.level - 1} 重 → ${c.level} 重`}</div><p>${c.type === 'evolve' ? '伤害大幅提升，施法更快，并强化法术形态。' : item.desc}</p>${c.type === 'weapon' || c.type === 'evolve' ? weaponAffinity(treasure(c.id), game!.spiritRoot, game!.rootElements) + evolutionRecipe(treasure(c.id), game!.path) : ''}<div class="choice-benefit">${c.type === 'weapon' ? '配方齐备后，升级可选仙器觉醒' : c.type === 'passive' ? masteryDescription(save, c.id) || '功效按重数叠加' : c.type === 'evolve' ? '仙器之力，尽破妖潮' : '恢复状态，继续修行'}</div><span class="choice-select">领悟此法 ${smallIcon('arrow')}</span></button>`;
+  const multiplier = (level: number) => `×${weaponLevelDamage(level).toFixed(2)}`;
+  const description =
+    c.type === 'evolve'
+      ? `法术形态强化；觉醒瞬间释放「觉醒一击」，身边妖物受 ${AWAKENING_BURST.hits} 倍单次伤害，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
+      : item.desc;
+  const benefit =
+    c.type === 'evolve'
+      ? `伤害 ${multiplier(MAX_WEAPON_LEVEL)} → ×${(weaponLevelDamage(MAX_WEAPON_LEVEL) * EVOLVED_DAMAGE).toFixed(2)} · 施法间隔 −${Math.round((1 - EVOLVED_COOLDOWN) * 100)}%`
+      : c.type === 'weapon'
+        ? c.level === 1
+          ? '配方齐备后，升级可选仙器觉醒'
+          : `伤害 ${multiplier(c.level - 1)} → ${multiplier(c.level)}`
+        : c.type === 'passive'
+          ? masteryDescription(save, c.id) || '功效按重数叠加'
+          : '恢复状态，继续修行';
+  return `<button class="choice-card ${c.type === 'evolve' ? 'evolution-choice' : ''}" data-action="choose" data-id="${i}" style="--item-color:${item.color}"><div class="choice-top"><span>${tag}</span><kbd>${i + 1}</kbd></div><div class="choice-art">${icon(item.id, item.color)}</div><h3>${c.type === 'evolve' ? treasure(c.id).evolution : item.name}</h3><div class="choice-level">${c.type === 'evolve' ? '六重 → 仙器' : c.type === 'heal' ? '固本培元' : c.level === 1 ? '领悟 · 一重' : `${c.level - 1} 重 → ${c.level} 重`}</div><p>${description}</p>${c.type === 'weapon' || c.type === 'evolve' ? weaponAffinity(treasure(c.id), game!.spiritRoot, game!.rootElements) + evolutionRecipe(treasure(c.id), game!.path) : ''}<div class="choice-benefit">${benefit}</div><span class="choice-select">领悟此法 ${smallIcon('arrow')}</span></button>`;
 }
 export function damageReport(game: Game | null) {
   if (!game) return '';

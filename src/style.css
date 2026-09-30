@@ -1972,6 +1972,12 @@ kbd {
   background: linear-gradient(90deg, #9bcbb0, #d6dda9);
   transition: width 0.15s;
 }
+.low-health .health-bar i {
+  background: linear-gradient(90deg, #c9574a, #f2a28f);
+}
+.low-health #health-text {
+  color: #f2a28f;
+}
 .cultivation-label {
   display: flex;
   justify-content: space-between;

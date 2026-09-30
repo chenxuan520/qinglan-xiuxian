@@ -106,7 +106,11 @@ test('HUD 仅缩写气血文字，保留当前气血向上取整与真实血条�
     game.player.hp = hp;
     game.player.maxHp = maxHp;
     const before = JSON.stringify(game.snapshot());
-    const health = { style: { width: '' } };
+    const toggles: [string, boolean][] = [];
+    const health = {
+      style: { width: '' },
+      classList: { toggle: (name: string, on: boolean) => toggles.push([name, on]) },
+    };
     let text = '';
     runInNewContext(stripTypeScriptTypes(render), {
       game,
@@ -119,6 +123,7 @@ test('HUD 仅缩写气血文字，保留当前气血向上取整与真实血条�
     });
     assert.equal(text, expected);
     assert.equal(health.style.width, `${(hp / maxHp) * 100}%`);
+    assert.deepEqual(toggles, [['low-health', hp / maxHp < 0.3]]);
     assert.equal(JSON.stringify(game.snapshot()), before);
   }
 });
