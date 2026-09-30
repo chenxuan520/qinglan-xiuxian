@@ -31,6 +31,7 @@ import {
   choiceCard,
   damageReport,
   updateStorySoundButton,
+  telemetryRow,
 } from './common-ui.ts';
 import { journeyMap, JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
 import { chronicleEntrance, chronicleContent } from './chronicle-ui.ts';
@@ -110,7 +111,8 @@ import { autoplayChoice, autoplayInput } from './autoplay.ts';
 import { Renderer } from './render.ts';
 import { icon, smallIcon } from './icons.ts';
 import { GUIDE_TABS, guideContent } from './guide.ts';
-import { GAME_SITE_URL, SUPPORT_CODE_IMAGE } from './setting.ts';
+import { GAME_SITE_URL, SUPPORT_CODE_IMAGE, TELEMETRY_SETTINGS } from './setting.ts';
+import { createTelemetry, type TelemetryEvent } from './telemetry.ts';
 import { spriteStyle } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
@@ -127,7 +129,7 @@ import {
   type ParentId,
 } from './hometown.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
-import { closeNpcChat, mountNpcChat, mountTeaStory } from './npc-chat.ts';
+import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-chat.ts';
 import { townVisit, townReturnMemory } from './town-history.ts';
 import { visitTownImmortal, meetTownImmortal } from './town-immortal.ts';
 import { chooseSmithStory } from './town-story.ts';
@@ -188,6 +190,25 @@ const save = saveRead.status === 'unreadable' ? parseSave(null) : saveRead.save;
 // 每次进入先静音，保留音量，只有明确开启声音后才播放。
 save.sound = false;
 if (!save.journeyEnded && !save.pendingReincarnation) resolveActivity(save);
+const telemetry = createTelemetry({
+  origin: location.origin,
+  endpoint: `${NPC_AI_BASE}${TELEMETRY_SETTINGS.path}`,
+  version: GAME_VERSION,
+  storage: storageAvailable ? localStorage : null,
+  send: (url, body) =>
+    navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain;charset=UTF-8' })) ||
+    fetch(url, {
+      method: 'POST',
+      body,
+      keepalive: true,
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    }).catch(() => {}),
+});
+telemetry.track({ type: 'session', fresh: saveRead.status === 'empty', ...lifeStats() });
+addEventListener('pagehide', () => telemetry.flush());
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') telemetry.flush();
+});
 const PROLOGUE_IMAGE = '/assets/qinglan-prologue-dark.webp';
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
 const catalogTreasures = [...TREASURES];
@@ -918,7 +939,7 @@ function renderPanel() {
     panelFrame(
       '关于《叩仙门》',
       '独立制作 · 持续更新',
-      `<div class="about-copy"><p class="about-lead">《叩仙门：青岚纪》是一款独立制作的 Web 修仙小游戏。</p><div class="about-maker"><span>制作</span><strong>一个想做点自己喜欢的东西的程序员 chenxuan，和一堆 AI 工具。</strong><p>从幸存者玩法出发，慢慢做成了一场关于修行、岁月与故人的仙途。</p></div><p class="panel-note">程序设计、玩法与内容由作者持续迭代；部分开发、美术生成与辅助工作使用 AI 工具完成。项目持续更新中，源码公开于 GitHub。</p><div class="about-meta"><p><span>GitHub</span><a href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">chenxuan520/qinglan-xiuxian</a></p><p><span>官网</span><a href="${GAME_SITE_URL}" target="_blank" rel="noopener noreferrer" tabindex="0">${new URL(GAME_SITE_URL).host}</a></p><p><span>版本</span>${GAME_VERSION}</p></div><div class="save-actions about-actions"><a class="primary-button" href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">GitHub 源码</a><a class="secondary-button" href="https://github.com/chenxuan520/qinglan-xiuxian/issues" target="_blank" rel="noopener noreferrer" tabindex="0">反馈问题</a></div><div class="about-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="128" height="128" loading="lazy"><div><strong>请道友喝杯茶</strong><p>这一程山水不收分文。若觉得值得，请作者喝杯茶便好——茶钱不换道具，也不换修为，只换作者多写几段山水。</p><small>微信扫码即可；手机上可先截图，再在「扫一扫」里从相册选取。</small></div></div></div>`,
+      `<div class="about-copy"><p class="about-lead">《叩仙门：青岚纪》是一款独立制作的 Web 修仙小游戏。</p><div class="about-maker"><span>制作</span><strong>一个想做点自己喜欢的东西的程序员 chenxuan，和一堆 AI 工具。</strong><p>从幸存者玩法出发，慢慢做成了一场关于修行、岁月与故人的仙途。</p></div><p class="panel-note">程序设计、玩法与内容由作者持续迭代；部分开发、美术生成与辅助工作使用 AI 工具完成。项目持续更新中，源码公开于 GitHub。</p><div class="about-meta"><p><span>GitHub</span><a href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">chenxuan520/qinglan-xiuxian</a></p><p><span>官网</span><a href="${GAME_SITE_URL}" target="_blank" rel="noopener noreferrer" tabindex="0">${new URL(GAME_SITE_URL).host}</a></p><p><span>版本</span>${GAME_VERSION}</p>${telemetryRow(telemetry.enabled(), telemetry.active)}</div><div class="save-actions about-actions"><a class="primary-button" href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">GitHub 源码</a><a class="secondary-button" href="https://github.com/chenxuan520/qinglan-xiuxian/issues" target="_blank" rel="noopener noreferrer" tabindex="0">反馈问题</a></div><div class="about-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="128" height="128" loading="lazy"><div><strong>请道友喝杯茶</strong><p>这一程山水不收分文。若觉得值得，请作者喝杯茶便好——茶钱不换道具，也不换修为，只换作者多写几段山水。</p><small>微信扫码即可；手机上可先截图，再在「扫一扫」里从相册选取。</small></div></div></div>`,
     );
   } else if (panel === 'medicine') {
     if (medicineView === 'shop' && refreshMedicineShop(save.medicine, save.age)) persist();
@@ -1260,6 +1281,17 @@ function finishRun() {
     startedImmortal: game.startedImmortal,
   });
   persist();
+  telemetry.track({
+    type: 'run-end',
+    ...lifeStats(),
+    stage: game.stage,
+    difficulty: game.difficulty,
+    result: game.state === 'won' ? 'won' : abandonConfirm ? 'abandon' : 'lost',
+    seconds: Math.round(game.time),
+    level: game.level,
+    kills: game.kills,
+  });
+  telemetry.flush();
   if (game.state === 'won') {
     selectedStage = Math.min(STAGES.length - 1, game.stage + 1);
     // 结算时预载，返回首页已选中下一境；失败时由正式入场流程提供重试。
@@ -1517,6 +1549,7 @@ function startRun() {
   abandonConfirm = false;
   game = new Game(save, selectedStage, difficulty);
   game.onEvent = gameEvent;
+  telemetry.track({ type: 'run-start', ...lifeStats(), stage: selectedStage, difficulty });
   previousState = 'playing';
   oldRealm = realmInfo(
     save.cultivation - game.creditedCultivation,
@@ -1582,6 +1615,20 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   section.scrollTop = 0;
   section.tabIndex = -1;
   section.focus({ preventScroll: true });
+}
+function lifeStats() {
+  return {
+    realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step,
+    stage: save.unlocked,
+    runs: save.runs,
+    age: Math.round(save.age),
+    root: save.spiritRoot,
+    path: save.path,
+  } satisfies Partial<TelemetryEvent>;
+}
+function trackReincarnation(result: 'lifespan' | 'tribulation' | 'epilogue' | 'manual') {
+  telemetry.track({ type: 'reincarnate', result, ...lifeStats() });
+  telemetry.flush();
 }
 function resetLifetime(previousLife?: string, revisitHometown: boolean | 'full' = false) {
   shownHumanLetters.clear();
@@ -1658,6 +1705,7 @@ function beginTribulation() {
   modal.innerHTML = '';
   clearInput();
   game.onEvent = gameEvent;
+  telemetry.track({ type: 'run-start', ...lifeStats(), tribulation: game.tribulation });
   renderHud();
   void mobileDisplay.enter();
   lastFrame = performance.now();
@@ -1681,6 +1729,14 @@ function finishTribulation() {
   if (!game?.tribulation || game.state !== 'won') return;
   const report = damageReport(game);
   if (!completeTribulation(save, game.tribulation)) return;
+  telemetry.track({
+    type: 'run-end',
+    ...lifeStats(),
+    result: 'won',
+    tribulation: save.tribulations,
+    seconds: Math.round(game.time),
+  });
+  telemetry.flush();
   resolveActivity(save);
   const original = save.tribulationReturn;
   save.tribulationReturn = null;
@@ -1786,6 +1842,7 @@ function handleAction(action: string, id?: string) {
       );
     } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
       ui.inert = false;
+      trackReincarnation('epilogue');
       resetLifetime('前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。', true);
     } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
     else if (action === 'epilogue-sound' && panel === 'epilogue') {
@@ -1808,6 +1865,7 @@ function handleAction(action: string, id?: string) {
       action === 'confirm-journey-reincarnate' &&
       (panel === 'lifespan-farewell' || panel === 'tribulation-farewell')
     ) {
+      trackReincarnation(panel === 'lifespan-farewell' ? 'lifespan' : 'tribulation');
       if (panel === 'lifespan-farewell') endLifetime();
       else resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
     }
@@ -1936,6 +1994,8 @@ function handleAction(action: string, id?: string) {
     }
     Object.assign(save, ended);
     pendingRun = null;
+    telemetry.track({ type: 'epilogue', ...lifeStats() });
+    telemetry.flush();
     renderEpilogue();
     return;
   }
@@ -2106,6 +2166,7 @@ function handleAction(action: string, id?: string) {
         save.mortal.events.splice(6);
       }
       persist();
+      telemetry.track({ type: 'town', ...lifeStats() });
       void mobileDisplay.enter();
       inTown = true;
       if (save.mortal.hometown) townPosition = { ...HOMETOWN_START };
@@ -2361,6 +2422,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'confirm-reincarnate' && panel === 'reincarnate' && !game) {
+    trackReincarnation('manual');
     resetLifetime(
       undefined,
       modal.querySelector<HTMLInputElement>('#reincarnate-full-opening')?.checked ? 'full' : false,
@@ -2436,6 +2498,12 @@ function handleAction(action: string, id?: string) {
   }
   if (action === 'about' && !game) {
     showPanel('about');
+    return;
+  }
+  if (action === 'telemetry-toggle' && panel === 'about') {
+    telemetry.setEnabled(!telemetry.enabled());
+    renderPanel();
+    modal.querySelector<HTMLButtonElement>('[data-action="telemetry-toggle"]')?.focus();
     return;
   }
   if (action === 'guide') {

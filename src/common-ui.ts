@@ -31,6 +31,10 @@ import { spriteStyle } from './sprites.ts';
 import { masteryDescription } from './mortal-ui.ts';
 import { formatNumber } from './number-format.ts';
 
+export function telemetryRow(enabled: boolean, active: boolean) {
+  const status = !enabled ? '已关闭' : active ? '已开启' : '已开启 · 本网址不发送';
+  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">为了解玩家常在哪一步卡住，官网与平台站会在开局、结算、入城、轮回和叩门时记录关卡、境界、年岁、时长与胜负，附一个随机匿名编号；不上传存档、闲聊或任何个人信息，数据保留三个月。</small>`;
+}
 export function currency(save: SaveData) {
   return `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
 }
