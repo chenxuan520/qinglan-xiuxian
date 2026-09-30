@@ -5588,6 +5588,25 @@ body.journey-complete:not(.in-game) {
 .about-meta a:hover {
   color: var(--gold);
 }
+.about-toggle {
+  margin-left: auto;
+  padding: 2px 12px;
+  border: 1px solid #a9baa159;
+  border-radius: 999px;
+  background: transparent;
+  color: #d7cf9f;
+  font-size: 10px;
+  cursor: pointer;
+}
+.about-toggle:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.about-telemetry-note {
+  color: #9eb29f;
+  font-size: 10px;
+  line-height: 1.8;
+}
 .about-actions {
   margin-top: 2px;
 }

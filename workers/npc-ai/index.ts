@@ -8,6 +8,8 @@ import {
 } from '../../src/setting.ts';
 import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town-story.ts';
 import { hometownParents, validHometown } from '../../src/hometown.ts';
+import { telemetryPoint, validTelemetryBatch } from '../../src/telemetry.ts';
+import { TELEMETRY_SETTINGS } from '../../src/setting.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
 export const STORY_IMAGE_MODEL = TEA_STORY_IMAGE_SETTINGS.model;
@@ -59,15 +61,15 @@ export async function verifyStoryImageToken(
     return false;
   }
 }
+const localOrigin = (url: URL) =>
+  ['http:', 'https:'].includes(url.protocol) &&
+  ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
 function allowedOrigin(origin: string, configured: string) {
   try {
     const url = new URL(origin);
     // Origin 只能是协议、主机与端口，不能混入路径、凭据或多个来源。
     if (url.origin !== origin) return false;
-    const local =
-      ['http:', 'https:'].includes(url.protocol) &&
-      ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-    return local || configured.split(',').some((value) => value.trim() === origin);
+    return localOrigin(url) || configured.split(',').some((value) => value.trim() === origin);
   } catch {
     return false;
   }
@@ -144,7 +146,10 @@ function storyImageBytes(value: unknown) {
 function storyImagePrompt(story: string) {
   return `Atmospheric Chinese xianxia ink-wash game illustration, dark jade and muted gold palette, misty mountains, ancient Chinese robes, cinematic composition, painterly detail, subdued contrast, no text, no letters, no calligraphy, no logo, no watermark, no frame, no interface, no explicit gore. Depict one decisive scene from this story:\n${story.trim()}`;
 }
-async function readBody(request: Request): Promise<unknown> {
+async function readBody(
+  request: Request,
+  limit: number = NPC_AI_SETTINGS.maxRequestBytes,
+): Promise<unknown> {
   const reader = request.body?.getReader();
   if (!reader) return null;
   let length = 0;
@@ -153,7 +158,7 @@ async function readBody(request: Request): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     length += value.byteLength;
-    if (length > NPC_AI_SETTINGS.maxRequestBytes) {
+    if (length > limit) {
       await reader.cancel();
       throw new Error('body-limit');
     }
@@ -356,6 +361,31 @@ export default {
         imageModel: STORY_IMAGE_MODEL,
         version: 3,
       });
+    if (path === '/event') {
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+      if (request.method !== 'POST') return fail('method', 405, '请求方法不支持。');
+      let batch: unknown;
+      try {
+        batch = await readBody(request, TELEMETRY_SETTINGS.maxRequestBytes);
+      } catch {
+        return fail('invalid-body', 400, '请求内容无效或过大。');
+      }
+      if (!validTelemetryBatch(batch)) return fail('invalid-event', 400, '统计内容无效。');
+      const site = new URL(origin);
+      // 本机预览与测试只校验格式，不写入统计。
+      if (localOrigin(site)) return new Response(null, { status: 204, headers });
+      try {
+        const limit = await env.EVENT_LIMITER.limit({
+          key: `event:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
+        });
+        if (!limit.success) return fail('busy', 429, '请求过于频繁，请在 60 秒后重试。', true);
+      } catch {
+        return fail('limiter-unavailable', 503, '限流服务暂时不可用，请稍后重试。', true);
+      }
+      for (const event of batch.events)
+        env.EVENTS.writeDataPoint(telemetryPoint(batch, event, site.host));
+      return new Response(null, { status: 204, headers });
+    }
     if (path !== '/chat' && path !== '/story-image') return fail('not-found', 404, '接口不存在。');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST') return fail('method', 405, '请求方法不支持。');

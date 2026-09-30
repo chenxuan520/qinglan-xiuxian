@@ -76,6 +76,22 @@ Worker 失败响应包含安全的 `error`、中文 `message`、`retryable`、`r
 
 `src/town-story.ts` 管理《炉火未凉》的固定三章和分支，`mortal.smithStory` 只保存相识年岁 / 代际、帮助方式、旧钟去向和完成标记。人物姓名由原人口种子派生，沿用换代节点，不生成历史人物列表。按钮事件统一校验可选动作、扣除玄铁或一次性发奖后立即存档；AI 只接收经过校验的故事状态，由 Worker 生成事实提示，不具备写入故事或发奖的能力。故事变化会重置相关闲谈上下文，避免旧对白覆盖新的选择。人间缘簿旧信仅在点击「游历人间」进入入口时检查：存在尚未展示的未读旧信就自动弹出现有卡片列表，不新增书信入口或系统，打开列表不标 `read`，点击展读才按原逻辑标读。页面 session 内的 `Set` 按信件标识记录已展示项，实际打开列表后才记录；关闭或重进不重复，新来信可再触发，刷新开启新会话，轮回清空 `Set`。寿尽、天劫与宗门欠费弹窗优先，不抢占它们，也不在战斗或镇中触发。
 
+## 匿名游玩统计 · Workers Analytics Engine
+
+静态站不变：统计代码打包在游戏 JS 内，不引入第三方脚本，也不需要服务器或构建密钥。`src/telemetry.ts` 同时提供事件校验、Analytics Engine 列映射与前端上报器；`src/setting.ts` 的 `TELEMETRY_SETTINGS` 集中发送来源、接口路径、批次与请求上限。只有页面来源为 `https://xiuxian.011203.xyz` 或 `https://chenxuan520.github.io`（GitHub Pages 子路径不影响 Origin）时才发送；本机 5173、自建副本与离线页面既不发送，也不写匿名编号。
+
+- 事件：`session`（打开页面）、`run-start`（开局 / 天劫）、`run-end`（通关、落败、主动结束或天劫成功）、`town`（走进青岚镇）、`reincarnate`（寿尽、天劫、叩门后、主动四种原因；命盘重抽不计）、`epilogue`（叩门）。附当前关卡、境界阶、年岁、历练次数、灵根、路线等数值，不含存档、闲聊、账号或设备信息。
+- 匿名编号为随机 UUID，单独存于 `qinglan-telemetry-id`，不进存档、不随导出导入迁移；「关于」开关写 `qinglan-telemetry-off`，关闭即清空待发队列。存储不可用时本页使用临时编号。
+- 事件先在内存排队，满 10 条、结算、轮回、叩门或页面隐藏时以 `navigator.sendBeacon`（`text/plain`，无预检）一次发送，不支持时退回 `fetch keepalive`；失败静默丢弃，不重试、不阻塞游戏。
+- Worker `POST /event` 沿用来源白名单，接受最多 4 KB、至多 20 条经过字段白名单校验的事件，按 IP 每 60 秒 60 次限流（`EVENT_LIMITER`），逐条写入数据集 `qinglan_events`（绑定 `EVENTS`），成功返回 204。本机来源只校验格式不写入。列映射：`blob1…6` 为事件、站点、版本、路线、灵根、结果或轮回原因；`double1…10` 为关卡、难度、境界阶、历练次数、秒数、局内等级、斩妖、天劫轮次、年岁、是否新存档，缺省为 -1。数据保留三个月；Workers 免费版每天可写 10 万条、查询 1 万次，账号每日请求额度与 NPC 对话共用。
+
+```bash
+npm run stats            # 近 7 天
+npm run stats -- --days=30
+```
+
+查询脚本使用本机环境变量 `CLOUDFLARE_ANALYTICS_TOKEN`（或 `CLOUDFLARE_API_TOKEN`，须有 Account Analytics Read 权限），可选 `CLOUDFLARE_ACCOUNT_ID`，未设置时读取令牌可访问的唯一账号。输出各站概览、各境开局与通关率、玩家最远通关、轮回原因与版本分布，均按 `_sample_interval` 加权。上线验证写入的记录使用版本号 `verification`，查询时排除。修改事件字段需同步 Worker、查询脚本与本节；发布顺序为先 `npm run deploy:npc-ai`，再推送或部署静态站，Worker 未更新时前端上报会被拒收但不影响游戏。
+
 ## GitHub Pages · 平台部署
 
 平台部署地址：`https://chenxuan520.github.io/qinglan-xiuxian/`，不作为对外游玩入口。

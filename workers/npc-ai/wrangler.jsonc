@@ -18,7 +18,13 @@
       "namespace_id": "202609232",
       "simple": { "limit": 2, "period": 60 },
     },
+    {
+      "name": "EVENT_LIMITER",
+      "namespace_id": "202610011",
+      "simple": { "limit": 60, "period": 60 },
+    },
   ],
+  "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "qinglan_events" }],
   "vars": {
     "ALLOWED_ORIGINS": "https://xiuxian.011203.xyz,https://chenxuan520.github.io",
   },

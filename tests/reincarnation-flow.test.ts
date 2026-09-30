@@ -25,6 +25,8 @@ const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = new Script(
   stripTypeScriptTypes(
     [
+      'lifeStats',
+      'trackReincarnation',
       'resetLifetime',
       'resumeHometown',
       'handleAction',
@@ -65,6 +67,7 @@ function harness(save: SaveData) {
   const writes: string[] = [];
   const routes: string[] = [];
   const messages: string[] = [];
+  const tracked: Record<string, unknown>[] = [];
   const openingChoice = { checked: false };
   let rolls = 0;
   const context = createContext({
@@ -96,6 +99,8 @@ function harness(save: SaveData) {
     writes,
     routes,
     messages,
+    tracked,
+    telemetry: { track: (event: Record<string, unknown>) => tracked.push(event), flush: noop },
     openingChoice,
     document: { body: element },
     ui: { innerHTML: '', inert: false, querySelector: () => element },
@@ -253,6 +258,7 @@ test('命盘连续重抽均直接展示新命盘，不经过故乡选择或序�
   }
   assert.deepEqual(context.routes, Array(4).fill('root-reveal'));
   assert.equal(context.writes.length, 4);
+  assert.deepEqual(context.tracked, []);
 });
 
 test('主动轮回保留清档确认与取消，确认后清旧进度并直接展示新命盘', () => {
@@ -282,9 +288,15 @@ test('主动轮回保留清档确认与取消，确认后清旧进度并直接�
   assert.equal(context.pendingRun, oldRun);
   context.handleAction('reincarnate');
   context.routes.length = 0;
+  assert.deepEqual(context.tracked, []);
+  const runs = save.runs;
   context.handleAction('confirm-reincarnate');
   assertNewReveal(context);
   assert.deepEqual(context.routes, ['root-reveal']);
+  assert.equal(context.tracked.length, 1);
+  assert.equal(context.tracked[0].type, 'reincarnate');
+  assert.equal(context.tracked[0].result, 'manual');
+  assert.equal(context.tracked[0].runs, runs);
   const expected = freshSave('variant', ['metal'], 'orthodox', () => 0);
   Object.assign(expected, { sound: true, volume: 0.27, prologueSeen: true });
   departHometown(expected);
@@ -352,6 +364,10 @@ for (const reason of ['lifespan', 'tribulation'] as const) {
     context.handleAction('confirm-journey-reincarnate');
     assertNewReveal(context);
     assert.deepEqual(context.routes, ['root-reveal']);
+    assert.deepEqual(
+      context.tracked.map((event) => [event.type, event.result]),
+      [['reincarnate', reason]],
+    );
     assert.equal(save.stones, 0);
     assert.equal(save.cultivation, 0);
     assert.match(

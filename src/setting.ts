@@ -44,4 +44,15 @@ export const TEA_STORY_IMAGE_SETTINGS = {
   inferenceTimeoutMs: 28000,
 } as const;
 
+// 匿名游玩统计经 npc-ai Worker 的 /event 写入 Analytics Engine；只在正式站发送。
+export const TELEMETRY_SETTINGS = {
+  origins: ['https://xiuxian.011203.xyz', 'https://chenxuan520.github.io'],
+  path: '/event',
+  idKey: 'qinglan-telemetry-id',
+  offKey: 'qinglan-telemetry-off',
+  maxEvents: 20,
+  flushSize: 10,
+  maxRequestBytes: 4096,
+} as const;
+
 // 域名绑定、来源白名单和边缘限流绑定属于部署设置，见 workers/npc-ai/wrangler.jsonc。
