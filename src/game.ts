@@ -61,6 +61,7 @@ import {
   gainCultivation,
 } from './progress.ts';
 import type { SaveData } from './progress.ts';
+import { BOSS_ENTRANCE_DURATION } from './boss-entrance.ts';
 
 export interface Point {
   x: number;
@@ -156,6 +157,7 @@ export interface Effect extends Point {
   x2?: number;
   y2?: number;
   element?: ElementId;
+  bossStage?: number;
 }
 export interface Pickup extends Point {
   kind: 'xp' | 'heal' | 'magnet' | 'iron' | 'chest';
@@ -1123,7 +1125,7 @@ export class Game {
         ) {
           const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
           this.bossSpawned = true;
-          this.spawnEnemy(10, false, true, undefined, bossStage);
+          this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
           this.trialBossesSpawned++;
           this.nextTrialBossAt =
             TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? STAGES[FINAL_TRIAL_STAGE].minutes * 60;
@@ -1132,7 +1134,7 @@ export class Game {
         }
       } else if (!this.bossSpawned && this.remaining === 0) {
         this.bossSpawned = true;
-        this.spawnEnemy(10, false, true);
+        this.bossArrival(this.spawnEnemy(10, false, true));
         this.announce(`${STAGES[this.stage].boss}降临 · 小心红色预警`);
         this.onEvent('boss');
       }
@@ -1250,6 +1252,18 @@ export class Game {
     }
     this.tribulationStep++;
     this.tribulationNextAt = this.time + rules.interval;
+  }
+  private bossArrival(enemy: Enemy) {
+    this.effects.push({
+      x: enemy.x,
+      y: enemy.y,
+      life: BOSS_ENTRANCE_DURATION,
+      maxLife: BOSS_ENTRANCE_DURATION,
+      radius: enemy.radius,
+      color: STAGES[enemy.bossStage ?? this.stage].color,
+      kind: 'boss-entrance',
+      bossStage: enemy.bossStage ?? this.stage,
+    });
   }
   spawnEnemy(
     type?: number,
