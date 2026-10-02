@@ -86,7 +86,7 @@ PY
 
 - 项目名 `qinglan-xiuxian`，生产分支 `master`，唯一官网 <https://xiuxian.011203.xyz/>。所有面向玩家的链接只使用官网域名。NPC Worker 的 `ALLOWED_ORIGINS` 必须包含官网来源，域名变更需同步配置并验证浏览器预检和实际对话。
 - `wrangler.jsonc` 管理配置；独立构建目录为 `artifacts/cloudflare`，使用根路径 `/`，不会覆盖本机 `dist`。
-- 现有 Direct Upload 项目由 `.github/workflows/cloudflare.yml` 提供自动上传：配置仓库 Actions Secrets 后，`master` 先发布 Worker 再发布官网，其他分支只生成预览。凭据缺失时明确提示并跳过，不能把跳过的任务当作发布成功。配置和原生 Git 集成备选方案见 [开发与部署](docs/development.md#自动部署与-pr-预览)。原生 Git 集成需要新建 Pages 项目，不擅自迁移官网域名。
+- 自动部署优先采用 Cloudflare Pages GitHub 集成：生产分支 `master`，功能分支仅用于预览，构建检查链与输出目录见 [开发与部署](docs/development.md#自动部署与-pr-预览)。Git 集成需在 Cloudflare 账号中实际接入；仅修改文档不代表已启用。已有 Direct Upload 项目不能原地切换，先准备新的 Git 集成项目并验证，不擅自迁移官网域名。
 - 原手动部署作为回退。优先使用环境中的 `CLOUDFLARE_API_TOKEN`，或用 `npx wrangler login` 登录；`npx wrangler whoami` 检查身份。不得把令牌写入仓库、日志或文档。
 
 ```bash
@@ -94,6 +94,6 @@ npm run deploy:cloudflare
 npx wrangler pages deployment list --project-name qinglan-xiuxian --json
 ```
 
-发布命令包含类型检查、构建和 Wrangler 上传。Cloudflare 自动部署凭据未配置时，GitHub push 不会更新官网；配置后也需确认实际部署任务成功，不能只以 push 或 GitHub Pages 成功作为主站上线完成。手动发布时 NPC Worker 仍需先单独发布。部署后使用 MCP 检查正式域名的新版本、素材及关键功能。
+发布命令包含类型检查、构建和 Wrangler 上传。Cloudflare Git 集成未启用时，GitHub push 不会自动发布 Cloudflare；启用后也需确认实际部署成功，不能只以 push 或 GitHub Pages 成功作为主站上线完成。NPC Worker 仍独立发布。部署后使用 MCP 检查正式域名的新版本、素材及关键功能。
 
 localhost、GitHub Pages、Cloudflare 各网址的存档相互独立。迁移使用洞府「此世存档」中的「导出此世 / 导入旧档」，不要暗中复制用户浏览器数据。

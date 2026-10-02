@@ -2,7 +2,7 @@
 
 [返回项目首页](../README.md)
 
-唯一官网是 [xiuxian.011203.xyz](https://xiuxian.011203.xyz/)，由 Cloudflare Pages 托管。README 和仓库网站栏只使用官网域名；平台域名仅供部署检查。现有 Cloudflare 项目使用 Direct Upload；仓库提供下述 Actions 自动上传流程，配置部署凭据后推送即可发布，未配置时仍需手动上传。
+唯一官网是 [xiuxian.011203.xyz](https://xiuxian.011203.xyz/)，由 Cloudflare Pages 托管。README 和仓库网站栏只使用官网域名；平台域名仅供部署检查。目前记录的 Cloudflare 发布方式是手动 Wrangler 上传；接入下述 Git 集成后，推送生产分支可自动构建和部署。
 
 ## 本地运行
 
@@ -36,21 +36,7 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 ### 自动部署与 PR 预览
 
-#### 保留现有项目：GitHub Actions
-
-现有 `qinglan-xiuxian` 项目是 Direct Upload，不必创建新项目或迁移官网域名。[Cloudflare 工作流](../.github/workflows/cloudflare.yml) 支持仓库内所有分支的 push，以及 Actions 页面手动触发：
-
-- `master`：检查、构建通过后先发布 NPC Worker，再上传官网前端。
-- 其他分支：只上传 Pages 预览，不发布 Worker。部署链接显示在 Actions 的 `cloudflare-preview` 环境与运行摘要中，可从 PR 的部署记录打开。
-- 缺少部署凭据：工作流明确提示自动部署尚未启用，并跳过部署。工作流成功但部署任务被跳过不代表网站已更新。
-
-在仓库 **Settings → Secrets and variables → Actions → Repository secrets** 配置 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID`。令牌需要有此账号的 Pages 与 Worker 部署权限；官网 Worker 的域名和资源绑定也需具备相应权限。密钥仅注入部署步骤，禁止放入前端、源码或日志。配置后推送一次，或在 Actions 手动运行以验证；应确认部署任务实际成功且站点版本匹配。GitHub Pages 仍沿用独立工作流。
-
-工作流不接收 fork 的 pull request 事件；预览使用仓库内分支推送。预览与官网存档相互独立，NPC AI 来源白名单仍只允许正式站点，因此预览对白可能回退本地对白。Worker 部署保留已有变量和机密绑定。
-
-#### 可选：Cloudflare 原生 Git 集成
-
-也可使用 Cloudflare Pages 的 [GitHub 集成](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)：Cloudflare 自己拉取代码、构建并发布，无需把 Cloudflare API Token 加到 GitHub 或前端。
+推荐使用 Cloudflare Pages 的 [GitHub 集成](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)：Cloudflare 自己拉取代码、构建并发布，无需把 Cloudflare API Token 加到 GitHub 或前端。
 
 在 Cloudflare 的 **Workers & Pages → Create application → Pages → Connect to Git** 接入 `chenxuan520/qinglan-xiuxian`。若仓库不在列表中，在 [GitHub 应用授权](https://github.com/settings/installations) 的 **Cloudflare Workers & Pages** 中将它加入允许访问的仓库。
 
@@ -78,7 +64,7 @@ npx wrangler login
 npm run deploy:cloudflare
 ```
 
-需要直接上传项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`；此命令不创建 Git 集成项目。部署使用当前登录账号，不在仓库保存令牌。GitHub Pages 仍在推送 master 后自动发布；Cloudflare Actions 配置凭据后会先发布 Worker，手动发布时仍需单独执行 Worker 发布命令。
+需要直接上传项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`；此命令不创建 Git 集成项目。部署使用当前登录账号，不在仓库保存令牌。GitHub Pages 仍在推送 master 后自动发布，NPC Worker 继续独立发布。
 
 不同网址的浏览器存档独立。迁移时先在原网址的洞府导出存档，再到新网址导入。
 
@@ -91,7 +77,7 @@ npm run check:npc-ai
 npm run deploy:npc-ai
 ```
 
-`check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Pages 工作流同步执行此检查，只部署静态站；Cloudflare 工作流配置凭据后在 master 上先发布 Worker、再发布 Pages。手动方式仍分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
+`check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Actions 同步执行此检查，但只部署静态站；Worker 和 Cloudflare Pages 分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
 
 服务端按 `Origin` 完整匹配公网来源：`https://xiuxian.011203.xyz`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；对白按来源 IP 每 60 秒允许 12 次请求，配图独立限制为 2 次，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 推理超时 12 秒，客户端 20 秒；失败回退本地台词，不自动重试普通闲谈。关闭对话会取消请求并通知上游，返回文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
 
