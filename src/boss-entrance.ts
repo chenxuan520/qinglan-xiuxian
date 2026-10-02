@@ -8,10 +8,10 @@ export const BOSS_ENTRANCE_THEMES = [
   { color: '#c5e4a2', title: '万木苏醒', particle: 'leaf' },
   { color: '#f0bb83', title: '赤焰临世', particle: 'ember' },
   { color: '#bce9f2', title: '寒魄凝霜', particle: 'ice' },
-  { color: '#d1df91', title: '幽泽瘴起', particle: 'ember' },
-  { color: '#d1b8ed', title: '幽门洞开', particle: 'ember' },
-  { color: '#e5dcac', title: '天雷将至', particle: 'ice' },
-  { color: '#f1d79b', title: '仙尊问劫', particle: 'ice' },
+  { color: '#d1df91', title: '幽泽瘴起', particle: 'miasma' },
+  { color: '#d1b8ed', title: '幽门洞开', particle: 'soul' },
+  { color: '#e5dcac', title: '天雷将至', particle: 'lightning' },
+  { color: '#f1d79b', title: '仙尊问劫', particle: 'rune' },
 ] as const;
 
 // 只读取战斗时钟和瞬时效果，不耗随机数、不写存档，也不改变妖王刷新或攻击。
