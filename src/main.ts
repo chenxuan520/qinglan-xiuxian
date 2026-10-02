@@ -421,6 +421,10 @@ function sound(name: string) {
   } else if (name === 'elite') {
     tone(150, now, 0.22, 0.07, 'sine', 0.4);
     tone(1200, now, 0.05, 0.012, 'triangle');
+  } else if (name === 'boss') {
+    tone(73.42, now, 0.9, 0.045, 'sine', 0.65);
+    tone(146.83, now + 0.08, 0.65, 0.025, 'triangle', 0.75);
+    tone(220, now + 0.18, 0.7, 0.015);
   } else if (name === 'loot') {
     tone(98, now, 1.4, 0.06);
     tone(196, now, 1.1, 0.035);
