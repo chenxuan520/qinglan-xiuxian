@@ -777,7 +777,8 @@ export class Renderer {
       if (e.kind === 'boss-entrance') {
         const progress = 1 - e.life / e.maxLife;
         const radius = e.radius + 45 + (this.reducedMotion.matches ? 0 : progress * 30);
-        this.cachedFormation(e.x, e.y + 8, radius, 0, e.color, 0.6 * (1 - progress));
+        // 半径逐帧变化，直接绘制，避免为每一帧生成并永久缓存离屏画布。
+        this.formation(e.x, e.y + 8, radius, 0, e.color, 0.6 * (1 - progress));
         if (e.bossStage !== undefined) {
           c.lineWidth = 2;
           for (let i = 0; i < 8; i++) {

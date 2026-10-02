@@ -51,6 +51,72 @@ test('六境妖王按原时刻刷新，提前预警并且只生成一次登场�
   }
 });
 
+test('出场法阵逐帧扩散和重复登场不累积离屏画布缓存', async () => {
+  const url = new URL('../src/render.ts', import.meta.url);
+  const hook = registerHooks({
+    load(id, context, nextLoad) {
+      if (id !== url.href) return nextLoad(id, context);
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: stripTypeScriptTypes(readFileSync(url, 'utf8'), { mode: 'transform' }),
+      };
+    },
+  });
+  const { Renderer } = await import('../src/render.ts').finally(() => hook.deregister());
+  const ctx = new Proxy({} as CanvasRenderingContext2D, { get: () => () => {} });
+  let canvases = 0;
+  const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  Object.defineProperty(globalThis, 'document', {
+    configurable: true,
+    value: {
+      createElement() {
+        canvases++;
+        return { getContext: () => ctx };
+      },
+    },
+  });
+  try {
+    const renderer = Object.assign(Object.create(Renderer.prototype), {
+      ctx,
+      width: 390,
+      height: 844,
+      scale: 1,
+      formations: new Map(),
+      reducedMotion: { matches: false },
+      sprite() {},
+    });
+    for (const still of [false, true]) {
+      renderer.reducedMotion.matches = still;
+      for (let repeat = 0; repeat < 2; repeat++)
+        for (let stage = 0; stage < 7; stage++) {
+          const g = encounter(stage);
+          g.weapons = [];
+          const effect = {
+            x: 0,
+            y: 0,
+            life: 1.8,
+            maxLife: 1.8,
+            radius: stage === 6 ? 62 : 48,
+            color: STAGES[stage].color,
+            kind: 'boss-entrance',
+            bossStage: stage,
+          };
+          g.effects = [effect];
+          for (let frame = 0; frame < 120; frame++) {
+            effect.life = 1.8 * (1 - frame / 120);
+            renderer.drawGame(g, frame / 60);
+          }
+        }
+    }
+    assert.equal(canvases, 0, '动态法阵不能为每一帧分配画布');
+    assert.equal(renderer.formations.size, 0, '登场次数不能扩大纹理缓存');
+  } finally {
+    if (previousDocument) Object.defineProperty(globalThis, 'document', previousDocument);
+    else Reflect.deleteProperty(globalThis, 'document');
+  }
+});
+
 test('终关每次复临和仙尊均使用对应名号，已在场妖王不阻止下一位登场', () => {
   const g = encounter(6);
   for (let wave = 0; wave < 7; wave++) {
