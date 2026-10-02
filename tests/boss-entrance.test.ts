@@ -82,6 +82,7 @@ test('出场效果消散后旧降临提示不回显，其他战斗提示仍正�
         while (g.time < at + elapsed) g.update(0.01);
         drawNotice();
         assert.equal(visible, false, `第 ${stage + 1} 境：${elapsed} 秒不回显旧提示`);
+        assert.equal(notice.textContent, '', '抑制名号时立即清空文字，避免淡出过渡叠字');
         if (elapsed > BOSS_ENTRANCE_DURATION) {
           assert.equal(bossEntranceCue(g), null);
           assert.ok(g.noticeTime > 0, '旧提示仍未到期，隐藏不依赖出场 cue');
