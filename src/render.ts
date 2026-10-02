@@ -5,6 +5,7 @@ import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
 import { bossEntranceCue, BOSS_ENTRANCE_THEMES } from './boss-entrance.ts';
+import { realmBreakthroughCue } from './realm-breakthrough.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -150,7 +151,53 @@ export class Renderer {
       c.fill();
     }
     c.globalAlpha = 1;
-    if (game) this.drawBossEntrance(game);
+    if (game) {
+      this.drawBossEntrance(game);
+      this.drawRealmBreakthrough(game);
+    }
+  }
+  private drawRealmBreakthrough(game: Game) {
+    const cue = realmBreakthroughCue(game);
+    if (!cue) return;
+    const c = this.ctx,
+      w = this.width,
+      h = this.height,
+      still = this.reducedMotion.matches;
+    const fade = Math.min(1, (1 - cue.progress) / 0.45);
+    c.save();
+    if (still) {
+      c.globalAlpha = fade * 0.025;
+      c.fillStyle = cue.color;
+    } else {
+      const x = -w * 0.3 + cue.progress * w * 1.6;
+      const sweep = c.createLinearGradient(x - w * 0.25, 0, x + w * 0.25, 0);
+      sweep.addColorStop(0, cue.color + '00');
+      sweep.addColorStop(0.5, cue.color);
+      sweep.addColorStop(1, cue.color + '00');
+      c.globalAlpha = fade * 0.09;
+      c.fillStyle = sweep;
+    }
+    c.fillRect(0, 0, w, h);
+    let x = w / 2,
+      y = h / 2 + (h < 500 ? 62 : 80);
+    // 留开角色和顶部 HUD；小屏与妖王名号同时出现时让到侧边。
+    if (bossEntranceCue(game)) {
+      if (w > h) x = w * 0.88;
+      else if (w < 700 && h < 720) {
+        x = w * 0.22;
+        y = h / 2 - 4;
+      }
+    }
+    if (!still) y -= cue.progress * 10;
+    c.globalAlpha = fade;
+    c.textAlign = 'center';
+    c.strokeStyle = '#102b25';
+    c.lineWidth = 3;
+    c.fillStyle = cue.color;
+    c.font = `600 ${w < 700 ? 40 : 52}px serif`;
+    c.strokeText(cue.name, x, y + 14);
+    c.fillText(cue.name, x, y + 14);
+    c.restore();
   }
   private drawBossEntrance(game: Game) {
     const cue = bossEntranceCue(game);
@@ -774,7 +821,12 @@ export class Renderer {
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;
       c.fillStyle = e.color;
-      if (e.kind === 'boss-entrance') {
+      if (e.kind === 'realm-breakthrough') {
+        const progress = 1 - e.life / e.maxLife;
+        const radius = this.reducedMotion.matches ? e.radius : 28 + e.radius * progress;
+        // 跟随角色脚下扩散，直接绘制动态半径，不增加纹理缓存。
+        this.formation(game.player.x, game.player.y + 9, radius, 0, e.color, 0.7 * (1 - progress));
+      } else if (e.kind === 'boss-entrance') {
         const progress = 1 - e.life / e.maxLife;
         const radius = e.radius + 45 + (this.reducedMotion.matches ? 0 : progress * 30);
         // 半径逐帧变化，直接绘制，避免为每一帧生成并永久缓存离屏画布。
