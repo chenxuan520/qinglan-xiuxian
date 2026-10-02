@@ -1201,8 +1201,9 @@ function updateHud() {
             ][enemyWave(game.stage, game.time)],
   );
   const notice = document.getElementById('notice')!;
-  notice.textContent = game.noticeTime > 0 ? game.notice : '';
-  notice.classList.toggle('visible', game.noticeTime > 0 && !game.notice.includes('降临'));
+  const showNotice = game.noticeTime > 0 && !game.notice.includes('降临');
+  notice.textContent = showNotice ? game.notice : '';
+  notice.classList.toggle('visible', showNotice);
   const aliveBosses = game.enemies.filter((e) => e.boss && !e.dead);
   const bossBar = document.querySelector<HTMLElement>('#boss-bar')!;
   bossBar.hidden = !game.boss;
