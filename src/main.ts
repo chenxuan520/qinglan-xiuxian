@@ -1,5 +1,4 @@
 import './medicine.css';
-import { bossEntranceCue } from './boss-entrance.ts';
 import {
   medicineContent,
   medicineEntrance,
@@ -1203,10 +1202,7 @@ function updateHud() {
   );
   const notice = document.getElementById('notice')!;
   notice.textContent = game.noticeTime > 0 ? game.notice : '';
-  notice.classList.toggle(
-    'visible',
-    game.noticeTime > 0 && !(bossEntranceCue(game) && game.notice.includes('降临')),
-  );
+  notice.classList.toggle('visible', game.noticeTime > 0 && !game.notice.includes('降临'));
   const aliveBosses = game.enemies.filter((e) => e.boss && !e.dead);
   const bossBar = document.querySelector<HTMLElement>('#boss-bar')!;
   bossBar.hidden = !game.boss;
