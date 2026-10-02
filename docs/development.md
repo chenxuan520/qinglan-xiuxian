@@ -2,7 +2,7 @@
 
 [返回项目首页](../README.md)
 
-唯一官网是 [xiuxian.011203.xyz](https://xiuxian.011203.xyz/)，由 Cloudflare Pages 托管。README 和仓库网站栏只使用官网域名；平台域名仅供部署检查。发布新版本时须同步 Cloudflare；仅推送 GitHub 不会更新官网。
+唯一官网是 [xiuxian.011203.xyz](https://xiuxian.011203.xyz/)，由 Cloudflare Pages 托管。README 和仓库网站栏只使用官网域名；平台域名仅供部署检查。目前记录的 Cloudflare 发布方式是手动 Wrangler 上传；接入下述 Git 集成后，推送生产分支可自动构建和部署。
 
 ## 本地运行
 
@@ -34,12 +34,37 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 使用 `wrangler.jsonc` 与独立构建目录 `artifacts/cloudflare`，避免覆盖本机正在运行的 `dist`。Cloudflare 使用根路径 `/`，GitHub Pages 仍按仓库子路径构建。
 
+### 自动部署与 PR 预览
+
+推荐使用 Cloudflare Pages 的 [GitHub 集成](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)：Cloudflare 自己拉取代码、构建并发布，无需把 Cloudflare API Token 加到 GitHub 或前端。
+
+在 Cloudflare 的 **Workers & Pages → Create application → Pages → Connect to Git** 接入 `chenxuan520/qinglan-xiuxian`。若仓库不在列表中，在 [GitHub 应用授权](https://github.com/settings/installations) 的 **Cloudflare Workers & Pages** 中将它加入允许访问的仓库。
+
+| 配置项       | 值                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------- |
+| 生产分支     | `master`                                                                               |
+| 根目录       | 仓库根目录，留空                                                                       |
+| 构建命令     | `npm run format:check && npm test && npm run check:npc-ai && npm run build:cloudflare` |
+| 构建输出目录 | `artifacts/cloudflare`                                                                 |
+| 构建环境变量 | `NODE_VERSION=22.18.0`，生产和预览环境均设置                                           |
+| 预览分支     | 所有非生产分支，或包含 `feat/*` 的自定义范围                                           |
+
+这些命令在当前 `master` 和功能分支中都已存在，不依赖先合并 PR。检查失败会阻止发布。接入后，推送 `master` 更新生产部署；推送功能分支生成预览，Cloudflare 会在 GitHub PR 中提供链接。功能分支不得设为现有官网的生产分支。
+
+若现有项目属于 [Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)，Cloudflare 不支持原地切换到 Git 集成，需新建 Git 集成项目。先使用新项目的预览验证构建、资源和存档导入导出，再单独安排官网域名迁移；接入前保留现有项目与域名。若必须沿用原直接上传项目，也可通过 GitHub Actions 调用 Wrangler 自动上传，此方式需要在 Actions Secrets 中配置 Cloudflare 凭据。
+
+本节是接入参数与操作说明，仓库文档的变更不会替用户完成 Cloudflare 账号授权或开启自动部署。应以 Cloudflare 项目配置、GitHub 检查及实际部署 URL 验证接入成功。预览地址用于审阅，与官网存档相互独立；NPC AI 的来源白名单仍只允许正式站点，预览中的对话可能回退本地对白。
+
+### 手动发布回退
+
+在已合并、准备发布的 `master` 上仍可使用原命令：
+
 ```bash
 npx wrangler login
 npm run deploy:cloudflare
 ```
 
-首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。Cloudflare 通过上述命令发布，GitHub Pages 仍在推送 master 后自动发布。
+需要直接上传项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`；此命令不创建 Git 集成项目。部署使用当前登录账号，不在仓库保存令牌。GitHub Pages 仍在推送 master 后自动发布，NPC Worker 继续独立发布。
 
 不同网址的浏览器存档独立。迁移时先在原网址的洞府导出存档，再到新网址导入。
 

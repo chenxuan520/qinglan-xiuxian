@@ -61,6 +61,8 @@ import {
   gainCultivation,
 } from './progress.ts';
 import type { SaveData } from './progress.ts';
+import { BOSS_ENTRANCE_DURATION } from './boss-entrance.ts';
+import { REALM_BREAKTHROUGH_COLORS, REALM_BREAKTHROUGH_DURATION } from './realm-breakthrough.ts';
 
 export interface Point {
   x: number;
@@ -156,6 +158,8 @@ export interface Effect extends Point {
   x2?: number;
   y2?: number;
   element?: ElementId;
+  bossStage?: number;
+  realmIndex?: number;
 }
 export interface Pickup extends Point {
   kind: 'xp' | 'heal' | 'magnet' | 'iron' | 'chest';
@@ -443,7 +447,7 @@ export class Game {
     )
       recordChronicle(this.save, '六仙同御', '单局六件法宝同时觉醒为仙器。', 'six-immortals');
   }
-  private creditCultivation() {
+  private creditCultivation(showRealmEffect = true) {
     if (this.tribulation) return;
     if (this.kills === 0 && this.level === 1) return;
     const earned = cultivationReward(this);
@@ -462,7 +466,20 @@ export class Game {
       this.player.maxHp = this.maximumHealth();
       if (this.player.hp > 0) this.player.hp += increase;
       this.announce(`${major ? '大境界突破' : '境界突破'} · ${realm.name} · 气血与法宝威力提升`);
-      this.effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
+      if (major) this.effects = this.effects.filter((e) => e.kind !== 'realm-breakthrough');
+      if (major && realm.index <= 7 && showRealmEffect) {
+        // 瞬时表现不入存档；同一帧多次跨境界只保留最后一次。
+        this.effects.push({
+          x: this.player.x,
+          y: this.player.y,
+          life: REALM_BREAKTHROUGH_DURATION,
+          maxLife: REALM_BREAKTHROUGH_DURATION,
+          radius: 95,
+          color: REALM_BREAKTHROUGH_COLORS[realm.index],
+          kind: 'realm-breakthrough',
+          realmIndex: realm.index,
+        });
+      } else this.effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
       this.onEvent('breakthrough');
     }
   }
@@ -1015,7 +1032,7 @@ export class Game {
         g.player.hp = 0;
       }
       g.announce('重续仙缘 · 上次历练已恢复');
-      g.creditCultivation();
+      g.creditCultivation(false);
       g.recordRunAchievements();
       return g;
     } catch {
@@ -1123,7 +1140,7 @@ export class Game {
         ) {
           const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
           this.bossSpawned = true;
-          this.spawnEnemy(10, false, true, undefined, bossStage);
+          this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
           this.trialBossesSpawned++;
           this.nextTrialBossAt =
             TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? STAGES[FINAL_TRIAL_STAGE].minutes * 60;
@@ -1132,7 +1149,7 @@ export class Game {
         }
       } else if (!this.bossSpawned && this.remaining === 0) {
         this.bossSpawned = true;
-        this.spawnEnemy(10, false, true);
+        this.bossArrival(this.spawnEnemy(10, false, true));
         this.announce(`${STAGES[this.stage].boss}降临 · 小心红色预警`);
         this.onEvent('boss');
       }
@@ -1250,6 +1267,18 @@ export class Game {
     }
     this.tribulationStep++;
     this.tribulationNextAt = this.time + rules.interval;
+  }
+  private bossArrival(enemy: Enemy) {
+    this.effects.push({
+      x: enemy.x,
+      y: enemy.y,
+      life: BOSS_ENTRANCE_DURATION,
+      maxLife: BOSS_ENTRANCE_DURATION,
+      radius: enemy.radius,
+      color: STAGES[enemy.bossStage ?? this.stage].color,
+      kind: 'boss-entrance',
+      bossStage: enemy.bossStage ?? this.stage,
+    });
   }
   spawnEnemy(
     type?: number,

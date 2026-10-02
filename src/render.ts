@@ -4,6 +4,8 @@ import type { Game, Point } from './game.ts';
 import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
+import { bossEntranceCue, BOSS_ENTRANCE_THEMES } from './boss-entrance.ts';
+import { realmBreakthroughCue } from './realm-breakthrough.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -149,6 +151,178 @@ export class Renderer {
       c.fill();
     }
     c.globalAlpha = 1;
+    if (game) {
+      this.drawBossEntrance(game);
+      this.drawRealmBreakthrough(game);
+    }
+  }
+  private drawRealmBreakthrough(game: Game) {
+    const cue = realmBreakthroughCue(game);
+    if (!cue) return;
+    const c = this.ctx,
+      w = this.width,
+      h = this.height,
+      still = this.reducedMotion.matches;
+    const fade = Math.min(1, (1 - cue.progress) / 0.45);
+    c.save();
+    if (still) {
+      c.globalAlpha = fade * 0.025;
+      c.fillStyle = cue.color;
+    } else {
+      const x = -w * 0.3 + cue.progress * w * 1.6;
+      const sweep = c.createLinearGradient(x - w * 0.25, 0, x + w * 0.25, 0);
+      sweep.addColorStop(0, cue.color + '00');
+      sweep.addColorStop(0.5, cue.color);
+      sweep.addColorStop(1, cue.color + '00');
+      c.globalAlpha = fade * 0.09;
+      c.fillStyle = sweep;
+    }
+    c.fillRect(0, 0, w, h);
+    let x = w / 2,
+      y = h / 2 + (h < 500 ? 62 : 80);
+    // 留开角色和顶部 HUD；小屏与妖王名号同时出现时让到侧边。
+    if (bossEntranceCue(game)) {
+      if (w > h) x = w * 0.88;
+      else if (w < 700 && h < 720) {
+        x = w * 0.22;
+        y = h / 2 - 4;
+      }
+    }
+    if (!still) y -= cue.progress * 10;
+    c.globalAlpha = fade;
+    c.textAlign = 'center';
+    c.strokeStyle = '#102b25';
+    c.lineWidth = 3;
+    c.fillStyle = cue.color;
+    c.font = `600 ${w < 700 ? 40 : 52}px serif`;
+    c.strokeText(cue.name, x, y + 14);
+    c.fillText(cue.name, x, y + 14);
+    c.restore();
+  }
+  private drawBossEntrance(game: Game) {
+    const cue = bossEntranceCue(game);
+    if (!cue) return;
+    const c = this.ctx,
+      w = this.width,
+      h = this.height;
+    const theme = BOSS_ENTRANCE_THEMES[cue.stage];
+    const still = this.reducedMotion.matches;
+    const fade = cue.arriving
+      ? Math.min(1, (1 - cue.progress) / 0.22)
+      : Math.min(1, cue.progress / 0.25);
+    const motion = still ? 0.4 : cue.progress;
+    c.save();
+    // 暗角只收束边缘，保留人物、弹幕与已有红色技能预警的辨识度。
+    const shade = c.createRadialGradient(
+      w / 2,
+      h / 2,
+      Math.min(w, h) * 0.3,
+      w / 2,
+      h / 2,
+      Math.hypot(w, h) * 0.6,
+    );
+    shade.addColorStop(0, '#081a1900');
+    shade.addColorStop(1, `rgba(5, 22, 18, ${fade * 0.45})`);
+    c.fillStyle = shade;
+    c.fillRect(0, 0, w, h);
+    c.strokeStyle = theme.color;
+    c.fillStyle = theme.color;
+    c.lineWidth = 1.5;
+    if (cue.stage === 0) {
+      // 藤蔓从两侧破土，中心和底部操作区域留空。
+      for (const side of [-1, 1])
+        for (let i = 0; i < 4; i++) {
+          const x = side < 0 ? i * 18 : w - i * 18;
+          const y = h * (0.45 + i * 0.09);
+          c.globalAlpha = fade * 0.45;
+          c.beginPath();
+          c.moveTo(x, y + 80);
+          c.bezierCurveTo(
+            x + side * 25,
+            y + 20,
+            x - side * 60,
+            y + 10,
+            x - side * 45,
+            y - 55 * motion,
+          );
+          c.stroke();
+        }
+    }
+    // 粒子固定数量，不在绘制中使用随机数；减少动态效果时仅保留静态名号。
+    if (!still)
+      for (let i = 0; i < 20; i++) {
+        const side = i % 2 ? 1 : -1;
+        const x =
+          (side < 0 ? 0 : w) - side * (18 + ((i * 37 + motion * 95) % Math.max(40, w * 0.22)));
+        const y = (((i * 113 + motion * (cue.arriving ? -150 : 60)) % h) + h) % h;
+        c.save();
+        c.globalAlpha = fade * (0.25 + (i % 3) * 0.12);
+        c.translate(x, y);
+        c.rotate(i + motion * 2);
+        c.beginPath();
+        if (theme.particle === 'leaf') c.ellipse(0, 0, 3, 9, 0.4, 0, TAU);
+        else if (theme.particle === 'ice') {
+          c.moveTo(0, -9);
+          c.lineTo(3, 0);
+          c.lineTo(0, 9);
+          c.lineTo(-3, 0);
+          c.closePath();
+        } else if (theme.particle === 'miasma') {
+          c.globalAlpha *= 0.5;
+          c.arc(0, 0, 8 + (i % 4) * 4, 0, TAU);
+        } else if (theme.particle === 'soul') {
+          c.ellipse(0, 0, 3, 7, 0, 0, TAU);
+          c.moveTo(0, 6);
+          c.quadraticCurveTo(12, 12, 3, 22);
+          c.stroke();
+        } else if (theme.particle === 'lightning') {
+          c.moveTo(0, -14);
+          c.lineTo(-5, 0);
+          c.lineTo(4, -2);
+          c.lineTo(-2, 14);
+          c.stroke();
+        } else if (theme.particle === 'rune') {
+          c.strokeRect(-8, -8, 16, 16);
+          c.font = '12px serif';
+          c.textAlign = 'center';
+          c.fillText(['劫', '天', '道', '仙'][i % 4], 0, 4);
+        } else c.arc(0, 0, 2 + (i % 3), 0, TAU);
+        c.fill();
+        c.restore();
+      }
+    c.globalAlpha = fade;
+    const cardWidth = Math.min(440, w - 32);
+    const centerY = h < 500 ? h * 0.67 : w < 700 ? h - 190 : Math.max(230, h * 0.29);
+    c.translate(w / 2, centerY);
+    const panel = c.createLinearGradient(-cardWidth / 2, 0, cardWidth / 2, 0);
+    panel.addColorStop(0, '#0b241b00');
+    panel.addColorStop(0.18, '#0b241be8');
+    panel.addColorStop(0.82, '#0b241be8');
+    panel.addColorStop(1, '#0b241b00');
+    c.fillStyle = panel;
+    c.fillRect(-cardWidth / 2, -54, cardWidth, 108);
+    c.strokeStyle = theme.color + '80';
+    c.beginPath();
+    c.moveTo(-cardWidth * 0.4, -53);
+    c.lineTo(cardWidth * 0.4, -53);
+    c.moveTo(-cardWidth * 0.4, 53);
+    c.lineTo(cardWidth * 0.4, 53);
+    c.stroke();
+    if (cue.arriving) {
+      this.sprite(STAGES[cue.stage].sprite, -cardWidth / 2 + 54, 26, 88);
+      c.translate(w < 700 ? 34 : 46, 0);
+    }
+    c.textAlign = 'center';
+    c.fillStyle = theme.color;
+    c.font = '12px serif';
+    c.fillText(cue.arriving ? `${theme.title} · 妖王降临` : '妖气汇聚 · 妖王将至', 0, -27);
+    c.font = `${w < 700 ? 28 : 34}px serif`;
+    c.fillStyle = '#f3e9c8';
+    c.fillText(STAGES[cue.stage].boss, 0, 12);
+    c.font = '12px serif';
+    c.fillStyle = theme.color;
+    c.fillText(`第${STAGES[cue.stage].chapter}境 · ${STAGES[cue.stage].name}`, 0, 36);
+    c.restore();
   }
   private drawPreview(camera: Point, time: number, realm: number) {
     const c = this.ctx;
@@ -647,7 +821,57 @@ export class Renderer {
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;
       c.fillStyle = e.color;
-      if (e.kind === 'text') {
+      if (e.kind === 'realm-breakthrough') {
+        const progress = 1 - e.life / e.maxLife;
+        const radius = this.reducedMotion.matches ? e.radius : 28 + e.radius * progress;
+        // 跟随角色脚下扩散，直接绘制动态半径，不增加纹理缓存。
+        this.formation(game.player.x, game.player.y + 9, radius, 0, e.color, 0.7 * (1 - progress));
+      } else if (e.kind === 'boss-entrance') {
+        const progress = 1 - e.life / e.maxLife;
+        const radius = e.radius + 45 + (this.reducedMotion.matches ? 0 : progress * 30);
+        // 半径逐帧变化，直接绘制，避免为每一帧生成并永久缓存离屏画布。
+        this.formation(e.x, e.y + 8, radius, 0, e.color, 0.6 * (1 - progress));
+        if (e.bossStage !== undefined) {
+          c.lineWidth = 2;
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * TAU;
+            c.save();
+            c.translate(e.x, e.y + 8);
+            c.rotate(angle);
+            c.beginPath();
+            if (e.bossStage === 0) {
+              c.moveTo(30, 0);
+              c.bezierCurveTo(55, -20, radius - 20, 20, radius, 0);
+              c.stroke();
+            } else if (e.bossStage === 1) {
+              c.arc(0, 0, radius * 0.8, -0.16, 0.16);
+              c.stroke();
+            } else if (e.bossStage === 2) {
+              c.moveTo(radius - 22, -5);
+              c.lineTo(radius + 8, 0);
+              c.lineTo(radius - 22, 5);
+              c.closePath();
+              c.stroke();
+            } else if (e.bossStage === 3 || e.bossStage === 4) {
+              c.globalAlpha *= 0.5;
+              c.beginPath();
+              c.ellipse(radius * 0.75, 0, e.bossStage === 3 ? 16 : 6, 10, 0, 0, TAU);
+              c.fill();
+            } else if (e.bossStage === 5) {
+              c.moveTo(radius * 0.4, 0);
+              c.lineTo(radius * 0.7, -8);
+              c.lineTo(radius * 0.65, 8);
+              c.lineTo(radius, 0);
+              c.stroke();
+            } else {
+              c.font = '16px serif';
+              c.textAlign = 'center';
+              c.fillText(['天', '地', '玄', '黄', '宇', '宙', '洪', '荒'][i], radius * 0.82, 5);
+            }
+            c.restore();
+          }
+        }
+      } else if (e.kind === 'text') {
         c.font = `600 ${e.text?.includes('!') ? 16 : 13}px Georgia, serif`;
         c.textAlign = 'center';
         c.strokeStyle = '#132421';
