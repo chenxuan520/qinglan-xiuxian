@@ -220,13 +220,32 @@ export class Renderer {
           c.lineTo(0, 9);
           c.lineTo(-3, 0);
           c.closePath();
+        } else if (theme.particle === 'miasma') {
+          c.globalAlpha *= 0.5;
+          c.arc(0, 0, 8 + (i % 4) * 4, 0, TAU);
+        } else if (theme.particle === 'soul') {
+          c.ellipse(0, 0, 3, 7, 0, 0, TAU);
+          c.moveTo(0, 6);
+          c.quadraticCurveTo(12, 12, 3, 22);
+          c.stroke();
+        } else if (theme.particle === 'lightning') {
+          c.moveTo(0, -14);
+          c.lineTo(-5, 0);
+          c.lineTo(4, -2);
+          c.lineTo(-2, 14);
+          c.stroke();
+        } else if (theme.particle === 'rune') {
+          c.strokeRect(-8, -8, 16, 16);
+          c.font = '12px serif';
+          c.textAlign = 'center';
+          c.fillText(['劫', '天', '道', '仙'][i % 4], 0, 4);
         } else c.arc(0, 0, 2 + (i % 3), 0, TAU);
         c.fill();
         c.restore();
       }
     c.globalAlpha = fade;
     const cardWidth = Math.min(440, w - 32);
-    const centerY = w < 700 ? Math.min(270, h * 0.34) : Math.max(190, h * 0.25);
+    const centerY = h < 500 ? h * 0.67 : w < 700 ? h - 190 : Math.max(230, h * 0.29);
     c.translate(w / 2, centerY);
     const panel = c.createLinearGradient(-cardWidth / 2, 0, cardWidth / 2, 0);
     panel.addColorStop(0, '#0b241b00');
@@ -242,6 +261,10 @@ export class Renderer {
     c.moveTo(-cardWidth * 0.4, 53);
     c.lineTo(cardWidth * 0.4, 53);
     c.stroke();
+    if (cue.arriving) {
+      this.sprite(STAGES[cue.stage].sprite, -cardWidth / 2 + 54, 26, 88);
+      c.translate(w < 700 ? 34 : 46, 0);
+    }
     c.textAlign = 'center';
     c.fillStyle = theme.color;
     c.font = '12px serif';
@@ -751,7 +774,51 @@ export class Renderer {
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;
       c.fillStyle = e.color;
-      if (e.kind === 'text') {
+      if (e.kind === 'boss-entrance') {
+        const progress = 1 - e.life / e.maxLife;
+        const radius = e.radius + 45 + (this.reducedMotion.matches ? 0 : progress * 30);
+        this.cachedFormation(e.x, e.y + 8, radius, 0, e.color, 0.6 * (1 - progress));
+        if (e.bossStage !== undefined) {
+          c.lineWidth = 2;
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * TAU;
+            c.save();
+            c.translate(e.x, e.y + 8);
+            c.rotate(angle);
+            c.beginPath();
+            if (e.bossStage === 0) {
+              c.moveTo(30, 0);
+              c.bezierCurveTo(55, -20, radius - 20, 20, radius, 0);
+              c.stroke();
+            } else if (e.bossStage === 1) {
+              c.arc(0, 0, radius * 0.8, -0.16, 0.16);
+              c.stroke();
+            } else if (e.bossStage === 2) {
+              c.moveTo(radius - 22, -5);
+              c.lineTo(radius + 8, 0);
+              c.lineTo(radius - 22, 5);
+              c.closePath();
+              c.stroke();
+            } else if (e.bossStage === 3 || e.bossStage === 4) {
+              c.globalAlpha *= 0.5;
+              c.beginPath();
+              c.ellipse(radius * 0.75, 0, e.bossStage === 3 ? 16 : 6, 10, 0, 0, TAU);
+              c.fill();
+            } else if (e.bossStage === 5) {
+              c.moveTo(radius * 0.4, 0);
+              c.lineTo(radius * 0.7, -8);
+              c.lineTo(radius * 0.65, 8);
+              c.lineTo(radius, 0);
+              c.stroke();
+            } else {
+              c.font = '16px serif';
+              c.textAlign = 'center';
+              c.fillText(['天', '地', '玄', '黄', '宇', '宙', '洪', '荒'][i], radius * 0.82, 5);
+            }
+            c.restore();
+          }
+        }
+      } else if (e.kind === 'text') {
         c.font = `600 ${e.text?.includes('!') ? 16 : 13}px Georgia, serif`;
         c.textAlign = 'center';
         c.strokeStyle = '#132421';
