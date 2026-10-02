@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
+import { runInNewContext } from 'node:vm';
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 import { STAGES, TRIAL_BOSS_STAGES, TRIAL_BOSS_TIMES } from '../src/data.ts';
@@ -48,6 +49,53 @@ test('六境妖王按原时刻刷新，提前预警并且只生成一次登场�
     g.update(0.02);
     assert.deepEqual(events, ['boss']);
     assert.equal(g.effects.filter((e) => e.kind === 'boss-entrance').length, 1);
+  }
+});
+
+test('出场效果消散后旧降临提示不回显，其他战斗提示仍正常显示', () => {
+  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const block = source.match(
+    /  const notice = document.getElementById\('notice'\)[^]*?(?=  const aliveBosses)/,
+  )![0];
+  for (let stage = 0; stage < 7; stage++) {
+    const g = encounter(stage);
+    const waves = stage === 6 ? TRIAL_BOSS_TIMES : [STAGES[stage].minutes * 60];
+    let visible = false;
+    const notice = {
+      textContent: '',
+      classList: { toggle: (_name: string, value: boolean) => (visible = value) },
+    };
+    const drawNotice = () =>
+      runInNewContext(stripTypeScriptTypes(block), {
+        game: g,
+        bossEntranceCue,
+        document: { getElementById: () => notice },
+      });
+    for (const at of waves) {
+      // 隔离本次登场提示，避免上一位仍在场妖王的技能提示覆盖它。
+      g.enemies = [];
+      g.effects = [];
+      g.time = at - 0.01;
+      g.update(0.02);
+      assert.ok(g.notice.includes('降临'));
+      for (const elapsed of [0.02, 1, 1.85, 2.4]) {
+        while (g.time < at + elapsed) g.update(0.01);
+        drawNotice();
+        assert.equal(visible, false, `第 ${stage + 1} 境：${elapsed} 秒不回显旧提示`);
+        if (elapsed > BOSS_ENTRANCE_DURATION) {
+          assert.equal(bossEntranceCue(g), null);
+          assert.ok(g.noticeTime > 0, '旧提示仍未到期，隐藏不依赖出场 cue');
+        }
+      }
+      g.announce('精英现身 · 击败可得炼器宝匣');
+      drawNotice();
+      assert.equal(visible, true);
+      assert.equal(notice.textContent, g.notice);
+      g.noticeTime = 0;
+      drawNotice();
+      assert.equal(visible, false);
+      assert.equal(notice.textContent, '');
+    }
   }
 });
 
