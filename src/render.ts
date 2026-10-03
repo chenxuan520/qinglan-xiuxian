@@ -1,4 +1,4 @@
-import { ENEMIES, STAGES, TAU } from './data.ts';
+import { ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
 import type { ElementId } from './data.ts';
 import type { Game, Point } from './game.ts';
 import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
@@ -613,28 +613,58 @@ export class Renderer {
       c.restore();
     }
     // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
-    if (game.stage < 6)
-      for (const e of game.enemies) {
-        if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
-        if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
-        c.save();
-        c.strokeStyle = '#ffc199';
-        c.fillStyle = '#e9836130';
-        c.lineWidth = 2;
-        if (e.charge > 0.55) {
-          c.translate(e.x, e.y);
-          c.rotate(Math.atan2(e.dy, e.dx));
-          const width = e.radius + 13;
-          c.fillRect(0, -width, 209, width * 2);
-          c.setLineDash([7, 5]);
-          c.strokeRect(0, -width, 209, width * 2);
-        } else {
-          c.beginPath();
-          c.arc(e.x, e.y, e.radius + 8, 0, TAU);
-          c.stroke();
-        }
-        c.restore();
+    for (const e of game.enemies) {
+      if (!game.usesRegionalSkill(e)) continue;
+      if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
+      if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
+      c.save();
+      c.strokeStyle = '#ffc199';
+      c.fillStyle = '#e9836130';
+      c.lineWidth = 2;
+      if (e.charge > 0.55) {
+        c.translate(e.x, e.y);
+        c.rotate(Math.atan2(e.dy, e.dx));
+        const width = e.radius + 13;
+        c.fillRect(0, -width, 209, width * 2);
+        c.setLineDash([7, 5]);
+        c.strokeRect(0, -width, 209, width * 2);
+      } else {
+        c.beginPath();
+        c.arc(e.x, e.y, e.radius + 8, 0, TAU);
+        c.stroke();
       }
+      c.restore();
+    }
+    const cache = game.cacheChallenge;
+    if (cache && ['offered', 'active'].includes(cache.phase) && this.visible(cache, p, 100)) {
+      c.save();
+      this.formation(cache.x, cache.y, 45, time * 0.3, '#e9ce8a', 0.65);
+      c.textAlign = 'center';
+      c.font = '16px serif';
+      c.lineWidth = 4;
+      c.strokeStyle = '#173b35';
+      c.fillStyle = '#f2e1ad';
+      const text = cache.phase === 'offered' ? '守匣灵阵' : '破阵取匣';
+      c.strokeText(text, cache.x, cache.y - 52);
+      c.fillText(text, cache.x, cache.y - 52);
+      c.fillText('匣', cache.x, cache.y + 6);
+      c.restore();
+    }
+    for (const e of game.enemies) {
+      if (e.dead || !game.encounterVersion || !ENEMY_TACTICS[e.type].boundSummons) continue;
+      c.save();
+      c.strokeStyle = '#cbb0e978';
+      c.setLineDash([5, 8]);
+      c.lineWidth = 1.5;
+      for (const child of game.enemies) {
+        if (child.dead || child.summonedBy !== e.id || !this.visible(child, p, 100)) continue;
+        c.beginPath();
+        c.moveTo(e.x, e.y);
+        c.lineTo(child.x, child.y);
+        c.stroke();
+      }
+      c.restore();
+    }
     const entities = [
       ...game.enemies.filter((e) => !e.dead && this.visible(e, p)),
       {
@@ -843,6 +873,24 @@ export class Renderer {
               c.beginPath();
               c.arc(-10, 0, 20, -0.8, 0.8);
               c.stroke();
+            } else if (shot.enemySkill === 'frostbolt') {
+              c.beginPath();
+              c.moveTo(12, 0);
+              c.lineTo(-5, -6);
+              c.lineTo(-2, 0);
+              c.lineTo(-5, 6);
+              c.closePath();
+              c.fill();
+              c.strokeStyle = '#e6faff';
+              c.stroke();
+            } else if (shot.enemySkill === 'firebolt') {
+              c.beginPath();
+              c.ellipse(0, 0, 9, 7, 0, 0, TAU);
+              c.fill();
+              c.fillStyle = '#fff0b2';
+              c.beginPath();
+              c.arc(2, 0, 4, 0, TAU);
+              c.fill();
             } else {
               c.beginPath();
               c.arc(0, 0, shot.kind === 'hostile' ? 5 : shot.radius * 0.75, 0, TAU);

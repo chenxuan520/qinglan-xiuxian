@@ -223,7 +223,9 @@ test('撤离途中按毒圈伤害和剩余寿命取舍，不因最短出口有�
 test('第六王无后续伤害的五圈残影不阻挡低血量玩家避开致命敌弹', (t) => {
   for (const control of ['up', 'ai']) {
     const g = encounter(0, 5);
-    const boss = g.spawnEnemy(10, false, true, { x: -500, y: 0 });
+    const boss = g.spawnEnemy(10, false, true, { x: -90, y: 0 });
+    // 新阵法以妖王前方90像素为阵心；固定妖王使五圈仍围绕原点。
+    boss.speed = 0;
     boss.skillStep = 2;
     boss.cooldown = 0;
     boss.pursuitCooldown = 999;

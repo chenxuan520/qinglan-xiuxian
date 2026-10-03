@@ -563,7 +563,7 @@ export const TREASURES: Treasure[] = [
     mark: '镰',
     color: '#c0a4de',
     tag: '近战 · 斩杀',
-    desc: '横扫前方半圆，气血低于三成的目标受到额外伤害。',
+    desc: '横扫前方半圆，可触发暴击；气血低于三成的目标受到额外伤害。',
     evolution: '九幽夺命镰',
     passive: 'crit',
     damage: 38,
@@ -677,7 +677,7 @@ export const TREASURES: Treasure[] = [
     tag: '重兵 · 震地',
     desc: '在前方砸下巨斧，短暂蓄势后爆发并击退一片妖物。',
     evolution: '盘古开天钺',
-    passive: 'power',
+    passive: 'guard',
     damage: 70,
     cooldown: 3.7,
   },
@@ -1431,7 +1431,21 @@ export const STAGE_ENEMIES = [
   [48, 49, 50, 51, 53, 54, 52, 16, 17, 18, 19, 55],
   [56, 57, 58, 59, 61, 62, 60, 20, 23, 21, 22, 63],
   [64, 65, 66, 67, 69, 70, 24, 25, 68, 26, 27, 71],
-  [65, 66, 59, 67, 61, 62, 69, 24, 25, 27, 63, 71],
+  // 终关按原来的四批时间混合前境招式。
+  [65, 33, 59, 67, 45, 54, 69, 24, 26, 27, 63, 71],
+];
+export const LEGACY_TRIAL_ENEMIES = [65, 66, 59, 67, 61, 62, 69, 24, 25, 27, 63, 71];
+export const ENEMY_CAST_RANGE = 360;
+export const ENEMY_FIELD_REACH = 200;
+export const BOSS_FIELD_REACH = 320;
+export const CACHE_CHALLENGE = { offerAt: 0.45, offerSeconds: 30, fightSeconds: 45, approach: 120 };
+export const REGION_ENCOUNTERS = [
+  { name: '竹海护阵', guardians: [1, 10] },
+  { name: '离火封路', guardians: [31, 33] },
+  { name: '寒霜夹击', guardians: [45, 14] },
+  { name: '瘴孢守匣', guardians: [53, 54] },
+  { name: '破主散卫', guardians: [61, 63] },
+  { name: '雷印缺环', guardians: [69, 26] },
 ];
 export const ENEMY_SKILLS = {
   ranged: {
@@ -1455,13 +1469,33 @@ export const ENEMY_SKILLS = {
   soul: { name: '摄魂交射', hint: '两侧灵弹向前交汇', eliteHint: '四道交叉灵弹，穿过间隙' },
   storm: {
     name: '引雷落印',
-    hint: '落雷锁定旧位置，及时离开',
-    eliteHint: '三处错时落雷，持续移动',
+    hint: '自身前方布下雷印，离开预警圈',
+    eliteHint: '近身三印错时落雷，观察先后次序',
+  },
+  firecharge: {
+    name: '焰迹扑杀',
+    hint: '蓄势扑击，短火痕留在行进路径',
+    eliteHint: '扑击路径留下三段火痕，绕开回头路',
+  },
+  firebolt: {
+    name: '熔火飞弹',
+    hint: '蓄势发射慢速火弹，横移避开',
+    eliteHint: '两枚火弹扇射，横移避开',
+  },
+  frostbolt: {
+    name: '凝霜飞弹',
+    hint: '霜弹命中短暂减速，避开弹道',
+    eliteHint: '三枚霜弹扇射，减速后有间隔保护',
+  },
+  gapring: {
+    name: '缺月星环',
+    hint: '有缺口的环形灵弹，从空隙穿过',
+    eliteHint: '星环更密，仍保留连续缺口',
   },
 };
 export type EnemySkill = keyof typeof ENEMY_SKILLS;
-// 前六境法师保留弹道攻击；重甲近身震地，追击精英蓄势扑杀。
-export const ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
+// 旧续局保留原技能组合；新开局在下方覆盖地域招式。
+export const LEGACY_ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
   const netherEnemy = STAGE_ENEMIES[4].includes(type);
   const soulCaster = netherEnemy && /咒师|祭师|巫师|毒巫|咒鬼|法使/.test(enemy.name);
   const flank = enemy.behavior === 'chase' && /狼|獒|剑卒/.test(enemy.name);
@@ -1486,14 +1520,37 @@ export const ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
         : skill;
   return { flank, skill, eliteSkill };
 });
+export const ENEMY_TACTICS = LEGACY_ENEMY_TACTICS.map((tactics, type) => {
+  const skill: EnemySkill | undefined = (
+    {
+      10: 'roots',
+      31: 'firecharge',
+      33: 'firebolt',
+      14: 'frost',
+      45: 'frostbolt',
+      53: 'miasma',
+      69: 'storm',
+      26: 'gapring',
+    } as Record<number, EnemySkill>
+  )[type];
+  return {
+    ...tactics,
+    ...(skill ? { skill, eliteSkill: skill } : {}),
+    regional: !!skill || type === 54 || type === 63,
+    deathMiasma: type === 54,
+    boundSummons: type === 63,
+  };
+});
 export function enemyWave(stage: number, seconds: number) {
   if (stage === FINAL_TRIAL_STAGE)
     return TRIAL_ENEMY_TIMES.filter((time) => time <= Math.max(0, seconds)).length - 1;
   return Math.min(3, Math.floor((Math.max(0, seconds) / (STAGES[stage].minutes * 60)) * 4));
 }
-export function enemyRoster(stage: number, seconds: number) {
+export function enemyRoster(stage: number, seconds: number, legacy = false) {
   const count = stage === 0 && seconds < 20 ? 1 : (enemyWave(stage, seconds) + 1) * 3;
-  return STAGE_ENEMIES[stage].slice(0, count);
+  return (
+    legacy && stage === FINAL_TRIAL_STAGE ? LEGACY_TRIAL_ENEMIES : STAGE_ENEMIES[stage]
+  ).slice(0, count);
 }
 export const MAX_WEAPONS = 6;
 export const MAX_PASSIVES = 4;

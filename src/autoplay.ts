@@ -1,10 +1,4 @@
-import {
-  treasure,
-  evolutionPassives,
-  MAX_WEAPON_LEVEL,
-  MAX_PASSIVE_LEVEL,
-  FINAL_TRIAL_STAGE,
-} from './data.ts';
+import { MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
 
 const favored = [
@@ -32,7 +26,7 @@ function choiceScore(c: Choice, g: Game) {
     c.level <= MAX_PASSIVE_LEVEL &&
     (g.passives[c.id] || 0) === c.level - 1 &&
     g.weapons.some((w) => {
-      const required = evolutionPassives(treasure(w.id), g.path);
+      const required = g.evolutionRequirements(w.id);
       return (
         !w.evolved &&
         w.level === MAX_WEAPON_LEVEL &&
@@ -42,9 +36,7 @@ function choiceScore(c: Choice, g: Game) {
     })
   )
     return 50 + c.level * 5;
-  const needed = g.weapons.some(
-    (w) => evolutionPassives(treasure(w.id), g.path).includes(c.id) && !w.evolved,
-  );
+  const needed = g.weapons.some((w) => g.evolutionRequirements(w.id).includes(c.id) && !w.evolved);
   return (
     (needed ? 16 : 0) +
     (g.player.hp < g.player.maxHp * 0.5 && ['guard', 'bone', 'duration', 'devour'].includes(c.id)
@@ -98,7 +90,9 @@ export function autoplayInput(g: Game) {
   }
   const norm = Math.hypot(dx, dy) || 1;
   const preferred = { x: dx / norm, y: dy / norm };
-  const charges = g.enemies.filter((e) => (e.boss || g.stage < 6) && !e.dead && e.charge > 0);
+  const charges = g.enemies.filter(
+    (e) => (e.boss || g.usesRegionalSkill(e)) && !e.dead && e.charge > 0,
+  );
   const speed = g.stats.speed;
   const zones = g.zones.filter(
     (z) => z.hostile && z.life > 0 && Math.hypot(z.x - p.x, z.y - p.y) < z.radius + 8 + speed * 1.6,
@@ -148,7 +142,7 @@ export function autoplayInput(g: Game) {
         const nextTick = tick + Math.max(0, Math.ceil((enter - 0.12 - delay - tick) / 0.5)) * 0.5;
         // 缚根与寒霜在伤害间隔中仍持续减速，不能当作无害残影。
         if (
-          !(g.stage < FINAL_TRIAL_STAGE && ['enemy-roots', 'enemy-frost'].includes(z.kind)) &&
+          !['enemy-roots', 'enemy-frost'].includes(z.kind) &&
           (nextTick > z.life || delay + nextTick > exit + 0.12)
         )
           continue;
