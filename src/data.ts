@@ -927,6 +927,15 @@ export const STAGE_COMBAT_SCALING = [
   { hp: 2.05, damage: 1.9, elite: { hp: 1.55, damage: 1.5, speed: 1.2 } },
   { hp: 2, damage: 2 },
 ];
+// 第三至六境的新局后段节奏；固定关卡参数，不读取玩家资质或战力。
+export const ELITE_PACING = {
+  hpPeaks: [1, 1, 4, 6, 8, 10, 1],
+  hpStart: 0.35,
+  hpRamp: 0.55,
+  lateInterval: 24,
+  maxAlive: 4,
+  bossLead: 15,
+};
 export const STAGES = [
   {
     name: '青岚竹海',

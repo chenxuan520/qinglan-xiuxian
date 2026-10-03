@@ -29,7 +29,9 @@ npm run format:check
 npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 ```
 
-永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。新局 `progressionVersion = 2`，缺少版本的旧续局按 1 恢复；它与整份存档的 `SAVE_SCHEMA = 2` 分别控制对局规则和存档写入兼容。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
+永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。新局 `progressionVersion = 2`，缺少版本的旧续局按 1 恢复；它与整份存档的 `SAVE_SCHEMA = 3` 分别控制对局规则和存档写入兼容。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
+
+第三至六境精英节奏配置集中在 `src/data.ts` 的 `ELITE_PACING`，波次调度与出生气血在 `src/game.ts`。新局 `elitePacingVersion = 2`，缺少版本的旧续局按 1 恢复；独立于修为规则版本。`lateEliteWaves` 记录是否已接上后半程波次，与 `nextElite` 一起保存，恢复时不重新放大在场敌人气血。变更覆盖波次边界、精英上限、暂停恢复和版本校验时，运行 `tests/elite-pacing.test.ts`；完整难度和分灵根对照见 [验证记录](verification.md)。
 
 `balance:realms` 不会购买永久强化，不能用它代替“正常投入所得资源”的通关测试。两种策略的样本、参数、逐关境界和局限见 [天灵根逐关成长验证](verification.md#天灵根逐关成长复核2026-10-03)。外部辅助模拟与原始结果不随仓库分发，现有命令与外部脚本的复现范围分别说明。
 
