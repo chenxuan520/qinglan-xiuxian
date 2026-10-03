@@ -7,6 +7,7 @@ import {
   PASSIVES,
   STAGES,
   STAGE_COMBAT_SCALING,
+  ELITE_PACING,
   STAGE_REALM_STEPS,
   LEGACY_STAGE_REALM_STEPS,
   STAGE_CULTIVATION_RATES,
@@ -212,6 +213,7 @@ export class Game {
   bossCultivation = 0;
   revivesUsed = 0;
   progressionVersion = 2;
+  elitePacingVersion = 2;
   tribulation = 0;
   tribulationStep = 0;
   tribulationNextAt = 1.2;
@@ -219,6 +221,7 @@ export class Game {
   nextElite = 60;
   onEvent: (name: string, items?: string[]) => void = () => {};
   private spawnBudget = 0;
+  private lateEliteWaves = false;
   private serial = 0;
   private nextEnemySkillAt = 0;
   private medicine: ReturnType<typeof medicineEffects>;
@@ -286,9 +289,14 @@ export class Game {
     return this.enemies.find((e) => e.boss && !e.dead);
   }
   get eliteInterval() {
+    if (this.usesElitePacing && this.time >= STAGES[this.stage].minutes * 30)
+      return ELITE_PACING.lateInterval;
     return this.isFinalTrial
       ? 60
       : (60 * STAGES[this.stage].minutes) / (STAGES[this.stage].minutes + 2);
+  }
+  private get usesElitePacing() {
+    return this.elitePacingVersion >= 2 && !this.tribulation && this.stage >= 2 && this.stage <= 5;
   }
   get lifespan() {
     return REALM_LIFESPANS[Math.floor(this.realm / 3)] + this.save.lifespanBonus;
@@ -497,6 +505,8 @@ export class Game {
       version: 1,
       realmScaling: 3,
       progressionVersion: this.progressionVersion,
+      elitePacingVersion: this.elitePacingVersion,
+      lateEliteWaves: this.lateEliteWaves,
       stage: this.stage,
       stageDuration: STAGES[this.stage].minutes * 60,
       difficulty: this.difficulty,
@@ -644,6 +654,12 @@ export class Game {
       )
         return null;
       if (s.progressionVersion !== undefined && ![1, 2].includes(s.progressionVersion)) return null;
+      if (s.elitePacingVersion !== undefined && ![1, 2].includes(s.elitePacingVersion)) return null;
+      if (
+        (s.elitePacingVersion === 2 || s.lateEliteWaves !== undefined) &&
+        typeof s.lateEliteWaves !== 'boolean'
+      )
+        return null;
       if (
         s.combatCultivation !== undefined &&
         (!Number.isFinite(s.combatCultivation) || s.combatCultivation < 0)
@@ -862,6 +878,8 @@ export class Game {
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.progressionVersion = s.progressionVersion ?? 1;
+      g.elitePacingVersion = s.elitePacingVersion ?? 1;
+      g.lateEliteWaves = s.lateEliteWaves ?? false;
       g.elapsedYears = s.elapsedYears;
       g.loot = s.loot
         ? {
@@ -1131,16 +1149,7 @@ export class Game {
         this.spawnBudget--;
         if (this.enemies.length < (this.isFinalTrial ? 210 : 240)) this.spawnEnemy();
       }
-      if (!this.isFinalTrial && this.time >= this.nextElite && !this.bossSpawned) {
-        const available = enemyRoster(this.stage, this.time);
-        const elites = available.filter((type) =>
-          ['tank', 'shield'].includes(ENEMIES[type].behavior),
-        );
-        this.spawnEnemy(elites.at(-1) ?? available.at(-1), true);
-        if (progress >= 0.5) this.spawnEnemy(available.at(-1), true);
-        this.nextElite += this.eliteInterval;
-        this.announce('精英现身 · 击败可得炼器宝匣');
-      }
+      this.updateEliteWave();
       if (this.isFinalTrial) {
         while (
           this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
@@ -1288,6 +1297,47 @@ export class Game {
       bossStage: enemy.bossStage ?? this.stage,
     });
   }
+  private updateEliteWave() {
+    if (this.isFinalTrial || this.bossSpawned) return;
+    const duration = STAGES[this.stage].minutes * 60;
+    const late = this.time >= duration * 0.5;
+    if (this.usesElitePacing) {
+      if (late && !this.lateEliteWaves) {
+        this.nextElite = Math.min(this.nextElite, duration * 0.5);
+        this.lateEliteWaves = true;
+      }
+      if (this.time >= duration - ELITE_PACING.bossLead) return;
+    }
+    if (this.time < this.nextElite) return;
+    if (
+      this.usesElitePacing &&
+      this.enemies.filter((e) => e.elite && !e.boss && !e.dead).length + (late ? 2 : 1) >
+        ELITE_PACING.maxAlive
+    ) {
+      // 满额时只延后一秒再尝试，不积攒波次等清场后一口气补齐。
+      this.nextElite = this.time + 1;
+      return;
+    }
+    const available = enemyRoster(this.stage, this.time);
+    const armored = available.filter((type) => ['tank', 'shield'].includes(ENEMIES[type].behavior));
+    let first = armored.at(-1) ?? available.at(-1);
+    let second = available.at(-1);
+    if (this.usesElitePacing && late) {
+      first = available.filter((type) => ENEMY_TACTICS[type].eliteSkill === 'dash').at(-1) ?? first;
+      second =
+        available
+          .filter((type) =>
+            ['ranged', 'volley', 'nova', 'soul'].includes(ENEMY_TACTICS[type].eliteSkill ?? ''),
+          )
+          .at(-1) ?? second;
+    }
+    this.spawnEnemy(first, true);
+    if (late) this.spawnEnemy(second, true);
+    this.nextElite += this.eliteInterval;
+    if (this.usesElitePacing && this.nextElite <= this.time)
+      this.nextElite = this.time + this.eliteInterval;
+    this.announce('精英现身 · 击败可得炼器宝匣');
+  }
   spawnEnemy(
     type?: number,
     elite = false,
@@ -1327,13 +1377,19 @@ export class Game {
             (this.tribulation ? 1 : this.stage === 4 ? 1.3 : this.stage === 5 ? 1.5 : 1)) *
         difficulty.hp
       : template.hp * strength * difficulty.hp * (elite ? 7 : 1) * (eliteScaling?.hp ?? 1);
+    const lateHealth =
+      this.usesElitePacing && elite && !boss
+        ? 1 +
+          (ELITE_PACING.hpPeaks[this.stage] - 1) *
+            Math.max(0, Math.min(1, (progress - ELITE_PACING.hpStart) / ELITE_PACING.hpRamp)) ** 1.5
+        : 1;
     const enemy: Enemy = {
       id: ++this.serial,
       type,
       x: at?.x ?? this.player.x + Math.cos(angle) * (this.viewport.width / 2 + 70),
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
-      hp: hp * scaling.hp * realmDamageMultiplier(realmStep),
-      maxHp: hp * scaling.hp * realmDamageMultiplier(realmStep),
+      hp: hp * scaling.hp * realmDamageMultiplier(realmStep) * lateHealth,
+      maxHp: hp * scaling.hp * realmDamageMultiplier(realmStep) * lateHealth,
       radius: boss
         ? bossStage === FINAL_TRIAL_STAGE
           ? 62
