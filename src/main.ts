@@ -1125,7 +1125,7 @@ function renderPanel() {
     panelFrame(
       '知妖性，方能破万劫',
       '妖物志',
-      `<p class="panel-note">前六境各有 12 种专属妖物，共 72 种；普通秘境只出现本境妖物。下面普通与精英技能说明适用于前六境，切换终关可查看其原有行为。每关分四批加入强敌：前六境按时长 0%、25%、50%、75% 解锁，终关提前到 0:00、0:45、1:30、2:30，后续以新批次为主。第七境「万劫归墟」汇聚历境精英，六位妖王与九天执劫仙尊依次登场；全部击败才能通关并解除成仙瓶颈。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物池">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
+      `<p class="panel-note">前六境各有 12 种专属妖物，共 72 种；普通秘境只出现本境妖物。各境特色包括藤阵、火痕、霜弹、毒孢、召唤护卫与缺口星环；终关分批混合这些招式。地面攻击在施法者附近生成，远程灵弹可见且有射程。每关分四批加入强敌：前六境按时长 0%、25%、50%、75% 解锁，终关提前到 0:00、0:45、1:30、2:30，后续以新批次为主。第七境「万劫归墟」汇聚历境精英，六位妖王与九天执劫仙尊依次登场；全部击败才能通关并解除成仙瓶颈。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物池">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
         (_, index) => bestiaryStage < 0 || STAGE_ENEMIES[bestiaryStage].includes(index),
       )
         .map((e) => {
@@ -1133,10 +1133,10 @@ function renderPanel() {
           const skill = tactics.skill && ENEMY_SKILLS[tactics.skill];
           const elite = tactics.eliteSkill && ENEMY_SKILLS[tactics.eliteSkill];
           const detail =
-            bestiaryStage === FINAL_TRIAL_STAGE
+            bestiaryStage === FINAL_TRIAL_STAGE && !tactics.regional
               ? behavior[e.behavior]
-              : `${tactics.flank ? '包抄 · 两翼绕行，近身合围' : e.behavior === 'shield' ? '护盾 · 亮盾减伤 55%，暗盾时反击；近身震地' : skill ? `${skill.name} · ${skill.hint}` : behavior[e.behavior]}<small class="enemy-skill">精英：${elite ? `${elite.name} · ${elite.eliteHint}` : behavior[e.behavior]}</small>`;
-          return `<article class="enemy-card"><span class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}" style="${spriteStyle(e.sprite)}"></span><div><h3>${e.name}</h3><p class="${bestiaryStage === FINAL_TRIAL_STAGE ? '' : 'enemy-detail'}">${detail}</p><small>${bestiaryStage === FINAL_TRIAL_STAGE ? '终关以精英形态出现 · ' : ''}基础气血 ${e.hp} · 伤害 ${e.damage}</small></div></article>`;
+              : `${tactics.flank ? '包抄 · 两翼绕行，近身合围' : e.behavior === 'shield' ? `护盾 · 亮盾减伤 55%，暗盾时反击；${skill ? skill.name : '近身震地'}` : skill ? `${skill.name} · ${skill.hint}` : behavior[e.behavior]}<small class="enemy-skill">精英：${elite ? `${elite.name} · ${elite.eliteHint}` : behavior[e.behavior]}</small>`;
+          return `<article class="enemy-card"><span class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}" style="${spriteStyle(e.sprite)}"></span><div><h3>${e.name}</h3><p class="${bestiaryStage === FINAL_TRIAL_STAGE ? '' : 'enemy-detail'}">${detail}${tactics.deathMiasma ? '<small>倒下后原地留瘴，预警后生效</small>' : ''}${tactics.boundSummons ? '<small>优先击杀召唤者，其护卫随之消散</small>' : ''}</p><small>${bestiaryStage === FINAL_TRIAL_STAGE ? '终关以精英形态出现 · ' : ''}基础气血 ${e.hp} · 伤害 ${e.damage}</small></div></article>`;
         })
         .join(
           '',
@@ -1168,7 +1168,7 @@ function renderHud() {
   document.body.classList.remove('immortal-home');
   lastLoadout = '';
   document.body.classList.add('in-game');
-  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(save, volumeOpen, mobileDisplay, true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><p class="touch-movement-hint"${touchHintDismissed || save.autoplay ? ' hidden' : ''}>按住空白处拖动 · 法宝自动攻击</p><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
+  ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span>实时修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${DIFFICULTIES[game.difficulty].name}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(STAGES[game.stage].minutes * 60)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(save, volumeOpen, mobileDisplay, true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div id="cache-prompt" class="cache-prompt" hidden><small id="cache-status"></small><button data-action="challenge-cache" hidden>挑战守匣</button></div><p class="touch-movement-hint"${touchHintDismissed || save.autoplay ? ' hidden' : ''}>按住空白处拖动 · 法宝自动攻击</p><div class="battle-bottom"><div class="battle-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
   updateHud();
 }
 let lastLoadout = '';
@@ -1191,6 +1191,29 @@ function updateHud() {
           : `${realm.progress} / ${realm.needed}`,
   );
   set('level', `LV. ${game.level}`);
+  const cachePrompt = document.getElementById('cache-prompt');
+  if (cachePrompt) {
+    const c = game.cacheChallenge;
+    const shown = !!c && ['offered', 'active'].includes(c.phase) && game.state === 'playing';
+    cachePrompt.hidden = !shown;
+    const button = cachePrompt.querySelector('button')!;
+    button.hidden = !shown || !game.cacheNearby;
+    button.disabled = game.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2;
+    button.textContent = button.disabled ? '先清理附近精英' : '挑战守匣';
+    if (shown && c) {
+      const dx = c.x - game.player.x,
+        dy = c.y - game.player.y;
+      const direction = ['→', '↘', '↓', '↙', '←', '↖', '↑', '↗'][
+        (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8
+      ];
+      set(
+        'cache-status',
+        c.phase === 'active'
+          ? `守匣挑战 · 剩余 ${Math.max(0, Math.ceil(c.deadline - game.time))} 秒`
+          : `守匣灵阵 ${direction} ${Math.round(Math.hypot(dx, dy))} 步 · 可选挑战`,
+      );
+    }
+  }
   set(
     'medicine-hud',
     activeMedicines(save.medicine, save.age)
@@ -1298,7 +1321,7 @@ function renderPause() {
 }
 function gameEvent(name: string) {
   sound(name);
-  if (name === 'loot') persist();
+  if (['loot', 'cache'].includes(name)) persist();
 }
 
 function finishRun() {
@@ -2798,6 +2821,11 @@ function handleAction(action: string, id?: string) {
     startRun();
   }
   if (action === 'return') returnLobby();
+  if (action === 'challenge-cache' && game && !panel) {
+    game.beginCacheChallenge();
+    updateHud();
+    return;
+  }
   if (action === 'pause' && game) {
     clearInput();
     panel = '';

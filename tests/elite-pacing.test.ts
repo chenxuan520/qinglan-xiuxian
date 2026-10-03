@@ -31,7 +31,9 @@ test('三至六境前半程保留原间隔，过半只接一波，之后每24秒
     g.update(0.01);
     assert.equal(ENEMY_TACTICS[elites(g)[0].type].eliteSkill, 'dash');
     assert.ok(
-      ['ranged', 'volley', 'nova', 'soul'].includes(ENEMY_TACTICS[elites(g)[1].type].eliteSkill),
+      ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(
+        ENEMY_TACTICS[elites(g)[1].type].eliteSkill,
+      ),
     );
     assert.equal(g.nextElite, half + 24);
     g.update(0.01);
@@ -47,7 +49,11 @@ test('三至六境前半程保留原间隔，过半只接一波，之后每24秒
       assert.equal(
         ranged.type,
         roster
-          .filter((t) => ['ranged', 'volley', 'nova', 'soul'].includes(ENEMY_TACTICS[t].eliteSkill))
+          .filter((t) =>
+            ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(
+              ENEMY_TACTICS[t].eliteSkill,
+            ),
+          )
           .at(-1),
       );
     }

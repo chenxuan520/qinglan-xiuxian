@@ -6529,3 +6529,47 @@ body.journey-complete:not(.in-game) {
     padding: 10px 14px max(10px, env(safe-area-inset-bottom));
   }
 }
+
+.cache-prompt {
+  position: absolute;
+  bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  text-align: center;
+  color: #f2e1ad;
+  background: #123b32ed;
+  border: 1px solid #d8c48166;
+  border-radius: 8px;
+  padding: 6px 12px;
+  pointer-events: none;
+}
+.cache-prompt small {
+  display: block;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cache-prompt button {
+  pointer-events: auto;
+  min-height: 44px;
+  padding: 4px 16px;
+  margin-top: 4px;
+  color: inherit;
+}
+.cache-prompt[hidden],
+.cache-prompt button[hidden] {
+  display: none;
+}
+.cache-prompt button {
+  border: 1px solid #d8c48188;
+  border-radius: 5px;
+  background: #e9ce8a18;
+}
+.cache-prompt:not([hidden]) ~ .touch-movement-hint {
+  display: none;
+}
+@media (max-height: 420px) {
+  .cache-prompt {
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+}
