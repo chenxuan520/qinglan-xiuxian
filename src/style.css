@@ -1441,6 +1441,87 @@ kbd {
   padding-left: 6px;
   color: #a8bfa4;
 }
+.collection-toolbar {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.collection-toolbar .book-tabs button {
+  min-height: 44px;
+}
+.collection-toolbar .header-right {
+  margin-left: auto;
+}
+.collection-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: sticky;
+  top: -35px;
+  z-index: 1;
+  padding: 4px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  background: #1d3d34;
+}
+.collection-filters,
+.collection-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.collection-filters button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 12px;
+  color: #a9bca2;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.collection-filters button.active {
+  color: #eee2b7;
+  border-color: #bec79580;
+  background: #aec28b1f;
+}
+.collection-pages {
+  margin-left: auto;
+}
+.collection-pages button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.collection-pages .small-icon {
+  width: 16px;
+  height: 16px;
+}
+.collection-previous .small-icon {
+  transform: rotate(180deg);
+}
+.collection-pages > span {
+  min-width: 28px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 11px;
+  color: #d5d4b0;
+  font-variant-numeric: tabular-nums;
+}
+.collection-pages .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .collection-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3661,6 +3742,20 @@ kbd {
   .panel-toolbar .header-right {
     gap: 8px;
   }
+  .collection-navigation {
+    top: -23px;
+    gap: 6px;
+  }
+  .collection-filters {
+    gap: 2px;
+  }
+  .collection-filters button {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  .collection-pages {
+    gap: 2px;
+  }
   .collection-grid {
     grid-template-columns: repeat(4, 1fr);
     gap: 6px;
@@ -4462,6 +4557,7 @@ body:not(.in-game) #ui {
 }
 .guide-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
@@ -4473,6 +4569,10 @@ body:not(.in-game) #ui {
   padding-top: 8px;
 }
 .guide-tabs button {
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: 10px 14px;
   font-size: 12px;
   color: #a9bca2;
@@ -4482,9 +4582,6 @@ body:not(.in-game) #ui {
 .guide-tabs button.active {
   color: #e1d9a9;
   border-color: #d2c597;
-}
-.collection-pages {
-  position: static;
 }
 .guide-close {
   margin-top: 24px;
@@ -4639,22 +4736,18 @@ body:not(.in-game) #ui {
 }
 @media (max-width: 650px) {
   .guide-tabs {
-    gap: 0;
-    justify-content: space-between;
+    gap: 4px;
+    justify-content: flex-start;
     top: -23px;
   }
   .guide-tabs button {
-    padding: 9px 5px;
-    font-size: 10px;
-    letter-spacing: 0.5px;
+    padding: 9px 6px;
+    font-size: 11px;
+    letter-spacing: 0;
   }
   .bestiary-tabs {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-  }
-  .bestiary-tabs button {
-    min-height: 36px;
-    white-space: nowrap;
   }
   .item-guide-row {
     gap: 12px;
