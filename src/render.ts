@@ -19,9 +19,12 @@ export class Renderer {
   scale = 1;
   private imageRequests = new Map<string, Promise<void>>();
   private loadedImages = new Set<string>();
+  private terrainImages: HTMLImageElement[] = [];
   private tiles: CanvasPattern[] = [];
+  needsRedraw = true;
   constructor(public canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
+    canvas.addEventListener('contextrestored', () => this.restore());
     this.resize();
   }
   hasScene(
@@ -55,10 +58,8 @@ export class Renderer {
               if (atlas >= 0) this.atlases[atlas] = image;
               const terrain = STAGES.findIndex((s) => s.terrain === url);
               if (terrain >= 0) {
-                const texture = document.createElement('canvas');
-                texture.width = texture.height = 850;
-                texture.getContext('2d')!.drawImage(image, 0, 0, 850, 850);
-                this.tiles[terrain] = this.ctx.createPattern(texture, 'repeat')!;
+                this.terrainImages[terrain] = image;
+                this.tiles[terrain] = this.terrainPattern(image);
               }
               this.loadedImages.add(url);
               resolve();
@@ -76,6 +77,16 @@ export class Renderer {
       }),
     );
   }
+  private terrainPattern(image: HTMLImageElement) {
+    const texture = document.createElement('canvas');
+    texture.width = texture.height = 850;
+    texture.getContext('2d')!.drawImage(image, 0, 0, 850, 850);
+    return this.ctx.createPattern(texture, 'repeat')!;
+  }
+  restore() {
+    // 手机后台可能回收主画布和离屏缓存；保留原图，在下一次绘制时重建。
+    this.needsRedraw = true;
+  }
   resize() {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
@@ -86,6 +97,14 @@ export class Renderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   draw(game: Game | null, now: number, stage: number, previewRealm = 0) {
+    if (this.ctx.isContextLost?.()) return;
+    if (this.needsRedraw) {
+      this.resize();
+      this.sprites.clear();
+      this.formations.clear();
+      this.glowSprites.clear();
+      this.tiles = this.terrainImages.map((image) => this.terrainPattern(image));
+    }
     if (game?.tribulation) stage = 6;
     const c = this.ctx,
       w = this.width,
@@ -155,6 +174,7 @@ export class Renderer {
       this.drawBossEntrance(game);
       this.drawRealmBreakthrough(game);
     }
+    this.needsRedraw = false;
   }
   private drawRealmBreakthrough(game: Game) {
     const cue = realmBreakthroughCue(game);

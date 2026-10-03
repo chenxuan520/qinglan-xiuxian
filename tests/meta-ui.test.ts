@@ -162,6 +162,7 @@ test('升级卡片写出伤害倍率，觉醒卡片说明觉醒一击', () => {
   assert.match(evolve, /觉醒一击/);
   assert.match(evolve, /8 倍单次伤害，妖王至多损失 5% 气血/);
   assert.match(evolve, /伤害 ×2\.60 → ×4\.68 · 施法间隔 −30%/);
+  assert.match(evolve, /class="choice-recipe-compact">配套五重功法：太玄剑经 或 血煞真经<\/div>/);
   const upgrade = choiceCard(game, save, { type: 'weapon', id: 'sword', level: 3 }, 1);
   assert.match(upgrade, /伤害 ×1\.32 → ×1\.64/);
   const fresh = choiceCard(game, save, { type: 'weapon', id: 'nail', level: 1 }, 2);
