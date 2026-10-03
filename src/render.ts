@@ -183,10 +183,10 @@ export class Renderer {
       w = this.width,
       h = this.height,
       still = this.reducedMotion.matches;
-    const fade = Math.min(1, (1 - cue.progress) / 0.45);
+    const fade = Math.min(1, cue.progress / 0.14) * Math.min(1, (1 - cue.progress) / 0.45);
     c.save();
     if (still) {
-      c.globalAlpha = fade * 0.025;
+      c.globalAlpha = fade * 0.015;
       c.fillStyle = cue.color;
     } else {
       const x = -w * 0.3 + cue.progress * w * 1.6;
@@ -194,7 +194,7 @@ export class Renderer {
       sweep.addColorStop(0, cue.color + '00');
       sweep.addColorStop(0.5, cue.color);
       sweep.addColorStop(1, cue.color + '00');
-      c.globalAlpha = fade * 0.09;
+      c.globalAlpha = fade * 0.05;
       c.fillStyle = sweep;
     }
     c.fillRect(0, 0, w, h);
@@ -208,15 +208,35 @@ export class Renderer {
         y = h / 2 - 4;
       }
     }
-    if (!still) y -= cue.progress * 10;
+    if (!still) y -= cue.progress * 6;
+    const fontSize = w < 700 || h < 500 ? 22 : 28;
+    const serif = '"Noto Serif SC", "Songti SC", "STSong", serif';
     c.globalAlpha = fade;
     c.textAlign = 'center';
-    c.strokeStyle = '#102b25';
-    c.lineWidth = 3;
-    c.fillStyle = cue.color;
-    c.font = `600 ${w < 700 ? 40 : 52}px serif`;
-    c.strokeText(cue.name, x, y + 14);
-    c.fillText(cue.name, x, y + 14);
+    c.shadowColor = '#102b25cc';
+    c.shadowBlur = 6;
+    c.shadowOffsetY = 1;
+    c.fillStyle = '#eee5c9';
+    c.font = `400 ${fontSize}px ${serif}`;
+    c.fillText(cue.name, x, y + 5);
+    c.globalAlpha = fade * 0.7;
+    c.fillStyle = c.strokeStyle = cue.color;
+    c.font = `400 ${fontSize === 22 ? 8 : 9}px ${serif}`;
+    c.fillText('破 境', x, y + 21);
+    c.shadowBlur = 0;
+    c.shadowOffsetY = 0;
+    c.lineWidth = 0.75;
+    // 细线收束名号，不加厚重描边或遮住战场的底板。
+    for (const side of [-1, 1]) {
+      const edge = x + side * (fontSize + 10);
+      c.beginPath();
+      c.moveTo(edge, y - 3);
+      c.lineTo(edge + side * 19, y - 3);
+      c.stroke();
+      c.beginPath();
+      c.arc(edge + side * 23, y - 3, 1.2, 0, TAU);
+      c.fill();
+    }
     c.restore();
   }
   private drawBossEntrance(game: Game) {

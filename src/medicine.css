@@ -32,6 +32,7 @@
   flex-wrap: wrap;
 }
 .medicine-tabs button {
+  min-height: 44px;
   padding: 10px 14px;
   border-bottom: 1px solid #aebc9955;
   font-size: 13px;

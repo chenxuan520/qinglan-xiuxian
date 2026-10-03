@@ -964,6 +964,7 @@ function renderPanel() {
     const visibleTreasures = catalogTreasures.filter(
       (t) => schoolFilter === 'all' || t.school === schoolFilter,
     );
+    const pageCount = Math.ceil(visibleTreasures.length / 12);
     const t = treasure(selectedTreasure),
       level = save.forge[t.id] || 0,
       cost = forgeCost(level),
@@ -975,19 +976,11 @@ function renderPanel() {
     panelFrame(
       '万般法宝，皆可入道',
       '藏器阁',
-      `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar"><div class="book-tabs"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency(save)}</div></div><div class="guide-tabs" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
-        bookTab === 'treasures'
-          ? `<div class="guide-tabs collection-pages" role="group" aria-label="法宝分页">${Array.from(
-              { length: Math.ceil(visibleTreasures.length / 12) },
-              (_, page) => page,
-            )
-              .map(
-                (page) =>
-                  `<button data-action="treasure-page" data-id="${page}" aria-pressed="${treasurePage === page}" class="${treasurePage === page ? 'active' : ''}">${page * 12 + 1}–${Math.min(visibleTreasures.length, page * 12 + 12)} / ${visibleTreasures.length}</button>`,
-              )
-              .join('')}</div>`
+      `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar collection-toolbar"><div class="book-tabs" role="group" aria-label="藏器分类"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}" aria-pressed="${bookTab === 'treasures'}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}" aria-pressed="${bookTab === 'passives'}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency(save)}</div></div><div class="collection-navigation"><div class="collection-filters" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
+        bookTab === 'treasures' && pageCount > 1
+          ? `<nav class="collection-pages" aria-label="法宝分页"><button class="collection-previous" data-action="treasure-page" data-id="previous" aria-label="上一页法宝" ${treasurePage === 0 ? 'disabled' : ''}>${smallIcon('arrow')}</button><span aria-live="polite" aria-atomic="true" title="第 ${treasurePage * 12 + 1}–${Math.min(visibleTreasures.length, (treasurePage + 1) * 12)} 件，共 ${visibleTreasures.length} 件"><span class="sr-only">第 </span>${treasurePage + 1}<span aria-hidden="true"> / </span><span class="sr-only"> 页，共 </span>${pageCount}<span class="sr-only"> 页</span></span><button data-action="treasure-page" data-id="next" aria-label="下一页法宝" ${treasurePage === pageCount - 1 ? 'disabled' : ''}>${smallIcon('arrow')}</button></nav>`
           : ''
-      }<div class="collection-grid ${bookTab === 'treasures' ? 'treasure-grid' : ''}">${
+      }</div><div class="collection-grid ${bookTab === 'treasures' ? 'treasure-grid' : ''}">${
         bookTab === 'treasures'
           ? visibleTreasures
               .slice(treasurePage * 12, treasurePage * 12 + 12)
@@ -2635,11 +2628,21 @@ function handleAction(action: string, id?: string) {
     renderLobby();
   }
   if (action === 'treasure-page') {
-    treasurePage = Number(id);
-    selectedTreasure = catalogTreasures.filter(
+    const treasures = catalogTreasures.filter(
       (t) => schoolFilter === 'all' || t.school === schoolFilter,
-    )[treasurePage * 12].id;
+    );
+    treasurePage = Math.max(
+      0,
+      Math.min(Math.ceil(treasures.length / 12) - 1, treasurePage + (id === 'next' ? 1 : -1)),
+    );
+    selectedTreasure = treasures[treasurePage * 12].id;
     renderPanel();
+    modal.querySelector('.panel')?.scrollTo(0, 0);
+    (
+      modal.querySelector<HTMLButtonElement>(
+        `.collection-pages button[data-id="${id}"]:not(:disabled)`,
+      ) ?? modal.querySelector<HTMLButtonElement>('.collection-pages button:not(:disabled)')
+    )?.focus({ preventScroll: true });
   }
   if (action === 'school-filter') {
     schoolFilter = id!;
