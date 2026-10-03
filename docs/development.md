@@ -21,12 +21,17 @@ npm run build      # TypeScript 检查与生产构建
 npm run preview    # 预览 dist 中的生产版本
 npm run balance    # 固定种子的难度与六境连续战斗模拟
 npm run balance:training # 天灵根与普通双、三灵根的连续六境及悟道终关对照
+npm run balance:realms -- --roots=heaven --seeds=307,619,997 # 不强化、不复活的七境顺推对照
 npm run balance:passives # 三路线、三灵根的终关功法对照
 npm run balance:trial # 四档境界的终关挑战模拟
 npm run balance:tribulation # 五次天劫的满配 AI 模拟
 npm run format:check
 npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 ```
+
+永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。新局 `progressionVersion = 2`，缺少版本的旧续局按 1 恢复；它与整份存档的 `SAVE_SCHEMA = 2` 分别控制对局规则和存档写入兼容。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
+
+`balance:realms` 不会购买永久强化，不能用它代替“正常投入所得资源”的通关测试。两种策略的样本、参数、逐关境界和局限见 [天灵根逐关成长验证](verification.md#天灵根逐关成长复核2026-10-03)。外部辅助模拟与原始结果不随仓库分发，现有命令与外部脚本的复现范围分别说明。
 
 ## Cloudflare Pages · 主站
 
