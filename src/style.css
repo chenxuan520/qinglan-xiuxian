@@ -5486,9 +5486,12 @@ body.journey-complete:not(.in-game) {
     text-align: center;
   }
   .choice-level {
+    position: absolute;
+    top: 10px;
+    right: 10px;
     align-self: auto;
     font-size: 11px;
-    margin-top: 4px;
+    margin: 0;
     text-align: center;
   }
   .choice-card p {

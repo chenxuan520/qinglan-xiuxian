@@ -176,12 +176,15 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
           : '恢复状态，继续修行';
   const specificBenefit = c.type === 'evolve' || (c.type === 'weapon' && c.level > 1) || mastery;
   const weapon = c.type === 'weapon' || c.type === 'evolve' ? treasure(c.id) : null;
+  const partners = weapon
+    ? evolutionPassives(weapon, game!.path).map((id) => passive(id).name)
+    : [];
   const compactRecipe =
-    c.type === 'weapon'
-      ? `觉醒需本法宝六重 ＋ ${evolutionPassives(weapon!, game!.path)
-          .map((id) => `${passive(id).name}五重`)
-          .join(' 或 ')}`
-      : '';
+    c.type === 'evolve'
+      ? `配套五重功法：${partners.join(' 或 ')}`
+      : c.type === 'weapon'
+        ? `觉醒需本法宝六重 ＋ ${partners.map((name) => `${name}五重`).join(' 或 ')}`
+        : '';
   return `<button class="choice-card ${c.type === 'evolve' ? 'evolution-choice' : ''}" data-action="choose" data-id="${i}" style="--item-color:${item.color}"><div class="choice-top"><span>${tag}</span><kbd>${i + 1}</kbd></div><div class="choice-art">${icon(item.id, item.color)}</div><h3>${c.type === 'evolve' ? treasure(c.id).evolution : item.name}</h3><div class="choice-level">${c.type === 'evolve' ? '六重 → 仙器' : c.type === 'heal' ? '固本培元' : c.level === 1 ? '领悟 · 一重' : `${c.level - 1} 重 → ${c.level} 重`}</div><p><span class="choice-description-full">${description}</span><span class="choice-description-compact">${compactDescription}</span></p><div class="choice-meta">${weapon ? weaponAffinity(weapon, game!.spiritRoot, game!.rootElements, true) : ''}<div class="choice-benefit ${specificBenefit ? '' : 'choice-benefit-hint'}">${benefit}</div></div>${weapon ? evolutionRecipe(weapon, game!.path) : ''}${compactRecipe ? `<div class="choice-recipe-compact">${compactRecipe}</div>` : ''}<span class="choice-select">领悟此法 ${smallIcon('arrow')}</span></button>`;
 }
 export function damageReport(game: Game | null) {
