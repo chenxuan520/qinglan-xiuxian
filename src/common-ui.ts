@@ -99,7 +99,8 @@ export function spiritRootEffects(save: SaveData) {
 }
 export function spiritRootSummary(save: SaveData, showAge = false) {
   const life = lifespanInfo(save);
-  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
+  const root = spiritRootInfo(save.spiritRoot);
+  return `<section class="root-profile" aria-label="此世灵根"><div class="root-profile-heading"><strong>${root.name}<small>${save.rootElements.map((id) => elementInfo(id).name).join(' · ') || '五行未显'} · 修为积累 ${Math.round(root.rate * 100)}%</small></strong>${showAge ? `<span>年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</span>` : ''}</div><div class="root-profile-actions"><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button></div><details class="disclosure" data-disclosure="root"><summary>五行命盘与详细属性</summary><div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}</div><p>${spiritRootEffects(save)}<small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></details></section>`;
 }
 export function lifespanSummary(save: SaveData, selectedStage: number) {
   const life = lifespanInfo(save);
