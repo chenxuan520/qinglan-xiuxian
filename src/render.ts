@@ -520,7 +520,7 @@ export class Renderer {
       c.stroke();
       c.restore();
     }
-    // 先画己方领域，再画敌方预警，红色危险边界始终位于地面装饰之上。
+    // 先画地面底色；危险边界集中放在法宝、人物和装饰之后绘制。
     for (const z of game.zones)
       if (hasArtifactField(z) && this.visible(z, p, z.radius + 50))
         drawArtifactField(c, z, time, this.reducedMotion.matches);
@@ -536,33 +536,7 @@ export class Renderer {
       c.beginPath();
       c.arc(0, 0, z.radius, 0, TAU);
       c.fill();
-      if (z.hostile) {
-        c.strokeStyle = '#301c2280';
-        c.lineWidth = 4;
-        c.stroke();
-        c.strokeStyle = '#ff9b80';
-        c.lineWidth = 2;
-      }
-      c.stroke();
-      if (z.kind.startsWith('enemy-')) {
-        c.fillStyle = z.color;
-        c.font = 'bold 16px serif';
-        c.textAlign = 'center';
-        c.fillText(
-          (
-            {
-              'enemy-roots': '藤',
-              'enemy-firepath': '火',
-              'enemy-frost': '霜',
-              'enemy-miasma': '瘴',
-              'enemy-storm': '雷',
-              'enemy-stomp': '震',
-            } as Record<string, string>
-          )[z.kind] ?? '',
-          0,
-          6,
-        );
-      }
+      if (!z.hostile) c.stroke();
       if (z.kind === 'vortex') this.formation(0, 0, z.radius * 0.9, time, z.color, 0.6);
       if (z.delay <= 0 && z.kind !== 'vortex') {
         for (let i = 0; i < 9; i++) {
@@ -618,29 +592,6 @@ export class Renderer {
           c.textAlign = 'center';
           c.fillText({ heal: '丹', magnet: '灵', iron: '铁', chest: '宝' }[kind], 0, 5);
         });
-      }
-      c.restore();
-    }
-    // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
-    for (const e of game.enemies) {
-      if (!game.usesRegionalSkill(e)) continue;
-      if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
-      if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
-      c.save();
-      c.strokeStyle = '#ffc199';
-      c.fillStyle = '#e9836130';
-      c.lineWidth = 2;
-      if (e.charge > 0.55) {
-        c.translate(e.x, e.y);
-        c.rotate(Math.atan2(e.dy, e.dx));
-        const width = e.radius + 13;
-        c.fillRect(0, -width, 209, width * 2);
-        c.setLineDash([7, 5]);
-        c.strokeRect(0, -width, 209, width * 2);
-      } else {
-        c.beginPath();
-        c.arc(e.x, e.y, e.radius + 8, 0, TAU);
-        c.stroke();
       }
       c.restore();
     }
@@ -991,6 +942,7 @@ export class Renderer {
       }
     }
     for (const e of game.effects) {
+      if (e.kind === 'line') continue;
       c.save();
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;
@@ -1079,24 +1031,6 @@ export class Renderer {
         }
       } else if (['chain', 'whip', 'starline', 'tower-ray'].includes(e.kind)) {
         drawArtifactBeam(c, e, this.reducedMotion.matches);
-      } else if (e.kind === 'line') {
-        if (e.radius > 30) {
-          c.save();
-          c.globalAlpha *= 0.2;
-          c.lineWidth = e.radius * 2;
-          c.lineCap = 'round';
-          c.beginPath();
-          c.moveTo(e.x, e.y);
-          c.lineTo(e.x2!, e.y2!);
-          c.stroke();
-          c.restore();
-        }
-        c.lineWidth = 2;
-        c.setLineDash([8, 5]);
-        c.beginPath();
-        c.moveTo(e.x, e.y);
-        c.lineTo(e.x2!, e.y2!);
-        c.stroke();
       } else if (e.kind === 'lightning') {
         c.translate(e.x, e.y);
         this.glowSprite(`lightning:${e.color}`, 110, 570, (c) => {
@@ -1127,6 +1061,94 @@ export class Renderer {
         c.stroke();
         if (e.kind === 'ice') this.formation(e.x, e.y, r, 0, e.color, 0.5);
       }
+      c.restore();
+    }
+    this.drawEnemyWarnings(game);
+  }
+  private drawEnemyWarnings(game: Game) {
+    const c = this.ctx,
+      p = game.player;
+    // 仅重绘清晰的边界与标记，不叠加第二层红色底色。
+    for (const z of game.zones) {
+      if (!z.hostile || !this.visible(z, p, z.radius + 50)) continue;
+      c.save();
+      c.translate(z.x, z.y);
+      c.setLineDash(z.delay > 0 ? [7, 5] : []);
+      c.beginPath();
+      c.arc(0, 0, z.radius, 0, TAU);
+      c.strokeStyle = '#301c2280';
+      c.lineWidth = 4;
+      c.stroke();
+      c.strokeStyle = '#ff9b80';
+      c.lineWidth = 2;
+      c.stroke();
+      if (z.kind.startsWith('enemy-')) {
+        c.fillStyle = z.color;
+        c.font = 'bold 16px serif';
+        c.textAlign = 'center';
+        c.fillText(
+          (
+            {
+              'enemy-roots': '藤',
+              'enemy-firepath': '火',
+              'enemy-frost': '霜',
+              'enemy-miasma': '瘴',
+              'enemy-storm': '雷',
+              'enemy-stomp': '震',
+            } as Record<string, string>
+          )[z.kind] ?? '',
+          0,
+          6,
+        );
+      }
+      c.restore();
+    }
+    // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
+    for (const e of game.enemies) {
+      if (!game.usesRegionalSkill(e)) continue;
+      if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
+      if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
+      c.save();
+      c.strokeStyle = '#ffc199';
+      c.fillStyle = '#e9836130';
+      c.lineWidth = 2;
+      if (e.charge > 0.55) {
+        c.translate(e.x, e.y);
+        c.rotate(Math.atan2(e.dy, e.dx));
+        const width = e.radius + 13;
+        c.fillRect(0, -width, 209, width * 2);
+        c.setLineDash([7, 5]);
+        c.strokeRect(0, -width, 209, width * 2);
+      } else {
+        c.beginPath();
+        c.arc(e.x, e.y, e.radius + 8, 0, TAU);
+        c.stroke();
+      }
+      c.restore();
+    }
+    // 妖王冲刺的路线也必须在己方法宝与觉醒装饰之上。
+    for (const e of game.effects) {
+      if (e.kind !== 'line') continue;
+      c.save();
+      c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
+      c.strokeStyle = e.color;
+      if (e.radius > 30) {
+        c.save();
+        c.globalAlpha *= 0.2;
+        c.lineWidth = e.radius * 2;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(e.x, e.y);
+        c.lineTo(e.x2!, e.y2!);
+        c.stroke();
+        c.restore();
+      }
+      c.lineWidth = 2;
+      c.setLineDash([8, 5]);
+      c.beginPath();
+      c.moveTo(e.x, e.y);
+      c.lineTo(e.x2!, e.y2!);
+      c.stroke();
       c.restore();
     }
   }

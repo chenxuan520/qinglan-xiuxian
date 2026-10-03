@@ -261,3 +261,137 @@ test('新存档字段校验与旧字段缺省兼容，不接受损坏动画数�
   assert.equal(parseSave(JSON.stringify({ ...g.save, schema: 4 })).schema, SAVE_SCHEMA);
   assert.equal(SAVE_SCHEMA, 5);
 });
+
+test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普通冲刺和妖王路线', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { registerHooks, stripTypeScriptTypes } = await import('node:module');
+  const renderUrl = new URL('../src/render.ts', import.meta.url);
+  const hook = registerHooks({
+    load(url, context, nextLoad) {
+      if (url !== renderUrl.href) return nextLoad(url, context);
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: stripTypeScriptTypes(readFileSync(renderUrl, 'utf8'), { mode: 'transform' }),
+      };
+    },
+  });
+  const { Renderer } = await import('../src/render.ts').finally(() => hook.deregister());
+  for (const id of ['axe', 'coffin', 'pagoda'] as const)
+    for (const charging of [false, true]) {
+      const g = fixture();
+      g.path = 'dual';
+      g.weapons = [{ id, level: 6, evolved: true, timer: 99 }];
+      const dash = g.spawnEnemy(0, false, false, { x: 60, y: 0 });
+      dash.charge = 0.9;
+      dash.dx = 1;
+      dash.dy = 0;
+      const ranged = g.spawnEnemy(1, false, false, { x: 100, y: 40 });
+      ranged.windup = 0.5;
+      ranged.pendingSkill = 'ranged';
+      g.cast(g.weapons[0]);
+      for (const z of g.zones) {
+        z.delay = charging ? 0.3 : 0;
+        z.castDelay = 0.6;
+        if (!charging) z.life -= 0.01;
+      }
+      g.zone(60, 0, 90, 0.5, 20, '#dc937b', 'enemy-firepath', 0.8, true);
+      // 故意先放敌方路线、后放己方光束，不能依赖 effects 的创建顺序。
+      g.effects = [
+        {
+          x: 0,
+          y: 0,
+          x2: 200,
+          y2: 0,
+          radius: 45,
+          life: 0.8,
+          maxLife: 0.8,
+          color: '#e2957c',
+          kind: 'line',
+        },
+        {
+          x: 0,
+          y: 0,
+          x2: 200,
+          y2: 0,
+          radius: 42,
+          life: 0.4,
+          maxLife: 0.4,
+          color: '#00cafe',
+          kind: 'whip',
+        },
+        {
+          x: 0,
+          y: 0,
+          radius: 420,
+          life: 1,
+          maxLife: 1.6,
+          color: '#76efcd',
+          kind: 'awaken',
+          element: 'earth',
+        },
+      ];
+      const calls: { method: string; args: unknown[]; strokeStyle: unknown; alpha: number }[] = [];
+      const stack: object[] = [];
+      const context = {
+        globalAlpha: 1,
+        strokeStyle: '#000',
+        fillStyle: '#000',
+        globalCompositeOperation: 'source-over',
+      } as CanvasRenderingContext2D;
+      const ctx = new Proxy(context, {
+        get(target, key: string) {
+          if (key in target) return target[key];
+          if (key === 'createLinearGradient') return () => ({ addColorStop() {} });
+          return (...args: unknown[]) => {
+            if (key === 'save') stack.push({ ...target });
+            else if (key === 'restore') Object.assign(target, stack.pop());
+            else
+              calls.push({
+                method: key,
+                args,
+                strokeStyle: target.strokeStyle,
+                alpha: target.globalAlpha,
+              });
+          };
+        },
+      });
+      const r = Object.assign(Object.create(Renderer.prototype), {
+        ctx,
+        width: 1280,
+        height: 800,
+        scale: 1,
+        reducedMotion: { matches: false },
+        sprite() {},
+        formation() {},
+        cachedFormation() {},
+      });
+      const before = g.snapshot();
+      r.drawGame(g, 0);
+      assert.deepEqual(g.snapshot(), before);
+      const lastObject = calls.findLastIndex(
+        (c) =>
+          ['fill', 'fillRect', 'stroke'].includes(c.method) &&
+          Math.abs(c.alpha - (charging ? 0.63 : 0.9)) < 1e-8,
+      );
+      const lastBeam = calls.findLastIndex(
+        (c) => c.method === 'stroke' && c.strokeStyle === '#00cafe',
+      );
+      const lastAwaken = calls.findLastIndex(
+        (c) => c.method === 'stroke' && c.strokeStyle === '#76efcd',
+      );
+      assert.ok(lastObject >= 0 && lastBeam >= 0 && lastAwaken >= 0);
+      const floor = calls.findIndex((c) => c.method === 'stroke' && c.strokeStyle === '#ff9b80');
+      const charge = calls.findIndex((c) => c.method === 'strokeRect' && c.args[2] === 209);
+      const windup = calls.findIndex(
+        (c) => c.method === 'arc' && c.args[0] === ranged.x && c.args[2] === ranged.radius + 8,
+      );
+      const boss = calls.findIndex((c) => c.method === 'stroke' && c.strokeStyle === '#e2957c');
+      for (const index of [floor, charge, windup, boss])
+        assert.ok(
+          index > Math.max(lastObject, lastBeam, lastAwaken),
+          `${id}/${charging}: 警示 ${index} 被实体 ${lastObject} 或光束 ${lastBeam} 覆盖`,
+        );
+      assert.equal(stack.length, 0);
+    }
+});
