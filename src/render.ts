@@ -6,6 +6,12 @@ import { assetUrl } from './asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
 import { bossEntranceCue, BOSS_ENTRANCE_THEMES } from './boss-entrance.ts';
 import { realmBreakthroughCue } from './realm-breakthrough.ts';
+import {
+  hasArtifactField,
+  drawArtifactField,
+  drawArtifactObject,
+  drawArtifactBeam,
+} from './artifact-effects.ts';
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
@@ -514,8 +520,12 @@ export class Renderer {
       c.stroke();
       c.restore();
     }
+    // 先画地面底色；危险边界集中放在法宝、人物和装饰之后绘制。
+    for (const z of game.zones)
+      if (hasArtifactField(z) && this.visible(z, p, z.radius + 50))
+        drawArtifactField(c, z, time, this.reducedMotion.matches);
     for (const z of game.zones) {
-      if (!this.visible(z, p, z.radius + 50)) continue;
+      if (hasArtifactField(z) || !this.visible(z, p, z.radius + 50)) continue;
       c.save();
       c.translate(z.x, z.y);
       const alpha = z.delay > 0 ? 0.15 + Math.sin(time * 13) * 0.06 : 0.22;
@@ -526,34 +536,7 @@ export class Renderer {
       c.beginPath();
       c.arc(0, 0, z.radius, 0, TAU);
       c.fill();
-      if (z.hostile) {
-        c.strokeStyle = '#301c2280';
-        c.lineWidth = 4;
-        c.stroke();
-        c.strokeStyle = '#ff9b80';
-        c.lineWidth = 2;
-      }
-      c.stroke();
-      if (z.kind.startsWith('enemy-')) {
-        c.fillStyle = z.color;
-        c.font = 'bold 16px serif';
-        c.textAlign = 'center';
-        c.fillText(
-          (
-            {
-              'enemy-roots': '藤',
-              'enemy-firepath': '火',
-              'enemy-frost': '霜',
-              'enemy-miasma': '瘴',
-              'enemy-storm': '雷',
-              'enemy-stomp': '震',
-            } as Record<string, string>
-          )[z.kind] ?? '',
-          0,
-          6,
-        );
-      }
-      this.zoneEmblem(z.kind, z.color, time, z.radius);
+      if (!z.hostile) c.stroke();
       if (z.kind === 'vortex') this.formation(0, 0, z.radius * 0.9, time, z.color, 0.6);
       if (z.delay <= 0 && z.kind !== 'vortex') {
         for (let i = 0; i < 9; i++) {
@@ -609,29 +592,6 @@ export class Renderer {
           c.textAlign = 'center';
           c.fillText({ heal: '丹', magnet: '灵', iron: '铁', chest: '宝' }[kind], 0, 5);
         });
-      }
-      c.restore();
-    }
-    // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
-    for (const e of game.enemies) {
-      if (!game.usesRegionalSkill(e)) continue;
-      if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
-      if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
-      c.save();
-      c.strokeStyle = '#ffc199';
-      c.fillStyle = '#e9836130';
-      c.lineWidth = 2;
-      if (e.charge > 0.55) {
-        c.translate(e.x, e.y);
-        c.rotate(Math.atan2(e.dy, e.dx));
-        const width = e.radius + 13;
-        c.fillRect(0, -width, 209, width * 2);
-        c.setLineDash([7, 5]);
-        c.strokeRect(0, -width, 209, width * 2);
-      } else {
-        c.beginPath();
-        c.arc(e.x, e.y, e.radius + 8, 0, TAU);
-        c.stroke();
       }
       c.restore();
     }
@@ -768,6 +728,9 @@ export class Renderer {
         }
       }
     }
+    for (const z of game.zones)
+      if (hasArtifactField(z) && this.visible(z, p, z.radius + 180))
+        drawArtifactObject(c, z, time, this.reducedMotion.matches);
     const lotus = game.weapons.find((w) => w.id === 'orbit');
     if (lotus) {
       const count = 2 + Math.floor(lotus.level / 2) + (lotus.evolved ? 3 : 0),
@@ -785,14 +748,44 @@ export class Renderer {
     for (const shot of game.shots) {
       if (!this.visible(shot, p)) continue;
       const a = Math.atan2(shot.vy, shot.vx);
-      if (shot.kind === 'sword' || shot.kind === 'arrow' || shot.kind === 'dragon')
-        this.sword(shot.x, shot.y, a, shot.color, shot.kind === 'dragon' ? 1.7 : 0.8);
+      if (shot.kind === 'sword') this.sword(shot.x, shot.y, a, shot.color, 0.8);
       else {
         c.save();
         c.translate(shot.x, shot.y);
         c.rotate(a);
         if (shot.kind === 'blade') c.rotate(time * 12);
-        if (shot.kind === 'qin') {
+        if (shot.kind === 'dragon') {
+          const bend = this.reducedMotion.matches ? 0 : Math.sin(shot.age * 7) * 8;
+          c.strokeStyle = shot.color + '50';
+          c.lineWidth = 15;
+          c.beginPath();
+          c.moveTo(-58, -bend);
+          c.bezierCurveTo(-37, 21 + bend, -20, -22, 9, 0);
+          c.stroke();
+          c.strokeStyle = shot.color;
+          c.lineWidth = 5;
+          c.stroke();
+          c.strokeStyle = '#f1e7c4';
+          c.lineWidth = 1.5;
+          c.stroke();
+          c.fillStyle = '#b3d7b5';
+          c.beginPath();
+          c.moveTo(19, 0);
+          c.lineTo(3, -9);
+          c.lineTo(-2, -2);
+          c.lineTo(3, 8);
+          c.closePath();
+          c.fill();
+          c.beginPath();
+          c.moveTo(4, -6);
+          c.lineTo(-4, -15);
+          c.lineTo(-10, -12);
+          c.moveTo(11, 3);
+          c.quadraticCurveTo(26, 11, 29, 3);
+          c.stroke();
+          c.fillStyle = '#fff5c9';
+          c.fillRect(9, -3, 3, 2);
+        } else if (shot.kind === 'qin') {
           // 扩散音波的半径持续变化，直接画线，避免为每一帧建立纹理。
           c.strokeStyle = shot.color;
           c.lineWidth = 2;
@@ -807,7 +800,31 @@ export class Renderer {
             c.shadowBlur = 12;
             c.strokeStyle = shot.color;
             c.fillStyle = shot.color;
-            if (shot.kind === 'blade') {
+            if (shot.kind === 'arrow') {
+              c.lineWidth = 2;
+              c.beginPath();
+              c.moveTo(-38, 0);
+              c.lineTo(15, 0);
+              c.stroke();
+              c.fillStyle = '#f6e6b1';
+              c.beginPath();
+              c.moveTo(24, 0);
+              c.lineTo(9, -5);
+              c.lineTo(13, 0);
+              c.lineTo(9, 5);
+              c.closePath();
+              c.fill();
+              c.strokeStyle = shot.color;
+              c.lineWidth = 1;
+              for (let i = 0; i < 3; i++) {
+                c.beginPath();
+                c.moveTo(-29 + i * 4, 0);
+                c.lineTo(-36 + i * 4, -6);
+                c.moveTo(-29 + i * 4, 0);
+                c.lineTo(-36 + i * 4, 6);
+                c.stroke();
+              }
+            } else if (shot.kind === 'blade') {
               c.lineWidth = 4;
               c.beginPath();
               c.arc(0, 0, 15, 0, Math.PI * 1.7);
@@ -850,15 +867,35 @@ export class Renderer {
               c.strokeStyle = '#eee7ff';
               c.stroke();
             } else if (shot.kind === 'skull') {
+              c.fillStyle = '#b3d7c333';
               c.beginPath();
-              c.ellipse(0, 0, 13, 10, 0, 0, TAU);
+              c.moveTo(3, -11);
+              c.bezierCurveTo(-17, -22, -29, 9, -52, -2);
+              c.bezierCurveTo(-32, 21, -14, 6, 3, 11);
               c.fill();
-              c.fillRect(-2, 6, 9, 7);
-              c.fillStyle = '#332344';
+              c.fillStyle = '#d9d8bc';
+              c.strokeStyle = '#9cad93';
+              c.lineWidth = 1;
               c.beginPath();
-              c.arc(3, -4, 3, 0, TAU);
-              c.arc(3, 4, 3, 0, TAU);
+              c.ellipse(1, 0, 12, 10, 0, 0, TAU);
               c.fill();
+              c.stroke();
+              c.fillRect(8, -6, 8, 12);
+              c.fillStyle = '#263d3e';
+              c.beginPath();
+              c.ellipse(5, -4, 4, 3, -0.2, 0, TAU);
+              c.ellipse(5, 4, 4, 3, 0.2, 0, TAU);
+              c.fill();
+              c.fillStyle = '#9fe4c0';
+              c.fillRect(5, -5, 2, 2);
+              c.fillRect(5, 3, 2, 2);
+              c.strokeStyle = '#455855';
+              for (let y = -4; y <= 4; y += 4) {
+                c.beginPath();
+                c.moveTo(12, y);
+                c.lineTo(16, y);
+                c.stroke();
+              }
             } else if (shot.kind === 'beads') {
               c.beginPath();
               c.arc(0, 0, shot.radius, 0, TAU);
@@ -905,6 +942,7 @@ export class Renderer {
       }
     }
     for (const e of game.effects) {
+      if (e.kind === 'line') continue;
       c.save();
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;
@@ -991,24 +1029,8 @@ export class Renderer {
           c.lineTo(e.x + Math.cos(a) * radius, e.y + Math.sin(a) * radius);
           c.stroke();
         }
-      } else if (e.kind === 'line') {
-        if (e.radius > 30) {
-          c.save();
-          c.globalAlpha *= 0.2;
-          c.lineWidth = e.radius * 2;
-          c.lineCap = 'round';
-          c.beginPath();
-          c.moveTo(e.x, e.y);
-          c.lineTo(e.x2!, e.y2!);
-          c.stroke();
-          c.restore();
-        }
-        c.lineWidth = 2;
-        c.setLineDash([8, 5]);
-        c.beginPath();
-        c.moveTo(e.x, e.y);
-        c.lineTo(e.x2!, e.y2!);
-        c.stroke();
+      } else if (['chain', 'whip', 'starline', 'tower-ray'].includes(e.kind)) {
+        drawArtifactBeam(c, e, this.reducedMotion.matches);
       } else if (e.kind === 'lightning') {
         c.translate(e.x, e.y);
         this.glowSprite(`lightning:${e.color}`, 110, 570, (c) => {
@@ -1041,117 +1063,94 @@ export class Renderer {
       }
       c.restore();
     }
+    this.drawEnemyWarnings(game);
   }
-  private zoneEmblem(kind: string, color: string, time: number, radius: number) {
-    const c = this.ctx;
-    c.save();
-    c.strokeStyle = color;
-    c.fillStyle = color;
-    c.lineWidth = 2;
-    c.globalAlpha = 0.8;
-    c.setLineDash([]);
-    if (kind === 'pagoda') {
-      for (let i = 0; i < 4; i++) {
-        const width = 10 + i * 5,
-          y = -40 + i * 15;
-        c.beginPath();
-        c.moveTo(-width, y + 8);
-        c.lineTo(0, y);
-        c.lineTo(width, y + 8);
-        c.stroke();
-        c.strokeRect(-width * 0.65, y + 8, width * 1.3, 9);
-      }
-    } else if (kind === 'cauldron') {
+  private drawEnemyWarnings(game: Game) {
+    const c = this.ctx,
+      p = game.player;
+    // 仅重绘清晰的边界与标记，不叠加第二层红色底色。
+    for (const z of game.zones) {
+      if (!z.hostile || !this.visible(z, p, z.radius + 50)) continue;
+      c.save();
+      c.translate(z.x, z.y);
+      c.setLineDash(z.delay > 0 ? [7, 5] : []);
       c.beginPath();
-      c.ellipse(0, 0, 24, 17, 0, 0, Math.PI);
+      c.arc(0, 0, z.radius, 0, TAU);
+      c.strokeStyle = '#301c2280';
+      c.lineWidth = 4;
       c.stroke();
-      c.beginPath();
-      c.ellipse(0, 0, 24, 8, 0, 0, TAU);
+      c.strokeStyle = '#ff9b80';
+      c.lineWidth = 2;
       c.stroke();
-      c.beginPath();
-      c.moveTo(-17, 12);
-      c.lineTo(-20, 24);
-      c.moveTo(17, 12);
-      c.lineTo(20, 24);
-      c.stroke();
-      for (let i = -1; i <= 1; i++) {
-        c.beginPath();
-        c.moveTo(i * 12, -8);
-        c.quadraticCurveTo(i * 12 + Math.sin(time * 3) * 10, -23, i * 12, -34);
-        c.stroke();
-      }
-    } else if (kind === 'coffin' || kind === 'grave') {
-      c.beginPath();
-      c.moveTo(-17, -32);
-      c.lineTo(17, -32);
-      c.lineTo(24, -16);
-      c.lineTo(15, 30);
-      c.lineTo(-15, 30);
-      c.lineTo(-24, -16);
-      c.closePath();
-      c.stroke();
-      c.strokeRect(-8, -20, 16, 33);
-    } else if (kind === 'banner') {
-      c.beginPath();
-      c.moveTo(-8, 23);
-      c.lineTo(-8, -30);
-      c.lineTo(26, -16);
-      c.lineTo(-8, -4);
-      c.stroke();
-      this.formation(0, 0, radius * 0.8, time * 0.25, color, 0.3);
-    } else if (kind === 'brush') {
-      c.lineWidth = 5;
-      c.rotate(-0.35);
-      c.beginPath();
-      c.moveTo(-24, -12);
-      c.lineTo(18, -12);
-      c.moveTo(0, -27);
-      c.lineTo(0, 25);
-      c.moveTo(-20, 20);
-      c.lineTo(18, 2);
-      c.stroke();
-    } else if (kind === 'bloodpool') {
-      for (let i = 0; i < 3; i++) {
-        c.beginPath();
-        c.ellipse(
+      if (z.kind.startsWith('enemy-')) {
+        c.fillStyle = z.color;
+        c.font = 'bold 16px serif';
+        c.textAlign = 'center';
+        c.fillText(
+          (
+            {
+              'enemy-roots': '藤',
+              'enemy-firepath': '火',
+              'enemy-frost': '霜',
+              'enemy-miasma': '瘴',
+              'enemy-storm': '雷',
+              'enemy-stomp': '震',
+            } as Record<string, string>
+          )[z.kind] ?? '',
           0,
-          0,
-          radius * (0.35 + i * 0.2),
-          radius * (0.2 + i * 0.13),
-          time * 0.3 + i,
-          0,
-          TAU,
+          6,
         );
-        c.stroke();
       }
-    } else if (kind === 'nest') {
-      for (let i = 0; i < 5; i++) {
-        const a = (i * TAU) / 5;
-        c.beginPath();
-        c.ellipse(Math.cos(a) * 15, Math.sin(a) * 15, 6, 10, a, 0, TAU);
-        c.stroke();
-      }
-    } else if (kind === 'sand') {
-      c.rotate(time);
-      c.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const a = (i * TAU) / 10,
-          r = i % 2 ? 8 : 25;
-        c.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      }
-      c.closePath();
-      c.fill();
-    } else if (kind === 'axe') {
-      c.rotate(-0.5);
-      c.fillRect(-3, -28, 6, 60);
-      c.beginPath();
-      c.moveTo(0, -24);
-      c.quadraticCurveTo(35, -45, 32, 10);
-      c.lineTo(0, -3);
-      c.closePath();
-      c.fill();
+      c.restore();
     }
-    c.restore();
+    // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
+    for (const e of game.enemies) {
+      if (!game.usesRegionalSkill(e)) continue;
+      if (e.dead || e.boss || !this.visible(e, p, 260)) continue;
+      if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
+      c.save();
+      c.strokeStyle = '#ffc199';
+      c.fillStyle = '#e9836130';
+      c.lineWidth = 2;
+      if (e.charge > 0.55) {
+        c.translate(e.x, e.y);
+        c.rotate(Math.atan2(e.dy, e.dx));
+        const width = e.radius + 13;
+        c.fillRect(0, -width, 209, width * 2);
+        c.setLineDash([7, 5]);
+        c.strokeRect(0, -width, 209, width * 2);
+      } else {
+        c.beginPath();
+        c.arc(e.x, e.y, e.radius + 8, 0, TAU);
+        c.stroke();
+      }
+      c.restore();
+    }
+    // 妖王冲刺的路线也必须在己方法宝与觉醒装饰之上。
+    for (const e of game.effects) {
+      if (e.kind !== 'line') continue;
+      c.save();
+      c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
+      c.strokeStyle = e.color;
+      if (e.radius > 30) {
+        c.save();
+        c.globalAlpha *= 0.2;
+        c.lineWidth = e.radius * 2;
+        c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(e.x, e.y);
+        c.lineTo(e.x2!, e.y2!);
+        c.stroke();
+        c.restore();
+      }
+      c.lineWidth = 2;
+      c.setLineDash([8, 5]);
+      c.beginPath();
+      c.moveTo(e.x, e.y);
+      c.lineTo(e.x2!, e.y2!);
+      c.stroke();
+      c.restore();
+    }
   }
   private visible(at: Point, camera: Point, margin = 150) {
     return (

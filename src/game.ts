@@ -158,6 +158,9 @@ export interface Zone extends Point {
   kind: string;
   delay: number;
   hostile: boolean;
+  castDelay?: number;
+  castAngle?: number;
+  castEvolved?: boolean;
 }
 export interface Effect extends Point {
   life: number;
@@ -228,6 +231,7 @@ export class Game {
   progressionVersion = 2;
   elitePacingVersion = 2;
   encounterVersion = 1;
+  artifactVersion = 1;
   cacheChallenge: CacheChallenge | null = null;
   private nextEnemySlowAt = 0;
   tribulation = 0;
@@ -354,6 +358,7 @@ export class Game {
     );
     g.tribulation = save.tribulations + 1;
     if (source) {
+      g.artifactVersion = source.artifactVersion;
       g.spiritRoot = source.spiritRoot;
       g.rootElements = [...source.rootElements];
       g.weapons = source.weapons.map((w) => ({ ...w, timer: 0 }));
@@ -523,6 +528,7 @@ export class Game {
       progressionVersion: this.progressionVersion,
       elitePacingVersion: this.elitePacingVersion,
       encounterVersion: this.encounterVersion,
+      artifactVersion: this.artifactVersion,
       cacheChallenge: this.cacheChallenge
         ? { ...this.cacheChallenge, guardians: [...this.cacheChallenge.guardians] }
         : null,
@@ -675,6 +681,7 @@ export class Game {
       )
         return null;
       if (s.encounterVersion !== undefined && ![0, 1].includes(s.encounterVersion)) return null;
+      if (s.artifactVersion !== undefined && ![0, 1].includes(s.artifactVersion)) return null;
       if (
         s.nextEnemySlowAt !== undefined &&
         (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
@@ -896,7 +903,11 @@ export class Game {
         !s.zones.every(
           (z) =>
             numbers(z, ['x', 'y', 'radius', 'life', 'maxLife', 'damage', 'tick', 'delay']) &&
-            typeof z.color === 'string',
+            typeof z.color === 'string' &&
+            (z.castDelay === undefined || (Number.isFinite(z.castDelay) && z.castDelay >= 0)) &&
+            (z.castAngle === undefined ||
+              (Number.isFinite(z.castAngle) && Math.abs(z.castAngle) <= Math.PI)) &&
+            (z.castEvolved === undefined || typeof z.castEvolved === 'boolean'),
         )
       )
         return null;
@@ -946,6 +957,7 @@ export class Game {
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.encounterVersion = s.encounterVersion ?? 0;
+      g.artifactVersion = s.artifactVersion ?? 0;
       g.cacheChallenge = s.cacheChallenge
         ? { ...s.cacheChallenge, guardians: [...s.cacheChallenge.guardians] }
         : null;
@@ -2033,6 +2045,7 @@ export class Game {
       this.stats.damage *
       (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
       (w.evolved ? EVOLVED_DAMAGE : 1) *
+      (w.id === 'skull' ? 1 + this.passivePower('bone') * 0.08 : 1) *
       (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t))
     );
   }
@@ -2361,7 +2374,7 @@ export class Game {
       const hit = new Set<number>();
       for (let i = 0; i < count + 2; i++) {
         hit.add(current.id);
-        this.effect(from.x, from.y, 0.4, 5, t.color, 'line', undefined, current.x, current.y);
+        this.effect(from.x, from.y, 0.4, 5, t.color, 'chain', undefined, current.x, current.y);
         this.hitEnemy(current, dmg, false, w.id);
         current.slow = 2;
         from = current;
@@ -2534,7 +2547,7 @@ export class Game {
         } else if (z.kind === 'pagoda') {
           const target = this.nearest(z, new Set(), z.radius);
           if (target) {
-            this.effect(z.x, z.y, 0.3, 4, z.color, 'line', undefined, target.x, target.y);
+            this.effect(z.x, z.y, 0.3, 4, z.color, 'tower-ray', undefined, target.x, target.y);
             this.hitEnemy(target, z.damage, false, z.kind);
           }
         } else {
@@ -2777,6 +2790,15 @@ export class Game {
       kind,
       delay,
       hostile,
+      ...(!hostile
+        ? {
+            castDelay: delay,
+            castAngle: Math.atan2(y - this.player.y, x - this.player.x),
+            castEvolved: this.weapons.some(
+              (w) => w.id === (kind === 'grave' ? 'coffin' : kind) && w.evolved,
+            ),
+          }
+        : {}),
     });
   }
   private areaDamage(
@@ -2808,7 +2830,17 @@ export class Game {
     pull = false,
     attack?: BossAttack,
   ) {
-    this.effect(from.x, from.y, 0.45, width, color, 'line', undefined, to.x, to.y);
+    this.effect(
+      from.x,
+      from.y,
+      0.45,
+      width,
+      color,
+      source === 'whip' ? 'whip' : source === 'compass' ? 'starline' : 'line',
+      undefined,
+      to.x,
+      to.y,
+    );
     const dx = to.x - from.x,
       dy = to.y - from.y;
     const lengthSquared = dx * dx + dy * dy || 1;
@@ -3052,7 +3084,11 @@ export class Game {
   evolutionRequirements(id: string) {
     const t = treasure(id);
     return evolutionPassives(
-      id === 'axe' && !this.encounterVersion ? { ...t, passive: 'power' } : t,
+      id === 'axe' && !this.encounterVersion
+        ? { ...t, passive: 'power' }
+        : id === 'skull' && !this.artifactVersion
+          ? { ...t, passive: 'spirit' }
+          : t,
       this.path,
     );
   }
