@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { Game } from '../src/game.ts';
-import { ENEMIES, ENEMY_TACTICS, STAGE_ENEMIES } from '../src/data.ts';
+import { ENEMIES, LEGACY_ENEMY_TACTICS as ENEMY_TACTICS, STAGE_ENEMIES } from '../src/data.ts';
 import { autoplayInput } from '../src/autoplay.ts';
 import { freshSave } from '../src/progress.ts';
 
@@ -12,6 +12,7 @@ function encounter(stage: number, type: number, elite = false, distance = 200) {
   save.unlocked = 6;
   save.cultivation = 1e9;
   const g = new Game(save, stage, 0, () => 0.5);
+  g.encounterVersion = 0;
   g.weapons[0].timer = 9999;
   g.spawnBudget = -10000;
   g.nextElite = 9999;
@@ -120,6 +121,7 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
   boss.pursuitCooldown = 999;
   boss.cooldown = 0;
   boss.skillStep = 1;
+  boss.x = -300;
   g.update(0.01);
   assert.ok(g.zones.some((z) => z.delay > 0));
   assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 50));
@@ -148,7 +150,7 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
   assert.equal(count, 72);
 });
 
-test('前六境地域法师恢复蓄势直线灵弹，不再在玩家脚下生成地域法阵', () => {
+test('旧续局前六境地域法师保留蓄势直线灵弹，不再在玩家脚下生成地域法阵', () => {
   for (const [stage, type] of [5, 33, 45, 53, 61, 69].entries()) {
     for (const elite of [false, true]) {
       const { g, e } = encounter(stage, type, elite);
@@ -217,7 +219,7 @@ test('灵弹蓄势后沿锁定方向发射，施法者死亡可以打断', () =>
   assert.equal(g.shots.length, 0);
 });
 
-test('普通怪和精英不再生成地域法阵，重甲近身震地保留', () => {
+test('旧续局普通怪和精英不生成地域法阵，重甲近身震地保留', () => {
   for (const stage of [0, 1, 2, 3, 4, 5]) {
     const caster = [5, 33, 45, 53, 61, 69][stage];
     for (const elite of [false, true]) {

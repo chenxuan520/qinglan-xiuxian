@@ -17,6 +17,12 @@ import {
   DIFFICULTIES,
   ENEMIES,
   ENEMY_TACTICS,
+  LEGACY_ENEMY_TACTICS,
+  ENEMY_CAST_RANGE,
+  ENEMY_FIELD_REACH,
+  BOSS_FIELD_REACH,
+  CACHE_CHALLENGE,
+  REGION_ENCOUNTERS,
   STAGE_ENEMIES,
   enemyRoster,
   enemyWave,
@@ -93,6 +99,7 @@ export interface Enemy extends Point {
   windup?: number;
   pendingSkill?: EnemySkill;
   summonedBy?: number;
+  cacheGuardian?: boolean;
   cooldown: number;
   slow: number;
   flash: number;
@@ -139,6 +146,7 @@ export interface Shot extends Point {
   bounce: number;
   crit: boolean;
   bossAttack?: BossAttack;
+  enemySkill?: 'firebolt' | 'frostbolt';
 }
 export interface Zone extends Point {
   radius: number;
@@ -168,6 +176,11 @@ export interface Pickup extends Point {
   kind: 'xp' | 'heal' | 'magnet' | 'iron' | 'chest';
   value: number;
   pull: boolean;
+}
+export interface CacheChallenge extends Point {
+  phase: 'offered' | 'active' | 'cleared' | 'expired';
+  deadline: number;
+  guardians: number[];
 }
 export interface Choice {
   type: 'weapon' | 'passive' | 'evolve' | 'heal';
@@ -214,6 +227,9 @@ export class Game {
   revivesUsed = 0;
   progressionVersion = 2;
   elitePacingVersion = 2;
+  encounterVersion = 1;
+  cacheChallenge: CacheChallenge | null = null;
+  private nextEnemySlowAt = 0;
   tribulation = 0;
   tribulationStep = 0;
   tribulationNextAt = 1.2;
@@ -506,6 +522,11 @@ export class Game {
       realmScaling: 3,
       progressionVersion: this.progressionVersion,
       elitePacingVersion: this.elitePacingVersion,
+      encounterVersion: this.encounterVersion,
+      cacheChallenge: this.cacheChallenge
+        ? { ...this.cacheChallenge, guardians: [...this.cacheChallenge.guardians] }
+        : null,
+      nextEnemySlowAt: this.nextEnemySlowAt,
       lateEliteWaves: this.lateEliteWaves,
       stage: this.stage,
       stageDuration: STAGES[this.stage].minutes * 60,
@@ -653,6 +674,30 @@ export class Game {
         s.rerolls > 3
       )
         return null;
+      if (s.encounterVersion !== undefined && ![0, 1].includes(s.encounterVersion)) return null;
+      if (
+        s.nextEnemySlowAt !== undefined &&
+        (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
+      )
+        return null;
+      if (s.cacheChallenge != null) {
+        const c = s.cacheChallenge;
+        if (
+          s.encounterVersion !== 1 ||
+          s.stage >= FINAL_TRIAL_STAGE ||
+          s.tribulation ||
+          !numbers(c, ['x', 'y', 'deadline']) ||
+          c.deadline < 0 ||
+          !['offered', 'active', 'cleared', 'expired'].includes(c.phase) ||
+          !Array.isArray(c.guardians) ||
+          c.guardians.length > 2 ||
+          new Set(c.guardians).size !== c.guardians.length ||
+          !c.guardians.every((id) => Number.isSafeInteger(id) && id > 0) ||
+          (c.phase === 'offered' && c.guardians.length !== 0) ||
+          (['active', 'cleared'].includes(c.phase) && c.guardians.length !== 2)
+        )
+          return null;
+      }
       if (s.progressionVersion !== undefined && ![1, 2].includes(s.progressionVersion)) return null;
       if (s.elitePacingVersion !== undefined && ![1, 2].includes(s.elitePacingVersion)) return null;
       if (
@@ -744,7 +789,10 @@ export class Game {
             (e.windup === undefined ||
               (Number.isFinite(e.windup) && e.windup >= 0 && e.windup <= 1.2)) &&
             (e.pendingSkill === undefined ||
-              ['ranged', 'volley', 'nova', 'soul'].includes(e.pendingSkill)) &&
+              ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(
+                e.pendingSkill,
+              )) &&
+            (e.cacheGuardian === undefined || typeof e.cacheGuardian === 'boolean') &&
             (e.summonedBy === undefined ||
               (Number.isSafeInteger(e.summonedBy) && e.summonedBy > 0)) &&
             (e.pursuitCooldown === undefined || Number.isFinite(e.pursuitCooldown)) &&
@@ -752,6 +800,25 @@ export class Game {
               (Number.isInteger(e.bossStage) &&
                 e.bossStage >= 0 &&
                 e.bossStage <= FINAL_TRIAL_STAGE)),
+        )
+      )
+        return null;
+      const cache = s.cacheChallenge;
+      if (
+        s.enemies.some(
+          (e) =>
+            e.cacheGuardian &&
+            (s.encounterVersion !== 1 ||
+              !cache ||
+              cache.phase === 'offered' ||
+              (!cache.guardians.includes(e.id) && !cache.guardians.includes(e.summonedBy ?? -1)) ||
+              (['cleared', 'expired'].includes(cache.phase) && !e.dead)),
+        )
+      )
+        return null;
+      if (
+        cache?.guardians.some((id) =>
+          s.enemies.some((e) => e.id === id && (!e.cacheGuardian || !e.elite || e.boss)),
         )
       )
         return null;
@@ -772,6 +839,7 @@ export class Game {
               'pierce',
               'bounce',
             ]) &&
+            (b.enemySkill === undefined || ['firebolt', 'frostbolt'].includes(b.enemySkill)) &&
             typeof b.color === 'string' &&
             Array.isArray(b.hit) &&
             (b.kind === 'hostile' || TREASURES.some((t) => t.id === b.kind)),
@@ -877,6 +945,10 @@ export class Game {
       )
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.encounterVersion = s.encounterVersion ?? 0;
+      g.cacheChallenge = s.cacheChallenge
+        ? { ...s.cacheChallenge, guardians: [...s.cacheChallenge.guardians] }
+        : null;
       g.progressionVersion = s.progressionVersion ?? 1;
       g.elitePacingVersion = s.elitePacingVersion ?? 1;
       g.lateEliteWaves = s.lateEliteWaves ?? false;
@@ -906,6 +978,8 @@ export class Game {
       const oldDuration = s.stageDuration ?? (g.isFinalTrial ? 600 : (s.stage + 5) * 60);
       const timeScale = g.tribulation ? 1 : duration / oldDuration;
       g.time = s.time * timeScale;
+      g.nextEnemySlowAt = (s.nextEnemySlowAt ?? 0) * timeScale;
+      if (g.cacheChallenge) g.cacheChallenge.deadline *= timeScale;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
@@ -1181,6 +1255,7 @@ export class Game {
     if (!this.tribulation) this.updateEnemies(dt);
     this.updateShots(dt);
     this.updateZones(dt);
+    this.updateCacheChallenge();
     this.updatePickups(dt);
     for (const e of this.effects) {
       e.life -= dt;
@@ -1224,13 +1299,13 @@ export class Game {
       const shot = this.shots[this.shots.length - 1];
       shot.color = '#d2b5ff';
       shot.radius = 8;
-      shot.life = 3.8;
+      shot.life = 720 / velocity;
     };
     const fan = (angle: number, count: number, spread: number) => {
       for (let i = 0; i < count; i++) shoot(angle + (i / (count - 1) - 0.5) * spread);
     };
     const strike = (x: number, y: number, radius: number, delay = warning) =>
-      this.zone(x, y, radius, 0.5, boss.damage, '#d2b5ff', 'blast', delay, true);
+      this.zone(boss.x + x, boss.y + y, radius, 0.5, boss.damage, '#d2b5ff', 'blast', delay, true);
     const ring = (radius: number, count: number, gap: number, size: number, delay = warning) => {
       for (let i = 0; i < count; i++) {
         if (gap >= 0 && (i - gap + count) % count < 3) continue;
@@ -1239,12 +1314,12 @@ export class Game {
       }
     };
     if (step === 0) {
-      this.announce('天劫 · 追身三雷与雷弹 · 侧移离开标记');
+      this.announce('天劫 · 前阵三雷与雷弹 · 侧移离开标记');
       fan(aim, 3 + Math.min(4, power), 0.7);
       for (let i = 0; i < 3; i++)
         strike(
-          this.player.x + this.input.x * 65 * i,
-          this.player.y + this.input.y * 65 * i,
+          Math.cos(aim) * (180 + i * 65),
+          Math.sin(aim) * (180 + i * 65),
           50 + Math.min(15, power * 2),
           warning + i * 0.4,
         );
@@ -1257,7 +1332,7 @@ export class Game {
       }
       for (let wave = 0; wave < 3; wave++)
         ring(120 + wave * 120, count, gap, 38, warning + wave * 0.3);
-      if (this.tribulation >= 3) strike(this.player.x, this.player.y, 55);
+      if (this.tribulation >= 3) strike(Math.cos(aim) * 220, Math.sin(aim) * 220, 55);
     } else if (step === 2) {
       this.announce('天劫 · 横贯雷柱与交叉弹幕 · 穿过空隙');
       for (let i = 0; i < 4; i++) fan((i * TAU) / 4 + this.time * 0.17, 3, 0.32);
@@ -1272,7 +1347,7 @@ export class Game {
       this.announce('天劫 · 雷界收束与散射 · 返回内圈');
       fan(aim, 5 + Math.min(6, power), Math.PI * 1.2);
       ring(365, 24, -1, 68);
-      if (this.tribulation >= 4) strike(this.player.x, this.player.y, 55);
+      if (this.tribulation >= 4) strike(Math.cos(aim) * 220, Math.sin(aim) * 220, 55);
     } else {
       this.zones = this.zones.filter((zone) => !zone.hostile);
       this.shots = this.shots.filter((s) => s.kind !== 'hostile');
@@ -1310,7 +1385,7 @@ export class Game {
     }
     if (this.time < this.nextElite) return;
     if (
-      this.usesElitePacing &&
+      (this.usesElitePacing || this.cacheChallenge?.phase === 'active') &&
       this.enemies.filter((e) => e.elite && !e.boss && !e.dead).length + (late ? 2 : 1) >
         ELITE_PACING.maxAlive
     ) {
@@ -1318,16 +1393,23 @@ export class Game {
       this.nextElite = this.time + 1;
       return;
     }
-    const available = enemyRoster(this.stage, this.time);
+    const available = enemyRoster(this.stage, this.time, this.encounterVersion === 0);
     const armored = available.filter((type) => ['tank', 'shield'].includes(ENEMIES[type].behavior));
     let first = armored.at(-1) ?? available.at(-1);
     let second = available.at(-1);
     if (this.usesElitePacing && late) {
-      first = available.filter((type) => ENEMY_TACTICS[type].eliteSkill === 'dash').at(-1) ?? first;
+      first =
+        available
+          .filter((type) =>
+            ['dash', 'firecharge'].includes(this.enemyTactics(type).eliteSkill ?? ''),
+          )
+          .at(-1) ?? first;
       second =
         available
           .filter((type) =>
-            ['ranged', 'volley', 'nova', 'soul'].includes(ENEMY_TACTICS[type].eliteSkill ?? ''),
+            ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(
+              this.enemyTactics(type).eliteSkill ?? '',
+            ),
           )
           .at(-1) ?? second;
     }
@@ -1346,7 +1428,7 @@ export class Game {
     bossStage = this.isFinalTrial ? TRIAL_BOSS_STAGES[this.trialBossesDefeated] : this.stage,
   ) {
     if (this.isFinalTrial && !boss) elite = true;
-    const available = enemyRoster(this.stage, this.time);
+    const available = enemyRoster(this.stage, this.time, this.encounterVersion === 0);
     if (type === undefined) {
       const pool =
         available.length > 3
@@ -1433,6 +1515,14 @@ export class Game {
     this.enemies.push(enemy);
     return enemy;
   }
+  private enemyTactics(type: number) {
+    return this.encounterVersion ? ENEMY_TACTICS[type] : LEGACY_ENEMY_TACTICS[type];
+  }
+  usesRegionalSkill(e: Enemy) {
+    return (
+      this.stage < FINAL_TRIAL_STAGE || (!!this.encounterVersion && ENEMY_TACTICS[e.type].regional)
+    );
+  }
   private updateEnemies(dt: number) {
     const p = this.player;
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
@@ -1457,7 +1547,7 @@ export class Game {
         }
       }
       const charging = e.charge > 0;
-      const winding = !e.boss && this.stage < FINAL_TRIAL_STAGE && (e.windup ?? 0) > 0;
+      const winding = !e.boss && this.usesRegionalSkill(e) && (e.windup ?? 0) > 0;
       if (winding) {
         e.windup = Math.max(0, e.windup! - dt);
         if (e.windup === 0 && e.pendingSkill) {
@@ -1471,7 +1561,7 @@ export class Game {
           const movement = (Math.min(0.7, before) - Math.min(0.7, e.charge)) * 820;
           e.x += e.dx * movement;
           e.y += e.dy * movement;
-        } else if (this.stage < FINAL_TRIAL_STAGE) {
+        } else if (this.usesRegionalSkill(e)) {
           const movement = (Math.min(0.55, before) - Math.min(0.55, e.charge)) * 380;
           e.x += e.dx * movement;
           e.y += e.dy * movement;
@@ -1480,17 +1570,22 @@ export class Game {
           e.y += e.dy * 380 * dt;
         }
       } else {
+        const localCaster =
+          this.encounterVersion &&
+          ['roots', 'frost', 'miasma', 'storm'].includes(this.enemyTactics(e.type).skill ?? '');
         const move =
-          ['ranged', 'volley', 'nova', 'summon'].includes(behavior) && d < 240 && !e.boss
-            ? d < 160
+          ['ranged', 'volley', 'nova', 'summon'].includes(behavior) &&
+          d < (localCaster ? 160 : 240) &&
+          !e.boss
+            ? d < (localCaster ? 110 : 160)
               ? -0.4
               : 0
             : 1;
         const speed = e.speed * (e.slow > 0 ? 0.35 : 1) * move;
         if (
           !e.boss &&
-          this.stage < FINAL_TRIAL_STAGE &&
-          ENEMY_TACTICS[e.type].flank &&
+          this.usesRegionalSkill(e) &&
+          this.enemyTactics(e.type).flank &&
           d > 100 &&
           d < 420
         ) {
@@ -1506,14 +1601,14 @@ export class Game {
       }
       if (e.boss && !charging && e.cooldown <= 0) {
         this.castBossSkill(e, nx, ny);
-      } else if (!e.boss && this.stage < FINAL_TRIAL_STAGE) {
+      } else if (!e.boss && this.usesRegionalSkill(e)) {
         if (!charging && !winding && e.cooldown <= 0 && this.time >= this.nextEnemySkillAt)
           this.castEnemySkill(e, d, nx, ny);
       } else if (!e.boss && e.cooldown <= 0) {
         e.cooldown = this.isFinalTrial
           ? 4.2 - progress * 2.1 + this.random() * 1.2
           : 4 - progress * 1.3 + this.random() * 2;
-        if (behavior === 'ranged' && d < 600)
+        if (behavior === 'ranged' && d < ENEMY_CAST_RANGE)
           this.hostileShot(
             e,
             nx,
@@ -1521,7 +1616,7 @@ export class Game {
             this.isFinalTrial ? 150 + progress * 55 : 145 + progress * 30,
             e.damage,
           );
-        if (behavior === 'volley' && d < 600) {
+        if (behavior === 'volley' && d < ENEMY_CAST_RANGE) {
           const angle = Math.atan2(ny, nx);
           for (const offset of [-0.24, 0, 0.24])
             this.hostileShot(
@@ -1532,7 +1627,7 @@ export class Game {
               e.damage * 0.8,
             );
         }
-        if (behavior === 'nova' && d < 550) {
+        if (behavior === 'nova' && d < ENEMY_CAST_RANGE) {
           for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * TAU + this.time * 0.15;
             this.hostileShot(
@@ -1570,18 +1665,23 @@ export class Game {
             y: e.y,
           });
         }
-        if (this.isFinalTrial && behavior === 'tank' && d < 500)
-          this.zone(p.x, p.y, 70, 0.5, e.damage, '#ef8a7a', 'blast', 1.1, true);
-        if (behavior === 'poison' && d < 350)
-          this.zone(p.x, p.y, 45, 3, e.damage * 0.7, '#adbe73', 'poison', 1, true);
+        if (this.isFinalTrial && behavior === 'tank' && d < ENEMY_FIELD_REACH)
+          this.enemyField(e, nx * 80, ny * 80, 70, 0.5, e.damage, '#ef8a7a', 'blast', 1.1);
+        if (behavior === 'poison' && d < ENEMY_FIELD_REACH)
+          this.enemyField(e, nx * 80, ny * 80, 45, 3, e.damage * 0.7, '#adbe73', 'poison', 1);
       }
       if (behavior === 'explode' && !e.boss && d < 60 && !e.dead) {
         e.dead = true;
-        this.zone(e.x, e.y, 66, 0.3, e.damage * 1.4, '#ee9b76', 'blast', 0.85, true);
+        this.enemyDeath(e);
+        this.enemyField(e, 0, 0, 66, 0.3, e.damage * 1.4, '#ee9b76', 'blast', 0.85);
       }
       d = distance(e, p);
       if (d < e.radius + 13 && !e.dead) this.hurtPlayer(e.damage);
-      if (d > Math.max(this.viewport.width, this.viewport.height) * 1.5 && !e.boss) {
+      if (
+        d > Math.max(this.viewport.width, this.viewport.height) * 1.5 &&
+        !e.boss &&
+        !e.cacheGuardian
+      ) {
         const a = this.random() * TAU;
         e.x = p.x + Math.cos(a) * (this.viewport.width / 2 + 60);
         e.y = p.y + Math.sin(a) * (this.viewport.height / 2 + 60);
@@ -1602,16 +1702,26 @@ export class Game {
     );
   }
   private castEnemySkill(e: Enemy, distance: number, nx: number, ny: number) {
-    const tactics = ENEMY_TACTICS[e.type];
+    const tactics = this.enemyTactics(e.type);
     const skill = e.elite ? tactics.eliteSkill : tactics.skill;
     if (
       !skill ||
-      distance > 540 ||
+      distance > ENEMY_CAST_RANGE ||
+      (['roots', 'frost', 'miasma', 'storm', 'firepath'].includes(skill) &&
+        distance > ENEMY_FIELD_REACH) ||
       (skill === 'stomp' && distance > 180) ||
       (skill === 'dash' && distance > 360)
     )
       return;
-    const projectile = ['ranged', 'volley', 'nova', 'soul'].includes(skill);
+    const projectile = [
+      'ranged',
+      'volley',
+      'nova',
+      'soul',
+      'firebolt',
+      'frostbolt',
+      'gapring',
+    ].includes(skill);
     const circles = ['roots', 'firepath', 'frost', 'miasma', 'storm', 'stomp'].includes(skill);
     // 前六境技能共享弹幕与地面区域预算；妖王独立施法，避免小怪挤满画面。
     if (projectile && this.shots.filter((b) => b.kind === 'hostile').length >= 60) return;
@@ -1625,8 +1735,21 @@ export class Game {
     this.nextEnemySkillAt = this.time + 0.18;
     e.dx = nx;
     e.dy = ny;
-    if (skill === 'dash') {
+    if (skill === 'dash' || skill === 'firecharge') {
       e.charge = 1.25;
+      if (skill === 'firecharge')
+        for (let i = 0; i < (e.elite ? 3 : 2); i++)
+          this.enemyField(
+            e,
+            nx * i * 65,
+            ny * i * 65,
+            32,
+            2.4,
+            e.damage * 0.45,
+            '#ef9c6c',
+            'enemy-firepath',
+            0.9 + i * 0.18,
+          );
       return;
     }
     if (projectile) {
@@ -1640,7 +1763,7 @@ export class Game {
         240 - this.enemies.length,
         12 - this.enemies.filter((v) => !v.dead && v.summonedBy !== undefined).length,
       );
-      const pool = enemyRoster(this.stage, this.time).slice(0, 2);
+      const pool = enemyRoster(this.stage, this.time, this.encounterVersion === 0).slice(0, 2);
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU;
         const summoned = this.spawnEnemy(pool[i % pool.length], false, false, {
@@ -1648,13 +1771,14 @@ export class Game {
           y: e.y + Math.sin(a) * 40,
         });
         summoned.summonedBy = e.id;
+        if (e.cacheGuardian) summoned.cacheGuardian = true;
       }
       this.effect(e.x, e.y, 0.7, 60, '#c8b9df', 'pulse');
       e.windup = 0.7;
       return;
     }
     e.windup = 0.9;
-    const p = { x: this.player.x, y: this.player.y };
+    const p = { x: e.x + nx * 80, y: e.y + ny * 80 };
     const circle = (
       x: number,
       y: number,
@@ -1662,7 +1786,18 @@ export class Game {
       life: number,
       color: string,
       delay = 0.9,
-    ) => this.zone(x, y, radius, life, e.damage * 0.8, color, `enemy-${skill}`, delay, true);
+    ) =>
+      this.enemyField(
+        e,
+        x - e.x,
+        y - e.y,
+        radius,
+        life,
+        e.damage * (skill === 'stomp' ? 0.8 : 0.65),
+        color,
+        `enemy-${skill}`,
+        delay,
+      );
     if (skill === 'stomp') {
       circle(e.x, e.y, 92, 0.25, '#e9bf85');
       if (e.elite) circle(e.x + nx * 115, e.y + ny * 115, 92, 0.25, '#e9bf85', 1.4);
@@ -1697,23 +1832,38 @@ export class Game {
     }
   }
   private fireEnemyVolley(e: Enemy, skill: EnemySkill) {
+    // 蓄力后仍向已锁定方向出弹，玩家远离后不会继续隔屏追射。
+    if (e.dead || distance(e, this.player) > ENEMY_CAST_RANGE) return;
     const count =
-      skill === 'nova'
+      skill === 'gapring'
         ? e.elite
-          ? 10
-          : 8
-        : skill === 'volley'
+          ? 12
+          : 10
+        : skill === 'firebolt'
           ? e.elite
-            ? 5
-            : 3
-          : skill === 'soul'
+            ? 2
+            : 1
+          : skill === 'frostbolt'
             ? e.elite
-              ? 4
-              : 2
-            : 1;
+              ? 3
+              : 1
+            : skill === 'nova'
+              ? e.elite
+                ? 10
+                : 8
+              : skill === 'volley'
+                ? e.elite
+                  ? 5
+                  : 3
+                : skill === 'soul'
+                  ? e.elite
+                    ? 4
+                    : 2
+                  : 1;
     const available = 64 - this.shots.filter((b) => b.kind === 'hostile').length;
     const angle = Math.atan2(e.dy, e.dx);
     for (let i = 0; i < Math.min(count, available); i++) {
+      if (skill === 'gapring' && (i === 2 || i === 3)) continue;
       if (skill === 'soul') {
         const side = (i - (count - 1) / 2) * 65;
         const from = { x: e.x - e.dy * side, y: e.y + e.dx * side };
@@ -1722,9 +1872,21 @@ export class Game {
         const length = Math.hypot(dx, dy);
         this.hostileShot(from, dx / length, dy / length, 165, e.damage * 0.8);
       } else {
-        const a =
-          skill === 'nova' ? angle + (i / count) * TAU : angle + (i - (count - 1) / 2) * 0.24;
-        this.hostileShot(e, Math.cos(a), Math.sin(a), skill === 'nova' ? 120 : 165, e.damage * 0.8);
+        const a = ['nova', 'gapring'].includes(skill)
+          ? angle + (i / count) * TAU
+          : angle + (i - (count - 1) / 2) * 0.24;
+        const shot = this.hostileShot(
+          e,
+          Math.cos(a),
+          Math.sin(a),
+          ['nova', 'gapring'].includes(skill) ? 120 : skill === 'firebolt' ? 140 : 165,
+          e.damage * 0.8,
+        );
+        if (skill === 'firebolt' || skill === 'frostbolt') {
+          shot.enemySkill = skill;
+          shot.color = skill === 'firebolt' ? '#ffad63' : '#9ce5ff';
+          shot.radius = skill === 'firebolt' ? 9 : 7;
+        }
       }
     }
   }
@@ -1737,6 +1899,7 @@ export class Game {
     this.bossChargeWarning(e);
   }
   private castBossSkill(e: Enemy, nx: number, ny: number) {
+    if (distance(e, this.player) > 480) return;
     const stage = e.bossStage ?? this.stage;
     const phase = e.skillStep ?? 0;
     e.skillStep = (phase + 1) % STAGES[stage].skills.length;
@@ -1753,7 +1916,7 @@ export class Game {
           : enraged
             ? 2.3
             : 3.8;
-    const p = { x: this.player.x, y: this.player.y };
+    const p = { x: e.x + nx * 90, y: e.y + ny * 90 };
     const angle = Math.atan2(ny, nx);
     const fan = (count: number, spread: number, speed: number, center = angle) => {
       for (let i = 0; i < count; i++) {
@@ -1764,7 +1927,17 @@ export class Game {
     const ring = (count: number, speed: number) =>
       fan(count, (TAU * (count - 1)) / count, speed, this.time * 0.25);
     const blast = (x: number, y: number, radius: number, life = 0.5) =>
-      this.zone(x, y, radius, life, e.damage, STAGES[stage].color, 'blast', 1.2, true);
+      this.enemyField(
+        e,
+        x - e.x,
+        y - e.y,
+        radius,
+        life,
+        e.damage,
+        STAGES[stage].color,
+        'blast',
+        1.2,
+      );
     const ringZones = (count: number, radius: number, size: number, life = 0.5) => {
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU;
@@ -1772,7 +1945,10 @@ export class Game {
       }
     };
     const summons = (count: number) => {
-      const pool = stage === FINAL_TRIAL_STAGE ? [24, 25] : enemyRoster(this.stage, this.time);
+      const pool =
+        stage === FINAL_TRIAL_STAGE
+          ? [24, 25]
+          : enemyRoster(this.stage, this.time, this.encounterVersion === 0);
       for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++)
         this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], false, false, {
           x: e.x + Math.cos((i / count) * TAU) * 90,
@@ -2064,6 +2240,7 @@ export class Game {
       return;
     }
     if (w.id === 'scythe') {
+      const crit = this.random() < s.crit;
       const reach = radius * 1.8;
       this.effect(
         p.x,
@@ -2080,7 +2257,12 @@ export class Game {
         const d = distance(e, p);
         const dot = ((e.x - p.x) * Math.cos(a) + (e.y - p.y) * Math.sin(a)) / (d || 1);
         if (d < reach + e.radius && (w.evolved || dot > -0.15))
-          this.hitEnemy(e, dmg * (e.hp / e.maxHp < 0.3 ? 2 : 1), false, w.id);
+          this.hitEnemy(
+            e,
+            dmg * (crit ? s.criticalDamage : 1) * (e.hp / e.maxHp < 0.3 ? 2 : 1),
+            crit,
+            w.id,
+          );
       }
       return;
     }
@@ -2253,6 +2435,7 @@ export class Game {
       if (b.life <= 0) continue;
       if (b.kind === 'hostile') {
         if (distance(b, this.player) < b.radius + 12) {
+          if (b.enemySkill === 'frostbolt') this.enemySlow();
           this.hurtPlayer(b.damage);
           b.life = 0;
         }
@@ -2323,14 +2506,13 @@ export class Game {
       z.life -= dt;
       z.tick -= dt;
       if (
-        this.stage < FINAL_TRIAL_STAGE &&
         z.hostile &&
         z.life > 0 &&
         ['enemy-roots', 'enemy-frost'].includes(z.kind) &&
         this.player.invincible <= 0 &&
         distance(z, this.player) < z.radius + 8
       )
-        this.slowed = 0.65;
+        this.enemySlow();
       if (z.kind === 'vortex')
         for (const e of this.enemies) {
           const d = distance(e, z);
@@ -2427,12 +2609,12 @@ export class Game {
     }
   }
   private hostileShot(from: Point, nx: number, ny: number, speed: number, damage: number) {
-    this.shots.push({
+    const shot: Shot = {
       x: from.x,
       y: from.y,
       vx: nx * speed,
       vy: ny * speed,
-      life: 6,
+      life: (this.tribulation ? 720 : (from as Enemy).boss ? 540 : 400) / speed,
       radius: 7,
       damage,
       color: '#f0a5ab',
@@ -2443,7 +2625,134 @@ export class Game {
       age: 0,
       bounce: 0,
       crit: false,
+    };
+    this.shots.push(shot);
+    return shot;
+  }
+  private enemySlow() {
+    if (this.player.invincible > 0 || this.time < this.nextEnemySlowAt) return;
+    this.slowed = 0.55;
+    this.nextEnemySlowAt = this.time + 2.5;
+  }
+  private enemyField(
+    e: Enemy,
+    dx: number,
+    dy: number,
+    radius: number,
+    life: number,
+    damage: number,
+    color: string,
+    kind: string,
+    delay = 0.9,
+  ) {
+    if (!e.boss && this.zones.filter((z) => z.hostile).length >= 10) return;
+    const reach = (e.boss ? BOSS_FIELD_REACH : ENEMY_FIELD_REACH) - radius;
+    const scale = Math.min(1, Math.max(0, reach) / (Math.hypot(dx, dy) || 1));
+    this.zone(
+      e.x + dx * scale,
+      e.y + dy * scale,
+      radius,
+      life,
+      damage,
+      color,
+      kind,
+      Math.max(0.85, delay),
+      true,
+    );
+  }
+  private enemyDeath(e: Enemy) {
+    if (!this.encounterVersion || e.boss) return;
+    const tactics = ENEMY_TACTICS[e.type];
+    if (tactics.deathMiasma)
+      this.enemyField(e, 0, 0, 50, 2.4, e.damage * 0.35, '#bdcc79', 'enemy-miasma');
+    if (tactics.boundSummons)
+      for (const child of this.enemies) if (child.summonedBy === e.id) child.dead = true;
+  }
+  get cacheNearby() {
+    const c = this.cacheChallenge;
+    return (
+      !!c &&
+      c.phase === 'offered' &&
+      this.time < c.deadline &&
+      distance(c, this.player) <= CACHE_CHALLENGE.approach
+    );
+  }
+  beginCacheChallenge() {
+    const c = this.cacheChallenge;
+    if (
+      this.state !== 'playing' ||
+      !this.cacheNearby ||
+      !c ||
+      this.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2
+    )
+      return false;
+    c.phase = 'active';
+    c.deadline = Math.min(
+      this.time + CACHE_CHALLENGE.fightSeconds,
+      STAGES[this.stage].minutes * 60 - 12,
+    );
+    const d = distance(c, this.player) || 1;
+    const nx = distance(c, this.player) > 1 ? (c.x - this.player.x) / d : 1;
+    const ny = distance(c, this.player) > 1 ? (c.y - this.player.y) / d : 0;
+    c.guardians = REGION_ENCOUNTERS[this.stage].guardians.map((type, i) => {
+      const side = i ? 90 : -90;
+      const e = this.spawnEnemy(type, true, false, {
+        x: c.x + nx * 110 - ny * side,
+        y: c.y + ny * 110 + nx * side,
+      });
+      e.hp = e.maxHp *= 0.7;
+      e.cacheGuardian = true;
+      return e.id;
     });
+    this.nextElite = Math.max(this.nextElite, this.time + 12);
+    this.announce(`${REGION_ENCOUNTERS[this.stage].name} · 击败两名守匣精英`);
+    this.onEvent('cache');
+    return true;
+  }
+  private updateCacheChallenge() {
+    if (
+      !this.encounterVersion ||
+      this.tribulation ||
+      this.isFinalTrial ||
+      this.state !== 'playing' ||
+      this.player.hp <= 0
+    )
+      return;
+    const duration = STAGES[this.stage].minutes * 60;
+    if (
+      !this.cacheChallenge &&
+      this.time >= duration * CACHE_CHALLENGE.offerAt &&
+      this.time < duration * CACHE_CHALLENGE.offerAt + CACHE_CHALLENGE.offerSeconds &&
+      !this.bossSpawned
+    ) {
+      const norm = Math.hypot(this.input.x, this.input.y);
+      this.cacheChallenge = {
+        x: this.player.x + (norm ? this.input.x / norm : 1) * 280,
+        y: this.player.y + (norm ? this.input.y / norm : 0) * 280,
+        phase: 'offered',
+        deadline: Math.min(this.time + CACHE_CHALLENGE.offerSeconds, duration - 60),
+        guardians: [],
+      };
+      this.announce('守匣灵阵出现 · 靠近后可自选挑战');
+      this.onEvent('cache');
+    }
+    const c = this.cacheChallenge;
+    if (!c || !['offered', 'active'].includes(c.phase)) return;
+    if (this.time >= c.deadline) {
+      c.phase = 'expired';
+      for (const e of this.enemies) if (e.cacheGuardian) e.dead = true;
+      this.announce('守匣灵阵散去 · 继续历练');
+      this.onEvent('cache');
+    } else if (
+      c.phase === 'active' &&
+      c.guardians.every((id) => !this.enemies.some((e) => e.id === id && !e.dead))
+    ) {
+      c.phase = 'cleared';
+      for (const e of this.enemies) if (e.cacheGuardian) e.dead = true;
+      this.pickups.push({ x: c.x, y: c.y, kind: 'chest', value: 1, pull: false });
+      this.announce('守匣挑战完成 · 炼器宝匣已解封');
+      this.onEvent('cache');
+    }
   }
   private zone(
     x: number,
@@ -2561,6 +2870,8 @@ export class Game {
       );
     if (e.hp <= 0) {
       e.dead = true;
+      this.enemyDeath(e);
+      if (e.cacheGuardian) return;
       this.kills++;
       if (this.tribulation) {
         this.state = this.player.hp > 0 ? 'won' : 'lost';
@@ -2738,6 +3049,13 @@ export class Game {
   private float(at: Point, text: string, color: string) {
     this.effect(at.x + (this.random() - 0.5) * 16, at.y - 22, 0.65, 0, color, 'text', text);
   }
+  evolutionRequirements(id: string) {
+    const t = treasure(id);
+    return evolutionPassives(
+      id === 'axe' && !this.encounterVersion ? { ...t, passive: 'power' } : t,
+      this.path,
+    );
+  }
   private canEvolve(id: string) {
     const item = TREASURES.find((treasure) => treasure.id === id);
     const owned = this.weapons.find((weapon) => weapon.id === id);
@@ -2746,7 +3064,7 @@ export class Game {
       !!owned &&
       owned.level === MAX_WEAPON_LEVEL &&
       !owned.evolved &&
-      evolutionPassives(item, this.path).some(
+      this.evolutionRequirements(id).some(
         (passiveId) => (this.passives[passiveId] || 0) >= MAX_PASSIVE_LEVEL,
       )
     );
@@ -2784,10 +3102,7 @@ export class Game {
       (c) =>
         c.type === 'passive' &&
         this.weapons.some(
-          (w) =>
-            !w.evolved &&
-            w.level >= 3 &&
-            evolutionPassives(treasure(w.id), this.path).includes(c.id),
+          (w) => !w.evolved && w.level >= 3 && this.evolutionRequirements(w.id).includes(c.id),
         ),
     );
     if (resonance.length && this.random() < 0.6)
