@@ -346,16 +346,22 @@ export class TownScene {
         button.disabled = !near && !homeTarget && !departure;
         button.textContent =
           homeTarget === 'dock'
-            ? '离开青岚 · E'
+            ? '离开青岚'
             : homeTarget === 'home'
-              ? '故居 · E'
+              ? '故居'
               : near
-                ? `与${near.name}交谈 · E`
+                ? `与${near.name}交谈`
                 : departure
                   ? navigating
                     ? '自动前往 · 点击停下'
                     : '前往渡口'
                   : '走近镇民可交谈';
+        if (homeTarget || near) {
+          const hint = document.createElement('span');
+          hint.className = 'keyboard-hint';
+          hint.textContent = ' · E';
+          button.append(hint);
+        }
       }
       this.host
         .querySelectorAll<HTMLElement>('.town-npc')
