@@ -14,7 +14,7 @@ import {
 } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
-import { SPIRIT_ROOTS } from '../src/data.ts';
+import { SPIRIT_ROOTS, STAGE_REALM_STEPS } from '../src/data.ts';
 
 test('闭关免费度过年岁，获得少量随机修为，三属性均可随机提升且不增加根基阶数', () => {
   const save = freshSave();
@@ -146,7 +146,7 @@ test('相同投入的闭关修为随资质递减，收益符合预览的随机�
   }
 });
 
-test('七个有限寿元境界整段或拆分闭关最多推进一个小阶段，不能跨大境界且收益低于对应妖王', () => {
+test('七个有限寿元境界整段或拆分闭关最多推进一个小阶段，收益低于同阶或更高秘境妖王', () => {
   for (let major = 0; major < 7; major++) {
     const start = Array.from({ length: major * 3 }, (_, i) => realmCost(i)).reduce(
       (a, b) => a + b,
@@ -165,7 +165,9 @@ test('七个有限寿元境界整段或拆分闭关最多推进一个小阶段�
         assert.ok(step >= major * 3 && step <= major * 3 + 1);
         assert.equal(save.cultivation - start, gainPerRetreat * parts);
         assert.ok(
-          save.cultivation - start < bossCultivationReward(Math.max(0, major - 1)) * root.rate,
+          save.cultivation - start <
+            bossCultivationReward(STAGE_REALM_STEPS.findIndex((step) => step >= major * 3)) *
+              root.rate,
         );
       }
     }

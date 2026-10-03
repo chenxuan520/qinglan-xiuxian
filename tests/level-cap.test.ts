@@ -21,8 +21,9 @@ test('第一百级只领取最后一次机缘，溢出经验与拾取不再反�
   g.makeChoices = () => [{ type: 'heal', id: 'heal', level: 1 }];
   g.update(0.01);
   assert.equal(g.level, 100);
-  const hp = g.player.hp;
-  assert.ok(hp > 10);
+  assert.ok(g.player.hp > 10);
+  // 首次跨境与最后一次回血已经结算；留出缺血空间验证满级拾取只自然回血。
+  const hp = (g.player.hp = g.player.maxHp / 2);
   for (let i = 0; i < 100; i++) {
     g.pickups.push({ x: g.player.x, y: g.player.y, kind: 'xp', value: 1e6, pull: true });
     g.update(0.01);

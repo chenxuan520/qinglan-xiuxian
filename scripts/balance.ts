@@ -143,6 +143,8 @@ for (const path of CULTIVATION_PATHS) {
           level: game.level,
           creditedCultivation: game.creditedCultivation,
           combatCultivation: game.combatCultivation,
+          progressionVersion: game.progressionVersion,
+          spiritRoot: game.spiritRoot,
         });
         campaign.push({
           path: path.name,
