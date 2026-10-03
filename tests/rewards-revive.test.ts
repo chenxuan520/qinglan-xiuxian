@@ -180,7 +180,9 @@ test('Boss 经验至少三十只本关最强精英，永久突破奖励高于小
     const settled = settleRun(save, { ...g.snapshot(), victory: true });
     assert.equal(
       settled.cultivationRemaining,
-      cultivationReward(g, 100 + stage * 50) - g.creditedCultivation,
+      cultivationReward(g, 100 + stage * 50) +
+        settled.firstClearCultivation -
+        g.creditedCultivation,
     );
     assert.equal(save.cultivation, credited + settled.cultivationRemaining);
   }

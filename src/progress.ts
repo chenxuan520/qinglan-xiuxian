@@ -20,6 +20,9 @@ import {
   rootStarter,
   ELEMENTS,
   REALM_LIFESPANS,
+  STAGE_CULTIVATION_RATES,
+  STAGE_BOSS_CULTIVATION,
+  FIRST_STAGE_CLEAR_CULTIVATION,
 } from './data.ts';
 import type { CultivationPath, SpiritRootId, ElementId } from './data.ts';
 import { freshMortal, validMortal, SECTS, SECT_DUES, type MortalState } from './mortal-data.ts';
@@ -68,7 +71,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 1;
+export const SAVE_SCHEMA = 2;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -441,8 +444,12 @@ export function cultivationFactor(step: number) {
   if (step < 15) return 1;
   return [2, 6, 16, 28][Math.min(3, Math.floor(step / 3) - 5)] * 1.15 ** (step % 3);
 }
-// 各秘境对应的大境界修为预算，Boss 奖励不受高境界小怪折算影响。
-export function bossCultivationReward(stage: number, bossStage = stage) {
+// 新历练按秘境给出固定奖励；旧续局保留原奖励直到本局结束。
+export function bossCultivationReward(stage: number, bossStage = stage, progressionVersion = 2) {
+  if (progressionVersion >= 2)
+    return stage === FINAL_TRIAL_STAGE && bossStage !== FINAL_TRIAL_STAGE
+      ? STAGE_BOSS_CULTIVATION[stage] * 0.4
+      : STAGE_BOSS_CULTIVATION[stage];
   const major = Math.min(7, stage + 1);
   const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
   return Math.max(
@@ -497,11 +504,14 @@ export function cultivationReward(
     difficulty: number;
     combatCultivation?: number;
     spiritRoot?: SpiritRootId;
+    stage?: number;
+    progressionVersion?: number;
   },
   bonus = 0,
 ) {
+  const rate = (run.progressionVersion ?? 1) >= 2 ? STAGE_CULTIVATION_RATES[run.stage ?? 0] : 1;
   return Math.floor(
-    (run.kills * 0.7 + (run.combatCultivation || 0) + run.level * 8 + bonus) *
+    ((run.kills * 0.7 + run.level * 8 + bonus) * rate + (run.combatCultivation || 0)) *
       DIFFICULTIES[run.difficulty].reward *
       spiritRootInfo(run.spiritRoot ?? 'heaven').rate,
   );
@@ -588,19 +598,34 @@ export function settleRun(
     spiritRoot?: SpiritRootId;
     path?: CultivationPath;
     startedImmortal?: boolean;
+    progressionVersion?: number;
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
-  const cultivation = cultivationReward(
-    { ...run, spiritRoot: run.spiritRoot ?? save.spiritRoot },
-    run.victory ? 100 + run.stage * 50 : 0,
-  );
+  const firstClearCultivation =
+    run.victory &&
+    run.stage === 0 &&
+    !save.completed.includes(0) &&
+    (run.progressionVersion ?? 1) >= 2
+      ? Math.floor(
+          FIRST_STAGE_CLEAR_CULTIVATION *
+            multiplier *
+            spiritRootInfo(run.spiritRoot ?? save.spiritRoot).rate,
+        )
+      : 0;
+  const cultivation =
+    firstClearCultivation +
+    cultivationReward(
+      { ...run, spiritRoot: run.spiritRoot ?? save.spiritRoot },
+      run.victory ? 100 + run.stage * 50 : 0,
+    );
   const rewards = {
     stones: Math.floor(
       (run.kills * 0.35 + run.time * 0.1 + (run.victory ? STAGES[run.stage].reward : 0)) *
         multiplier,
     ),
     cultivation,
+    firstClearCultivation,
     cultivationRemaining: cultivation - int(run.creditedCultivation, cultivation),
     iron: run.iron + (run.victory ? 3 + run.stage * 2 : 0),
   };

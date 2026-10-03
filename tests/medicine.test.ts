@@ -14,7 +14,7 @@ import { freshSave, parseSave, realmCost, retreat, settleRun } from '../src/prog
 import { Game } from '../src/game.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
 import { advanceMortal, joinSect } from '../src/mortal.ts';
-import { SPIRIT_ROOTS, STAGE_ENEMIES, DIFFICULTIES } from '../src/data.ts';
+import { SPIRIT_ROOTS, STAGE_ENEMIES, STAGE_CULTIVATION_RATES, DIFFICULTIES } from '../src/data.ts';
 import { medicineContent, medicineTime } from '../src/medicine-ui.ts';
 import { guideContent } from '../src/guide.ts';
 
@@ -355,7 +355,8 @@ test('虚灵丹只增加击杀修为，过期与读档不回溯、不重复记�
   };
   const plain = kill(false, false),
     buff = kill(true, false);
-  approx(buff.g.combatCultivation + 0.7, (plain.g.combatCultivation + 0.7) * 1.2);
+  const baseKill = 0.7 * STAGE_CULTIVATION_RATES[3];
+  approx(buff.g.combatCultivation + baseKill, (plain.g.combatCultivation + baseKill) * 1.2);
   assert.equal(
     buff.g.pickups.find((p) => p.kind === 'xp')!.value,
     plain.g.pickups.find((p) => p.kind === 'xp')!.value,

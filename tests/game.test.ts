@@ -7,7 +7,7 @@ import {
   PASSIVES,
   STAGES,
   ENEMIES,
-  STAGE_REALM_STEPS,
+  LEGACY_STAGE_REALM_STEPS,
   tribulationRules,
   xpNeeded,
 } from '../src/data.ts';
@@ -369,14 +369,14 @@ test('旧末境加成升级为真仙，续局补齐上限且保留缺血，刷�
 
 test('斩妖和升级实时增加修为，突破立即提升气血与伤害', () => {
   const save = freshSave();
-  save.cultivation = 80;
+  save.cultivation = 89;
   const game = new Game(save, 0, 0, seeded());
   for (let i = 0; i < 3; i++) {
     const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
     game.hitEnemy(enemy, enemy.maxHp);
   }
   assert.equal(save.cultivation, 90);
-  assert.equal(game.creditedCultivation, 10);
+  assert.equal(game.creditedCultivation, 1);
   assert.equal(realmInfo(save.cultivation).name, '炼气中期');
   assert.equal(game.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
   assert.equal(game.player.hp, game.player.maxHp);
@@ -384,8 +384,8 @@ test('斩妖和升级实时增加修为，突破立即提升气血与伤害', ()
   assert.match(game.notice, /突破.*炼气中期/);
   game.xp = xpNeeded(1);
   game.update(0.05);
-  assert.equal(save.cultivation, 98);
-  assert.equal(game.creditedCultivation, 18);
+  assert.equal(save.cultivation, 91);
+  assert.equal(game.creditedCultivation, 2);
   game.choices = [{ type: 'passive', id: 'guard', level: 1 }];
   game.choose(0);
   assert.equal(game.player.maxHp, Math.round(103 * 1.1 * realmHealthMultiplier(1)));
@@ -408,6 +408,8 @@ test('各难度实时修为保留小数累计，失败和通关结算只补差�
         victory,
         iron: game.iron,
         level: game.level,
+        progressionVersion: game.progressionVersion,
+        combatCultivation: game.combatCultivation,
       };
       const expected = settleRun(freshSave(), run).cultivation;
       const paid = game.creditedCultivation;
@@ -508,7 +510,7 @@ test('通关奖励跨大境界后，下次开局获得完整加成且没有额�
 });
 test('实时修为随存档恢复，不重复入账或重复增加气血', () => {
   const save = freshSave();
-  save.cultivation = 85;
+  save.cultivation = 89;
   const game = new Game(save, 0, 0, seeded());
   const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
   game.hitEnemy(enemy, enemy.maxHp);
@@ -516,14 +518,14 @@ test('实时修为随存档恢复，不重复入账或重复增加气血', () =>
   const restoredSave = parseSave(stored);
   const restored = Game.restore(restoredSave, JSON.parse(stored).activeRun)!;
   assert.ok(restored);
-  assert.equal(restoredSave.cultivation, 93);
-  assert.equal(restored.creditedCultivation, 8);
+  assert.equal(restoredSave.cultivation, 90);
+  assert.equal(restored.creditedCultivation, 1);
   assert.equal(restored.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
   assert.equal(restored.player.hp, game.player.hp);
   assert.equal(restored.stats.damage, game.stats.damage);
   restored.resume();
   restored.update(0.05);
-  assert.equal(restoredSave.cultivation, 93);
+  assert.equal(restoredSave.cultivation, 90);
   assert.equal(restored.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
 });
 test('旧对局补发未结算修为，连续刷新只补发一次', () => {
@@ -532,6 +534,7 @@ test('旧对局补发未结算修为，连续刷新只补发一次', () => {
   game.kills = 500;
   const legacy = JSON.parse(JSON.stringify(game.snapshot()));
   delete legacy.creditedCultivation;
+  delete legacy.progressionVersion;
   const save = freshSave();
   const restored = Game.restore(save, legacy)!;
   assert.ok(restored);
@@ -710,6 +713,7 @@ test('无境界标记旧局只迁移一次，保留缺血、敌人血量比例�
       const legacy = JSON.parse(JSON.stringify(g.snapshot()));
       assert.equal(legacy.realmScaling, 3);
       delete legacy.realmScaling;
+      delete legacy.progressionVersion;
       const realmDamage = 1 + realmBonuses(step).damage;
       const passiveDamage = trained ? 4 * 0.12 + 2 * 0.04 : 0;
       const passiveGrowth = (realmDamage * (1 + passiveDamage)) / (realmDamage + passiveDamage);
@@ -761,8 +765,10 @@ test('无境界标记旧局只迁移一次，保留缺血、敌人血量比例�
       const saveBefore = JSON.stringify(save);
       const restored = Game.restore(save, legacy)!;
       assert.ok(restored);
-      const enemyHealth = realmDamageMultiplier(tribulation ? 23 : STAGE_REALM_STEPS[stage]);
-      const enemyDamage = realmHealthMultiplier(tribulation ? step : STAGE_REALM_STEPS[stage]);
+      const enemyHealth = realmDamageMultiplier(tribulation ? 23 : LEGACY_STAGE_REALM_STEPS[stage]);
+      const enemyDamage = realmHealthMultiplier(
+        tribulation ? step : LEGACY_STAGE_REALM_STEPS[stage],
+      );
       const playerDamage = realmDamageMultiplier(step) / (step === 24 ? 2 : 1);
       assert.equal(
         restored.player.maxHp,
@@ -1142,7 +1148,7 @@ test('自动历练开关保存在浏览器存档，旧存档默认手动', () =>
 });
 test('气血已耗尽时斩妖突破不会复活角色', () => {
   const save = freshSave();
-  save.cultivation = 85;
+  save.cultivation = 89;
   const game = new Game(save, 0, 0, seeded());
   game.hurtPlayer(1000);
   const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
@@ -1150,5 +1156,5 @@ test('气血已耗尽时斩妖突破不会复活角色', () => {
   game.update(0.05);
   assert.equal(game.state, 'lost');
   assert.equal(game.player.hp, 0);
-  assert.equal(save.cultivation, 93);
+  assert.equal(save.cultivation, 90);
 });

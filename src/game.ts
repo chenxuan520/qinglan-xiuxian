@@ -8,6 +8,8 @@ import {
   STAGES,
   STAGE_COMBAT_SCALING,
   STAGE_REALM_STEPS,
+  LEGACY_STAGE_REALM_STEPS,
+  STAGE_CULTIVATION_RATES,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
@@ -209,6 +211,7 @@ export class Game {
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
   revivesUsed = 0;
+  progressionVersion = 2;
   tribulation = 0;
   tribulationStep = 0;
   tribulationNextAt = 1.2;
@@ -493,6 +496,7 @@ export class Game {
       startedImmortal: this.startedImmortal,
       version: 1,
       realmScaling: 3,
+      progressionVersion: this.progressionVersion,
       stage: this.stage,
       stageDuration: STAGES[this.stage].minutes * 60,
       difficulty: this.difficulty,
@@ -639,6 +643,7 @@ export class Game {
         s.rerolls > 3
       )
         return null;
+      if (s.progressionVersion !== undefined && ![1, 2].includes(s.progressionVersion)) return null;
       if (
         s.combatCultivation !== undefined &&
         (!Number.isFinite(s.combatCultivation) || s.combatCultivation < 0)
@@ -856,6 +861,7 @@ export class Game {
       )
         return null;
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.progressionVersion = s.progressionVersion ?? 1;
       g.elapsedYears = s.elapsedYears;
       g.loot = s.loot
         ? {
@@ -930,9 +936,11 @@ export class Game {
       }));
       g.zones = s.zones.map((z) => ({ ...z }));
       if (s.realmScaling === undefined) {
-        const enemyHealth = realmDamageMultiplier(g.tribulation ? 23 : STAGE_REALM_STEPS[g.stage]);
+        const enemyHealth = realmDamageMultiplier(
+          g.tribulation ? 23 : LEGACY_STAGE_REALM_STEPS[g.stage],
+        );
         const enemyDamage = realmHealthMultiplier(
-          g.tribulation ? g.realm : STAGE_REALM_STEPS[g.stage],
+          g.tribulation ? g.realm : LEGACY_STAGE_REALM_STEPS[g.stage],
         );
         const playerDamage = realmDamageMultiplier(g.realm) / (g.realm >= 24 ? 2 : 1);
         // 旧战场只换算一次，保留妖物剩余血量比例、弹幕与天劫窗口进度。
@@ -1301,6 +1309,9 @@ export class Game {
     const template = ENEMIES[type],
       angle = this.random() * TAU;
     const difficulty = DIFFICULTIES[this.difficulty];
+    const realmStep = (this.progressionVersion >= 2 ? STAGE_REALM_STEPS : LEGACY_STAGE_REALM_STEPS)[
+      this.stage
+    ];
     const scaling = STAGE_COMBAT_SCALING[this.stage];
     const eliteScaling = elite && !boss ? scaling.elite : undefined;
     const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
@@ -1321,8 +1332,8 @@ export class Game {
       type,
       x: at?.x ?? this.player.x + Math.cos(angle) * (this.viewport.width / 2 + 70),
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
-      hp: hp * scaling.hp * realmDamageMultiplier(STAGE_REALM_STEPS[this.stage]),
-      maxHp: hp * scaling.hp * realmDamageMultiplier(STAGE_REALM_STEPS[this.stage]),
+      hp: hp * scaling.hp * realmDamageMultiplier(realmStep),
+      maxHp: hp * scaling.hp * realmDamageMultiplier(realmStep),
       radius: boss
         ? bossStage === FINAL_TRIAL_STAGE
           ? 62
@@ -1349,7 +1360,7 @@ export class Game {
         difficulty.damage *
         (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
         (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3) *
-        realmHealthMultiplier(STAGE_REALM_STEPS[this.stage]) *
+        realmHealthMultiplier(realmStep) *
         (eliteScaling?.damage ?? 1),
       elite,
       boss,
@@ -2510,9 +2521,11 @@ export class Game {
           )
         : Math.round(ENEMIES[e.type].xp * (1 + this.stage * 0.16) * (e.elite ? 8 : 1));
       // 基础击杀收益保留，额外修为按地域与怪物强度结算；旧快照不追溯虚构击杀。
-      const cultivationScale = cultivationFactor(this.realm);
+      const cultivationScale = this.progressionVersion >= 2 ? 1 : cultivationFactor(this.realm);
+      const cultivationRate =
+        this.progressionVersion >= 2 ? STAGE_CULTIVATION_RATES[this.stage] : 1;
       const bossReward = e.boss
-        ? bossCultivationReward(this.stage, e.bossStage ?? this.stage) *
+        ? bossCultivationReward(this.stage, e.bossStage ?? this.stage, this.progressionVersion) *
           this.medicine.bossCultivation
         : 0;
       this.bossCultivation +=
@@ -2524,7 +2537,7 @@ export class Game {
             ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * (e.elite ? 4 : 1)) /
               cultivationScale -
               0.7,
-          );
+          ) * cultivationRate;
       if (!e.boss)
         this.combatCultivation +=
           Math.max(
@@ -2532,7 +2545,8 @@ export class Game {
             ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * (e.elite ? 4 : 1)) /
               cultivationScale,
           ) *
-          (this.medicine.cultivation - 1);
+          (this.medicine.cultivation - 1) *
+          cultivationRate;
       const lastBoss =
         !this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length - 1;
       const medicineBefore = e.boss ? { ...this.save.medicine.bag } : null;

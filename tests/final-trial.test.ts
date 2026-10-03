@@ -25,7 +25,7 @@ function trial() {
   return new Game(save, 6, 0, () => 0.5);
 }
 
-test('越到高境界永久修为成长越慢，已有境界不回退，灵气收益不受影响', () => {
+test('旧续局保留高境界小怪折算，已有境界不回退，灵气收益不受影响', () => {
   const gains = [15, 18, 21].map((step) => {
     const save = freshSave();
     save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
@@ -34,6 +34,7 @@ test('越到高境界永久修为成长越慢，已有境界不回退，灵气�
     );
     const before = save.cultivation;
     const g = new Game(save, 6, 0, () => 0.5);
+    g.progressionVersion = 1;
     for (let i = 0; i < 100; i++) g.hitEnemy(g.spawnEnemy(65), 1e9);
     assert.equal(realmInfo(save.cultivation).step, step);
     return {
