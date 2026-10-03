@@ -23,8 +23,12 @@ function encounter(step: number) {
 }
 
 function earn(g: Game) {
-  const enemy = g.spawnEnemy(0, false, false, { x: 300, y: 0 });
-  g.hitEnemy(enemy, enemy.maxHp);
+  const before = g.save.cultivation;
+  for (let i = 0; i < 20 && g.save.cultivation === before; i++) {
+    const enemy = g.spawnEnemy(0, false, false, { x: 300, y: 0 });
+    g.hitEnemy(enemy, enemy.maxHp);
+  }
+  assert.ok(g.save.cultivation > before);
 }
 
 test('筑基至大乘各触发一次短演出，小阶段和真仙保留原有反馈', () => {
@@ -115,6 +119,7 @@ test('连续跨境只保留最新演出，暂停冻结，读档不重播，视�
   legacyGame.kills = 500;
   const legacy = JSON.parse(JSON.stringify(legacyGame.snapshot()));
   delete legacy.creditedCultivation;
+  delete legacy.progressionVersion;
   const legacySave = freshSave();
   const migrated = Game.restore(legacySave, legacy)!;
   assert.ok(migrated);

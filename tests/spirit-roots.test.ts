@@ -209,8 +209,11 @@ test('各灵根的小怪、Boss 与通关修为倍率一致，连续读档不补
       assert.equal(save.cultivation, cultivationReward(g));
       const credited = g.creditedCultivation;
       const rewards = settleRun(save, { ...g.snapshot(), victory: true });
-      assert.equal(rewards.cultivationRemaining, cultivationReward(g, 100) - credited);
-      assert.equal(save.cultivation, cultivationReward(g, 100));
+      assert.equal(
+        rewards.cultivationRemaining,
+        cultivationReward(g, 100) + rewards.firstClearCultivation - credited,
+      );
+      assert.equal(save.cultivation, cultivationReward(g, 100) + rewards.firstClearCultivation);
       if (root.id === 'heaven') {
         expectedStones = rewards.stones;
         expectedIron = rewards.iron;

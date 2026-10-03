@@ -1281,6 +1281,7 @@ function finishRun() {
     level: game.level,
     creditedCultivation: game.creditedCultivation,
     combatCultivation: game.combatCultivation,
+    progressionVersion: game.progressionVersion,
     spiritRoot: game.spiritRoot,
     path: game.path,
     startedImmortal: game.startedImmortal,
