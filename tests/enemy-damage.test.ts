@@ -138,12 +138,13 @@ test('第七境精英与七位妖王采用固定两倍强度，重复续局不�
   }
 });
 
-test('第三至第六境精英拉开气血与追击差距，普通怪不变，重复续局不叠加', () => {
+test('旧节奏第三至第六境精英保留气血与追击差距，普通怪不变，重复续局不叠加', () => {
   for (let stage = 0; stage < 6; stage++) {
     for (const progress of [0, 0.5, 1]) {
       const save = freshSave();
       save.unlocked = stage;
       const g = new Game(save, stage, 0, () => 0.5);
+      g.elitePacingVersion = 1;
       g.time = STAGES[stage].minutes * 60 * progress;
       for (const type of STAGE_ENEMIES[stage]) {
         const normal = g.spawnEnemy(type, false, false, { x: 200, y: 0 });

@@ -50,10 +50,11 @@ test('三难度仅第五、第六关妖王增加气血与移速，前四关和�
   }
 });
 
-test('三难度全部关卡仅非妖王精英移速再增10%，普通怪、气血与伤害不变', () => {
+test('旧节奏三难度全部关卡仅非妖王精英移速再增10%，普通怪、气血与伤害不变', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
     for (let stage = 0; stage < STAGES.length; stage++) {
       const g = new Game(freshSave(), stage, difficulty, () => 0.5);
+      g.elitePacingVersion = 1;
       const scaling = STAGE_COMBAT_SCALING[stage];
       const final = stage === FINAL_TRIAL_STAGE;
       for (const progress of [0, 0.5, 1]) {
