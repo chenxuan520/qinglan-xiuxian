@@ -2383,8 +2383,15 @@ kbd {
     serif;
   margin-left: 5px;
 }
-.upgrade-heading p span {
+.upgrade-instruction > span {
   margin: 0 10px;
+}
+.choice-description-compact,
+.choice-recipe-compact {
+  display: none;
+}
+.choice-meta {
+  display: contents;
 }
 .choice-grid {
   display: grid;
@@ -2464,6 +2471,7 @@ kbd {
   min-height: 65px;
 }
 .choice-benefit {
+  order: 1;
   margin-top: auto;
   padding: 14px 0;
   font-size: 9px;
@@ -2474,6 +2482,7 @@ kbd {
   min-height: 46px;
 }
 .choice-select {
+  order: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4027,102 +4036,153 @@ kbd {
   }
   .upgrade-panel {
     width: 100%;
-    max-height: 95svh;
+    max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  .in-game .upgrade-backdrop {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
   .upgrade-heading {
-    margin-bottom: 19px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
   }
-  .upgrade-heading .eyebrow {
-    font-size: 9px;
-    letter-spacing: 3px;
+  .upgrade-heading .eyebrow,
+  .upgrade-instruction {
+    display: none;
   }
   .upgrade-heading h2 {
-    font-size: 29px;
-    letter-spacing: 5px;
-    margin-top: 10px;
+    font-size: 22px;
+    letter-spacing: 3px;
+    margin: 0;
   }
   .upgrade-heading p {
-    font-size: 9px;
-    margin-top: 10px;
+    font-size: 11px;
+    margin: 0;
     letter-spacing: 0;
+  }
+  .upgrade-heading b {
+    font-size: 15px;
   }
   .choice-grid {
     grid-template-columns: 1fr;
-    gap: 11px;
+    gap: 7px;
   }
   .choice-card {
-    padding: 15px 16px 15px 82px;
-    min-height: 137px;
+    padding: 8px 12px;
+    min-height: 0;
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     column-gap: 8px;
     align-items: start;
   }
   .choice-top {
-    grid-column: 1/-1;
-    margin-bottom: 9px;
-    font-size: 8px;
+    position: absolute;
+    left: 54px;
+    top: 8px;
+    font-size: 10px;
+    letter-spacing: 1px;
   }
   .choice-top kbd {
-    height: 17px;
-    min-width: 18px;
-    font-size: 9px;
+    display: none;
   }
   .choice-art {
     position: absolute;
-    left: 13px;
-    top: 37px;
-    width: 56px;
-    height: 65px;
+    left: 10px;
+    top: 8px;
+    width: 34px;
+    height: 40px;
   }
   .choice-art .icon {
-    width: 47px;
-    height: 57px;
+    width: 30px;
+    height: 38px;
   }
   .choice-card h3 {
-    font-size: 20px;
-    letter-spacing: 2px;
+    padding: 14px 0 0 42px;
+    font-size: 18px;
+    line-height: 24px;
+    letter-spacing: 1px;
     text-align: left;
   }
   .choice-level {
     text-align: right;
-    font-size: 8px;
-    margin-top: 6px;
+    align-self: end;
+    font-size: 11px;
+    margin: 0 0 3px;
     letter-spacing: 0;
   }
   .choice-card p {
     grid-column: 1/-1;
-    font-size: 10px;
-    line-height: 1.7;
+    font-size: 12px;
+    line-height: 1.45;
     min-height: 0;
-    margin-top: 9px;
+    margin-top: 5px;
+  }
+  .choice-meta {
+    grid-column: 1/-1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 8px;
+    margin-top: 4px;
+  }
+  .choice-meta:empty {
+    display: none;
+  }
+  .choice-card .element-affinity {
+    font-size: 10px;
+    padding: 1px 5px;
+    line-height: 1.5;
   }
   .choice-benefit {
-    grid-column: 1/-1;
-    padding: 6px 0 0;
-    margin-top: 8px;
-    border-bottom: 0;
-    font-size: 8px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    font-size: 11px;
+    line-height: 1.45;
     min-height: 0;
   }
-  .choice-select {
+  .choice-select,
+  .choice-benefit-hint,
+  .choice-description-full,
+  .choice-card .evolution-recipe {
     display: none;
+  }
+  .choice-description-compact {
+    display: inline;
+  }
+  .choice-recipe-compact {
+    display: block;
+    grid-column: 1/-1;
+    color: #c8cba7;
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.45;
   }
   .choice-card:hover {
     transform: translateY(-2px);
   }
   .upgrade-footer {
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-top: 17px;
-    font-size: 9px;
-  }
-  .upgrade-footer .secondary-button {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+    margin-top: 8px;
     font-size: 10px;
-    min-height: 39px;
-    padding: 9px 12px;
-    gap: 10px;
+  }
+  .upgrade-footer > span {
+    grid-column: 1/-1;
+  }
+  .upgrade-footer .secondary-button,
+  .upgrade-footer .auto-button {
+    font-size: 11px;
+    min-height: 44px;
+    padding: 8px;
+    gap: 8px;
     letter-spacing: 1px;
+    justify-content: center;
   }
   .upgrade-footer > small {
     display: none;
@@ -5363,15 +5423,41 @@ body.journey-complete:not(.in-game) {
     padding: 18px;
   }
   .upgrade-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     margin-bottom: 10px;
   }
   .upgrade-heading h2 {
-    font-size: 24px;
-    margin-top: 5px;
+    font-size: 22px;
+    letter-spacing: 3px;
+    margin: 0;
   }
   .upgrade-heading p {
-    margin-top: 5px;
-    font-size: 10px;
+    margin: 0;
+    font-size: 11px;
+  }
+  .upgrade-heading b {
+    font-size: 15px;
+  }
+  .upgrade-heading .eyebrow,
+  .upgrade-instruction,
+  .choice-top kbd,
+  .choice-description-full,
+  .choice-benefit-hint,
+  .choice-card .evolution-recipe,
+  .upgrade-footer > small {
+    display: none;
+  }
+  .choice-description-compact {
+    display: inline;
+  }
+  .choice-recipe-compact {
+    display: block;
+    color: #c8cba7;
+    font-size: 11px;
+    line-height: 1.45;
+    margin-top: 4px;
   }
   .choice-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5385,56 +5471,69 @@ body.journey-complete:not(.in-game) {
     min-height: 0;
   }
   .choice-top {
-    font-size: 8px;
+    position: static;
+    font-size: 10px;
+    letter-spacing: 1px;
     margin-bottom: 4px;
   }
   .choice-art {
-    position: static;
-    width: auto;
-    height: 42px;
-  }
-  .choice-art .icon {
-    width: 30px;
-    height: 38px;
+    display: none;
   }
   .choice-card h3 {
+    padding: 0;
     font-size: 16px;
     letter-spacing: 1px;
     text-align: center;
   }
   .choice-level {
-    font-size: 8px;
+    align-self: auto;
+    font-size: 11px;
     margin-top: 4px;
     text-align: center;
   }
   .choice-card p {
-    font-size: 10px;
-    line-height: 1.5;
+    font-size: 11px;
+    line-height: 1.45;
     min-height: 0;
-    margin-top: 8px;
+    margin-top: 5px;
+  }
+  .choice-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 8px;
+    margin-top: 4px;
   }
   .choice-card .element-affinity {
-    font-size: 9px;
-    padding: 2px 5px;
-  }
-  .choice-card .evolution-recipe {
-    font-size: 9px;
+    font-size: 10px;
+    padding: 1px 5px;
     line-height: 1.5;
-    margin: 6px 0;
-    padding: 5px 0;
   }
   .choice-benefit {
     min-height: 0;
-    padding: 5px 0;
-    font-size: 8px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    font-size: 11px;
+    line-height: 1.45;
   }
   .choice-select {
-    padding-top: 6px;
-    font-size: 10px;
+    display: none;
   }
   .upgrade-footer {
-    margin-top: 10px;
-    gap: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    gap: 8px;
+    font-size: 10px;
+  }
+  .upgrade-footer .secondary-button,
+  .upgrade-footer .auto-button {
+    min-height: 44px;
+    padding: 8px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    justify-content: center;
   }
   .pause-actions {
     display: grid;

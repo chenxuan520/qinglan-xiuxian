@@ -1240,7 +1240,7 @@ function updateHud() {
 
 function renderChoices() {
   if (!game) return;
-  modal.innerHTML = `<div class="modal-backdrop upgrade-backdrop"><section class="upgrade-panel" role="dialog" aria-modal="true" aria-label="局内升级，选择一项机缘"><div class="upgrade-heading"><span class="eyebrow">灵气充盈 · 道法自成</span><h2>顿悟新机缘</h2><p>局内等级 <b>${game.level}</b> <span>·</span> 选择一项，续写你的修行之路</p></div><div class="choice-grid">${game.choices.map((c, i) => choiceCard(game, save, c, i)).join('')}</div><div class="upgrade-footer"><span>法宝 ${game.weapons.length} / 6 <i>·</i> 功法 ${Object.keys(game.passives).length} / 4</span><button class="secondary-button" data-action="reroll" ${game.rerolls === 0 ? 'disabled' : ''}>${smallIcon('refresh')}重悟机缘 <span>${game.rerolls} / 3</span></button>${autoplayButton(save.autoplay)}<small>${save.autoplay ? '自动历练正在挑选适合当前搭配的机缘…' : '按 1 / 2 / 3 选择'}</small></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop upgrade-backdrop"><section class="upgrade-panel" role="dialog" aria-modal="true" aria-label="局内升级，选择一项机缘"><div class="upgrade-heading"><span class="eyebrow">灵气充盈 · 道法自成</span><h2>顿悟新机缘</h2><p>局内等级 <b>${game.level}</b><span class="upgrade-instruction"><span>·</span>选择一项，续写你的修行之路</span></p></div><div class="choice-grid">${game.choices.map((c, i) => choiceCard(game, save, c, i)).join('')}</div><div class="upgrade-footer"><span>法宝 ${game.weapons.length} / 6 <i>·</i> 功法 ${Object.keys(game.passives).length} / 4</span><button class="secondary-button" data-action="reroll" ${game.rerolls === 0 ? 'disabled' : ''}>${smallIcon('refresh')}重悟机缘 <span>${game.rerolls} / 3</span></button>${autoplayButton(save.autoplay)}<small>${save.autoplay ? '自动历练正在挑选适合当前搭配的机缘…' : '按 1 / 2 / 3 选择'}</small></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('.choice-card')?.focus();
 }
 function renderPause() {
@@ -2899,6 +2899,7 @@ window.addEventListener('blur', () => {
 });
 window.addEventListener('focus', () => {
   lastMortalTick = performance.now();
+  renderer.restore();
 });
 document.addEventListener('visibilitychange', () => {
   lastMortalTick = performance.now();
@@ -2906,8 +2907,9 @@ document.addEventListener('visibilitychange', () => {
     clearInput();
     if (!save.autoplay && game?.state === 'playing') handleAction('pause');
     if ((game && !settled) || inMortalWorld) persist();
-  }
+  } else renderer.restore();
 });
+window.addEventListener('pageshow', () => renderer.restore());
 const canvas = renderer.canvas;
 canvas.addEventListener('pointerdown', (e) => {
   if (game?.state !== 'playing' || pointer !== null) return;
@@ -3051,7 +3053,11 @@ function tick(now: number, draw: boolean) {
   if (
     draw &&
     !inMortalWorld &&
-    (canvasDirty || !game || game.state === 'playing' || game.state !== lastRenderedState)
+    (canvasDirty ||
+      renderer.needsRedraw ||
+      !game ||
+      game.state === 'playing' ||
+      game.state !== lastRenderedState)
   ) {
     renderer.draw(
       game,
@@ -3064,18 +3070,16 @@ function tick(now: number, draw: boolean) {
   }
 }
 function frame(now: number) {
+  // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
+  requestAnimationFrame(frame);
   if (saveLock && !modal.querySelector('.save-lock')) renderSaveLock();
-  if (save.journeyEnded) {
-    requestAnimationFrame(frame);
-    return;
-  }
+  if (save.journeyEnded) return;
   townScene?.update(
     now,
     townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel),
   );
   tickMortal(now);
   tick(now, true);
-  requestAnimationFrame(frame);
 }
 const backgroundClock = new Worker(new URL('./background-clock.ts', import.meta.url), {
   type: 'module',

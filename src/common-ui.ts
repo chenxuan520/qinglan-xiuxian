@@ -159,6 +159,11 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
     c.type === 'evolve'
       ? `法术形态强化；觉醒瞬间释放「觉醒一击」，身边妖物受 ${AWAKENING_BURST.hits} 倍单次伤害，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
       : item.desc;
+  const compactDescription =
+    c.type === 'evolve'
+      ? `形态强化；觉醒一击 ×${AWAKENING_BURST.hits}，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
+      : description;
+  const mastery = c.type === 'passive' ? masteryDescription(save, c.id) : '';
   const benefit =
     c.type === 'evolve'
       ? `伤害 ${multiplier(MAX_WEAPON_LEVEL)} → ×${(weaponLevelDamage(MAX_WEAPON_LEVEL) * EVOLVED_DAMAGE).toFixed(2)} · 施法间隔 −${Math.round((1 - EVOLVED_COOLDOWN) * 100)}%`
@@ -167,9 +172,17 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
           ? '配方齐备后，升级可选仙器觉醒'
           : `伤害 ${multiplier(c.level - 1)} → ${multiplier(c.level)}`
         : c.type === 'passive'
-          ? masteryDescription(save, c.id) || '功效按重数叠加'
+          ? mastery || '功效按重数叠加'
           : '恢复状态，继续修行';
-  return `<button class="choice-card ${c.type === 'evolve' ? 'evolution-choice' : ''}" data-action="choose" data-id="${i}" style="--item-color:${item.color}"><div class="choice-top"><span>${tag}</span><kbd>${i + 1}</kbd></div><div class="choice-art">${icon(item.id, item.color)}</div><h3>${c.type === 'evolve' ? treasure(c.id).evolution : item.name}</h3><div class="choice-level">${c.type === 'evolve' ? '六重 → 仙器' : c.type === 'heal' ? '固本培元' : c.level === 1 ? '领悟 · 一重' : `${c.level - 1} 重 → ${c.level} 重`}</div><p>${description}</p>${c.type === 'weapon' || c.type === 'evolve' ? weaponAffinity(treasure(c.id), game!.spiritRoot, game!.rootElements) + evolutionRecipe(treasure(c.id), game!.path) : ''}<div class="choice-benefit">${benefit}</div><span class="choice-select">领悟此法 ${smallIcon('arrow')}</span></button>`;
+  const specificBenefit = c.type === 'evolve' || (c.type === 'weapon' && c.level > 1) || mastery;
+  const weapon = c.type === 'weapon' || c.type === 'evolve' ? treasure(c.id) : null;
+  const compactRecipe =
+    c.type === 'weapon'
+      ? `觉醒需本法宝六重 ＋ ${evolutionPassives(weapon!, game!.path)
+          .map((id) => `${passive(id).name}五重`)
+          .join(' 或 ')}`
+      : '';
+  return `<button class="choice-card ${c.type === 'evolve' ? 'evolution-choice' : ''}" data-action="choose" data-id="${i}" style="--item-color:${item.color}"><div class="choice-top"><span>${tag}</span><kbd>${i + 1}</kbd></div><div class="choice-art">${icon(item.id, item.color)}</div><h3>${c.type === 'evolve' ? treasure(c.id).evolution : item.name}</h3><div class="choice-level">${c.type === 'evolve' ? '六重 → 仙器' : c.type === 'heal' ? '固本培元' : c.level === 1 ? '领悟 · 一重' : `${c.level - 1} 重 → ${c.level} 重`}</div><p><span class="choice-description-full">${description}</span><span class="choice-description-compact">${compactDescription}</span></p><div class="choice-meta">${weapon ? weaponAffinity(weapon, game!.spiritRoot, game!.rootElements, true) : ''}<div class="choice-benefit ${specificBenefit ? '' : 'choice-benefit-hint'}">${benefit}</div></div>${weapon ? evolutionRecipe(weapon, game!.path) : ''}${compactRecipe ? `<div class="choice-recipe-compact">${compactRecipe}</div>` : ''}<span class="choice-select">领悟此法 ${smallIcon('arrow')}</span></button>`;
 }
 export function damageReport(game: Game | null) {
   if (!game) return '';
