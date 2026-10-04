@@ -56,7 +56,7 @@ function mote(c: CanvasRenderingContext2D, x: number, y: number, size: number) {
   c.fill();
 }
 
-/** 地面材质留在人物下方，短刻痕标记真实半径，避免多个领域叠成同样的大圆框。 */
+/** 地面材质留在人物下方，完整圆形边界标记实际半径，内部保留法宝各自的纹样。 */
 export function drawArtifactField(
   c: CanvasRenderingContext2D,
   z: Zone,
@@ -69,15 +69,16 @@ export function drawArtifactField(
   c.save();
   c.translate(z.x, z.y);
   c.globalAlpha = cue.opacity;
-  c.strokeStyle = z.color + (cue.charging ? '50' : '40');
+  c.strokeStyle = z.color + (cue.charging ? '66' : '80');
+  c.fillStyle = z.color + (cue.charging ? '08' : '12');
   c.lineWidth = 1;
   // 边界从第一帧就位于伤害半径，装饰的移动不能冒充伤害扩张。
-  for (let i = 0; i < 8; i++) {
-    const a = (i * TAU) / 8;
-    c.beginPath();
-    c.arc(0, 0, r, a - 0.025, a + 0.025);
-    c.stroke();
-  }
+  c.setLineDash(cue.charging ? [3, 9] : []);
+  c.beginPath();
+  c.arc(0, 0, r, 0, TAU);
+  c.fill();
+  c.stroke();
+  c.setLineDash([]);
   // 所有地面材质都裁在实际范围内，雾与波纹不会暗示更大的伤害区域。
   c.beginPath();
   c.arc(0, 0, r, 0, TAU);
@@ -795,8 +796,8 @@ export function drawArtifactBurst(c: CanvasRenderingContext2D, e: Effect, reduce
     r = e.radius;
   c.save();
   c.translate(e.x, e.y);
-  c.strokeStyle = e.color + '48';
-  c.lineWidth = 0.8;
+  c.strokeStyle = e.color;
+  c.lineWidth = e.kind === 'ice' ? 4 : 3;
   c.beginPath();
   c.arc(0, 0, r, 0, TAU);
   c.stroke();
