@@ -19,6 +19,7 @@ import { syncHumanStories } from '../src/human-stories.ts';
 import { sectDuesPending } from '../src/mortal.ts';
 import { Game } from '../src/game.ts';
 import { AD_SECONDS } from '../src/ads.ts';
+import { SUPPORT_CODE_IMAGE } from '../src/setting.ts';
 
 // 执行实际函数和调用入口，不导入 main 的游戏、音频、Worker 与页面初始化。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -86,6 +87,7 @@ function harness(save: SaveData) {
     sectDuesPending,
     SAVE_KEY,
     AD_SECONDS,
+    SUPPORT_CODE_IMAGE,
     structuredClone,
     localStorage: {
       getItem: () => writes.at(-1) ?? null,
