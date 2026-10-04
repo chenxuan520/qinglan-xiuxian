@@ -1610,7 +1610,6 @@ function startRun() {
     return;
   }
   if (!ensureScene(selectedStage, startRun)) {
-    void mobileDisplay.enter();
     return;
   }
   clearInput();
@@ -1629,14 +1628,12 @@ function startRun() {
     save.completed.includes(FINAL_TRIAL_STAGE),
   ).name;
   renderHud();
-  void mobileDisplay.enter();
   if (save.sound) unlockAudio();
   persist();
 }
 function restoreRun() {
   if (!pendingRun || !assetsReady) return;
   if (!ensureScene(pendingRun.stage, restoreRun, pendingRun)) {
-    void mobileDisplay.enter();
     return;
   }
   game = pendingRun;
@@ -1655,7 +1652,6 @@ function restoreRun() {
     save.completed.includes(FINAL_TRIAL_STAGE),
   ).name;
   renderHud();
-  void mobileDisplay.enter();
   if (game.state === 'upgrade') renderChoices();
   else if (game.state === 'lost') renderDeath();
   else renderPause();
@@ -1763,7 +1759,6 @@ function beginTribulation() {
     return;
   }
   if (!ensureScene(6, beginTribulation, null, true)) {
-    void mobileDisplay.enter();
     return;
   }
   const source = game && !settled ? game : pendingRun;
@@ -1780,7 +1775,6 @@ function beginTribulation() {
   game.onEvent = gameEvent;
   telemetry.track({ type: 'run-start', ...lifeStats(), tribulation: game.tribulation });
   renderHud();
-  void mobileDisplay.enter();
   lastFrame = performance.now();
   persist();
 }
@@ -2240,7 +2234,6 @@ function handleAction(action: string, id?: string) {
       }
       persist();
       telemetry.track({ type: 'town', ...lifeStats() });
-      void mobileDisplay.enter();
       inTown = true;
       if (save.mortal.hometown) townPosition = { ...HOMETOWN_START };
       lastMortalTick = performance.now();

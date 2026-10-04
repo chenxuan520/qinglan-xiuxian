@@ -46,7 +46,7 @@ function environment(t: test.TestContext, mobile = true) {
 }
 
 for (const direction of ['portrait-primary', 'landscape-primary']) {
-  test(`手机点击入场立即请求全屏，保持${direction === 'portrait-primary' ? '竖屏' : '横屏'}`, async (t) => {
+  test(`手机手动请求全屏，保持${direction === 'portrait-primary' ? '竖屏' : '横屏'}`, async (t) => {
     const { calls, orientation } = environment(t);
     Object.assign(orientation, { type: direction });
     const display = new MobileDisplay(() => {});
@@ -61,7 +61,7 @@ for (const direction of ['portrait-primary', 'landscape-primary']) {
   });
 }
 
-test('桌面端入场不改变全屏状态或屏幕方向', async (t) => {
+test('桌面端调用全屏入口不改变状态或屏幕方向', async (t) => {
   const { calls } = environment(t, false);
   await new MobileDisplay(() => {}).enter();
   assert.deepEqual(calls, []);
@@ -135,7 +135,7 @@ test('离场时保留用户原有的全屏状态', async (t) => {
   assert.deepEqual(calls, []);
 });
 
-test('快速重复入场共用同一个全屏请求', async (t) => {
+test('快速重复手动进入全屏共用同一个请求', async (t) => {
   const { calls } = environment(t);
   const display = new MobileDisplay(() => {});
   await Promise.all([display.enter(), display.enter()]);
