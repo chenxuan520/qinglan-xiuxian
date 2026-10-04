@@ -1458,9 +1458,6 @@ kbd {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  position: sticky;
-  top: -35px;
-  z-index: 1;
   padding: 4px 0;
   margin-bottom: 12px;
   border-bottom: 1px solid var(--border);
@@ -3747,7 +3744,6 @@ kbd {
     gap: 8px;
   }
   .collection-navigation {
-    top: -23px;
     gap: 6px;
   }
   .collection-filters {
@@ -6293,7 +6289,6 @@ body.journey-complete:not(.in-game) {
 .panel-heading {
   min-height: 44px;
 }
-.collection-navigation,
 .guide-tabs {
   top: 52px;
 }
