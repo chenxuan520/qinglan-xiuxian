@@ -1304,6 +1304,15 @@ function updateHud() {
       )
       .join('');
   }
+  const timer = ui.querySelector<HTMLElement>('.stage-timer')!;
+  ui.style.setProperty(
+    '--battle-timer-bottom',
+    `${Math.ceil(timer.getBoundingClientRect().bottom)}px`,
+  );
+  ui.style.setProperty(
+    '--battle-info-bottom',
+    `${Math.ceil((bossBar.hidden ? timer : bossBar).getBoundingClientRect().bottom)}px`,
+  );
 }
 
 function renderChoices() {
