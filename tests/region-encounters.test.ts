@@ -59,32 +59,6 @@ test('所有地域地面技能从施法者附近生成，整个区域不越过20
   assert.equal(samples, 12);
 });
 
-test('七位妖王全部地面招式以自身为中心限制在320像素，不能隔屏在玩家脚下落阵', () => {
-  let ground = 0;
-  for (let stage = 0; stage < 7; stage++)
-    for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
-      const g = fixture(stage);
-      const e = g.spawnEnemy(10, false, true, { x: 510, y: -700 }, stage);
-      g.player.x = e.x + 450;
-      g.player.y = e.y;
-      e.skillStep = phase;
-      g.castBossSkill(e, 1, 0);
-      for (const z of g.zones) {
-        assert.ok(Math.hypot(z.x - e.x, z.y - e.y) + z.radius <= 320.00001, `${stage}/${phase}`);
-        assert.ok(z.delay >= 0.85);
-        ground++;
-      }
-      g.zones = [];
-      g.shots = [];
-      e.skillStep = phase;
-      g.player.x = e.x + 1000;
-      g.castBossSkill(e, 1, 0);
-      assert.equal(g.zones.length + g.shots.length, 0);
-      assert.equal(e.skillStep, phase);
-    }
-  assert.ok(ground > 50);
-});
-
 test('普通与精英火弹霜弹可见飞行、锁定方向且有射程，星环保留连续缺口', () => {
   for (const [type, skill, counts] of [
     [33, 'firebolt', [1, 2]],
@@ -444,22 +418,6 @@ test('地域技能在大量混合精英场景下遵守弹丸、法阵与召唤�
     summons = Math.max(summons, currentSummons);
   }
   assert.ok(shots > 0 && zones > 0 && summons > 0);
-});
-
-test('独立天劫雷阵全部相对核心布置，玩家再远也不会追到其脚下生成', () => {
-  for (let phase = 0; phase < 4; phase++) {
-    const g = fixture(6);
-    g.tribulation = 5;
-    g.tribulationStep = phase;
-    g.tribulationNextAt = 0;
-    const e = g.spawnEnemy(10, false, true, { x: 250, y: 500 });
-    g.player.x = e.x + 3000;
-    g.player.y = e.y;
-    g.updateTribulation();
-    assert.ok(g.zones.length);
-    for (const z of g.zones) assert.ok(Math.hypot(z.x - e.x, z.y - e.y) + z.radius <= 458.00001);
-    for (const b of g.shots) assert.ok(b.life * Math.hypot(b.vx, b.vy) <= 720.00001);
-  }
 });
 
 test('旧开天斧待选界面与自动选技都沿用该局的功法配方', async () => {
