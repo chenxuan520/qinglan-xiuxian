@@ -6240,47 +6240,7 @@ body.journey-complete:not(.in-game) {
   }
 }
 
-/* 常用操作优先，完整命盘和说明按需展开。 */
-.root-profile {
-  margin: 18px 0;
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  background: #183b333d;
-}
-.root-profile-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 18px;
-  color: var(--gold);
-  font-size: 15px;
-}
-.root-profile-heading strong {
-  font-weight: 500;
-}
-.root-profile-heading small,
-.root-profile-heading > span {
-  color: var(--muted);
-  font-size: 11px;
-}
-.root-profile-heading small {
-  display: block;
-  margin-top: 5px;
-}
-.root-profile-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-.root-profile-actions button {
-  flex: 1;
-  min-height: 44px;
-  padding: 8px;
-  font-size: 11px;
-  letter-spacing: 0;
-}
+/* 说明区保留按需展开；五行灵根盘沿用完整展示。 */
 .disclosure {
   text-align: left;
   border-top: 1px solid var(--border);
@@ -6297,12 +6257,6 @@ body.journey-complete:not(.in-game) {
 .disclosure > summary:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
-}
-.root-profile .spirit-root-summary {
-  margin: 0;
-  padding: 12px 0;
-  border: 0;
-  background: none;
 }
 .cultivation-summary {
   padding: 0 0 14px;
@@ -6467,13 +6421,6 @@ body.journey-complete:not(.in-game) {
   }
   .journey-depart .embark {
     width: 100%;
-  }
-  .root-profile {
-    padding: 12px;
-    margin: 14px 0;
-  }
-  .root-profile-heading {
-    font-size: 14px;
   }
   .training-card {
     display: grid;
