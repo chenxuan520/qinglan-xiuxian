@@ -41,6 +41,7 @@ function draw(g: Game) {
     width: 1280,
     height: 800,
     scale: 1,
+    reducedMotion: { matches: false },
     sprite() {},
     formation() {},
     cachedFormation() {},
@@ -130,11 +131,16 @@ test('瞬时范围命中与控制不等待扩圈，首帧、中段及结束前�
           assert.equal(g.damageBySource[id], damage * 2);
         }
       }
-      assert.deepEqual(
-        frames,
-        frames.map((f) => ({ ...f, circles: [{ radius, visible: true }] })),
-        `${id} 已即时命中边界靶，反馈半径不能随 life 才扩到伤害边缘`,
-      );
+      for (const f of frames) {
+        assert.ok(
+          f.circles.some((c) => c.visible && Math.abs(c.radius - radius) < 1e-8),
+          `${id} 已即时命中边界靶，反馈半径不能随 life 才扩到伤害边缘`,
+        );
+        assert.ok(
+          f.circles.every((c) => c.radius <= radius),
+          '装饰声浪不得超出命中边界',
+        );
+      }
     });
 
   await t.test('雪魄', () => {

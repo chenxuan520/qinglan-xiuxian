@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, type Zone } from '../src/game.ts';
+import { Game, type Effect, type Zone } from '../src/game.ts';
 import { freshSave, parseSave, SAVE_SCHEMA } from '../src/progress.ts';
 import { treasure, type WeaponKind } from '../src/data.ts';
 import { joinSect } from '../src/mortal.ts';
@@ -11,6 +11,7 @@ import {
   hasArtifactField,
   drawArtifactField,
   drawArtifactObject,
+  drawArtifactBurst,
 } from '../src/artifact-effects.ts';
 
 function fixture() {
@@ -262,6 +263,43 @@ test('新存档字段校验与旧字段缺省兼容，不接受损坏动画数�
   assert.equal(SAVE_SCHEMA, 5);
 });
 
+test('钟声和冰镜绘制不修改效果时钟，减少动态效果仍保留完整命中边界', () => {
+  for (const id of ['pulse', 'ice'] as const) {
+    const g = fixture();
+    g.weapons = [{ id, level: 6, evolved: true, timer: 999 }];
+    g.cast(g.weapons[0]);
+    const e = g.effects.find((e) => e.kind === (id === 'pulse' ? 'bell' : 'ice'))!;
+    assert.ok(e);
+    const radii: number[] = [],
+      stack: number[] = [];
+    const ctx = new Proxy({ globalAlpha: 1 } as CanvasRenderingContext2D, {
+      get(target, key) {
+        if (key === 'globalAlpha') return target.globalAlpha;
+        return (...args: unknown[]) => {
+          if (key === 'save') stack.push(target.globalAlpha);
+          if (key === 'restore') target.globalAlpha = stack.pop()!;
+          if (key === 'arc') radii.push(args[2] as number);
+          for (const value of args)
+            if (typeof value === 'number') assert.ok(Number.isFinite(value));
+        };
+      },
+    });
+    for (const fraction of [1, 0.5, 0.001])
+      for (const reduced of [false, true]) {
+        e.life = e.maxLife * fraction;
+        const before = structuredClone(e) as Effect;
+        const snapshot = g.snapshot();
+        radii.length = 0;
+        drawArtifactBurst(ctx, e, reduced);
+        assert.deepEqual(e, before);
+        assert.deepEqual(g.snapshot(), snapshot);
+        assert.equal(stack.length, 0);
+        assert.ok(radii.includes(e.radius));
+        assert.ok(radii.every((r) => r <= e.radius));
+      }
+  }
+});
+
 test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普通冲刺和妖王路线', async () => {
   const { readFileSync } = await import('node:fs');
   const { registerHooks, stripTypeScriptTypes } = await import('node:module');
@@ -323,6 +361,24 @@ test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普�
         {
           x: 0,
           y: 0,
+          radius: 210,
+          life: 0.5,
+          maxLife: 0.75,
+          color: '#9fdcfa',
+          kind: 'ice',
+        },
+        {
+          x: 0,
+          y: 0,
+          radius: 210,
+          life: 0.5,
+          maxLife: 0.75,
+          color: '#edc77f',
+          kind: 'bell',
+        },
+        {
+          x: 0,
+          y: 0,
           radius: 420,
           life: 1,
           maxLife: 1.6,
@@ -380,7 +436,11 @@ test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普�
       const lastAwaken = calls.findLastIndex(
         (c) => c.method === 'stroke' && c.strokeStyle === '#76efcd',
       );
+      const lastBurst = calls.findLastIndex(
+        (c) => c.method === 'stroke' && ['#d4efeb', '#d6b66f'].includes(String(c.strokeStyle)),
+      );
       assert.ok(lastObject >= 0 && lastBeam >= 0 && lastAwaken >= 0);
+      assert.ok(lastBurst >= 0);
       const floor = calls.findIndex((c) => c.method === 'stroke' && c.strokeStyle === '#ff9b80');
       const charge = calls.findIndex((c) => c.method === 'strokeRect' && c.args[2] === 209);
       const windup = calls.findIndex(
@@ -389,7 +449,7 @@ test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普�
       const boss = calls.findIndex((c) => c.method === 'stroke' && c.strokeStyle === '#e2957c');
       for (const index of [floor, charge, windup, boss])
         assert.ok(
-          index > Math.max(lastObject, lastBeam, lastAwaken),
+          index > Math.max(lastObject, lastBeam, lastAwaken, lastBurst),
           `${id}/${charging}: 警示 ${index} 被实体 ${lastObject} 或光束 ${lastBeam} 覆盖`,
         );
       assert.equal(stack.length, 0);

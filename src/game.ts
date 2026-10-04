@@ -232,6 +232,7 @@ export class Game {
   encounterVersion = 1;
   artifactVersion = 1;
   cacheChallenge: CacheChallenge | null = null;
+  private cacheApproachStartedAt: number | null = null;
   private nextEnemySlowAt = 0;
   tribulation = 0;
   tribulationStep = 0;
@@ -2128,7 +2129,7 @@ export class Game {
       return;
     }
     if (w.id === 'pulse' || w.id === 'ice') {
-      this.effect(p.x, p.y, 0.75, radius * 1.5, t.color, w.id === 'pulse' ? 'impact' : w.id);
+      this.effect(p.x, p.y, 0.75, radius * 1.5, t.color, w.id === 'pulse' ? 'bell' : w.id);
       this.areaDamage(p, radius * 1.5, dmg, w.id);
       return;
     }
@@ -2678,16 +2679,26 @@ export class Game {
       distance(c, this.player) <= CACHE_CHALLENGE.approach
     );
   }
+  get cacheApproachProgress() {
+    return this.cacheNearby && this.cacheApproachStartedAt !== null
+      ? Math.min(
+          1,
+          Math.max(0, this.time - this.cacheApproachStartedAt) / CACHE_CHALLENGE.holdSeconds,
+        )
+      : 0;
+  }
   beginCacheChallenge() {
     const c = this.cacheChallenge;
     if (
       this.state !== 'playing' ||
+      this.player.hp <= 0 ||
       !this.cacheNearby ||
       !c ||
       this.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2
     )
       return false;
     c.phase = 'active';
+    this.cacheApproachStartedAt = null;
     c.deadline = Math.min(
       this.time + CACHE_CHALLENGE.fightSeconds,
       STAGES[this.stage].minutes * 60 - 12,
@@ -2734,16 +2745,24 @@ export class Game {
         deadline: Math.min(this.time + CACHE_CHALLENGE.offerSeconds, duration - 60),
         guardians: [],
       };
-      this.announce('守匣灵阵出现 · 靠近后可自选挑战');
+      this.announce('守匣灵阵出现 · 入阵停留片刻即可开阵');
       this.onEvent('cache');
     }
     const c = this.cacheChallenge;
     if (!c || !['offered', 'active'].includes(c.phase)) return;
     if (this.time >= c.deadline) {
       c.phase = 'expired';
+      this.cacheApproachStartedAt = null;
       for (const e of this.enemies) if (e.cacheGuardian) e.dead = true;
       this.announce('守匣灵阵散去 · 继续历练');
       this.onEvent('cache');
+    } else if (c.phase === 'offered') {
+      if (!this.cacheNearby || this.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2)
+        this.cacheApproachStartedAt = null;
+      else {
+        this.cacheApproachStartedAt ??= this.time;
+        if (this.cacheApproachProgress >= 1) this.beginCacheChallenge();
+      }
     } else if (
       c.phase === 'active' &&
       c.guardians.every((id) => !this.enemies.some((e) => e.id === id && !e.dead))

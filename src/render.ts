@@ -1,4 +1,4 @@
-import { ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
+import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
 import type { ElementId } from './data.ts';
 import type { Game, Point } from './game.ts';
 import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
@@ -11,6 +11,7 @@ import {
   drawArtifactField,
   drawArtifactObject,
   drawArtifactBeam,
+  drawArtifactBurst,
 } from './artifact-effects.ts';
 
 export class Renderer {
@@ -596,9 +597,29 @@ export class Renderer {
       c.restore();
     }
     const cache = game.cacheChallenge;
-    if (cache && ['offered', 'active'].includes(cache.phase) && this.visible(cache, p, 100)) {
+    if (
+      cache &&
+      ['offered', 'active'].includes(cache.phase) &&
+      this.visible(cache, p, CACHE_CHALLENGE.approach)
+    ) {
       c.save();
       this.formation(cache.x, cache.y, 45, time * 0.3, '#e9ce8a', 0.65);
+      if (cache.phase === 'offered') {
+        c.strokeStyle = '#d8c48180';
+        c.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) {
+          const a = (i * TAU) / 4;
+          c.beginPath();
+          c.arc(cache.x, cache.y, CACHE_CHALLENGE.approach, a - 0.09, a + 0.09);
+          c.stroke();
+        }
+        if (game.cacheApproachProgress > 0) {
+          c.fillStyle = '#193c35';
+          c.fillRect(cache.x - 30, cache.y + 55, 60, 3);
+          c.fillStyle = '#ead292';
+          c.fillRect(cache.x - 30, cache.y + 55, 60 * game.cacheApproachProgress, 3);
+        }
+      }
       c.textAlign = 'center';
       c.font = '16px serif';
       c.lineWidth = 4;
@@ -1049,17 +1070,17 @@ export class Renderer {
           c.ellipse(0, 0, 35, 18, 0, 0, TAU);
           c.stroke();
         });
+      } else if (e.kind === 'ice' || e.kind === 'bell') {
+        drawArtifactBurst(c, e, this.reducedMotion.matches);
       } else if (e.kind === 'awaken') {
         this.awakening(p.x, p.y, 1 - e.life / e.maxLife, e.radius, e.color, e.element);
       } else {
         // 瞬发效果首帧即覆盖判定范围，普通脉冲仍作为扩散装饰。
-        const r =
-          e.kind === 'impact' || e.kind === 'ice' ? e.radius : e.radius * (1 - e.life / e.maxLife);
-        c.lineWidth = e.kind === 'ice' ? 4 : 3;
+        const r = e.kind === 'impact' ? e.radius : e.radius * (1 - e.life / e.maxLife);
+        c.lineWidth = 3;
         c.beginPath();
         c.arc(e.x, e.y, r, 0, TAU);
         c.stroke();
-        if (e.kind === 'ice') this.formation(e.x, e.y, r, 0, e.color, 0.5);
       }
       c.restore();
     }

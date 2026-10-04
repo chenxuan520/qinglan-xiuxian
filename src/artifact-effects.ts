@@ -56,7 +56,7 @@ function mote(c: CanvasRenderingContext2D, x: number, y: number, size: number) {
   c.fill();
 }
 
-/** 地面只画实际作用范围与材质，实体在人物之后绘制，避免巨斧被妖群遮住。 */
+/** 地面材质留在人物下方，短刻痕标记真实半径，避免多个领域叠成同样的大圆框。 */
 export function drawArtifactField(
   c: CanvasRenderingContext2D,
   z: Zone,
@@ -64,22 +64,25 @@ export function drawArtifactField(
   reduced = false,
 ) {
   const cue = artifactCue(z, reduced),
-    r = z.radius;
-  const clock = reduced ? 0 : time;
+    r = z.radius,
+    clock = reduced ? 0 : time;
   c.save();
   c.translate(z.x, z.y);
   c.globalAlpha = cue.opacity;
-  c.strokeStyle = z.color + (cue.charging ? '66' : '80');
-  c.fillStyle = z.color + (cue.charging ? '08' : '12');
+  c.strokeStyle = z.color + (cue.charging ? '50' : '40');
   c.lineWidth = 1;
-  c.setLineDash(cue.charging ? [3, 9] : []);
+  // 边界从第一帧就位于伤害半径，装饰的移动不能冒充伤害扩张。
+  for (let i = 0; i < 8; i++) {
+    const a = (i * TAU) / 8;
+    c.beginPath();
+    c.arc(0, 0, r, a - 0.025, a + 0.025);
+    c.stroke();
+  }
+  // 所有地面材质都裁在实际范围内，雾与波纹不会暗示更大的伤害区域。
   c.beginPath();
   c.arc(0, 0, r, 0, TAU);
-  c.fill();
-  c.stroke();
-  c.setLineDash([]);
+  c.clip();
   if (!cue.charging && ['axe', 'meteor', 'coffin'].includes(z.kind)) {
-    // 裂纹从受击中心伸向边界，长度不越过真实伤害圈。
     c.rotate(z.castAngle ?? 0);
     c.strokeStyle = z.color + 'a0';
     c.lineWidth = 1.4;
@@ -99,62 +102,173 @@ export function drawArtifactField(
       c.restore();
     }
   } else if (z.kind === 'vortex') {
-    c.rotate(clock * 0.6);
-    c.strokeStyle = z.color + 'aa';
-    c.lineWidth = 2;
-    for (let arm = 0; arm < 2; arm++) {
-      c.rotate(Math.PI);
-      c.beginPath();
-      for (let i = 0; i <= 32; i++) {
-        const a = (i / 32) * Math.PI * 1.7,
-          d = r * (0.85 - i / 40);
-        if (i) c.lineTo(Math.cos(a) * d, Math.sin(a) * d);
-        else c.moveTo(Math.cos(a) * d, Math.sin(a) * d);
-      }
-      c.stroke();
-    }
-    c.fillStyle = '#d8e9d8';
+    c.rotate(clock * 0.24);
+    const s = r * 0.57;
+    c.fillStyle = '#15332ed9';
     c.beginPath();
-    c.arc(0, -r * 0.2, r * 0.13, 0, TAU);
+    c.arc(0, 0, s, 0, TAU);
     c.fill();
-    c.fillStyle = '#153c39';
+    // 阴阳两鱼与鱼眼形成完整太极，而不是两条相似的螺旋线。
+    c.fillStyle = '#c7d9bcc4';
     c.beginPath();
-    c.arc(0, r * 0.2, r * 0.13, 0, TAU);
+    c.arc(0, 0, s, -Math.PI / 2, Math.PI / 2);
+    c.arc(0, s / 2, s / 2, Math.PI / 2, -Math.PI / 2);
+    c.arc(0, -s / 2, s / 2, Math.PI / 2, -Math.PI / 2, true);
+    c.closePath();
     c.fill();
-  } else if (z.kind === 'bloodpool') {
-    c.fillStyle = '#841f5355';
-    c.beginPath();
-    c.arc(0, 0, r * 0.92, 0, TAU);
-    c.fill();
-    c.strokeStyle = '#e998bb';
-    for (let i = 0; i < 5; i++) {
-      const a = (i * TAU) / 5 + clock * 0.18;
-      const d = r * (0.3 + ((i * 0.17 + clock * 0.13) % 0.55));
+    for (const side of [-1, 1]) {
+      c.fillStyle = side < 0 ? '#c7d9bc' : '#15332e';
       c.beginPath();
-      c.arc(0, 0, d, a, a + 0.7);
-      c.stroke();
-    }
-  } else if (z.kind === 'poison' || z.kind === 'grave') {
-    // 稀薄雾团，不覆盖人物或敌方危险预警。
-    c.fillStyle = z.color + '18';
-    for (let i = 0; i < 5; i++) {
-      const a = i * 2.4 + clock * 0.12;
-      c.beginPath();
-      c.arc(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42, r * 0.43, 0, TAU);
+      c.arc(0, (side * s) / 2, s * 0.12, 0, TAU);
       c.fill();
     }
-  } else if (z.kind === 'pagoda' || z.kind === 'banner' || z.kind === 'cauldron') {
-    c.strokeStyle = z.color + '70';
+    c.strokeStyle = '#d7d6acaa';
+    c.lineWidth = Math.max(1, r * 0.012);
     for (let i = 0; i < 8; i++) {
       c.save();
       c.rotate((i * TAU) / 8);
+      for (let bar = 0; bar < 3; bar++) {
+        const x = r * (0.76 + bar * 0.045),
+          w = r * 0.075;
+        if (i & (1 << bar)) {
+          line(c, [
+            [x, -w],
+            [x, -w * 0.23],
+          ]);
+          line(c, [
+            [x, w * 0.23],
+            [x, w],
+          ]);
+        } else
+          line(c, [
+            [x, -w],
+            [x, w],
+          ]);
+      }
+      c.restore();
+    }
+    c.fillStyle = '#e0dec6aa';
+    for (let i = 0; i < 6; i++) {
+      const t = (clock * 0.18 + i / 6) % 1,
+        a = i * 2.4 - t * 0.8,
+        d = r * (0.7 - t * 0.42);
+      mote(c, Math.cos(a) * d, Math.sin(a) * d, Math.min(3, r * 0.02));
+    }
+  } else if (z.kind === 'bloodpool') {
+    c.fillStyle = '#70263866';
+    c.beginPath();
+    for (let i = 0; i <= 32; i++) {
+      const a = (i * TAU) / 32,
+        d = r * (0.85 + Math.sin(a * 5 + clock * 0.7) * 0.055 + Math.sin(a * 3) * 0.04);
+      if (i) c.lineTo(Math.cos(a) * d, Math.sin(a) * d);
+      else c.moveTo(Math.cos(a) * d, Math.sin(a) * d);
+    }
+    c.closePath();
+    c.fill();
+    // 血流有分叉、明暗和长条波光，避免用粉色实心圆代替水面。
+    for (let i = 0; i < 6; i++) {
+      c.save();
+      c.rotate(i * 2.4 + clock * 0.035);
+      c.strokeStyle = '#bf617759';
+      c.lineWidth = Math.max(3, r * 0.055);
+      c.beginPath();
+      c.moveTo(-r * 0.08, r * 0.1);
+      c.bezierCurveTo(r * 0.35, -r * 0.27, r * 0.32, r * 0.3, r * 0.82, -r * 0.09);
+      c.stroke();
+      c.strokeStyle = '#ecc0bba0';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(r * 0.27, -r * 0.02);
+      c.bezierCurveTo(r * 0.45, r * 0.08, r * 0.61, -r * 0.12, r * 0.73, -r * 0.1);
+      c.stroke();
+      c.restore();
+    }
+  } else if (z.kind === 'poison') {
+    for (let i = 0; i < 7; i++) {
+      const a = i * 2.4 + clock * 0.08,
+        d = r * (0.18 + (i % 3) * 0.17);
+      c.save();
+      c.translate(Math.cos(a) * d, Math.sin(a) * d);
+      c.rotate(a * 0.4);
+      c.fillStyle = '#5f884329';
+      c.beginPath();
+      c.ellipse(0, 0, r * 0.43, r * 0.26, 0, 0, TAU);
+      c.fill();
+      c.fillStyle = '#bdd58929';
+      c.beginPath();
+      c.ellipse(-r * 0.03, -r * 0.04, r * 0.32, r * 0.18, 0, 0, TAU);
+      c.fill();
+      c.strokeStyle = '#dce7acaa';
+      c.lineWidth = 1.1;
+      c.beginPath();
+      c.moveTo(-r * 0.32, r * 0.04);
+      c.bezierCurveTo(-r * 0.12, -r * 0.15, r * 0.07, r * 0.15, r * 0.3, -r * 0.04);
+      c.stroke();
+      c.restore();
+    }
+  } else if (z.kind === 'grave') {
+    c.strokeStyle = '#b7a9c355';
+    for (let i = 0; i < 5; i++) {
+      c.save();
+      c.rotate(i * 2.4);
       line(c, [
-        [r * 0.85, -5],
-        [r * 0.92, -5],
-        [r * 0.92, 5],
-        [r * 0.85, 5],
+        [r * 0.16, 0],
+        [r * 0.4, 8],
+        [r * 0.64, -4],
+        [r * 0.85, 7],
       ]);
       c.restore();
+    }
+  } else if (z.kind === 'pagoda' || z.kind === 'brush') {
+    c.rotate(z.kind === 'brush' ? (z.castAngle ?? 0) : Math.PI / 4);
+    c.strokeStyle = z.color + '45';
+    const d = r * (z.kind === 'pagoda' ? 0.57 : 0.42);
+    c.strokeRect(-d, -d, d * 2, d * 2);
+    for (const side of [-1, 1]) {
+      line(c, [
+        [side * d, -d * 0.7],
+        [side * d * 0.7, -d * 0.7],
+        [side * d * 0.7, -d],
+      ]);
+      line(c, [
+        [side * d, d * 0.7],
+        [side * d * 0.7, d * 0.7],
+        [side * d * 0.7, d],
+      ]);
+    }
+  } else if (z.kind === 'banner') {
+    c.rotate(z.castAngle ?? 0);
+    c.strokeStyle = z.color + '80';
+    const d = r * 0.7;
+    line(
+      c,
+      [
+        [0, -d],
+        [d * 0.86, d * 0.5],
+        [-d * 0.86, d * 0.5],
+      ],
+      true,
+    );
+  } else if (z.kind === 'cauldron') {
+    c.strokeStyle = '#c4db9277';
+    for (let i = 0; i < 6; i++) {
+      c.save();
+      c.rotate((i * TAU) / 6 + clock * 0.05);
+      c.beginPath();
+      c.moveTo(r * 0.3, 0);
+      c.bezierCurveTo(r * 0.36, -r * 0.22, r * 0.62, -r * 0.2, r * 0.79, 0);
+      c.bezierCurveTo(r * 0.6, r * 0.1, r * 0.44, r * 0.08, r * 0.3, 0);
+      c.stroke();
+      c.restore();
+    }
+  } else if (z.kind === 'nest' || z.kind === 'sand') {
+    c.strokeStyle = z.color + '38';
+    for (let i = 0; i < 5; i++) {
+      const a = i * 2.4;
+      line(c, [
+        [Math.cos(a) * r * 0.25, Math.sin(a) * r * 0.25],
+        [Math.cos(a + 0.2) * r * 0.65, Math.sin(a + 0.2) * r * 0.65],
+      ]);
     }
   }
   c.restore();
@@ -586,8 +700,12 @@ export function drawArtifactObject(
       c.globalAlpha *= 0.55;
       if (z.kind === 'poison') {
         c.fillStyle = z.color + '40';
+        c.strokeStyle = '#d5e5a788';
         c.beginPath();
-        c.arc(0, 0, 4 + (i % 3) * 2, 0, TAU);
+        c.moveTo(-9, 4);
+        c.bezierCurveTo(-4, -9, 10, -3, 4, -22);
+        c.bezierCurveTo(18, -9, 3, 2, 11, 6);
+        c.closePath();
         c.fill();
         c.stroke();
       } else {
@@ -667,6 +785,154 @@ export function drawArtifactBeam(c: CanvasRenderingContext2D, e: Effect, reduced
     c.fillStyle = '#eee4ba';
     const count = e.kind === 'starline' ? 4 : 2;
     for (let i = 1; i <= count; i++) mote(c, (length * i) / count, 0, i === count ? 5 : 3);
+  }
+  c.restore();
+}
+
+/** 瞬发范围第一帧即显示完整边界；冰棱与钟声只移动装饰，不改变命中时机。 */
+export function drawArtifactBurst(c: CanvasRenderingContext2D, e: Effect, reduced = false) {
+  const progress = clamp(1 - e.life / Math.max(e.maxLife, 0.001)),
+    r = e.radius;
+  c.save();
+  c.translate(e.x, e.y);
+  c.strokeStyle = e.color + '48';
+  c.lineWidth = 0.8;
+  c.beginPath();
+  c.arc(0, 0, r, 0, TAU);
+  c.stroke();
+  if (e.kind === 'ice') {
+    // 不再叠圆形法阵：错落的棱面、霜纹与碎晶共同表现寒光爆发。
+    for (let i = 0; i < 12; i++) {
+      const a = (i * TAU) / 12 + 0.08,
+        d = r * (0.3 + (i % 3) * 0.22 + (reduced ? 0 : progress * 0.08)),
+        h = r * (0.09 + (i % 2) * 0.045),
+        w = h * 0.3;
+      c.save();
+      c.rotate(a);
+      c.fillStyle = '#a6dcf088';
+      c.strokeStyle = '#d5f1f3cc';
+      c.lineWidth = 1.2;
+      line(
+        c,
+        [
+          [d - h, 0],
+          [d, -w],
+          [d + h, 0],
+          [d, w],
+        ],
+        true,
+        true,
+      );
+      c.fillStyle = '#e6fcf1aa';
+      c.beginPath();
+      c.moveTo(d - h, 0);
+      c.lineTo(d, -w);
+      c.lineTo(d + h, 0);
+      c.closePath();
+      c.fill();
+      c.strokeStyle = '#c3e7eb88';
+      c.lineWidth = 0.8;
+      line(c, [
+        [r * 0.12, 0],
+        [d - h, 0],
+      ]);
+      line(c, [
+        [r * 0.25, 0],
+        [r * 0.21, -r * 0.055],
+      ]);
+      c.fillStyle = '#e4f7eff0';
+      mote(c, r * 0.89, (i % 2 ? -1 : 1) * r * 0.035, Math.min(3, r * 0.018));
+      c.restore();
+    }
+    // 镜面是小六棱晶，不用另一个大圆代表法宝本体。
+    c.save();
+    c.translate(-40, -58);
+    c.fillStyle = '#88c3d466';
+    c.strokeStyle = '#d4efeb';
+    const s = Math.min(30, r * 0.14);
+    c.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i * TAU) / 6;
+      if (i) c.lineTo(Math.cos(a) * s, Math.sin(a) * s);
+      else c.moveTo(Math.cos(a) * s, Math.sin(a) * s);
+    }
+    c.closePath();
+    c.fill();
+    c.stroke();
+    line(c, [
+      [-s * 0.45, s * 0.4],
+      [s * 0.4, -s * 0.4],
+    ]);
+    c.restore();
+  } else if (e.kind === 'bell') {
+    // 分段声浪留下透视与空隙，钟体成为视觉中心。
+    for (let wave = 0; wave < 2; wave++) {
+      const d = r * (reduced ? 0.55 + wave * 0.25 : 0.22 + wave * 0.23 + progress * 0.5);
+      c.strokeStyle = wave ? '#edce9580' : '#f4dea7bb';
+      c.lineWidth = wave ? 1 : 2;
+      for (let i = 0; i < 6; i++) {
+        const a = (i * TAU) / 6;
+        c.beginPath();
+        c.arc(0, 0, d, a - 0.25, a + 0.25);
+        c.stroke();
+      }
+    }
+    c.save();
+    c.translate(42, -82);
+    c.scale(Math.min(1.3, r / 145), Math.min(1.3, r / 145));
+    c.rotate(reduced ? 0 : Math.sin(progress * Math.PI * 4) * 0.055 * (1 - progress));
+    c.fillStyle = '#79653bd9';
+    c.strokeStyle = '#f3dda2';
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.moveTo(-19, -29);
+    c.bezierCurveTo(-24, -17, -17, 5, -32, 21);
+    c.quadraticCurveTo(0, 30, 32, 21);
+    c.bezierCurveTo(17, 5, 24, -17, 19, -29);
+    c.quadraticCurveTo(0, -38, -19, -29);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.fillStyle = '#e3c77d66';
+    c.beginPath();
+    c.moveTo(-11, -28);
+    c.quadraticCurveTo(-16, 0, -20, 17);
+    c.lineTo(-7, 20);
+    c.lineTo(-3, -31);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#35463ce6';
+    c.beginPath();
+    c.ellipse(0, 22, 31, 6, 0, 0, TAU);
+    c.fill();
+    c.stroke();
+    c.beginPath();
+    c.moveTo(-7, -33);
+    c.bezierCurveTo(-12, -52, 12, -52, 7, -33);
+    c.stroke();
+    c.beginPath();
+    c.ellipse(0, -29, 19, 5, 0, 0, TAU);
+    c.stroke();
+    for (const side of [-1, 1]) {
+      c.strokeStyle = '#ead595aa';
+      line(c, [
+        [side * 12, -17],
+        [side * 12, 9],
+      ]);
+      for (let y = -14; y <= 6; y += 10)
+        line(c, [
+          [side * 8, y],
+          [side * 16, y + 2],
+        ]);
+    }
+    c.strokeStyle = '#d6b66f';
+    line(c, [
+      [0, 17],
+      [0, 31],
+    ]);
+    c.fillStyle = '#f6dfa2';
+    mote(c, 0, 32, 4);
+    c.restore();
   }
   c.restore();
 }

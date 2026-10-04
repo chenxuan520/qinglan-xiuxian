@@ -6318,7 +6318,11 @@ body.journey-complete:not(.in-game) {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
   padding: 32px 32px 16px;
+}
+.settlement-content::-webkit-scrollbar {
+  display: none;
 }
 .settlement-content > .eyebrow {
   justify-content: center;
@@ -6496,21 +6500,8 @@ body.journey-complete:not(.in-game) {
   font-size: 12px;
   white-space: nowrap;
 }
-.cache-prompt button {
-  pointer-events: auto;
-  min-height: 44px;
-  padding: 4px 16px;
-  margin-top: 4px;
-  color: inherit;
-}
-.cache-prompt[hidden],
-.cache-prompt button[hidden] {
+.cache-prompt[hidden] {
   display: none;
-}
-.cache-prompt button {
-  border: 1px solid #d8c48188;
-  border-radius: 5px;
-  background: #e9ce8a18;
 }
 .cache-prompt:not([hidden]) ~ .touch-movement-hint {
   display: none;
