@@ -20,7 +20,6 @@ import {
   LEGACY_ENEMY_TACTICS,
   ENEMY_CAST_RANGE,
   ENEMY_FIELD_REACH,
-  BOSS_FIELD_REACH,
   CACHE_CHALLENGE,
   REGION_ENCOUNTERS,
   STAGE_ENEMIES,
@@ -1311,13 +1310,13 @@ export class Game {
       const shot = this.shots[this.shots.length - 1];
       shot.color = '#d2b5ff';
       shot.radius = 8;
-      shot.life = 720 / velocity;
+      shot.life = 3.8;
     };
     const fan = (angle: number, count: number, spread: number) => {
       for (let i = 0; i < count; i++) shoot(angle + (i / (count - 1) - 0.5) * spread);
     };
     const strike = (x: number, y: number, radius: number, delay = warning) =>
-      this.zone(boss.x + x, boss.y + y, radius, 0.5, boss.damage, '#d2b5ff', 'blast', delay, true);
+      this.zone(x, y, radius, 0.5, boss.damage, '#d2b5ff', 'blast', delay, true);
     const ring = (radius: number, count: number, gap: number, size: number, delay = warning) => {
       for (let i = 0; i < count; i++) {
         if (gap >= 0 && (i - gap + count) % count < 3) continue;
@@ -1326,12 +1325,12 @@ export class Game {
       }
     };
     if (step === 0) {
-      this.announce('天劫 · 前阵三雷与雷弹 · 侧移离开标记');
+      this.announce('天劫 · 追身三雷与雷弹 · 侧移离开标记');
       fan(aim, 3 + Math.min(4, power), 0.7);
       for (let i = 0; i < 3; i++)
         strike(
-          Math.cos(aim) * (180 + i * 65),
-          Math.sin(aim) * (180 + i * 65),
+          this.player.x + this.input.x * 65 * i,
+          this.player.y + this.input.y * 65 * i,
           50 + Math.min(15, power * 2),
           warning + i * 0.4,
         );
@@ -1344,7 +1343,7 @@ export class Game {
       }
       for (let wave = 0; wave < 3; wave++)
         ring(120 + wave * 120, count, gap, 38, warning + wave * 0.3);
-      if (this.tribulation >= 3) strike(Math.cos(aim) * 220, Math.sin(aim) * 220, 55);
+      if (this.tribulation >= 3) strike(this.player.x, this.player.y, 55);
     } else if (step === 2) {
       this.announce('天劫 · 横贯雷柱与交叉弹幕 · 穿过空隙');
       for (let i = 0; i < 4; i++) fan((i * TAU) / 4 + this.time * 0.17, 3, 0.32);
@@ -1359,7 +1358,7 @@ export class Game {
       this.announce('天劫 · 雷界收束与散射 · 返回内圈');
       fan(aim, 5 + Math.min(6, power), Math.PI * 1.2);
       ring(365, 24, -1, 68);
-      if (this.tribulation >= 4) strike(Math.cos(aim) * 220, Math.sin(aim) * 220, 55);
+      if (this.tribulation >= 4) strike(this.player.x, this.player.y, 55);
     } else {
       this.zones = this.zones.filter((zone) => !zone.hostile);
       this.shots = this.shots.filter((s) => s.kind !== 'hostile');
@@ -1911,7 +1910,6 @@ export class Game {
     this.bossChargeWarning(e);
   }
   private castBossSkill(e: Enemy, nx: number, ny: number) {
-    if (distance(e, this.player) > 480) return;
     const stage = e.bossStage ?? this.stage;
     const phase = e.skillStep ?? 0;
     e.skillStep = (phase + 1) % STAGES[stage].skills.length;
@@ -1928,7 +1926,7 @@ export class Game {
           : enraged
             ? 2.3
             : 3.8;
-    const p = { x: e.x + nx * 90, y: e.y + ny * 90 };
+    const p = { x: this.player.x, y: this.player.y };
     const angle = Math.atan2(ny, nx);
     const fan = (count: number, spread: number, speed: number, center = angle) => {
       for (let i = 0; i < count; i++) {
@@ -1939,17 +1937,7 @@ export class Game {
     const ring = (count: number, speed: number) =>
       fan(count, (TAU * (count - 1)) / count, speed, this.time * 0.25);
     const blast = (x: number, y: number, radius: number, life = 0.5) =>
-      this.enemyField(
-        e,
-        x - e.x,
-        y - e.y,
-        radius,
-        life,
-        e.damage,
-        STAGES[stage].color,
-        'blast',
-        1.2,
-      );
+      this.zone(x, y, radius, life, e.damage, STAGES[stage].color, 'blast', 1.2, true);
     const ringZones = (count: number, radius: number, size: number, life = 0.5) => {
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU;
@@ -2627,7 +2615,7 @@ export class Game {
       y: from.y,
       vx: nx * speed,
       vy: ny * speed,
-      life: (this.tribulation ? 720 : (from as Enemy).boss ? 540 : 400) / speed,
+      life: this.tribulation || (from as Enemy).boss ? 6 : 400 / speed,
       radius: 7,
       damage,
       color: '#f0a5ab',
@@ -2659,7 +2647,7 @@ export class Game {
     delay = 0.9,
   ) {
     if (!e.boss && this.zones.filter((z) => z.hostile).length >= 10) return;
-    const reach = (e.boss ? BOSS_FIELD_REACH : ENEMY_FIELD_REACH) - radius;
+    const reach = ENEMY_FIELD_REACH - radius;
     const scale = Math.min(1, Math.max(0, reach) / (Math.hypot(dx, dy) || 1));
     this.zone(
       e.x + dx * scale,

@@ -1437,7 +1437,6 @@ export const STAGE_ENEMIES = [
 export const LEGACY_TRIAL_ENEMIES = [65, 66, 59, 67, 61, 62, 69, 24, 25, 27, 63, 71];
 export const ENEMY_CAST_RANGE = 360;
 export const ENEMY_FIELD_REACH = 200;
-export const BOSS_FIELD_REACH = 320;
 export const CACHE_CHALLENGE = { offerAt: 0.45, offerSeconds: 30, fightSeconds: 45, approach: 120 };
 export const REGION_ENCOUNTERS = [
   { name: '竹海护阵', guardians: [1, 10] },
