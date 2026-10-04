@@ -52,7 +52,7 @@ export class MobileDisplay {
         return;
       }
     }
-    // 方向由设备与系统设置决定，仅管理本次自动全屏。
+    // 方向由设备与系统设置决定，仅管理玩家手动请求的全屏。
     if (!this.wanted) await this.release();
   }
 

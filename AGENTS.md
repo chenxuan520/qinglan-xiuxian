@@ -48,6 +48,7 @@ npm run format:check
 - NPC 域名、模型、超时、对话长度与换代年限集中在 `src/setting.ts`；姓名与换代在 `src/town-population.ts`，百年城景和上次入城记录在 `src/town-history.ts`，对白 UI 在 `src/npc-chat.ts`，共享协议与兜底在 `src/npc-dialogue.ts`。Worker 在 `workers/npc-ai/`；修改后执行 `npm run check:npc-ai` 与相关测试，`npm run deploy:npc-ai` 单独发布。默认域名 `qinglan-npc-ai.011203.xyz`，绑定和 CORS 来源随配置维护；严禁将 API 密钥放入前端，AI 文本不能改变游戏数值或当作 HTML 执行。
 - 匿名游玩统计在 `src/telemetry.ts`，经同一 Worker 的 `POST /event` 写入 Analytics Engine（`qinglan_events`），只在官网与 GitHub Pages 发送，静态部署不依赖它；`npm run stats` 查询。改事件字段需同步 Worker 校验、查询脚本与 [开发与部署](docs/development.md)。发布时先部署 Worker 再推送；上线验证写入的记录用版本号 `verification`，不要用真实版本号制造测试数据。
 - 视觉及交互改动需用真实页面验证，桌面和手机布局都要检查。开发模式可用 `window.__qinglan`；生产构建没有此入口。
+- 不擅自移动或折叠已确认的首页五行灵根盘，不顺带改变战斗按钮大小。通用触屏样式必须检查固定网格是否仍容纳按钮；发布前逐项复查本次修改涉及的手机、电脑操作及返回路径，并检查窄屏、横竖屏、后期长数字与多种药效，不能只验证初始画面。
 - 存档键为 `qinglan-immortal-v1`。兼容旧档，保留玩家进度，注意永久结算不能重复入账。测试使用隔离存档，禁止清空用户真实 localStorage。新增或改变存档字段时递增 `progress.ts` 的 `SAVE_SCHEMA`，旧页面读到更高版本只读不写；`main.ts` 写存档只经过 `writeSave`。
 - 新图片生成后运行 `python3 scripts/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。
 - 人间研习、委托等主动操作直接消耗游戏年岁并结算，禁止让玩家等待现实倒计时；沿用寿尽、天劫、供奉边界，旧任务只结算剩余部分。城镇闲逛保留前台计时。

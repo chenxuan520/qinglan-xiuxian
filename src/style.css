@@ -2142,6 +2142,15 @@ kbd {
   }
 }
 @media (pointer: coarse) and (max-width: 650px) and (orientation: portrait) {
+  .game-hud {
+    flex-wrap: wrap;
+  }
+  .game-hud .stage-timer {
+    position: static;
+    transform: none;
+    order: 1;
+    width: 100%;
+  }
   .game-hud .combat-actions {
     display: grid;
     grid-template-columns: repeat(4, 32px);
@@ -2366,7 +2375,7 @@ kbd {
 }
 .battle-notice {
   position: absolute;
-  top: 24%;
+  top: max(24%, calc(var(--battle-info-bottom, 0px) + 10px));
   left: 50%;
   transform: translateX(-50%);
   color: #f1e1b4;
@@ -2384,7 +2393,7 @@ kbd {
 .boss-bar {
   position: absolute;
   width: min(420px, 50%);
-  top: 137px;
+  top: max(var(--boss-top, 137px), calc(var(--battle-timer-bottom, 127px) + 10px));
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 15px;
@@ -4110,7 +4119,7 @@ kbd {
     margin-left: 2px;
   }
   .battle-notice {
-    top: calc(29% + 20px);
+    top: max(calc(29% + 20px), calc(var(--battle-info-bottom, 0px) + 10px));
     font-size: 10px;
     letter-spacing: 1px;
     padding: 10px 16px;
@@ -4120,7 +4129,7 @@ kbd {
     line-height: 1.8;
   }
   .boss-bar {
-    top: 222px;
+    --boss-top: 222px;
     width: 65%;
     padding: 8px 10px;
   }
@@ -4363,6 +4372,20 @@ kbd {
     max-width: 90%;
   }
 }
+@media (max-width: 350px) {
+  .lobby-header {
+    gap: 4px;
+  }
+  .lobby-header .brand {
+    gap: 5px;
+  }
+  .lobby-header .header-right {
+    gap: 2px;
+  }
+  .lobby-header .auto-button {
+    padding: 0 5px;
+  }
+}
 @media (max-height: 650px) and (min-width: 651px) {
   .lobby-header {
     height: 80px;
@@ -4432,7 +4455,7 @@ kbd {
     top: 15px;
   }
   .boss-bar {
-    top: 107px;
+    --boss-top: 107px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -5490,7 +5513,7 @@ body.journey-complete:not(.in-game) {
     height: 18px;
   }
   .boss-bar {
-    top: 106px;
+    --boss-top: 106px;
     width: 45%;
     padding: 6px 10px;
   }
@@ -5502,7 +5525,7 @@ body.journey-complete:not(.in-game) {
     font-size: 8px;
   }
   .battle-notice {
-    top: 37%;
+    top: max(37%, calc(var(--battle-info-bottom, 0px) + 6px));
     font-size: 11px;
     letter-spacing: 1px;
     padding: 7px 16px;
