@@ -1420,7 +1420,7 @@ function renderDeath() {
     return;
   }
   panel = 'death';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="重燃道心"><div class="eyebrow">仙途未尽</div><h2>重燃道心</h2><p>观看广告后原地满血复活，获得 3 秒护体。<br>每局最多复活 ${MAX_REVIVES} 次，法宝、等级和战绩全部保留。${game.tribulation ? '<br>放弃本次天劫后可先留存此世，再确认轮回。' : ''}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-ad">看广告复活 · 剩余 ${MAX_REVIVES - game.revivesUsed} 次</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '直接结算'}</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="历练受挫"><div class="eyebrow">修行暂歇</div><h2>历练受挫</h2><p>气血已尽，本次修行暂停。</p><p class="panel-note">观看广告后原地满血复活，获得 3 秒护体。<br>每局最多复活 ${MAX_REVIVES} 次，法宝、等级和战绩全部保留。${game.tribulation ? '<br>放弃本次天劫后可先留存此世，再确认轮回。' : ''}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-ad">看广告复活 · 剩余 ${MAX_REVIVES - game.revivesUsed} 次</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '直接结算'}</button></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('button')?.focus();
 }
 function showReviveAd() {
@@ -1474,7 +1474,7 @@ function renderSectDues() {
   if (!sectDuesPending(save)) return;
   const dues = save.mortal.member!.dues;
   panel = 'sect-dues';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="宗门供奉到期"><div class="eyebrow">仙门供奉</div><h2>供奉到期</h2><p>本期需 ${dues} 灵石，现有 ${save.stones} 灵石。${save.stones < dues ? `<br>还缺 ${dues - save.stones} 灵石，可看广告领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁。` : '<br>物资已足，可以补缴。'}</p><p class="panel-note">人间计时已暂停，在籍身份与精研保留。一次不足可再次领取；放弃补缴会被清退出宗门。</p><div class="result-actions death-actions">${save.stones < dues ? '<button class="primary-button" data-action="dues-ad">看广告 · 领取物资</button>' : '<button class="primary-button" data-action="dues-pay">补缴供奉 · 继续游历</button>'}<button class="secondary-button" data-action="dues-decline">放弃补缴 · 离开宗门</button></div></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="宗门供奉到期"><div class="eyebrow">仙门供奉</div><h2>供奉到期</h2><p>本期需 ${dues} 灵石，现有 ${save.stones} 灵石。${save.stones < dues ? `<br>还缺 ${dues - save.stones} 灵石。` : '<br>物资已足，可以补缴。'}</p><p class="panel-note">人间计时已暂停，在籍身份与精研保留。${save.stones < dues ? `<br>可看广告领取 ${AD_SUPPLIES.stones} 灵石与 ${AD_SUPPLIES.iron} 玄铁，一次不足可再次领取。` : ''}放弃补缴会被清退出宗门。</p><div class="result-actions death-actions">${save.stones < dues ? '<button class="primary-button" data-action="dues-ad">看广告 · 领取物资</button>' : '<button class="primary-button" data-action="dues-pay">补缴供奉 · 继续游历</button>'}<button class="secondary-button" data-action="dues-decline">放弃补缴 · 离开宗门</button></div></section></div>`;
   modal.querySelector<HTMLButtonElement>('button')?.focus();
 }
 function showSuppliesShortage(stones: number, iron: number) {
