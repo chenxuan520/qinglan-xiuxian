@@ -5843,26 +5843,26 @@ body.journey-complete:not(.in-game) {
   font-size: 10px;
   line-height: 1.8;
 }
-.epilogue-support {
+.reincarnate-support {
   display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 28px;
-  padding-top: 18px;
+  margin: 20px 0;
+  padding-top: 16px;
   border-top: 1px solid #68837444;
 }
-.epilogue-support img {
+.reincarnate-support img {
   flex: 0 0 auto;
   width: 104px;
   height: 104px;
   border-radius: 8px;
   background: #102e2b;
 }
-.epilogue-support figcaption {
-  color: #476647;
+.reincarnate-support figcaption {
+  color: #a9baaa;
   font-size: 12px;
   line-height: 1.9;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 @media (max-width: 360px) {
   .lobby-footer,

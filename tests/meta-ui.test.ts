@@ -51,7 +51,7 @@ test('首页底部以轻量关于入口替代自动保存提示', () => {
   assert.match(source, /querySelector<HTMLButtonElement>\('\[data-action="about"\]'\)\?\.focus/);
 });
 
-test('关于面板与终章放置微信赞赏码，纯打赏不换取游戏内道具', () => {
+test('关于面板与通关轮回确认放置微信赞赏码，终章正文不展示打赏', () => {
   assert.equal(SUPPORT_CODE_IMAGE, '/assets/support-wechat.webp');
   assert.ok(existsSync(new URL(`../public${SUPPORT_CODE_IMAGE}`, import.meta.url)));
   const support = source.match(/<div class="about-support">[^]*?<\/div><\/div>/)![0];
@@ -59,10 +59,19 @@ test('关于面板与终章放置微信赞赏码，纯打赏不换取游戏内�
   assert.match(support, /请道友喝杯茶/);
   assert.match(support, /茶钱不换道具，也不换修为/);
   assert.match(support, /先截图，再在「扫一扫」里从相册选取/);
-  assert.match(
-    source,
-    /<figure class="epilogue-support"><img src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}"/,
+  const epilogue = source.slice(
+    source.indexOf('function renderEpilogue()'),
+    source.indexOf('function renderEpilogue()') +
+      source.slice(source.indexOf('function renderEpilogue()')).indexOf('\nfunction '),
   );
+  assert.doesNotMatch(epilogue, /SUPPORT_CODE_IMAGE|请作者喝杯茶/);
+  const confirmation = source.match(/'再问长生',[^]*?\n      \);/)![0];
+  assert.match(
+    confirmation,
+    /<figure class="reincarnate-support"><img src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}"/,
+  );
+  assert.match(confirmation, /data-action="close">留在终章/);
+  assert.match(confirmation, /data-action="confirm-reincarnate">确认轮回/);
   // 赞赏入口只是静态图片，不接任何按钮动作、奖励或弹窗。
   assert.doesNotMatch(support, /data-action/);
 });
