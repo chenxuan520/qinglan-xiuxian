@@ -1871,7 +1871,7 @@ function renderLifespanEnd() {
   panelFrame(
     '一生将尽，山河仍远',
     '寿元已尽 · 此世未了',
-    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。若心愿未了，便再向苍天借一程；若已倦了，来世的春风，也会吹过青岚。</p></div><p class="pause-description">此世行至${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
+    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。山风拂过衣袖，你望着来时的路，久久没有言语。</p></div><p class="pause-description">此世行至${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
   );
   modal.querySelector('[data-action="close"]')?.remove();
 }
