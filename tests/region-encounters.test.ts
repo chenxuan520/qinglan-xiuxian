@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 import {
+  CACHE_CHALLENGE,
   ENEMIES,
   ENEMY_TACTICS,
   STAGE_ENEMIES,
@@ -187,7 +188,88 @@ function started(stage = 0) {
   return g;
 }
 
-test('前六境中段各提供一次自选守匣，必须靠近并点击，不挤破精英上限', () => {
+test('前六境进入守匣范围停留一秒自动开启，快速经过或离开不触发', () => {
+  for (let stage = 0; stage < 6; stage++) {
+    const g = offered(stage),
+      c = g.cacheChallenge!;
+    g.player.invincible = 9999;
+    g.player.x = c.x + CACHE_CHALLENGE.approach + 0.01;
+    g.player.y = c.y;
+    advance(g, 1.2);
+    assert.equal(c.phase, 'offered');
+    assert.equal(g.cacheApproachProgress, 0);
+    g.player.x = c.x + CACHE_CHALLENGE.approach;
+    advance(g, 0.7);
+    assert.equal(c.phase, 'offered');
+    assert.ok(g.cacheApproachProgress > 0.6);
+    g.player.x += 0.01;
+    advance(g, 0.01);
+    assert.equal(g.cacheApproachProgress, 0);
+    g.player.x = c.x;
+    advance(g, 0.99);
+    assert.equal(c.phase, 'offered');
+    advance(g, 0.04);
+    assert.equal(c.phase, 'active');
+    assert.equal(g.enemies.filter((e) => e.cacheGuardian).length, 2);
+    const ids = [...c.guardians];
+    advance(g, 1);
+    assert.deepEqual(c.guardians, ids);
+  }
+});
+
+test('自动开阵的停留时间在暂停和选技时冻结，精英过多时重新等待', () => {
+  const g = offered(),
+    c = g.cacheChallenge!;
+  Object.assign(g.player, { x: c.x, y: c.y, invincible: 9999 });
+  advance(g, 0.6);
+  const progress = g.cacheApproachProgress;
+  for (const state of ['paused', 'upgrade'] as const) {
+    g.state = state;
+    advance(g, 3);
+    assert.equal(c.phase, 'offered');
+    assert.equal(g.cacheApproachProgress, progress);
+  }
+  g.state = 'playing';
+  for (let i = 0; i < 3; i++) g.spawnEnemy(0, true, false, { x: c.x + 300, y: c.y });
+  advance(g, 0.01);
+  assert.equal(g.cacheApproachProgress, 0);
+  advance(g, 2);
+  assert.equal(c.phase, 'offered');
+  g.enemies.pop();
+  advance(g, 0.7);
+  assert.equal(c.phase, 'offered');
+  advance(g, 0.35);
+  assert.equal(c.phase, 'active');
+  assert.equal(g.enemies.filter((e) => !e.dead && e.elite).length, 4);
+});
+
+test('未开阵续局重新停留一秒，过期与倒下不能自动生成守卫', () => {
+  const g = offered(),
+    c = g.cacheChallenge!;
+  Object.assign(g.player, { x: c.x, y: c.y, invincible: 9999 });
+  advance(g, 0.8);
+  const restored = Game.restore(g.save, g.snapshot())!;
+  assert.equal(restored.cacheApproachProgress, 0);
+  restored.resume();
+  advance(restored, 0.9);
+  assert.equal(restored.cacheChallenge!.phase, 'offered');
+  advance(restored, 0.15);
+  assert.equal(restored.cacheChallenge!.phase, 'active');
+  const late = offered();
+  Object.assign(late.player, late.cacheChallenge!);
+  late.time = late.cacheChallenge!.deadline - 0.5;
+  advance(late, 0.6);
+  assert.equal(late.cacheChallenge!.phase, 'expired');
+  assert.equal(late.enemies.length, 0);
+  const dead = offered();
+  Object.assign(dead.player, { x: dead.cacheChallenge!.x, y: dead.cacheChallenge!.y, hp: 0 });
+  advance(dead, 1.2);
+  assert.equal(dead.beginCacheChallenge(), false);
+  assert.equal(dead.cacheChallenge!.phase, 'offered');
+  assert.equal(dead.enemies.length, 0);
+});
+
+test('前六境中段各提供一次守匣，必须靠近且不挤破精英上限', () => {
   for (let stage = 0; stage < 6; stage++) {
     const g = offered(stage);
     assert.equal(g.state, 'playing');
