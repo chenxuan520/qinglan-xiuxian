@@ -3046,7 +3046,7 @@ export class Game {
       ? this.trialBossesDefeated === TRIAL_BOSS_STAGES.length
       : this.bossSpawned && !this.boss;
     this.state = cleared ? 'won' : 'playing';
-    this.announce('满血复活 · 三息护体');
+    this.announce('重燃道心 · 满血复活 · 三息护体');
     return true;
   }
   hurtPlayer(damage: number) {
