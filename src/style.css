@@ -2134,6 +2134,8 @@ kbd {
     display: grid;
   }
   .combat-actions .round-button {
+    min-width: 0;
+    min-height: 0;
     padding: 0;
     flex-shrink: 0;
     white-space: nowrap;
@@ -6370,8 +6372,7 @@ body.journey-complete:not(.in-game) {
   }
 }
 @media (max-width: 650px) {
-  .lobby-header .round-button,
-  .game-hud .round-button {
+  .lobby-header .round-button {
     min-width: 44px;
     min-height: 44px;
   }
@@ -6473,6 +6474,12 @@ body.journey-complete:not(.in-game) {
   }
   .settlement-panel > .result-actions {
     padding: 10px 14px max(10px, env(safe-area-inset-bottom));
+  }
+}
+@media (pointer: coarse) {
+  body.in-game #toast {
+    top: auto;
+    bottom: calc(118px + env(safe-area-inset-bottom));
   }
 }
 
