@@ -119,7 +119,7 @@ function harness(save: SaveData) {
     clearInterval: noop,
     clearInput: noop,
     unlockAudio: noop,
-    mobileDisplay: { available: false, active: false, leave: noop },
+    mobileDisplay: { available: false, active: false, enter: noop, leave: noop },
     toast: (text: string) => messages.push(text),
     shownHumanLetters: new Set(['previous-life']),
     game: null,
