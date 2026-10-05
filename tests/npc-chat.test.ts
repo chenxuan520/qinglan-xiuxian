@@ -21,6 +21,27 @@ const input = {
   message: '近来如何？',
   history: [],
 };
+test('已知离线时闲谈回退本地、听书和配图不等待网络或重试', async (t) => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'navigator', descriptor);
+    else delete globalThis.navigator;
+  });
+  let requests = 0;
+  const fetcher = async () => {
+    requests++;
+    throw new Error('unexpected network');
+  };
+  const signal = new AbortController().signal;
+  assert.equal(await requestNpcDialogue(input, signal, fetcher), null);
+  assert.equal(await requestNpcDialogue({ ...input, mode: 'tea-story' }, signal, fetcher), null);
+  assert.equal(
+    await requestTeaStoryImage('一回故事', `1234567890.${'a'.repeat(64)}`, signal, fetcher),
+    null,
+  );
+  assert.equal(requests, 0);
+});
 test('NPC 默认调用已绑定域名，只提交对白上下文，失败和空响应交由本地兜底', async () => {
   const before = JSON.stringify(input);
   const signal = new AbortController().signal;
