@@ -3,11 +3,19 @@ import { assetUrl } from './asset-url.ts';
 const build = typeof __QINGLAN_BUILD_ID__ === 'undefined' ? '' : __QINGLAN_BUILD_ID__;
 type Progress = { count: number; total: number; bytes: number; totalBytes: number };
 type Status = { ready: boolean; stored: boolean; busy: boolean; progress?: Progress };
-type State = Status & { checking: boolean; error: string; bytes?: number };
-const state: State = { ready: false, stored: false, busy: false, checking: false, error: '' };
+type State = Status & { checking: boolean; error: string; notice: string; bytes?: number };
+const state: State = {
+  ready: false,
+  stored: false,
+  busy: false,
+  checking: false,
+  error: '',
+  notice: '',
+};
 let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 let operating = false;
 let cancelled = false;
+let statusRevision = 0;
 let notify: () => void = () => {};
 
 function supported() {
@@ -51,7 +59,16 @@ async function registration(create: boolean) {
 async function request(action: 'status' | 'cache' | 'cancel' | 'clear'): Promise<Status> {
   const reg = await registration(action === 'cache');
   if (action === 'cache' && cancelled) throw new Error('cancelled');
-  if (!reg?.active) return { ready: false, stored: false, busy: false };
+  if (!reg?.active) {
+    if (action === 'clear') {
+      const scope = new URL(import.meta.env.BASE_URL, location.href);
+      const prefix = `qinglan-offline:${scope.pathname}:`;
+      for (const name of await caches.keys()) {
+        if (name.startsWith(prefix)) await caches.delete(name);
+      }
+    }
+    return { ready: false, stored: false, busy: false };
+  }
   return new Promise((resolve, reject) => {
     const channel = new MessageChannel();
     // 有进度时重置超时；慢网和正常缓存都能继续，死掉的 worker 可重试。
@@ -95,7 +112,7 @@ function message(error: unknown) {
 }
 
 export function offlinePanel() {
-  return `<section class="offline-resources" aria-label="离线资源缓存"><p>缓存完成后，断网重新打开也能游玩秘境与城镇。AI 对话与新故事需要联网。</p><p class="offline-status" role="status" aria-live="polite"></p><progress aria-label="离线资源缓存进度" max="100" value="0" hidden></progress><div class="offline-actions"><button class="primary-button" data-action="offline-cache">缓存所有离线资源</button><button class="secondary-button" data-action="offline-cancel" hidden>取消缓存</button><button class="secondary-button" data-action="offline-clear" hidden>清除离线资源</button></div><small>资源保存在当前浏览器中；清理浏览器数据后需重新缓存。清除离线资源不会删除存档。</small></section>`;
+  return `<section class="offline-resources" aria-label="离线资源缓存"><p>缓存完成后，断网重新打开也能游玩秘境与城镇。AI 对话与新故事需要联网。</p><p class="offline-status" role="status" aria-live="polite"></p><progress aria-label="离线资源缓存进度" max="100" value="0" hidden></progress><div class="offline-actions"><button class="primary-button" data-action="offline-cache">缓存所有离线资源</button><button class="secondary-button" data-action="offline-cancel" hidden>取消缓存</button><button class="secondary-button" data-action="offline-clear" disabled>清除所有缓存资源</button></div><small>资源保存在当前浏览器中；清理浏览器数据后需重新缓存。清除缓存不会删除存档，清除后可联网重新打开，加载最新版本。</small></section>`;
 }
 
 export function refreshOfflinePanel() {
@@ -130,6 +147,7 @@ export function refreshOfflinePanel() {
     text = p ? `正在缓存 · ${percent}% · ${p.count} / ${p.total} 项` : '正在准备缓存…';
   else if (state.checking) text = '正在检查离线资源…';
   else if (state.error) text = state.error;
+  else if (state.notice) text = state.notice;
   status.textContent = text;
   cache.textContent = state.ready
     ? '全部资源已缓存'
@@ -140,20 +158,29 @@ export function refreshOfflinePanel() {
   cache.hidden = state.busy;
   cancel.hidden = !state.busy;
   cancel.disabled = state.checking;
-  clear.hidden = !state.stored || state.busy;
-  clear.disabled = state.checking || operating;
+  clear.hidden = false;
+  clear.disabled = !supported() || state.busy || state.checking || operating;
   progress.hidden = !state.busy;
   progress.value = percent;
 }
 
 export async function checkOffline() {
   if (!supported()) return refreshOfflinePanel();
+  if (operating) return refreshOfflinePanel();
   clearTimeout(refreshTimer);
+  const revision = ++statusRevision;
   try {
     const result = await request('status');
-    update({ ...result, checking: false, ...(result.ready ? { error: '' } : {}) });
+    if (revision !== statusRevision) return;
+    update({
+      ...result,
+      checking: false,
+      ...(result.ready ? { error: '' } : {}),
+      ...(result.stored || result.busy ? { notice: '' } : {}),
+    });
     if (result.busy && !operating) refreshTimer = setTimeout(() => void checkOffline(), 1000);
   } catch {
+    if (revision !== statusRevision) return;
     update({ checking: false, error: '暂时无法检查缓存，请重试。' });
   }
 }
@@ -183,8 +210,9 @@ export async function offlineAction(action: string) {
   if (action === 'offline-cache') {
     if (operating || state.busy) return;
     operating = true;
+    statusRevision++;
     cancelled = false;
-    update({ busy: true, error: '', progress: undefined });
+    update({ busy: true, error: '', notice: '', progress: undefined });
     try {
       const result = await request('cache');
       update({ ...result, error: '' });
@@ -196,6 +224,7 @@ export async function offlineAction(action: string) {
     }
   } else if (action === 'offline-cancel') {
     cancelled = true;
+    statusRevision++;
     update({ checking: true });
     try {
       await request('cancel');
@@ -207,13 +236,21 @@ export async function offlineAction(action: string) {
     }
   } else if (action === 'offline-clear') {
     if (operating) return;
-    update({ checking: true, error: '' });
+    operating = true;
+    statusRevision++;
+    update({ checking: true, error: '', notice: '' });
     try {
       const result = await request('clear');
-      update({ ...result, error: '', progress: undefined });
+      update({
+        ...result,
+        error: '',
+        notice: '已清除所有缓存资源，游戏存档保留。',
+        progress: undefined,
+      });
     } catch (error) {
       update({ error: message(error) });
     } finally {
+      operating = false;
       update({ checking: false });
     }
   }

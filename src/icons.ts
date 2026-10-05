@@ -11,6 +11,8 @@ export const smallIcon = (id: string) => {
   const paths: Record<string, string> = {
     sound: '<path d="m11 5-6 5H2v4h3l6 5ZM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
     mute: '<path d="m11 5-6 5H2v4h3l6 5ZM16 9l6 6m0-6-6 6"/>',
+    settings:
+      '<path d="m10 2-.6 3-2.3 1.3-2.9-1-2 3.4 2.3 2v2.6l-2.3 2 2 3.4 2.9-1 2.3 1.3.6 3h4l.6-3 2.3-1.3 2.9 1 2-3.4-2.3-2v-2.6l2.3-2-2-3.4-2.9 1L14.6 5 14 2Z"/><circle cx="12" cy="12" r="3"/>',
     pause: '<path d="M8 5v14M16 5v14"/>',
     play: '<path d="m8 4 12 8-12 8Z"/>',
     close: '<path d="m6 6 12 12M6 18 18 6"/>',

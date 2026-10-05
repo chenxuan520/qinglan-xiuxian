@@ -1,4 +1,4 @@
-/* 可选离线资源缓存：只有玩家点击关于面板里的按钮才建立完整缓存。 */
+/* 可选离线资源缓存：只有玩家点击设置面板里的按钮才建立完整缓存。 */
 const scope = self.registration.scope;
 const prefix = `qinglan-offline:${new URL(scope).pathname}:`;
 const marker = new URL('.offline-complete', scope).href;

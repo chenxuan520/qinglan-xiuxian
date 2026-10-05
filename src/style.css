@@ -4401,6 +4401,25 @@ kbd {
     padding: 0 5px;
   }
 }
+@media (max-width: 420px) {
+  .lobby-header {
+    height: 128px;
+    align-items: flex-start;
+  }
+  .lobby-header .header-right {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    gap: 6px;
+  }
+  .lobby-header .auto-button {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .lobby-header nav {
+    top: 140px;
+  }
+}
 @media (max-height: 650px) and (min-width: 651px) {
   .lobby-header {
     height: 80px;
@@ -4602,10 +4621,7 @@ body:not(.in-game) #ui {
   border-bottom: 1px solid var(--border);
   padding-bottom: 12px;
   margin-bottom: 20px;
-  position: sticky;
-  top: -35px;
   background: #1d3d34;
-  z-index: 1;
   padding-top: 8px;
 }
 .guide-tabs button {
@@ -6410,9 +6426,6 @@ body.journey-complete:not(.in-game) {
 }
 .panel-heading {
   min-height: 44px;
-}
-.guide-tabs {
-  top: 52px;
 }
 .panel[data-panel='treasure-detail'] .treasure-detail {
   flex-wrap: wrap;
