@@ -4402,22 +4402,15 @@ kbd {
   }
 }
 @media (max-width: 420px) {
-  .lobby-header {
-    height: 128px;
-    align-items: flex-start;
-  }
   .lobby-header .header-right {
     display: grid;
     grid-template-columns: repeat(3, 44px);
     gap: 6px;
   }
+}
+@media (max-width: 650px), (pointer: coarse) {
   .lobby-header .auto-button {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: end;
-  }
-  .lobby-header nav {
-    top: 140px;
+    display: none;
   }
 }
 @media (max-height: 650px) and (min-width: 651px) {
@@ -5898,6 +5891,7 @@ body.journey-complete:not(.in-game) {
   margin: 4px 0;
   accent-color: #d7cf9f;
 }
+.settings-autoplay p,
 .settings-sound p,
 .settings-section > summary small {
   color: #a9baaa;
@@ -6414,15 +6408,59 @@ body.journey-complete:not(.in-game) {
   color: var(--muted);
 }
 .panel-close {
-  position: sticky;
-  top: 0;
-  float: right;
-  z-index: 4;
   width: 44px;
   height: 44px;
   min-width: 44px;
-  margin-left: 12px;
   background: #183e34;
+}
+.panel-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(700px, 100%);
+  max-height: min(90svh, 100%);
+  min-height: 0;
+  border: 1px solid #b4c79b47;
+  background: linear-gradient(145deg, #203f36f7, #102e2bf7);
+  box-shadow: 0 30px 120px #01181b88;
+  pointer-events: auto;
+}
+.wide-panel-shell {
+  width: min(1050px, 100%);
+}
+.tabbed-panel-shell {
+  height: min(90svh, 100%);
+}
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 12px 35px 8px;
+}
+.panel-actions:empty {
+  display: none;
+}
+.panel-shell > .panel {
+  width: 100%;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.panel-actions:not(:empty) + .panel {
+  padding-top: 0;
+}
+@media (max-width: 650px) {
+  .panel-shell {
+    max-height: min(92svh, 100%);
+  }
+  .tabbed-panel-shell {
+    height: min(92svh, 100%);
+  }
+  .panel-actions {
+    padding-inline: 19px;
+  }
 }
 .panel-heading {
   min-height: 44px;

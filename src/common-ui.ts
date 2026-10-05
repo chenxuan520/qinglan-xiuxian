@@ -57,7 +57,7 @@ export function controls(
   display: { available: boolean; active: boolean },
   inGame = false,
 ) {
-  return `${autoplayButton(save.autoplay, inGame)}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span>${inGame ? '' : `<button class="round-button settings-button" data-action="settings" aria-label="设置" aria-haspopup="dialog" title="设置 · 声音与离线资源">${smallIcon('settings')}</button>`}<button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton(display.available, display.active)}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
+  return `${autoplayButton(save.autoplay, inGame)}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span>${inGame ? '' : `<button class="round-button settings-button" data-action="settings" aria-label="设置" aria-haspopup="dialog" title="设置 · 自动历练、声音与离线资源">${smallIcon('settings')}</button>`}<button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton(display.available, display.active)}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 export function realmVerse(realm: ReturnType<typeof realmInfo>) {
   return REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]];
@@ -135,6 +135,14 @@ export function evolutionRecipe(
 ) {
   const partners = requirements.map((id) => `${passive(id).name}五重`);
   return `<div class="evolution-recipe"><span>仙器 · ${t.evolution}</span><div>${t.name}六重 ＋ ${partners.length > 1 ? `（${partners.join(' 或 ')}）` : partners[0]}</div></div>`;
+}
+// 藏器阁是完整图鉴，始终列出两条合法配方；局内卡片仍按本局路线与续局规则显示。
+export function catalogEvolutionRecipe(t: Treasure) {
+  const partners = evolutionPassives(t)
+    .map((id) => passive(id))
+    .sort((a, b) => Number(b.school === t.school) - Number(a.school === t.school))
+    .map((p) => `${p.name}五重（${pathInfo(p.school).name}）`);
+  return `<div class="evolution-recipe"><span>仙器 · ${t.evolution}</span><div>${t.name}六重 ＋（${partners.join(' 或 ')}）</div></div>`;
 }
 export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: number) {
   const item =

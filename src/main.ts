@@ -27,7 +27,7 @@ import {
   retreatEstimate,
   retreatSection,
   weaponAffinity,
-  evolutionRecipe,
+  catalogEvolutionRecipe,
   choiceCard,
   damageReport,
   updateStorySoundButton,
@@ -676,8 +676,9 @@ function resumeHometown() {
   return true;
 }
 function renderDeparture() {
-  leaveTown();
   closeNpcChat();
+  // 同一段离乡行程的素材重试只重建场景，保留玩家当前的全屏状态。
+  releaseTownScene();
   inMortalWorld = inTown = true;
   townPosition = { ...HOMETOWN_START };
   save.mortal.population ??= freshTownPopulation(15);
@@ -896,7 +897,7 @@ function restorePanel(location: PanelLocation) {
 }
 function panelFrame(title: string, subtitle: string, body: string, wide = false) {
   closeNpcChat();
-  const existing = modal.querySelector<HTMLElement>('.modal-backdrop > .panel');
+  const existing = modal.querySelector<HTMLElement>('.panel-shell > .panel');
   const focused =
     document.activeElement instanceof HTMLElement ? document.activeElement.dataset : {};
   const samePanel = existing?.dataset.panel === panel;
@@ -904,24 +905,29 @@ function panelFrame(title: string, subtitle: string, body: string, wide = false)
   const openDetails = samePanel ? rememberPanel().openDetails : [];
   if (!existing)
     modal.innerHTML =
-      '<div class="modal-backdrop"><section role="dialog" aria-modal="true"></section></div>';
+      '<div class="modal-backdrop"><div class="panel-shell" role="dialog" aria-modal="true"><div class="panel-actions"></div><section></section></div></div>';
+  const shell = modal.querySelector<HTMLElement>('.panel-shell')!;
+  shell.className = `panel-shell ${wide ? 'wide-panel-shell' : ''} ${panel === 'arsenal' || panel === 'guide' || panel === 'bestiary' ? 'tabbed-panel-shell' : ''}`;
+  shell.setAttribute('aria-label', title);
+  shell.querySelector('.panel-actions')!.innerHTML =
+    `<button class="round-button panel-close" data-action="close" aria-label="${panel === 'treasure-detail' ? '返回法宝列表' : '关闭'}">${smallIcon('close')}</button>`;
   const section = modal.querySelector<HTMLElement>('section')!;
   section.className = `panel ${wide ? 'wide-panel' : ''} ${panel === 'arsenal' || panel === 'guide' || panel === 'bestiary' ? 'tabbed-panel' : ''}`;
   section.setAttribute('aria-label', title);
   section.dataset.panel = panel;
-  section.innerHTML = `<button class="round-button panel-close" data-action="close" aria-label="${panel === 'treasure-detail' ? '返回法宝列表' : '关闭'}">${smallIcon('close')}</button><div class="panel-heading"><div><div class="eyebrow">${subtitle}</div><h2>${title}</h2></div></div>${body}`;
+  section.innerHTML = `<div class="panel-heading"><div><div class="eyebrow">${subtitle}</div><h2>${title}</h2></div></div>${body}`;
   section.querySelectorAll<HTMLDetailsElement>('details[data-disclosure]').forEach((detail) => {
     detail.open = openDetails.includes(detail.dataset.disclosure!);
   });
   section.scrollTop = scroll;
   if (samePanel) {
     section.scrollTop = scroll;
-    [...section.querySelectorAll<HTMLButtonElement>('button')]
+    [...shell.querySelectorAll<HTMLButtonElement>('button')]
       .find(
         (button) => button.dataset.action === focused.action && button.dataset.id === focused.id,
       )
       ?.focus({ preventScroll: true });
-  } else section.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  } else shell.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
 }
 async function renderJourneyCard() {
   if (
@@ -1020,7 +1026,7 @@ function renderPanel() {
       owned = save.artifacts.includes(t.id);
     const detail =
       bookTab === 'treasures'
-        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t, save.spiritRoot, save.rootElements)}${evolutionRecipe(t, save.path)}<p>法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需击败妖王获得遗宝' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>炼器伤害 +${Math.round(forgeDamageBonus(level) * 100)}%${level < MAX_FORGE_LEVEL ? ` · 下一阶 +${Math.round(forgeDamageBonus(level + 1) * 100)}%（较当前提升 ${(((1 + forgeDamageBonus(level + 1)) / (1 + forgeDamageBonus(level)) - 1) * 100).toFixed(1)}%）` : ' · 十阶圆满'}</small></div></div>`
+        ? `<div class="treasure-detail"><div class="detail-emblem" style="--item-color:${t.color}">${icon(t.id, t.color)}</div><div class="detail-copy"><span class="item-tag">${pathInfo(t.school).name} · ${t.tag}</span><h3>${t.name}<small>炼器 ${level} / ${MAX_FORGE_LEVEL}</small></h3><p>${t.desc}</p>${weaponAffinity(t, save.spiritRoot, save.rootElements)}${catalogEvolutionRecipe(t)}<p>法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。纯修使用本流派功法，兼修可任选上述两种之一。这里的重数是局内等级，与永久炼器阶数无关。</p></div><div class="detail-actions"><button class="secondary-button" data-action="equip" ${!owned || save.starter === t.id || !allowsSchool(save.path, t.school) ? 'disabled' : ''}>${!owned ? '需击败妖王获得遗宝' : !allowsSchool(save.path, t.school) ? `需选择${pathInfo(t.school).name}或兼修` : save.starter === t.id ? '已设为本命法宝' : '设为本命法宝'}</button><button class="primary-button compact" data-action="forge" data-cost-stones="${cost.stones}" data-cost-iron="${cost.iron}" ${!owned || level >= MAX_FORGE_LEVEL ? 'disabled' : ''}>${!owned ? '尚未收藏 · 可局内领悟' : level >= MAX_FORGE_LEVEL ? '炼器圆满' : `炼器 · ${cost.iron} 玄铁 + ${cost.stones} 灵石`}</button><small>炼器伤害 +${Math.round(forgeDamageBonus(level) * 100)}%${level < MAX_FORGE_LEVEL ? ` · 下一阶 +${Math.round(forgeDamageBonus(level + 1) * 100)}%（较当前提升 ${(((1 + forgeDamageBonus(level + 1)) / (1 + forgeDamageBonus(level)) - 1) * 100).toFixed(1)}%）` : ' · 十阶圆满'}</small></div></div>`
         : '<p class="panel-note">正道与魔道各 8 种功法，纯修仅出现本流派功法，兼修可自由混搭。每局最多修炼 4 种，每种可升至五重。将对应功法修满五重，才可使六重法宝进化为仙器。</p>';
     if (panel === 'treasure-detail') {
       panelFrame(
@@ -1043,7 +1049,7 @@ function renderPanel() {
               .slice(treasurePage * 12, treasurePage * 12 + 12)
               .map(
                 (t) =>
-                  `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}${save.artifacts.includes(t.id) ? '' : ' is-unowned'}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${save.artifacts.includes(t.id) ? '已收藏' : '待收集'}</small>${weaponAffinity(t, save.spiritRoot, save.rootElements, true)}${evolutionRecipe(t, save.path)}</div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots">炼器 ${save.forge[t.id] || 0} / ${MAX_FORGE_LEVEL}</span></button>`,
+                  `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}${save.artifacts.includes(t.id) ? '' : ' is-unowned'}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${save.artifacts.includes(t.id) ? '已收藏' : '待收集'}</small>${weaponAffinity(t, save.spiritRoot, save.rootElements, true)}${catalogEvolutionRecipe(t)}</div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots">炼器 ${save.forge[t.id] || 0} / ${MAX_FORGE_LEVEL}</span></button>`,
               )
               .join('')
           : PASSIVES.filter((p) => schoolFilter === 'all' || p.school === schoolFilter)
@@ -1987,6 +1993,14 @@ function handleAction(action: string, id?: string) {
     }
     if (action === 'prologue-enter' || action === 'prologue-skip' || action === 'close') {
       const replay = save.prologueSeen;
+      if (
+        action === 'prologue-enter' &&
+        !replay &&
+        !pendingRun &&
+        save.mortal.hometown &&
+        ['farewell', 'walk'].includes(save.mortal.hometown.stage)
+      )
+        void mobileDisplay.enter();
       save.prologueSeen = true;
       ui.inert = false;
       panel = '';
@@ -2013,8 +2027,10 @@ function handleAction(action: string, id?: string) {
     lifespanInfo(save).remaining > 0 &&
     !tribulationDue(save)
   ) {
-    if (action === 'hometown-walk' && panel === 'hometown-choice') renderDeparture();
-    else if (action === 'hometown-skip' && panel === 'hometown-choice') finishDeparture();
+    if (action === 'hometown-walk' && panel === 'hometown-choice') {
+      void mobileDisplay.enter();
+      renderDeparture();
+    } else if (action === 'hometown-skip' && panel === 'hometown-choice') finishDeparture();
     else if (action === 'hometown-continue' && panel === 'hometown-farewell') {
       save.mortal.hometown.stage = 'walk';
       persist();
@@ -2116,6 +2132,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'tribulation-start' && tribulationDue(save)) {
+    if (assetsReady) void mobileDisplay.enter();
     beginTribulation();
     return;
   }
@@ -2248,6 +2265,7 @@ function handleAction(action: string, id?: string) {
       }
       persist();
       telemetry.track({ type: 'town', ...lifeStats() });
+      void mobileDisplay.enter();
       inTown = true;
       if (save.mortal.hometown) townPosition = { ...HOMETOWN_START };
       lastMortalTick = performance.now();
@@ -2519,7 +2537,10 @@ function handleAction(action: string, id?: string) {
       renderHud();
       if (game.state === 'upgrade') renderChoices();
       else if (game.state === 'paused' && panel !== 'guide') renderPause();
-    } else renderLobby();
+    } else {
+      renderLobby();
+      if (panel === 'settings') renderPanel();
+    }
     toast(save.autoplay ? '自动历练已开启 · 自动走位与选技' : '已切回手动操作');
     return;
   }
@@ -2838,14 +2859,25 @@ function handleAction(action: string, id?: string) {
     sound('upgrade');
     if (tribulationDue(save)) renderTribulationPending();
   }
-  if (action === 'start' || action === 'retry') startRun();
-  if (action === 'restore') restoreRun();
+  if (action === 'start' || action === 'retry') {
+    if (assetsReady && selectedStage <= save.unlocked && !pendingRun && !tribulationDue(save))
+      void mobileDisplay.enter();
+    startRun();
+  }
+  if (action === 'restore') {
+    if (assetsReady && pendingRun) void mobileDisplay.enter();
+    restoreRun();
+  }
   if (action === 'new-run') {
     pendingRun = null;
+    if (assetsReady && selectedStage <= save.unlocked && !tribulationDue(save))
+      void mobileDisplay.enter();
     startRun();
   }
   if (action === 'next' && game) {
     selectedStage = Math.min(STAGES.length - 1, game.stage + 1);
+    if (assetsReady && selectedStage <= save.unlocked && !tribulationDue(save))
+      void mobileDisplay.enter();
     startRun();
   }
   if (action === 'return') returnLobby();
@@ -2958,7 +2990,11 @@ document.addEventListener('change', async (event) => {
   }
 });
 document.addEventListener('keydown', (event) => {
-  if ((event.target as HTMLElement).matches('input[type="range"], input[type="number"]')) return;
+  if (
+    (event.target as HTMLElement).matches('input[type="range"], input[type="number"]') &&
+    !['Escape', 'Tab'].includes(event.key)
+  )
+    return;
   if (
     (event.target as HTMLElement).matches('input, textarea') &&
     !['Escape', 'Tab'].includes(event.key)
@@ -2967,13 +3003,36 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Tab' && modal.innerHTML) {
     const elements = [
       ...modal.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), summary, [tabindex="0"]',
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], summary, [tabindex="0"]',
       ),
-    ].filter((element) => element.getClientRects().length);
+    ].filter((element) => {
+      if (
+        element.tabIndex < 0 ||
+        !element.getClientRects().length ||
+        getComputedStyle(element).visibility === 'hidden'
+      )
+        return false;
+      // 折叠 details 的子控件可能仍有布局框，但不能进入键盘焦点循环。
+      for (
+        let parent = element.parentElement;
+        parent && parent !== modal;
+        parent = parent.parentElement
+      )
+        if (
+          parent instanceof HTMLDetailsElement &&
+          !parent.open &&
+          !parent.querySelector(':scope > summary')?.contains(element)
+        )
+          return false;
+      return true;
+    });
     if (!elements.length) return;
     const first = elements[0],
       last = elements[elements.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    if (!elements.includes(document.activeElement as HTMLElement)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    } else if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
       last.focus();
     } else if (!event.shiftKey && document.activeElement === last) {
