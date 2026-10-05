@@ -522,7 +522,7 @@ function renderLobby(returnYears?: number) {
   ui.innerHTML = `
     <header class="lobby-header">
       <a class="brand" href="#" data-action="home" aria-label="叩仙门：青岚纪首页"><span class="brand-emblem">${icon('sword')}</span><span class="brand-title">叩仙门<small>青岚纪</small></span><span class="seal">${completed ? '圆满' : '问道'}</span></a>
-      <nav aria-label="修行菜单"><button class="nav-link active" data-action="home">${completed ? '七境巡游' : '秘境历练'}</button><button class="nav-link" data-action="cultivation">洞府修炼</button><button class="nav-link" data-action="arsenal">藏器阁</button><button class="nav-link" data-action="bestiary">妖物志</button><button class="nav-link" data-action="medicine">炼丹炉</button><button class="nav-link" data-action="settings" aria-haspopup="dialog">设置</button></nav>
+      <nav aria-label="修行菜单"><button class="nav-link active" data-action="home">${completed ? '七境巡游' : '秘境历练'}</button><button class="nav-link" data-action="cultivation">洞府修炼</button><button class="nav-link" data-action="arsenal">藏器阁</button><button class="nav-link" data-action="bestiary">妖物志</button><button class="nav-link" data-action="medicine">炼丹炉</button></nav>
       <div class="header-right">${currency(save)}${controls(save, volumeOpen, mobileDisplay)}</div>
     </header>
     <main class="lobby-main ${completed ? 'journey-lobby' : ''}">
