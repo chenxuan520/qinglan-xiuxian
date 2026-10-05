@@ -37,7 +37,7 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 ## 可选离线资源缓存
 
-`src/offline.ts` 管理关于面板的缓存操作；只有点击「缓存所有离线资源」才注册 `public/offline-worker.js` 并获取全部资源。完成过缓存的浏览器重新打开时只检查既有缓存，不自动缓存新版本。缓存与 `qinglan-immortal-v1` 存档独立，清除缓存不读写存档。
+`src/settings-ui.ts` 渲染独立设置面板，声音控制复用现有音频实例、存档字段与 `data-volume` 事件；离线资源小节每次打开面板默认折叠，音量调整和缓存进度刷新保留当前展开状态。`src/offline.ts` 管理设置面板的缓存操作；只有点击「缓存所有离线资源」才注册 `public/offline-worker.js` 并获取全部资源。完成过缓存的浏览器重新打开时只检查既有缓存，不自动缓存新版本。缓存与 `qinglan-immortal-v1` 存档独立，清除缓存不读写存档。
 
 Vite 的 `scripts/offline-build.ts` 为每次生产构建生成 `offline-manifest.json` 与带构建号的固定清单；收录整个构建输出，包括后台计时 Worker、留影懒加载代码、字体、音乐和未访问关卡素材。清单包含文件长度与 SHA-256，缓存逐项校验，全部成功后才写完成标记。网络、空间不足、取消或部署中途资源变化均不能标为完整。保持根路径与 GitHub Pages 子路径的独立作用域。
 

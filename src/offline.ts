@@ -95,11 +95,11 @@ function message(error: unknown) {
 }
 
 export function offlinePanel() {
-  return `<section class="about-offline" aria-labelledby="offline-title"><h3 id="offline-title">离线游玩</h3><p>缓存完成后，断网重新打开也能游玩秘境与城镇。AI 对话与新故事需要联网。</p><p class="offline-status" role="status" aria-live="polite"></p><progress aria-label="离线资源缓存进度" max="100" value="0" hidden></progress><div class="offline-actions"><button class="primary-button" data-action="offline-cache">缓存所有离线资源</button><button class="secondary-button" data-action="offline-cancel" hidden>取消缓存</button><button class="secondary-button" data-action="offline-clear" hidden>清除离线资源</button></div><small>资源保存在当前浏览器中；清理浏览器数据后需重新缓存。清除离线资源不会删除存档。</small></section>`;
+  return `<section class="offline-resources" aria-label="离线资源缓存"><p>缓存完成后，断网重新打开也能游玩秘境与城镇。AI 对话与新故事需要联网。</p><p class="offline-status" role="status" aria-live="polite"></p><progress aria-label="离线资源缓存进度" max="100" value="0" hidden></progress><div class="offline-actions"><button class="primary-button" data-action="offline-cache">缓存所有离线资源</button><button class="secondary-button" data-action="offline-cancel" hidden>取消缓存</button><button class="secondary-button" data-action="offline-clear" hidden>清除离线资源</button></div><small>资源保存在当前浏览器中；清理浏览器数据后需重新缓存。清除离线资源不会删除存档。</small></section>`;
 }
 
 export function refreshOfflinePanel() {
-  const host = document.querySelector<HTMLElement>('.about-offline');
+  const host = document.querySelector<HTMLElement>('.offline-resources');
   if (!host) return;
   const status = host.querySelector<HTMLElement>('.offline-status')!;
   const cache = host.querySelector<HTMLButtonElement>('[data-action="offline-cache"]')!;
@@ -109,6 +109,17 @@ export function refreshOfflinePanel() {
   const amount = state.bytes ? `约 ${(state.bytes / 1024 / 1024).toFixed(1)} MB` : '';
   const p = state.progress;
   const percent = p ? Math.min(100, Math.floor((p.bytes / Math.max(1, p.totalBytes)) * 100)) : 0;
+  const summary = document.querySelector<HTMLElement>('[data-offline-summary]');
+  if (summary)
+    summary.textContent = state.busy
+      ? p
+        ? `正在缓存 · ${percent}%`
+        : '正在准备缓存…'
+      : state.ready
+        ? '全部资源已缓存'
+        : state.stored
+          ? '有资源更新'
+          : '按需缓存，断网游玩';
   let text = state.ready
     ? '全部离线资源已缓存，可断网重新打开游玩。'
     : state.stored

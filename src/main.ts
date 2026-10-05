@@ -130,7 +130,8 @@ import {
 } from './hometown.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
 import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-chat.ts';
-import { offlinePanel, openOfflinePanel, offlineAction, initOffline } from './offline.ts';
+import { openOfflinePanel, offlineAction, initOffline } from './offline.ts';
+import { settingsContent, settingsSoundNote } from './settings-ui.ts';
 import { townVisit, townReturnMemory } from './town-history.ts';
 import { visitTownImmortal, meetTownImmortal } from './town-immortal.ts';
 import { chooseSmithStory } from './town-story.ts';
@@ -521,7 +522,7 @@ function renderLobby(returnYears?: number) {
   ui.innerHTML = `
     <header class="lobby-header">
       <a class="brand" href="#" data-action="home" aria-label="叩仙门：青岚纪首页"><span class="brand-emblem">${icon('sword')}</span><span class="brand-title">叩仙门<small>青岚纪</small></span><span class="seal">${completed ? '圆满' : '问道'}</span></a>
-      <nav aria-label="修行菜单"><button class="nav-link active" data-action="home">${completed ? '七境巡游' : '秘境历练'}</button><button class="nav-link" data-action="cultivation">洞府修炼</button><button class="nav-link" data-action="arsenal">藏器阁</button><button class="nav-link" data-action="bestiary">妖物志</button><button class="nav-link" data-action="medicine">炼丹炉</button></nav>
+      <nav aria-label="修行菜单"><button class="nav-link active" data-action="home">${completed ? '七境巡游' : '秘境历练'}</button><button class="nav-link" data-action="cultivation">洞府修炼</button><button class="nav-link" data-action="arsenal">藏器阁</button><button class="nav-link" data-action="bestiary">妖物志</button><button class="nav-link" data-action="medicine">炼丹炉</button><button class="nav-link" data-action="settings" aria-haspopup="dialog">设置</button></nav>
       <div class="header-right">${currency(save)}${controls(save, volumeOpen, mobileDisplay)}</div>
     </header>
     <main class="lobby-main ${completed ? 'journey-lobby' : ''}">
@@ -984,13 +985,15 @@ async function renderJourneyCard() {
   }
 }
 function renderPanel() {
-  if (panel === 'about') {
+  if (panel === 'settings') {
+    panelFrame('设置', '游戏选项', settingsContent(save));
+    void openOfflinePanel();
+  } else if (panel === 'about') {
     panelFrame(
       '关于《叩仙门》',
       '独立制作 · 持续更新',
-      `<div class="about-copy"><p class="about-lead">《叩仙门：青岚纪》是一款独立制作的 Web 修仙小游戏。</p><div class="about-maker"><span>制作</span><strong>一个想做点自己喜欢的东西的程序员 chenxuan，和一堆 AI 工具。</strong><p>从幸存者玩法出发，慢慢做成了一场关于修行、岁月与故人的仙途。</p></div><p class="panel-note">程序设计、玩法与内容由作者持续迭代；部分开发、美术生成与辅助工作使用 AI 工具完成。项目持续更新中，源码公开于 GitHub。</p><div class="about-meta"><p><span>GitHub</span><a href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">chenxuan520/qinglan-xiuxian</a></p><p><span>官网</span><a href="${GAME_SITE_URL}" target="_blank" rel="noopener noreferrer" tabindex="0">${new URL(GAME_SITE_URL).host}</a></p><p><span>版本</span>${GAME_VERSION}</p>${telemetryRow(telemetry.enabled(), telemetry.active)}</div>${offlinePanel()}<div class="save-actions about-actions"><a class="primary-button" href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">GitHub 源码</a><a class="secondary-button" href="https://github.com/chenxuan520/qinglan-xiuxian/issues" target="_blank" rel="noopener noreferrer" tabindex="0">反馈问题</a></div><div class="about-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="128" height="128" loading="lazy"><div><strong>请道友喝杯茶</strong><p>这一程山水不收分文。若觉得值得，请作者喝杯茶便好——茶钱不换道具，也不换修为，只换作者多写几段山水。</p><small>微信扫码即可；手机上可先截图，再在「扫一扫」里从相册选取。</small></div></div></div>`,
+      `<div class="about-copy"><p class="about-lead">《叩仙门：青岚纪》是一款独立制作的 Web 修仙小游戏。</p><div class="about-maker"><span>制作</span><strong>一个想做点自己喜欢的东西的程序员 chenxuan，和一堆 AI 工具。</strong><p>从幸存者玩法出发，慢慢做成了一场关于修行、岁月与故人的仙途。</p></div><p class="panel-note">程序设计、玩法与内容由作者持续迭代；部分开发、美术生成与辅助工作使用 AI 工具完成。项目持续更新中，源码公开于 GitHub。</p><div class="about-meta"><p><span>GitHub</span><a href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">chenxuan520/qinglan-xiuxian</a></p><p><span>官网</span><a href="${GAME_SITE_URL}" target="_blank" rel="noopener noreferrer" tabindex="0">${new URL(GAME_SITE_URL).host}</a></p><p><span>版本</span>${GAME_VERSION}</p>${telemetryRow(telemetry.enabled(), telemetry.active)}</div><div class="save-actions about-actions"><a class="primary-button" href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">GitHub 源码</a><a class="secondary-button" href="https://github.com/chenxuan520/qinglan-xiuxian/issues" target="_blank" rel="noopener noreferrer" tabindex="0">反馈问题</a></div><div class="about-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="128" height="128" loading="lazy"><div><strong>请道友喝杯茶</strong><p>这一程山水不收分文。若觉得值得，请作者喝杯茶便好——茶钱不换道具，也不换修为，只换作者多写几段山水。</p><small>微信扫码即可；手机上可先截图，再在「扫一扫」里从相册选取。</small></div></div></div>`,
     );
-    void openOfflinePanel();
   } else if (panel === 'medicine') {
     if (medicineView === 'shop' && refreshMedicineShop(save.medicine, save.age)) persist();
     panelFrame(
@@ -2552,6 +2555,7 @@ function handleAction(action: string, id?: string) {
     closeNpcChat();
     const wasHumanMemory = panel === 'human-memory';
     const returnToAbout = panel === 'about';
+    const returnToSettings = panel === 'settings';
     if (game?.state === 'lost' && !settled) return;
     if (game?.state === 'paused' && panel === 'damage') {
       panel = '';
@@ -2574,6 +2578,10 @@ function handleAction(action: string, id?: string) {
         ui.querySelector<HTMLButtonElement>('[data-action="about"]')?.focus({
           preventScroll: true,
         });
+      if (returnToSettings)
+        ui.querySelector<HTMLButtonElement>('[data-action="settings"]')?.focus({
+          preventScroll: true,
+        });
     }
     return;
   }
@@ -2589,7 +2597,19 @@ function handleAction(action: string, id?: string) {
     showPanel('about');
     return;
   }
-  if (action.startsWith('offline-') && panel === 'about') {
+  if (action === 'settings' && !game) {
+    showPanel('settings');
+    return;
+  }
+  if (action === 'settings-sound' && panel === 'settings') {
+    save.sound = !save.sound;
+    unlockAudio();
+    persist();
+    renderLobby();
+    renderPanel();
+    return;
+  }
+  if (action.startsWith('offline-') && panel === 'settings') {
     void offlineAction(action);
     return;
   }
@@ -2908,6 +2928,8 @@ document.addEventListener('input', (event) => {
   if (!input.matches('input[data-volume]')) return;
   save.volume = Number(input.value) / 100;
   input.parentElement!.querySelector('output')!.textContent = `${input.value}%`;
+  const settingsNote = modal.querySelector<HTMLElement>('[data-settings-sound-note]');
+  if (settingsNote) settingsNote.textContent = settingsSoundNote(save);
   unlockAudio();
   persist();
 });
