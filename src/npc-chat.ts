@@ -22,6 +22,7 @@ function dialogueErrorMessage(error: string) {
         'request-timeout': '等待服务响应超时',
         'inference-timeout': 'AI 生成超时',
         network: '网络连接失败',
+        offline: '当前处于离线状态，请联网后再听新故事',
         busy: '请求过于频繁，请稍后再试',
         unavailable: 'AI 服务暂时不可用',
         'inference-failed': 'AI 服务生成失败',
@@ -42,6 +43,8 @@ async function requestNpcDialogueResponse(
     : NPC_AI_SETTINGS.requestTimeoutMs,
   onRetry?: (attempt: number, error: string) => void,
 ): Promise<NpcDialogueResponse | NpcDialogueFailure> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false)
+    return { error: 'offline', retryable: false };
   const attempts = input.mode === 'tea-story' ? TEA_STORY_SETTINGS.maxAttempts : 1;
   let failure: NpcDialogueFailure = { error: 'network', retryable: true };
   for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -139,7 +142,8 @@ export async function requestTeaStoryImage(
     !text ||
     text.length > TEA_STORY_SETTINGS.maxReplyLength ||
     !/^\d{10}\.[a-f0-9]{64}$/.test(token) ||
-    signal.aborted
+    signal.aborted ||
+    (typeof navigator !== 'undefined' && navigator.onLine === false)
   )
     return null;
   const controller = new AbortController();

@@ -1,5 +1,11 @@
 # 素材与生成提示词
 
+## 本地中文字体 · 离线缓存（2026-10-05）
+
+界面继续使用 Noto Serif SC，改为本站提供的变量字体用字子集，不再依赖 Google Fonts 在线请求。`public/assets/fonts/noto-serif-sc-2275c0dc339f.woff2` 约 590 KiB，保留 200–900 字重，使用 `font-display: swap`；包含源码中的界面用字，未包含的动态 AI 用字沿用系统宋体回退。字体许可为 SIL Open Font License 1.1，完整授权随资源保存在 `public/assets/fonts/OFL.txt`。
+
+原始字体来源：[Google Fonts 的 Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，原始 24 MB TTF 不入仓库。扩充界面用字时，在仓库外取得官方 `NotoSerifSC[wght].ttf`，安装 `fonttools` 与 `brotli` 后运行 `python3 scripts/subset-font.py /tmp/NotoSerifSC.ttf`；脚本按 `src` 与首页用字生成带内容 hash 的 WOFF2 并更新 CSS。字体预处理不参与普通 npm 构建，不增加玩家需要安装的依赖。
+
 ## 微信赞赏码 · 关于面板与轮回确认（2026-10-04）
 
 路径：`public/assets/support-wechat.webp`，由作者提供的微信赞赏码截图裁出码的部分，不含顶部窗口栏、引导语与底部横幅，四周留约 8% 白边。赞赏码是微信小程序码，不是标准二维码（`jsqr` 无法解码），也无法用 `uqr` 重新生成，只能使用原图；更换时直接替换该文件，路径常量为 `src/setting.ts` 的 `SUPPORT_CODE_IMAGE`。按作者要求改为深底白点的反色码：按亮度把白底转为透明、黑色码点转为柔白 `#f4f4ee` 并以透明度保留抗锯齿，两端截去 JPEG 噪点；中央头像与右下点赞角标按区域保护、保持原色不透明，头像圆角外与角标外圈的残留白色随底色一并透明。关于面板直接透出面板渐变背景；终章正文不显示赞赏码，通关后的「再问长生」轮回确认窗口使用深绿圆角底。462 × 462 RGBA，经现有压缩脚本 quality=82、透明通道无损转为 WebP，104,968 字节 PNG 压至 23,010 字节（减少 78.1%），不保留 PNG。作者已用手机微信实际扫描反色版确认可识别。码中央的头像为作者本人的微信头像。
