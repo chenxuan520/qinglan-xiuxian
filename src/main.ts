@@ -2,6 +2,7 @@ import './medicine.css';
 import {
   medicineContent,
   medicineEntrance,
+  medicineArt,
   type MedicineView,
   type MedicineTierFilter,
 } from './medicine-ui.ts';
@@ -745,13 +746,18 @@ function showTownEvent(npc: TownResident) {
   townNpc = npc;
   panel = 'town-event';
   const visitor = save.mortal.immortal;
-  if (visitor?.npcId === npc.id) {
+  if (visitor?.npcId === npc.id && !save.journeyEnded) {
     closeNpcChat();
-    if (meetTownImmortal(save, npc.id, npc.name)) persist();
+    const granted = meetTownImmortal(save, npc.id, npc.name);
+    if (granted) persist();
+    const medicine = medicineInfo(visitor.medicineId)!;
+    const story = granted
+      ? '<p>那人混在赶集的人群里，衣衫寻常，正替摊主扶稳一盏旧灯。你停步问路，他却笑着说起千年前的渡口——连那时桥下的一株老柳，也记得清楚。</p><p>街声依旧喧闹，四周灵机却在他抬眼时静了一瞬。你才明白，眼前并非凡人。</p><p>“走得远了，才知人间一碗热茶，也值得回来。”他将一只小瓷瓶放入你掌心，“长生路长，莫只顾赶路。今日相逢，便赠你这一炉余香。”</p><p>再望去，他仍只是街巷里一张平常的面孔。你收好瓷瓶，把这场相逢记在心里。</p>'
+      : '<p>你再度向这位前辈问候。他仍坐在街巷间，笑着与你说起人间烟火。这场仙缘已记在心里，此次相遇的丹药也已赠过。</p>';
     panelFrame(
       '市井逢仙',
       `青岚镇 · 与${npc.name}的一席闲谈`,
-      `<div class="town-story immortal-encounter"><p>那人混在赶集的人群里，衣衫寻常，正替摊主扶稳一盏旧灯。你停步问路，他却笑着说起千年前的渡口——连那时桥下的一株老柳，也记得清楚。</p><p>街声依旧喧闹，四周灵机却在他抬眼时静了一瞬。你才明白，眼前并非凡人。</p><p>“走得远了，才知人间一碗热茶，也值得回来。”他将一只小瓷瓶放入你掌心，“长生路长，莫只顾赶路。今日相逢，便赠你这一炉余香。”</p><p>再望去，他仍只是街巷里一张平常的面孔。你收好瓷瓶，把这场相逢记在心里。</p></div><p class="boss-reward">${medicineInfo(visitor.medicineId)!.name} · 一份<small>已收入丹囊 · 此次赠药仅一次</small></p><button class="primary-button" data-action="close">谢过前辈 · 继续游历</button>`,
+      `<section class="immortal-gift${granted ? '' : ' is-claimed'}" aria-label="仙人赠药">${medicineArt(medicine)}<div><small>仙人赠药 · ${medicine.years ? '珍品' : '本世珍品'}</small><strong>${granted ? '获赠' : '此前获赠'}：${medicine.name} <span>×1</span></strong><p>${granted ? '已收入丹囊' : '此次仙缘已赠药 · 不重复赠送'} · 现持有 ${save.medicine.bag[medicine.id] || 0} 份</p></div></section><div class="town-story immortal-encounter">${story}</div><button class="primary-button" data-action="close">${granted ? '谢过前辈' : '与前辈作别'} · 继续游历</button>`,
     );
     return;
   }
