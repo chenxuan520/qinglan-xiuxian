@@ -116,7 +116,8 @@ import { createTelemetry, type TelemetryEvent } from './telemetry.ts';
 import { spriteStyle } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
-import { shareImage } from './image-share.ts';
+import { imageDownloadUrl, shareImage } from './image-share.ts';
+import { ScreenAwake } from './screen-awake.ts';
 import { runLootContent } from './run-loot-ui.ts';
 import { TownScene } from './town-scene.ts';
 import { TOWN_START, HOMETOWN_START, townClockRunning } from './town.ts';
@@ -960,7 +961,7 @@ async function renderJourneyCard() {
     );
     if (!host.isConnected) return;
     host.innerHTML =
-      '<img alt="此世留影纪念卡预览"><div class="save-actions"><button class="primary-button">分享此世</button><a class="secondary-button" download="叩仙门：青岚纪-此世留影.png" tabindex="0">保存图片</a></div><p class="panel-note" role="status">支持时打开系统分享面板，不支持时保存 PNG；手机也可长按图片。纪念图不能用于恢复存档，二维码不携带存档数据。</p>';
+      '<img alt="此世留影纪念卡预览"><div class="save-actions"><button class="primary-button">分享此世</button><a class="secondary-button" download="叩仙门：青岚纪-此世留影.png" target="_blank" rel="noopener" tabindex="0">保存图片</a></div><p class="panel-note" role="status">保存图片会请求浏览器下载；若未出现下载提示，可长按上方图片保存，或通过「分享此世」选择保存到手机。纪念图不能用于恢复存档，二维码不携带存档数据。</p>';
     host.querySelector('img')!.src = url;
     const download = host.querySelector('a')!;
     download.href = url;
@@ -969,6 +970,18 @@ async function renderJourneyCard() {
       download.download,
       { type: 'image/png' },
     );
+    const status = host.querySelector<HTMLElement>('[role="status"]')!;
+    download.onclick = () => {
+      try {
+        // 文件已准备完成；在此次点击内同步创建下载地址，保留用户激活。
+        download.href = imageDownloadUrl(file);
+        status.textContent =
+          '已请求下载图片，请查看浏览器下载记录。若未出现下载提示，可长按上方图片保存，或通过「分享此世」选择保存到手机。';
+      } catch {
+        status.textContent =
+          '此浏览器无法直接下载图片，请长按上方图片保存，或通过「分享此世」选择保存到手机。';
+      }
+    };
     const button = host.querySelector('button')!;
     button.onclick = async () => {
       if (button.disabled) return;
@@ -976,13 +989,12 @@ async function renderJourneyCard() {
       const result = await shareImage(file);
       if (!host.isConnected) return;
       button.disabled = false;
-      if (result === 'save') download.click();
-      host.querySelector('[role="status"]')!.textContent =
-        result === 'shared'
-          ? '已交给系统分享面板。'
-          : result === 'cancelled'
-            ? '已取消分享，图片仍在，可再次分享或保存。'
-            : '系统图片分享不可用，已尝试保存 PNG；也可点击保存图片或长按图片。';
+      if (result === 'save') {
+        download.click();
+        return;
+      }
+      status.textContent =
+        result === 'shared' ? '已交给系统分享面板。' : '已取消分享，图片仍在，可再次分享或保存。';
     };
   } catch {
     if (!host.isConnected) return;
@@ -3224,6 +3236,19 @@ function simulate(dt: number, now: number) {
     }
   }
 }
+const screenAwake = new ScreenAwake();
+const coarsePointer = matchMedia('(pointer: coarse)');
+function syncScreenAwake() {
+  screenAwake.setActive(
+    coarsePointer.matches &&
+      document.hasFocus() &&
+      !saveLock &&
+      !settled &&
+      save.autoplay &&
+      !!game &&
+      (game.state === 'playing' || game.state === 'upgrade'),
+  );
+}
 function tick(now: number, draw: boolean) {
   let remaining = Math.max(0, Math.min(2, (now - lastFrame) / 1000));
   lastFrame = now;
@@ -3234,6 +3259,7 @@ function tick(now: number, draw: boolean) {
       remaining -= dt;
     }
   } else simulate(Math.min(0.05, remaining), now);
+  syncScreenAwake();
   if (
     draw &&
     !inMortalWorld &&
@@ -3256,6 +3282,7 @@ function tick(now: number, draw: boolean) {
 function frame(now: number) {
   // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
   requestAnimationFrame(frame);
+  syncScreenAwake();
   if (saveLock && !modal.querySelector('.save-lock')) renderSaveLock();
   if (save.journeyEnded) return;
   townScene?.update(

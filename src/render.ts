@@ -6,6 +6,7 @@ import { assetUrl } from './asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
 import { bossEntranceCue, BOSS_ENTRANCE_THEMES } from './boss-entrance.ts';
 import { realmBreakthroughCue } from './realm-breakthrough.ts';
+import { drawPlayerFormation } from './player-formation.ts';
 import {
   hasArtifactField,
   drawArtifactField,
@@ -666,7 +667,7 @@ export class Renderer {
     ].sort((a, b) => a.y - b.y);
     for (const e of entities) {
       if (e.type === -1) {
-        this.formation(p.x, p.y + 9, 29, time * 0.5, '#c7e4bd', 0.5);
+        this.playerFormation(p.x, p.y + 9, game.realmIndex, time);
         c.globalAlpha = p.invincible > 0 ? 0.5 + Math.sin(time * 35) * 0.3 : 1;
         this.sprite(
           0,
@@ -1535,6 +1536,9 @@ export class Renderer {
     c.globalAlpha = alpha;
     c.drawImage(texture, -extent, -extent, extent * 2, extent * 2);
     c.restore();
+  }
+  private playerFormation(x: number, y: number, realm: number, time: number) {
+    drawPlayerFormation(this.ctx, x, y, realm, this.reducedMotion.matches ? 0 : time);
   }
   private formation(
     x: number,

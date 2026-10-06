@@ -1,8 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { shareImage } from '../src/image-share.ts';
+import { imageDownloadUrl, shareImage } from '../src/image-share.ts';
 
 const file = new File([new Uint8Array([137, 80, 78, 71])], '此世留影.png', { type: 'image/png' });
+
+test('图片下载使用实际 PNG 文件地址，保留原始内容并延后释放', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const url = imageDownloadUrl(file);
+  assert.match(url, /^blob:/);
+  const response = await fetch(url);
+  assert.equal(response.headers.get('content-type'), 'image/png');
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), new Uint8Array([137, 80, 78, 71]));
+  context.mock.timers.tick(59_999);
+  assert.equal((await fetch(url)).status, 200);
+  context.mock.timers.tick(1);
+  await assert.rejects(fetch(url));
+});
+
+test('重复保存使用各自有效的文件地址，旧地址释放不影响新下载', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const first = imageDownloadUrl(file);
+  context.mock.timers.tick(30_000);
+  const second = imageDownloadUrl(file);
+  assert.notEqual(first, second);
+  context.mock.timers.tick(30_000);
+  await assert.rejects(fetch(first));
+  assert.equal((await fetch(second)).status, 200);
+  context.mock.timers.tick(30_000);
+  await assert.rejects(fetch(second));
+});
 
 test('支持图片分享时直接调用系统面板，发送PNG文件而非数据网址', async () => {
   let called = false;

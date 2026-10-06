@@ -44,6 +44,7 @@ function draw(g: Game) {
     reducedMotion: { matches: false },
     sprite() {},
     formation() {},
+    playerFormation() {},
     cachedFormation() {},
     glowSprite(_key: string, _width: number, _height: number, paint: (c: typeof ctx) => void) {
       paint(ctx);
