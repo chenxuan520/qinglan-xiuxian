@@ -1,3 +1,11 @@
+// 以文件地址发起下载，避免手机浏览器忽略过长的内嵌图片链接。
+export function imageDownloadUrl(file: File) {
+  const url = URL.createObjectURL(file);
+  // 给浏览器下载或打开图片留出时间，再释放本地文件地址。
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return url;
+}
+
 export async function shareImage(
   file: File,
   browser: Partial<Pick<Navigator, 'canShare' | 'share'>> = navigator,

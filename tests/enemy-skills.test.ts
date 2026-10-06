@@ -53,8 +53,10 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
       width: 1280,
       height: 800,
       scale: 1,
+      reducedMotion: { matches: false },
       sprite() {},
       formation() {},
+      playerFormation() {},
       cachedFormation() {},
       glowSprite(_key: string, _width: number, _height: number, paint: (c: typeof ctx) => void) {
         paint(ctx);

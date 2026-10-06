@@ -318,6 +318,10 @@ export class Game {
   private get usesElitePacing() {
     return this.elitePacingVersion >= 2 && !this.tribulation && this.stage >= 2 && this.stage <= 5;
   }
+  // 绘制沿用当前战斗已结算的境界，不重复推算修为。
+  get realmIndex() {
+    return Math.floor(this.realm / 3);
+  }
   get lifespan() {
     return REALM_LIFESPANS[Math.floor(this.realm / 3)] + this.save.lifespanBonus;
   }
