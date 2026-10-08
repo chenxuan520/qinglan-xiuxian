@@ -174,8 +174,8 @@ test('精英规则不读取灵根、境界或装备，三档难度共用波次�
 test('暂停和升级不推进波次，过半前后与满额延期读档均不重复生成或再次乘血量', () => {
   for (const point of ['before', 'after', 'blocked'] as const) {
     let g = fixture(4);
-    g.time = 149.99;
-    g.nextElite = (300 / 7) * 4;
+    g.time = STAGES[4].minutes * 30 - 0.01;
+    g.nextElite = ((STAGES[4].minutes * 60) / (STAGES[4].minutes + 2)) * 4;
     if (point !== 'before') g.update(0.01);
     if (point === 'blocked') {
       g.spawnEnemy(0, true);
@@ -201,7 +201,7 @@ test('暂停和升级不推进波次，过半前后与满额延期读档均不�
     g.resume();
     g.update(0.01);
     assert.equal(elites(g).length, point === 'blocked' ? 3 : 2);
-    if (point === 'before') assert.equal(g.nextElite, 174);
+    if (point === 'before') assert.equal(g.nextElite, STAGES[4].minutes * 30 + 24);
     else assert.equal(g.nextElite, before.nextElite);
   }
 });
@@ -230,7 +230,7 @@ test('缺少新版本字段的旧续局保留旧兵种、间隔和气血，新�
       .map((e) => e.type),
     [armor.at(-1), roster.at(-1)],
   );
-  assert.equal(restored.nextElite, 200 + 300 / 7);
+  assert.equal(restored.nextElite, 200 + (STAGES[4].minutes * 60) / (STAGES[4].minutes + 2));
   assert.equal(Game.restore(g.save, restored.snapshot())!.elitePacingVersion, 1);
   assert.equal(new Game(g.save, 4, 0).elitePacingVersion, 2);
 });
@@ -256,7 +256,7 @@ test('第一二境、第七境和独立天劫不采用新节奏', () => {
   g.elitePacingVersion = 1;
   const before = g.spawnEnemy(0, true);
   assert.equal(after.maxHp, before.maxHp);
-  assert.equal(g.eliteInterval, 300 / 7);
+  assert.equal(g.eliteInterval, (STAGES[5].minutes * 60) / (STAGES[5].minutes + 2));
 });
 
 test('未知节奏版本与损坏的阶段标记拒绝恢复', () => {

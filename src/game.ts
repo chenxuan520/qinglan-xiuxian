@@ -229,7 +229,7 @@ export class Game {
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
   revivesUsed = 0;
-  progressionVersion = 2;
+  progressionVersion = 3;
   elitePacingVersion = 2;
   encounterVersion = 1;
   artifactVersion = 1;
@@ -711,7 +711,8 @@ export class Game {
         )
           return null;
       }
-      if (s.progressionVersion !== undefined && ![1, 2].includes(s.progressionVersion)) return null;
+      if (s.progressionVersion !== undefined && ![1, 2, 3].includes(s.progressionVersion))
+        return null;
       if (s.elitePacingVersion !== undefined && ![1, 2].includes(s.elitePacingVersion)) return null;
       if (
         (s.elitePacingVersion === 2 || s.lateEliteWaves !== undefined) &&
@@ -1001,8 +1002,15 @@ export class Game {
       const oldDuration = s.stageDuration ?? (g.isFinalTrial ? 600 : (s.stage + 5) * 60);
       const timeScale = g.tribulation ? 1 : duration / oldDuration;
       g.time = s.time * timeScale;
-      g.nextEnemySlowAt = (s.nextEnemySlowAt ?? 0) * timeScale;
-      if (g.cacheChallenge) g.cacheChallenge.deadline *= timeScale;
+      // 关卡进度按比例缩时，局部冷却保留剩余秒数，避免旧时间戳让技能停摆。
+      const shiftClock = (at: number) => Math.max(0, at + (g.time - s.time));
+      g.nextEnemySlowAt = shiftClock(s.nextEnemySlowAt ?? 0);
+      if (g.cacheChallenge && timeScale !== 1) {
+        const c = g.cacheChallenge;
+        c.deadline = shiftClock(c.deadline);
+        if (c.phase === 'offered' || c.phase === 'active')
+          c.deadline = Math.min(c.deadline, duration - (c.phase === 'active' ? 12 : 60));
+      }
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
@@ -1017,8 +1025,8 @@ export class Game {
         (!Number.isFinite(s.nextMedicinePulse) || s.nextMedicinePulse < 0)
       )
         return null;
-      g.nextMedicinePulse = s.nextMedicinePulse ?? 0;
-      g.nextEnemySkillAt = s.nextEnemySkillAt ?? 0;
+      g.nextMedicinePulse = shiftClock(s.nextMedicinePulse ?? 0);
+      g.nextEnemySkillAt = shiftClock(s.nextEnemySkillAt ?? 0);
       g.weapons = s.weapons.map((w) => ({ ...w }));
       g.passives = { ...s.passives };
       const maxHp = g.maximumHealth();
@@ -2992,6 +3000,10 @@ export class Game {
       const cultivationScale = this.progressionVersion >= 2 ? 1 : cultivationFactor(this.realm);
       const cultivationRate =
         this.progressionVersion >= 2 ? STAGE_CULTIVATION_RATES[this.stage] : 1;
+      // 终关全员精英属于战斗强度：新局永久修为按普通倍率，局内灵气仍按精英给。
+      // 旧续局沿用原奖励至结束，已入账修为不重算、不扣回。
+      const cultivationElite =
+        e.elite && (!this.isFinalTrial || this.progressionVersion < 3) ? 4 : 1;
       const bossReward = e.boss
         ? bossCultivationReward(this.stage, e.bossStage ?? this.stage, this.progressionVersion) *
           this.medicine.bossCultivation
@@ -3002,7 +3014,7 @@ export class Game {
         ? bossReward
         : Math.max(
             0,
-            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * (e.elite ? 4 : 1)) /
+            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite) /
               cultivationScale -
               0.7,
           ) * cultivationRate;
@@ -3010,7 +3022,7 @@ export class Game {
         this.combatCultivation +=
           Math.max(
             0.7,
-            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * (e.elite ? 4 : 1)) /
+            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite) /
               cultivationScale,
           ) *
           (this.medicine.cultivation - 1) *

@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { STAGES, TRIAL_BOSS_TIMES, enemyRoster } from '../src/data.ts';
-import { freshSave } from '../src/progress.ts';
+import { freshSave, syncTribulationClock } from '../src/progress.ts';
 
-test('前六境为334455分钟，四批敌人和精英随时长提前，终关七分钟每分钟出王', () => {
+test('前六境按三分钟、三分半、四分钟两两分档，四批敌人和精英随时长提前，终关七分钟每分钟出王', () => {
   assert.deepEqual(
     STAGES.map((s) => s.minutes),
-    [3, 3, 4, 4, 5, 5, 7],
+    [3, 3, 3.5, 3.5, 4, 4, 7],
   );
   assert.deepEqual(TRIAL_BOSS_TIMES, [60, 120, 180, 240, 300, 360, 420]);
   for (let stage = 0; stage < 6; stage++) {
@@ -63,6 +63,7 @@ test('无时长标记的早期续局按原始5至10分钟换算，重复读档�
 
 test('上一版续局按完成比例换算，已出场妖王、收益和消耗寿元保持不变', () => {
   for (const oldMinutes of [
+    [3, 3, 4, 4, 5, 5, 7],
     [3, 4, 5, 6, 7, 8, 10],
     [3, 3, 5, 5, 7, 7, 10],
   ]) {
@@ -110,4 +111,93 @@ test('上一版续局按完成比例换算，已出场妖王、收益和消耗�
       }
     }
   }
+});
+
+test('旧局缩时保留技能、丹药和减速保护的剩余秒数，预警、弹幕及年岁不压缩', () => {
+  for (const stage of [2, 3, 4, 5]) {
+    const save = freshSave();
+    save.unlocked = 6;
+    const g = new Game(save, stage, 0, () => 0.5);
+    const oldDuration = stage < 4 ? 240 : 300;
+    g.time = oldDuration * 0.6;
+    g.nextEnemySkillAt = g.time + 0.18;
+    g.nextEnemySlowAt = g.time + 2.5;
+    g.nextMedicinePulse = g.time + 6;
+    g.zone(100, 100, 60, 0.8, 20, '#fff', 'blast', 1.2, true);
+    const before = g.snapshot();
+    const restored = Game.restore(save, { ...before, stageDuration: oldDuration })!;
+    assert.ok(restored);
+    for (const [key, remaining] of [
+      ['nextEnemySkillAt', 0.18],
+      ['nextEnemySlowAt', 2.5],
+      ['nextMedicinePulse', 6],
+    ] as const) {
+      assert.ok(Math.abs(restored[key] - restored.time - remaining) < 1e-9);
+      assert.equal(Game.restore(save, restored.snapshot())![key], restored[key]);
+    }
+    assert.deepEqual(restored.zones, g.zones);
+    assert.equal(restored.elapsedYears, g.elapsedYears);
+    const dormant = Game.restore(save, {
+      ...before,
+      stageDuration: oldDuration,
+      nextEnemySkillAt: 0,
+      nextEnemySlowAt: 0,
+      nextMedicinePulse: 0,
+    })!;
+    assert.equal(dormant.nextEnemySkillAt, 0);
+    assert.equal(dormant.nextEnemySlowAt, 0);
+    assert.equal(dormant.nextMedicinePulse, 0);
+  }
+});
+
+test('旧守匣剩余窗口保留但避开妖王出场，已完成或过期不会重开', () => {
+  for (const phase of ['offered', 'active', 'cleared', 'expired'] as const) {
+    for (const time of [150, 235]) {
+      const save = freshSave();
+      save.unlocked = 6;
+      const g = new Game(save, 4, 0, () => 0.5);
+      g.time = time;
+      g.cacheChallenge = {
+        x: 280,
+        y: 0,
+        phase,
+        deadline: time + 25,
+        guardians: phase === 'active' || phase === 'cleared' ? [999, 1000] : [],
+      };
+      const restored = Game.restore(save, { ...g.snapshot(), stageDuration: 300 })!;
+      assert.ok(restored);
+      const expected = ['active', 'offered'].includes(phase)
+        ? Math.min(restored.time + 25, 240 - (phase === 'active' ? 12 : 60))
+        : restored.time + 25;
+      assert.equal(restored.cacheChallenge!.deadline, expected);
+      assert.equal(restored.cacheChallenge!.phase, phase);
+      const again = Game.restore(save, restored.snapshot())!;
+      assert.deepEqual(again.cacheChallenge, restored.cacheChallenge);
+      if (phase === 'cleared' || phase === 'expired') {
+        again.resume();
+        again.update(0.01);
+        assert.equal(again.cacheChallenge!.phase, phase);
+        assert.equal(again.pickups.filter((p) => p.kind === 'chest').length, 0);
+      }
+    }
+  }
+});
+
+test('独立天劫时间轴不随秘境缩时', () => {
+  const save = freshSave();
+  save.cultivation = 1e9;
+  save.unlocked = 6;
+  syncTribulationClock(save);
+  save.age = save.nextTribulationAge;
+  const g = Game.createTribulation(save, null);
+  g.time = 75;
+  g.nextMedicinePulse = 80;
+  g.nextEnemySkillAt = 75.18;
+  g.tribulationNextAt = 76.2;
+  const restored = Game.restore(save, { ...g.snapshot(), stageDuration: 600 })!;
+  assert.ok(restored);
+  assert.equal(restored.time, 75);
+  assert.equal(restored.nextMedicinePulse, 80);
+  assert.equal(restored.nextEnemySkillAt, 75.18);
+  assert.equal(restored.tribulationNextAt, 76.2);
 });
