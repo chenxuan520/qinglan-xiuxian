@@ -95,6 +95,7 @@ export interface Enemy extends Point {
   boss: boolean;
   bossStage?: number;
   skillStep?: number;
+  bossSkillQueue?: number[];
   pursuitCooldown?: number;
   windup?: number;
   pendingSkill?: EnemySkill;
@@ -562,7 +563,10 @@ export class Game {
       player: { ...this.player },
       weapons: this.weapons.map((w) => ({ ...w })),
       passives: { ...this.passives },
-      enemies: this.enemies.map((e) => ({ ...e })),
+      enemies: this.enemies.map((e) => ({
+        ...e,
+        ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+      })),
       bossVolleys: bossVolleys.map((v) => ({ weapon: v.weapon, hitBosses: [...v.hitBosses] })),
       shots: this.shots.map(({ bossAttack, ...s }) => ({
         ...s,
@@ -813,7 +817,26 @@ export class Game {
             (e.bossStage === undefined ||
               (Number.isInteger(e.bossStage) &&
                 e.bossStage >= 0 &&
-                e.bossStage <= FINAL_TRIAL_STAGE)),
+                e.bossStage <= FINAL_TRIAL_STAGE)) &&
+            (e.skillStep === undefined ||
+              (e.boss &&
+                Number.isInteger(e.skillStep) &&
+                e.skillStep >= 0 &&
+                e.skillStep < STAGES[e.bossStage ?? s.stage].skills.length)) &&
+            (e.bossSkillQueue === undefined ||
+              (e.boss &&
+                !s.tribulation &&
+                e.skillStep !== undefined &&
+                Array.isArray(e.bossSkillQueue) &&
+                e.bossSkillQueue.length < STAGES[e.bossStage ?? s.stage].skills.length &&
+                new Set(e.bossSkillQueue).size === e.bossSkillQueue.length &&
+                e.bossSkillQueue.every(
+                  (skill) =>
+                    Number.isInteger(skill) &&
+                    skill >= 0 &&
+                    skill < STAGES[e.bossStage ?? s.stage].skills.length &&
+                    skill !== e.skillStep,
+                ))),
         )
       )
         return null;
@@ -1039,7 +1062,10 @@ export class Game {
       // 旧对局补齐境界收益，保留已损失气血；新快照的差额为零。
       g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + growth));
       g.player.maxHp = maxHp;
-      g.enemies = s.enemies.map((e) => ({ ...e }));
+      g.enemies = s.enemies.map((e) => ({
+        ...e,
+        ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+      }));
       for (const e of g.enemies) if (e.boss && !e.dead && e.charge > 0.7) g.bossChargeWarning(e);
       const bossVolleys = (s.bossVolleys ?? []).map((v) => ({
         weapon: v.weapon,
@@ -1553,6 +1579,11 @@ export class Game {
       dy: 0,
       dead: false,
     };
+    if (boss && !this.tribulation) {
+      const [next, ...queue] = this.shuffleBossSkills(bossStage);
+      enemy.skillStep = next;
+      enemy.bossSkillQueue = queue;
+    }
     this.enemies.push(enemy);
     return enemy;
   }
@@ -1939,10 +1970,28 @@ export class Game {
     e.cooldown = Math.max(e.cooldown, e.charge + 0.5);
     this.bossChargeWarning(e);
   }
+  private shuffleBossSkills(stage: number, previous?: number) {
+    const order = STAGES[stage].skills.map((_, skill) => skill);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(this.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    // 每轮覆盖全部招式，轮次交界也不连续重复同一招。
+    if (order[0] === previous) {
+      const j = 1 + Math.floor(this.random() * (order.length - 1));
+      [order[0], order[j]] = [order[j], order[0]];
+    }
+    return order;
+  }
   private castBossSkill(e: Enemy, nx: number, ny: number) {
     const stage = e.bossStage ?? this.stage;
     const phase = e.skillStep ?? 0;
-    e.skillStep = (phase + 1) % STAGES[stage].skills.length;
+    // 旧妖王保留已排定的下一招，再将本轮其余招式打乱。
+    const remaining =
+      e.bossSkillQueue ?? this.shuffleBossSkills(stage).filter((skill) => skill !== phase);
+    const [next, ...queue] = remaining.length ? remaining : this.shuffleBossSkills(stage, phase);
+    e.skillStep = next;
+    e.bossSkillQueue = queue;
     const enraged = e.hp < e.maxHp / 2;
     e.cooldown =
       stage === FINAL_TRIAL_STAGE

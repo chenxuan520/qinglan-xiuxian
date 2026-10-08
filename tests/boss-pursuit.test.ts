@@ -58,10 +58,13 @@ test('追袭有距离和独立冷却限制，半血加快，普通冲刺保持�
 
 test('冲刺期间不被原有招式打断，冷却与预警跨刷新保留，兼容旧妖王快照', () => {
   const { g, boss } = encounter(2);
+  const next = boss.skillStep;
+  const queue = [...boss.bossSkillQueue!];
   g.update(0.01);
   boss.cooldown = 0;
   g.update(0.05);
-  assert.equal(boss.skillStep, undefined);
+  assert.equal(boss.skillStep, next);
+  assert.deepEqual(boss.bossSkillQueue, queue);
   assert.equal(boss.x, -500);
   const raw = JSON.parse(JSON.stringify(g.snapshot()));
   const restored = Game.restore(g.save, raw)!;

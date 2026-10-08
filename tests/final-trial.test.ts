@@ -47,7 +47,7 @@ test('旧续局保留高境界小怪折算，已有境界不回退，灵气收�
   assert.equal(gains[0].xp, gains[2].xp);
 });
 
-test('终关追击精英有冲刺；前六位首领三招，仙尊六招按顺序释放', () => {
+test('终关追击精英有冲刺；前六位首领三招，仙尊六招每轮各释放一次', () => {
   const g = trial();
   g.weapons = [];
   g.time = 60;
@@ -63,13 +63,17 @@ test('终关追击精英有冲刺；前六位首领三招，仙尊六招按顺�
     h.weapons = [];
     const boss = h.spawnEnemy(10, false, true, { x: 300, y: 0 }, stage);
     assert.equal(STAGES[stage].skills.length, stage === 6 ? 6 : 3);
-    for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
+    const phases: number[] = [];
+    for (let i = 0; i < STAGES[stage].skills.length; i++) {
+      const phase = boss.skillStep!;
+      phases.push(phase);
       boss.charge = 0;
       boss.cooldown = 0;
       h.update(0.01);
       assert.match(h.notice, new RegExp(STAGES[stage].skills[phase]));
-      assert.equal(boss.skillStep, (phase + 1) % STAGES[stage].skills.length);
+      assert.notEqual(boss.skillStep, phase);
     }
+    assert.equal(new Set(phases).size, STAGES[stage].skills.length);
   }
 });
 
@@ -85,16 +89,17 @@ test('仙尊新增横扫、精英天兵与预警突进，伤害随终关强度�
   boss.cooldown = 0;
   g.update(0.01);
   assert.equal(g.shots.filter((s) => s.kind === 'hostile').length, 11);
+  boss.skillStep = 4;
   boss.cooldown = 0;
   g.update(0.01);
   const guards = g.enemies.filter((e) => !e.boss);
   assert.equal(guards.length, 6);
   assert.ok(guards.every((e) => e.elite && [24, 25].includes(e.type)));
+  boss.skillStep = 5;
   boss.cooldown = 0;
   g.update(0.01);
   assert.ok(boss.charge >= 1.5);
   assert.ok(g.effects.some((e) => e.kind === 'line' && e.life > 0.9));
-  assert.equal(boss.skillStep, 0);
   const x = boss.x;
   g.update(0.05);
   assert.equal(boss.x, x, '突进预警期间保持原地');
