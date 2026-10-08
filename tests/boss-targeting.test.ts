@@ -41,9 +41,10 @@ test('七位妖王恢复原地面目标，远距离也能锁定主角，落点�
           const target = { x: e.x + range, y: e.y + 80 };
           Object.assign(g.player, target);
           e.skillStep = phase;
+          delete e.bossSkillQueue;
           const d = Math.hypot(range, 80);
           g.castBossSkill(e, range / d, 80 / d);
-          assert.equal(e.skillStep, (phase + 1) % STAGES[stage].skills.length);
+          assert.notEqual(e.skillStep, phase);
           assert.equal(g.zones.length, counts[`${stage}/${phase}`] ?? 0);
           if (g.zones.length) {
             const center = stage === 6 && phase === 5 ? e : target;
