@@ -7,6 +7,7 @@ import { sceneAssets } from './scene-assets.ts';
 import { bossEntranceCue, BOSS_ENTRANCE_THEMES } from './boss-entrance.ts';
 import { realmBreakthroughCue } from './realm-breakthrough.ts';
 import { drawPlayerFormation } from './player-formation.ts';
+import { drawBossField, drawBossShot } from './boss-effects.ts';
 import {
   hasArtifactField,
   drawArtifactField,
@@ -528,6 +529,7 @@ export class Renderer {
         drawArtifactField(c, z, time, this.reducedMotion.matches);
     for (const z of game.zones) {
       if (hasArtifactField(z) || !this.visible(z, p, z.radius + 50)) continue;
+      if (drawBossField(c, z, time, this.reducedMotion.matches)) continue;
       c.save();
       c.translate(z.x, z.y);
       const alpha = z.delay > 0 ? 0.15 + Math.sin(time * 13) * 0.06 : 0.22;
@@ -776,7 +778,9 @@ export class Renderer {
         c.translate(shot.x, shot.y);
         c.rotate(a);
         if (shot.kind === 'blade') c.rotate(time * 12);
-        if (shot.kind === 'dragon') {
+        if (shot.kind === 'hostile' && shot.bossStage !== undefined) {
+          drawBossShot(c, shot);
+        } else if (shot.kind === 'dragon') {
           const bend = this.reducedMotion.matches ? 0 : Math.sin(shot.age * 7) * 8;
           c.strokeStyle = shot.color + '50';
           c.lineWidth = 15;
@@ -1104,6 +1108,14 @@ export class Renderer {
       c.strokeStyle = '#ff9b80';
       c.lineWidth = 2;
       c.stroke();
+      if (z.kind.startsWith('boss-') && z.delay > 0) {
+        const progress = Math.max(0, Math.min(1, 1 - z.delay / (z.castDelay || 1.2)));
+        c.setLineDash([]);
+        c.beginPath();
+        c.arc(0, 0, z.radius * 0.92, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
+        c.strokeStyle = '#ffe0a1';
+        c.stroke();
+      }
       if (z.kind.startsWith('enemy-')) {
         c.fillStyle = z.color;
         c.font = 'bold 16px serif';

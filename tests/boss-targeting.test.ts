@@ -55,7 +55,9 @@ test('七位妖王恢复原地面目标，远距离也能锁定主角，落点�
               );
             }
             for (const zone of g.zones) {
-              assert.equal(zone.delay, 1.2);
+              assert.ok(zone.delay >= 1.2 && zone.delay <= 2);
+              assert.equal(zone.castDelay, zone.delay);
+              assert.ok(zone.kind.startsWith('boss-'));
               assert.equal(zone.damage, e.damage);
             }
           }

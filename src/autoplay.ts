@@ -142,7 +142,7 @@ export function autoplayInput(g: Game) {
         const nextTick = tick + Math.max(0, Math.ceil((enter - 0.12 - delay - tick) / 0.5)) * 0.5;
         // 缚根与寒霜在伤害间隔中仍持续减速，不能当作无害残影。
         if (
-          !['enemy-roots', 'enemy-frost'].includes(z.kind) &&
+          !['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind) &&
           (nextTick > z.life || delay + nextTick > exit + 0.12)
         )
           continue;

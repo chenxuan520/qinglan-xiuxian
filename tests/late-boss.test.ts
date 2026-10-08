@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import {
   DIFFICULTIES,
+  BOSS_COMBAT,
   ENEMIES,
   FINAL_TRIAL_STAGE,
   STAGE_COMBAT_SCALING,
@@ -13,7 +14,7 @@ import {
 } from '../src/data.ts';
 import { freshSave, realmDamageMultiplier, realmHealthMultiplier } from '../src/progress.ts';
 
-test('三难度仅第五、第六关妖王增加气血与移速，前四关和终关复用妖王不变', () => {
+test('三难度七境妖王使用固定强化倍率，终关单列，移动速度与判定半径保留', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
     for (let stage = 0; stage < STAGES.length; stage++) {
       const g = new Game(freshSave(), stage, difficulty, () => 0.5);
@@ -28,7 +29,11 @@ test('三难度仅第五、第六关妖王增加气血与移速，前四关和�
             : [16000, 27000, 38000, 49000, 78000, 106500][stage];
         assert.equal(
           boss.hp,
-          baseHp * rules.hp * scaling.hp * realmDamageMultiplier(STAGE_REALM_STEPS[stage]),
+          baseHp *
+            rules.hp *
+            (stage === FINAL_TRIAL_STAGE ? BOSS_COMBAT.trialHp : BOSS_COMBAT.hp[stage]) *
+            scaling.hp *
+            realmDamageMultiplier(STAGE_REALM_STEPS[stage]),
         );
         assert.equal(boss.maxHp, boss.hp);
         assert.ok(Math.abs(boss.speed - [70, 74, 78, 82, 98.9, 108, 94][stage]) < 1e-10);
@@ -41,7 +46,11 @@ test('三难度仅第五、第六关妖王增加气血与移速，前四关和�
             : 52 + stage * 16;
         assert.equal(
           boss.damage,
-          damage * rules.damage * scaling.damage * realmHealthMultiplier(STAGE_REALM_STEPS[stage]),
+          damage *
+            rules.damage *
+            scaling.damage *
+            realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
+            (stage === FINAL_TRIAL_STAGE ? BOSS_COMBAT.trialDamage : BOSS_COMBAT.damage[stage]),
         );
         assert.equal(boss.bossStage, bossStage);
         assert.equal(boss.radius, bossStage === FINAL_TRIAL_STAGE ? 62 : 48);

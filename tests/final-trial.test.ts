@@ -78,7 +78,8 @@ test('仙尊新增横扫、精英天兵与预警突进，伤害随终关强度�
   g.weapons = [];
   const boss = g.spawnEnemy(10, false, true, { x: 300, y: 0 }, 6);
   assert.ok(
-    Math.abs(boss.damage - 440 * 0.72 * 1.02 * realmHealthMultiplier(STAGE_REALM_STEPS[6])) < 1e-8,
+    Math.abs(boss.damage - 440 * 0.72 * 1.02 * realmHealthMultiplier(STAGE_REALM_STEPS[6]) * 1.08) <
+      1e-8,
   );
   boss.skillStep = 3;
   boss.cooldown = 0;
@@ -286,7 +287,7 @@ test('最终仙尊拥有独立立绘、更强属性与二阶段弹幕，落雷�
   immortal.cooldown = 0;
   g.update(0.01);
   assert.equal(g.shots.length, 32);
-  assert.equal(immortal.cooldown, 1.25);
+  assert.equal(immortal.cooldown, 1.2);
   g.time = 8;
   immortal.skillStep = 1;
   immortal.cooldown = 0;
