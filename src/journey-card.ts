@@ -1,6 +1,6 @@
 import { encode } from 'uqr';
 import { assetUrl } from './asset-url.ts';
-import { chronicleAchievements, realmTitle } from './chronicle.ts';
+import { chronicleAchievements } from './chronicle.ts';
 import {
   ELEMENTS,
   elementInfo,
@@ -113,8 +113,8 @@ function drawRootDisc(
   root: ReturnType<typeof journeyCardData>['root'],
 ) {
   const x = 270;
-  const y = 950;
-  const radius = 67;
+  const y = 958;
+  const radius = 82;
   const vertices = root.elements.map((element, i) => {
     const angle = (i * 72 - 90) * (Math.PI / 180);
     return { ...element, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
@@ -155,7 +155,7 @@ function drawRootDisc(
     c.stroke();
     c.shadowBlur = 0;
     c.fillStyle = point.active ? point.color : '#879c91';
-    c.font = '600 23px "Noto Serif SC", "Songti SC", serif';
+    c.font = '600 18px "Noto Serif SC", "Songti SC", serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     c.fillText(point.name, point.x * 1.34, point.y * 1.34);
@@ -165,14 +165,14 @@ function drawRootDisc(
   c.arc(0, 0, 46, 0, Math.PI * 2);
   c.fill();
   c.fillStyle = '#b2c0a9';
-  c.font = '400 22px "Noto Serif SC", "Songti SC", serif';
+  c.font = '400 13px "Noto Serif SC", "Songti SC", serif';
   c.fillText('此世灵根', 0, -21);
   c.fillStyle = '#e1d3a4';
-  c.font = '600 32px "Noto Serif SC", "Songti SC", serif';
-  c.fillText(root.seal, 0, 6);
+  c.font = '600 38px "Noto Serif SC", "Songti SC", serif';
+  c.fillText(root.seal, 0, 7);
   c.fillStyle = '#bcc7af';
-  c.font = '400 20px "Noto Serif SC", "Songti SC", serif';
-  c.fillText(root.name, 0, 35);
+  c.font = '400 15px "Noto Serif SC", "Songti SC", serif';
+  c.fillText(root.name, 0, 33);
   c.restore();
 }
 
@@ -237,31 +237,16 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
       ? 'immortal'
       : (save.pendingReincarnation ??
         (life.remaining === 0 && Number.isFinite(life.limit) ? 'lifespan' : 'ongoing')));
-  const milestones = save.chronicle.milestones;
-  const at = (key: string) => milestones[key] ?? null;
-  const memories: Array<{ title: string; detail: string; age: number | null; ageNote?: string }> =
-    [];
+  const memories: Array<{ title: string; detail: string }> = [];
   const home = save.mortal.hometown;
   if (home?.letterRead)
-    memories.push({
-      title: '家书犹存',
-      detail: '归乡展读家书，仍记门前的叮嘱',
-      age: at('home-letter-read'),
-    });
-  else if (home && Object.hasOwn(milestones, 'home-reunion'))
-    memories.push({
-      title: '曾归故里',
-      detail: '回到青岚，与亲人坐下说了些家常',
-      age: at('home-reunion'),
-    });
+    memories.push({ title: '家书犹存', detail: '归乡展读家书，仍记门前的叮嘱' });
+  else if (home && Object.hasOwn(save.chronicle.milestones, 'home-reunion'))
+    memories.push({ title: '曾归故里', detail: '修行途中，曾回青岚与亲人相见' });
   const companion = save.mortal.humanStories?.companion;
   if (companion?.choice === 'bond') {
     const view = humanStoryView(save, 'companion')!;
-    memories.push({
-      title: '人间有归灯',
-      detail: `曾与${view.name}结为凡人道侣`,
-      age: companion.chosenAt,
-    });
+    memories.push({ title: '人间有归灯', detail: `曾与${view.name}结为凡人道侣` });
   } else {
     const id = HUMAN_STORY_IDS.find((id) => {
       const story = save.mortal.humanStories?.[id];
@@ -269,53 +254,35 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     });
     if (id) {
       const view = humanStoryView(save, id)!;
-      const story = save.mortal.humanStories![id]!;
-      // 记相识的实际年岁，不把信件抵达或当前年岁冒充展读时间。
       memories.push({
         title: '旧信犹温',
-        detail: `${view.name}留下的旧信${story.read ? '，已珍藏于此世' : '，尚未展读'}`,
-        age: story.metAt,
-        ageNote: '相识',
+        detail: `${view.name}留下的旧信${save.mortal.humanStories![id]!.read ? '，已珍藏于此世' : '，尚未展读'}`,
       });
     }
   }
-  const feats = chronicleAchievements(save)
-    .filter((feat) => feat.achieved)
-    .sort((a, b) => {
-      const priority = (id: string) => {
-        const index = ACHIEVEMENT_PRIORITY.indexOf(id);
-        return index < 0 ? ACHIEVEMENT_PRIORITY.length : index;
-      };
-      return priority(a.id) - priority(b.id);
-    });
-  const feat = feats[0];
-  if (feat) memories.push({ title: feat.title, detail: feat.detail, age: feat.age ?? null });
-  const deepest = Math.max(-1, ...save.completed);
-  if (deepest >= 0)
-    memories.push({
-      title: `踏破 · ${STAGES[deepest].name}`,
-      detail: `击败${STAGES[deepest].boss}，首次通关此境`,
-      age: at(`stage-${deepest}`),
-    });
+  for (const feat of chronicleAchievements(save).sort(
+    (a, b) => ACHIEVEMENT_PRIORITY.indexOf(a.id) - ACHIEVEMENT_PRIORITY.indexOf(b.id),
+  ))
+    if (feat.achieved && feat.id !== 'six-immortals' && feat.id !== 'five-tribulations')
+      memories.push({ title: feat.title, detail: feat.detail });
+  if (Object.hasOwn(save.chronicle.milestones, 'six-immortals'))
+    memories.push({ title: '六仙同御', detail: '曾在一场历练中同时觉醒六件仙器' });
   if (save.tribulations > 0)
     memories.push({
       title: `历劫 ${save.tribulations.toLocaleString('zh-CN', { useGrouping: false })} 次`,
-      detail: '首次渡劫的劫印，留在此世来路',
-      age: at('tribulation'),
+      detail: '渡过的天劫，已化作此世劫印',
     });
-  if (realm.step > 0 && Object.hasOwn(milestones, `realm-${realm.step}`))
-    memories.push({
-      title: `突破 · ${realmTitle(realm.step)}`,
-      detail: '修为再进一境，仙途由此向前',
-      age: at(`realm-${realm.step}`),
-    });
-  // 新世与历史稀少的旧档保持留白，不用本命装备再填一条虚构的经历。
-  if (Object.hasOwn(milestones, 'departure'))
-    memories.push({
-      title: '青岚启程',
-      detail: '离开青岚，向山海外求道',
-      age: Object.hasOwn(milestones, 'home-departure') ? at('home-departure') : at('departure'),
-    });
+  if (save.completed.length)
+    memories.push({ title: `踏破 ${save.completed.length} 境`, detail: '山河走过，皆为此世来路' });
+  memories.push({
+    title: `本命 · ${treasure(save.starter).name}`,
+    detail: save.forge[save.starter]
+      ? `炼器 ${save.forge[save.starter]} 阶`
+      : '伴此行山海，问一程长生',
+  });
+  if (save.chronicle.milestones.departure === 15)
+    memories.push({ title: '十五岁启程', detail: '从青岚镇出发，向山海外求道' });
+  const deepest = Math.max(-1, ...save.completed);
   return {
     realm: realm.name,
     realmIndex: realm.index,
@@ -343,7 +310,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     ended: save.journeyEnded && realm.max,
     progress: { count: save.completed.length, deepest: deepest < 0 ? null : STAGES[deepest].name },
     appraisal: journeyAppraisal(save, state, realm.index),
-    memories: memories.slice(0, 3),
+    memories: memories.slice(0, 4),
   };
 }
 
@@ -524,31 +491,21 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   text(
     `踏破 ${card.progress.count} / 7 境${card.progress.deepest ? ` · 最深 ${card.progress.deepest}` : ' · 尚未踏破秘境'}`,
     540,
-    1072,
+    1092,
     30,
     '#d8c998',
     880,
   );
   c.restore();
   line(1100);
-  text('此 世 纪 事', 80, 1142, 28, '#d8c998');
+  text('此 世 留 痕', 80, 1142, 28, '#d8c998');
   card.memories.forEach((memory, i) => {
-    const y = 1204 + i * 85;
-    text(
-      memory.age === null
-        ? '年岁未载'
-        : `${memory.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 岁`,
-      84,
-      y,
-      26,
-      '#b2c0a9',
-      146,
-    );
-    if (memory.ageNote) text(memory.ageNote, 84, y + 36, 25, '#b2c0a9', 146);
+    const x = 84 + (i % 2) * 450;
+    const y = 1204 + Math.floor(i / 2) * 82;
     c.fillStyle = '#cfbc87';
-    c.fillRect(250, y - 24, 3, 58);
-    text(memory.title, 279, y, 32, '#e5d7ad', 718);
-    text(memory.detail, 279, y + 36, 28, '#bbc8b2', 718);
+    c.fillRect(x, y - 18, 5, 48);
+    text(memory.title, x + 30, y, 25, '#e5d7ad', 380);
+    text(memory.detail, x + 30, y + 28, 18, '#b9c7b1', 380);
   });
   line(1425);
   text('此 世 评 语', 80, 1474, 26, '#b2c0a9');

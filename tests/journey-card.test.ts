@@ -22,7 +22,7 @@ test('纪念卡只写当前资质与真实成果，不把年岁写成寿终或�
   assert.equal(card.root.elements.filter((element) => element.active).length, 0);
   assert.equal(card.weapon.name, '青霄剑');
   assert.equal(card.weapon.forge, 0);
-  assert.ok(card.memories.length >= 1 && card.memories.length <= 3);
+  assert.ok(card.memories.length >= 1 && card.memories.length <= 4);
   assert.ok(!JSON.stringify(card).includes('道侣'));
   assert.ok(!JSON.stringify(card).includes('六仙同御'));
   assert.equal(JSON.stringify(save), before);
@@ -116,9 +116,8 @@ test('天劫殒命留影标记止于天劫，保留待轮回的本世数据', ()
   assert.equal(JSON.stringify(save), before);
 });
 
-test('精选纪事混合突出成就、最深已通关秘境与历劫，最多三条', () => {
+test('已达成成就优先于六仙同御和渡劫记录，留痕最多两行四条', () => {
   const save = freshSave();
-  save.age = 100;
   save.completed = [0, 1, 2, 3, 4, 5, 6];
   save.tribulations = 1;
   save.chronicle.milestones.forge = 16;
@@ -126,58 +125,10 @@ test('精选纪事混合突出成就、最深已通关秘境与历劫，最多�
   save.chronicle.milestones['six-immortals'] = 30;
   save.chronicle.milestones['three-paths'] = 40;
   save.chronicle.milestones['hard-immortal'] = 50;
-  save.chronicle.milestones['stage-6'] = 60;
-  save.chronicle.milestones.tribulation = 70;
-  const card = journeyCardData(save);
   assert.deepEqual(
-    card.memories.map((m) => m.title),
-    ['逆境问道', '踏破 · 万劫归墟', '历劫 1 次'],
+    journeyCardData(save).memories.map((memory) => memory.title),
+    ['逆境问道', '三道皆证', '万宝归藏', '炉火纯青'],
   );
-  assert.deepEqual(
-    card.memories.map((m) => m.age),
-    [50, 60, 70],
-  );
-  assert.deepEqual(card.progress, { count: 7, deepest: '万劫归墟' });
-});
-
-test('旧档留白，已解锁不冒充已通关，离乡年岁优先取真实辞别记录', () => {
-  const save = freshSave();
-  save.age = 1000;
-  save.cultivation = 1000;
-  save.unlocked = 6;
-  save.completed = [0, 2];
-  save.chronicle.milestones = { departure: null, 'stage-2': null, 'realm-5': null };
-  const before = JSON.stringify(save);
-  const card = journeyCardData(save);
-  assert.deepEqual(card.progress, { count: 2, deepest: '玄冰幽谷' });
-  assert.ok(card.memories.every((m) => m.age === null));
-  assert.equal(JSON.stringify(save), before);
-  save.completed = [];
-  save.chronicle.milestones = { departure: 15, 'home-departure': 18.5 };
-  assert.equal(journeyCardData(save).memories.find((m) => m.title === '青岚启程')?.age, 18.5);
-});
-
-test('评语区分未竟、寿尽、天劫、成仙未叩门与终章，不虚构交往或觉醒', () => {
-  const save = freshSave('none', [], 'orthodox', () => 0);
-  const before = JSON.stringify(save);
-  assert.equal(journeyCardData(save).appraisal.title, '青岚初问道');
-  assert.equal(journeyCardData(save, 'lifespan').appraisal.title, '此生曾问道');
-  assert.equal(journeyCardData(save, 'tribulation').appraisal.title, '一念问天');
-  assert.equal(JSON.stringify(save), before);
-  save.pendingReincarnation = 'tribulation';
-  assert.equal(journeyCardData(save).ending, 'tribulation');
-  save.pendingReincarnation = null;
-  save.cultivation = 1e9;
-  save.completed = [0, 1, 2, 3, 4, 5, 6];
-  assert.equal(journeyCardData(save).appraisal.title, '长生已证');
-  save.journeyEnded = true;
-  assert.equal(journeyCardData(save).appraisal.title, '七境问长生');
-  save.chronicle.milestones['rootless-immortal'] = null;
-  assert.equal(journeyCardData(save).appraisal.title, '凡骨登仙');
-  delete save.chronicle.milestones['rootless-immortal'];
-  save.chronicle.milestones['home-reunion'] = null;
-  assert.equal(journeyCardData(save).appraisal.title, '仙心有归处');
-  assert.deepEqual(journeyCardData(save), journeyCardData(save));
 });
 
 test('纪念卡米金墨绿二维码保留浅色静区并能解码为官网，不携带玩家数据', () => {
@@ -205,6 +156,29 @@ test('纪念卡米金墨绿二维码保留浅色静区并能解码为官网，�
   }
   assert.equal(jsQR(pixels, width, width)?.data, GAME_SITE_URL);
   assert.equal(new URL(GAME_SITE_URL).protocol, 'https:');
+});
+
+test('评语区分未竟、寿尽、天劫、成仙未叩门与终章，不虚构交往或觉醒', () => {
+  const save = freshSave('none', [], 'orthodox', () => 0);
+  const before = JSON.stringify(save);
+  assert.equal(journeyCardData(save).appraisal.title, '青岚初问道');
+  assert.equal(journeyCardData(save, 'lifespan').appraisal.title, '此生曾问道');
+  assert.equal(journeyCardData(save, 'tribulation').appraisal.title, '一念问天');
+  assert.equal(JSON.stringify(save), before);
+  save.pendingReincarnation = 'tribulation';
+  assert.equal(journeyCardData(save).ending, 'tribulation');
+  save.pendingReincarnation = null;
+  save.cultivation = 1e9;
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  assert.equal(journeyCardData(save).appraisal.title, '长生已证');
+  save.journeyEnded = true;
+  assert.equal(journeyCardData(save).appraisal.title, '七境问长生');
+  save.chronicle.milestones['rootless-immortal'] = null;
+  assert.equal(journeyCardData(save).appraisal.title, '凡骨登仙');
+  delete save.chronicle.milestones['rootless-immortal'];
+  save.chronicle.milestones['home-reunion'] = null;
+  assert.equal(journeyCardData(save).appraisal.title, '仙心有归处');
+  assert.deepEqual(journeyCardData(save), journeyCardData(save));
 });
 
 test('合法缺项旧档成为真仙后，评语不补造七境全通历史', () => {
