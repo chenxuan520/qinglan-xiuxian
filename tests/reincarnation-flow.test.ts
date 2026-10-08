@@ -89,6 +89,8 @@ function harness(save: SaveData) {
     AD_SECONDS,
     SUPPORT_CODE_IMAGE,
     structuredClone,
+    AbortController,
+    journeyCardRequest: null,
     localStorage: {
       getItem: () => writes.at(-1) ?? null,
       setItem(key: string, value: string) {

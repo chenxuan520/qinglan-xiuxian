@@ -1,11 +1,47 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import jsQR from 'jsqr';
-import { JOURNEY_CARD_QR, JOURNEY_CARD_QR_COLORS, journeyCardData } from '../src/journey-card.ts';
+import {
+  JOURNEY_CARD_QR,
+  JOURNEY_CARD_QR_COLORS,
+  journeyCardData,
+  journeyAppraisalLines,
+} from '../src/journey-card.ts';
 import { GAME_SITE_URL } from '../src/setting.ts';
 import { freshSave, enterImmortalGate, readSave } from '../src/progress.ts';
 import { chooseHumanStory, humanStoryView } from '../src/human-stories.ts';
 import { joinSect } from '../src/mortal.ts';
+
+test('评语中文句末不落在下一行开头，正文不截断且不越过二维码边界', () => {
+  const detail =
+    '此世终于写下叩入仙门的终章。真仙之境已证，无灵根亦于最险历练证仙。家书已读；道侣共春秋，信未展。';
+  const measure = (value: string) => value.length * 26 + Math.max(0, value.length - 1) * 1.5;
+  const lines = journeyAppraisalLines(detail, measure, 610, 4, 26);
+  assert.equal(lines.join(''), detail);
+  assert.ok(lines.length <= 4);
+  for (const line of lines) {
+    assert.ok(measure(line) <= 610);
+    assert.ok(!/^[，。！？；：、）》」』】”’]/.test(line));
+  }
+});
+
+test('最长80字评语及连续收尾标点保留完整四行，不靠省略号裁掉事实', () => {
+  const measure = (value: string) => value.length * 26 + Math.max(0, value.length - 1) * 1.5;
+  for (let length = 48; length <= 80; length++) {
+    for (let interval = 3; interval <= 22; interval++) {
+      const detail = Array.from({ length }, (_, i) =>
+        i && i % interval === 0 ? '。”’'[interval % 3] : i && i % interval === 1 ? '」' : '仙',
+      ).join('');
+      const lines = journeyAppraisalLines(detail, measure, 610, 4, 26);
+      assert.equal(lines.join(''), detail);
+      assert.ok(lines.length <= 4);
+      for (const line of lines) {
+        assert.ok(measure(line) <= 610);
+        assert.ok(!/^[，。！？；：、）》」』】”’]/.test(line));
+      }
+    }
+  }
+});
 
 test('纪念卡只写当前资质与真实成果，不把年岁写成寿终或虚构未结道侣', () => {
   const save = freshSave('none', [], 'orthodox', () => 0);
