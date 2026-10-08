@@ -15,6 +15,12 @@ import {
 } from './data.ts';
 import { HUMAN_STORY_IDS, humanStoryView } from './human-stories.ts';
 import { itemArt } from './item-art.ts';
+import {
+  journeyAppraisalFacts,
+  localJourneyAppraisal,
+  type JourneyCardEnding,
+} from './journey-appraisal.ts';
+import { resolveJourneyAppraisal } from './journey-appraisal-ai.ts';
 import { SECTS } from './mortal-data.ts';
 import { sectRole } from './mortal.ts';
 import { drawPlayerFormation } from './player-formation.ts';
@@ -24,7 +30,7 @@ import { spriteFrame } from './sprites.ts';
 
 export const JOURNEY_CARD_QR = encode(GAME_SITE_URL, { ecc: 'M', border: 4 });
 export const JOURNEY_CARD_QR_COLORS = { light: '#e1d3a4', dark: '#102b28' } as const;
-export type JourneyCardEnding = 'ongoing' | 'lifespan' | 'tribulation' | 'immortal';
+export type { JourneyCardEnding } from './journey-appraisal.ts';
 const ROOT_SEALS: Record<SpiritRootId, string> = {
   heaven: '天',
   variant: '异',
@@ -74,6 +80,44 @@ function loadImage(path: string) {
     image.onerror = fail;
     image.src = assetUrl(path);
   });
+}
+
+export function journeyAppraisalLines(
+  value: string,
+  measure: (value: string) => number,
+  width: number,
+  maxLines: number,
+  size: number,
+) {
+  const closing = /^[，。！？；：、）》」』】”’]$/;
+  const split = (target: number) => {
+    const lines: string[] = [];
+    let row = '';
+    for (const char of value) {
+      if (row && measure(row + char) > target) {
+        if (closing.test(char)) {
+          if (measure(row + char) <= width) {
+            row += char;
+            continue;
+          }
+          const previous = Array.from(row);
+          let carried = previous.pop()!;
+          while (previous.length && closing.test(carried[0])) carried = previous.pop()! + carried;
+          if (previous.length) lines.push(previous.join(''));
+          row = carried;
+        } else {
+          lines.push(row);
+          row = '';
+        }
+      }
+      row += char;
+    }
+    if (row) lines.push(row);
+    return lines;
+  };
+  const count = Math.min(maxLines, Math.max(1, Math.ceil(measure(value) / width)));
+  const balanced = split(Math.min(width, measure(value) / count + size / 2));
+  return balanced.length <= maxLines ? balanced : split(width);
 }
 
 function drawRealmFigure(c: CanvasRenderingContext2D, image: HTMLImageElement, realmIndex: number) {
@@ -176,55 +220,6 @@ function drawRootDisc(
   c.restore();
 }
 
-function journeyAppraisal(save: SaveData, ending: JourneyCardEnding, realmIndex: number) {
-  const has = (key: string) => Object.hasOwn(save.chronicle.milestones, key);
-  const allStages = STAGES.every((_, index) => save.completed.includes(index));
-  if (ending === 'tribulation')
-    return { title: '一念问天', detail: '此身止于天劫，向天问道的这一程，仍有回响。' };
-  if (has('rootless-immortal'))
-    return { title: '凡骨登仙', detail: '无灵根亦证长生，仙途曾为这一身凡骨让路。' };
-  if (has('hard-immortal'))
-    return { title: '逆境问道', detail: '于最险的历练中证得长生，风雷也曾为你作证。' };
-  if (ending === 'immortal') {
-    if (save.mortal.hometown?.letterRead || has('home-reunion'))
-      return { title: '仙心有归处', detail: '已叩仙门，也曾回望青岚。长生之外，仍记来处。' };
-    if (save.mortal.humanStories?.companion?.choice === 'bond')
-      return { title: '长生有旧灯', detail: '仙门已开，人间曾有一盏灯，与你共度寻常岁月。' };
-    return allStages
-      ? { title: '七境问长生', detail: '踏破七境，叩入仙门。青岚启程的少年，终于走到此处。' }
-      : { title: '此世叩仙门', detail: '已证真仙，叩入仙门。这一程问道，终于走到此处。' };
-  }
-  if (ending === 'lifespan') {
-    if (save.mortal.humanStories?.companion?.choice === 'bond')
-      return { title: '此生有归灯', detail: '未得长生，也曾与一人共度岁月。这一世自有温存。' };
-    if (save.mortal.hometown?.letterRead || has('home-reunion'))
-      return { title: '山海有归途', detail: '走过山海，也曾回到故乡。此世落幕，来路未曾忘。' };
-    return realmIndex >= 3
-      ? { title: '修得一程山海', detail: '修至高境，终归岁月。长生未得，走过的山海已留痕。' }
-      : { title: '此生曾问道', detail: '此世止于寿元，向山海外迈出的脚步，仍是自己的路。' };
-  }
-  if (realmIndex === 8)
-    return {
-      title: '长生已证',
-      detail: `${allStages ? '七境皆破' : '长生已证'}，已成真仙。仙门在前，这一世还待你落笔。`,
-    };
-  if (realmIndex >= 7)
-    return { title: '仙关在望', detail: '修行已至仙关，尚有天劫待渡。这一程还未到终章。' };
-  if (save.mortal.humanStories?.companion?.choice === 'bond')
-    return { title: '问道有归灯', detail: '山外修行，人间有灯。求长生的路，也曾与一人同行。' };
-  if (save.mortal.hometown?.letterRead || has('home-reunion'))
-    return { title: '行远仍知归', detail: '修行之外，也曾归乡。这一程走得再远，仍记得来处。' };
-  if (has('six-immortals'))
-    return { title: '六器曾共鸣', detail: '曾御六件仙器同行，风雷俱响。前路仍有新的山海。' };
-  if (realmIndex >= 3 && ['none', 'quad', 'five'].includes(save.spiritRoot))
-    return { title: '拙根亦向上', detail: '眼下资质虽薄，修为已至高境。问道的路仍在延伸。' };
-  if (save.completed.length)
-    return { title: '山海初留名', detail: '已有秘境踏破，已有来路可记。下一程山海，尚待启行。' };
-  if (realmIndex >= 1)
-    return { title: '道心渐有成', detail: '修为已越初境，长生尚在远处。这一程正慢慢写下。' };
-  return { title: '青岚初问道', detail: '此世才起笔，长生尚无定论。先向山海走一程。' };
-}
-
 export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
   const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const life = lifespanInfo(save);
@@ -309,12 +304,17 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     ending: state,
     ended: save.journeyEnded && realm.max,
     progress: { count: save.completed.length, deepest: deepest < 0 ? null : STAGES[deepest].name },
-    appraisal: journeyAppraisal(save, state, realm.index),
+    appraisal: localJourneyAppraisal(journeyAppraisalFacts(save, state)),
     memories: memories.slice(0, 4),
   };
 }
 
-export async function createJourneyCard(save: SaveData, ending?: JourneyCardEnding) {
+export async function createJourneyCard(
+  save: SaveData,
+  ending?: JourneyCardEnding,
+  signal: AbortSignal = new AbortController().signal,
+) {
+  signal.throwIfAborted();
   const card = journeyCardData(save, ending);
   const playerFrame = spriteFrame(0);
   const weaponArt = itemArt(card.weapon.id)!;
@@ -327,7 +327,7 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
       fontTimeout = setTimeout(() => reject(new Error('留影字体加载超时')), 15000);
     }),
   ]).finally(() => clearTimeout(fontTimeout));
-  const [image, playerImage, weaponImage] = await Promise.all([
+  const [image, playerImage, weaponImage, , appraisal] = await Promise.all([
     loadImage(
       card.ending === 'immortal'
         ? '/assets/qinglan-prologue.webp'
@@ -336,7 +336,10 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
     loadImage(playerFrame.url),
     loadImage(weaponArt.src),
     fontReady,
+    resolveJourneyAppraisal(journeyAppraisalFacts(save, card.ending), signal),
   ]);
+  signal.throwIfAborted();
+  card.appraisal = appraisal;
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 1740;
@@ -374,10 +377,17 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   const setFont = (size: number) => {
     c.font = `${size >= 34 ? 600 : 400} ${size}px "Noto Serif SC", "Songti SC", "STSong", serif`;
   };
+  // 手动字距兼容较旧的手机浏览器，仅用于评语，不改动其他区域字体。
+  let tracking = 0;
+  const measure = (value: string) =>
+    tracking
+      ? Array.from(value).reduce((width, char) => width + c.measureText(char).width, 0) +
+        Math.max(0, Array.from(value).length - 1) * tracking
+      : c.measureText(value).width;
   const fit = (value: string, width: number) => {
-    if (c.measureText(value).width <= width) return value;
+    if (measure(value) <= width) return value;
     const chars = Array.from(value);
-    while (chars.length && c.measureText(chars.join('') + '…').width > width) chars.pop();
+    while (chars.length && measure(chars.join('') + '…') > width) chars.pop();
     return chars.join('') + '…';
   };
   const text = (
@@ -390,7 +400,15 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
   ) => {
     setFont(size);
     c.fillStyle = color;
-    c.fillText(fit(value, width), x, y);
+    const fitted = fit(value, width);
+    if (!tracking) c.fillText(fitted, x, y);
+    else {
+      let offset = x;
+      for (const char of fitted) {
+        c.fillText(char, offset, y);
+        offset += c.measureText(char).width + tracking;
+      }
+    }
   };
   const wrap = (
     value: string,
@@ -399,30 +417,16 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
     size: number,
     width: number,
     maxLines: number,
+    lineHeight = size + 12,
   ) => {
     setFont(size);
-    const chars = Array.from(value);
-    const lineCount = Math.min(
-      maxLines,
-      Math.max(1, Math.ceil(c.measureText(value).width / width)),
-    );
-    const targetWidth = Math.min(width, c.measureText(value).width / lineCount + size / 2);
-    const lines: string[] = [];
-    let row = '';
-    for (const char of chars) {
-      if (row && c.measureText(row + char).width > targetWidth) {
-        lines.push(row);
-        row = '';
-      }
-      row += char;
-    }
-    if (row) lines.push(row);
+    const lines = journeyAppraisalLines(value, measure, width, maxLines, size);
     lines.slice(0, maxLines).forEach((line, i) => {
       const clipped =
         i === maxLines - 1 && lines.length > maxLines
           ? fit(line + lines.slice(maxLines).join(''), width)
           : line;
-      text(clipped, x, y + i * (size + 12), size, '#c7cfb8', width);
+      text(clipped, x, y + i * lineHeight, size, '#c7cfb8', width);
     });
   };
   const line = (y: number) => {
@@ -507,10 +511,13 @@ export async function createJourneyCard(save: SaveData, ending?: JourneyCardEndi
     text(memory.title, x + 30, y, 25, '#e5d7ad', 380);
     text(memory.detail, x + 30, y + 28, 18, '#b9c7b1', 380);
   });
-  line(1425);
-  text('此 世 评 语', 80, 1474, 26, '#b2c0a9');
-  text(card.appraisal.title, 80, 1533, 38, '#e1d3a4', 610);
-  wrap(card.appraisal.detail, 80, 1574, 32, 610, 2);
+  line(1340);
+  text('此 世 评 语', 80, 1378, 26, '#b2c0a9');
+  tracking = 2;
+  text(card.appraisal.title, 80, 1432, 36, '#e1d3a4', 610);
+  tracking = 1.5;
+  wrap(card.appraisal.detail, 80, 1490, 26, 610, 4, 44);
+  tracking = 0;
   text(state[1], 80, 1658, 22, '#d8c998', 610);
   text(new URL(GAME_SITE_URL).host, 80, 1683, 18, '#aabda8', 610);
 

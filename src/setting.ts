@@ -44,6 +44,18 @@ export const TEA_STORY_IMAGE_SETTINGS = {
   inferenceTimeoutMs: 28000,
 } as const;
 
+// 留影评语复用文字 AI binding，官网优先生成；其他静态站和离线使用组合式兜底。
+export const JOURNEY_APPRAISAL_SETTINGS = {
+  model: '@cf/qwen/qwen3-30b-a3b-fp8',
+  path: '/journey-appraisal',
+  requestTimeoutMs: 15000,
+  inferenceTimeoutMs: 12000,
+  maxOutputTokens: 512,
+  maxDetailLength: 80,
+  maxRequestBytes: 4096,
+  cacheEntries: 16,
+} as const;
+
 // 匿名游玩统计经 npc-ai Worker 的 /event 写入 Analytics Engine；只在正式站发送。
 export const TELEMETRY_SETTINGS = {
   origins: ['https://xiuxian.011203.xyz', 'https://chenxuan520.github.io'],

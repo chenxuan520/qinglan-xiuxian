@@ -241,6 +241,7 @@ let panel = '',
   settled = false;
 let journeyCardReturn: 'chronicle' | 'lifespan-farewell' | 'tribulation-farewell' | 'epilogue' =
   'chronicle';
+let journeyCardRequest: AbortController | null = null;
 let inMortalWorld = false;
 let mortalFilter = 'all';
 let mortalTab: 'town' | 'sects' = 'town';
@@ -903,6 +904,8 @@ function restorePanel(location: PanelLocation) {
     ?.focus({ preventScroll: true });
 }
 function panelFrame(title: string, subtitle: string, body: string, wide = false) {
+  journeyCardRequest?.abort();
+  journeyCardRequest = null;
   closeNpcChat();
   const existing = modal.querySelector<HTMLElement>('.panel-shell > .panel');
   const focused =
@@ -947,9 +950,11 @@ async function renderJourneyCard() {
   panel = 'journey-card';
   panelFrame(
     '此世留影',
-    '留存此世 · 本地生成',
-    '<div class="journey-card-preview"><p class="panel-note" role="status">正在生成此世留影，请稍候……可随时关闭。</p></div>',
+    '留存此世 · 山海留痕',
+    '<div class="journey-card-preview"><p class="panel-note" role="status">正在写下此世评语并生成留影，请稍候……可随时关闭。</p></div>',
   );
+  const request = new AbortController();
+  journeyCardRequest = request;
   const host = modal.querySelector<HTMLElement>('.journey-card-preview')!;
   modal.querySelector('.panel')?.scrollTo(0, 0);
   modal.querySelector<HTMLButtonElement>('[data-action="close"]')?.focus({ preventScroll: true });
@@ -964,6 +969,7 @@ async function renderJourneyCard() {
         : journeyCardReturn === 'tribulation-farewell'
           ? 'tribulation'
           : undefined,
+      request.signal,
     );
     if (!host.isConnected) return;
     host.innerHTML =
@@ -1006,6 +1012,8 @@ async function renderJourneyCard() {
     if (!host.isConnected) return;
     host.innerHTML =
       '<p class="panel-note" role="alert">此世留影生成失败，未能生成图片。请重试，或关闭后稍后再来；此世进度不受影响。</p><button class="secondary-button" data-action="journey-card">重新生成</button>';
+  } finally {
+    if (journeyCardRequest === request) journeyCardRequest = null;
   }
 }
 function renderPanel() {
@@ -1932,6 +1940,10 @@ function handleAction(action: string, id?: string) {
       renderPrologue();
     }
     return;
+  }
+  if (action === 'close' && panel === 'journey-card') {
+    journeyCardRequest?.abort();
+    journeyCardRequest = null;
   }
   if (save.journeyEnded) {
     if (action === 'journey-card' && (panel === 'epilogue' || panel === 'journey-card')) {

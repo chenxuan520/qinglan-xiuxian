@@ -5,7 +5,14 @@ import {
   NPC_AI_SETTINGS,
   TEA_STORY_IMAGE_SETTINGS,
   TEA_STORY_SETTINGS,
+  GAME_SITE_URL,
+  JOURNEY_APPRAISAL_SETTINGS,
 } from '../../src/setting.ts';
+import { validJourneyAppraisalFacts } from '../../src/journey-appraisal.ts';
+import {
+  extractJourneyAppraisal,
+  journeyAppraisalMessages,
+} from '../../src/journey-appraisal-ai-protocol.ts';
 import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town-story.ts';
 import { hometownParents, validHometown } from '../../src/hometown.ts';
 import { telemetryPoint, validTelemetryBatch } from '../../src/telemetry.ts';
@@ -13,6 +20,7 @@ import { TELEMETRY_SETTINGS } from '../../src/setting.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
 export const STORY_IMAGE_MODEL = TEA_STORY_IMAGE_SETTINGS.model;
+export const JOURNEY_APPRAISAL_MODEL = JOURNEY_APPRAISAL_SETTINGS.model;
 type WorkerEnv = NpcAiEnv & { STORY_IMAGE_SECRET?: string };
 const textEncoder = new TextEncoder();
 async function storyImageKey(secret: string) {
@@ -297,7 +305,12 @@ export default {
     const path = new URL(request.url).pathname;
     const ray = request.headers.get('CF-Ray') || '';
     const requestId = /^[a-f0-9]{16}(?:-[a-z]{3})?$/i.test(ray) ? ray : crypto.randomUUID();
-    let mode = path === '/story-image' ? 'story-image' : 'dialogue';
+    let mode =
+      path === '/story-image'
+        ? 'story-image'
+        : path === JOURNEY_APPRAISAL_SETTINGS.path
+          ? 'journey-appraisal'
+          : 'dialogue';
     let stage = 'request';
     const fail = (
       error: string,
@@ -386,16 +399,76 @@ export default {
         env.EVENTS.writeDataPoint(telemetryPoint(batch, event, site.host));
       return new Response(null, { status: 204, headers });
     }
-    if (path !== '/chat' && path !== '/story-image') return fail('not-found', 404, '接口不存在。');
+    if (path !== '/chat' && path !== '/story-image' && path !== JOURNEY_APPRAISAL_SETTINGS.path)
+      return fail('not-found', 404, '接口不存在。');
+    if (
+      path === JOURNEY_APPRAISAL_SETTINGS.path &&
+      origin !== new URL(GAME_SITE_URL).origin &&
+      !localOrigin(new URL(origin))
+    )
+      return fail('origin', 403, '此来源使用本地评语。');
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     if (request.method !== 'POST') return fail('method', 405, '请求方法不支持。');
     if (!request.headers.get('Content-Type')?.startsWith('application/json'))
       return fail('content-type', 415, '请求须使用 JSON 格式。');
     let input: unknown;
     try {
-      input = await readBody(request);
+      input = await readBody(
+        request,
+        path === JOURNEY_APPRAISAL_SETTINGS.path
+          ? JOURNEY_APPRAISAL_SETTINGS.maxRequestBytes
+          : undefined,
+      );
     } catch {
       return fail('invalid-body', 400, '请求内容无效或过大。');
+    }
+    if (path === JOURNEY_APPRAISAL_SETTINGS.path) {
+      if (!validJourneyAppraisalFacts(input))
+        return fail('invalid-appraisal', 400, '此世摘要无效。');
+      try {
+        stage = 'limiter';
+        const limit = await env.NPC_LIMITER.limit({
+          key: `journey:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
+        });
+        if (!limit.success) return fail('busy', 429, '请求过于频繁，请稍后重试。', true);
+        stage = 'inference';
+        const output = await runInference(
+          request.signal,
+          JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs,
+          (signal) =>
+            env.AI.run(
+              JOURNEY_APPRAISAL_MODEL,
+              {
+                messages: journeyAppraisalMessages(input),
+                response_format: { type: 'json_object' },
+                max_tokens: JOURNEY_APPRAISAL_SETTINGS.maxOutputTokens,
+                temperature: 0.7,
+              },
+              { signal },
+            ),
+        );
+        stage = 'output';
+        let outputIssue = '';
+        const appraisal = extractJourneyAppraisal(output, input, (reason) => {
+          outputIssue = reason;
+        });
+        if (!appraisal) {
+          const failed = fail(
+            'invalid-appraisal-output',
+            502,
+            '评语暂未生成，将使用本地评语。',
+            true,
+          );
+          // 仅返回固定诊断码，不含生成文本、事实摘要或用户资料。
+          return json(
+            { ...((await failed.json()) as Record<string, unknown>), outputIssue },
+            failed.status,
+          );
+        }
+        return json({ appraisal });
+      } catch (error) {
+        return inferenceFailure(error);
+      }
     }
     if (path === '/story-image') {
       if (!validStoryImage(input)) return fail('invalid-story', 400, '配图请求无效。');
