@@ -297,7 +297,7 @@ const FEAT_WORDS: Record<(typeof JOURNEY_APPRAISAL_FEATS)[number], readonly stri
   'permanent-medicine': ['珍丹曾入体', '本世曾服珍丹', '珍丹留下造化'],
   story: ['炉火旧事已圆', '曾续起炉火旧缘', '人间炉火留了痕'],
   collection: ['万宝已归藏', '三十六宝归藏', '诸宝皆入珍藏'],
-  'level-100': ['百级曾归真', '一局修到百级', '百级历练已亲证'],
+  'level-100': ['百级曾归真', '百级修行曾亲证', '百级历练已亲证'],
   mastery: ['宝典精研十阶', '宗门宝典已精研', '一部宝典研至十阶'],
   'training-master': ['三元皆修成', '三元修至二十阶', '淬体悟道身法皆成'],
   'six-immortals': ['六器曾齐鸣', '曾同御六件仙器', '六件仙器曾共鸣'],
@@ -398,9 +398,9 @@ function tiesWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) =>
             : pick(['檐下曾有相逢', '布铺檐下曾避雨相识', '春灯下结过一段缘'])
         : id === 'friend'
           ? tie('friend-river')
-            ? pick(['曾劝渔友远行', '曾送渔友去看大江', '渔友曾听你劝去远行'])
+            ? pick(['曾劝渔友远行', '曾送渔友去看大江', '曾劝渔友去看大江'])
             : tie('friend-harbor')
-              ? pick(['曾陪渔友守渡', '曾劝渔友留在渡口', '守渡的选择曾一同谈过'])
+              ? pick(['曾陪渔友守渡', '曾劝渔友留在渡口', '曾与渔友谈起守渡'])
               : pick(['江上曾与渔友共饮', '船头曾有一杯相逢', '曾在船头结识渔友'])
           : tie('student-teach')
             ? pick(['曾劝少年授业', '曾劝问路少年留下授业', '远山曾托付少年讲给后来人'])
@@ -414,15 +414,8 @@ function tiesWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) =>
         : '';
     groups.push(`${base}${letter}`);
   }
-  if (!groups.length)
-    return {
-      full: pick([
-        '人间缘簿尚留白，山海之外的相逢暂未落在此页。',
-        '人间旧缘尚无记载，这页空白也属于真实的此世。',
-        '人间缘簿仍留白，未记下的故事不必强作圆满。',
-      ]),
-      compact: '人间缘簿尚留白，这一页也属于真实的此世。',
-    };
+  // 缺少牵挂事实就不写这一段，不能把数据缺项当作角色的人生。
+  if (!groups.length) return { full: '', compact: '' };
   const compact = groups.map((_, i) => {
     // 压缩仅换成同义短句，不删掉整组牵挂，也不把未展旧信写成已读。
     if (i === 0 && (tie('home-letter-found') || tie('home-reunion')))
@@ -461,7 +454,7 @@ function tiesWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) =>
   };
 }
 
-/** 三类信息分别参与落笔；优先组合事实，长度不足或过长时只换同义长短句。 */
+/** 三类事实有则参与落笔；缺项省略，过长时只换同义短句，不凑字数。 */
 export function localJourneyAppraisal(f: JourneyAppraisalFacts): JourneyAppraisal {
   let seed = factsSeed(f);
   const pick = (words: readonly string[]) => {
@@ -479,8 +472,5 @@ export function localJourneyAppraisal(f: JourneyAppraisalFacts): JourneyAppraisa
     [0, ending.brief],
   ] as const)
     if (parts.join('').length > 78) parts[index] = compact;
-  let detail = parts.join('');
-  if (detail.length < 48)
-    detail += f.ending === 'ongoing' ? '余下的山海，仍待亲行。' : '这一程，已留下自己的笔迹。';
-  return { title: appraisalTitle(f), detail };
+  return { title: appraisalTitle(f), detail: parts.join('') };
 }
