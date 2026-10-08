@@ -71,7 +71,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 7;
+export const SAVE_SCHEMA = 8;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -240,6 +240,12 @@ export function readSave(
     alignStarterWithPath(base);
     if (migrateEarthStarter)
       base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
+    // 已通关的旧档也补齐成仙门槛；只补差额，不补发整局或妖王奖励。
+    const ascensionCultivation =
+      !newer && base.completed.includes(FINAL_TRIAL_STAGE)
+        ? Math.max(0, IMMORTAL_CULTIVATION - base.cultivation)
+        : 0;
+    base.cultivation += ascensionCultivation;
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
     base.journeyEnded = s.journeyEnded === true && realm.max;
     if (base.mortal.member) {
@@ -247,6 +253,15 @@ export function readSave(
       if (realm.max) base.mortal.member.dueAt = 0;
     }
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
+    if (ascensionCultivation > 0) {
+      // 旧记录无法证明当年通关的灵根、难度和年岁，不补造相关成就。
+      base.chronicle.milestones['realm-24'] ??= null;
+      recordChronicle(
+        base,
+        '通关成仙补录',
+        `已有第七境通关记录，补足成仙修为 ${ascensionCultivation}。原通关年岁沿用已有记录。`,
+      );
+    }
     syncHumanStories(base);
     claimArtifacts(base);
     syncTribulationClock(base);
@@ -324,6 +339,10 @@ export function realmInfo(cultivation: number, finalTrialCleared = false) {
   };
 }
 export const realmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export const IMMORTAL_CULTIVATION = Array.from({ length: 24 }, (_, step) => realmCost(step)).reduce(
+  (sum, cost) => sum + cost,
+  0,
+);
 export function lifespanInfo(save: SaveData) {
   const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const base = REALM_LIFESPANS[realm.index];
@@ -619,14 +638,21 @@ export function settleRun(
       { ...run, spiritRoot: run.spiritRoot ?? save.spiritRoot },
       run.victory ? 100 + run.stage * 50 : 0,
     );
+  const cultivationRemaining = cultivation - int(run.creditedCultivation, cultivation);
+  // 先结算原奖励，再补足成仙缺口；不乘灵根、难度或药效，不追回超额修为。
+  const ascensionCultivation =
+    run.victory && run.stage === FINAL_TRIAL_STAGE
+      ? Math.max(0, IMMORTAL_CULTIVATION - save.cultivation - cultivationRemaining)
+      : 0;
   const rewards = {
     stones: Math.floor(
       (run.kills * 0.35 + run.time * 0.1 + (run.victory ? STAGES[run.stage].reward : 0)) *
         multiplier,
     ),
-    cultivation,
+    cultivation: cultivation + ascensionCultivation,
     firstClearCultivation,
-    cultivationRemaining: cultivation - int(run.creditedCultivation, cultivation),
+    ascensionCultivation,
+    cultivationRemaining: cultivationRemaining + ascensionCultivation,
     iron: run.iron + (run.victory ? 3 + run.stage * 2 : 0),
   };
   save.stones += rewards.stones;
@@ -638,6 +664,8 @@ export function settleRun(
     const before = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
     save.unlocked = Math.max(save.unlocked, Math.min(STAGES.length - 1, run.stage + 1));
     if (!save.completed.includes(run.stage)) save.completed.push(run.stage);
+    if (ascensionCultivation > 0)
+      recordChronicle(save, '七劫登仙', `尽破七劫，补足成仙修为 ${ascensionCultivation}。`);
     recordChronicle(
       save,
       `踏破 · ${STAGES[run.stage].name}`,
