@@ -16,6 +16,20 @@ const plain = (value: unknown, min: number, max: number): value is string =>
 
 function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
   const text = appraisal.title + appraisal.detail;
+  // 成品是人生评语，不向玩家解释摘要、存档缺项或生成过程。
+  if (
+    /记载|记录|存档|数据|资料|信息|字段|摘要|档案|缘簿|纪事|留白|空白|未载|未录|不详|无从考证/.test(
+      text,
+    )
+  )
+    return false;
+  if (
+    !facts.ties.length &&
+    /孑然|孤身|独自|独行|孤独|无人相伴|无人同行|未遇故人|人缘尚缺|(?:未有|没有|不曾|未曾|尚无|暂无|未结|未遇|未见|尚缺|无)[^。！？；]{0,10}(?:牵挂|旧缘|结缘|相逢|相伴|故人|归处|人缘|人间经历)|(?:没有|未有|尚无|暂无)(?:任何|一段|人间)?(?:故事|经历)|(?:牵挂|旧缘|人缘|人间经历|故事)[^。！？；]{0,6}(?:未有|没有|全无|尚缺|缺失|暂无|尚待补全)|(?:故事|经历)[^。！？；]{0,8}(?:补全|补录)/.test(
+      text,
+    )
+  )
+    return false;
   const asserted = text.replace(
     /(?:尚未|还未|仍未|未曾|未能|未|不曾|没有|无缘|尚待|待)(?:叩入仙门|证得真仙|修成真仙|证得长生|飞升成仙|成仙|登仙)/g,
     '',
@@ -111,7 +125,7 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
   const messages = [
     {
       role: 'system' as const,
-      content: `你为修仙游戏《叩仙门：青岚纪》写一段个人留影评语。用克制、有温度的中文古风白话写真实经历，避免套话、评判人格、打分或重复罗列数据。必须同时考虑：此世结局、确实取得的修行成果、人间牵挂。不能因为一项成就忽略其他两类。若有人间选择，要写出对应意味；若无相关记录，留白，不编造孤独、遗憾、爱人、弟子或亲人死亡。若道侣与家书同时有记录，尽量兼顾。\n只输出 JSON 对象，恰好四个字段：title（2至10个汉字的题名）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。三个句子连起来应自然、有相互呼应，总计48至78个字，绝不能超过80个字；每句8至28字且以中文标点结尾。正文只用中文、数字和中文标点，不输出Markdown、解释、推理或标签。\n只能引用提供的事实。成就id是已达成记录；未列出的成就未知，不能补写。灵根只是当前资质，不能说天生如此。已通关秘境是精确列表，必须全部七境都有才可说踏破七境。正在修行不能写成此生已落幕，真仙尚未叩门不能写仙门已开；寿尽与天劫殒命不能写成已得长生。没有道侣记录不能写道侣；有相识未结缘只写相逢；旧信尚未读不能说读过。故乡家书展读不代表亲历归乡相见。结局、境界和成就以事实为准，未知历史一律不补造。`,
+      content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、有温度的中文古风白话回望角色走过的路，像一段完整的题跋，不写资料说明、评语生成过程、人格评分或数据清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，不能因一项成就忽略其他已知经历。人间选择有事实才写，并写出对应意味；道侣与家书同时存在时尽量兼顾。事实未提供就直接省略，不能把缺项写成人生：不得出现「尚无记载」「暂无记录」「缘簿留白」「这页空白也属于真实的此世」等表述，也不提存档、记录、数据、字段、摘要、档案、纪事、留白或空白。缺少牵挂事实不等于孤独、没有故事、没有旧缘或没有归处，不能如此推断；不编造遗憾、爱人、弟子或亲人死亡。\n只输出 JSON 对象，恰好四个字段：title（2至10个汉字的题名）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。输入的 ties 数组为空时，输出 ties 必须是空字符串，不补任何牵挂句；有牵挂事实时必须写对应句。ending 写结局与意味；cultivation 写具体成果，不重述同一句结局。outcome 仅供辨认状态，groundedReference 仅供事实校对，不照抄参考全文；将事实融成一段短评，避免连续重复相同信息，并保留无灵根或最险历练等具体修行经历。非空段落以中文句末标点结束，合起来自然、有相互呼应，总计30至78字，绝不能超过80字；无牵挂时用结局和修行成果写完整短评，不为了凑字数编造第三段。正文只用中文、数字和中文标点，不输出Markdown、解释、推理或标签。\n只能引用提供的事实。成就id是已达成经历，未列出的成就不能补写。灵根只是当前资质，不能说天生如此。已通关秘境是精确列表，全部七境都有才可说踏破七境。正在修行不能写成此生已落幕，真仙尚未叩门不能写仙门已开；寿尽与天劫殒命不能写成已得长生。没有道侣事实不能写道侣；有相识未结缘只写相逢；旧信尚未读不能说读过。故乡家书展读不代表亲历归乡相见。结局、境界和成就以事实为准。`,
     },
     {
       role: 'user' as const,
@@ -163,8 +177,12 @@ export function extractJourneyAppraisal(
     for (const key of ['ending', 'cultivation', 'ties']) {
       if (typeof parsed[key] !== 'string') return reject(`section-${key}-type`);
       parsed[key] = (parsed[key] as string).replace(/\s/g, '');
+      if (key === 'ties' && !facts.ties.length) {
+        if (parsed[key] !== '') return reject('section-ties-unexpected');
+        continue;
+      }
       if (!plain(parsed[key], 4, 64)) return reject(`section-${key}-format`);
-      // JSON 字段是三段内容，模型偶尔省略句末或以逗号收尾，由此处统一落句。
+      // 非空段落偶尔省略句末或以逗号收尾，由此处统一落句。
       if (!/[。！？]$/.test(parsed[key] as string))
         parsed[key] = (parsed[key] as string).replace(/[，；：、]+$/, '') + '。';
       if (!plain(parsed[key], 4, 64) || !/[\p{Script=Han}]/u.test(parsed[key] as string))

@@ -16,7 +16,7 @@ const aiParts = {
   title: '青岚初问道',
   ending: '此世仍在修行，青岚之外尚有远山。',
   cultivation: '青霄剑随身，初境的功业正在写下。',
-  ties: '人间相逢尚未留下纪事，牵挂留待后来。',
+  ties: '',
 };
 const aiAppraisal = {
   title: aiParts.title,
@@ -182,14 +182,14 @@ test('超时与关闭即使 fetch 忽略 signal 也结束等待、取消请求�
   }
 });
 
-test('AI 输出必须有结局、成果、牵挂三段，严格检查长度和真实记录', () => {
+test('AI 按已知事实落笔，无牵挂时允许省略，有牵挂时不能吞掉对应句', () => {
   const input = facts();
   assert.deepEqual(
     extractJourneyAppraisal({ response: JSON.stringify(aiParts) }, input),
     aiAppraisal,
   );
   for (const invalid of [
-    { ...aiParts, ties: '' },
+    { ...aiParts, ties: '人间旧缘尚无记载，这页空白也属于真实的此世。' },
     { ...aiParts, ending: '，，，，' },
     { ...aiParts, cultivation: '１２３４' },
     { ...aiParts, extra: '更多' },
@@ -254,8 +254,8 @@ test('AI 输出必须有结局、成果、牵挂三段，严格检查长度和�
         response: JSON.stringify({
           title: '长生待叩门',
           ending: '长生已证，尚未叩入仙门，此世未尽。',
-          cultivation: '秘境已有通关记录，修行留下实迹。',
-          ties: '人间缘簿尚留白，牵挂留待后来的山水。',
+          cultivation: '此身已踏破一境，长生路上自有来处。',
+          ties: '',
         }),
       },
       waiting,
@@ -264,6 +264,68 @@ test('AI 输出必须有结局、成果、牵挂三段，严格检查长度和�
   const messages = journeyAppraisalMessages(input);
   assert.match(messages[0].content, /结局.*修行成果.*人间牵挂/);
   assert.equal(JSON.parse(messages[1].content).outcome, '正在修行，此世尚未结束');
+  assert.match(messages[0].content, /ties.*为空.*空字符串/);
+  const home = { ...input, ties: ['home-reunion'] };
+  assert.equal(extractJourneyAppraisal({ response: JSON.stringify(aiParts) }, home), null);
+  assert.ok(
+    extractJourneyAppraisal(
+      {
+        response: JSON.stringify({ ...aiParts, ties: '曾回青岚与亲人相见，故里的灯火仍在心间。' }),
+      },
+      home,
+    ),
+  );
+});
+
+test('提示与参考不解释缺项，成品拒绝缺数据文案及由此编造的孤独', async () => {
+  const input = facts(93);
+  const messages = journeyAppraisalMessages(input);
+  const reference = JSON.parse(messages[1].content).groundedReference;
+  assert.doesNotMatch(reference.detail, /尚无记载|暂无记录|留白|空白|纪事|孤身/);
+  const forbidden = [
+    '人间旧缘尚无记载，这页空白也属于真实的此世。',
+    '人间相逢尚未留下纪事，牵挂留待后来。',
+    '人间缘簿仍留白，未记下的故事不必强作圆满。',
+    '尚无通关记录，修行的数据还待增添。',
+    '此生孤身独行，无人相伴，求道自有来处。',
+    '此生未有牵挂，仙路之外没有归处。',
+    '一路不曾有旧缘相伴，唯独长生仍可追寻。',
+    '暂无人间经历，这段故事尚待补全。',
+    '此身未遇故人，此世人缘尚缺。',
+    '牵挂信息尚缺，未提供的资料仍待增添。',
+    '此生没有故事，人间经历还待补全。',
+  ];
+  for (const detail of forbidden) {
+    const bad = { title: aiParts.title, detail: aiAppraisal.detail + detail };
+    assert.equal(validJourneyAppraisal(bad, input), false);
+    assert.deepEqual(
+      await resolveJourneyAppraisal(input, new AbortController().signal, {
+        origin,
+        fetcher: async () => response(bad),
+      }),
+      localJourneyAppraisal(input),
+    );
+    // 缺项说明移入修行段也必须由 Worker 拒绝，不能只检查 ties 字段。
+    const parts = { ...aiParts, cultivation: detail, ties: '' };
+    assert.equal(extractJourneyAppraisal({ response: JSON.stringify(parts) }, input), null);
+    assert.equal(
+      (
+        await worker.fetch(
+          request(input),
+          env(async () => ({ response: JSON.stringify(parts) })),
+        )
+      ).status,
+      502,
+    );
+  }
+  // 真实信件尚未展读是角色经历，不能与缺项说明混为一谈。
+  const found = { ...input, ties: ['home-letter-found'] };
+  assert.ok(
+    extractJourneyAppraisal(
+      { response: JSON.stringify({ ...aiParts, ties: '故乡家书仍待展读，纸上的叮嘱尚未打开。' }) },
+      found,
+    ),
+  );
 });
 
 test('Worker 主站预检与真实生成、来源限制、摘要验证和独立限流前缀', async () => {

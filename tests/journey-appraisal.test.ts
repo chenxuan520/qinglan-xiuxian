@@ -26,9 +26,10 @@ function assertLength(f: JourneyAppraisalFacts) {
   const appraisal = localJourneyAppraisal(f);
   assert.ok(appraisal.title.length >= 2 && appraisal.title.length <= 10, appraisal.title);
   assert.ok(
-    appraisal.detail.length >= 48 && appraisal.detail.length <= 80,
+    appraisal.detail.length >= 30 && appraisal.detail.length <= 80,
     `${appraisal.detail.length}: ${appraisal.detail}`,
   );
+  assert.doesNotMatch(appraisal.detail, /记载|记录|存档|数据|缘簿|纪事|留白|空白|未载/);
   return appraisal;
 }
 
@@ -162,11 +163,30 @@ test('各灵根只描述眼下资质，普通初境与无交往不虚构成果�
     const appraisal = assertLength(facts({ root: root.id }));
     assert.match(appraisal.detail, new RegExp(expected[index]));
     assert.match(appraisal.detail, /眼下/);
-    assert.match(appraisal.detail, /缘簿.*留白|旧缘尚无记载/);
+    assert.doesNotMatch(appraisal.detail, /旧缘|牵挂|相逢|知己|孤身|无人相伴/);
     assert.doesNotMatch(appraisal.detail, /天生|生来|孤独|失去|辞世|道侣|六器|证仙|寿尽|止于天劫/);
     details.add(appraisal.detail);
   });
   assert.equal(details.size, SPIRIT_ROOTS.length);
+});
+
+test('四种结局缺少牵挂事实时直接省略，不把数据缺项写成评语或硬凑第三段', () => {
+  for (const ending of ['ongoing', 'lifespan', 'tribulation', 'immortal'] as const) {
+    for (let age = 15; age < 115; age++) {
+      const f = facts({
+        ending,
+        age,
+        realmIndex: 8,
+        stages: [0, 1, 2, 3, 4, 5, 6],
+        feats: ['collection', 'level-100'],
+        ties: [],
+      });
+      const appraisal = assertLength(f);
+      assert.match(appraisal.detail, /(?:万宝|三十六宝|诸宝).*(?:百级|百级修行)/);
+      assert.doesNotMatch(appraisal.detail, /人间|旧缘|牵挂|空白|孤身|没有故事|这一程，已留下/);
+      assert.equal(appraisal.detail.split('。').filter(Boolean).length, 2);
+    }
+  }
 });
 
 test('炼器、通境与历劫也可组成修行段，不会只在取得勋章后才有内容', () => {
@@ -374,7 +394,7 @@ test('审查发现的三项长成就加四组旧信回归，短版仍保留三�
   assert.match(appraisal.detail, /法宝|炉火|炼器/);
   assert.match(appraisal.detail, /家书/);
   assert.match(appraisal.detail, /道侣/);
-  assert.match(appraisal.detail, /曾劝渔友远行|渔友曾听你劝/);
+  assert.match(appraisal.detail, /曾劝渔友远行|曾劝渔友去看/);
   assert.match(appraisal.detail, /曾劝.*少年.*授业|曾劝少年授业/);
   assert.match(appraisal.detail, /信已读/);
   assert.ok(appraisal.detail.endsWith('。'));
