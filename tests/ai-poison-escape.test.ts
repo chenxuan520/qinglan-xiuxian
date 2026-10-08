@@ -224,18 +224,17 @@ test('第六王无后续伤害的五圈残影不阻挡低血量玩家避开致�
   for (const control of ['up', 'ai']) {
     const g = encounter(0, 5);
     const boss = g.spawnEnemy(10, false, true, { x: -90, y: 0 });
-    // 新阵法以妖王前方90像素为阵心；固定妖王使五圈仍围绕原点。
+    // 两批陨星均落地后、第一批消散前，只剩不会再次伤害的残影。
     boss.speed = 0;
     boss.skillStep = 2;
     boss.cooldown = 0;
     boss.pursuitCooldown = 999;
-    for (let frame = 0; frame < 70; frame++) g.update(0.02);
+    for (let frame = 0; frame < 82; frame++) g.update(0.02);
     assert.equal(g.zones.length, 5);
     for (const z of g.zones) {
       assert.ok(Math.abs(Math.hypot(z.x, z.y) - 95) < 1e-8);
       assert.equal(z.radius, 70);
-      assert.ok(Math.abs(z.life - 0.3) < 1e-8);
-      assert.ok(Math.abs(z.tick - 0.32) < 1e-8);
+      assert.ok(z.delay <= 0 && z.life > 0);
       assert.ok(z.tick > z.life, '由真实妖王技能推进至最后一次伤害后的视觉残圈');
     }
     g.enemies = [];

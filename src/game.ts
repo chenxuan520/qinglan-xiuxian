@@ -7,6 +7,7 @@ import {
   PASSIVES,
   STAGES,
   STAGE_COMBAT_SCALING,
+  BOSS_COMBAT,
   ELITE_PACING,
   STAGE_REALM_STEPS,
   LEGACY_STAGE_REALM_STEPS,
@@ -146,6 +147,7 @@ export interface Shot extends Point {
   crit: boolean;
   bossAttack?: BossAttack;
   enemySkill?: 'firebolt' | 'frostbolt';
+  bossStage?: number;
 }
 export interface Zone extends Point {
   radius: number;
@@ -851,6 +853,11 @@ export class Game {
               'bounce',
             ]) &&
             (b.enemySkill === undefined || ['firebolt', 'frostbolt'].includes(b.enemySkill)) &&
+            (b.bossStage === undefined ||
+              (b.kind === 'hostile' &&
+                Number.isInteger(b.bossStage) &&
+                b.bossStage >= 0 &&
+                b.bossStage < STAGES.length)) &&
             typeof b.color === 'string' &&
             Array.isArray(b.hit) &&
             (b.kind === 'hostile' || TREASURES.some((t) => t.id === b.kind)),
@@ -1473,7 +1480,12 @@ export class Game {
             : 120000 + bossStage * 35000
           : (16000 + this.stage * 11000) *
             (this.tribulation ? 1 : this.stage === 4 ? 1.3 : this.stage === 5 ? 1.5 : 1)) *
-        difficulty.hp
+        difficulty.hp *
+        (this.tribulation
+          ? 1
+          : this.isFinalTrial
+            ? BOSS_COMBAT.trialHp
+            : BOSS_COMBAT.hp[this.stage])
       : template.hp * strength * difficulty.hp * (elite ? 7 : 1) * (eliteScaling?.hp ?? 1);
     const lateHealth =
       this.usesElitePacing && elite && !boss
@@ -1515,7 +1527,12 @@ export class Game {
         (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
         (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3) *
         realmHealthMultiplier(realmStep) *
-        (eliteScaling?.damage ?? 1),
+        (eliteScaling?.damage ?? 1) *
+        (boss && !this.tribulation
+          ? this.isFinalTrial
+            ? BOSS_COMBAT.trialDamage
+            : BOSS_COMBAT.damage[this.stage]
+          : 1),
       elite,
       boss,
       bossStage: boss ? bossStage : undefined,
@@ -1922,15 +1939,15 @@ export class Game {
     e.cooldown =
       stage === FINAL_TRIAL_STAGE
         ? enraged
-          ? 1.25
-          : 2.1
+          ? 1.2
+          : 2
         : this.isFinalTrial
           ? enraged
-            ? 1.8
-            : 2.6
+            ? 1.7
+            : 2.5
           : enraged
-            ? 2.3
-            : 3.8;
+            ? 1.85
+            : 3;
     const p = { x: this.player.x, y: this.player.y };
     const angle = Math.atan2(ny, nx);
     const fan = (count: number, spread: number, speed: number, center = angle) => {
@@ -1941,19 +1958,36 @@ export class Game {
     };
     const ring = (count: number, speed: number) =>
       fan(count, (TAU * (count - 1)) / count, speed, this.time * 0.25);
-    const blast = (x: number, y: number, radius: number, life = 0.5) =>
-      this.zone(x, y, radius, life, e.damage, STAGES[stage].color, 'blast', 1.2, true);
-    const ringZones = (count: number, radius: number, size: number, life = 0.5) => {
+    const kinds = ['roots', 'flame', 'frost', 'miasma', 'soul', 'rift', 'thunder'];
+    const blast = (x: number, y: number, radius: number, life = 0.5, delay = 1.2) =>
+      this.zone(
+        x,
+        y,
+        radius,
+        life,
+        e.damage,
+        STAGES[stage].color,
+        `boss-${kinds[stage]}`,
+        delay,
+        true,
+      );
+    const ringZones = (count: number, radius: number, size: number, life = 0.5, stagger = 0) => {
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU;
-        blast(p.x + Math.cos(a) * radius, p.y + Math.sin(a) * radius, size, life);
+        blast(
+          p.x + Math.cos(a) * radius,
+          p.y + Math.sin(a) * radius,
+          size,
+          life,
+          1.2 + (i % 2) * stagger,
+        );
       }
     };
     const summons = (count: number) => {
       const pool =
         stage === FINAL_TRIAL_STAGE
           ? [24, 25]
-          : enemyRoster(this.stage, this.time, this.encounterVersion === 0);
+          : enemyRoster(stage, STAGES[stage].minutes * 60, this.encounterVersion === 0);
       for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++)
         this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], false, false, {
           x: e.x + Math.cos((i / count) * TAU) * 90,
@@ -1963,24 +1997,33 @@ export class Game {
     this.announce(`${STAGES[stage].boss} · ${STAGES[stage].skills[phase]}`);
     switch (stage) {
       case 0:
-        if (phase === 0) ringZones(6, 130, 42, 2);
+        if (phase === 0) ringZones(6, 130, 42, 2, 0.3);
         else if (phase === 1) fan(7, 1.15, 165);
         else summons(3);
         break;
       case 1:
         if (phase === 0) fan(9, 1.5, 180);
-        else if (phase === 1) for (let i = -2; i <= 2; i++) blast(p.x + i * 85, p.y, 50, 3);
+        else if (phase === 1)
+          for (let i = -2; i <= 2; i++)
+            blast(p.x - ny * i * 85, p.y + nx * i * 85, 50, 3, 1.2 + Math.abs(i) * 0.18);
         else ring(16, 150);
         break;
       case 2:
         if (phase === 0) {
           this.startBossCharge(e, nx, ny);
-        } else if (phase === 1) fan(7, 0.95, 205);
-        else ringZones(8, 145, 46, 2);
+        } else if (phase === 1) {
+          // 快慢三层冰牙，施法时锁定方向，玩家侧移后不再追踪。
+          fan(3, 0.5, 240);
+          fan(2, 0.22, 180);
+          fan(2, 0.38, 130);
+        } else ringZones(8, 145, 46, 2, 0.4);
         break;
       case 3:
-        if (phase === 0) ringZones(5, 110, 62, 5);
-        else if (phase === 1) fan(5, 0.75, 160);
+        if (phase === 0) {
+          blast(p.x, p.y, 62, 5);
+          for (const x of [-100, 100])
+            for (const y of [-75, 75]) blast(p.x + x, p.y + y, 62, 5, 1.45);
+        } else if (phase === 1) fan(5, 0.75, 160);
         else summons(4);
         break;
       case 4:
@@ -1988,25 +2031,26 @@ export class Game {
         else if (phase === 1) ring(20, 165);
         else {
           ringZones(6, 165, 52, 2);
-          blast(p.x, p.y, 60);
+          blast(p.x, p.y, 60, 0.5, 1.8);
         }
         break;
       case 5:
         if (phase === 0) {
           for (let i = -2; i <= 2; i++) {
             blast(p.x + i * 105, p.y, 48);
-            if (i !== 0) blast(p.x, p.y + i * 105, 48);
+            if (i !== 0) blast(p.x, p.y + i * 105, 48, 0.5, 1.65);
           }
         } else if (phase === 1) ring(22, 175);
-        else ringZones(5, 95, 70);
+        else ringZones(5, 95, 70, 0.5, 0.4);
         break;
       case FINAL_TRIAL_STAGE:
         if (phase === 0) ring(enraged ? 32 : 24, 185);
         else if (phase === 1)
-          for (let i = -2; i <= 2; i++) blast(p.x + i * 105, p.y + (i % 2) * 65, 88);
+          for (let i = -2; i <= 2; i++)
+            blast(p.x + i * 105, p.y + (i % 2) * 65, 88, 0.5, 1.2 + Math.abs(i) * 0.22);
         else if (phase === 2) {
-          ringZones(8, 180, 60);
-          blast(p.x, p.y, 80);
+          ringZones(8, 180, 60, 0.5, 0.45);
+          blast(p.x, p.y, 80, 0.5, 2);
         } else if (phase === 3) {
           fan(enraged ? 15 : 11, Math.PI * 1.2, 230);
         } else if (phase === 4) {
@@ -2436,13 +2480,20 @@ export class Game {
         b.vx = vx * Math.cos(angle) - b.vy * Math.sin(angle);
         b.vy = vx * Math.sin(angle) + b.vy * Math.cos(angle);
       }
+      if (b.kind === 'hostile' && b.bossStage === 4) {
+        // 幽魂先盘旋再沿切线飞出，不持续追踪角色。
+        const turn = Math.max(0, Math.min(dt, 1.2 - (b.age - dt))) * 0.55;
+        const vx = b.vx;
+        b.vx = vx * Math.cos(turn) - b.vy * Math.sin(turn);
+        b.vy = vx * Math.sin(turn) + b.vy * Math.cos(turn);
+      }
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       if (b.life <= 0) continue;
       if (b.kind === 'hostile') {
         if (distance(b, this.player) < b.radius + 12) {
-          if (b.enemySkill === 'frostbolt') this.enemySlow();
-          this.hurtPlayer(b.damage);
+          if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
+          this.hurtPlayer(b.damage * (b.bossStage === 3 ? this.medicine.poison : 1));
           b.life = 0;
         }
         continue;
@@ -2514,7 +2565,7 @@ export class Game {
       if (
         z.hostile &&
         z.life > 0 &&
-        ['enemy-roots', 'enemy-frost'].includes(z.kind) &&
+        ['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind) &&
         this.player.invincible <= 0 &&
         distance(z, this.player) < z.radius + 8
       )
@@ -2532,10 +2583,12 @@ export class Game {
         if (z.hostile) {
           if (this.tribulation && z.kind === 'blast' && z.life > 0)
             this.effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
-          if (distance(z, this.player) < z.radius + 8)
+          if (z.life > 0 && distance(z, this.player) < z.radius + 8)
             this.hurtPlayer(
               z.damage *
-                (z.kind === 'poison' || z.kind === 'enemy-miasma' ? this.medicine.poison : 1),
+                (['poison', 'enemy-miasma', 'boss-miasma'].includes(z.kind)
+                  ? this.medicine.poison
+                  : 1),
             );
         } else if (z.kind === 'pagoda') {
           const target = this.nearest(z, new Set(), z.radius);
@@ -2615,6 +2668,10 @@ export class Game {
     }
   }
   private hostileShot(from: Point, nx: number, ny: number, speed: number, damage: number) {
+    const bossStage =
+      !this.tribulation && (from as Enemy).boss
+        ? ((from as Enemy).bossStage ?? this.stage)
+        : undefined;
     const shot: Shot = {
       x: from.x,
       y: from.y,
@@ -2631,6 +2688,7 @@ export class Game {
       age: 0,
       bounce: 0,
       crit: false,
+      ...(bossStage !== undefined ? { bossStage, color: STAGES[bossStage].color } : {}),
     };
     this.shots.push(shot);
     return shot;
@@ -2801,9 +2859,9 @@ export class Game {
       kind,
       delay,
       hostile,
+      castDelay: delay,
       ...(!hostile
         ? {
-            castDelay: delay,
             castAngle: Math.atan2(y - this.player.y, x - this.player.x),
             castEvolved: this.weapons.some(
               (w) => w.id === (kind === 'grave' ? 'coffin' : kind) && w.evolved,

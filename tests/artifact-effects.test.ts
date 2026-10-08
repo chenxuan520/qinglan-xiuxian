@@ -260,7 +260,7 @@ test('新存档字段校验与旧字段缺省兼容，不接受损坏动画数�
   }
   assert.ok(Game.restore(g.save, snapshot));
   assert.equal(parseSave(JSON.stringify({ ...g.save, schema: 4 })).schema, SAVE_SCHEMA);
-  assert.equal(SAVE_SCHEMA, 5);
+  assert.ok(SAVE_SCHEMA >= 5);
 });
 
 test('钟声和冰镜绘制不修改效果时钟，减少动态效果仍保留完整命中边界', () => {

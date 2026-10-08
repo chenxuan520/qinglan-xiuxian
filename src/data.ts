@@ -910,6 +910,13 @@ export const TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
 // 首境保留入门强度；后续秘境按天灵根逐关积累的境界定标，不追随玩家属性。
 export const STAGE_REALM_STEPS = [0, 6, 10, 13, 16, 19, 22];
+// 固定关卡倍率，不随玩家装备、灵根或境界上涨；终关已有长首领战，单独小幅加强。
+export const BOSS_COMBAT = {
+  hp: [1.15, 1.65, 2.2, 2.4, 2.4, 2.4],
+  damage: [1.1, 1.15, 1.15, 1.15, 1.18, 1.18],
+  trialHp: 1.1,
+  trialDamage: 1.08,
+};
 // 未结束的旧历练沿用原定标与奖励，新开局才切换到新梯度。
 export const LEGACY_STAGE_REALM_STEPS = [0, 9, 13, 16, 18, 20, 22];
 // 永久修为按秘境递增；局内灵气和既有境界突破需求独立计算。

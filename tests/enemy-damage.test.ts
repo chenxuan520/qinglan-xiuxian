@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { DIFFICULTIES, ENEMIES, STAGES, STAGE_ENEMIES, STAGE_REALM_STEPS } from '../src/data.ts';
+import {
+  BOSS_COMBAT,
+  DIFFICULTIES,
+  ENEMIES,
+  STAGES,
+  STAGE_ENEMIES,
+  STAGE_REALM_STEPS,
+} from '../src/data.ts';
 import { freshSave, realmHealthMultiplier } from '../src/progress.ts';
 
 test('前六境各阶段刷新量增加25%，妖王阶段比例与同屏上限保留', () => {
@@ -78,7 +85,8 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
         damage[stage] *
         DIFFICULTIES[difficulty].damage *
         [1, 1.08, 1.16, 1.24, 1.85, 1.9][stage] *
-        realmHealthMultiplier(STAGE_REALM_STEPS[stage]);
+        realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
+        BOSS_COMBAT.damage[stage];
       assert.equal(boss.damage, expected);
       boss.skillStep = stage === 1 ? 0 : 1;
       boss.cooldown = 0;
@@ -100,7 +108,7 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
   }
 });
 
-test('第七境精英与七位妖王采用固定两倍强度，重复续局不会重复乘倍率', () => {
+test('第七境精英与七位妖王采用固定强度，重复续局不会重复乘倍率', () => {
   for (let difficulty = 0; difficulty < 3; difficulty++) {
     for (const progress of [0, 0.5, 1]) {
       const save = freshSave();
@@ -126,7 +134,8 @@ test('第七境精英与七位妖王采用固定两倍强度，重复续局不�
           (stage === 6 ? 220 : 85 + stage * 10) *
             DIFFICULTIES[difficulty].damage *
             2 *
-            realmHealthMultiplier(STAGE_REALM_STEPS[6]),
+            realmHealthMultiplier(STAGE_REALM_STEPS[6]) *
+            BOSS_COMBAT.trialDamage,
         );
       }
       const restored = Game.restore(g.save, g.snapshot())!;
