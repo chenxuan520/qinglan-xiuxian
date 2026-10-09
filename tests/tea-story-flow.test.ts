@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { setImmediate } from 'node:timers/promises';
 import { createContext, Script } from 'node:vm';
-import { AD_SUPPLIES, FINAL_TRIAL_STAGE, MAX_REVIVES } from '../src/data.ts';
+import { adSupplies, FINAL_TRIAL_STAGE, MAX_REVIVES } from '../src/data.ts';
 import { freshSave, lifespanInfo, realmInfo, SAVE_KEY, tribulationDue } from '../src/progress.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
@@ -122,7 +122,7 @@ function harness(t: TestContext) {
     lifespanInfo,
     realmInfo,
     tribulationDue,
-    AD_SUPPLIES,
+    adSupplies,
     FINAL_TRIAL_STAGE,
     MAX_REVIVES,
     SAVE_KEY,

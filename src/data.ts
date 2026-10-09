@@ -1576,6 +1576,22 @@ export const MAX_RUN_LEVEL = 100;
 export const MAX_REVIVES = 1;
 export const MAX_FORGE_LEVEL = 10;
 export const AD_SUPPLIES = { stones: 300, iron: 30 };
+export const AD_SUPPLY_STONES = [300, 450, 600, 850, 1200, 1600, 2200];
+export const STAGE_STONE_RATES = [
+  { kill: 0.35, second: 0.1 },
+  { kill: 0.38, second: 0.11 },
+  { kill: 0.41, second: 0.12 },
+  { kill: 0.44, second: 0.13 },
+  { kill: 0.47, second: 0.14 },
+  { kill: 0.5, second: 0.15 },
+  { kill: 0.53, second: 0.16 },
+];
+export function adSupplies(unlocked: number) {
+  const stage = Number.isFinite(unlocked)
+    ? Math.min(STAGES.length - 1, Math.max(0, Math.floor(unlocked)))
+    : 0;
+  return { stones: AD_SUPPLY_STONES[stage], iron: AD_SUPPLIES.iron };
+}
 export const MAX_PASSIVE_LEVEL = 5;
 export const EVOLVED_DAMAGE = 1.8;
 export const EVOLVED_COOLDOWN = 0.7;

@@ -159,7 +159,7 @@ git push origin v0.0.1
 
 ## 激励广告位（占位实现）
 
-四处广告位共用 `src/ads.ts` 的时长与占位 Markup：复活（`showReviveAd`）、自选灵根与物资补给（`showRewardAd`）、借寿（`showLifespanAd`）。当前为 5 秒占位倒计时，由 `startAdCountdown` 播放、`adCompleted` 判定完成；奖励发放仍在各领取点（`game.revive`、灵根洗练、`AD_SUPPLIES`、借寿）。接入真实广告 SDK 时替换播放与完成判定即可，弹窗结构与奖励逻辑不变。物资补给暂无每日次数限制，上线真实广告前需按数值定。
+四处广告位共用 `src/ads.ts` 的时长与占位 Markup：复活（`showReviveAd`）、自选灵根与物资补给（`showRewardAd`）、借寿（`showLifespanAd`）。当前为 5 秒占位倒计时，由 `startAdCountdown` 播放、`adCompleted` 判定完成；奖励发放仍在各领取点（`game.revive`、灵根洗练、`adSupplies(save.unlocked)`、借寿）。接入真实广告 SDK 时替换播放与完成判定即可，弹窗结构与奖励逻辑不变。物资补给暂无每日次数限制，上线真实广告前需按数值定。
 
 `src/common-ui.ts` 收纳首页、洞府与战斗共用的纯展示片段，只按参数渲染 HTML，不读写全局游戏状态。新增同类片段时优先放这里，保持 `main.ts` 只做状态衔接与事件路由。
 
