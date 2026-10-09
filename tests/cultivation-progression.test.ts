@@ -130,7 +130,7 @@ test('旧续局保留原关卡强度与修为规则，新开局采用新梯度�
     }
     assert.equal(old.creditedCultivation, restored.creditedCultivation);
     assert.equal(old.save.cultivation, restored.save.cultivation);
-    const malformed = { ...fresh.snapshot(), progressionVersion: 4 };
+    const malformed = { ...fresh.snapshot(), progressionVersion: 5 };
     assert.equal(Game.restore(fresh.save, malformed), null);
   }
 });
@@ -149,7 +149,7 @@ test('新修为累计支持断点续局与失败结算，已获境界保留且�
       const before = save.cultivation;
       const restored = Game.restore(save, JSON.parse(JSON.stringify(g.snapshot())))!;
       assert.ok(restored);
-      assert.equal(restored.progressionVersion, 3);
+      assert.equal(restored.progressionVersion, 4);
       assert.equal(save.cultivation, before);
       assert.equal(restored.creditedCultivation, g.creditedCultivation);
       assert.ok(Game.restore(save, restored.snapshot()));

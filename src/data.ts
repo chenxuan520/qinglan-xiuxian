@@ -925,7 +925,13 @@ export const BOSS_COMBAT = {
 // 未结束的旧历练沿用原定标与奖励，新开局才切换到新梯度。
 export const LEGACY_STAGE_REALM_STEPS = [0, 9, 13, 16, 18, 20, 22];
 // 永久修为按秘境递增；局内灵气和既有境界突破需求独立计算。
-export const STAGE_CULTIVATION_RATES = [0.15, 0.9, 0.9, 1.1, 1.5, 2, 2.4];
+export const LEGACY_STAGE_CULTIVATION_RATES = [0.15, 0.9, 0.9, 1.1, 1.5, 2, 2.4];
+export const STAGE_CULTIVATION_RATES = [0.3, 0.9, 0.9, 1.1, 1.5, 2, 2.4];
+export function cultivationRate(stage: number, progressionVersion: number) {
+  return progressionVersion < 2
+    ? 1
+    : (progressionVersion < 4 ? LEGACY_STAGE_CULTIVATION_RATES : STAGE_CULTIVATION_RATES)[stage];
+}
 export const STAGE_BOSS_CULTIVATION = [120, 1000, 2400, 5000, 11000, 24000, 64000];
 // 将首境开荒所需成长与重复奖励分开，避免反复刷首境妖王代替推进。
 export const FIRST_STAGE_CLEAR_CULTIVATION = 3000;

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { Game } from '../src/game.ts';
 import { treasure } from '../src/data.ts';
-import { freshSave, parseSave } from '../src/progress.ts';
+import { realmCost, freshSave, parseSave } from '../src/progress.ts';
 import { joinSect } from '../src/mortal.ts';
 
 const renderUrl = new URL('../src/render.ts', import.meta.url);
@@ -239,7 +239,7 @@ test('火球爆炸中途突破解锁旧精研时，视觉仍使用本次判定�
   const save = freshSave();
   save.stones = 1000;
   assert.equal(joinSect(save, 'area'), true);
-  save.cultivation = 204;
+  save.cultivation = realmCost(0) + realmCost(1) - 1;
   save.mortal.mastery.area = 1;
   const g = quiet(parseSave(JSON.stringify(save)));
   assert.equal(g.realm, 1);

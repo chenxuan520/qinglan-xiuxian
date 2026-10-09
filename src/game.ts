@@ -11,7 +11,7 @@ import {
   ELITE_PACING,
   STAGE_REALM_STEPS,
   LEGACY_STAGE_REALM_STEPS,
-  STAGE_CULTIVATION_RATES,
+  cultivationRate,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
@@ -238,7 +238,7 @@ export class Game {
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
   revivesUsed = 0;
-  progressionVersion = 3;
+  progressionVersion = 4;
   elitePacingVersion = 2;
   encounterVersion = 1;
   artifactVersion = 2;
@@ -273,7 +273,9 @@ export class Game {
     difficulty: number,
     random: () => number = Math.random,
     path: CultivationPath = save.mortal.member ? passive(save.mortal.member.id).school : save.path,
+    progressionVersion = 4,
   ) {
+    this.progressionVersion = progressionVersion;
     this.save = save;
     this.medicine = medicineEffects(save.medicine, save.age);
     syncTribulationClock(save);
@@ -284,7 +286,11 @@ export class Game {
     this.path = path;
     this.spiritRoot = save.spiritRoot;
     this.rootElements = [...save.rootElements];
-    this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
+    this.realm = realmInfo(
+      save.cultivation,
+      save.completed.includes(FINAL_TRIAL_STAGE),
+      this.progressionVersion,
+    ).step;
     this.startedImmortal = this.realm === 24;
     this.baseHp = spiritRootInfo(this.spiritRoot).baseHp + realmBonuses(this.realm).hp;
     if (save.mortal.member) this.passives[save.mortal.member.id] = 1;
@@ -298,7 +304,7 @@ export class Game {
     this.announce('踏入秘境 · 妖物将至');
   }
   private passivePower(id: string) {
-    return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id));
+    return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id, this.progressionVersion));
   }
   private maximumHealth(medicineHp = this.medicine.hp) {
     const base =
@@ -370,6 +376,7 @@ export class Game {
       0,
       Math.random,
       source?.path ?? save.path,
+      source?.progressionVersion ?? 4,
     );
     g.tribulation = save.tribulations + 1;
     if (source) {
@@ -517,7 +524,11 @@ export class Game {
     gainCultivation(this.save, delta, this.spiritRoot);
     syncTribulationClock(this.save);
     this.creditedCultivation = earned;
-    const realm = realmInfo(this.save.cultivation, this.save.completed.includes(FINAL_TRIAL_STAGE));
+    const realm = realmInfo(
+      this.save.cultivation,
+      this.save.completed.includes(FINAL_TRIAL_STAGE),
+      this.progressionVersion,
+    );
     if (realm.step > this.realm) {
       const hp = realmBonuses(realm.step).hp - realmBonuses(this.realm).hp;
       const major = realm.index > Math.floor(this.realm / 3);
@@ -743,7 +754,7 @@ export class Game {
         )
           return null;
       }
-      if (s.progressionVersion !== undefined && ![1, 2, 3].includes(s.progressionVersion))
+      if (s.progressionVersion !== undefined && ![1, 2, 3, 4].includes(s.progressionVersion))
         return null;
       if (s.elitePacingVersion !== undefined && ![1, 2].includes(s.elitePacingVersion)) return null;
       if (
@@ -976,7 +987,8 @@ export class Game {
         return null;
       if (
         !Array.isArray(s.pickups) ||
-        s.pickups.length > 800 ||
+        // 每次有效击杀最多两件掉落，守匣最多额外一件；旧上限会拒绝合法终关续局。
+        s.pickups.length > Math.max(800, s.kills * 2 + 1) ||
         !s.pickups.every(
           (p) =>
             numbers(p, ['x', 'y', 'value']) &&
@@ -1018,7 +1030,14 @@ export class Game {
           ))
       )
         return null;
-      const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      const g = new Game(
+        save,
+        s.stage,
+        s.difficulty,
+        Math.random,
+        s.path ?? 'dual',
+        s.progressionVersion ?? 1,
+      );
       g.encounterVersion = s.encounterVersion ?? 0;
       g.artifactVersion = s.artifactVersion ?? 0;
       g.trialBossSchedule = s.trialBossSchedule === 5 ? 5 : 4;
@@ -1043,6 +1062,7 @@ export class Game {
         realmInfo(
           Math.max(0, save.cultivation - (s.creditedCultivation ?? 0)),
           save.completed.includes(FINAL_TRIAL_STAGE),
+          g.progressionVersion,
         ).step === 24;
       g.tribulation = s.tribulation ?? 0;
       g.tribulationStep = s.tribulationStep ?? 0;
@@ -3116,8 +3136,7 @@ export class Game {
         : Math.round(ENEMIES[e.type].xp * (1 + this.stage * 0.16) * (e.elite ? 8 : 1));
       // 基础击杀收益保留，额外修为按地域与怪物强度结算；旧快照不追溯虚构击杀。
       const cultivationScale = this.progressionVersion >= 2 ? 1 : cultivationFactor(this.realm);
-      const cultivationRate =
-        this.progressionVersion >= 2 ? STAGE_CULTIVATION_RATES[this.stage] : 1;
+      const rate = cultivationRate(this.stage, this.progressionVersion);
       // 终关全员精英属于战斗强度：新局永久修为按普通倍率，局内灵气仍按精英给。
       // 旧续局沿用原奖励至结束，已入账修为不重算、不扣回。
       const cultivationElite =
@@ -3135,7 +3154,7 @@ export class Game {
             ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite) /
               cultivationScale -
               0.7,
-          ) * cultivationRate;
+          ) * rate;
       if (!e.boss)
         this.combatCultivation +=
           Math.max(
@@ -3144,7 +3163,7 @@ export class Game {
               cultivationScale,
           ) *
           (this.medicine.cultivation - 1) *
-          cultivationRate;
+          rate;
       const lastBoss =
         !this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length - 1;
       const medicineBefore = e.boss ? { ...this.save.medicine.bag } : null;
@@ -3192,7 +3211,8 @@ export class Game {
           pull:
             !!this.passives.soul &&
             distance(e, this.player) <=
-              (110 + this.passives.soul * 50) * (1 + masteryBonus(this.save, 'soul')),
+              (110 + this.passives.soul * 50) *
+                (1 + masteryBonus(this.save, 'soul', this.progressionVersion)),
         });
       if (
         (e.elite && (!this.isFinalTrial || this.random() < 0.06)) ||

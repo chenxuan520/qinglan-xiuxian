@@ -146,7 +146,7 @@ test('相同投入的闭关修为随资质递减，收益符合预览的随机�
   }
 });
 
-test('七个有限寿元境界整段或拆分闭关最多推进一个小阶段，收益低于同阶或更高秘境妖王', () => {
+test('七个有限寿元境界整段或拆分闭关不跨大境界，可推进两个较低成本的小阶段，收益低于同阶或更高秘境妖王', () => {
   for (let major = 0; major < 7; major++) {
     const start = Array.from({ length: major * 3 }, (_, i) => realmCost(i)).reduce(
       (a, b) => a + b,
@@ -162,7 +162,7 @@ test('七个有限寿元境界整段或拆分闭关最多推进一个小阶段�
         for (let i = 0; i < parts; i++)
           assert.equal(retreat(save, years, () => 0.999999)?.cultivation, gainPerRetreat);
         const step = realmInfo(save.cultivation).step;
-        assert.ok(step >= major * 3 && step <= major * 3 + 1);
+        assert.ok(step >= major * 3 && step <= major * 3 + 2);
         assert.equal(save.cultivation - start, gainPerRetreat * parts);
         assert.ok(
           save.cultivation - start <
