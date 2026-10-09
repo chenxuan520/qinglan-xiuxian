@@ -1221,11 +1221,9 @@ function updateHud() {
     'cultivation-text',
     realm.max
       ? '真仙 · 长生久视'
-      : realm.ascending
-        ? '渡劫待成仙 · 需通关第七境'
-        : realm.locked
-          ? '成仙瓶颈 · 通关第七境即可成仙'
-          : `${realm.progress} / ${realm.needed}`,
+      : realm.locked
+        ? '通关第七境成仙'
+        : `${realm.progress} / ${realm.needed}`,
   );
   set('level', `LV. ${game.level}`);
   const cachePrompt = document.getElementById('cache-prompt');
