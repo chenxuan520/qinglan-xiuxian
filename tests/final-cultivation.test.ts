@@ -98,7 +98,7 @@ test('终关同种妖物仍比第六境普通怪多给修为，精英属性及�
   );
 });
 
-test('旧版续局保留已入账及后续奖励，新局使用第三版，导入续局与失败结算不重复入账', () => {
+test('旧版续局保留已入账及后续奖励，新局使用第四版，导入续局与失败结算不重复入账', () => {
   for (const version of [2, 3]) {
     const g = fixture(6, version);
     for (const type of STAGE_ENEMIES[6]) kill(g, type);
@@ -121,6 +121,6 @@ test('旧版续局保留已入账及后续奖励，新局使用第三版，导�
       assert.equal(result.cultivationRemaining, 0);
       assert.equal(candidate.save.cultivation, earned);
     }
-    assert.equal(new Game(g.save, 6, 0).progressionVersion, 3);
+    assert.equal(new Game(g.save, 6, 0).progressionVersion, 4);
   }
 });

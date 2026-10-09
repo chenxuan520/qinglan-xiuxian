@@ -25,15 +25,30 @@ npm run balance:realms -- --roots=heaven --seeds=307,619,997 # 不强化、不�
 npm run balance:passives # 三路线、三灵根的终关功法对照
 npm run balance:trial # 四档境界的终关挑战模拟
 npm run balance:tribulation # 五次天劫的满配 AI 模拟
+npm run balance:ci # 每次提交：840 条前六关裸开荒目标验收与日志
+npm run balance:gate # 扩展回归；核心改变自动强制完整目标门禁
+npm run balance:gate:full # 三难度、20 样本/组、用户确认的裸开荒与成长目标
 npm run format:check
 npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 ```
 
-永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。新局 `progressionVersion = 2`，缺少版本的旧续局按 1 恢复；它与整份存档的 `SAVE_SCHEMA = 3` 分别控制对局规则和存档写入兼容。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
+永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。新局 `progressionVersion = 4`，缺少版本的旧续局按 1 恢复；它与整份存档的 `SAVE_SCHEMA = 11` 分别控制对局规则和存档写入兼容。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
 
 第三至六境精英节奏配置集中在 `src/data.ts` 的 `ELITE_PACING`，波次调度与出生气血在 `src/game.ts`。新局 `elitePacingVersion = 2`，缺少版本的旧续局按 1 恢复；独立于修为规则版本。`lateEliteWaves` 记录是否已接上后半程波次，与 `nextElite` 一起保存，恢复时不重新放大在场敌人气血。变更覆盖波次边界、精英上限、暂停恢复和版本校验时，运行 `tests/elite-pacing.test.ts`；完整难度和分灵根对照见 [验证记录](verification.md)。
 
 `balance:realms` 不会购买永久强化，不能用它代替“正常投入所得资源”的通关测试。两种策略的样本、参数、逐关境界和局限见 [天灵根逐关成长验证](verification.md#天灵根逐关成长复核2026-10-03)。外部辅助模拟与原始结果不随仓库分发，现有命令与外部脚本的复现范围分别说明。
+
+`balance:ci` 每次提交只运行 840 条**前六关、初入仙途、无辅助**真实路线：七种灵根 × 正/魔/兼修 × 手机/电脑 × 20 固定种子，合法本命轮换，共覆盖十种五行本命。无广告、训练、炼器、丹药、宗门或重试，成功为 `cleared >= 6`，不能称作成仙。此前旧规则单独运行实测约两分钟；本轮新规则与完整矩阵并发实测约 6.2 分钟，不能保证托管机器固定两分钟完成。当前引擎只跑一遍，源依赖摘要用于记录和防止运行中源码变化，不再为快检追加旧引擎或长矩阵。
+
+用户最新确认的整体通过率硬门槛（绝对百分点，覆盖旧七关目标）：天灵根 70–100%、异灵根 50–90%、双灵根 20–60%、三灵根 10–50%、四灵根 0–30%、五灵根 0–25%、无灵根 **0–10%**。异常、漏样本、重复样本、错误妖王身份/死亡记录及越界通过率都非零退出。计划分母不因缺失样本减少。路线、本命和手机/电脑分别打印；分组差异单独诊断，不混入玩家未授权的额外整体目标。
+
+每次快检在已忽略的 `artifacts/balance-ci/` 生成 JSON、逐战 CSV 和中文摘要，直接打印灵根逐关、路线、本命、场地、耗时与妖王统计，并写入 GitHub Actions Summary。成功或失败均保留 artifact 14 天。失败邮件使用 GitHub 自带 Actions 通知，仓库代码无法替用户开启个人邮件设置（GitHub Settings → Notifications → Actions → Email / 仅失败）。
+
+每天**北京时间 12:00**（UTC cron `0 4 * * *`，可能排队延迟）运行 `balance:gate:full`；也能在 Balance gate 手动选择 full。完整矩阵共 10,080 条：七根 × 三路 × 两场地 × 四种投入 × 三难度 × 20 固定种子。裸开荒一试即停，收益养成、仅广告复活/借寿、广告满根基炼器分别统计，其他投入至多每关 5 次且有有限操作预算。记录七关进入率、累计连通率、成功/失败耗时、90 秒修为/境界、每只妖王实际出场、击杀或存活观测下界，不能把未进入或未击杀记成零秒击杀。另做真实重复首关，首通修为只能领一次。默认完整命令只验收当前矩阵，保留前六关通过率、首关天灵根 90 秒九成中期、跨大境界至少五倍和技术完整性硬门槛；终关按用户确认只展示实测，妖王演出和本命差异列诊断。
+
+历史双向研究入口 `npm run balance:gate -- --full` 仍冻结 `d10f276` 作真实旧引擎对照（所有产品源码一致才复用），比例 ±10 个百分点、耗时中位 ±20% / P90 ±25%、妖王存活 ±25% / ±30%、修为 ±20% 等旧版本差异如实记录。它不是默认两分钟 CI 或日测，不能把本轮明确授权提高的收益判成未授权差异；不自动更新基线。报告路径只允许 `artifacts/` 或 `/tmp`，不得删失败样本、截掉掉落物或伪造通过。
+
+**每日完整报告：<https://chenxuan520.github.io/qinglan-xiuxian/balance-report/>**。`balance:report` 将完整结果生成静态网页，灵根/投入/难度可筛选，原始逐局数据另提供 JSON。测试失败仍发布失败日报，Actions 保持失败；生成时间和测试源提交明确标注。`balance-daily-report` artifact 保留 90 天，然后作为现有 GitHub Pages 下的目录上传，**生成报告从不提交仓库、不建立报告分支**。日报发布使用最近成功游戏部署的源版本构建游戏，再加入本次报告，避免报告覆盖游戏或回滚到测试开始时的游戏；普通游戏发布恢复本仓库 master 最近完成的正式 schedule / 手动 full 报告，排除 PR、分支和未完成任务产物。没有首份日报时目录尚未生成；执行或排队期间继续显示上一份。Cloudflare 主站不发布测试报告。
 
 ## 可选离线资源缓存
 

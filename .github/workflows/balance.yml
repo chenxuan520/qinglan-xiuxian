@@ -1,0 +1,148 @@
+name: Balance gate
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  schedule:
+    # 每天北京时间 12:00（UTC 04:00）；GitHub 定时任务可能排队延迟。
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: '执行完整矩阵（10,080 条，四种投入、三个难度）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  quick:
+    if: github.event_name != 'schedule' && inputs.full != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run balance:ci
+      - name: Publish readable summary
+        if: always()
+        run: |
+          if [ -f artifacts/balance-ci/summary.md ]; then
+            cat artifacts/balance-ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve complete report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-first-six
+          path: |
+            artifacts/balance-ci/
+            /tmp/qinglan-balance-failed-*/samples.json
+          if-no-files-found: error
+          retention-days: 14
+
+  full:
+    outputs:
+      report-id: ${{ steps.report.outputs.artifact-id }}
+    if: github.event_name == 'schedule' || inputs.full == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run balance:gate:full
+      - name: Generate daily web report even on failure
+        if: always()
+        run: |
+          npm run balance:report
+          cat artifacts/balance-daily-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve daily web report
+        if: always()
+        id: report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-daily-report
+          path: artifacts/balance-daily-report/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve complete report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-full
+          path: |
+            artifacts/balance-gate.json
+            /tmp/qinglan-balance-failed-*/samples.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-report:
+    needs: full
+    if: always() && github.ref == 'refs/heads/master' && needs.full.outputs.report-id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}balance-report/
+    steps:
+      # 使用最近成功游戏部署的版本，报告更新不发布未经游戏 CI 的新代码。
+      - name: Select latest deployed game
+        id: game
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          game_sha=$(gh run list --repo "$REPOSITORY" --workflow pages.yml --branch master --status success --limit 1 --json headSha --jq '.[0].headSha')
+          test -n "$game_sha"
+          echo "sha=$game_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.game.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Build deployed game
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: npm run build -- --base "$BASE_PATH/"
+      - name: Include this daily report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_RUN: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh run download "$REPORT_RUN" --repo "$REPOSITORY" --name balance-daily-report --dir dist/balance-report
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

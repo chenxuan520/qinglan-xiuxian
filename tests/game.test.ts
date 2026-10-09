@@ -369,14 +369,14 @@ test('旧末境加成升级为真仙，续局补齐上限且保留缺血，刷�
 
 test('斩妖和升级实时增加修为，突破立即提升气血与伤害', () => {
   const save = freshSave();
-  save.cultivation = 89;
+  save.cultivation = realmCost(0) - 3;
   const game = new Game(save, 0, 0, seeded());
   for (let i = 0; i < 3; i++) {
     const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
     game.hitEnemy(enemy, enemy.maxHp);
   }
-  assert.equal(save.cultivation, 90);
-  assert.equal(game.creditedCultivation, 1);
+  assert.equal(save.cultivation, realmCost(0));
+  assert.equal(game.creditedCultivation, 3);
   assert.equal(realmInfo(save.cultivation).name, '炼气中期');
   assert.equal(game.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
   assert.equal(game.player.hp, game.player.maxHp);
@@ -384,8 +384,8 @@ test('斩妖和升级实时增加修为，突破立即提升气血与伤害', ()
   assert.match(game.notice, /突破.*炼气中期/);
   game.xp = xpNeeded(1);
   game.update(0.05);
-  assert.equal(save.cultivation, 91);
-  assert.equal(game.creditedCultivation, 2);
+  assert.equal(save.cultivation, realmCost(0) + 2);
+  assert.equal(game.creditedCultivation, 5);
   game.choices = [{ type: 'passive', id: 'guard', level: 1 }];
   game.choose(0);
   assert.equal(game.player.maxHp, Math.round(103 * 1.1 * realmHealthMultiplier(1)));
@@ -510,7 +510,7 @@ test('通关奖励跨大境界后，下次开局获得完整加成且没有额�
 });
 test('实时修为随存档恢复，不重复入账或重复增加气血', () => {
   const save = freshSave();
-  save.cultivation = 89;
+  save.cultivation = realmCost(0) - 2;
   const game = new Game(save, 0, 0, seeded());
   const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
   game.hitEnemy(enemy, enemy.maxHp);
@@ -518,14 +518,14 @@ test('实时修为随存档恢复，不重复入账或重复增加气血', () =>
   const restoredSave = parseSave(stored);
   const restored = Game.restore(restoredSave, JSON.parse(stored).activeRun)!;
   assert.ok(restored);
-  assert.equal(restoredSave.cultivation, 90);
-  assert.equal(restored.creditedCultivation, 1);
+  assert.equal(restoredSave.cultivation, realmCost(0));
+  assert.equal(restored.creditedCultivation, 2);
   assert.equal(restored.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
   assert.equal(restored.player.hp, game.player.hp);
   assert.equal(restored.stats.damage, game.stats.damage);
   restored.resume();
   restored.update(0.05);
-  assert.equal(restoredSave.cultivation, 90);
+  assert.equal(restoredSave.cultivation, realmCost(0));
   assert.equal(restored.player.maxHp, Math.round(103 * realmHealthMultiplier(1)));
 });
 test('旧对局补发未结算修为，连续刷新只补发一次', () => {
@@ -540,7 +540,7 @@ test('旧对局补发未结算修为，连续刷新只补发一次', () => {
   assert.ok(restored);
   assert.equal(save.cultivation, 550);
   assert.equal(restored.creditedCultivation, 550);
-  assert.equal(realmInfo(save.cultivation).name, '筑基中期');
+  assert.equal(realmInfo(save.cultivation, false, 1).name, '筑基中期');
   assert.equal(restored.player.maxHp, Math.round(154 * realmHealthMultiplier(4)));
   const again = Game.restore(save, JSON.parse(JSON.stringify(restored.snapshot())))!;
   assert.equal(save.cultivation, 550);
@@ -689,7 +689,7 @@ test('无境界标记旧局只迁移一次，保留缺血、敌人血量比例�
       [23, 6, true],
     ] as const) {
       const save = freshSave();
-      save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+      save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i, 1)).reduce(
         (a, b) => a + b,
         0,
       );
@@ -1148,7 +1148,7 @@ test('自动历练开关保存在浏览器存档，旧存档默认手动', () =>
 });
 test('气血已耗尽时斩妖突破不会复活角色', () => {
   const save = freshSave();
-  save.cultivation = 89;
+  save.cultivation = realmCost(0) - 2;
   const game = new Game(save, 0, 0, seeded());
   game.hurtPlayer(1000);
   const enemy = game.spawnEnemy(0, false, false, { x: 300, y: 0 });
@@ -1156,5 +1156,5 @@ test('气血已耗尽时斩妖突破不会复活角色', () => {
   game.update(0.05);
   assert.equal(game.state, 'lost');
   assert.equal(game.player.hp, 0);
-  assert.equal(save.cultivation, 90);
+  assert.equal(save.cultivation, realmCost(0));
 });

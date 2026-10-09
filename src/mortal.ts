@@ -54,14 +54,18 @@ export function settleSectDues(save: SaveData, decline = false, random = Math.ra
   resolveActivity(save, random);
   return true;
 }
-function masteryLimit(save: SaveData) {
-  const step = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
+function masteryLimit(save: SaveData, progressionVersion = 4) {
+  const step = realmInfo(
+    save.cultivation,
+    save.completed.includes(FINAL_TRIAL_STAGE),
+    progressionVersion,
+  ).step;
   return MASTERY_REALMS.filter((r) => r.step <= step).length;
 }
-export function masteryBonus(save: SaveData, id: string) {
+export function masteryBonus(save: SaveData, id: string, progressionVersion = 4) {
   const level = save.mortal.mastery[id] || 0;
   if (save.mortal.member?.id !== id || !level) return 0;
-  return Math.min(level, masteryLimit(save)) * MASTERY_PER_LEVEL;
+  return Math.min(level, masteryLimit(save, progressionVersion)) * MASTERY_PER_LEVEL;
 }
 export function studyPlan(save: SaveData) {
   const id = save.mortal.member?.id;

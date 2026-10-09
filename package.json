@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
     "build:cloudflare": "npm run build -- --base / --outDir artifacts/cloudflare --emptyOutDir",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy artifacts/cloudflare --project-name qinglan-xiuxian --branch master",
+    "deploy:cloudflare": "npm run balance:ci && npm run build:cloudflare && wrangler pages deploy artifacts/cloudflare --project-name qinglan-xiuxian --branch master",
     "check:npc-ai": "node -e \"require('node:fs').mkdirSync('artifacts', { recursive: true })\" && wrangler types artifacts/npc-ai-env.d.ts --config workers/npc-ai/wrangler.jsonc --env-interface NpcAiEnv && tsc -p workers/npc-ai/tsconfig.json",
     "deploy:npc-ai": "npm run check:npc-ai && wrangler deploy --config workers/npc-ai/wrangler.jsonc",
     "preview": "vite preview --host 0.0.0.0",
@@ -17,10 +17,14 @@
     "balance:passives": "node --experimental-strip-types scripts/passive-balance.ts",
     "balance:training": "node --experimental-strip-types scripts/training-balance.ts",
     "balance:realms": "node --experimental-strip-types scripts/realm-balance.ts",
+    "balance:gate": "node --experimental-strip-types scripts/balance-gate.ts",
+    "balance:gate:full": "node --experimental-strip-types scripts/balance-gate.ts --full --acceptance --current-only",
     "balance:tribulation": "node --experimental-strip-types scripts/tribulation-balance.ts",
     "balance:trial": "node --experimental-strip-types scripts/final-trial-balance.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "balance:ci": "node --experimental-strip-types scripts/balance-ci.ts",
+    "balance:report": "node --experimental-strip-types scripts/balance-report.ts"
   },
   "devDependencies": {
     "jsqr": "^1.4.0",

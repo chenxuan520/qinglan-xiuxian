@@ -21,7 +21,7 @@ import {
   rootStarter,
   ELEMENTS,
   REALM_LIFESPANS,
-  STAGE_CULTIVATION_RATES,
+  cultivationRate,
   STAGE_BOSS_CULTIVATION,
   FIRST_STAGE_CLEAR_CULTIVATION,
 } from './data.ts';
@@ -72,7 +72,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 10;
+export const SAVE_SCHEMA = 11;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -320,14 +320,15 @@ export function attuneSpiritRoot(
   recordCollectionAchievement(save);
   return true;
 }
-export function realmInfo(cultivation: number, finalTrialCleared = false) {
+export function realmInfo(cultivation: number, finalTrialCleared = false, progressionVersion = 4) {
   let remaining = cultivation;
   let step = 0;
-  while (step < (finalTrialCleared ? 24 : 23) && remaining >= realmCost(step)) {
-    remaining -= realmCost(step);
+  while (step < (finalTrialCleared ? 24 : 23) && remaining >= realmCost(step, progressionVersion)) {
+    remaining -= realmCost(step, progressionVersion);
     step++;
   }
-  const ascending = step === 23 && !finalTrialCleared && remaining >= realmCost(step);
+  const ascending =
+    step === 23 && !finalTrialCleared && remaining >= realmCost(step, progressionVersion);
   return {
     step,
     index: Math.floor(step / 3),
@@ -338,13 +339,23 @@ export function realmInfo(cultivation: number, finalTrialCleared = false) {
           ? '渡劫'
           : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
     progress: remaining,
-    needed: realmCost(step),
+    needed: realmCost(step, progressionVersion),
     max: step === 24,
     locked: step === 23 && !finalTrialCleared,
     ascending,
   };
 }
-export const realmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export const legacyRealmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export function realmCost(step: number, progressionVersion = 4) {
+  if (progressionVersion < 4) return legacyRealmCost(step);
+  // 每个大境界三阶合计完全保留；小突破提前，跨境界承担主要修为成本。
+  const first = Math.floor(step / 3) * 3;
+  const budget = legacyRealmCost(first) + legacyRealmCost(first + 1) + legacyRealmCost(first + 2);
+  const early = Math.round(budget / 9),
+    middle = Math.round((budget * 1.25) / 9);
+  return step % 3 === 0 ? early : step % 3 === 1 ? middle : budget - early - middle;
+}
+
 export const IMMORTAL_CULTIVATION = Array.from({ length: 24 }, (_, step) => realmCost(step)).reduce(
   (sum, cost) => sum + cost,
   0,
@@ -534,7 +545,7 @@ export function cultivationReward(
   },
   bonus = 0,
 ) {
-  const rate = (run.progressionVersion ?? 1) >= 2 ? STAGE_CULTIVATION_RATES[run.stage ?? 0] : 1;
+  const rate = cultivationRate(run.stage ?? 0, run.progressionVersion ?? 1);
   return Math.floor(
     ((run.kills * 0.7 + run.level * 8 + bonus) * rate + (run.combatCultivation || 0)) *
       DIFFICULTIES[run.difficulty].reward *
