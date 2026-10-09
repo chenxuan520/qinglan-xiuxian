@@ -1187,7 +1187,10 @@ export class Game {
             return null;
           g.damageBySource[id] = amount;
         }
-        if (Object.values(g.damageBySource).reduce((sum, n) => sum + n, 0) > g.damageDealt + 0.01)
+        const sourceDamage = Object.values(g.damageBySource).reduce((sum, n) => sum + n, 0);
+        // 总伤害逐次累加，分项先各自累加再求和；后期大数会有不同的浮点舍入误差。
+        const damageTolerance = Math.max(0.01, g.damageDealt * 1e-9);
+        if (!Number.isFinite(sourceDamage) || sourceDamage - g.damageDealt > damageTolerance)
           return null;
       }
       if (

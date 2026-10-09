@@ -424,12 +424,12 @@ test('百分比回血不超过上限，零血与致命伤后即使击杀或拾�
       }
 });
 
-test('炼器前五阶保留，高阶实际命中收益递增，十阶为未炼器的2.5倍', () => {
+test('炼器前九阶保留，十阶含圆满奖励且实际命中为未炼器的3倍', () => {
   const base = swordDamage(0, 0);
-  const expected = [1, 1.08, 1.16, 1.24, 1.32, 1.4, 1.52, 1.68, 1.88, 2.14, 2.5];
+  const expected = [1, 1.08, 1.16, 1.24, 1.32, 1.4, 1.52, 1.68, 1.88, 2.14, 3];
   for (let level = 0; level <= 10; level++)
     assert.ok(Math.abs(swordDamage(0, level) / base - expected[level]) < 1e-8);
-  assert.ok(swordDamage(0, 10) / swordDamage(0, 9) > 1.16);
+  assert.ok(Math.abs(swordDamage(0, 10) / swordDamage(0, 9) - 3 / 2.14) < 1e-8);
   assert.ok(Math.abs(swordDamage(24, 10) / swordDamage(23, 10) - 5) < 1e-8);
 });
 
@@ -440,7 +440,7 @@ test('旧档炼器等级保留，灵威使用相同炼器收益且不修改存�
   const snapshot = JSON.stringify(restored);
   const score = spiritPower(restored).score;
   const noForge = spiritPower({ ...restored, forge: {} }).score;
-  assert.ok(Math.abs(score / noForge - Math.sqrt(2.5)) < 0.002);
+  assert.ok(Math.abs(score / noForge - Math.sqrt(3)) < 0.002);
   assert.equal(JSON.stringify(restored), snapshot);
   assert.equal(restored.forge.sword, 10);
 });

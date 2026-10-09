@@ -12,6 +12,7 @@ import {
   treasure,
   FINAL_TRIAL_STAGE,
   MAX_FORGE_LEVEL,
+  STAGE_STONE_RATES,
   SPIRIT_ROOTS,
   spiritRootInfo,
   rollSpiritRoot,
@@ -542,7 +543,7 @@ export function cultivationReward(
 }
 export const trainingCost = (level: number) =>
   Math.round(45 * 1.42 ** Math.min(level, 9) * 1.25 ** Math.max(0, level - 9));
-const FORGE_DAMAGE_BONUSES = [0, 8, 16, 24, 32, 40, 52, 68, 88, 114, 150];
+const FORGE_DAMAGE_BONUSES = [0, 8, 16, 24, 32, 40, 52, 68, 88, 114, 200];
 export const forgeDamageBonus = (level: number) =>
   FORGE_DAMAGE_BONUSES[Math.min(MAX_FORGE_LEVEL, Math.max(0, Math.floor(level)))] / 100;
 export const forgeCost = (level: number) => {
@@ -626,6 +627,7 @@ export function settleRun(
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
+  const stoneRate = STAGE_STONE_RATES[run.stage];
   const firstClearCultivation =
     run.victory &&
     run.stage === 0 &&
@@ -651,7 +653,9 @@ export function settleRun(
       : 0;
   const rewards = {
     stones: Math.floor(
-      (run.kills * 0.35 + run.time * 0.1 + (run.victory ? STAGES[run.stage].reward : 0)) *
+      (run.kills * stoneRate.kill +
+        run.time * stoneRate.second +
+        (run.victory ? STAGES[run.stage].reward : 0)) *
         multiplier,
     ),
     cultivation: cultivation + ascensionCultivation,
