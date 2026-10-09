@@ -169,10 +169,10 @@ export type WeaponKind =
   | 'sand';
 export const ROOT_STARTERS: Record<ElementId, [WeaponKind, WeaponKind]> = {
   metal: ['sword', 'nail'],
-  wood: ['orbit', 'poison'],
+  wood: ['fan', 'chain'],
   water: ['ice', 'bloodpool'],
   fire: ['lightning', 'fire'],
-  earth: ['pagoda', 'vortex'],
+  earth: ['pagoda', 'skull'],
 };
 export const rootStarter = (elements: ElementId[], path: CultivationPath) =>
   ROOT_STARTERS[elements[0] ?? 'metal'][path === 'demonic' ? 1 : 0];
@@ -299,7 +299,7 @@ export const TREASURES: Treasure[] = [
     tag: '风法 · 扇射',
     desc: '朝妖群挥出扇形风刃，覆盖宽阔战线。',
     evolution: '九天罡风',
-    passive: 'haste',
+    passive: 'crit',
     damage: 19,
     cooldown: 1.6,
   },
@@ -355,7 +355,7 @@ export const TREASURES: Treasure[] = [
     tag: '连锁 · 禁锢',
     desc: '金索在妖物间弹射，以灵力束缚目标。',
     evolution: '天罗地网',
-    passive: 'duration',
+    passive: 'area',
     damage: 23,
     cooldown: 2,
   },
@@ -906,7 +906,12 @@ export function tribulationRules(round: number) {
   };
 }
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
-export const TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
+export const TRIAL_BOSS_TIMES = [60, 105, 150, 195, 240, 285, 330];
+export const LEGACY_TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
+export const TRIAL_PRESSURE_SECONDS = 420;
+export const TRIAL_BOSS_CAP = 2;
+export const TRIAL_BOSS_BUFFER_SECONDS = 5;
+export const TRIAL_BOSS_INTERVAL = 45;
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
 // 首境保留入门强度；后续秘境按天灵根逐关积累的境界定标，不追随玩家属性。
 export const STAGE_REALM_STEPS = [0, 6, 10, 13, 16, 19, 22];
@@ -1027,14 +1032,14 @@ export const STAGES = [
     terrain: '/assets/terrain-trial.webp',
     subtitle: '仙尊问劫 · 大乘破关',
     chapter: '柒',
-    minutes: 7,
+    minutes: 5.5,
     color: '#c8b981',
     boss: '九天执劫仙尊',
     skills: ['诛仙雷轮', '五方劫雷', '八荒封天', '天罡剑潮', '金阙天兵', '踏云雷袭'],
     sprite: 80,
     reward: 1200,
     description:
-      '终极试炼，全员精英。六位妖王每分钟依次复临，第七分钟九天执劫仙尊降临。尽破七劫，即可渡劫飞升、成就真仙。建议大乘、炼器与完整搭配后挑战。',
+      '终极试炼，全员精英。首王 1:00 登场，此后至少间隔 45 秒一劫，仙尊最早 5:30 降临。同时最多两王，满额时顺延并留五秒缓冲。尽破七劫，即可成就真仙。建议大乘、炼器与完整搭配后挑战。',
   },
 ];
 export const DIFFICULTIES = [
@@ -1576,6 +1581,18 @@ export const EVOLVED_DAMAGE = 1.8;
 export const EVOLVED_COOLDOWN = 0.7;
 export const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05 };
 export const weaponLevelDamage = (level: number) => 1 + (level - 1) * 0.32;
+// 新局只补护体与灵塔的低重伤害；升阶继续递增，高重与仙器沿用原曲线。
+export function weaponDamageMultiplier(id: string, level: number, artifactVersion = 2) {
+  const opening =
+    artifactVersion >= 2 && (id === 'orbit' || id === 'pagoda')
+      ? level <= 2
+        ? 1.2
+        : level === 3
+          ? 1.1
+          : 1
+      : 1;
+  return weaponLevelDamage(level) * opening;
+}
 export const TAU = Math.PI * 2;
 export const treasure = (id: string) => TREASURES.find((t) => t.id === id)!;
 export const passive = (id: string) => PASSIVES.find((p) => p.id === id)!;

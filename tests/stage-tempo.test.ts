@@ -4,12 +4,12 @@ import { Game } from '../src/game.ts';
 import { STAGES, TRIAL_BOSS_TIMES, enemyRoster } from '../src/data.ts';
 import { freshSave, syncTribulationClock } from '../src/progress.ts';
 
-test('前六境按三分钟、三分半、四分钟两两分档，四批敌人和精英随时长提前，终关七分钟每分钟出王', () => {
+test('前六境按三分钟、三分半、四分钟两两分档，四批敌人和精英随时长提前，终关首王一分钟，之后每45秒一王', () => {
   assert.deepEqual(
     STAGES.map((s) => s.minutes),
-    [3, 3, 3.5, 3.5, 4, 4, 7],
+    [3, 3, 3.5, 3.5, 4, 4, 5.5],
   );
-  assert.deepEqual(TRIAL_BOSS_TIMES, [60, 120, 180, 240, 300, 360, 420]);
+  assert.deepEqual(TRIAL_BOSS_TIMES, [60, 105, 150, 195, 240, 285, 330]);
   for (let stage = 0; stage < 6; stage++) {
     const g = new Game(freshSave(), stage, 0, () => 0.5);
     g.weapons = [];
@@ -41,7 +41,8 @@ test('无时长标记的早期续局按原始5至10分钟换算，重复读档�
     const save = freshSave();
     save.unlocked = stage;
     const g = new Game(save, stage, 0, () => 0.5);
-    const duration = STAGES[stage].minutes * 60;
+    g.trialBossSchedule = 4;
+    const duration = g.stageDuration;
     const oldDuration = stage === 6 ? 600 : (stage + 5) * 60;
     g.time = oldDuration / 2;
     g.nextElite = oldDuration / 2 + 60;
@@ -73,7 +74,8 @@ test('上一版续局按完成比例换算，已出场妖王、收益和消耗�
         save.unlocked = stage;
         const g = new Game(save, stage, 0, () => 0.5);
         const oldDuration = oldMinutes[stage] * 60;
-        const duration = STAGES[stage].minutes * 60;
+        g.trialBossSchedule = 4;
+        const duration = g.stageDuration;
         g.time = oldDuration * (bossSpawned ? 1.1 : 0.6);
         g.nextElite = g.time + 20;
         g.kills = 100;

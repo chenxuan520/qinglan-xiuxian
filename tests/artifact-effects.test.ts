@@ -89,7 +89,7 @@ test('更新前白骨续局保留逆命配方，重复恢复、已觉醒与进�
     false,
   );
   assert.equal(Game.createTribulation(g.save, evolved).artifactVersion, 0);
-  assert.equal(new Game(g.save, 0, 0).artifactVersion, 1);
+  assert.equal(new Game(g.save, 0, 0).artifactVersion, 2);
 });
 
 test('白骨每重给骨灵独立增伤8%，精研最高52%，不增加其他法宝伤害', () => {
@@ -251,7 +251,7 @@ test('新存档字段校验与旧字段缺省兼容，不接受损坏动画数�
     broken.zones[0][key] = value;
     assert.equal(Game.restore(g.save, broken), null, String(key));
   }
-  assert.equal(Game.restore(g.save, { ...snapshot, artifactVersion: 2 }), null);
+  assert.equal(Game.restore(g.save, { ...snapshot, artifactVersion: 3 }), null);
   delete snapshot.artifactVersion;
   for (const z of snapshot.zones) {
     delete z.castDelay;

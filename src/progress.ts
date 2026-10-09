@@ -71,7 +71,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 9;
+export const SAVE_SCHEMA = 10;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -236,7 +236,12 @@ export function readSave(
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
     const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);
     if (sect) base.path = sect.school;
-    const migrateEarthStarter = base.path === 'demonic' && base.starter === 'meteor';
+    const migrateEarthStarter =
+      (s.schema ?? 0) < 10 && base.path === 'demonic' && base.starter === 'meteor';
+    if (migrateEarthStarter) {
+      base.starter = 'vortex';
+      base.artifacts = [...new Set([...base.artifacts, 'vortex'])];
+    }
     alignStarterWithPath(base);
     if (migrateEarthStarter)
       base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
