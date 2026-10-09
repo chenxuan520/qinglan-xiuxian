@@ -15,6 +15,11 @@ import {
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
+  LEGACY_TRIAL_BOSS_TIMES,
+  TRIAL_PRESSURE_SECONDS,
+  TRIAL_BOSS_CAP,
+  TRIAL_BOSS_BUFFER_SECONDS,
+  TRIAL_BOSS_INTERVAL,
   DIFFICULTIES,
   ENEMIES,
   ENEMY_TACTICS,
@@ -35,7 +40,7 @@ import {
   EVOLVED_DAMAGE,
   EVOLVED_COOLDOWN,
   AWAKENING_BURST,
-  weaponLevelDamage,
+  weaponDamageMultiplier,
   TAU,
   treasure,
   xpNeeded,
@@ -226,6 +231,9 @@ export class Game {
   trialBossesDefeated = 0;
   trialBossesSpawned = 0;
   nextTrialBossAt = TRIAL_BOSS_TIMES[0];
+  trialBossSchedule = 5;
+  trialBossBlocked = false;
+  bossOpeningVersion = 1;
   damageDealt = 0;
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
@@ -233,7 +241,7 @@ export class Game {
   progressionVersion = 3;
   elitePacingVersion = 2;
   encounterVersion = 1;
-  artifactVersion = 1;
+  artifactVersion = 2;
   cacheChallenge: CacheChallenge | null = null;
   private cacheApproachStartedAt: number | null = null;
   private nextEnemySlowAt = 0;
@@ -388,7 +396,21 @@ export class Game {
     return g;
   }
   get remaining() {
-    return Math.max(0, STAGES[this.stage].minutes * 60 - this.time);
+    return Math.max(0, this.stageDuration - this.time);
+  }
+  get stageDuration() {
+    return this.isFinalTrial && this.trialBossSchedule < 5
+      ? LEGACY_TRIAL_BOSS_TIMES.at(-1)!
+      : STAGES[this.stage].minutes * 60;
+  }
+  private get combatProgress() {
+    return Math.min(
+      1,
+      this.time / (this.isFinalTrial ? TRIAL_PRESSURE_SECONDS : this.stageDuration),
+    );
+  }
+  private get trialBossTimes() {
+    return this.trialBossSchedule >= 5 ? TRIAL_BOSS_TIMES : LEGACY_TRIAL_BOSS_TIMES;
   }
   // 气血低于三成时返回 0–1 的危急程度，越接近 1 越危险；其余情况为 0。
   get lowHealth() {
@@ -542,7 +564,7 @@ export class Game {
       nextEnemySlowAt: this.nextEnemySlowAt,
       lateEliteWaves: this.lateEliteWaves,
       stage: this.stage,
-      stageDuration: STAGES[this.stage].minutes * 60,
+      stageDuration: this.stageDuration,
       difficulty: this.difficulty,
       path: this.path,
       state: this.state,
@@ -587,7 +609,9 @@ export class Game {
       trialBossesDefeated: this.trialBossesDefeated,
       trialBossesSpawned: this.trialBossesSpawned,
       nextTrialBossAt: this.nextTrialBossAt,
-      trialBossSchedule: 4,
+      trialBossSchedule: this.trialBossSchedule,
+      trialBossBlocked: this.trialBossBlocked,
+      bossOpeningVersion: this.bossOpeningVersion,
       nextElite: this.nextElite,
       damageDealt: this.damageDealt,
       damageBySource: { ...this.damageBySource },
@@ -691,7 +715,11 @@ export class Game {
       )
         return null;
       if (s.encounterVersion !== undefined && ![0, 1].includes(s.encounterVersion)) return null;
-      if (s.artifactVersion !== undefined && ![0, 1].includes(s.artifactVersion)) return null;
+      if (s.artifactVersion !== undefined && ![0, 1, 2].includes(s.artifactVersion)) return null;
+      if (s.trialBossSchedule !== undefined && ![2, 3, 4, 5].includes(s.trialBossSchedule))
+        return null;
+      if (s.trialBossSchedule === 5 && typeof s.trialBossBlocked !== 'boolean') return null;
+      if (s.bossOpeningVersion !== undefined && ![0, 1].includes(s.bossOpeningVersion)) return null;
       if (
         s.nextEnemySlowAt !== undefined &&
         (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
@@ -993,6 +1021,9 @@ export class Game {
       const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
       g.encounterVersion = s.encounterVersion ?? 0;
       g.artifactVersion = s.artifactVersion ?? 0;
+      g.trialBossSchedule = s.trialBossSchedule === 5 ? 5 : 4;
+      g.trialBossBlocked = g.trialBossSchedule === 5 ? s.trialBossBlocked : false;
+      g.bossOpeningVersion = s.bossOpeningVersion ?? 0;
       g.cacheChallenge = s.cacheChallenge
         ? { ...s.cacheChallenge, guardians: [...s.cacheChallenge.guardians] }
         : null;
@@ -1020,7 +1051,7 @@ export class Game {
       g.spiritRoot = s.spiritRoot ?? 'heaven';
       g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
-      const duration = STAGES[s.stage].minutes * 60;
+      const duration = g.stageDuration;
       // 无时长标记的早期六境固定为 5–10 分钟，终关按旧十分钟迁移。
       const oldDuration = s.stageDuration ?? (g.isFinalTrial ? 600 : (s.stage + 5) * 60);
       const timeScale = g.tribulation ? 1 : duration / oldDuration;
@@ -1125,7 +1156,7 @@ export class Game {
       g.choices = s.choices.map((c) => ({ ...c }));
       g.bossSpawned = s.bossSpawned;
       g.trialBossesDefeated = Math.min(s.trialBossesDefeated ?? 0, TRIAL_BOSS_STAGES.length);
-      if (s.trialBossSchedule === 3 || s.trialBossSchedule === 4) {
+      if ([3, 4, 5].includes(s.trialBossSchedule)) {
         if (
           !Number.isInteger(s.trialBossesSpawned) ||
           s.trialBossesSpawned < g.trialBossesDefeated ||
@@ -1140,7 +1171,9 @@ export class Game {
         );
       }
       g.nextTrialBossAt =
-        TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? STAGES[FINAL_TRIAL_STAGE].minutes * 60;
+        g.trialBossSchedule === 5
+          ? Math.max(s.nextTrialBossAt, g.trialBossTimes[g.trialBossesSpawned] ?? g.stageDuration)
+          : (g.trialBossTimes[g.trialBossesSpawned] ?? g.stageDuration);
       g.nextElite = s.nextElite * timeScale;
       g.damageDealt = s.damageDealt;
       if (s.damageBySource !== undefined) {
@@ -1243,7 +1276,7 @@ export class Game {
           enemy.slow = Math.max(enemy.slow, 2);
       this.effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'impact');
     }
-    const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
+    const progress = this.combatProgress;
     this.noticeTime -= dt;
     this.slowed = Math.max(0, this.slowed - dt);
     const p = this.player,
@@ -1282,19 +1315,21 @@ export class Game {
       }
       this.updateEliteWave();
       if (this.isFinalTrial) {
-        while (
-          this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
-          this.time >= this.nextTrialBossAt
-        ) {
-          const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
-          this.bossSpawned = true;
-          this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
-          this.trialBossesSpawned++;
-          this.nextTrialBossAt =
-            TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? STAGES[FINAL_TRIAL_STAGE].minutes * 60;
-          this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
-          this.onEvent('boss');
-        }
+        if (this.trialBossSchedule >= 5) this.updateTrialBosses();
+        else
+          while (
+            this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
+            this.time >= this.nextTrialBossAt
+          ) {
+            const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
+            this.bossSpawned = true;
+            this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
+            this.trialBossesSpawned++;
+            this.nextTrialBossAt =
+              this.trialBossTimes[this.trialBossesSpawned] ?? this.stageDuration;
+            this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
+            this.onEvent('boss');
+          }
       } else if (!this.bossSpawned && this.remaining === 0) {
         this.bossSpawned = true;
         this.bossArrival(this.spawnEnemy(10, false, true));
@@ -1477,6 +1512,30 @@ export class Game {
       this.nextElite = this.time + this.eliteInterval;
     this.announce('精英现身 · 击败可得炼器宝匣');
   }
+  private updateTrialBosses() {
+    if (this.trialBossesSpawned >= TRIAL_BOSS_STAGES.length) return;
+    const alive = this.enemies.filter((e) => e.boss && !e.dead).length;
+    if (alive >= TRIAL_BOSS_CAP) {
+      if (this.time >= this.nextTrialBossAt) this.trialBossBlocked = true;
+      return;
+    }
+    if (this.trialBossBlocked) {
+      this.trialBossBlocked = false;
+      this.nextTrialBossAt = Math.max(this.nextTrialBossAt, this.time + TRIAL_BOSS_BUFFER_SECONDS);
+      return;
+    }
+    if (this.time < this.nextTrialBossAt) return;
+    const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
+    this.bossSpawned = true;
+    this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
+    this.trialBossesSpawned++;
+    this.nextTrialBossAt = Math.max(
+      this.trialBossTimes[this.trialBossesSpawned] ?? this.stageDuration,
+      this.time + TRIAL_BOSS_INTERVAL,
+    );
+    this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
+    this.onEvent('boss');
+  }
   spawnEnemy(
     type?: number,
     elite = false,
@@ -1503,8 +1562,8 @@ export class Game {
     ];
     const scaling = STAGE_COMBAT_SCALING[this.stage];
     const eliteScaling = elite && !boss ? scaling.elite : undefined;
-    const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
-    // 终关缩短至七分钟，仍按进度抵达原十分钟的气血峰值。
+    const progress = this.combatProgress;
+    // 妖王排程独立于小怪压力，仍用七分钟达到原十分钟的气血峰值。
     const strengthTime = this.isFinalTrial ? progress * 600 : this.time;
     const strength = (1 + strengthTime / 260) * (1 + this.stage * 0.22);
     const hp = boss
@@ -1571,7 +1630,14 @@ export class Game {
       boss,
       bossStage: boss ? bossStage : undefined,
       pursuitCooldown: boss ? 2.5 : undefined,
-      cooldown: boss ? 2.5 : 1 + this.random() * 3,
+      cooldown: boss
+        ? this.bossOpeningVersion &&
+          !this.tribulation &&
+          !this.isFinalTrial &&
+          [1, 5].includes(this.stage)
+          ? 1
+          : 2.5
+        : 1 + this.random() * 3,
       slow: 0,
       flash: 0,
       charge: 0,
@@ -1597,7 +1663,7 @@ export class Game {
   }
   private updateEnemies(dt: number) {
     const p = this.player;
-    const progress = Math.min(1, this.time / (STAGES[this.stage].minutes * 60));
+    const progress = this.combatProgress;
     for (const e of this.enemies) {
       if (e.dead) continue;
       e.slow -= dt;
@@ -2131,11 +2197,11 @@ export class Game {
     }
     return result;
   }
-  private weaponHitDamage(w: Weapon) {
+  weaponHitDamage(w: Weapon) {
     const t = treasure(w.id);
     return (
       t.damage *
-      weaponLevelDamage(w.level) *
+      weaponDamageMultiplier(w.id, w.level, this.artifactVersion) *
       this.stats.damage *
       (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
       (w.evolved ? EVOLVED_DAMAGE : 1) *
@@ -3218,7 +3284,11 @@ export class Game {
         ? { ...t, passive: 'power' }
         : id === 'skull' && !this.artifactVersion
           ? { ...t, passive: 'spirit' }
-          : t,
+          : this.artifactVersion < 2 && id === 'fan'
+            ? { ...t, passive: 'haste' }
+            : this.artifactVersion < 2 && id === 'chain'
+              ? { ...t, passive: 'duration' }
+              : t,
       this.path,
     );
   }

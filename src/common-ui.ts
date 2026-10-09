@@ -14,7 +14,7 @@ import {
   treasure,
   passive,
   evolutionPassives,
-  weaponLevelDamage,
+  weaponDamageMultiplier,
   EVOLVED_DAMAGE,
   EVOLVED_COOLDOWN,
   AWAKENING_BURST,
@@ -166,7 +166,8 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
           : c.level === 1
             ? `${pathInfo(treasure(c.id).school).name}法宝`
             : '法宝升阶';
-  const multiplier = (level: number) => `×${weaponLevelDamage(level).toFixed(2)}`;
+  const multiplier = (level: number) =>
+    `×${weaponDamageMultiplier(c.id, level, game?.artifactVersion ?? 2).toFixed(2)}`;
   const description =
     c.type === 'evolve'
       ? `法术形态强化；觉醒瞬间释放「觉醒一击」，身边妖物受 ${AWAKENING_BURST.hits} 倍单次伤害，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
@@ -178,7 +179,7 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
   const mastery = c.type === 'passive' ? masteryDescription(save, c.id) : '';
   const benefit =
     c.type === 'evolve'
-      ? `伤害 ${multiplier(MAX_WEAPON_LEVEL)} → ×${(weaponLevelDamage(MAX_WEAPON_LEVEL) * EVOLVED_DAMAGE).toFixed(2)} · 施法间隔 −${Math.round((1 - EVOLVED_COOLDOWN) * 100)}%`
+      ? `伤害 ${multiplier(MAX_WEAPON_LEVEL)} → ×${(weaponDamageMultiplier(c.id, MAX_WEAPON_LEVEL, game?.artifactVersion ?? 2) * EVOLVED_DAMAGE).toFixed(2)} · 施法间隔 −${Math.round((1 - EVOLVED_COOLDOWN) * 100)}%`
       : c.type === 'weapon'
         ? c.level === 1
           ? '配方齐备后，升级可选仙器觉醒'

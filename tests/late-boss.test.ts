@@ -10,6 +10,7 @@ import {
   STAGE_REALM_STEPS,
   STAGES,
   TRIAL_BOSS_STAGES,
+  TRIAL_PRESSURE_SECONDS,
   tribulationRules,
 } from '../src/data.ts';
 import { freshSave, realmDamageMultiplier, realmHealthMultiplier } from '../src/progress.ts';
@@ -67,7 +68,7 @@ test('旧节奏三难度全部关卡仅非妖王精英移速再增10%，普通�
       const scaling = STAGE_COMBAT_SCALING[stage];
       const final = stage === FINAL_TRIAL_STAGE;
       for (const progress of [0, 0.5, 1]) {
-        g.time = STAGES[stage].minutes * 60 * progress;
+        g.time = (final ? TRIAL_PRESSURE_SECONDS : g.stageDuration) * progress;
         const strength = (1 + (final ? progress * 600 : g.time) / 260) * (1 + stage * 0.22);
         for (const [type, template] of ENEMIES.entries()) {
           for (const elite of [false, true]) {

@@ -153,9 +153,9 @@ test('五行对应不同正魔入门本命，自选可切换且不扣除已有�
     attuneSpiritRoot(save, 'none', [], () => 0.99),
     true,
   );
-  assert.equal(save.starter, 'vortex');
+  assert.equal(save.starter, 'skull');
   assert.ok(save.artifacts.includes('pagoda'));
-  assert.ok(save.artifacts.includes('vortex'));
+  assert.ok(save.artifacts.includes('skull'));
 });
 
 test('无灵根从当前路线的五行入门法宝中随机本命', () => {
@@ -163,17 +163,17 @@ test('无灵根从当前路线的五行入门法宝中随机本命', () => {
   assert.equal(initial.path, 'orthodox');
   assert.equal(initial.starter, 'pagoda');
   assert.equal(freshSave('none', [], 'dual', () => 0).starter, 'sword');
-  assert.equal(freshSave('none', [], 'dual', () => 0.99).starter, 'vortex');
+  assert.equal(freshSave('none', [], 'dual', () => 0.99).starter, 'skull');
   const save = freshSave('none', [], 'dual', () => 0.2);
-  assert.equal(save.starter, 'orbit');
-  assert.ok(save.artifacts.includes('orbit'));
-  assert.ok(save.artifacts.includes('poison'));
+  assert.equal(save.starter, 'fan');
+  assert.ok(save.artifacts.includes('fan'));
+  assert.ok(save.artifacts.includes('chain'));
   save.path = 'demonic';
   assert.equal(
     attuneSpiritRoot(save, 'none', [], () => 0.99),
     true,
   );
-  assert.equal(save.starter, 'vortex');
+  assert.equal(save.starter, 'skull');
   assert.equal(
     freshSave('five', ['water', 'earth', 'fire', 'wood', 'metal'], 'dual', () => 0.99).starter,
     'ice',
@@ -208,6 +208,7 @@ test('旧魔道番天印校正为阴阳盘并保留炼器阶数', () => {
   const save = freshSave('heaven', ['earth']);
   save.path = 'demonic';
   save.starter = 'meteor';
+  save.schema = 9;
   save.forge.meteor = 7;
   const restored = parseSave(JSON.stringify(save));
   assert.equal(restored.starter, 'vortex');
@@ -220,6 +221,6 @@ test('旧魔道番天印校正为阴阳盘并保留炼器阶数', () => {
   current.starter = 'meteor';
   current.forge.meteor = 7;
   assert.equal(alignStarterWithPath(current), true);
-  assert.equal(current.starter, 'vortex');
+  assert.equal(current.starter, 'skull');
   assert.equal(current.forge.vortex || 0, 0);
 });

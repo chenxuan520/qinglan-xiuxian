@@ -39,7 +39,7 @@ test('六境妖王按原时刻刷新，提前预警并且只生成一次登场�
     g.time = at - 0.01;
     g.update(0.02);
     assert.equal(g.boss!.bossStage, stage);
-    assert.equal(g.boss!.cooldown, 2.48, '保留既有首招等待时间');
+    assert.equal(g.boss!.cooldown, [1, 5].includes(stage) ? 0.98 : 2.48);
     assert.deepEqual(events, ['boss']);
     const cue = bossEntranceCue(g)!;
     assert.equal(cue.arriving, true);
@@ -71,13 +71,15 @@ test('出场效果消散后旧降临提示不回显，其他战斗提示仍正�
         bossEntranceCue,
         document: { getElementById: () => notice },
       });
-    for (const at of waves) {
+    for (const nominal of waves) {
+      const at = stage === 6 ? g.nextTrialBossAt : nominal;
       // 隔离本次登场提示，避免上一位仍在场妖王的技能提示覆盖它。
       g.enemies = [];
       g.effects = [];
       g.time = at - 0.01;
       g.update(0.02);
       assert.ok(g.notice.includes('降临'));
+      g.boss!.cooldown = 999;
       for (const elapsed of [0.02, 1, 1.85, 2.4]) {
         while (g.time < at + elapsed) g.update(0.01);
         drawNotice();
@@ -166,10 +168,11 @@ test('出场法阵逐帧扩散和重复登场不累积离屏画布缓存', async
   }
 });
 
-test('终关每次复临和仙尊均使用对应名号，已在场妖王不阻止下一位登场', () => {
+test('终关每次复临和仙尊均使用对应名号，保留一王时可出下一位', () => {
   const g = encounter(6);
   for (let wave = 0; wave < 7; wave++) {
-    const at = TRIAL_BOSS_TIMES[wave];
+    const at = g.nextTrialBossAt;
+    g.enemies = g.enemies.filter((e) => e.boss).slice(-1);
     g.time = at - 0.4;
     g.effects = [];
     const warning = bossEntranceCue(g)!;
@@ -179,7 +182,7 @@ test('终关每次复临和仙尊均使用对应名号，已在场妖王不阻�
     g.update(0.02);
     assert.equal(bossEntranceCue(g)!.stage, TRIAL_BOSS_STAGES[wave]);
     assert.equal(bossEntranceCue(g)!.arriving, true);
-    assert.equal(g.enemies.filter((e) => e.boss).length, wave + 1);
+    assert.equal(g.enemies.filter((e) => e.boss).length, Math.min(2, wave + 1));
     assert.equal(g.trialBossesSpawned, wave + 1);
   }
   g.effects = [];

@@ -21,11 +21,7 @@ export function spiritPower(save: SaveData) {
     hp: preview.player.maxHp,
     ...stats,
     weapon: weapon.name,
-    weaponDamage:
-      weapon.damage *
-      stats.damage *
-      (1 + forgeDamageBonus(save.forge[weapon.id] || 0)) *
-      (1 + weaponRootBonus(preview.spiritRoot, preview.rootElements, weapon)),
+    weaponDamage: preview.weaponHitDamage(preview.weapons[0]),
     forge: save.forge[weapon.id] || 0,
   };
 }

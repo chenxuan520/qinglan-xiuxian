@@ -1,4 +1,4 @@
-import { FINAL_TRIAL_STAGE, STAGES, TRIAL_BOSS_STAGES } from './data.ts';
+import { FINAL_TRIAL_STAGE, STAGES, TRIAL_BOSS_CAP, TRIAL_BOSS_STAGES } from './data.ts';
 import type { Game } from './game.ts';
 
 export const BOSS_ENTRANCE_DURATION = 1.8;
@@ -25,6 +25,13 @@ export function bossEntranceCue(game: Game) {
       progress: Math.max(0, Math.min(1, 1 - arrival.life / BOSS_ENTRANCE_DURATION)),
       at: arrival,
     };
+  if (
+    game.isFinalTrial &&
+    game.trialBossSchedule >= 5 &&
+    (game.trialBossBlocked ||
+      game.enemies.filter((e) => e.boss && !e.dead).length >= TRIAL_BOSS_CAP)
+  )
+    return null;
   const stage = game.isFinalTrial ? TRIAL_BOSS_STAGES[game.trialBossesSpawned] : game.stage;
   if (stage === undefined || (!game.isFinalTrial && game.bossSpawned)) return null;
   const spawnAt =

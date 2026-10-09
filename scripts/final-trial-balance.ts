@@ -1,4 +1,4 @@
-import { STAGES, FINAL_TRIAL_STAGE } from '../src/data.ts';
+import { TRIAL_BOSS_STAGES } from '../src/data.ts';
 import { Game } from '../src/game.ts';
 import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
@@ -27,6 +27,8 @@ for (const step of [15, 18, 21, 23]) {
     let minHp = g.player.hp;
     let level5m: number | null = null;
     let levelAtFinalBoss: number | null = null;
+    let finalBossAt: number | null = null;
+    let maxAliveBosses = 0;
     for (let frame = 0; frame < 1140 * 30 && !['won', 'lost'].includes(g.state); frame++) {
       if (g.state === 'upgrade') {
         const c = autoplayChoice(g)!;
@@ -39,7 +41,11 @@ for (const step of [15, 18, 21, 23]) {
       if (frame % 4 === 0) g.input = autoplayInput(g);
       g.update(1 / 30);
       if (g.time >= 300) level5m ??= g.level;
-      if (g.time >= STAGES[FINAL_TRIAL_STAGE].minutes * 60) levelAtFinalBoss ??= g.level;
+      if (g.trialBossesSpawned === TRIAL_BOSS_STAGES.length) {
+        levelAtFinalBoss ??= g.level;
+        finalBossAt ??= g.time;
+      }
+      maxAliveBosses = Math.max(maxAliveBosses, g.enemies.filter((e) => e.boss && !e.dead).length);
       minHp = Math.min(minHp, g.player.hp);
     }
     results.push({
@@ -53,6 +59,8 @@ for (const step of [15, 18, 21, 23]) {
       level: g.level,
       level5m,
       levelAtFinalBoss,
+      finalBossAt: finalBossAt === null ? null : Math.round(finalBossAt),
+      maxAliveBosses,
       kills: g.kills,
       minHp: Math.round(minHp),
       hp: Math.round(g.player.hp),

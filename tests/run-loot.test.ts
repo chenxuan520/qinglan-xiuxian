@@ -77,7 +77,10 @@ test('旧续局标记收获未载，之后新掉落仍记录，不凭整个背�
 
 test('最后仙尊本世珍品进入本局收获，重复命中死者不重复发放', () => {
   const { save, game } = trial();
-  game.time = 420;
+  game.trialBossesSpawned = 6;
+  game.trialBossesDefeated = 6;
+  game.nextTrialBossAt = 330;
+  game.time = 330;
   game.update(0.01);
   const boss = game.enemies.find((e) => e.bossStage === 6)!;
   game.hitEnemy(boss, boss.maxHp);

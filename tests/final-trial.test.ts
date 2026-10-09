@@ -6,6 +6,7 @@ import {
   ENEMIES,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
+  LEGACY_TRIAL_BOSS_TIMES,
   STAGE_REALM_STEPS,
 } from '../src/data.ts';
 import {
@@ -262,7 +263,7 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
 
 test('旧版已过第六关的存档自动解锁终关，已有修为不丢失', () => {
   assert.equal(STAGES.length, 7);
-  assert.equal(STAGES[6].minutes, 7);
+  assert.equal(STAGES[6].minutes, 5.5);
   assert.equal(TRIAL_BOSS_STAGES.length, 7);
   assert.equal(TRIAL_BOSS_STAGES.at(-1), 6);
   const legacy = { ...freshSave(), unlocked: 5, completed: [0, 1, 2, 3, 4, 5], cultivation: 1e6 };
@@ -357,8 +358,9 @@ test('七位首领按顺序轮战，首王与倒计时结束均不会提前通�
   }
 });
 
-test('终关到点继续出王，允许七王同时存在，乱序击杀全部七王才通关', () => {
+test('旧终关保留到点继续出王，七王同时存在时乱序击杀全部才通关', () => {
   const g = trial();
+  g.trialBossSchedule = 4;
   g.weapons[0].timer = 1e9;
   g.player.invincible = 999;
   g.time = 60;
@@ -405,8 +407,9 @@ test('旧串行 Boss 存档迁移后补齐到期妖王，不重复当前妖王',
   assert.equal(twice.enemies.filter((e) => e.boss && !e.dead).length, 3);
 });
 
-test('终关七王在整分钟边界出场，存活前王不阻塞且七分钟后不再加王', () => {
+test('旧终关在整分钟边界出场，存活前王不阻塞且七分钟后不再加王', () => {
   const g = trial();
+  g.trialBossSchedule = 4;
   g.weapons[0].timer = 99999;
   g.player.invincible = 99999;
   for (let minute = 1; minute <= 7; minute++) {
@@ -460,7 +463,7 @@ test('十分钟终关存档按比例缩至七分钟，保留乱序击杀和在�
     twice.update(0.01);
     const expected = Math.max(
       g.trialBossesSpawned,
-      TRIAL_BOSS_TIMES.filter((at) => at <= twice.time).length,
+      LEGACY_TRIAL_BOSS_TIMES.filter((at) => at <= twice.time).length,
     );
     assert.equal(twice.trialBossesSpawned, expected);
     const alive = twice.enemies.filter((e) => e.boss && !e.dead).map((e) => e.bossStage);
