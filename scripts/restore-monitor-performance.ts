@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { newestArtifacts } from './ci-artifacts.ts';
 import {
   performanceSource,
   type PerformanceKind,
@@ -44,9 +45,9 @@ export function restorePerformance(
   localChecks?: { commit: string; runId: number; directory: string },
 ) {
   mkdirSync(outDir, { recursive: true });
-  const api = (path: string) =>
+  const api = (path: string, paginate = false) =>
     JSON.parse(
-      execFileSync('gh', ['api', path], {
+      execFileSync('gh', ['api', path, ...(paginate ? ['--paginate', '--slurp'] : [])], {
         encoding: 'utf8',
         maxBuffer: 8 * 1024 * 1024,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -80,9 +81,17 @@ export function restorePerformance(
       continue;
     }
     // 不把网络/权限故障伪装成从未采样；发布步骤失败，保持上次完整部署。
-    const artifacts = api(
-      `repos/${repository}/actions/artifacts?name=${name}&per_page=100`,
-    ).artifacts;
+    const artifacts = newestArtifacts(
+      api(`repos/${repository}/actions/artifacts?name=${name}&per_page=100`, true).flatMap(
+        (page: {
+          artifacts: {
+            created_at: string;
+            expired: boolean;
+            workflow_run: { id: number; head_branch: string };
+          }[];
+        }) => page.artifacts,
+      ),
+    );
     for (const artifact of artifacts) {
       if (artifact.expired || artifact.workflow_run?.head_branch !== 'master') continue;
       const run = api(`repos/${repository}/actions/runs/${artifact.workflow_run.id}`);
