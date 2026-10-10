@@ -33,11 +33,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run balance:ci
+      - run: npm run perf:sim
+      - run: npm run size:check
       - name: Publish readable summary
         if: always()
         run: |
           if [ -f artifacts/balance-ci/summary.md ]; then
             cat artifacts/balance-ci/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f artifacts/perf-sim/summary.md ]; then
+            cat artifacts/perf-sim/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f artifacts/size-check/summary.md ]; then
+            cat artifacts/size-check/summary.md >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Preserve complete report
         if: always()
@@ -91,6 +99,37 @@ jobs:
             /tmp/qinglan-balance-failed-*/samples.json
           if-no-files-found: error
           retention-days: 14
+
+  # 每日渲染实测：无头 Chrome 恢复第六境后期高压对局采样 60 秒帧率与长任务，只报告不设门槛。
+  perf-render:
+    if: github.event_name == 'schedule' || inputs.full == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run perf:render
+      - name: Publish render summary
+        if: always()
+        run: |
+          if [ -f artifacts/perf-render/summary.md ]; then
+            cat artifacts/perf-render/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve render report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: perf-render
+          path: |
+            artifacts/perf-render/report.json
+            artifacts/perf-render/summary.md
+            artifacts/perf-render/frame.png
+          if-no-files-found: warn
+          retention-days: 90
 
   publish-report:
     needs: full
