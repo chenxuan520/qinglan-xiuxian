@@ -1,0 +1,21 @@
+{
+  "name": "叩仙门：青岚纪",
+  "short_name": "青岚纪",
+  "description": "只需走位的修仙生存游戏。御三十六法宝，历七重秘境，从炼气走向渡劫。",
+  "lang": "zh-CN",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#102d29",
+  "theme_color": "#102d29",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
