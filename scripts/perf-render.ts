@@ -2,9 +2,10 @@
 // 只生成报告（artifacts/perf-render/），不因机器慢而失败；仅当浏览器/页面流程出错时非零退出。
 // 本地运行需 CHROME_PATH 指向 Chrome/Chrome for Testing；CI 的 ubuntu-latest 自带 google-chrome。
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { Game } from '../src/game.ts';
 import { freshSave, realmCost, SAVE_KEY } from '../src/progress.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
@@ -173,7 +174,9 @@ async function clickAction(session: CdpSession, action: string) {
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
   }
 }
-async function launchChrome(): Promise<{ chrome: ChildProcess; devtoolsPort: string }> {
+async function launchChrome(
+  userDataDir: string,
+): Promise<{ chrome: ChildProcess; devtoolsPort: string }> {
   const chrome = spawn(
     findChrome(),
     [
@@ -181,6 +184,7 @@ async function launchChrome(): Promise<{ chrome: ChildProcess; devtoolsPort: str
       '--no-sandbox',
       '--disable-dev-shm-usage',
       '--window-size=1365,900',
+      `--user-data-dir=${userDataDir}`,
       '--remote-debugging-port=0',
       'about:blank',
     ],
@@ -198,7 +202,14 @@ async function launchChrome(): Promise<{ chrome: ChildProcess; devtoolsPort: str
         ok(match[1]);
       }
     });
-    chrome.on('exit', (code) => fail(new Error(`Chrome 提前退出（${code}）`)));
+    chrome.on('error', () => {
+      clearTimeout(timer);
+      fail(new Error('Chrome 启动失败'));
+    });
+    chrome.on('exit', (code) => {
+      clearTimeout(timer);
+      fail(new Error(`Chrome 提前退出（${code}）`));
+    });
   });
   return { chrome, devtoolsPort: new URL(wsUrl).port };
 }
@@ -219,9 +230,12 @@ export async function collectRenderSample(options?: { seconds?: number }) {
   );
   let chrome: ChildProcess | undefined;
   let session: CdpSession | undefined;
+  let userDataDir: string | undefined;
   try {
     await waitForServer('http://localhost:5199/', server);
-    const launched = await launchChrome();
+    // Chrome 136+ 需要非默认 profile 才启用调试端口，也避免污染开发者的浏览器。
+    userDataDir = mkdtempSync(join(tmpdir(), 'qinglan-perf-chrome-'));
+    const launched = await launchChrome(userDataDir);
     chrome = launched.chrome;
     const targets = (await (
       await fetch(`http://127.0.0.1:${launched.devtoolsPort}/json/list`)
@@ -231,6 +245,12 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     session = await CdpSession.connect(page.webSocketDebuggerUrl);
     await session.send('Page.enable');
     await session.send('Runtime.enable');
+    await session.send('Emulation.setDeviceMetricsOverride', {
+      width: 1365,
+      height: 900,
+      deviceScaleFactor: 1,
+      mobile: false,
+    });
     const firstLoad = session.nextEvent('Page.loadEventFired');
     await session.send('Page.navigate', { url: 'http://localhost:5199/' });
     await firstLoad;
@@ -266,6 +286,8 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     session?.close();
     chrome?.kill();
     server.kill();
+    if (userDataDir)
+      rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 }
 
