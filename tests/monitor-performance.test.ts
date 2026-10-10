@@ -6,6 +6,7 @@ import {
   type PerformanceSnapshot,
 } from '../src/monitor-performance.ts';
 import { eligiblePerformanceRun } from '../scripts/restore-monitor-performance.ts';
+import { newestArtifacts } from '../scripts/ci-artifacts.ts';
 
 const generatedAt = '2026-10-10T12:00:00Z',
   commit = 'a'.repeat(40);
@@ -124,4 +125,21 @@ test('性能 artifact 仅采纳本仓库 master 正式任务，渲染可在全�
     true,
   );
   assert.equal(eligiblePerformanceRun({ ...run, event: 'push' }, repo, false), false);
+});
+
+test('产物内部编号及列表乱序时，仍选最新生成结果并排除过期或坏时间', () => {
+  const artifacts = [
+    { id: 11666011051, created_at: '2026-10-10T09:21:42Z', state: 'failed' },
+    { id: 11665506904, created_at: '2026-10-10T09:10:08Z', state: 'ready' },
+    { id: 11665403763, created_at: '2026-10-10T09:35:55Z', state: 'ready' },
+    { id: 99999999999, created_at: '2026-10-10T10:00:00Z', expired: true },
+    { id: 88888888888, created_at: 'invalid' },
+  ];
+  assert.deepEqual(
+    newestArtifacts(artifacts).map((a) => a.id),
+    [11665403763, 11666011051, 11665506904],
+  );
+  assert.equal(artifacts[0].id, 11666011051);
+  const newestFailure = { id: 1, created_at: '2026-10-10T09:40:00Z', state: 'failed' };
+  assert.equal(newestArtifacts([...artifacts, newestFailure])[0].state, 'failed');
 });
