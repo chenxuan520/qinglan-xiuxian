@@ -139,7 +139,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPORT_RUN: ${{ github.run_id }}
           REPOSITORY: ${{ github.repository }}
-        run: gh run download "$REPORT_RUN" --repo "$REPOSITORY" --name balance-daily-report --dir dist/balance-report
+        run: |
+          gh run download "$REPORT_RUN" --repo "$REPOSITORY" --name balance-daily-report --dir dist/balance-report
+          npm run balance:report -- --refresh
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist

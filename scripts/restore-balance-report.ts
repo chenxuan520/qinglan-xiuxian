@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { refreshReport } from './balance-report.ts';
 // 只恢复本仓库 master 的正式每日/手动完整报告，不接收 PR 或分支产物。
 const repository = process.env.GITHUB_REPOSITORY;
 if (!repository) throw new Error('缺少 GITHUB_REPOSITORY');
@@ -36,6 +37,7 @@ for (const artifact of artifacts) {
     ],
     { stdio: 'inherit' },
   );
+  refreshReport(target);
   console.log(`保留每日报告，测试提交 ${run.head_sha}，Actions ${run.id}`);
   found = true;
   break;

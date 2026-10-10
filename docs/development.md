@@ -48,7 +48,15 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 历史双向研究入口 `npm run balance:gate -- --full` 仍冻结 `d10f276` 作真实旧引擎对照（所有产品源码一致才复用），比例 ±10 个百分点、耗时中位 ±20% / P90 ±25%、妖王存活 ±25% / ±30%、修为 ±20% 等旧版本差异如实记录。它不是默认两分钟 CI 或日测，不能把本轮明确授权提高的收益判成未授权差异；不自动更新基线。报告路径只允许 `artifacts/` 或 `/tmp`，不得删失败样本、截掉掉落物或伪造通过。
 
-**每日完整报告：<https://chenxuan520.github.io/qinglan-xiuxian/balance-report/>**。`balance:report` 将完整结果生成静态网页，灵根/投入/难度可筛选，原始逐局数据另提供 JSON。测试失败仍发布失败日报，Actions 保持失败；生成时间和测试源提交明确标注。`balance-daily-report` artifact 保留 90 天，然后作为现有 GitHub Pages 下的目录上传，**生成报告从不提交仓库、不建立报告分支**。日报发布使用最近成功游戏部署的源版本构建游戏，再加入本次报告，避免报告覆盖游戏或回滚到测试开始时的游戏；普通游戏发布恢复本仓库 master 最近完成的正式 schedule / 手动 full 报告，排除 PR、分支和未完成任务产物。没有首份日报时目录尚未生成；执行或排队期间继续显示上一份。Cloudflare 主站不发布测试报告。
+**每日完整报告：<https://chenxuan520.github.io/qinglan-xiuxian/balance-report/>**。`balance:report` 将完整结果生成静态网页，灵根、路线、本命法宝、手机/电脑场地、投入及难度可组合筛选；子组用实际逐局数据重新统计，计划分母保留缺失样本，空组合明确提示无测试样本。图表提供逐关累计通关率柱状图、胜局耗时中位折线图及妖王击杀存活中位条形图，按灵根汇总当前筛选；生成后随筛选更新，可保存含筛选条件、测试版本和时间的 PNG。胜局与已击杀妖王分别计算，空观测不当零秒。原始逐局数据另提供 JSON。测试失败仍发布失败日报，Actions 保持失败；生成时间和测试源提交明确标注。`balance-daily-report` artifact 保留 90 天，然后作为现有 GitHub Pages 下的目录上传，**生成报告从不提交仓库、不建立报告分支**。日报发布使用最近成功游戏部署的源版本构建游戏，再加入本次报告，避免报告覆盖游戏或回滚到测试开始时的游戏；普通游戏发布恢复本仓库 master 最近完成的正式 schedule / 手动 full 报告，排除 PR、分支和未完成任务产物。没有首份日报时目录尚未生成；执行或排队期间继续显示上一份。Cloudflare 主站不发布测试报告。恢复或发布已完成日报时，用当前展示代码重新生成页面和接口，保留测试源提交、生成时间与逐局数据，不伪称重跑了矩阵。
+
+诊断区位于统计筛选之前，覆盖整次测试：红色 **Error** 包括执行异常、覆盖校验及硬门槛失败；黄色 **Warning** 包括历史差异、妖王演出和路线/本命/场地差异，不单独导致门禁失败。已列入硬失败的历史差异仍保留 Error。筛选不会隐藏总体错误。
+
+本地 AI 可直接请求静态 GET 接口 **<https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnostics.json>**，无需凭证；与每日页面同时更新。`schemaVersion: 1`，包含真实 `commit/currentHash/generatedAt`、`passed`、计划/返回样本数、`counts.error/warning` 和 `items`。每项提供 `severity`（`error` / `warning`）、`category`、`source`、原始 `message`、中文 `displayMessage` 和可确定的 `scope`（灵根/路线/本命/场地/投入/难度/种子，或关卡/妖王）。关卡与妖王编号从 0 开始；未知格式保留原文、范围为空，不猜测原因。`scope: whole-run` 表示整次测试；诊断为筛查线索，不是自动证明了根因。需要逐局佐证时读取同目录 `results.json`，核对提交和时间后关联样本。
+
+```bash
+curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnostics.json
+```
 
 ## 可选离线资源缓存
 
