@@ -8,7 +8,9 @@ import {
   validTelemetryBatch,
   TELEMETRY_BLOBS,
   TELEMETRY_DOUBLES,
+  TELEMETRY_DETAIL_MAX_LENGTH,
   type TelemetryBatch,
+  type TelemetryEvent,
 } from '../src/telemetry.ts';
 import { TELEMETRY_SETTINGS } from '../src/setting.ts';
 import { telemetryRow } from '../src/common-ui.ts';
@@ -101,15 +103,24 @@ test('统计协议只接受白名单事件与有限数值，拒收未知字段�
     { root: 'god' },
     { path: 'sword' },
     { fresh: 'yes' },
+    { detail: 42 },
+    { detail: 'x'.repeat(TELEMETRY_DETAIL_MAX_LENGTH + 1) },
   ])
     assert.equal(
       broken((b) => Object.assign(b.events[0], patch)),
       false,
       JSON.stringify(patch),
     );
+  assert.equal(
+    validTelemetryBatch({
+      ...batch,
+      events: [{ type: 'error', detail: 'error: TypeError: x @ main.js:9' }],
+    }),
+    true,
+  );
 });
 
-test('写入 Analytics Engine 的列顺序固定，缺省数值记为 -1', () => {
+test('写入 Analytics Engine 的列顺序固定，缺省数值记为 -1，错误摘要写入末列', () => {
   const point = telemetryPoint(batch, batch.events[1], 'xiuxian.011203.xyz');
   assert.deepEqual(point.indexes, [batch.id]);
   assert.equal(point.blobs.length, TELEMETRY_BLOBS.length);
@@ -121,9 +132,12 @@ test('写入 Analytics Engine 的列顺序固定，缺省数值记为 -1', () =>
     'orthodox',
     '',
     'won',
+    '',
   ]);
   assert.deepEqual(point.doubles, [1, 0, -1, -1, 186, 26, 509, -1, -1, -1]);
   assert.equal(telemetryPoint(batch, batch.events[0], 'x').doubles.at(-1), 1);
+  const failure: TelemetryEvent = { type: 'error', detail: 'rejection: 未知原因' };
+  assert.equal(telemetryPoint(batch, failure, 'x').blobs.at(-1), failure.detail);
 });
 
 test('本机、自建副本等非正式站不发送统计，也不写入匿名编号', () => {

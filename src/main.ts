@@ -33,6 +33,9 @@ import {
   damageReport,
   updateStorySoundButton,
   telemetryRow,
+  ERROR_NOTICE_ACTIONS,
+  ERROR_NOTICE_TEXT,
+  ERROR_NOTICE_TITLE,
 } from './common-ui.ts';
 import { journeyMap, JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
 import { chronicleEntrance, chronicleContent } from './chronicle-ui.ts';
@@ -114,6 +117,7 @@ import { icon, smallIcon } from './icons.ts';
 import { GUIDE_TABS, guideContent } from './guide.ts';
 import { GAME_SITE_URL, SUPPORT_CODE_IMAGE, TELEMETRY_SETTINGS } from './setting.ts';
 import { createTelemetry, type TelemetryEvent } from './telemetry.ts';
+import { createErrorWatch } from './error-report.ts';
 import { spriteStyle } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
@@ -212,6 +216,27 @@ telemetry.track({ type: 'session', fresh: saveRead.status === 'empty', ...lifeSt
 addEventListener('pagehide', () => telemetry.flush());
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') telemetry.flush();
+});
+// 未捕获错误兜底：摘要去重限频上报，同时提示玩家刷新；提示独立于游戏界面，游戏卡死也能显示。
+function showRuntimeErrorNotice() {
+  if (document.querySelector('.runtime-error')) return;
+  const box = document.createElement('div');
+  box.className = 'runtime-error';
+  box.setAttribute('role', 'alert');
+  box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${ERROR_NOTICE_TEXT}</p>${ERROR_NOTICE_ACTIONS}`;
+  box
+    .querySelector('[data-error-action="refresh"]')
+    ?.addEventListener('click', () => location.reload());
+  box.querySelector('[data-error-action="dismiss"]')?.addEventListener('click', () => box.remove());
+  document.body.appendChild(box);
+}
+createErrorWatch({
+  target: window,
+  track: (event) => {
+    telemetry.track(event);
+    telemetry.flush();
+  },
+  onError: showRuntimeErrorNotice,
 });
 const PROLOGUE_IMAGE = '/assets/qinglan-prologue-dark.webp';
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。

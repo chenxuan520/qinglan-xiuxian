@@ -27,7 +27,7 @@ const column = Object.fromEntries([
   ...TELEMETRY_BLOBS.map((name, index) => [name, `blob${index + 1}`]),
   ...TELEMETRY_DOUBLES.map((name, index) => [name, `double${index + 1}`]),
 ]) as Record<(typeof TELEMETRY_BLOBS)[number] | (typeof TELEMETRY_DOUBLES)[number], string>;
-const { type, site, version, result } = column;
+const { type, site, version, result, detail } = column;
 const { stage, realm, seconds, tribulation, age, fresh } = column;
 const table = 'qinglan_events';
 // 上线验证写入的记录版本号为 verification，统计时排除。
@@ -138,3 +138,21 @@ const versions = await query(
 );
 console.log('\n版本分布');
 console.table(versions.map((row) => ({ 版本: row.version, 打开次数: num(row.sessions) })));
+
+// 错误摘要由前端去重限频后上报，同版本同摘要合并计数，便于发现灰度回归。
+const errors = await query(
+  `SELECT ${site} AS site, ${version} AS version, ${detail} AS summary, SUM(${weight}) AS count
+  FROM ${table} WHERE ${recent} AND ${type} = 'error'
+  GROUP BY site, version, summary ORDER BY count DESC LIMIT 20`,
+);
+console.log('\n运行错误（各站合并最多 20 条）');
+if (errors.length)
+  console.table(
+    errors.map((row) => ({
+      站点: row.site,
+      版本: row.version,
+      摘要: row.summary,
+      次数: num(row.count),
+    })),
+  );
+else console.log('（无记录）');

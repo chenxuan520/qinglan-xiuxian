@@ -5729,6 +5729,12 @@ body.journey-complete:not(.in-game) {
   height: 10px;
   accent-color: #ccd9a2;
 }
+/* 失败重试按钮收缩为内容宽度并水平居中；标题、说明与进度条保持原有对齐。 */
+.scene-loading .secondary-button,
+.town-loading .secondary-button {
+  width: fit-content;
+  margin-inline: auto;
+}
 .town-loading > div {
   width: min(300px, 85%);
   text-align: center;
@@ -6683,4 +6689,57 @@ body.journey-complete:not(.in-game) {
   .cache-prompt {
     bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   }
+}
+
+/* 运行错误兜底提示：独立于游戏界面层级，游戏卡死时仍覆盖在其上方。 */
+.runtime-error {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  transform: translateX(-50%);
+  z-index: 1100;
+  width: max-content;
+  max-width: min(430px, calc(100vw - 32px));
+  padding: 16px 20px 14px;
+  border-radius: 14px;
+  color: #f4e7c8;
+  background: linear-gradient(180deg, #174439 0%, #102d26 100%);
+  border: 1px solid #d8c48166;
+  box-shadow: 0 8px 30px #06120fb3;
+}
+.runtime-error-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #f2dfa8;
+  letter-spacing: 1px;
+}
+.runtime-error-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  color: #e9c979;
+}
+.runtime-error-icon svg {
+  width: 100%;
+  height: 100%;
+}
+.runtime-error-text {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #d9e4d2;
+  text-align: center;
+}
+.runtime-error-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.runtime-error-actions button {
+  cursor: pointer;
 }
