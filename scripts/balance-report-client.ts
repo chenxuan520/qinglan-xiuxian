@@ -2,7 +2,11 @@ import type { Chart, ChartConfiguration } from 'chart.js';
 import type { BalanceCase } from './balance-policy.ts';
 import type { CampaignSample } from './balance-simulation.ts';
 import { reportTables, reportChartData } from './balance-report-view.ts';
-import type { ReportLabels, ReportChartMetric } from './balance-report-view.ts';
+import type {
+  ReportLabels,
+  ReportChartMetric,
+  ReportChartDimension,
+} from './balance-report-view.ts';
 
 export function installReportFilters(
   plan: BalanceCase[],
@@ -25,13 +29,30 @@ export function installReportFilters(
   const status = document.getElementById('filter-status')!;
   const chartStatus = document.getElementById('chart-status')!;
   const save = document.getElementById('save-chart') as HTMLButtonElement;
+  const groupInputs = [...document.querySelectorAll<HTMLInputElement>('#chart-grouping input')];
+  const legend = document.getElementById('chart-legend')!;
+  const previous = document.getElementById('chart-previous') as HTMLButtonElement;
+  const next = document.getElementById('chart-next') as HTMLButtonElement;
+  const pageSize = 8;
+  const grouping = () =>
+    groupInputs
+      .filter((input) => input.checked)
+      .map((input) => input.value as ReportChartDimension);
+  const groupingText = () =>
+    groupInputs
+      .filter((input) => input.checked)
+      .map((input) => input.parentElement!.textContent!.trim())
+      .join('＋') || '不分组（当前筛选合计）';
   const bodies = ['roots', 'stages', 'groups'].map((id) => document.getElementById(`${id}-body`)!);
   const original = bodies.map((b) => b.innerHTML);
   const observed = new Set(observedKeys);
   let data: Promise<CampaignSample[]> | undefined,
     revision = 0,
     chart: Chart | undefined,
-    requested = false;
+    requested = false,
+    groupPage = 0,
+    groupTotal = 0,
+    exporting = false;
   let selectedPlan = plan,
     selectedRows: CampaignSample[] = [],
     selectedText = '全部条件';
@@ -58,10 +79,19 @@ export function installReportFilters(
     chart = undefined;
     document.getElementById('chart-wrap')!.hidden = true;
     save.disabled = true;
+    legend.replaceChildren();
+    document.getElementById('chart-pagination')!.hidden = true;
   };
-  const title = () => `${selectedText} · 返回 ${selectedRows.length}/${selectedPlan.length}`;
-  const titleLines = () =>
-    title().match(new RegExp(`.{1,${innerWidth < 480 ? 22 : 65}}`, 'gu')) ?? [];
+  const groupRange = () =>
+    groupTotal > pageSize
+      ? `第 ${groupPage * pageSize + 1}–${Math.min((groupPage + 1) * pageSize, groupTotal)} 组 / 共 ${groupTotal} 组`
+      : `共 ${groupTotal} 组`;
+  const title = () =>
+    `${selectedText} · 返回 ${selectedRows.length}/${selectedPlan.length}\n汇总：${groupingText()}`;
+  const titleLines = (width = innerWidth < 480 ? 22 : 65) => [
+    ...(title().match(new RegExp(`.{1,${width}}(?![0-9/])`, 'gu')) ?? []),
+    ...groupRange().split(' / '),
+  ];
   function draw() {
     hideChart();
     if (!ready || !selectedPlan.length) {
@@ -79,11 +109,28 @@ export function installReportFilters(
       time: '逐关胜局耗时中位数',
       boss: '妖王击杀存活中位数',
     };
+    const data = reportChartData(selectedRows, selectedPlan, metric, labels, grouping());
+    groupTotal = data.datasets.length;
+    groupPage = Math.min(groupPage, Math.max(0, Math.ceil(groupTotal / pageSize) - 1));
+    data.datasets = data.datasets.slice(groupPage * pageSize, (groupPage + 1) * pageSize);
+    document.getElementById('chart-pagination')!.hidden = groupTotal <= pageSize;
+    document.getElementById('chart-page-status')!.textContent = groupRange();
+    previous.disabled = groupPage === 0;
+    next.disabled = (groupPage + 1) * pageSize >= groupTotal;
+    const pageCount = Math.ceil(groupTotal / pageSize);
+    const pages = Array.from({ length: pageCount }, (_, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `${index + 1} / ${pageCount}`;
+      return option;
+    });
+    select('chart-page').replaceChildren(...pages);
+    select('chart-page').value = String(groupPage);
     document.getElementById('chart-wrap')!.hidden = false;
     document.getElementById('chart-wrap')!.style.height = metric === 'boss' ? '640px' : '420px';
     const config: ChartConfiguration = {
       type: metric === 'time' ? 'line' : 'bar',
-      data: reportChartData(selectedRows, selectedPlan, metric, labels),
+      data,
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -91,7 +138,7 @@ export function installReportFilters(
         indexAxis: metric === 'boss' ? 'y' : 'x',
         plugins: {
           title: { display: true, text: [names[metric], ...titleLines()] },
-          legend: { position: 'bottom' },
+          legend: { display: false, position: 'bottom' },
         },
         scales:
           metric === 'boss'
@@ -120,8 +167,32 @@ export function installReportFilters(
     };
     try {
       chart = new ChartClass(document.getElementById('report-chart') as HTMLCanvasElement, config);
-      chartStatus.textContent = `${names[metric]}；按灵根汇总当前筛选。耗时只计算胜局，妖王只计算已击杀，空观测留空。${!select('profile').value || !select('difficulty').value ? '当前合并了多种投入或难度，不用于无辅助门禁判断。' : ''}`;
-      save.disabled = false;
+      const captured = chart;
+      data.datasets.forEach((dataset, index) => {
+        const button = document.createElement('button'),
+          swatch = document.createElement('span'),
+          text = document.createElement('span');
+        button.type = 'button';
+        button.className = 'chart-legend-item';
+        button.disabled = exporting;
+        button.setAttribute('aria-pressed', 'true');
+        swatch.className = 'chart-swatch';
+        swatch.style.backgroundColor = dataset.borderColor;
+        swatch.setAttribute('aria-hidden', 'true');
+        text.className = 'chart-legend-label';
+        text.textContent = dataset.label;
+        button.append(swatch, text);
+        button.addEventListener('click', () => {
+          if (exporting || captured !== chart) return;
+          const visible = !captured.isDatasetVisible(index);
+          captured.setDatasetVisibility(index, visible);
+          captured.update('none');
+          button.setAttribute('aria-pressed', String(visible));
+        });
+        legend.append(button);
+      });
+      chartStatus.textContent = `${names[metric]}；按${groupingText()}汇总当前筛选，${groupRange()}。耗时只计算胜局，妖王只计算已击杀，空观测留空。${!select('profile').value || !select('difficulty').value ? '当前合并了多种投入或难度，不用于无辅助门禁判断。' : ''}`;
+      save.disabled = exporting;
     } catch {
       hideChart();
       chartStatus.textContent = '图表生成失败，请重试。';
@@ -131,6 +202,7 @@ export function installReportFilters(
     const token = ++revision,
       filters = selection();
     ready = false;
+    groupPage = 0;
     hideChart();
     selectedPlan = plan.filter((c) => matches(c, filters));
     selectedText =
@@ -194,17 +266,41 @@ export function installReportFilters(
   select('chart-metric').addEventListener('change', () => {
     if (requested) void apply();
   });
+  groupInputs.forEach((input) =>
+    input.addEventListener('change', () => {
+      if (requested) void apply();
+    }),
+  );
+  [previous, next].forEach((button, index) =>
+    button.addEventListener('click', () => {
+      if (!ready || button.disabled) return;
+      revision++;
+      groupPage += index === 0 ? -1 : 1;
+      draw();
+    }),
+  );
+  select('chart-page').addEventListener('change', () => {
+    const page = Number(select('chart-page').value);
+    if (!ready || !Number.isInteger(page) || page < 0 || page * pageSize >= groupTotal) return;
+    revision++;
+    groupPage = page;
+    draw();
+  });
   save.addEventListener('click', async () => {
-    if (!chart || !ready) return;
+    if (!chart || !ready || exporting) return;
+    exporting = true;
     save.disabled = true;
+    legend.querySelectorAll('button').forEach((button) => (button.disabled = true));
     const captured = chart,
       token = revision,
       metric = select('chart-metric').value;
     const originalTitle = captured.options.plugins!.title!.text;
     const originalRatio = captured.options.devicePixelRatio;
+    const originalLegend = captured.options.plugins!.legend!.display;
     try {
       captured.options.responsive = false;
       captured.options.devicePixelRatio = 1;
+      captured.options.plugins!.legend!.display = true;
       captured.options.plugins!.title!.text = [
         (
           {
@@ -213,7 +309,7 @@ export function installReportFilters(
             boss: '妖王击杀存活中位（秒）',
           } as Record<string, string>
         )[metric],
-        title(),
+        ...titleLines(65),
         `测试 ${metadata.commit ?? '未知'} · ${metadata.generatedAt ?? '未知'}`,
       ];
       captured.resize(1200, metric === 'boss' ? 900 : 720);
@@ -226,7 +322,7 @@ export function installReportFilters(
       const url = URL.createObjectURL(blob),
         anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `qinglan-balance-${metric}-${ids.map((id) => select(id).value || 'all').join('-')}.png`;
+      anchor.download = `qinglan-balance-${metric}-${ids.map((id) => select(id).value || 'all').join('-')}-group-${grouping().join('-') || 'total'}-page-${groupPage + 1}.png`;
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
       chartStatus.textContent = '已生成 PNG 并请求浏览器保存；也可查看当前图表。';
@@ -234,9 +330,13 @@ export function installReportFilters(
       if (token === revision)
         chartStatus.textContent = errorMessage(error, '图片保存失败，请重试。');
     } finally {
+      exporting = false;
+      legend.querySelectorAll('button').forEach((button) => (button.disabled = false));
+      save.disabled = !chart || !ready;
       if (captured === chart && token === revision) {
         captured.options.plugins!.title!.text = originalTitle;
         captured.options.devicePixelRatio = originalRatio;
+        captured.options.plugins!.legend!.display = originalLegend;
         captured.options.responsive = true;
         captured.resize();
         captured.update('none');
