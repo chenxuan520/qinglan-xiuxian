@@ -24,6 +24,114 @@ function fixture() {
 }
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 
+function pagodaFixture(level: number, evolved = false) {
+  const g = new Game(freshSave('heaven', ['earth'], 'orthodox'), 0, 0, () => 0.99);
+  g.weapons = [{ id: 'pagoda', level, evolved, timer: 999 }];
+  g.spawnEnemy(0, false, false, { x: g.player.x + 100, y: g.player.y });
+  g.cast(g.weapons[0]);
+  g.enemies = [];
+  const z = g.zones[0];
+  const enemies = [20, 40, 60, 80, z.radius + 0.01].map((offset) => {
+    const e = g.spawnEnemy(0, false, false, { x: z.x + offset, y: z.y });
+    e.hp = e.maxHp = 10000;
+    return e;
+  });
+  return { g, z, enemies };
+}
+
+test('七宝塔低重每轮镇压两只，三重及仙器三只，副目标两成且不越出圆形范围', () => {
+  for (const [level, evolved] of [
+    [1, false],
+    [2, false],
+    [3, false],
+    [6, false],
+    [6, true],
+  ] as const) {
+    const { g, z, enemies } = pagodaFixture(level, evolved);
+    const count = level >= 3 || evolved ? 3 : 2;
+    near(z.radius, (210 + level * 15) * g.stats.area);
+    near(z.maxLife, 4.5 * g.stats.duration);
+    g.updateZones(0.01);
+    enemies.forEach((e, i) => near(e.maxHp - e.hp, i < count ? z.damage * (i ? 0.2 : 1) : 0));
+    near(g.damageBySource.pagoda, z.damage * (1 + (count - 1) * 0.2));
+    assert.equal(g.effects.filter((e) => e.kind === 'tower-ray').length, count);
+    const hp = enemies.map((e) => e.hp);
+    g.updateZones(0.2);
+    assert.deepEqual(
+      enemies.map((e) => e.hp),
+      hp,
+    );
+    g.updateZones(0.3);
+    enemies.forEach((e, i) => near(e.maxHp - e.hp, i < count ? z.damage * (i ? 0.4 : 2) : 0));
+  }
+});
+
+test('七宝塔跳过已死目标，主目标死亡后也不会重复命中或把余力叠给单只妖王', () => {
+  const { g, z, enemies } = pagodaFixture(3);
+  enemies[0].dead = true;
+  enemies[1].hp = z.damage / 2;
+  g.updateZones(0.01);
+  assert.equal(enemies[0].hp, enemies[0].maxHp);
+  assert.equal(enemies[1].dead, true);
+  near(enemies[2].maxHp - enemies[2].hp, z.damage * 0.2);
+  near(enemies[3].maxHp - enemies[3].hp, z.damage * 0.2);
+  assert.equal(enemies[4].hp, enemies[4].maxHp);
+  const solo = pagodaFixture(6, true);
+  solo.g.enemies = [];
+  const boss = solo.g.spawnEnemy(0, false, true, { x: solo.z.x + 20, y: solo.z.y });
+  boss.hp = boss.maxHp = 100000;
+  solo.g.updateZones(0.01);
+  near(boss.maxHp - boss.hp, solo.z.damage);
+  assert.equal(solo.g.effects.filter((e) => e.kind === 'tower-ray').length, 1);
+});
+
+test('七宝塔活动领域续局恢复后仍按同样的多目标、间隔与伤害结算', () => {
+  for (const level of [1, 3, 6]) {
+    const { g, enemies } = pagodaFixture(level, level === 6);
+    g.updateZones(0.01);
+    const restored = Game.restore(g.save, g.snapshot());
+    assert.ok(restored);
+    g.updateZones(0.5);
+    restored.updateZones(0.5);
+    assert.deepEqual(
+      restored.enemies.map((e) => e.hp),
+      enemies.map((e) => e.hp),
+    );
+    near(restored.damageBySource.pagoda, g.damageBySource.pagoda);
+    assert.deepEqual(restored.zones, g.zones);
+  }
+});
+
+test('七宝塔有空余目标名额时也不命中圆形边界或范围外的妖物', () => {
+  const { g, z, enemies } = pagodaFixture(3);
+  enemies.slice(1).forEach((e, i) => {
+    e.x = z.x + z.radius + i * 20;
+    e.y = z.y;
+  });
+  g.updateZones(0.01);
+  near(enemies[0].maxHp - enemies[0].hp, z.damage);
+  enemies.slice(1).forEach((e) => assert.equal(e.hp, e.maxHp));
+  assert.equal(g.effects.filter((e) => e.kind === 'tower-ray').length, 1);
+});
+
+test('多个七宝塔圈独立镇压，重叠圈续局后不漏伤或在单圈重复命中', () => {
+  const { g, z, enemies } = pagodaFixture(3);
+  g.cast(g.weapons[0]);
+  assert.equal(g.zones.length, 2);
+  g.updateZones(0.01);
+  enemies.forEach((e, i) => near(e.maxHp - e.hp, i < 3 ? z.damage * (i ? 0.4 : 2) : 0));
+  const restored = Game.restore(g.save, g.snapshot());
+  assert.ok(restored);
+  g.updateZones(0.5);
+  restored.updateZones(0.5);
+  assert.deepEqual(
+    restored.enemies.map((e) => e.hp),
+    enemies.map((e) => e.hp),
+  );
+  near(restored.damageBySource.pagoda, g.damageBySource.pagoda);
+  assert.deepEqual(restored.zones, g.zones);
+});
+
 test('白骨髅新配方、升级提示和自动选技都认白骨魔功，兼修也可金刚不坏', () => {
   for (const path of ['demonic', 'dual'] as const) {
     const g = fixture();

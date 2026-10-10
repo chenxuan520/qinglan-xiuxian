@@ -451,7 +451,7 @@ export const TREASURES: Treasure[] = [
     mark: '塔',
     color: '#f1d39a',
     tag: '镇守 · 灵塔',
-    desc: '在身侧立起灵塔，持续锁定附近妖物降下镇压灵光。',
+    desc: '在身侧立起灵塔，持续镇压附近两只妖物，三重起三只；副目标受到两成伤害。',
     evolution: '三十三天塔',
     passive: 'duration',
     damage: 23,

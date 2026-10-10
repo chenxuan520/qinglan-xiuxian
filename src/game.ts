@@ -2737,10 +2737,15 @@ export class Game {
                   : 1),
             );
         } else if (z.kind === 'pagoda') {
-          const target = this.nearest(z, new Set(), z.radius);
-          if (target) {
+          const weapon = this.weapons.find((w) => w.id === 'pagoda');
+          const count = weapon && (weapon.level >= 3 || weapon.evolved) ? 3 : 2;
+          const hit = new Set<number>();
+          for (let i = 0; i < count; i++) {
+            const target = this.nearest(z, hit, z.radius);
+            if (!target) break;
+            hit.add(target.id);
             this.effect(z.x, z.y, 0.3, 4, z.color, 'tower-ray', undefined, target.x, target.y);
-            this.hitEnemy(target, z.damage, false, z.kind);
+            this.hitEnemy(target, z.damage * (i === 0 ? 1 : 0.2), false, z.kind);
           }
         } else {
           const hits = this.enemies.some((e) => !e.dead && distance(e, z) < z.radius + e.radius);
