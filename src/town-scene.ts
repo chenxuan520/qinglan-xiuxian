@@ -1,5 +1,6 @@
 import { assetUrl } from './asset-url.ts';
-import { spriteStyle } from './sprites.ts';
+import type { CultivationPath } from './data.ts';
+import { PLAYER_IMAGES, playerSpriteBackground } from './player-appearance.ts';
 import {
   TOWN_WIDTH,
   TOWN_HEIGHT,
@@ -23,11 +24,11 @@ import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts
 import { hometownParents, type HometownState } from './hometown.ts';
 
 const TOWN_IMAGES = [
-  'town-ground.webp',
-  'town-buildings.webp',
-  'town-props.webp',
-  'town-npcs.webp',
-  'characters.webp',
+  '/assets/town-ground.webp',
+  '/assets/town-buildings.webp',
+  '/assets/town-props.webp',
+  '/assets/town-npcs.webp',
+  ...Object.values(PLAYER_IMAGES),
 ];
 
 export class TownScene {
@@ -66,6 +67,7 @@ export class TownScene {
     private population: TownPopulation,
     age: number,
     private interact: (npc: TownResident) => void,
+    private playerPath: () => CultivationPath,
     scenery?: TownScenery,
     private hometown?: {
       state: HometownState;
@@ -90,7 +92,7 @@ export class TownScene {
       })
       .join(
         '',
-      )}<div class="town-player" style="${spriteStyle(0)}"><span>你</span></div>${this.residents.map((npc) => `<div class="town-npc ${npc.id.startsWith('villager-') ? 'town-villager' : ''}" data-npc="${npc.id}" data-resident="${npc.id}:${npc.generation}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="town-npc-art" style="background-position:${(npc.art % 3) * 50}% ${Math.floor(npc.art / 3) * 50}%;filter:hue-rotate(${npc.tint}deg)"></span><span class="town-npc-name">${npc.name}<small>${npc.place} · ${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${TOWN_WIDTH} ${TOWN_HEIGHT}" aria-label="青岚镇方位图"><rect width="3600" height="2500" fill="#253b2d"/><rect x="3180" width="420" height="2500" fill="#315658"/>${TOWN_STREETS.map(([x, y, r, b]) => `<rect x="${x}" y="${y}" width="${r - x}" height="${b - y}" fill="#8b8d72"/>`).join('')}${this.layout.npcs.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="37" fill="#dbc17a"/>`).join('')}<circle class="town-map-marker" r="45" fill="#fff" stroke="#315e41" stroke-width="16"/></svg><div class="town-loading" role="status"><div>青岚镇 · 街巷铺展中<progress max="${TOWN_IMAGES.length}" value="0" aria-label="城镇加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
+      )}<div class="town-player" style="background:${playerSpriteBackground(playerPath())}"><span>你</span></div>${this.residents.map((npc) => `<div class="town-npc ${npc.id.startsWith('villager-') ? 'town-villager' : ''}" data-npc="${npc.id}" data-resident="${npc.id}:${npc.generation}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="town-npc-art" style="background-position:${(npc.art % 3) * 50}% ${Math.floor(npc.art / 3) * 50}%;filter:hue-rotate(${npc.tint}deg)"></span><span class="town-npc-name">${npc.name}<small>${npc.place} · ${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${TOWN_WIDTH} ${TOWN_HEIGHT}" aria-label="青岚镇方位图"><rect width="3600" height="2500" fill="#253b2d"/><rect x="3180" width="420" height="2500" fill="#315658"/>${TOWN_STREETS.map(([x, y, r, b]) => `<rect x="${x}" y="${y}" width="${r - x}" height="${b - y}" fill="#8b8d72"/>`).join('')}${this.layout.npcs.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="37" fill="#dbc17a"/>`).join('')}<circle class="town-map-marker" r="45" fill="#fff" stroke="#315e41" stroke-width="16"/></svg><div class="town-loading" role="status"><div>青岚镇 · 街巷铺展中<progress max="${TOWN_IMAGES.length}" value="0" aria-label="城镇加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.town-map')!;
     this.player = host.querySelector('.town-player')!;
     if (hometown) {
@@ -210,7 +212,7 @@ export class TownScene {
               resolve();
             };
             img.onerror = reject;
-            img.src = assetUrl(`assets/${name}`);
+            img.src = assetUrl(name);
           }),
       ),
     )
@@ -398,6 +400,11 @@ export class TownScene {
     if (transform !== this.lastTransform) {
       this.map.style.transform = transform;
       this.lastTransform = transform;
+    }
+    const path = this.playerPath();
+    if (this.player.dataset.path !== path) {
+      this.player.style.background = playerSpriteBackground(path);
+      this.player.dataset.path = path;
     }
     this.player.style.left = `${this.position.x}px`;
     this.player.style.top = `${this.position.y}px`;

@@ -1,5 +1,6 @@
 import { ENEMIES, STAGES, STAGE_ENEMIES, FINAL_TRIAL_STAGE } from './data.ts';
 import { SPRITE_ATLASES, spriteFrame } from './sprites.ts';
+import { PLAYER_IMAGES } from './player-appearance.ts';
 
 export function sceneAssets(stage: number, tribulation = false, extraSprites: number[] = []) {
   const sprites = tribulation
@@ -13,6 +14,7 @@ export function sceneAssets(stage: number, tribulation = false, extraSprites: nu
   return [
     ...new Set([
       STAGES[tribulation ? FINAL_TRIAL_STAGE : stage].terrain,
+      ...Object.values(PLAYER_IMAGES),
       ...sprites.map((index) => SPRITE_ATLASES[spriteFrame(index).atlas].url),
       '/assets/treasures-1.webp',
       '/assets/treasures-2.webp',

@@ -4,12 +4,14 @@ import { readFileSync } from 'node:fs';
 import { sceneAssets } from '../src/scene-assets.ts';
 import { STAGES, STAGE_ENEMIES, ENEMIES } from '../src/data.ts';
 import { spriteFrame } from '../src/sprites.ts';
+import { PLAYER_IMAGES } from '../src/player-appearance.ts';
 
 test('每境预加载本地图、全部本境敌人及首领，终境覆盖七王与召唤兵种', () => {
   for (let stage = 0; stage < STAGES.length; stage++) {
     const urls = sceneAssets(stage);
     assert.ok(urls.includes(STAGES[stage].terrain));
     assert.ok(urls.includes(spriteFrame(0).url));
+    for (const url of Object.values(PLAYER_IMAGES)) assert.ok(urls.includes(url));
     for (const type of STAGE_ENEMIES[stage])
       assert.ok(urls.includes(spriteFrame(ENEMIES[type].sprite).url));
     for (const boss of stage === 6 ? STAGES : [STAGES[stage]])
@@ -20,7 +22,7 @@ test('每境预加载本地图、全部本境敌人及首领，终境覆盖七�
   assert.equal(first.filter((url) => url.includes('terrain')).length, 1);
   assert.ok(!first.some((url) => /sects|town|enemies-heaven|boss-immortal/.test(url)));
   assert.ok(
-    first.reduce((total, url) => total + readFileSync(`public${url}`).length, 0) < 3_000_000,
+    first.reduce((total, url) => total + readFileSync(`public${url}`).length, 0) < 3_600_000,
   );
 });
 test('旧续局额外妖物补载；天劫只加载对应首领、角色与终境地图', () => {
@@ -28,6 +30,7 @@ test('旧续局额外妖物补载；天劫只加载对应首领、角色与终�
   const urls = sceneAssets(0, true);
   assert.ok(urls.includes(STAGES[6].terrain));
   assert.ok(urls.includes(spriteFrame(81).url));
+  for (const url of Object.values(PLAYER_IMAGES)) assert.ok(urls.includes(url));
   assert.ok(!urls.includes(STAGES[0].terrain));
 });
 test('城镇与九职业NPC、正魔宗门图集均为有效压缩资源', () => {
