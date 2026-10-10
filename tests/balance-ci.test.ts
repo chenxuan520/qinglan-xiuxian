@@ -36,7 +36,8 @@ test('真实六关模拟与七关默认模拟前缀完全相同，不进入终�
     all = simulateCampaign(c);
   assert.equal(six.cleared, 6);
   assert.equal(six.complete, false);
-  assert.equal(all.complete, true);
+  assert.ok(all.battles.some((battle) => battle.stage === 6));
+  assert.equal(all.complete, all.cleared === 7);
   assert.deepEqual(
     six.battles,
     all.battles.filter((b) => b.stage < 6),

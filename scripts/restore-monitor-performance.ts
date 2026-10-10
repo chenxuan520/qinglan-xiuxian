@@ -26,7 +26,7 @@ export function eligiblePerformanceRun(
     run.head_branch === 'master' &&
     run.head_repository?.full_name === repository &&
     (render
-      ? ['schedule', 'workflow_dispatch'].includes(run.event)
+      ? ['schedule', 'workflow_dispatch', 'push'].includes(run.event)
       : run.status === 'completed' && ['push', 'workflow_dispatch'].includes(run.event))
   );
 }
@@ -74,7 +74,11 @@ export function restorePerformance(
       continue;
     }
     // 不把网络/权限故障伪装成从未采样；发布步骤失败，保持上次完整部署。
-    const artifacts = newestArtifacts(
+    const artifacts = newestArtifacts<{
+      created_at: string;
+      expired: boolean;
+      workflow_run: { id: number; head_branch: string };
+    }>(
       api(`repos/${repository}/actions/artifacts?name=${name}&per_page=100`, true).flatMap(
         (page: {
           artifacts: {

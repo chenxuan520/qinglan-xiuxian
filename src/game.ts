@@ -1586,7 +1586,7 @@ export class Game {
     const scaling = STAGE_COMBAT_SCALING[this.stage];
     const eliteScaling = elite && !boss ? scaling.elite : undefined;
     const progress = this.combatProgress;
-    // 妖王排程独立于小怪压力，仍用七分钟达到原十分钟的气血峰值。
+    // 妖王排程独立于小怪压力；小怪五分钟达到固定峰值，之后不再增强。
     const strengthTime = this.isFinalTrial ? progress * 600 : this.time;
     const strength = (1 + strengthTime / 260) * (1 + this.stage * 0.22);
     const hp = boss

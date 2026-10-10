@@ -123,6 +123,7 @@ import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
 import { imageDownloadUrl, shareImage } from './image-share.ts';
 import { ScreenAwake } from './screen-awake.ts';
+import { FrameRate } from './frame-rate.ts';
 import { runLootContent } from './run-loot-ui.ts';
 import { TownScene } from './town-scene.ts';
 import { TOWN_START, HOMETOWN_START, townClockRunning } from './town.ts';
@@ -179,6 +180,7 @@ const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const modal = document.querySelector<HTMLDivElement>('#modal-root')!;
 const joystick = document.querySelector<HTMLDivElement>('#joystick')!;
 const renderer = new Renderer(document.querySelector<HTMLCanvasElement>('#world')!);
+const frameRate = new FrameRate();
 let sceneLoading = false;
 let storageAvailable = true;
 let raw: string | null = null;
@@ -1390,7 +1392,7 @@ function renderPause() {
   panelFrame(
     '静心片刻',
     '修行暂歇',
-    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · 已斩 ${game.kills} 妖</p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重 ${weaponAffinity(treasure(w.id), game!.spiritRoot, game!.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${game.tribulation ? '放弃本次天劫会强制轮回，清空这一世进度。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton(save.autoplay)}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${game.tribulation ? '放弃渡劫 · 轮回' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
+    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · <span class="pause-kills">已斩 ${game.kills} 妖<small class="pause-frame-rate" title="暂停前最近一秒的平均帧率">${frameRate.value === undefined ? '帧率采样中' : `${frameRate.value} FPS`}</small></span></p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重 ${weaponAffinity(treasure(w.id), game!.spiritRoot, game!.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${game.tribulation ? '放弃本次天劫会强制轮回，清空这一世进度。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton(save.autoplay)}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon">${game.tribulation ? '放弃渡劫 · 轮回' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
   );
 }
 function gameEvent(name: string) {
@@ -1694,6 +1696,7 @@ function startRun() {
   rewards = null;
   abandonConfirm = false;
   game = new Game(save, selectedStage, difficulty);
+  frameRate.reset();
   game.onEvent = gameEvent;
   telemetry.track({ type: 'run-start', ...lifeStats(), stage: selectedStage, difficulty });
   previousState = 'playing';
@@ -1711,6 +1714,7 @@ function restoreRun() {
     return;
   }
   game = pendingRun;
+  frameRate.reset();
   pendingRun = null;
   settled = false;
   rewards = null;
@@ -1838,6 +1842,7 @@ function beginTribulation() {
   const source = game && !settled ? game : pendingRun;
   save.tribulationReturn = source?.snapshot() ?? null;
   game = Game.createTribulation(save, source);
+  frameRate.reset();
   pendingRun = null;
   settled = false;
   rewards = null;
@@ -3142,6 +3147,7 @@ window.addEventListener('focus', () => {
 });
 document.addEventListener('visibilitychange', () => {
   lastMortalTick = performance.now();
+  frameRate.sample(0, false);
   if (document.hidden) {
     clearInput();
     if (!save.autoplay && game?.state === 'playing') handleAction('pause');
@@ -3330,6 +3336,7 @@ function tick(now: number, draw: boolean) {
 function frame(now: number) {
   // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
   requestAnimationFrame(frame);
+  frameRate.sample(now, !document.hidden && !inMortalWorld && game?.state === 'playing');
   syncScreenAwake();
   if (saveLock && !modal.querySelector('.save-lock')) renderSaveLock();
   if (save.journeyEnded) return;

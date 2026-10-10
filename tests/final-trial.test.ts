@@ -8,6 +8,7 @@ import {
   TRIAL_BOSS_TIMES,
   LEGACY_TRIAL_BOSS_TIMES,
   STAGE_REALM_STEPS,
+  TRIAL_PRESSURE_SECONDS,
 } from '../src/data.ts';
 import {
   freshSave,
@@ -54,7 +55,11 @@ test('终关追击精英有冲刺；前六位首领三招，仙尊六招每轮�
   g.time = 60;
   const chase = g.spawnEnemy(65, false, false, { x: 300, y: 0 });
   // 中段精英独立加强，终关开场仍保留原有构筑空间与渐进速度。
-  const expectedSpeed = Math.max(100, ENEMIES[65].speed * (1.05 + 0.3 / 7)) * (1 + 0.3 / 7) * 1.21;
+  const progress = 60 / TRIAL_PRESSURE_SECONDS;
+  const expectedSpeed =
+    Math.max(95 + 35 * progress, ENEMIES[65].speed * (1.05 + 0.3 * progress)) *
+    (1 + 0.3 * progress) *
+    1.21;
   assert.ok(Math.abs(chase.speed - expectedSpeed) < 1e-8);
   chase.cooldown = 0;
   g.update(0.01);

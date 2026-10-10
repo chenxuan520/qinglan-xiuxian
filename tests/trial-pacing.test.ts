@@ -107,8 +107,8 @@ test('旧七分钟续局继续旧排程及并场规则，新局刷新不缩时�
   assert.equal(Game.restore(current.save, { ...current.snapshot(), trialBossSchedule: 6 }), null);
 });
 
-test('新终关缩短妖王等待但小怪压力保持420秒曲线，不提前拉到峰值', () => {
-  for (const time of [0, 60, 150, 330, 420, 900]) {
+test('新旧出王排程均使用五分钟小怪压力曲线，排程不改变小怪属性', () => {
+  for (const time of [0, 60, 150, 299, 300, 330, 420, 900]) {
     const current = trial();
     const legacy = trial();
     legacy.trialBossSchedule = 4;

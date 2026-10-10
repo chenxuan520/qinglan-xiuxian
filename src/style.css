@@ -2638,6 +2638,17 @@ kbd {
   color: #baccb0;
   letter-spacing: 2px;
 }
+.pause-frame-rate {
+  margin-left: 8px;
+  color: #a6b69e;
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+.pause-kills {
+  display: inline-block;
+  white-space: nowrap;
+}
 .lifespan-story {
   max-width: 40em;
   margin-bottom: 24px;

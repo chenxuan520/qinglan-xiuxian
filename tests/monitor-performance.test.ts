@@ -115,6 +115,7 @@ test('性能 artifact 仅采纳本仓库 master 正式任务，渲染可在全�
     status: 'in_progress',
   };
   assert.equal(eligiblePerformanceRun(run, repo, true), true);
+  assert.equal(eligiblePerformanceRun({ ...run, event: 'push' }, repo, true), true);
   for (const patch of [
     { path: '.github/workflows/evil.yml' },
     { head_branch: 'feature' },

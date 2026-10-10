@@ -29,6 +29,8 @@ export function installReportFilters(
   const status = document.getElementById('filter-status')!;
   const chartStatus = document.getElementById('chart-status')!;
   const save = document.getElementById('save-chart') as HTMLButtonElement;
+  const generate = document.getElementById('generate-chart') as HTMLButtonElement;
+  const stale = document.getElementById('chart-stale')!;
   const groupInputs = [...document.querySelectorAll<HTMLInputElement>('#chart-grouping input')];
   const legend = document.getElementById('chart-legend')!;
   const previous = document.getElementById('chart-previous') as HTMLButtonElement;
@@ -48,8 +50,9 @@ export function installReportFilters(
   const observed = new Set(observedKeys);
   let data: Promise<CampaignSample[]> | undefined,
     revision = 0,
+    filterRevision = 0,
     chart: Chart | undefined,
-    requested = false,
+    dirty = false,
     groupPage = 0,
     groupTotal = 0,
     exporting = false;
@@ -77,10 +80,24 @@ export function installReportFilters(
   const hideChart = () => {
     chart?.destroy();
     chart = undefined;
+    dirty = false;
+    stale.hidden = true;
     document.getElementById('chart-wrap')!.hidden = true;
     save.disabled = true;
     legend.replaceChildren();
     document.getElementById('chart-pagination')!.hidden = true;
+  };
+  const markChartStale = () => {
+    dirty = !!chart;
+    stale.hidden = !dirty;
+    save.disabled = true;
+    previous.disabled = true;
+    next.disabled = true;
+    select('chart-page').disabled = true;
+    legend.querySelectorAll('button').forEach((button) => (button.disabled = true));
+    chartStatus.textContent = dirty
+      ? '图表已过期，请点击「生成图表」应用当前筛选条件及汇总规则。'
+      : '选择筛选条件及汇总维度后，点击「生成图表」；更改条件不会自动重画。';
   };
   const groupRange = () =>
     groupTotal > pageSize
@@ -126,6 +143,7 @@ export function installReportFilters(
     });
     select('chart-page').replaceChildren(...pages);
     select('chart-page').value = String(groupPage);
+    select('chart-page').disabled = false;
     document.getElementById('chart-wrap')!.hidden = false;
     document.getElementById('chart-wrap')!.style.height = metric === 'boss' ? '640px' : '420px';
     const config: ChartConfiguration = {
@@ -183,7 +201,7 @@ export function installReportFilters(
         text.textContent = dataset.label;
         button.append(swatch, text);
         button.addEventListener('click', () => {
-          if (exporting || captured !== chart) return;
+          if (exporting || dirty || captured !== chart) return;
           const visible = !captured.isDatasetVisible(index);
           captured.setDatasetVisibility(index, visible);
           captured.update('none');
@@ -198,12 +216,14 @@ export function installReportFilters(
       chartStatus.textContent = '图表生成失败，请重试。';
     }
   }
-  async function apply() {
-    const token = ++revision,
+  async function apply(render = false) {
+    const token = ++filterRevision,
+      chartToken = ++revision,
       filters = selection();
+    generate.disabled = render;
     ready = false;
     groupPage = 0;
-    hideChart();
+    markChartStale();
     selectedPlan = plan.filter((c) => matches(c, filters));
     selectedText =
       ids
@@ -212,7 +232,7 @@ export function installReportFilters(
         .join(' / ') || '全部条件';
     const extra = !!(filters.path || filters.starter || filters.device);
     status.textContent = `筛选计划 ${selectedPlan.length} 条${extra ? '，正在重新统计…' : ''}`;
-    if (requested) chartStatus.textContent = '正在更新当前筛选图表…';
+    if (render) chartStatus.textContent = '正在生成当前筛选图表…';
     if (!extra) {
       bodies.forEach((body, i) => {
         body.innerHTML = original[i];
@@ -231,13 +251,17 @@ export function installReportFilters(
       });
     if (!selectedPlan.length) {
       status.textContent = '该组合没有测试计划样本，请调整筛选。';
-      if (requested) draw();
+      if (render) {
+        hideChart();
+        chartStatus.textContent = '当前筛选没有测试样本，无法生成图表。';
+      }
+      generate.disabled = false;
       return;
     }
-    if (!extra && !requested) return;
+    if (!extra && !render) return;
     try {
       const rows = await load();
-      if (token !== revision) return;
+      if (token !== filterRevision) return;
       selectedRows = rows.filter((r) => matches(r.case, filters));
       if (extra) {
         const tables = reportTables(selectedRows, selectedPlan, labels, true);
@@ -247,11 +271,13 @@ export function installReportFilters(
       }
       ready = true;
       status.textContent = `返回 ${selectedRows.length}/${selectedPlan.length} 条；路线、本命或场地子组为独立统计，不套用整体门禁区间。`;
-      if (requested) draw();
+      if (render && chartToken === revision) draw();
     } catch (error) {
-      if (token !== revision) return;
+      if (token !== filterRevision) return;
       status.textContent = errorMessage(error, '统计数据无法读取，请重试或查看原始数据。');
       chartStatus.textContent = '统计数据未就绪，无法生成或保存图表。';
+    } finally {
+      if (chartToken === revision) generate.disabled = false;
     }
   }
   ids.forEach((id) => select(id).addEventListener('change', () => void apply()));
@@ -260,20 +286,18 @@ export function installReportFilters(
     void apply();
   });
   document.getElementById('generate-chart')!.addEventListener('click', () => {
-    requested = true;
-    void apply();
+    void apply(true);
   });
-  select('chart-metric').addEventListener('change', () => {
-    if (requested) void apply();
-  });
-  groupInputs.forEach((input) =>
-    input.addEventListener('change', () => {
-      if (requested) void apply();
-    }),
-  );
+  const changeChartRule = () => {
+    revision++;
+    generate.disabled = false;
+    markChartStale();
+  };
+  select('chart-metric').addEventListener('change', changeChartRule);
+  groupInputs.forEach((input) => input.addEventListener('change', changeChartRule));
   [previous, next].forEach((button, index) =>
     button.addEventListener('click', () => {
-      if (!ready || button.disabled) return;
+      if (!ready || dirty || exporting || button.disabled) return;
       revision++;
       groupPage += index === 0 ? -1 : 1;
       draw();
@@ -281,13 +305,21 @@ export function installReportFilters(
   );
   select('chart-page').addEventListener('change', () => {
     const page = Number(select('chart-page').value);
-    if (!ready || !Number.isInteger(page) || page < 0 || page * pageSize >= groupTotal) return;
+    if (
+      !ready ||
+      dirty ||
+      exporting ||
+      !Number.isInteger(page) ||
+      page < 0 ||
+      page * pageSize >= groupTotal
+    )
+      return;
     revision++;
     groupPage = page;
     draw();
   });
   save.addEventListener('click', async () => {
-    if (!chart || !ready || exporting) return;
+    if (!chart || !ready || dirty || exporting) return;
     exporting = true;
     save.disabled = true;
     legend.querySelectorAll('button').forEach((button) => (button.disabled = true));
@@ -331,16 +363,16 @@ export function installReportFilters(
         chartStatus.textContent = errorMessage(error, '图片保存失败，请重试。');
     } finally {
       exporting = false;
-      legend.querySelectorAll('button').forEach((button) => (button.disabled = false));
-      save.disabled = !chart || !ready;
-      if (captured === chart && token === revision) {
+      legend.querySelectorAll('button').forEach((button) => (button.disabled = dirty));
+      save.disabled = !chart || !ready || dirty;
+      if (captured === chart) {
         captured.options.plugins!.title!.text = originalTitle;
         captured.options.devicePixelRatio = originalRatio;
         captured.options.plugins!.legend!.display = originalLegend;
         captured.options.responsive = true;
         captured.resize();
         captured.update('none');
-        save.disabled = false;
+        save.disabled = !ready || dirty;
       }
     }
   });
