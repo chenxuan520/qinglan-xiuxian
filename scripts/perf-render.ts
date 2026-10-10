@@ -214,6 +214,35 @@ async function launchChrome(
   return { chrome, devtoolsPort: new URL(wsUrl).port };
 }
 
+// SIGTERM 发出后浏览器仍可能写 profile；等进程与管道关闭后才能删除目录。
+export async function stopRenderProcess(child: ChildProcess | undefined): Promise<void> {
+  if (!child) return;
+  if (
+    (child.exitCode !== null || child.signalCode !== null) &&
+    [child.stdin, child.stdout, child.stderr].every((stream) => !stream || stream.closed)
+  )
+    return;
+  await new Promise<void>((ok, fail) => {
+    let forced: ReturnType<typeof setTimeout> | undefined;
+    const finish = (error?: Error) => {
+      clearTimeout(graceful);
+      clearTimeout(forced);
+      child.removeListener('close', closed);
+      child.removeListener('error', finish);
+      if (error) fail(error);
+      else ok();
+    };
+    const closed = () => finish();
+    const graceful = setTimeout(() => {
+      child.kill('SIGKILL');
+      forced = setTimeout(() => finish(new Error('Chrome 退出超时')), 2000);
+    }, 5000);
+    child.once('close', closed);
+    child.once('error', finish);
+    child.kill();
+  });
+}
+
 export async function collectRenderSample(options?: { seconds?: number }) {
   const seconds = options?.seconds ?? 60;
   const outDir = 'artifacts/perf-render';
@@ -284,24 +313,20 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     return summarizeRender(data.gaps, data.tasks);
   } finally {
     session?.close();
-    if (chrome) {
-      // 等 Chrome 真正退出再清理临时 profile；清理属收尾工作，失败不影响报告。
-      await new Promise<void>((resolveExit) => {
-        const timer = setTimeout(resolveExit, 10_000);
-        chrome!.once('exit', () => {
-          clearTimeout(timer);
-          resolveExit();
-        });
-        chrome!.kill();
-      });
+    try {
+      await stopRenderProcess(chrome);
+    } catch {
+      // 保留上游语义：进程收尾失败不抹掉已经完成的真实采样。
+      console.warn('Chrome 清理未完成，保留已完成的采样结果。');
+    } finally {
+      server.kill();
+      if (userDataDir)
+        try {
+          rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+        } catch {
+          console.warn('临时浏览器目录清理未完成，保留已完成的采样结果。');
+        }
     }
-    server.kill();
-    if (userDataDir)
-      try {
-        rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-      } catch {
-        // 临时目录残留不视为失败。
-      }
   }
 }
 
