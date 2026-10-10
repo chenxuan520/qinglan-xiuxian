@@ -67,7 +67,7 @@ curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnos
 
 - `perf:sim` 每次 push / PR 在 Balance gate 快检与 Pages 部署链路中执行：固定种子在 Node 里驱动真实 `Game`，场景为第六境后期满配自动历练 90 秒、第七境满配逢妖王 90 秒、第六境妖王弹幕 75 秒，逐帧计 `g.update` 耗时统计均值 / p50 / p95 / 最差帧与敌人、弹丸峰值。预算为宽松兜底（p95 ≤ 4ms，最差帧 ≤ 60ms；2026-10 本机基线约 p95 0.12–0.62ms），只拦战斗模拟的灾难性复杂度回归，不随机器快慢抖动；超出预算或场景持续推进不足 30 秒非零退出。
 - `size:check` 同源链路执行：独立目录 `artifacts/size-check` 以根路径构建后按 `index.html` 引用定位入口 JS/CSS，校验原始与 gzip 字节（JS ≤ 550,000 / gzip ≤ 210,000，CSS ≤ 150,000 / gzip ≤ 35,000；2026-10 基线 451,039 / 169,642 / 125,815 / 27,266）。防止依赖或素材误打进产物。
-- `perf:render` 每天与手动 full 一起跑（`perf-render` job，不卡门禁）：无头 Chrome（CI 的 ubuntu-latest 自带 google-chrome，本地用 `CHROME_PATH` 指定）加载根路径独立构建，写入一份自动生成的「第六境后期满配」可恢复存档（`perfSaveFixture()` 用真实 `Game` 模拟 10 秒后快照），恢复历练后采样 60 秒 rAF 帧间隔与长任务，输出 `artifacts/perf-render/report.json`、`summary.md` 与结帧截图。无头软渲染远低于真机帧率，数据仅作日报观测，不设门槛，不与真实设备比较；浏览器或页面流程出错才非零退出。三方依赖仅 `puppeteer-core`，不下载浏览器。
+- `perf:render` 每天与手动 full 一起跑（`perf-render` job，不卡门禁）：无头 Chrome（CI 的 ubuntu-latest 自带 google-chrome，本地用 `CHROME_PATH` 指定）加载根路径独立构建，写入一份自动生成的「第六境后期满配」可恢复存档（`perfSaveFixture()` 用真实 `Game` 模拟 10 秒后快照），恢复历练后采样 60 秒 rAF 帧间隔与长任务，输出 `artifacts/perf-render/report.json`、`summary.md` 与结帧截图。无头软渲染远低于真机帧率，数据仅作日报观测，不设门槛，不与真实设备比较；浏览器或页面流程出错才非零退出。不引入任何新依赖：直接用 Node 22 内置 WebSocket 走 Chrome DevTools Protocol 驱动浏览器（`scripts/perf-render.ts` 自带极简 CDP 客户端），避免浏览器驱动库拖入安装链。
 
 ## 可选离线资源缓存
 
