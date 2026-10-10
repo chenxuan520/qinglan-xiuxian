@@ -5,7 +5,6 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import puppeteer, { type Browser, type Page } from 'puppeteer-core';
 import { Game } from '../src/game.ts';
 import { freshSave, realmCost, SAVE_KEY } from '../src/progress.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
@@ -96,9 +95,112 @@ async function waitForServer(url: string, server: ChildProcess) {
   }
 }
 
-async function click(page: Page, selector: string) {
-  await page.waitForSelector(selector, { timeout: 30_000 });
-  await page.click(selector);
+// 极简 CDP 客户端：只用 Node 22 内置 WebSocket 与 fetch，不引入任何浏览器驱动依赖。
+class CdpSession {
+  private seq = 0;
+  private pending = new Map<number, { ok: (value: any) => void; fail: (error: Error) => void }>();
+  private listeners = new Map<string, ((params: any) => void)[]>();
+  private ws: WebSocket;
+  private constructor(ws: WebSocket) {
+    this.ws = ws;
+    ws.addEventListener('message', (event) => {
+      const msg = JSON.parse(String(event.data));
+      if (msg.id !== undefined && this.pending.has(msg.id)) {
+        const { ok, fail } = this.pending.get(msg.id)!;
+        this.pending.delete(msg.id);
+        if (msg.error) fail(new Error(`CDP ${msg.error.message || '调用失败'}`));
+        else ok(msg.result);
+      } else if (msg.method) {
+        for (const handler of this.listeners.get(msg.method) ?? []) handler(msg.params);
+      }
+    });
+  }
+  static async connect(url: string): Promise<CdpSession> {
+    const ws = new WebSocket(url);
+    await new Promise<void>((ok, fail) => {
+      ws.addEventListener('open', () => ok(), { once: true });
+      ws.addEventListener('error', () => fail(new Error(`CDP 连接失败：${url}`)), { once: true });
+    });
+    return new CdpSession(ws);
+  }
+  send<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+    const id = ++this.seq;
+    return new Promise<T>((ok, fail) => {
+      this.pending.set(id, { ok, fail });
+      this.ws.send(JSON.stringify({ id, method, params }));
+    });
+  }
+  nextEvent(method: string): Promise<unknown> {
+    return new Promise((ok) => {
+      const handler = (params: unknown) => {
+        this.listeners.set(
+          method,
+          (this.listeners.get(method) ?? []).filter((h) => h !== handler),
+        );
+        ok(params);
+      };
+      this.listeners.set(method, [...(this.listeners.get(method) ?? []), handler]);
+    });
+  }
+  close() {
+    this.ws.close();
+  }
+}
+async function evalJs<T>(session: CdpSession, expression: string): Promise<T> {
+  const result = await session.send<{
+    result: { value: T };
+    exceptionDetails?: { text?: string; exception?: { description?: string } };
+  }>('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  if (result.exceptionDetails)
+    throw new Error(
+      `页面脚本执行失败：${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`,
+    );
+  return result.result.value;
+}
+async function clickAction(session: CdpSession, action: string) {
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    if (
+      await evalJs<boolean>(
+        session,
+        `!!document.querySelector('[data-action="${action}"]:not([hidden]):not(:disabled)')`,
+      )
+    ) {
+      await evalJs(session, `document.querySelector('[data-action="${action}"]').click()`);
+      return;
+    }
+    if (Date.now() > deadline) throw new Error(`30 秒内未出现可点击的 ${action}`);
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+  }
+}
+async function launchChrome(): Promise<{ chrome: ChildProcess; devtoolsPort: string }> {
+  const chrome = spawn(
+    findChrome(),
+    [
+      '--headless=new',
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+      '--window-size=1365,900',
+      '--remote-debugging-port=0',
+      'about:blank',
+    ],
+    { stdio: ['ignore', 'ignore', 'pipe'] },
+  );
+  const wsUrl = await new Promise<string>((ok, fail) => {
+    const timer = setTimeout(() => {
+      chrome.kill(); // 超时立即回收进程，避免无头 Chrome 残留在本机
+      fail(new Error('Chrome 15 秒未输出 DevTools 地址'));
+    }, 15_000);
+    chrome.stderr!.on('data', (chunk) => {
+      const match = String(chunk).match(/DevTools listening on (ws:\/\/\S+)/);
+      if (match) {
+        clearTimeout(timer);
+        ok(match[1]);
+      }
+    });
+    chrome.on('exit', (code) => fail(new Error(`Chrome 提前退出（${code}）`)));
+  });
+  return { chrome, devtoolsPort: new URL(wsUrl).port };
 }
 
 export async function collectRenderSample(options?: { seconds?: number }) {
@@ -115,47 +217,54 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     ['vite', 'preview', '--outDir', `${outDir}/site`, '--port', '5199', '--strictPort'],
     { stdio: 'ignore' },
   );
-  let browser: Browser | undefined;
+  let chrome: ChildProcess | undefined;
+  let session: CdpSession | undefined;
   try {
     await waitForServer('http://localhost:5199/', server);
-    browser = await puppeteer.launch({
-      executablePath: findChrome(),
-      headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
-    });
-    const page = await browser.newPage();
-    await page.setViewport({ width: 1365, height: 900 });
-    await page.goto('http://localhost:5199/', { waitUntil: 'load' });
-    const fixture = perfSaveFixture();
-    await page.evaluate((key, data) => localStorage.setItem(key, data), SAVE_KEY, fixture);
-    await page.reload({ waitUntil: 'load' });
-    await click(page, '[data-action="restore"]');
-    await click(page, '[data-action="resume"]');
-    await new Promise((resolve) => setTimeout(resolve, 8000));
-    await page.evaluate(() => {
-      const gaps: number[] = [];
-      const tasks: number[] = [];
-      new PerformanceObserver((list) =>
-        list.getEntries().forEach((entry) => tasks.push(entry.duration)),
-      ).observe({ type: 'longtask' });
+    const launched = await launchChrome();
+    chrome = launched.chrome;
+    const targets = (await (
+      await fetch(`http://127.0.0.1:${launched.devtoolsPort}/json/list`)
+    ).json()) as { type: string; webSocketDebuggerUrl: string }[];
+    const page = targets.find((target) => target.type === 'page');
+    if (!page) throw new Error('Chrome 无可用页面标签');
+    session = await CdpSession.connect(page.webSocketDebuggerUrl);
+    await session.send('Page.enable');
+    await session.send('Runtime.enable');
+    const firstLoad = session.nextEvent('Page.loadEventFired');
+    await session.send('Page.navigate', { url: 'http://localhost:5199/' });
+    await firstLoad;
+    await evalJs(
+      session,
+      `localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(perfSaveFixture())})`,
+    );
+    const reloaded = session.nextEvent('Page.loadEventFired');
+    await session.send('Page.navigate', { url: 'http://localhost:5199/' });
+    await reloaded;
+    await clickAction(session, 'restore');
+    await clickAction(session, 'resume');
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 8000));
+    await evalJs(
+      session,
+      `(() => { const gaps = []; const tasks = [];
+      new PerformanceObserver((list) => list.getEntries().forEach((e) => tasks.push(e.duration))).observe({ type: 'longtask' });
       let last = performance.now();
-      const tick = (now: number) => {
-        gaps.push(now - last);
-        last = now;
-        requestAnimationFrame(tick);
-      };
+      const tick = (now) => { gaps.push(now - last); last = now; requestAnimationFrame(tick); };
       requestAnimationFrame(tick);
-      (window as unknown as { __perf: unknown }).__perf = { gaps, tasks };
-    });
-    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-    const data = await page.evaluate(() => {
-      const perf = (window as unknown as { __perf: { gaps: number[]; tasks: number[] } }).__perf;
-      return { gaps: perf.gaps, tasks: perf.tasks };
-    });
-    await page.screenshot({ path: `${outDir}/frame.png` });
+      window.__perf = { gaps, tasks };
+      return true; })()`,
+    );
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, seconds * 1000));
+    const data = await evalJs<{ gaps: number[]; tasks: number[] }>(
+      session,
+      '(() => ({ gaps: window.__perf.gaps, tasks: window.__perf.tasks }))()',
+    );
+    const shot = await session.send<{ data: string }>('Page.captureScreenshot');
+    writeFileSync(`${outDir}/frame.png`, Buffer.from(shot.data, 'base64'));
     return summarizeRender(data.gaps, data.tasks);
   } finally {
-    await browser?.close();
+    session?.close();
+    chrome?.kill();
     server.kill();
   }
 }
