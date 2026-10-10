@@ -1,5 +1,15 @@
 # 验证记录
 
+## 性能门禁与每日渲染实测 CI（2026-10-10）
+
+本次只新增持续集成脚本与工作流，不修改游戏战斗、成长、界面或存档。两个轻量门禁 `perf:sim`（固定种子高压场景逐帧模拟耗时）与 `size:check`（独立构建后入口 JS/CSS 体积预算）挂入 Balance 快检与 Pages 部署链路；每日/手动 full 的 `perf-render` 用无头 Chrome 恢复高压续局采样 60 秒帧率与长任务，只报告不卡关。实际验证记录如下：
+
+- 模拟基准三场景本地实测（Node 22）：第六境后期满配 90 秒 2700 帧，p95 0.62ms / 最差 9.6ms，峰值敌人 73 弹丸 92；第七境满配 90 秒 2700 帧遇多批妖王，p95 0.18ms；第六境妖王弹幕 75 秒 2250 帧，p95 0.12ms，峰值弹丸 80。预算 p95 ≤ 4ms、最差 ≤ 60ms 为 6 倍以上余量，只拦灾难性回归；全部通过。
+- 体积门禁本地实测：入口 JS 451,039 字节（gzip 169,642）、CSS 125,815 字节（gzip 27,266），预算余量 19–28%，通过；负路径由 `tests/size-check.test.ts` 合成超预算样本覆盖。
+- 渲染实测本地整链实跑（chrome-for-testing，`CHROME_PATH` 指向）：构建 → preview → 注入自动生成的高压存档 → 恢复续局 → 采样 60 秒，平均 27.2 fps、p5 15 fps、采样 1,496 帧、结帧截图确认画面为第六境后期真战场（满配六仙器、妖王血条、密集弹幕特效）。无头软渲染帧率远低于真机属预期，故仅作日报观测，不设门槛；不在此断言真机帧率。
+- 存档夹具合法性由 `tests/perf-render.test.ts` 用游戏自身 `parseSave` + `Game.restore` 走真实读档/恢复路径验证；统计纯函数与预算判定各有独立测试。全量单测 **778/778** 通过，全仓格式检查通过；两份工作流经 YAML 解析校验。
+- 尚未验证：GitHub Actions 上首次实际执行（快速门禁与每日渲染报告）要在推送后观察；CI 的 ubuntu-latest 自带 google-chrome 为公开文档说明，上线首跑若缺浏览器需按日志处理。
+
 ## 错误上报提示、PWA 图标与加载失败按钮居中（2026-10-10）
 
 本次包含三组未经发布的前端改动：运行时错误匿名上报与兜底提示、PWA / 主屏幕图标、素材加载失败「重新加载」按钮居中修复，不涉及战斗、修为、门槛或存档结构；统计查询脚本（`npm run stats`）新增的运行错误分组因需 Cloudflare 令牌与真实数据集，未在本机实跑，上线后补查。实际验证记录如下：
@@ -7,7 +17,7 @@
 - 全量单测 **765/765** 通过（Node 22），含新增 error-report 6 项、pwa 2 项与 telemetry 扩展断言；全仓格式检查通过。
 - 加载失败按钮居中修复在 Chrome DevTools MCP 正常 5173（本地 dev）隔离上下文实测：修复前 `.scene-loading` 与 `.town-loading` 的「重新加载」按钮左缘与容器左缘重合（1905 视口 left 723/803，贴左不居中，与用户报告一致，原因为全局 flex 按钮抵消父级 `text-align: center`）；新增 `width: fit-content; margin-inline: auto` 规则后，桌面 1905 视口两处按钮中心 952.5 = 视口中心，手机 390×844 两处中心 195 = 视口中心，两种视口截图均已查看。两处失败界面仅各含一枚 `.secondary-button`，新选择器不命中其他入口；`[hidden]` 全局隐藏规则不受影响。
 - PWA：根路径与 `/qinglan-xiuxian/` 子路径独立构建均成功，`%BASE_URL%` 在两者下分别替换为 `/...` 与 `/qinglan-xiuxian/...`，manifest、四枚 PNG 与 apple-touch-icon 声明一致（`tests/pwa.test.ts` 另有静态断言）。生成图标的基线几何与 `favicon.svg` 同源。
-- 错误上报链路实测覆盖：`tests/error-report.test.ts` 验证摘要清洗/截断/去重/限频/detach/吞错；Worker 因直接 import 前端校验实现而自动同步，旧 Worker 收到 error 事件按文档设计拒收且不影响游戏；`docs/verification.md` 未声称已实跑线上 Analytics Engine 写入。
+- 错误上报链路实测覆盖：`tests/error-report.test.ts` 验证摘要清洗/截断/去重/限频/detach/吞错；Worker 因直接 import 前端校验实现而自动同步，旧 Worker 收到 error 事件按文档设计拒收且不影响游戏；`npm run stats` 新「运行错误」分组在发布后已持令牌实跑通过（当时无错误记录，查询正常执行）。
 - 独立 subagent 完整审查本轮 9 个修改文件与 5 类新文件：结论无必须修复问题；提醒的 verification 记录即本节；可选的代理对截断显示瑕疵与 iOS standalone meta 按最小改动原则未改动。
 
 ## 日报筛选、图表与分级诊断（2026-10-10）

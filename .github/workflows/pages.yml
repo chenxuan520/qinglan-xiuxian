@@ -40,6 +40,8 @@ jobs:
           npm test
           npm run check:npc-ai
           npm run balance:ci
+          npm run perf:sim
+          npm run size:check
       - name: Configure Pages
         id: pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
