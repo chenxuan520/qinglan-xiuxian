@@ -1,12 +1,13 @@
 import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
-import type { ElementId } from './data.ts';
+import type { CultivationPath, ElementId } from './data.ts';
 import type { Game, Point } from './game.ts';
-import { spriteFrame, SPRITE_ATLASES } from './sprites.ts';
+import { spriteFrame } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
 import { bossEntranceCue, BOSS_ENTRANCE_THEMES } from './boss-entrance.ts';
 import { realmBreakthroughCue } from './realm-breakthrough.ts';
 import { drawPlayerFormation } from './player-formation.ts';
+import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
 import { drawBossField, drawBossShot } from './boss-effects.ts';
 import {
   hasArtifactField,
@@ -18,7 +19,7 @@ import {
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
-  private atlases: HTMLImageElement[] = [];
+  private images = new Map<string, HTMLImageElement>();
   private sprites = new Map<string, HTMLCanvasElement>();
   private formations = new Map<string, HTMLCanvasElement>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
@@ -63,8 +64,7 @@ export class Renderer {
           request = new Promise<void>((resolve, reject) => {
             const image = new Image();
             image.onload = () => {
-              const atlas = SPRITE_ATLASES.findIndex((sheet) => sheet.url === url);
-              if (atlas >= 0) this.atlases[atlas] = image;
+              this.images.set(url, image);
               const terrain = STAGES.findIndex((s) => s.terrain === url);
               if (terrain >= 0) {
                 this.terrainImages[terrain] = image;
@@ -105,7 +105,13 @@ export class Renderer {
     this.canvas.height = Math.round(this.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  draw(game: Game | null, now: number, stage: number, previewRealm = 0) {
+  draw(
+    game: Game | null,
+    now: number,
+    stage: number,
+    previewRealm = 0,
+    previewPath: CultivationPath = 'orthodox',
+  ) {
     if (this.ctx.isContextLost?.()) return;
     if (this.needsRedraw) {
       this.resize();
@@ -137,7 +143,7 @@ export class Renderer {
     c.fillStyle = '#04171920';
     c.fillRect(camera.x - w / s, camera.y - h / s, (w * 2) / s, (h * 2) / s);
     if (game) this.drawGame(game, time);
-    else this.drawPreview(camera, time, previewRealm);
+    else this.drawPreview(camera, time, previewRealm, previewPath);
     c.restore();
     const shade = c.createRadialGradient(w * 0.52, h * 0.4, h * 0.15, w / 2, h / 2, w * 0.73);
     shade.addColorStop(0, '#06221f00');
@@ -373,7 +379,7 @@ export class Renderer {
     c.fillText(`第${STAGES[cue.stage].chapter}境 · ${STAGES[cue.stage].name}`, 0, 36);
     c.restore();
   }
-  private drawPreview(camera: Point, time: number, realm: number) {
+  private drawPreview(camera: Point, time: number, realm: number, path: CultivationPath) {
     const c = this.ctx;
     c.save();
     c.translate(camera.x, camera.y);
@@ -436,7 +442,7 @@ export class Renderer {
         c.globalAlpha = 0.6;
         c.shadowColor = color;
         c.shadowBlur = 18;
-        this.sprite(0, 75, -95 + Math.sin(time) * 8, 65, -1);
+        this.sprite(0, 75, -95 + Math.sin(time) * 8, 65, -1, false, path);
         c.restore();
         break;
       case 4:
@@ -507,7 +513,7 @@ export class Renderer {
         }
         break;
     }
-    this.sprite(0, 0, 0, 150, 1);
+    this.sprite(0, 150 * playerHomeOffset(path), 0, 150, 1, false, path);
     c.restore();
   }
   private drawGame(game: Game, time: number) {
@@ -677,6 +683,8 @@ export class Renderer {
           p.y + (p.moving ? Math.sin(time * 15) * 2 : Math.sin(time * 2) * 1.5),
           84,
           p.facing,
+          false,
+          game.path,
         );
         c.globalAlpha = 1;
         if (game.slowed > 0) {
@@ -1192,7 +1200,15 @@ export class Renderer {
       Math.abs(at.y - camera.y) < this.height / this.scale / 2 + margin
     );
   }
-  private sprite(index: number, x: number, y: number, size: number, facing = 1, flash = false) {
+  private sprite(
+    index: number,
+    x: number,
+    y: number,
+    size: number,
+    facing = 1,
+    flash = false,
+    path: CultivationPath = 'orthodox',
+  ) {
     const c = this.ctx;
     c.save();
     c.translate(x, y);
@@ -1201,12 +1217,14 @@ export class Renderer {
     c.beginPath();
     c.ellipse(0, 11, size * 0.25, size * 0.09, 0, 0, TAU);
     c.fill();
-    const frame = spriteFrame(index);
-    const source = this.atlases[frame.atlas];
+    const playerFrame = index === 0 ? playerSpriteFrame(path) : undefined;
+    const frame = playerFrame ?? spriteFrame(index);
+    const artScale = playerFrame?.scale ?? 1;
+    const source = this.images.get(frame.url);
     const width = Math.min(size, (size * 4 * frame.width) / (3 * frame.height));
     const height = (width * frame.height) / frame.width;
     if (source?.complete && source.naturalWidth) {
-      const key = `${index}:${size}:${flash}`;
+      const key = `${index}:${size}:${flash}:${index === 0 ? path : ''}`;
       let sprite = this.sprites.get(key);
       if (!sprite) {
         sprite = document.createElement('canvas');
@@ -1228,7 +1246,13 @@ export class Renderer {
         );
         this.sprites.set(key, sprite);
       }
-      c.drawImage(sprite, -width / 2, -height * 0.765, width, height);
+      c.drawImage(
+        sprite,
+        (-width * artScale) / 2,
+        -height * 0.765 + (height * (1 - artScale)) / 2,
+        width * artScale,
+        height * artScale,
+      );
     }
     c.restore();
   }

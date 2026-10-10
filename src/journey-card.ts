@@ -11,6 +11,7 @@ import {
   spiritRootInfo,
   STAGES,
   treasure,
+  type CultivationPath,
   type SpiritRootId,
 } from './data.ts';
 import { HUMAN_STORY_IDS, humanStoryView } from './human-stories.ts';
@@ -24,9 +25,9 @@ import { resolveJourneyAppraisal } from './journey-appraisal-ai.ts';
 import { SECTS } from './mortal-data.ts';
 import { sectRole } from './mortal.ts';
 import { drawPlayerFormation } from './player-formation.ts';
+import { playerSpriteFrame } from './player-appearance.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import { GAME_SITE_URL } from './setting.ts';
-import { spriteFrame } from './sprites.ts';
 
 export const JOURNEY_CARD_QR = encode(GAME_SITE_URL, { ecc: 'M', border: 4 });
 export const JOURNEY_CARD_QR_COLORS = { light: '#e1d3a4', dark: '#102b28' } as const;
@@ -120,7 +121,12 @@ export function journeyAppraisalLines(
   return balanced.length <= maxLines ? balanced : split(width);
 }
 
-function drawRealmFigure(c: CanvasRenderingContext2D, image: HTMLImageElement, realmIndex: number) {
+function drawRealmFigure(
+  c: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  realmIndex: number,
+  path: CultivationPath,
+) {
   const color = REALM_COLORS[realmIndex];
   c.save();
   const glow = c.createRadialGradient(540, 490, 20, 540, 490, 290);
@@ -134,20 +140,20 @@ function drawRealmFigure(c: CanvasRenderingContext2D, image: HTMLImageElement, r
   drawPlayerFormation(c, 0, 0, realmIndex, 0);
   c.restore();
 
-  const frame = spriteFrame(0);
   c.save();
   c.shadowColor = `${color}70`;
   c.shadowBlur = 24;
+  const frame = playerSpriteFrame(path);
   c.drawImage(
     image,
-    (frame.x / 1536) * image.naturalWidth,
-    (frame.y / 1024) * image.naturalHeight,
+    0,
+    0,
     image.naturalWidth / frame.columns,
     image.naturalHeight / frame.rows,
-    382,
-    304,
-    316,
-    421,
+    382 + (316 * (1 - frame.scale)) / 2,
+    304 + (421 * (1 - frame.scale)) / 2,
+    316 * frame.scale,
+    421 * frame.scale,
   );
   c.restore();
 }
@@ -316,7 +322,7 @@ export async function createJourneyCard(
 ) {
   signal.throwIfAborted();
   const card = journeyCardData(save, ending);
-  const playerFrame = spriteFrame(0);
+  const playerFrame = playerSpriteFrame(save.path);
   const weaponArt = itemArt(card.weapon.id)!;
   let fontTimeout: ReturnType<typeof setTimeout> | undefined;
   const fontReady = Promise.race([
@@ -462,7 +468,7 @@ export async function createJourneyCard(
     850,
   );
   c.restore();
-  drawRealmFigure(c, playerImage, card.realmIndex);
+  drawRealmFigure(c, playerImage, card.realmIndex, save.path);
   c.save();
   c.textAlign = 'center';
   text(card.realmVerse, 540, 748, 27, REALM_COLORS[card.realmIndex], 820);

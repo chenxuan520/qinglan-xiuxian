@@ -623,6 +623,7 @@ function mountTownScene() {
     save.mortal.population,
     save.age,
     showTownEvent,
+    () => save.path,
     save.mortal.scenery,
     save.mortal.hometown
       ? {
@@ -3295,6 +3296,7 @@ function tick(now: number, draw: boolean) {
       now,
       game?.stage ?? selectedStage,
       game ? 0 : realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
+      save.path,
     );
     lastRenderedState = game?.state;
     canvasDirty = false;
