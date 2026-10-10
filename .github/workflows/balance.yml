@@ -141,7 +141,6 @@ jobs:
           path: |
             artifacts/perf-render/report.json
             artifacts/perf-render/summary.md
-            artifacts/perf-render/frame.png
           if-no-files-found: warn
           retention-days: 90
 

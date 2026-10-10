@@ -5,7 +5,6 @@ export type PerformanceSource = {
   runId: number | null;
   generatedAt: string | null;
   data: Record<string, unknown> | null;
-  frame?: boolean;
 };
 export type PerformanceSnapshot = {
   schemaVersion: 1;
@@ -19,7 +18,7 @@ const date = (x: unknown): x is string => typeof x === 'string' && Number.isFini
 const fields = (input: Record<string, unknown>, keys: readonly string[]) =>
   Object.fromEntries(keys.map((key) => [key, input[key]]));
 
-// 只发布监控使用的字段；CI 的完整 JSON 和截图仍保存在 artifact，不进入 Git。
+// 只发布监控使用的字段；CI 的完整数值报告保存在 artifact，不进入 Git。
 export function performanceData(
   kind: PerformanceKind,
   input: unknown,
@@ -136,8 +135,7 @@ export function validPerformanceSnapshot(input: unknown): input is PerformanceSn
         s.runId === null ||
         (numeric(s.runId) && Number.isSafeInteger(s.runId) && Number(s.runId) > 0)
       ) ||
-      !(s.generatedAt === null || date(s.generatedAt)) ||
-      (s.frame !== undefined && typeof s.frame !== 'boolean')
+      !(s.generatedAt === null || date(s.generatedAt))
     )
       return false;
     if (s.data === null) return s.state !== 'ready';

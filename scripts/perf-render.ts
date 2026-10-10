@@ -247,6 +247,7 @@ export async function collectRenderSample(options?: { seconds?: number }) {
   const seconds = options?.seconds ?? 60;
   const outDir = 'artifacts/perf-render';
   mkdirSync(outDir, { recursive: true });
+  rmSync(`${outDir}/frame.png`, { force: true });
   execFileSync(
     'npx',
     ['vite', 'build', '--base', '/', '--outDir', `${outDir}/site`, '--emptyOutDir'],
@@ -308,8 +309,6 @@ export async function collectRenderSample(options?: { seconds?: number }) {
       session,
       '(() => ({ gaps: window.__perf.gaps, tasks: window.__perf.tasks }))()',
     );
-    const shot = await session.send<{ data: string }>('Page.captureScreenshot');
-    writeFileSync(`${outDir}/frame.png`, Buffer.from(shot.data, 'base64'));
     return summarizeRender(data.gaps, data.tasks);
   } finally {
     session?.close();
