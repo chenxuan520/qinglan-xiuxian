@@ -23,6 +23,22 @@ permissions:
   actions: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      full: ${{ steps.detect.outputs.full }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Detect experience and balance changes
+        id: detect
+        run: node --experimental-strip-types scripts/balance-change-trigger.ts
+
   quick:
     if: github.event_name != 'schedule' && inputs.full != true && inputs.render_only != true
     runs-on: ubuntu-latest
@@ -73,9 +89,14 @@ jobs:
           retention-days: 90
 
   full:
+    needs: changes
+    # 同一分支不并行重算；保留正在执行的矩阵及最后进入队列的待运行作业。
+    concurrency:
+      group: balance-full-${{ github.ref }}
+      cancel-in-progress: false
     outputs:
       report-id: ${{ steps.report.outputs.artifact-id }}
-    if: (github.event_name == 'schedule' || inputs.full == true) && inputs.render_only != true
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.full == true || needs.changes.outputs.full == 'true' || needs.changes.result == 'failure') && inputs.render_only != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -113,10 +134,14 @@ jobs:
             /tmp/qinglan-balance-failed-*/samples.json
           if-no-files-found: error
           retention-days: 14
+      - name: Fail CI on report Error after preserving artifacts
+        if: always()
+        run: node --experimental-strip-types scripts/check-balance-report.ts
 
   # 每日渲染实测：无头 Chrome 恢复第六境后期高压对局采样 60 秒帧率与长任务，只报告不设门槛。
   perf-render:
-    if: github.event_name == 'schedule' || inputs.full == true || inputs.render_only == true
+    needs: changes
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.full == true || inputs.render_only == true || needs.changes.outputs.full == 'true' || needs.changes.result == 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

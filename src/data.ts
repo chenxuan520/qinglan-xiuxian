@@ -908,7 +908,7 @@ export function tribulationRules(round: number) {
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [60, 105, 150, 195, 240, 285, 330];
 export const LEGACY_TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
-export const TRIAL_PRESSURE_SECONDS = 420;
+export const TRIAL_PRESSURE_SECONDS = 300;
 export const TRIAL_BOSS_CAP = 2;
 export const TRIAL_BOSS_BUFFER_SECONDS = 5;
 export const TRIAL_BOSS_INTERVAL = 45;

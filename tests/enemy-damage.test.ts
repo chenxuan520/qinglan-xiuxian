@@ -8,6 +8,7 @@ import {
   STAGES,
   STAGE_ENEMIES,
   STAGE_REALM_STEPS,
+  TRIAL_PRESSURE_SECONDS,
 } from '../src/data.ts';
 import { freshSave, realmHealthMultiplier } from '../src/progress.ts';
 
@@ -114,7 +115,7 @@ test('第七境精英与七位妖王采用固定强度，重复续局不会重�
       const save = freshSave();
       save.unlocked = 6;
       const g = new Game(save, 6, difficulty, () => 0.5);
-      g.time = progress * 420;
+      g.time = progress * TRIAL_PRESSURE_SECONDS;
       for (const type of STAGE_ENEMIES[6]) {
         const e = g.spawnEnemy(type);
         const expected =

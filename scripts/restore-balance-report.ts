@@ -2,13 +2,17 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { refreshReport } from './balance-report.ts';
-import { newestArtifacts } from './ci-artifacts.ts';
-// 只恢复本仓库 master 的正式每日/手动完整报告，不接收 PR 或分支产物。
+import { eligibleBalanceReportRun, newestArtifacts } from './ci-artifacts.ts';
+// 只恢复本仓库 master 的每日/手动/数值 push 完整报告，不接收 PR 或分支产物。
 const repository = process.env.GITHUB_REPOSITORY;
 if (!repository) throw new Error('缺少 GITHUB_REPOSITORY');
 const api = (path: string) =>
   JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 }));
-const artifacts = newestArtifacts(
+const artifacts = newestArtifacts<{
+  created_at: string;
+  expired: boolean;
+  workflow_run: { id: number; head_branch: string };
+}>(
   JSON.parse(
     execFileSync(
       'gh',
@@ -34,12 +38,7 @@ let found = false;
 for (const artifact of artifacts) {
   if (artifact.expired || artifact.workflow_run.head_branch !== 'master') continue;
   const run = api(`repos/${repository}/actions/runs/${artifact.workflow_run.id}`);
-  if (
-    run.status !== 'completed' ||
-    run.path !== '.github/workflows/balance.yml' ||
-    !['schedule', 'workflow_dispatch'].includes(run.event)
-  )
-    continue;
+  if (!eligibleBalanceReportRun(run, repository)) continue;
   const target = resolve('dist/balance-report');
   mkdirSync(target, { recursive: true });
   execFileSync(
