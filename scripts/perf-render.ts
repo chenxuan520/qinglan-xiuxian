@@ -284,10 +284,24 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     return summarizeRender(data.gaps, data.tasks);
   } finally {
     session?.close();
-    chrome?.kill();
+    if (chrome) {
+      // 等 Chrome 真正退出再清理临时 profile；清理属收尾工作，失败不影响报告。
+      await new Promise<void>((resolveExit) => {
+        const timer = setTimeout(resolveExit, 10_000);
+        chrome!.once('exit', () => {
+          clearTimeout(timer);
+          resolveExit();
+        });
+        chrome!.kill();
+      });
+    }
     server.kill();
     if (userDataDir)
-      rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      try {
+        rmSync(userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      } catch {
+        // 临时目录残留不视为失败。
+      }
   }
 }
 
