@@ -22,6 +22,7 @@ const render = {
   },
   chrome: '/private/path',
   secret: 'must not appear',
+  frame: true,
 };
 const simulation = {
   generatedAt,
@@ -60,6 +61,7 @@ test('性能公开摘要投影受限，空与失败不冒充采样成功', () =>
   assert.equal(validPerformanceSnapshot(data), true);
   assert.ok(!JSON.stringify(data).includes('must not appear'));
   assert.ok(!JSON.stringify(data).includes('/private/path'));
+  assert.equal('frame' in data.sources.render, false);
   assert.equal(performanceSource('render', null, commit, 1).state, 'unavailable');
   assert.equal(
     performanceSource('render', { generatedAt, error: 'failed' }, commit, 1).state,

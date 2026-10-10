@@ -436,8 +436,6 @@ function performanceHTML(kind: PerformanceKind, source: PerformanceSource) {
           ['采样帧数', count(s.samples)],
         ],
       );
-      if (source.frame)
-        body += `<details><summary>采样结束截图</summary><img class="render-frame" src="https://chenxuan520.github.io/qinglan-xiuxian/monitor/render-frame.png?run=${source.runId}&at=${encodeURIComponent(source.generatedAt ?? '')}" alt="每日无头 Chrome 采样结束时的游戏画面" loading="lazy" /></details>`;
     } else if (kind === 'simulation') {
       const rows = source.data.scenarios as Record<string, string | number>[];
       body = table(

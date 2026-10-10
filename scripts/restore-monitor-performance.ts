@@ -1,13 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -45,6 +37,7 @@ export function restorePerformance(
   localChecks?: { commit: string; runId: number; directory: string },
 ) {
   mkdirSync(outDir, { recursive: true });
+  rmSync(join(outDir, 'render-frame.png'), { force: true });
   const api = (path: string, paginate = false) =>
     JSON.parse(
       execFileSync('gh', ['api', path, ...(paginate ? ['--paginate', '--slurp'] : [])], {
@@ -125,14 +118,6 @@ export function restorePerformance(
             /* 旧产物缺数据时显示未提供，不冒充成功。 */
           }
           sources[kind] = performanceSource(kind, input, run.head_sha, run.id);
-          if (
-            kind === 'render' &&
-            sources.render.state === 'ready' &&
-            existsSync(join(temporary, 'frame.png'))
-          ) {
-            copyFileSync(join(temporary, 'frame.png'), join(outDir, 'render-frame.png'));
-            sources.render.frame = true;
-          }
         }
         console.log(`保留性能摘要 ${name}：Actions ${run.id}，源提交 ${run.head_sha}`);
       } finally {

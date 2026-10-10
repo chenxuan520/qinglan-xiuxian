@@ -236,13 +236,6 @@ footer {
   border-top: 1px solid #e4eae5;
   padding-top: 16px;
 }
-.render-frame {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin-top: 12px;
-  border-radius: 8px;
-}
 @media (max-width: 700px) {
   main {
     padding: 20px 12px 40px;
