@@ -1,5 +1,16 @@
 # 验证记录
 
+## 性能 CI 推送事故与修复（2026-10-10）
+
+记录 `npm ci` 在 GitHub 运行器确定性崩溃的根因与修复，防止同类问题再发。
+
+- 现象：`0b0c884` 与 `999fa10` 两个提交（均含 puppeteer-core 依赖）在 Balance gate 与 Pages 两个 workflow 的 `npm ci` 步骤必崩，报 `npm error Exit handler never called!`；本地干净 clone、清缓存、npm 10.9.2/10.9.4 全量安装均通过。
+- A/B 实验：旧提交 `44adfa4`（无该子树）在同一时段 runner 重跑 `npm ci` 成功，证明与 GitHub 环境波动无关、与锁文件内容强相关。
+- 真正的根因：本机 npm registry 指向了内部镜像 `bnpm.byted.org`，`npm install -D puppeteer-core` 生成的新增包条目 `resolved` URL 落在该内网域名；GitHub 运行器无法访问，`npm ci` 在下载阶段崩溃。检查重点应是锁文件的 `resolved` 域名而非依赖本身。当时先怀疑手工合并的锁文件结构并做了两轮回滚/重生成，走了弯路；应在首次失败后优先 diff 锁文件的 `resolved` 域名（`61c6398` 的锁文件 diff 中 bnpm→registry.npmjs.org 的替换直接暴露了这一点）。
+- 最终修复：`61c6398` 已把 puppeteer 子树 URL 改为 npmjs 官方源；叠加的 `a89ed39` 进一步移除 puppeteer-core，渲染实测改为只用 Node 22 内置 WebSocket / fetch 的极简 CDP 客户端（`scripts/perf-render.ts`，无新增依赖），锁文件还原为 `44adfa4` 的已知可用内容（npm ci 依赖路径与此前成功提交完全一致）。
+- 推送后实测：`a89ed39` 的 Balance gate（`38040343108`）与 Pages 部署（`38040343151`）均成功；日志逐条确认 `balance:ci` 前六关 840/840 通过、`perf:sim` 三场景 p95 0.11–0.45ms 通过、`size:check` 入口 452,337 字节（gzip 170,807）通过。Cloudflare 主站部署 `973d2034`（来源 `a89ed39`，本地门禁 840/840 通过），两站 `/monitor/` 均 200。
+- 尚未验证：`perf-render` 每日 job 在 CI 的首次实跑（含无头 Chrome 出图）要在下个定时 / 手动 full 触发后确认；本地已通过 `CHROME_PATH` 指向 chrome-for-testing 整链实跑两次（33.7 / 31.7 fps 均值）。
+
 ## 统一公开监控与性能摘要（2026-10-10）
 
 - 新增两站 `/monitor/` 和「关于」入口；线上统计按时间 / 站点筛选，CI 诊断默认折叠，独立动态读取正式日报。每日渲染、模拟成本及游戏体积摘要由 Actions artifact 发布为 Pages JSON，原始报告和截图不提交 Git。没有修改游戏数值、广告或首页 / 战斗按钮。
