@@ -266,6 +266,15 @@ async function handleFetch(request) {
       if (response.ok) return response;
       throw new Error('network');
     } catch (error) {
+      // 多入口导航先查目标页面，不能把已缓存的监控页错误替换为游戏首页。
+      const target = new URL(url);
+      target.search = '';
+      target.hash = '';
+      if (target.pathname.endsWith('/')) target.pathname += 'index.html';
+      for (const entry of completed) {
+        const response = await entry.cache.match(target.href);
+        if (response) return response;
+      }
       for (const entry of completed) {
         const response = await entry.cache.match(resourceUrl('index.html'));
         if (response) return response;

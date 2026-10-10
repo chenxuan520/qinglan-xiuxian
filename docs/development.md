@@ -109,7 +109,7 @@ npm run deploy:npc-ai
 
 `check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Actions 同步执行此检查，但只部署静态站；Worker 和 Cloudflare Pages 分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
 
-服务端按 `Origin` 完整匹配公网来源：`https://xiuxian.011203.xyz`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；对白按来源 IP 每 60 秒允许 12 次请求，配图独立限制为 2 次，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 推理超时 12 秒，客户端 20 秒；失败回退本地台词，不自动重试普通闲谈。关闭对话会取消请求并通知上游，返回文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
+服务端按 `Origin` 完整匹配公网来源：`https://xiuxian.011203.xyz`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。除公开聚合监控 GET 外，所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；对白按来源 IP 每 60 秒允许 12 次请求，配图独立限制为 2 次，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 推理超时 12 秒，客户端 20 秒；失败回退本地台词，不自动重试普通闲谈。关闭对话会取消请求并通知上游，返回文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
 
 茶馆听书复用 `POST /chat`，请求带 `mode: "tea-story"`，仅接受 `npcId: "tea"` 和空历史；与闲谈共用来源检查和每 IP 限流。`TEA_STORY_SETTINGS` 单独设置 1400 tokens、900 字上限、服务端推理 50 秒 / 客户端单次 60 秒超时，给预检、连接和返回留余量，提示生成 320–500 字的完整修仙故事。网络中断、超时、可重试的 5xx／408、空内容最多自动尝试两次，间隔 600 毫秒，最坏客户端等待约 120.6 秒；400／403／429 等不自动连刷，服务端不再叠加重试。关闭会取消当前请求与重试等待，不把主动取消提示成生成失败。自动尝试仍失败时显示具体原因与「重试这一回」，只重发生成请求、不再消耗年岁或判定机缘；成功后才启用「再听一回」，沿原听书结算另耗半载并判定一次机缘。正文以 `textContent` 展示，不写入存档，不控制奖励，不用固定文本冒充新故事。
 
@@ -147,6 +147,17 @@ npm run stats -- --days=30
 ```
 
 查询脚本使用本机环境变量 `CLOUDFLARE_ANALYTICS_TOKEN`（或 `CLOUDFLARE_API_TOKEN`，须有 Account Analytics Read 权限），可选 `CLOUDFLARE_ACCOUNT_ID`，未设置时读取令牌可访问的唯一账号。输出各站概览、各境开局与通关率、玩家最远通关、轮回原因、版本分布与运行错误，均按 `_sample_interval` 加权。上线验证写入的记录使用版本号 `verification`，查询时排除。修改事件字段需同步 Worker、查询脚本与本节；发布顺序为先 `npm run deploy:npc-ai`，再推送或部署静态站，Worker 未更新时前端上报会被拒收但不影响游戏。
+
+## 统一公开监控
+
+游戏「关于」的「运行监控」入口：<https://xiuxian.011203.xyz/monitor/>，GitHub Pages 对应 <https://chenxuan520.github.io/qinglan-xiuxian/monitor/>。独立静态入口不会创建匿名编号或发送游玩事件；不改变首页、战斗布局或游戏数值。线上筛选支持最近 1 / 7 / 30 / 90 天和两站 / 合并，展示访问、开局、结算、灵根、路线、最远通关、最高境界、轮回、版本、错误及天劫记录。天劫现有打点没有完整失败结算，只展示迎劫 / 完成和已记录完成时长，不计算天劫胜率。匿名编号按观测去重，不代表真实人数；事件量按采样权重估算，开局与结算不能严格配对。错误文本转义展示，版本与错误分别最多 100 组。
+
+- 线上聚合接口：`GET https://qinglan-npc-ai.011203.xyz/monitor/stats?days=7&site=all`，`site` 仅接受 `all` / `main` / `pages`。固定 SQL 白名单，不接受任意查询；响应 `schemaVersion`、`generatedAt`、`filter`、`sections`，每项有 `rows`，读取失败有 `error`，不冒充零记录。原始编号、SQL、账号和令牌不输出。配置 `MONITOR_PUBLIC=false` 后接口立即关闭，即使存在缓存；静态页面仍可显示公开 CI 摘要，隐藏整个页面需另行调整静态发布。
+- Worker 需服务端 secrets `ANALYTICS_READ_TOKEN`（推荐只授予 Account Analytics Read）、`ANALYTICS_ACCOUNT_ID`；用 `wrangler secret put <名称> --config workers/npc-ai/wrangler.jsonc` 在安全环境配置，不能使用公开 Vite 变量。公开 GET 允许无 Origin 的本地分析工具；浏览器仍仅放行官网、GitHub Pages 和本机来源。`MONITOR_LIMITER` 每 IP 每分钟 12 次，单项查询 8 秒截止、每批 4 条、成功聚合缓存 5 分钟；每次响应独立设置 CORS，防止两站混用缓存头。数据约保留三个月，时间按北京展示。
+- CI 摘要直接读取正式日报的 `balance-report/diagnostics.json`；诊断明细默认折叠，完整筛选、自由组合汇总与图像导出仍在完整日报。主站不复制某一天的旧报告 HTML。
+- 性能公开接口：<https://chenxuan520.github.io/qinglan-xiuxian/monitor/performance.json>。`schemaVersion: 1`，`publishedAt` 和 `sources.render / simulation / size` 各带 `state`（ready / failed / unavailable）、源提交、Actions run ID、采样时间及精简指标。两站监控都从这个接口动态读取，不在 Cloudflare 页面冻结数值；GitHub Pages 允许跨域 GET，无需浏览器 GitHub 凭证。
+- `scripts/restore-monitor-performance.ts` 只读取本仓库 master 的可信 `balance.yml` artifact。Pages 发布优先采用当前 job 已完成的模拟 / 体积结果，避免并行快检尚未结束时误用旧数据；每日发布使用最新正式 artifact。`perf-checks` 保存模拟 / 体积，`perf-render` 保存渲染摘要与截图，均保留 90 天。报告、JSON、截图只进入 Actions artifact 和 Pages 部署目录，**不提交 Git**。每次游戏发布和每日完整报告发布都恢复这些摘要；渲染失败也发布安全失败记录，页面不会显示绿色成功。
+- 每日北京时间 12:00 调度保持不变。需要只更新渲染时，可手动运行 Balance gate 并选择 `render_only=true`：不重跑 10,080 矩阵，保留最近成功部署的游戏和正式平衡日报，只更新渲染及监控摘要。无头 Chrome 的平均 / 5%低分位帧率、最差帧间隔和长任务只是 CI 环境观测，不代表手机真机表现。
 
 ## GitHub Pages · 平台部署
 

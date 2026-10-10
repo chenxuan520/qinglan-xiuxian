@@ -182,6 +182,14 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       );
     })
     .catch((error) => {
+      mkdirSync('artifacts/perf-render', { recursive: true });
+      writeFileSync(
+        'artifacts/perf-render/report.json',
+        JSON.stringify({
+          generatedAt: new Date().toISOString(),
+          error: '渲染采样未完成，请查看 Actions 原始错误。',
+        }),
+      );
       console.error(`渲染实测失败：${error instanceof Error ? error.message : error}`);
       process.exit(1);
     });

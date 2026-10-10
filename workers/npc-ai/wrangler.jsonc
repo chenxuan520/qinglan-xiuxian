@@ -23,10 +23,16 @@
       "namespace_id": "202610011",
       "simple": { "limit": 60, "period": 60 },
     },
+    {
+      "name": "MONITOR_LIMITER",
+      "namespace_id": "202610101",
+      "simple": { "limit": 12, "period": 60 },
+    },
   ],
   "analytics_engine_datasets": [{ "binding": "EVENTS", "dataset": "qinglan_events" }],
   "vars": {
     "ALLOWED_ORIGINS": "https://xiuxian.011203.xyz,https://chenxuan520.github.io",
+    "MONITOR_PUBLIC": "true",
   },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 },
 }

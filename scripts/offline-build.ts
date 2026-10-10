@@ -25,9 +25,13 @@ export function offlineBuild(version: string): Plugin {
       const inputs = [
         ...files(resolve(config.root, 'src')),
         ...files(resolve(config.root, 'public')),
-        ...['index.html', 'vite.config.ts', 'scripts/offline-build.ts', 'package-lock.json'].map(
-          (path) => resolve(config.root, path),
-        ),
+        ...[
+          'index.html',
+          'monitor/index.html',
+          'vite.config.ts',
+          'scripts/offline-build.ts',
+          'package-lock.json',
+        ].map((path) => resolve(config.root, path)),
       ].sort();
       for (const path of inputs)
         hash.update(relative(config.root, path)).update(readFileSync(path));

@@ -204,6 +204,24 @@ test('新旧版本素材隔离，成功更新后断网导航使用完整新版�
   assert.equal(await (await h.request('', { navigate: true })).text(), '<html>new</html>');
 });
 
+test('缓存后的监控目录导航保留独立页面，兼容根路径与 GitHub 子路径', async () => {
+  for (const base of ['/', '/qinglan-xiuxian/']) {
+    const h = harness(base);
+    h.fixture(BUILD, 'game', { 'monitor/index.html': '<html>monitor</html>' });
+    assert.equal((await h.message('cache')).error, undefined);
+    h.setOffline(true);
+    assert.equal(
+      await (await h.request('monitor/?days=7', { navigate: true })).text(),
+      '<html>monitor</html>',
+    );
+    assert.equal(
+      await (await h.request('monitor/index.html', { navigate: true })).text(),
+      '<html>monitor</html>',
+    );
+    assert.equal(await (await h.request('', { navigate: true })).text(), '<html>game</html>');
+  }
+});
+
 test('部署资源变化、网络失败和空间不足不能标记完整，也不会破坏旧版缓存', async () => {
   for (const failure of ['changed', 'network', 'quota', 'marker-quota']) {
     const h = harness();
@@ -308,10 +326,11 @@ test('清单越界、重复或缺少首页时拒绝缓存', async () => {
 test('构建清单收录完整输出并校验内容，部署子路径和资源变化进入构建号', () => {
   const root = mkdtempSync(join(tmpdir(), 'qinglan-manifest-'));
   try {
-    for (const dir of ['src', 'public/assets', 'scripts', 'output/assets'])
+    for (const dir of ['src', 'public/assets', 'scripts', 'monitor', 'output/assets'])
       mkdirSync(join(root, dir), { recursive: true });
     for (const path of [
       'index.html',
+      'monitor/index.html',
       'vite.config.ts',
       'scripts/offline-build.ts',
       'package-lock.json',
@@ -341,8 +360,11 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
     );
     assert.equal(initial.manifest.build, build('/qinglan-xiuxian/').manifest.build);
     assert.notEqual(initial.manifest.build, build('/').manifest.build);
+    writeFileSync(join(root, 'monitor/index.html'), 'monitor changed');
+    const monitorChanged = build('/qinglan-xiuxian/');
+    assert.notEqual(initial.manifest.build, monitorChanged.manifest.build);
     writeFileSync(join(root, 'public/assets/map.webp'), 'changed');
-    assert.notEqual(initial.manifest.build, build('/qinglan-xiuxian/').manifest.build);
+    assert.notEqual(monitorChanged.manifest.build, build('/qinglan-xiuxian/').manifest.build);
     assert.match(
       initial.plugin.transform("body{background:url('/assets/map.webp')}", 'src/style.css'),
       new RegExp(`qinglan-build=${initial.manifest.build}`),

@@ -17,11 +17,12 @@ import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/tow
 import { hometownParents, validHometown } from '../../src/hometown.ts';
 import { telemetryPoint, validTelemetryBatch } from '../../src/telemetry.ts';
 import { TELEMETRY_SETTINGS } from '../../src/setting.ts';
+import { monitorResponse, type MonitorEnv } from './monitor.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
 export const STORY_IMAGE_MODEL = TEA_STORY_IMAGE_SETTINGS.model;
 export const JOURNEY_APPRAISAL_MODEL = JOURNEY_APPRAISAL_SETTINGS.model;
-type WorkerEnv = NpcAiEnv & { STORY_IMAGE_SECRET?: string };
+type WorkerEnv = NpcAiEnv & MonitorEnv & { STORY_IMAGE_SECRET?: string };
 const textEncoder = new TextEncoder();
 async function storyImageKey(secret: string) {
   return crypto.subtle.importKey(
@@ -295,14 +296,17 @@ export default {
     const origin = request.headers.get('Origin') || '';
     const allowed = allowedOrigin(origin, env.ALLOWED_ORIGINS);
     const headers = new Headers({ 'Cache-Control': 'no-store', Vary: 'Origin' });
-    if (!allowed) return new Response(null, { status: 403, headers });
-    headers.set('Access-Control-Allow-Origin', origin);
+    const path = new URL(request.url).pathname;
+    // 公开聚合 GET 也供无 Origin 的本地分析工具使用；其他接口仍要求原有来源。
+    if (!allowed && !(path === '/monitor/stats' && !origin))
+      return new Response(null, { status: 403, headers });
+    if (allowed) headers.set('Access-Control-Allow-Origin', origin);
     headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
     headers.set('Access-Control-Allow-Headers', 'Content-Type');
     headers.set('Access-Control-Expose-Headers', 'Retry-After');
     headers.set('Access-Control-Max-Age', '86400');
     const json = (body: unknown, status = 200) => Response.json(body, { status, headers });
-    const path = new URL(request.url).pathname;
+    if (path === '/monitor/stats') return monitorResponse(request, env, headers);
     const ray = request.headers.get('CF-Ray') || '';
     const requestId = /^[a-f0-9]{16}(?:-[a-z]{3})?$/i.test(ray) ? ray : crypto.randomUUID();
     let mode =

@@ -21,16 +21,27 @@ export interface SizeMeasure {
 }
 export function measureEntry(outDir: string): SizeMeasure {
   const html = readFileSync(join(outDir, 'index.html'), 'utf8');
-  const js = html.match(/src="[^"]*assets\/(index-[^"]+\.js)"/);
-  const css = html.match(/href="[^"]*assets\/(index-[^"]+\.css)"/);
-  if (!js || !css) throw new Error('未在 index.html 找到入口 JS/CSS 引用');
-  const jsFile = readFileSync(join(outDir, 'assets', js[1]));
-  const cssFile = readFileSync(join(outDir, 'assets', css[1]));
+  // 多入口会抽取共享模块；计入游戏 HTML 的静态预加载，避免拆包绕过预算。
+  const js = [...html.matchAll(/(?:src|href)="[^"]*assets\/([^"/]+\.js)"/g)].map((m) => m[1]);
+  const css = [...html.matchAll(/href="[^"]*assets\/([^"/]+\.css)"/g)].map((m) => m[1]);
+  if (!js.length || !css.length) throw new Error('未在 index.html 找到入口 JS/CSS 引用');
+  const measure = (names: string[]) =>
+    [...new Set(names)]
+      .map((name) => readFileSync(join(outDir, 'assets', name)))
+      .reduce(
+        (total, file) => ({
+          bytes: total.bytes + file.byteLength,
+          gzip: total.gzip + gzipSync(file, { level: 9 }).byteLength,
+        }),
+        { bytes: 0, gzip: 0 },
+      );
+  const jsFiles = measure(js),
+    cssFiles = measure(css);
   return {
-    jsBytes: jsFile.byteLength,
-    jsGzip: gzipSync(jsFile, { level: 9 }).byteLength,
-    cssBytes: cssFile.byteLength,
-    cssGzip: gzipSync(cssFile, { level: 9 }).byteLength,
+    jsBytes: jsFiles.bytes,
+    jsGzip: jsFiles.gzip,
+    cssBytes: cssFiles.bytes,
+    cssGzip: cssFiles.gzip,
   };
 }
 export function budgetBreaches(measure: SizeMeasure, budget = SIZE_BUDGET): string[] {
