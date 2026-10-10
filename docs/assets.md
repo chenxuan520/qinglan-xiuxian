@@ -15,6 +15,10 @@
 
 首页魔道主角按立绘宽度向左微调 6%，正常首页与真仙肖像共用偏移；战斗、小镇和留影的位置不变。
 
+## PWA 与主屏幕图标（2026-10-10）
+
+`public/icons/` 的 PNG 由 `python3 scripts/generate-icons.py` 生成（需要 Pillow），图案与 `public/favicon.svg` 同源同配色：manifest 用图保留圆角与透明角；maskable 满幅铺底并把画作缩进 76% 安全区，供系统圆形裁切；apple-touch-icon（180×180）满幅铺底，画作缩至 90%，避免 iOS 把透明角填黑。PNG 是 Web App Manifest 与苹果主屏幕的硬性格式要求，不经 `compress-assets.py` 转 WebP。调整标志时同步更新 `favicon.svg` 与脚本中的几何常量，再重跑脚本；`tests/pwa.test.ts` 校验 manifest 声明与图标文件尺寸一致。
+
 ## 本地中文字体 · 离线缓存（2026-10-05）
 
 界面继续使用 Noto Serif SC，改为本站提供的变量字体用字子集，不再依赖 Google Fonts 在线请求。`public/assets/fonts/noto-serif-sc-2275c0dc339f.woff2` 约 590 KiB，保留 200–900 字重，使用 `font-display: swap`；包含源码中的界面用字，未包含的动态 AI 用字沿用系统宋体回退。字体许可为 SIL Open Font License 1.1，完整授权随资源保存在 `public/assets/fonts/OFL.txt`。
