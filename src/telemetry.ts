@@ -14,6 +14,7 @@ export const TELEMETRY_EVENTS = [
   'town',
   'reincarnate',
   'epilogue',
+  'error',
 ] as const;
 // 历练结果，或轮回原因（寿尽、天劫、叩门后、主动）。
 export const TELEMETRY_RESULTS = [
@@ -26,7 +27,16 @@ export const TELEMETRY_RESULTS = [
   'manual',
 ] as const;
 // 写入 Analytics Engine 的列顺序；查询脚本按同一顺序命名 blob1… 与 double1…。
-export const TELEMETRY_BLOBS = ['type', 'site', 'version', 'path', 'root', 'result'] as const;
+// 现有数据集已有 blob1…6 的行，detail 只能追加在末尾，旧行该列为空。
+export const TELEMETRY_BLOBS = [
+  'type',
+  'site',
+  'version',
+  'path',
+  'root',
+  'result',
+  'detail',
+] as const;
 export const TELEMETRY_DOUBLES = [
   'stage',
   'difficulty',
@@ -41,6 +51,8 @@ export const TELEMETRY_DOUBLES = [
 ] as const;
 
 type NumberField = Exclude<(typeof TELEMETRY_DOUBLES)[number], 'fresh'>;
+// error 事件的错误摘要上限：足够定位名字、信息与文件行号，又限制批量体积。
+export const TELEMETRY_DETAIL_MAX_LENGTH = 160;
 export type TelemetryEvent = { type: (typeof TELEMETRY_EVENTS)[number] } & Partial<
   Record<NumberField, number>
 > & {
@@ -48,6 +60,7 @@ export type TelemetryEvent = { type: (typeof TELEMETRY_EVENTS)[number] } & Parti
     path?: CultivationPath;
     root?: SpiritRootId;
     fresh?: boolean;
+    detail?: string;
   };
 export interface TelemetryBatch {
   id: string;
@@ -57,7 +70,15 @@ export interface TelemetryBatch {
 
 const ID_PATTERN = /^[a-z0-9-]{8,40}$/i;
 const NUMBER_FIELDS = TELEMETRY_DOUBLES.filter((key) => key !== 'fresh') as NumberField[];
-const EVENT_KEYS = new Set<string>(['type', 'result', 'path', 'root', 'fresh', ...NUMBER_FIELDS]);
+const EVENT_KEYS = new Set<string>([
+  'type',
+  'result',
+  'path',
+  'root',
+  'fresh',
+  'detail',
+  ...NUMBER_FIELDS,
+]);
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
@@ -72,6 +93,8 @@ function validEvent(value: unknown): value is TelemetryEvent {
     if (key === 'path') return isCultivationPath(field);
     if (key === 'root') return SPIRIT_ROOTS.some((root) => root.id === field);
     if (key === 'fresh') return typeof field === 'boolean';
+    if (key === 'detail')
+      return typeof field === 'string' && field.length <= TELEMETRY_DETAIL_MAX_LENGTH;
     return typeof field === 'number' && Number.isFinite(field) && field >= 0 && field <= 1e7;
   });
 }
@@ -96,6 +119,7 @@ export function telemetryPoint(batch: TelemetryBatch, event: TelemetryEvent, sit
     path: event.path ?? '',
     root: event.root ?? '',
     result: event.result ?? '',
+    detail: event.detail ?? '',
   };
   return {
     indexes: [batch.id],

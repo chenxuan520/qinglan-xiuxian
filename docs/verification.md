@@ -1,5 +1,15 @@
 # 验证记录
 
+## 错误上报提示、PWA 图标与加载失败按钮居中（2026-10-10）
+
+本次包含三组未经发布的前端改动：运行时错误匿名上报与兜底提示、PWA / 主屏幕图标、素材加载失败「重新加载」按钮居中修复，不涉及战斗、修为、门槛或存档结构；统计查询脚本（`npm run stats`）新增的运行错误分组因需 Cloudflare 令牌与真实数据集，未在本机实跑，上线后补查。实际验证记录如下：
+
+- 全量单测 **765/765** 通过（Node 22），含新增 error-report 6 项、pwa 2 项与 telemetry 扩展断言；全仓格式检查通过。
+- 加载失败按钮居中修复在 Chrome DevTools MCP 正常 5173（本地 dev）隔离上下文实测：修复前 `.scene-loading` 与 `.town-loading` 的「重新加载」按钮左缘与容器左缘重合（1905 视口 left 723/803，贴左不居中，与用户报告一致，原因为全局 flex 按钮抵消父级 `text-align: center`）；新增 `width: fit-content; margin-inline: auto` 规则后，桌面 1905 视口两处按钮中心 952.5 = 视口中心，手机 390×844 两处中心 195 = 视口中心，两种视口截图均已查看。两处失败界面仅各含一枚 `.secondary-button`，新选择器不命中其他入口；`[hidden]` 全局隐藏规则不受影响。
+- PWA：根路径与 `/qinglan-xiuxian/` 子路径独立构建均成功，`%BASE_URL%` 在两者下分别替换为 `/...` 与 `/qinglan-xiuxian/...`，manifest、四枚 PNG 与 apple-touch-icon 声明一致（`tests/pwa.test.ts` 另有静态断言）。生成图标的基线几何与 `favicon.svg` 同源。
+- 错误上报链路实测覆盖：`tests/error-report.test.ts` 验证摘要清洗/截断/去重/限频/detach/吞错；Worker 因直接 import 前端校验实现而自动同步，旧 Worker 收到 error 事件按文档设计拒收且不影响游戏；`docs/verification.md` 未声称已实跑线上 Analytics Engine 写入。
+- 独立 subagent 完整审查本轮 9 个修改文件与 5 类新文件：结论无必须修复问题；提醒的 verification 记录即本节；可选的代理对截断显示瑕疵与 iOS standalone meta 按最小改动原则未改动。
+
 ## 日报筛选、图表与分级诊断（2026-10-10）
 
 本次仅修改测试报告展示及恢复/发布链路，不修改游戏战斗、修为、门槛、终关或门禁数值。使用已完成的正式日报 `a5f8bfb` 的 10,080 条实测数据验证页面；未为本次展示改动重跑三小时完整矩阵。报告、JSON、测试夹具与截图均只在忽略目录或 `/tmp`，不提交 Git。

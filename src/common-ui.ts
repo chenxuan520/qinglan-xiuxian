@@ -33,8 +33,17 @@ import { formatNumber } from './number-format.ts';
 
 export function telemetryRow(enabled: boolean, active: boolean) {
   const status = !enabled ? '已关闭' : active ? '已开启' : '已开启 · 本网址不发送';
-  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">为了解玩家常在哪一步卡住，官网与平台站会在开局、结算、入城、轮回和叩门时记录关卡、境界、年岁、时长与胜负，附一个随机匿名编号；不上传存档、闲聊或任何个人信息，数据保留三个月。</small>`;
+  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">为了解玩家常在哪一步卡住，官网与平台站会在开局、结算、入城、轮回和叩门时记录关卡、境界、年岁、时长与胜负，页面出错时另记录错误摘要，附一个随机匿名编号；不上传存档、闲聊或任何个人信息，数据保留三个月。</small>`;
 }
+
+// 运行错误兜底提示：上报在 error-report.ts，本模块只管排版。标题含图标与提示语，
+// 按钮组独立，方便需要时单独替换措辞或增删按钮。
+export const ERROR_NOTICE_TITLE =
+  '<h2 class="runtime-error-title"><span class="runtime-error-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20 2 20 Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17.2"/></svg></span>出了点状况</h2>';
+export const ERROR_NOTICE_TEXT =
+  '刚刚发生了一个错误，但进度都已保存好。若画面没有反应，刷新页面即可继续。';
+export const ERROR_NOTICE_ACTIONS =
+  '<div class="runtime-error-actions"><button class="primary-button" data-error-action="refresh">刷新重进</button><button class="secondary-button" data-error-action="dismiss">继续试试</button></div>';
 export function currency(save: SaveData) {
   return `<span class="currency">${smallIcon('gem')}<b>${save.stones}</b><span>灵石</span></span><span class="currency iron"><i>◆</i><b>${save.iron}</b><span>玄铁</span></span>`;
 }
