@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { offlineBuild } from './scripts/offline-build.ts';
 
@@ -15,6 +16,14 @@ function describeVersion() {
 const version = describeVersion();
 export default defineConfig({
   plugins: [offlineBuild(version)],
+  build: {
+    rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        monitor: fileURLToPath(new URL('./monitor/index.html', import.meta.url)),
+      },
+    },
+  },
   define: {
     __QINGLAN_VERSION__: JSON.stringify(version),
   },

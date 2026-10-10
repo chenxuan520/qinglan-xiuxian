@@ -42,3 +42,22 @@ test('measureEntry 从 index.html 引用解析入口 JS/CSS 并给出 gzip 尺�
   assert.ok(measure.jsGzip > 0 && measure.jsGzip < measure.jsBytes);
   assert.ok(measure.cssGzip > 0 && measure.cssGzip < measure.cssBytes);
 });
+
+test('共享预加载计入游戏体积并去重，不计入独立监控入口', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'qinglan-size-shared-'));
+  mkdirSync(join(dir, 'assets'), { recursive: true });
+  for (const [name, text] of [
+    ['index-a.js', 'game'],
+    ['shared-b.js', 'shared'],
+    ['index-c.css', 'style'],
+    ['monitor-d.js', 'monitor'.repeat(100)],
+  ])
+    writeFileSync(join(dir, 'assets', name), text);
+  writeFileSync(
+    join(dir, 'index.html'),
+    '<link rel="modulepreload" href="/assets/shared-b.js"><link rel="modulepreload" href="/assets/shared-b.js"><link rel="stylesheet" href="/assets/index-c.css"><script type="module" src="/assets/index-a.js"></script>',
+  );
+  const result = measureEntry(dir);
+  assert.equal(result.jsBytes, 10);
+  assert.equal(result.cssBytes, 5);
+});
