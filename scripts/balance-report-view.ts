@@ -77,19 +77,47 @@ export function reportTables(
 }
 
 export type ReportChartMetric = 'clear' | 'time' | 'boss';
+export type ReportChartDimension =
+  | 'root'
+  | 'path'
+  | 'starter'
+  | 'device'
+  | 'profile'
+  | 'difficulty';
 export function reportChartData(
   rows: CampaignSample[],
   plan: BalanceCase[],
   metric: ReportChartMetric,
   labels: ReportLabels,
+  groupBy: readonly ReportChartDimension[] = ['root'],
 ) {
   // 与 summarize 一致：只关联计划身份，每个身份最多计一次，失败报告也不虚增比例。
   const byKey = new Map(rows.map((row) => [row.key, row]));
-  rows = plan.flatMap((c) => {
+  const dimensions = [...new Set(groupBy)];
+  const groups = new Map<string, { label: string; planned: number; samples: CampaignSample[] }>();
+  for (const c of plan) {
+    const key = JSON.stringify(dimensions.map((dimension) => c[dimension]));
+    let group = groups.get(key);
+    if (!group) {
+      const names = {
+        root: labels.roots[c.root] ?? c.root,
+        path: labels.paths[c.path] ?? c.path,
+        starter: labels.treasures[c.starter] ?? c.starter,
+        device: c.device === 'phone' ? '手机' : '电脑',
+        profile: labels.profiles[c.profile] ?? c.profile,
+        difficulty: labels.difficulties[c.difficulty] ?? `难度 ${c.difficulty + 1}`,
+      };
+      group = {
+        label: dimensions.map((dimension) => names[dimension]).join(' / ') || '当前筛选合计',
+        planned: 0,
+        samples: [],
+      };
+      groups.set(key, group);
+    }
+    group.planned++;
     const row = byKey.get(caseKey(c));
-    return row ? [{ ...row, case: c }] : [];
-  });
-  const roots = Object.keys(labels.roots).filter((root) => plan.some((c) => c.root === root));
+    if (row) group.samples.push(row);
+  }
   const slots =
     metric === 'boss'
       ? [
@@ -103,27 +131,28 @@ export function reportChartData(
         ? `${s.stage === 6 ? '终关' : `第${s.stage + 1}境`}·${labels.bosses[s.king]}`
         : labels.stages[s.stage],
     ),
-    datasets: roots.map((root) => {
-      const index = Object.keys(labels.roots).indexOf(root);
-      const samples = rows.filter((r) => r.case.root === root),
-        n = plan.filter((c) => c.root === root).length;
+    datasets: [...groups].map(([key, { label, planned, samples }], index) => {
+      const root = dimensions.length === 1 && dimensions[0] === 'root' ? JSON.parse(key)[0] : '';
+      const palette = [
+        '#176357',
+        '#a66523',
+        '#4778b4',
+        '#9064ac',
+        '#ba5665',
+        '#6c8042',
+        '#606d79',
+        '#2394a5',
+      ];
+      const color =
+        palette[root ? Object.keys(labels.roots).indexOf(root) : index % palette.length] ??
+        palette[index % palette.length];
       return {
-        label: labels.roots[root],
-        borderColor: ['#176357', '#a66523', '#4778b4', '#9064ac', '#ba5665', '#6c8042', '#606d79'][
-          index
-        ],
-        backgroundColor: [
-          '#176357',
-          '#a66523',
-          '#4778b4',
-          '#9064ac',
-          '#ba5665',
-          '#6c8042',
-          '#606d79',
-        ][index],
+        label,
+        borderColor: color,
+        backgroundColor: color,
         data: slots.map(({ stage, king }) => {
           if (metric === 'clear')
-            return (samples.filter((r) => r.cleared > stage).length / n) * 100;
+            return (samples.filter((r) => r.cleared > stage).length / planned) * 100;
           const battles = samples.flatMap((r) => r.battles.filter((b) => b.stage === stage));
           if (metric === 'time')
             return quantile(

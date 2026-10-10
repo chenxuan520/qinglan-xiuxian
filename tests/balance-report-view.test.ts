@@ -107,6 +107,79 @@ test('图表使用计划分母和原始中位数，未击杀与无胜局不会�
     0,
   );
 });
+test('自定义组合按计划分组，缺失保留分母，重复与错误身份不虚增通过率', () => {
+  const base = balanceCases(true)[0];
+  const plan: ReturnType<typeof balanceCases> = [
+    base,
+    { ...base, device: 'desktop', seed: 82 },
+    { ...base, root: 'dual', seed: 123 },
+    { ...base, path: 'demonic', starter: 'skull', seed: 164 },
+  ];
+  const names = { ...labels, paths: { orthodox: '正道', demonic: '魔道' } };
+  const win = { ...sample(plan[0]), cleared: 1, case: plan[3] };
+  const demonic = { ...sample(plan[3]), cleared: 1 };
+  const rows = [win, win, demonic, { ...win, key: 'unknown' }];
+  const data = reportChartData(rows, plan, 'clear', names, ['path', 'device']);
+  assert.deepEqual(
+    data.datasets.map((d) => [d.label, d.data[0]]),
+    [
+      ['正道 / 手机', 50],
+      ['正道 / 电脑', 0],
+      ['魔道 / 手机', 100],
+    ],
+  );
+  assert.equal(reportChartData(rows, plan, 'clear', names, []).datasets[0].data[0], 50);
+  const firstColor = data.datasets[2].borderColor;
+  assert.equal(
+    reportChartData(rows, plan, 'time', names, ['path', 'device']).datasets[2].borderColor,
+    firstColor,
+  );
+});
+test('合并维度时耗时与妖王中位数直接使用原始观测，不平均各组中位数', () => {
+  const plan = balanceCases(true).slice(0, 3);
+  const rows = plan.map(sample);
+  rows[0].battles = [10, 20, 30].map((seconds) => ({
+    ...rows[0].battles[0],
+    state: 'won',
+    seconds,
+    bosses: [{ stage: 0, at: 60, deadAt: 60 + seconds, observedSeconds: seconds, hpFraction: 0 }],
+  }));
+  rows[1].battles[0].state = 'won';
+  rows[1].battles[0].seconds = 100;
+  rows[1].battles[0].bosses = [
+    { stage: 0, at: 60, deadAt: 160, observedSeconds: 100, hpFraction: 0 },
+  ];
+  rows[2].battles[0].bosses = [
+    { stage: 0, at: 60, deadAt: null, observedSeconds: 5, hpFraction: 0.5 },
+  ];
+  for (const metric of ['time', 'boss'] as const) {
+    const data = reportChartData(rows, plan, metric, labels, []);
+    assert.equal(data.datasets.length, 1);
+    assert.equal(data.datasets[0].label, '当前筛选合计');
+    assert.equal(data.datasets[0].data[0], 20);
+    assert.equal(data.datasets[0].data[1], null);
+  }
+});
+test('六种汇总维度均使用中文名称，重复选择去重，空计划不造分组', () => {
+  const c = { ...balanceCases(true)[0], profile: 'maxed' as const, difficulty: 1 };
+  const names = {
+    ...labels,
+    paths: { orthodox: '正道' },
+    treasures: { sword: '青霄剑' },
+    profiles: { maxed: '广告与根基满级' },
+    difficulties: ['初入仙途', '险境'],
+  };
+  const dimensions = ['root', 'path', 'starter', 'device', 'profile', 'difficulty'] as const;
+  const data = reportChartData([], [c], 'clear', names, dimensions);
+  assert.equal(data.datasets[0].label, '天灵根 / 正道 / 青霄剑 / 手机 / 广告与根基满级 / 险境');
+  assert.equal(data.datasets[0].data[0], 0);
+  assert.equal(reportChartData([], [c], 'time', names, dimensions).datasets[0].data[0], null);
+  assert.deepEqual(
+    reportChartData([], [c], 'clear', names, ['root', 'root']),
+    reportChartData([], [c], 'clear', names),
+  );
+  assert.deepEqual(reportChartData([], [], 'clear', names, []).datasets, []);
+});
 test('诊断分级、去重、范围、原始信息与接口版本保持明确', () => {
   const plan = balanceCases(true);
   const message = '<script>bad</script>';
