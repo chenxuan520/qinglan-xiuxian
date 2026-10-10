@@ -116,7 +116,7 @@ export interface Metric {
   median?: number | null;
   p90?: number | null;
 }
-const distribution = (values: number[]): Metric => ({
+export const distribution = (values: number[]): Metric => ({
   n: values.length,
   median: quantile(values, 0.5),
   p90: quantile(values, 0.9),
