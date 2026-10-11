@@ -1,6 +1,12 @@
 import { syncHumanStories } from './human-stories.ts';
 import { freshHometown, validHometown } from './hometown.ts';
-import { freshMedicine, validMedicine, type MedicineState } from './medicine-data.ts';
+import {
+  freshMedicine,
+  validMedicine,
+  MEDICINES,
+  medicineInfo,
+  type MedicineState,
+} from './medicine-data.ts';
 import {
   REALMS,
   STAGES,
@@ -35,7 +41,12 @@ import {
   type Chronicle,
 } from './chronicle.ts';
 
+export type BirthInheritance =
+  | { kind: 'artifact'; id: string; level: number }
+  | { kind: 'medicine'; id: string };
+
 export interface SaveData {
+  birthInheritance: BirthInheritance | null;
   medicine: MedicineState;
   version: 1;
   schema: number;
@@ -72,7 +83,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 11;
+export const SAVE_SCHEMA = 12;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -113,6 +124,7 @@ export function freshSave(
 ): SaveData {
   const starter = initialStarter(rootElements, path, random);
   return {
+    birthInheritance: null,
     version: 1,
     schema: SAVE_SCHEMA,
     medicine: freshMedicine(),
@@ -150,6 +162,82 @@ export function freshSave(
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
   typeof n === 'number' && Number.isFinite(n) ? Math.min(max, Math.max(0, Math.floor(n))) : 0;
+
+export function validInheritance(value: unknown): value is BirthInheritance {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const gift = value as BirthInheritance;
+  if (gift.kind === 'medicine') return !!medicineInfo(gift.id);
+  return (
+    gift.kind === 'artifact' &&
+    TREASURES.some((t) => t.id === gift.id) &&
+    Number.isSafeInteger(gift.level) &&
+    gift.level >= 0 &&
+    gift.level <= MAX_FORGE_LEVEL
+  );
+}
+export function inheritanceChoices(save: SaveData): BirthInheritance[] {
+  if (!realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max) return [];
+  return [
+    ...TREASURES.filter((t) => save.artifacts.includes(t.id)).map(
+      (t): BirthInheritance => ({
+        kind: 'artifact',
+        id: t.id,
+        level: int(save.forge[t.id], MAX_FORGE_LEVEL),
+      }),
+    ),
+    ...MEDICINES.filter((m) => (save.medicine.bag[m.id] || 0) > 0).map(
+      (m): BirthInheritance => ({
+        kind: 'medicine',
+        id: m.id,
+      }),
+    ),
+  ];
+}
+export function resolveInheritance(save: SaveData, key: string): BirthInheritance | null {
+  return inheritanceChoices(save).find((gift) => `${gift.kind}:${gift.id}` === key) ?? null;
+}
+export function validBirthInheritance(save: SaveData, value: unknown): value is BirthInheritance {
+  if (
+    !validInheritance(value) ||
+    save.age !== 15 ||
+    save.cultivation ||
+    save.runs ||
+    save.completed.length ||
+    !save.mortal.hometown ||
+    save.mortal.hometown.stage === 'departed'
+  )
+    return false;
+  return value.kind === 'artifact'
+    ? save.artifacts.includes(value.id) && (save.forge[value.id] || 0) === value.level
+    : (save.medicine.bag[value.id] || 0) === 1;
+}
+// 只用于新的一世；选项在旧世确认时校验，命盘重抽时从新生存档继续携带。
+export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | null) {
+  if (
+    !validInheritance(gift) ||
+    save.age !== 15 ||
+    save.cultivation ||
+    save.runs ||
+    save.completed.length ||
+    !save.mortal.hometown ||
+    save.mortal.hometown.stage === 'departed'
+  )
+    return false;
+  if (gift.kind === 'artifact') {
+    save.artifacts = [...new Set([...save.artifacts, gift.id])];
+    save.forge[gift.id] = gift.level;
+  } else save.medicine.bag[gift.id] = 1;
+  save.birthInheritance = { ...gift };
+  recordChronicle(
+    save,
+    '薪火相传',
+    gift.kind === 'artifact'
+      ? `前人留下${treasure(gift.id).name}，炼器${gift.level}阶，已收入藏器阁。`
+      : `前人留下一枚${medicineInfo(gift.id)!.name}，已收入丹囊。`,
+    'birth-inheritance',
+  );
+  return true;
+}
 export function parseSave(raw: string | null, random: () => number = Math.random): SaveData {
   return readSave(raw, random).save;
 }
@@ -282,6 +370,8 @@ export function readSave(
         (s.pendingReincarnation === 'tribulation' && tribulationDue(base)))
     )
       base.pendingReincarnation = s.pendingReincarnation;
+    if (validBirthInheritance(base, s.birthInheritance))
+      base.birthInheritance = { ...s.birthInheritance };
     return { save: base, status: newer ? 'newer' : 'ok' };
   } catch {
     return { save: base, status: newer ? 'newer' : 'unreadable' };
@@ -562,7 +652,7 @@ export const forgeDamageBonus = (level: number) =>
   FORGE_DAMAGE_BONUSES[Math.min(MAX_FORGE_LEVEL, Math.max(0, Math.floor(level)))] / 100;
 export const forgeCost = (level: number) => {
   const advanced = Math.max(0, level - 4) ** 2;
-  return { iron: 3 + level * 3 + advanced * 12, stones: 35 + level * 45 + advanced * 180 };
+  return { iron: 3 + level * 6 + advanced * 18, stones: 35 + level * 30 + advanced * 90 };
 };
 export function train(save: SaveData, kind: keyof SaveData['training']) {
   const cost = trainingCost(save.training[kind]);

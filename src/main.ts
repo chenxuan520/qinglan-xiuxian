@@ -9,6 +9,11 @@ import {
 import { activeMedicines, refreshMedicineShop, medicineInfo } from './medicine-data.ts';
 import { useMedicine, buyMedicine, craftMedicine, buyMedicineRecipe } from './medicine.ts';
 import './style.css';
+import {
+  inheritanceContent,
+  inheritancePreview,
+  birthInheritanceNotice,
+} from './inheritance-ui.ts';
 import './mortal.css';
 import './journey-map.css';
 import { AD_DURATION_MS, AD_SECONDS, AD_PLACEHOLDER_HTML } from './ads.ts';
@@ -83,6 +88,8 @@ import {
   parseSave,
   readSave,
   freshSave,
+  applyBirthInheritance,
+  resolveInheritance,
   enterImmortalGate,
   SAVE_KEY,
   realmInfo,
@@ -102,6 +109,7 @@ import {
   retreatPlan,
   retreat,
   type SaveData,
+  type BirthInheritance,
 } from './progress.ts';
 import { Game } from './game.ts';
 import {
@@ -1224,7 +1232,7 @@ function renderPanel() {
     panelFrame(
       '修行指南',
       '道法有迹',
-      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，同样会清空本世进度。圆满终章后轮回，也可以选择再走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，除真仙选定的传承遗物外，同样会清空本世进度。圆满终章后轮回，也可以选择再走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
     );
   }
 }
@@ -1753,7 +1761,7 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   panelFrame(
     firstLife ? '命盘初现，始问长生' : '一念轮回，再问长生',
     '命盘初现 · 此世资质',
-    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout"><div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div></div><div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
+    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout"><div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div></div>${birthInheritanceNotice(save.birthInheritance)}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
     true,
   );
   modal.querySelector('[data-action="close"]')?.remove();
@@ -1777,7 +1785,11 @@ function trackReincarnation(result: 'lifespan' | 'tribulation' | 'epilogue' | 'm
   telemetry.track({ type: 'reincarnate', result, ...lifeStats() });
   telemetry.flush();
 }
-function resetLifetime(previousLife?: string, revisitHometown: boolean | 'full' = false) {
+function resetLifetime(
+  previousLife?: string,
+  revisitHometown: boolean | 'full' = false,
+  inheritance: BirthInheritance | null = null,
+) {
   shownHumanLetters.clear();
   const root = rollSpiritRoot();
   clearInterval(adTimer);
@@ -1796,6 +1808,7 @@ function resetLifetime(previousLife?: string, revisitHometown: boolean | 'full' 
     prologueSeen,
     hometownSeen,
   });
+  applyBirthInheritance(save, inheritance);
   if (revisitHometown === 'full') {
     save.prologueSeen = false;
     save.hometownSeen = false;
@@ -1988,12 +2001,19 @@ function handleAction(action: string, id?: string) {
       panelFrame(
         '再问长生',
         '轮回转世 · 开启新的一世',
-        `<p class="pause-description">此世已在仙门前落幕。轮回将清空此世修为、年岁、法宝、物资与履历，重新抽取灵根，从十五岁启程。</p><figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回</button></div>`,
+        `<p class="pause-description">此世已在仙门前落幕。除所选传承遗物外，轮回将清空此世修为、年岁、法宝、物资与履历，重新抽取灵根，从十五岁启程。</p>${inheritanceContent(save)}<figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回</button></div>`,
       );
     } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
       ui.inert = false;
       trackReincarnation('epilogue');
-      resetLifetime('前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。', true);
+      resetLifetime(
+        '前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。',
+        true,
+        resolveInheritance(
+          save,
+          modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
+        ),
+      );
     } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
     else if (action === 'epilogue-sound' && panel === 'epilogue') {
       save.sound = !save.sound;
@@ -2022,12 +2042,14 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (panel === 'root-reveal') {
-    if (action === 'reroll-root') resetLifetime();
+    if (action === 'reroll-root') resetLifetime(undefined, false, save.birthInheritance);
     else if (action === 'accept-root' || action === 'close') {
       ui.inert = false;
       panel = '';
       modal.innerHTML = '';
-      if (acceptHometownRoot(save)) persist();
+      const hadInheritance = save.birthInheritance !== null;
+      save.birthInheritance = null;
+      if (acceptHometownRoot(save) || hadInheritance) persist();
       renderLobby();
       ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
     }
@@ -2139,7 +2161,7 @@ function handleAction(action: string, id?: string) {
     panelFrame(
       '叩入仙门',
       '越过此门，此世落幕',
-      '<p class="pause-description">确认后进入终章，此世将永久结束。历练、洞府和青岚镇均不可再返回，未完成的历练也会终止；刷新页面仍保留结束状态。</p><p class="panel-note">之后只能轮回转世，清空此世进度，从十五岁重新启程。也可暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 结束此世</button></div>',
+      '<p class="pause-description">确认后进入终章，此世将永久结束。历练、洞府和青岚镇均不可再返回，未完成的历练也会终止；刷新页面仍保留结束状态。</p><p class="panel-note">之后只能轮回转世，可选择一件法宝或一枚丹药传承，其余此世进度清空，从十五岁重新启程。也可暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 结束此世</button></div>',
     );
     return;
   }
@@ -2579,7 +2601,7 @@ function handleAction(action: string, id?: string) {
     panelFrame(
       '轮回转世',
       '重启仙途',
-      '<p class="pause-description">将清空此浏览器在当前网址的全部进度：累计年岁、境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，仅收藏新本命五行对应的正魔入门法宝，重新随机灵根资质与五行，资质可能低于当前。</p><label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>重走十五岁那一程<small>重走序章、故居告别与离乡；不勾选则直接看新命盘。</small></span></label><div class="pause-actions"><button class="secondary-button" data-action="home">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>',
+      `<p class="pause-description">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max ? '除所选传承遗物外，将清空此世进度' : '将清空此浏览器在当前网址的全部进度'}：累计年岁、境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，收藏新本命五行对应的正魔入门法宝，重新随机灵根资质与五行，资质可能低于当前。</p>${inheritanceContent(save)}<label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>重走十五岁那一程<small>重走序章、故居告别与离乡；不勾选则直接看新命盘。</small></span></label><div class="pause-actions"><button class="secondary-button" data-action="home">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>`,
     );
     return;
   }
@@ -2588,6 +2610,10 @@ function handleAction(action: string, id?: string) {
     resetLifetime(
       undefined,
       modal.querySelector<HTMLInputElement>('#reincarnate-full-opening')?.checked ? 'full' : false,
+      resolveInheritance(
+        save,
+        modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
+      ),
     );
     return;
   }
@@ -3031,6 +3057,14 @@ document.addEventListener('input', (event) => {
 });
 document.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (
+    input.id === 'reincarnate-inheritance' &&
+    (panel === 'reincarnate' || panel === 'epilogue-reincarnate')
+  ) {
+    const preview = modal.querySelector<HTMLElement>('.inheritance-preview');
+    if (preview) preview.innerHTML = inheritancePreview(save, input.value);
+    return;
+  }
   if (input.id !== 'save-import' || game || panel !== 'cultivation') return;
   const file = input.files?.[0];
   input.value = '';

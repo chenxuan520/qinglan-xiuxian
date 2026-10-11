@@ -4918,6 +4918,97 @@ body:not(.in-game) #ui {
   font-size: 14px;
   cursor: pointer;
 }
+.inheritance-section {
+  margin: 24px 0;
+  padding: clamp(16px, 3vw, 24px);
+  border: 1px solid #b5c28b55;
+  background: linear-gradient(135deg, #68805a14, #0b292633);
+}
+.inheritance-heading h3 {
+  margin: 8px 0 10px;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+.inheritance-heading p,
+.inheritance-preview p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--muted);
+}
+.inheritance-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 20px 0 8px;
+  font-size: 13px;
+}
+.inheritance-label span {
+  color: var(--muted);
+  font-size: 11px;
+}
+#reincarnate-inheritance {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #b5c28b66;
+  border-radius: 2px;
+  background: #173b32;
+  color: #e7e8d6;
+  font: inherit;
+  font-size: 14px;
+  color-scheme: dark;
+}
+#reincarnate-inheritance:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.inheritance-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 18px;
+}
+.inheritance-preview > .icon,
+.inheritance-preview > .medicine-art,
+.inheritance-seal {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+}
+.inheritance-seal {
+  display: grid;
+  place-items: center;
+  border: 1px solid #b5c28b55;
+  color: var(--gold);
+  font-size: 24px;
+}
+.inheritance-preview > div {
+  min-width: 0;
+}
+.inheritance-preview strong {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: 400;
+}
+.inheritance-preview strong small {
+  padding: 2px 6px;
+  border: 1px solid #b5c28b44;
+  color: var(--gold);
+  font-size: 10px;
+}
+.inheritance-arrival {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid #b5c28b44;
+}
 .reincarnate-opening input {
   appearance: none;
   flex: 0 0 18px;

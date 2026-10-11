@@ -7,6 +7,7 @@ import {
   parseSave,
   forge,
   forgeCost,
+  train,
   claimArtifacts,
   settleRun,
 } from '../src/progress.ts';
@@ -31,18 +32,18 @@ test('三十六件已收藏法宝均能炼至十阶，每阶准确扣款且刷�
   }
 });
 
-test('炼器前五阶保持旧价，后五阶两种材料费用加速递增，缺少任一材料不扣款', () => {
+test('炼器首阶保持可负担，玄铁与灵石逐阶递增，后五阶加速且缺料不扣款', () => {
   assert.deepEqual(
     Array.from({ length: 5 }, (_, level) => forgeCost(level)),
     [
       { iron: 3, stones: 35 },
-      { iron: 6, stones: 80 },
-      { iron: 9, stones: 125 },
-      { iron: 12, stones: 170 },
-      { iron: 15, stones: 215 },
+      { iron: 9, stones: 65 },
+      { iron: 15, stones: 95 },
+      { iron: 21, stones: 125 },
+      { iron: 27, stones: 155 },
     ],
   );
-  assert.deepEqual(forgeCost(9), { iron: 330, stones: 4940 });
+  assert.deepEqual(forgeCost(9), { iron: 507, stones: 2555 });
   for (let level = 5; level < 10; level++) {
     const cost = forgeCost(level),
       prior = forgeCost(level - 1),
@@ -59,6 +60,22 @@ test('炼器前五阶保持旧价，后五阶两种材料费用加速递增，�
       assert.equal(JSON.stringify(save), before);
     }
   }
+});
+
+test('一份首关补给足够本命炼至三阶并修习两项根基，玄铁消耗有效而灵石不独占预算', () => {
+  const save = freshSave();
+  save.stones = 300;
+  save.iron = 30;
+  for (let i = 0; i < 3; i++) assert.equal(forge(save, save.starter), true);
+  assert.equal(save.forge[save.starter], 3);
+  assert.equal(save.iron, 3);
+  assert.equal(save.stones, 105);
+  assert.equal(train(save, 'vitality'), true);
+  assert.equal(train(save, 'power'), true);
+  assert.equal(save.stones, 15);
+  const before = JSON.stringify(save);
+  assert.equal(forge(save, save.starter), false);
+  assert.equal(JSON.stringify(save), before);
 });
 
 test('十阶炼器含圆满奖励，实际攻击伤害增加百分之二百，旧五阶保留原加成', () => {

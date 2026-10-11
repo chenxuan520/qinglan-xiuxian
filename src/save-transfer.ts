@@ -8,7 +8,7 @@ import {
   spiritRootInfo,
 } from './data.ts';
 import { Game } from './game.ts';
-import { readSave, SAVE_KEY, type SaveData } from './progress.ts';
+import { readSave, SAVE_KEY, validBirthInheritance, type SaveData } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
 
@@ -157,6 +157,8 @@ export function importSave(text: string) {
     throw new Error('此存档来自更新的版本，请刷新页面载入新版本后再导入');
   if (read.status !== 'ok') throw new Error('存档内容不完整或已损坏，当前进度未更改');
   const save = read.save;
+  if (data.birthInheritance != null && !validBirthInheritance(save, data.birthInheritance))
+    throw new Error('存档中的传承遗物无效，当前进度未更改');
   if (
     data.pendingReincarnation !== undefined &&
     data.pendingReincarnation !== save.pendingReincarnation

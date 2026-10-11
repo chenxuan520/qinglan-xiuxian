@@ -274,7 +274,10 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
       detail: '渡过的天劫，已化作此世劫印',
     });
   if (save.completed.length)
-    memories.push({ title: `踏破 ${save.completed.length} 境`, detail: '山河走过，皆为此世来路' });
+    memories.push({
+      title: `踏破${'一二三四五六七'[save.completed.length - 1]}境`,
+      detail: '山河走过，皆为此世来路',
+    });
   memories.push({
     title: `本命 · ${treasure(save.starter).name}`,
     detail: save.forge[save.starter]

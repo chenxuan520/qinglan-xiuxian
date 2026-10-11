@@ -6,6 +6,8 @@ import { createContext, Script } from 'node:vm';
 import * as data from '../src/data.ts';
 import {
   freshSave,
+  applyBirthInheritance,
+  resolveInheritance,
   parseSave,
   lifespanInfo,
   realmInfo,
@@ -14,6 +16,7 @@ import {
   SAVE_KEY,
   type SaveData,
 } from '../src/progress.ts';
+import { inheritanceContent } from '../src/inheritance-ui.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
 import { sectDuesPending } from '../src/mortal.ts';
@@ -70,6 +73,7 @@ function harness(save: SaveData) {
   const messages: string[] = [];
   const tracked: Record<string, unknown>[] = [];
   const openingChoice = { checked: false };
+  const inheritanceChoice = { value: '' };
   let rolls = 0;
   const context = createContext({
     ...data,
@@ -80,6 +84,9 @@ function harness(save: SaveData) {
     rootElementsFor: (root: data.SpiritRootId) => data.rootElementsFor(root, [], () => 0),
     lifespanInfo,
     realmInfo,
+    applyBirthInheritance,
+    resolveInheritance,
+    inheritanceContent,
     tribulationDue,
     departHometown,
     acceptHometownRoot,
@@ -106,6 +113,7 @@ function harness(save: SaveData) {
     tracked,
     telemetry: { track: (event: Record<string, unknown>) => tracked.push(event), flush: noop },
     openingChoice,
+    inheritanceChoice,
     document: { body: element },
     ui: { innerHTML: '', inert: false, querySelector: () => element },
     modal: {
@@ -115,7 +123,11 @@ function harness(save: SaveData) {
           ? context.modal.innerHTML.includes('id="reincarnate-full-opening"')
             ? openingChoice
             : null
-          : element,
+          : selector === '#reincarnate-inheritance'
+            ? context.modal.innerHTML.includes('id="reincarnate-inheritance"')
+              ? inheritanceChoice
+              : null
+            : element,
     },
     window: { clearTimeout: noop, matchMedia: () => ({ matches: false }) },
     clearInterval: noop,
@@ -173,6 +185,7 @@ function harness(save: SaveData) {
     panelFrame(_title: string, _subtitle: string, content: string) {
       context.modal.innerHTML = content;
       if (content.includes('id="reincarnate-full-opening"')) openingChoice.checked = false;
+      inheritanceChoice.value = '';
       routes.push(context.panel);
     },
     renderRootReveal() {
@@ -655,4 +668,93 @@ test('完整重开仍可主动跳过开场，此后命盘重抽不继承完整�
   context.handleAction('reroll-root');
   assertNewReveal(context);
   assert.deepEqual(context.routes, ['root-reveal']);
+});
+
+test('真仙主动传承魔道法宝：取消不清档，确认仅入藏，刷新与命盘重抽保留且不累积其他法宝', () => {
+  const save = previousLife();
+  save.completed = [data.FINAL_TRIAL_STAGE];
+  save.cultivation = 1e9;
+  save.forge.skull = 10;
+  const old = JSON.stringify(save);
+  const context = harness(save);
+  context.handleAction('reincarnate');
+  assert.match(context.modal.innerHTML, /真仙传承/);
+  context.inheritanceChoice.value = 'artifact:skull';
+  context.handleAction('home');
+  assert.equal(JSON.stringify(save), old);
+  context.handleAction('reincarnate');
+  assert.equal(context.inheritanceChoice.value, '');
+  context.inheritanceChoice.value = 'artifact:skull';
+  context.handleAction('confirm-reincarnate');
+  assertNewReveal(context);
+  assert.equal(save.path, 'orthodox');
+  assert.notEqual(save.starter, 'skull');
+  assert.equal(save.forge.skull, 10);
+  assert.deepEqual(save.artifacts, [
+    ...new Set([...data.ROOT_STARTERS[data.treasure(save.starter).element], 'skull']),
+  ]);
+  assert.equal(save.medicine.bag.huanglong, undefined);
+  assert.equal(save.stones, 0);
+  assert.equal(save.iron, 0);
+  assert.deepEqual(save.training, { vitality: 0, power: 0, speed: 0 });
+  assert.equal(save.chronicle.entries.filter((e) => e.title === '薪火相传').length, 1);
+  let restored = harness(parseSave(context.writes.at(-1)));
+  for (let i = 0; i < 4; i++) {
+    restored.renderLobby();
+    restored.handleAction('reroll-root');
+    assert.equal(restored.save.forge.skull, 10);
+    assert.deepEqual(Array.from(restored.save.artifacts), [
+      ...new Set([...data.ROOT_STARTERS[data.treasure(restored.save.starter).element], 'skull']),
+    ]);
+    assert.equal(
+      restored.save.chronicle.entries.filter((e: { title: string }) => e.title === '薪火相传')
+        .length,
+      1,
+    );
+    restored = harness(parseSave(restored.writes.at(-1)));
+  }
+  restored.renderLobby();
+  restored.handleAction('accept-root');
+  assert.equal(restored.save.birthInheritance, null);
+  assert.equal(restored.save.forge.skull, 10);
+  assert.equal(parseSave(restored.writes.at(-1)).birthInheritance, null);
+});
+
+test('终章传一枚丹药：故乡步行、跳过、完整序章和刷新均保留，重抽不增加库存', () => {
+  for (const route of ['skip', 'walk', 'full'] as const) {
+    const save = previousLife();
+    save.cultivation = 1e9;
+    save.completed = [data.FINAL_TRIAL_STAGE];
+    const context = harness(save);
+    if (route === 'full') {
+      context.handleAction('reincarnate');
+      context.openingChoice.checked = true;
+    } else {
+      assert.equal(enterImmortalGate(save), true);
+      context.renderLobby();
+      context.handleAction('epilogue-reincarnate');
+    }
+    context.inheritanceChoice.value = 'medicine:huanglong';
+    context.handleAction('confirm-reincarnate');
+    let restored = harness(parseSave(context.writes.at(-1)));
+    if (route === 'full') {
+      restored.renderPrologue();
+      restored.handleAction('prologue-enter');
+    } else restored.renderLobby();
+    if (route === 'full') restored.finishDeparture();
+    else if (route === 'walk') {
+      restored.handleAction('hometown-walk');
+      restored.finishDeparture();
+    } else restored.handleAction('hometown-skip');
+    assertNewReveal(restored);
+    assert.deepEqual(restored.save.medicine.bag, { huanglong: 1 });
+    assert.deepEqual(restored.save.medicine.active, {});
+    restored = harness(parseSave(restored.writes.at(-1)));
+    restored.renderLobby();
+    for (let i = 0; i < 3; i++) restored.handleAction('reroll-root');
+    assert.deepEqual(restored.save.medicine.bag, { huanglong: 1 });
+    restored.handleAction('accept-root');
+    assert.equal(restored.save.birthInheritance, null);
+    assert.deepEqual(restored.save.medicine.bag, { huanglong: 1 });
+  }
 });
