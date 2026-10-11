@@ -1,5 +1,9 @@
 # 素材与生成提示词
 
+## 社交分享卡片封面（2026-10-10）
+
+`public/assets/og-cover.jpg` 由 `python3 scripts/generate-og-image.py` 生成（需要 Pillow）：取 `qinglan-prologue-dark.webp`（黄昏山门全景，与深色主视觉同系）按宽度等比缩放后垂直居中裁成标准的 1200 × 630，以质量 85 存成 JPEG 约 200 KiB。分享抓取器对 JPEG 支持最完备，不在此处压成 WebP。index.html 的 canonical、Open Graph 与 Twitter 卡片标签固定指向唯一官网 `https://xiuxian.011203.xyz/`（含图绝对地址与尺寸声明），`tests/social-meta.test.ts` 校验标签内容与封面文件一致性。更换主视觉时改脚本里的来源并重跑。
+
 ## 正魔兼修人物立绘（2026-10-10）
 
 正道保留 `characters.webp` 第零格的青衣执剑少年；魔道为黑红衣袍、单手持万魂幡，兼修为黑白青玉衣袍、单手托阴阳盘，均保留原人物的脸、发髻与金冠。两张新图由内置 imagegen 参考原角色生成，使用 `python3 scripts/compress-assets.py` 压缩，保持 1086 × 1448 尺寸与逐像素相同的 alpha 通道。
