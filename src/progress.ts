@@ -133,7 +133,7 @@ export function freshSave(
     training: { vitality: 0, power: 0, speed: 0 },
     retreatBonus: { vitality: 0, power: 0, speed: 0 },
     forge: {},
-    artifacts: [...new Set(['sword', 'nail', ...ROOT_STARTERS[treasure(starter).element]])],
+    artifacts: [...ROOT_STARTERS[treasure(starter).element]],
     artifactDrops: [],
     starter,
     sound: false,
@@ -222,9 +222,12 @@ export function readSave(
             ...validIds([s.starter]),
           ]
         : validIds(s.artifacts);
-    base.artifacts = [
-      ...new Set([...base.artifacts, ...ROOT_STARTERS[base.rootElements[0] ?? 'metal'], ...legacy]),
-    ];
+    // 不合入兜底新档的金系收藏；已有收藏的无灵根换本命后也不额外赠宝。
+    const starterElement =
+      base.rootElements[0] ?? TREASURES.find((t) => t.id === s.starter)?.element ?? 'metal';
+    const initialArtifacts =
+      base.rootElements.length || s.artifacts === undefined ? ROOT_STARTERS[starterElement] : [];
+    base.artifacts = [...new Set([...initialArtifacts, ...legacy])];
     base.artifactDrops = [...new Set(validIds(s.artifactDrops))].filter(
       (id) => !base.artifacts.includes(id),
     );

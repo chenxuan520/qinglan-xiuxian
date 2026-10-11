@@ -94,6 +94,7 @@ test('36 件法宝未觉醒与觉醒的实际伤害按灵根百分比加持，�
 
 test('广告自选资质与五行，无灵根可获单系，本局资质不随洗练变化且续局不重复放大弹道', () => {
   const save = freshSave('dual', ['fire', 'metal']);
+  save.artifacts.push('sword');
   save.starter = 'sword';
   const g = new Game(save, 0, 0, () => 0.5);
   g.spawnEnemy(0, false, false, { x: 300, y: 0 });

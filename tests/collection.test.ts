@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { TREASURES } from '../src/data.ts';
+import { ELEMENTS, ROOT_STARTERS, TREASURES, treasure } from '../src/data.ts';
 import {
   freshSave,
   parseSave,
@@ -90,7 +90,7 @@ test('新角色默认静音，存档解析仍保留显式声音设置', () => {
     assert.equal(parseSave(JSON.stringify({ ...freshSave(), sound })).sound, sound);
 });
 
-test('默认仅有青霄剑与追魂钉，未收藏法宝不能炼器但仍可局内领悟', () => {
+test('金系入门收藏青霄剑与追魂钉，未收藏法宝不能炼器但仍可局内领悟', () => {
   const save = freshSave();
   assert.deepEqual(save.artifacts, ['sword', 'nail']);
   save.stones = save.iron = 9999;
@@ -106,6 +106,104 @@ test('默认仅有青霄剑与追魂钉，未收藏法宝不能炼器但仍可�
   assert.equal(new Game(save, 0, 0).weapons[0].id, 'sword');
   save.path = 'demonic';
   assert.equal(new Game(save, 0, 0).weapons[0].id, 'nail');
+});
+
+test('五行各路线仅赠对应两件入门法宝，刷新、导入与续局不额外赠送金系法宝', () => {
+  for (const element of ELEMENTS) {
+    for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+      const save = freshSave('heaven', [element.id], path, () => 0.5);
+      const expected = ROOT_STARTERS[element.id];
+      assert.deepEqual(save.artifacts, expected);
+      assert.equal(save.starter, expected[path === 'demonic' ? 1 : 0]);
+      const game = new Game(save, 0, 0, () => 0.5);
+      assert.deepEqual(
+        game.weapons.map((w) => w.id),
+        [save.starter],
+      );
+      const loaded = parseSave(JSON.stringify(save));
+      assert.deepEqual(loaded.artifacts, expected);
+      assert.equal(loaded.starter, save.starter);
+      const restored = Game.restore(loaded, JSON.parse(JSON.stringify(game.snapshot())))!;
+      assert.ok(restored);
+      assert.deepEqual(
+        restored.weapons.map((w) => w.id),
+        [save.starter],
+      );
+      if (element.id !== 'metal') {
+        loaded.stones = loaded.iron = 9999;
+        assert.equal(forge(loaded, 'sword'), false);
+        assert.equal(forge(loaded, 'nail'), false);
+        assert.equal(loaded.stones, 9999);
+        assert.equal(loaded.iron, 9999);
+      }
+    }
+  }
+});
+
+test('无灵根每种随机本命仅收藏对应五行两件，反复读档不补金系也不重抽本命', () => {
+  for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+    const candidates =
+      path === 'dual'
+        ? Object.values(ROOT_STARTERS).flat()
+        : Object.values(ROOT_STARTERS).map((pair) => pair[path === 'demonic' ? 1 : 0]);
+    for (let i = 0; i < candidates.length; i++) {
+      let save = freshSave('none', [], path, () => (i + 0.1) / candidates.length);
+      const starter = candidates[i];
+      const expected = ROOT_STARTERS[treasure(starter).element];
+      assert.equal(save.starter, starter);
+      assert.deepEqual(save.artifacts, expected);
+      for (let reload = 0; reload < 3; reload++) {
+        save = parseSave(JSON.stringify(save), () => {
+          throw new Error('已有无灵根本命不得重抽');
+        });
+        assert.equal(save.starter, starter);
+        assert.deepEqual(save.rootElements, []);
+        assert.deepEqual(save.artifacts, expected);
+        assert.equal(new Game(save, 0, 0).weapons[0].id, starter);
+      }
+    }
+  }
+});
+
+test('非金系旧档已收藏的青霄剑、追魂钉和炼器保留，缺少收藏字段时不凭空补送', () => {
+  const save = freshSave('heaven', ['wood'], 'orthodox', () => 0.5);
+  save.artifacts.push('sword', 'nail', 'orbit');
+  save.forge.sword = 7;
+  save.forge.nail = 3;
+  save.stones = 1234;
+  const loaded = parseSave(JSON.stringify({ ...save, schema: 10 }));
+  assert.deepEqual(new Set(loaded.artifacts), new Set(save.artifacts));
+  assert.equal(loaded.forge.sword, 7);
+  assert.equal(loaded.forge.nail, 3);
+  assert.equal(loaded.stones, 1234);
+  assert.equal(loaded.starter, 'fan');
+  const { artifacts, ...legacy } = freshSave('heaven', ['wood'], 'orthodox', () => 0.5);
+  const migrated = parseSave(JSON.stringify({ ...legacy, starter: 'orbit', forge: { sand: 2 } }));
+  assert.deepEqual(new Set(migrated.artifacts), new Set(['fan', 'chain', 'orbit', 'sand']));
+  assert.equal(migrated.starter, 'orbit');
+  assert.equal(migrated.forge.sand, 2);
+});
+
+test('无灵根领取遗宝再改选本命，刷新不按新本命五行额外赠宝', () => {
+  for (const [roll, id] of [
+    [0, 'orbit'],
+    [0.99, 'sword'],
+  ] as const) {
+    const save = freshSave('none', [], 'orthodox', () => roll);
+    save.artifactDrops.push(id);
+    assert.deepEqual(claimArtifacts(save), [id]);
+    save.starter = id;
+    const expected = [...save.artifacts];
+    for (let reload = 0; reload < 3; reload++) {
+      const loaded = parseSave(JSON.stringify(save));
+      assert.deepEqual(loaded.artifacts, expected);
+      assert.equal(loaded.starter, id);
+      assert.equal(new Game(loaded, 0, 0).weapons[0].id, id);
+      Object.assign(save, loaded);
+    }
+  }
+  const { artifacts, ...legacy } = freshSave('none', [], 'orthodox', () => 0.99);
+  assert.deepEqual(parseSave(JSON.stringify(legacy)).artifacts, ['pagoda', 'skull']);
 });
 
 test('只有击败妖王才掉三件未拥有法宝，收入藏器阁，收齐后不重复掉落', () => {
