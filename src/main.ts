@@ -1754,14 +1754,26 @@ function returnLobby() {
   clearInput();
   renderLobby(years);
 }
-function renderRootReveal(previousLife = '前尘已散，新一世从十五岁启程。', firstLife = false) {
+function rootRevealContent() {
   const starter = treasure(save.starter);
+  return `<div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div>`;
+}
+function refreshRootReveal() {
+  const content = modal.querySelector<HTMLElement>('.root-reveal-layout');
+  const section = modal.querySelector<HTMLElement>('.root-reveal-panel');
+  if (!content || !section) return false;
+  const scrollTop = section.scrollTop;
+  content.innerHTML = rootRevealContent();
+  section.scrollTop = scrollTop;
+  return true;
+}
+function renderRootReveal(previousLife = '前尘已散，新一世从十五岁启程。', firstLife = false) {
   panel = 'root-reveal';
   ui.inert = true;
   panelFrame(
     firstLife ? '命盘初现，始问长生' : '一念轮回，再问长生',
     '命盘初现 · 此世资质',
-    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout"><div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div></div>${birthInheritanceNotice(save.birthInheritance)}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
+    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout">${rootRevealContent()}</div>${birthInheritanceNotice(save.birthInheritance)}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
     true,
   );
   modal.querySelector('[data-action="close"]')?.remove();
@@ -1790,6 +1802,7 @@ function resetLifetime(
   revisitHometown: boolean | 'full' = false,
   inheritance: BirthInheritance | null = null,
 ) {
+  const rerolling = panel === 'root-reveal' && !revisitHometown;
   shownHumanLetters.clear();
   const root = rollSpiritRoot();
   clearInterval(adTimer);
@@ -1822,6 +1835,8 @@ function resetLifetime(
   schoolFilter = 'all';
   bookTab = 'treasures';
   persist();
+  if (saveLock) return;
+  if (rerolling && refreshRootReveal()) return;
   panel = '';
   modal.innerHTML = '';
   ui.inert = false;

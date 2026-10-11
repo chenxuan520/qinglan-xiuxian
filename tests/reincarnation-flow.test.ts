@@ -17,6 +17,7 @@ import {
   type SaveData,
 } from '../src/progress.ts';
 import { inheritanceContent } from '../src/inheritance-ui.ts';
+import { spiritRootDiagram, spiritRootEffects, ROOT_IMPRESSIONS } from '../src/common-ui.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
 import { sectDuesPending } from '../src/mortal.ts';
@@ -32,12 +33,16 @@ const flow = new Script(
       'lifeStats',
       'trackReincarnation',
       'resetLifetime',
+      'rootRevealContent',
+      'refreshRootReveal',
       'resumeHometown',
       'handleAction',
       'renderLobby',
       'renderPrologue',
       'persist',
       'writeSave',
+      'lockStaleSave',
+      'renderSaveLock',
       'endLifetime',
       'beginJourneyFarewell',
       'renderJourneyFarewell',
@@ -74,6 +79,8 @@ function harness(save: SaveData) {
   const tracked: Record<string, unknown>[] = [];
   const openingChoice = { checked: false };
   const inheritanceChoice = { value: '' };
+  const rootFrame = { scrollTop: 0 };
+  const rootLayout = { innerHTML: '' };
   let rolls = 0;
   const context = createContext({
     ...data,
@@ -87,6 +94,9 @@ function harness(save: SaveData) {
     applyBirthInheritance,
     resolveInheritance,
     inheritanceContent,
+    spiritRootDiagram,
+    spiritRootEffects,
+    ROOT_IMPRESSIONS,
     tribulationDue,
     departHometown,
     acceptHometownRoot,
@@ -106,6 +116,7 @@ function harness(save: SaveData) {
       },
     },
     saveLock: null,
+    unreadableBackedUp: false,
     lastSaveText: null,
     writes,
     routes,
@@ -114,20 +125,30 @@ function harness(save: SaveData) {
     telemetry: { track: (event: Record<string, unknown>) => tracked.push(event), flush: noop },
     openingChoice,
     inheritanceChoice,
+    rootFrame,
+    rootLayout,
     document: { body: element },
     ui: { innerHTML: '', inert: false, querySelector: () => element },
     modal: {
       innerHTML: '',
       querySelector: (selector: string) =>
-        selector === '#reincarnate-full-opening'
-          ? context.modal.innerHTML.includes('id="reincarnate-full-opening"')
-            ? openingChoice
+        selector === '.root-reveal-panel'
+          ? context.panel === 'root-reveal'
+            ? rootFrame
             : null
-          : selector === '#reincarnate-inheritance'
-            ? context.modal.innerHTML.includes('id="reincarnate-inheritance"')
-              ? inheritanceChoice
+          : selector === '.root-reveal-layout'
+            ? context.panel === 'root-reveal'
+              ? rootLayout
               : null
-            : element,
+            : selector === '#reincarnate-full-opening'
+              ? context.modal.innerHTML.includes('id="reincarnate-full-opening"')
+                ? openingChoice
+                : null
+              : selector === '#reincarnate-inheritance'
+                ? context.modal.innerHTML.includes('id="reincarnate-inheritance"')
+                  ? inheritanceChoice
+                  : null
+                : element,
     },
     window: { clearTimeout: noop, matchMedia: () => ({ matches: false }) },
     clearInterval: noop,
@@ -191,6 +212,7 @@ function harness(save: SaveData) {
     renderRootReveal() {
       context.panel = 'root-reveal';
       context.ui.inert = true;
+      context.rootLayout.innerHTML = context.rootRevealContent();
       routes.push(context.panel);
     },
     renderDeparture() {
@@ -259,7 +281,7 @@ function assertNewReveal(context: ReturnType<typeof harness>) {
   assert.deepEqual(JSON.parse(context.writes.at(-1)), { ...save, activeRun: null });
 }
 
-test('命盘连续重抽均直接展示新命盘，不经过故乡选择或序章', () => {
+test('命盘连续重抽只更新结果，保留弹窗与滚动，不经过故乡或序章', () => {
   const save = freshSave();
   save.prologueSeen = true;
   departHometown(save);
@@ -267,15 +289,49 @@ test('命盘连续重抽均直接展示新命盘，不经过故乡选择或序�
   context.renderLobby();
   assert.equal(context.panel, 'root-reveal');
   context.routes.length = 0;
+  const frame = context.rootFrame;
+  const layout = context.rootLayout;
+  context.modal.innerHTML = '保留命盘外框、说明、遗物与按钮';
+  context.ui.innerHTML = '保留背景首页';
+  frame.scrollTop = 160;
   for (const root of ['variant', 'none', 'dual', 'variant']) {
     context.handleAction('reroll-root');
     assertNewReveal(context);
     assert.equal(save.spiritRoot, root);
     assert.equal(save.rootElements.length, data.spiritRootInfo(root).count);
+    assert.equal(context.rootFrame, frame);
+    assert.equal(context.rootLayout, layout);
+    assert.equal(frame.scrollTop, 160);
+    assert.equal(context.modal.innerHTML, '保留命盘外框、说明、遗物与按钮');
+    assert.equal(context.ui.innerHTML, '保留背景首页');
+    assert.match(layout.innerHTML, new RegExp(data.spiritRootInfo(root).name));
   }
-  assert.deepEqual(context.routes, Array(4).fill('root-reveal'));
+  assert.deepEqual(context.routes, []);
   assert.equal(context.writes.length, 4);
   assert.deepEqual(context.tracked, []);
+});
+
+test('重抽或确认轮回时发现另一窗口更新存档，保留存档锁提示且不覆盖存档', () => {
+  for (const action of ['reroll-root', 'confirm-reincarnate']) {
+    const context = harness(previousLife());
+    if (action === 'reroll-root') context.renderRootReveal();
+    else context.handleAction('reincarnate');
+    context.routes.length = 0;
+    context.ui.innerHTML = '原背景';
+    const layout = context.rootLayout.innerHTML;
+    const otherSave = JSON.stringify(freshSave('none'));
+    context.localStorage.getItem = () => otherSave;
+    context.handleAction(action);
+    assert.equal(context.saveLock, 'stale');
+    assert.equal(context.panel, 'save-lock');
+    assert.equal(context.ui.inert, true);
+    assert.match(context.modal.innerHTML, /同一存档刚在另一个窗口/);
+    assert.equal(context.ui.innerHTML, '原背景');
+    assert.equal(context.rootLayout.innerHTML, layout);
+    assert.deepEqual(context.routes, ['save-lock']);
+    assert.deepEqual(context.writes, []);
+    assert.equal(context.localStorage.getItem(), otherSave);
+  }
 });
 
 test('主动轮回保留清档确认与取消，确认后清旧进度并直接展示新命盘', () => {
@@ -486,7 +542,7 @@ test('只有圆满终章入口保留故乡 farewell 和选择，之后命盘重�
   context.routes.length = 0;
   context.handleAction('reroll-root');
   assertNewReveal(context);
-  assert.deepEqual(context.routes, ['root-reveal']);
+  assert.deepEqual(context.routes, []);
 });
 
 test('首次 freshSave 仍从序章和 farewell 离乡开始，不提前显示命盘或故乡选择', () => {
@@ -667,7 +723,7 @@ test('完整重开仍可主动跳过开场，此后命盘重抽不继承完整�
   context.routes.length = 0;
   context.handleAction('reroll-root');
   assertNewReveal(context);
-  assert.deepEqual(context.routes, ['root-reveal']);
+  assert.deepEqual(context.routes, []);
 });
 
 test('真仙主动传承魔道法宝：取消不清档，确认仅入藏，刷新与命盘重抽保留且不累积其他法宝', () => {
