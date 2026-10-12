@@ -58,7 +58,7 @@ root.innerHTML = `<main>
   <section><div class="two-column"><div><h2>灵根</h2><div id="roots"></div></div><div><h2>路线</h2><div id="paths"></div></div></div></section>
   <section><div class="two-column"><div><h2>最远通关记录</h2><div id="best"></div></div><div><h2>最高境界记录</h2><div id="realms"></div></div></div></section>
   <section><h2>天劫历练</h2><p class="note">现有打点记录迎劫与成功渡劫，没有完整的失败或弃劫结算；这里不计算天劫胜率。</p><div id="tribulations"></div></section>
-  <section><h2>轮回原因</h2><div id="reasons"></div></section>
+  <section><h2>轮回与离界</h2><div id="reasons"></div></section>
   <section><h2>站点分布</h2><div id="sites"></div></section>
   <section><h2>版本分布</h2><div id="versions"></div></section>
   <footer>线上汇总由 Cloudflare Worker 查询 Analytics Engine；测试摘要来自 GitHub Pages。两者分别显示更新时间。仅公开汇总，不输出匿名编号或查询凭证。</footer>
@@ -287,7 +287,7 @@ function render(data: MonitorData) {
       case 'reasons':
         $(id).innerHTML =
           table(
-            ['轮回原因', '次数', '平均境界阶', '平均年岁'],
+            ['接续原因', '次数', '平均境界阶', '平均年岁'],
             rows.map((r) => [
               monitorReason(r.reason),
               count(r.count),

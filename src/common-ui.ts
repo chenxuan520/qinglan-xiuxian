@@ -24,7 +24,7 @@ import {
   type SpiritRootId,
   type ElementId,
 } from './data.ts';
-import { lifespanInfo, retreatPlan, type SaveData, type realmInfo } from './progress.ts';
+import { lifespanInfo, retreatPlan, realmInfo, type SaveData } from './progress.ts';
 import type { Game, Choice } from './game.ts';
 import { icon, smallIcon } from './icons.ts';
 import { playerHomeOffset, playerSpriteBackground } from './player-appearance.ts';
@@ -108,7 +108,8 @@ export function spiritRootEffects(save: SaveData) {
 }
 export function spiritRootSummary(save: SaveData, showAge = false) {
   const life = lifespanInfo(save);
-  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>刷新保留 · 轮回重抽资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">轮回转世 · 重启仙途</button></div></div>`;
+  const immortal = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max;
+  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>刷新保留 · 新角色随机资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">${immortal ? '叩入仙门 · 离界传承' : '轮回转世 · 重启仙途'}</button></div></div>`;
 }
 export function lifespanSummary(save: SaveData, selectedStage: number) {
   const life = lifespanInfo(save);

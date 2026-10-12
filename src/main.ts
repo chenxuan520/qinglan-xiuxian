@@ -13,7 +13,9 @@ import {
   inheritanceContent,
   inheritancePreview,
   birthInheritanceNotice,
+  isImmortalSuccessor,
 } from './inheritance-ui.ts';
+import { recordChronicle } from './chronicle.ts';
 import './mortal.css';
 import './journey-map.css';
 import { AD_DURATION_MS, AD_SECONDS, AD_PLACEHOLDER_HTML } from './ads.ts';
@@ -604,7 +606,7 @@ function renderEpilogue() {
   ui.innerHTML = '';
   ui.inert = true;
   panel = 'epilogue';
-  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene epilogue-scene" role="dialog" aria-modal="true" aria-labelledby="epilogue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="epilogue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="journey-card">留存此世</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 终章</span><h1 id="epilogue-title">云开<span>见长生</span></h1><p>此去长生，亦记人间。</p><span class="prologue-seal">此世圆满</span></div><div class="prologue-story" tabindex="0" aria-label="终章正文"><p>青岚山下，又是一年春水。炊烟漫过新修的青瓦，渡口有人挑起归灯。茶馆里醒木一响，说书人讲起一位从小镇走出的少年——讲到后来，连他的姓名，也渐渐成了传说。</p><p>你立在云海尽头，身后七境归于寂静。曾经惊心的雷声，已远得像一场旧雨。眼前仙门缓缓开启，没有谁问你斩过多少妖、炼成多少法，只见门上浮光如水，映出十五岁那年的衣衫。</p><p>那时行囊很轻，前路很远。你听闻天地间有长生，便以为走得足够远，就能将离别留在身后。直到春秋从指间流过，旧桥几度重修，熟悉的声音一个个散入晚风，才懂得：有些相逢虽只一瞬，也足以陪人走完漫长的一生。</p><p>仙门外的风吹动衣襟，你下意识拢了拢。恍惚间，青岚渡口的旧风，又从岁月深处吹来。</p><p>叩门之前，你曾最后回了一趟青岚。渡口坐着一个十五岁的少年，望着远山，问你外面的天地究竟有多大。你便在他身旁坐下，说起竹海之外的山川、云海尽头的星辰，也说起求道路上的风雪与险恶。末了，你告诉他：山河之外，还有求长生、问大道的路。</p><p>少年听得出神，眼里有一簇你熟悉的光。你忽然想起，许多年前，也有一位过路修士，在这里向你说过同样的话。临别时你替他拢好被风吹开的衣襟，只道：路远，记得添衣。</p><p>一步踏出，仙门在身后合拢。凡间不再有你的归舟，山河却仍循着自己的时序，迎春，送雪。而那个少年，终于背起轻轻的行囊，朝青岚山深处走去。</p><p class="prologue-last">山河未老，故人先秋。<br>幸而此心未改，来路仍明。<br><br>这一程山水，至此落笔。<br>长生已觅，大道无涯。</p></div><footer class="prologue-footer"><span>此世已结束 · 真仙<br>叩门于 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 岁</span><button class="primary-button" data-action="epilogue-reincarnate">轮回转世 ${smallIcon('arrow')}</button></footer></section></div>`;
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene epilogue-scene" role="dialog" aria-modal="true" aria-labelledby="epilogue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="epilogue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="journey-card">留存此世</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 终章</span><h1 id="epilogue-title">云开<span>见长生</span></h1><p>此去长生，亦记人间。</p><span class="prologue-seal">此世圆满</span></div><div class="prologue-story" tabindex="0" aria-label="终章正文"><p>青岚山下，又是一年春水。炊烟漫过新修的青瓦，渡口有人挑起归灯。茶馆里醒木一响，说书人讲起一位从小镇走出的少年——讲到后来，连他的姓名，也渐渐成了传说。</p><p>你立在云海尽头，身后七境归于寂静。曾经惊心的雷声，已远得像一场旧雨。眼前仙门缓缓开启，没有谁问你斩过多少妖、炼成多少法，只见门上浮光如水，映出十五岁那年的衣衫。</p><p>那时行囊很轻，前路很远。你听闻天地间有长生，便以为走得足够远，就能将离别留在身后。直到春秋从指间流过，旧桥几度重修，熟悉的声音一个个散入晚风，才懂得：有些相逢虽只一瞬，也足以陪人走完漫长的一生。</p><p>仙门外的风吹动衣襟，你下意识拢了拢。恍惚间，青岚渡口的旧风，又从岁月深处吹来。</p><p>叩门之前，你曾最后回了一趟青岚。渡口坐着一个十五岁的少年，望着远山，问你外面的天地究竟有多大。你便在他身旁坐下，说起竹海之外的山川、云海尽头的星辰，也说起求道路上的风雪与险恶。末了，你告诉他：山河之外，还有求长生、问大道的路。</p><p>少年听得出神，眼里有一簇你熟悉的光。你忽然想起，许多年前，也有一位过路修士，在这里向你说过同样的话。临别时你替他拢好被风吹开的衣襟，只道：路远，记得添衣。</p><p>仙门内，星河正铺向更远的天地。你回望青岚，山河仍循着自己的时序，迎春，送雪。渡口那个少年已经收好行囊，正等着风起。临行之际，除了那些指路的话，你也可以再留给他一件相伴求道的东西。</p><p class="prologue-last">山河未老，故人先秋。<br>幸而此心未改，来路仍明。<br><br>这一程山水，至此落笔。<br>长生已觅，大道无涯。</p></div><footer class="prologue-footer"><span>此界圆满 · 真仙<br>叩门于 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 岁</span><button class="primary-button" data-action="epilogue-reincarnate">离界传缘 ${smallIcon('arrow')}</button></footer></section></div>`;
   updateStorySoundButton(
     modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
     save.sound,
@@ -621,7 +623,8 @@ function renderPrologue(replay = false) {
   if ((!replay && save.prologueSeen) || game || inMortalWorld || panel) return;
   panel = 'prologue';
   ui.inert = true;
-  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="prologue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="${replay ? 'prologue-enter' : 'prologue-skip'}">${replay ? '返回仙途' : '跳过开场'} ${smallIcon('arrow')}</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 序</span><h1 id="prologue-title">山河<span>一梦</span></h1><p>山河未老，故人先秋。</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">${replay ? '返回仙途' : '入此山河'} ${smallIcon('arrow')}</button></footer></section></div>`;
+  const successor = isImmortalSuccessor(save);
+  modal.innerHTML = `<div class="modal-backdrop prologue-backdrop"><section class="prologue-scene" role="dialog" aria-modal="true" aria-labelledby="prologue-title" tabindex="-1"><div class="prologue-controls"><button class="prologue-sound" data-action="prologue-sound" aria-pressed="${save.sound}">${smallIcon(save.sound ? 'sound' : 'mute')}<span>${save.sound ? '关闭声音' : '开启声音'}</span></button><button class="prologue-skip" data-action="${replay ? 'prologue-enter' : 'prologue-skip'}">${replay ? '返回仙途' : '跳过开场'} ${smallIcon('arrow')}</button></div><div class="prologue-heading"><span class="eyebrow">叩仙门：青岚纪 · 序</span><h1 id="prologue-title">${successor ? '少年<span>承缘</span>' : '山河<span>一梦</span>'}</h1><p>${successor ? '前人离界，山河又一程。' : '山河未老，故人先秋。'}</p><span class="prologue-seal" aria-hidden="true">问长生</span></div><div class="prologue-story" tabindex="0" aria-label="序章正文"><p>青岚山下，有一座临水的小镇。清晨炊烟漫过青瓦，暮色里渔火一盏盏亮起。人们在此迎春、送雪，把一生过成几声钟响。</p><p>你便生在这座小镇。儿时听过茶馆的醒木，也曾在渡口等过一盏归灯。镇上的人总说，稻熟一季，人又老了一岁。你渐渐明白，有些告别，来年春天也等不回。</p><p>${successor ? '十五岁那年，渡口的修士临行前告诉你：他已证得长生，将离开此界，而山河之外，还有求长生、问大道的路。' : '十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。'}于是你收拾行囊，向青岚山深处走去。你想看看凡人的一生之外，天地究竟还有多远；也想在漫长岁月里，寻得一个不负此生的答案。</p><p>山外却有另一种岁月。传说云海尽头藏着仙门，一炉香可燃尽百年，一柄剑曾照彻长夜。有人得道归来，故园已成荒丘；有人问遍诸天，仍寻不回旧时的一场雨。</p><p>如今灵潮再起，沉寂的秘境次第苏醒。正道山门重开，魔宗旧灯复燃。风从竹海吹来，带着妖雾，也带着无人认领的仙缘。</p><p>你从青岚的烟火中来，以觅长生为愿，以追寻大道为志。此后每一次修行，都是向天地多问一句；而故乡的万家灯火，会在身后一代代明灭，提醒你为何出发。</p><p class="prologue-last">此去青岚，愿你历尽千劫，<br>仍记得为何出发。</p></div><footer class="prologue-footer"><span>一程山水，自此启行。</span><button class="primary-button" data-action="prologue-enter">${replay ? '返回仙途' : '入此山河'} ${smallIcon('arrow')}</button></footer></section></div>`;
   updateStorySoundButton(
     modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!,
     save.sound,
@@ -701,14 +704,19 @@ function resumeHometown() {
       document.body.classList.remove('in-mortal');
       ui.innerHTML = '';
     }
-    renderRootReveal('十五岁，离乡问道。此世灵根已定，前路自此展开。', true);
+    renderRootReveal(
+      isImmortalSuccessor(save)
+        ? '那位修士已离开此界。如今，你是渡口那个十五岁的少年，前路从此由你走。'
+        : '十五岁，离乡问道。此世灵根已定，前路自此展开。',
+      true,
+    );
   } else if (home.stage === 'farewell' && save.hometownSeen) {
     panel = 'hometown-choice';
     ui.inert = true;
     panelFrame(
-      '再别青岚',
-      '新一世 · 十五岁',
-      '<p>故居门前，仍有这一世的亲人。你可以再走一程，也可以径直启程。</p><div class="save-actions hometown-choice-actions"><button class="primary-button" data-action="hometown-skip">径直启程</button><button class="secondary-button" data-action="hometown-walk">走一程故乡</button></div>',
+      isImmortalSuccessor(save) ? '少年将行' : '再别青岚',
+      isImmortalSuccessor(save) ? '承缘启程 · 十五岁' : '新一世 · 十五岁',
+      `${isImmortalSuccessor(save) ? '<p>渡口的修士已经离界，问道的路留给了你。启程前，可以先向家中亲人告别，也可以径直上路。</p>' : '<p>故居门前，仍有这一世的亲人。你可以再走一程，也可以径直启程。</p>'}<div class="save-actions hometown-choice-actions"><button class="primary-button" data-action="hometown-skip">径直启程</button><button class="secondary-button" data-action="hometown-walk">走一程故乡</button></div>`,
     );
     modal.querySelector('[data-action="close"]')?.remove();
   } else renderDeparture();
@@ -747,7 +755,7 @@ function finishDeparture(skipOpening = false) {
   panel = '';
   modal.innerHTML = '';
   renderLobby();
-  toast('十五岁，离乡问道。', 1800);
+  if (!isImmortalSuccessor(save)) toast('十五岁，离乡问道。', 1800);
 }
 function showHometown(parent?: ParentId) {
   const home = save.mortal.hometown;
@@ -1232,7 +1240,7 @@ function renderPanel() {
     panelFrame(
       '修行指南',
       '道法有迹',
-      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，除真仙选定的传承遗物外，同样会清空本世进度。圆满终章后轮回，也可以选择再走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+      `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，同样会清空本世进度。真仙终章则由承缘少年接续，可选赠一物，也可选择先走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${game ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
     );
   }
 }
@@ -1768,12 +1776,13 @@ function refreshRootReveal() {
   return true;
 }
 function renderRootReveal(previousLife = '前尘已散，新一世从十五岁启程。', firstLife = false) {
+  const successor = isImmortalSuccessor(save);
   panel = 'root-reveal';
   ui.inert = true;
   panelFrame(
-    firstLife ? '命盘初现，始问长生' : '一念轮回，再问长生',
-    '命盘初现 · 此世资质',
-    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout">${rootRevealContent()}</div>${birthInheritanceNotice(save.birthInheritance)}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">轮回转世</button></div>`,
+    successor ? '少年承缘，始问长生' : firstLife ? '命盘初现，始问长生' : '一念轮回，再问长生',
+    successor ? '前人离界 · 后来者启程' : '命盘初现 · 此世资质',
+    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout">${rootRevealContent()}</div>${birthInheritanceNotice(save.birthInheritance)}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">${successor ? '重看命盘' : '轮回转世'}</button></div>`,
     true,
   );
   modal.querySelector('[data-action="close"]')?.remove();
@@ -1801,6 +1810,7 @@ function resetLifetime(
   previousLife?: string,
   revisitHometown: boolean | 'full' = false,
   inheritance: BirthInheritance | null = null,
+  successor = false,
 ) {
   const rerolling = panel === 'root-reveal' && !revisitHometown;
   shownHumanLetters.clear();
@@ -1822,6 +1832,13 @@ function resetLifetime(
     hometownSeen,
   });
   applyBirthInheritance(save, inheritance);
+  if (successor)
+    recordChronicle(
+      save,
+      '承缘启程',
+      '渡口的修士已证长生，离界而去。十五岁的少年循着他的指引，接续问道之路。',
+      'immortal-successor',
+    );
   if (revisitHometown === 'full') {
     save.prologueSeen = false;
     save.hometownSeen = false;
@@ -1842,7 +1859,7 @@ function resetLifetime(
   ui.inert = false;
   renderLobby();
   if (!save.prologueSeen) renderPrologue();
-  if (previousLife) toast(previousLife);
+  if (previousLife && !successor) toast(previousLife);
 }
 function renderTribulationPending() {
   if (game) {
@@ -2014,20 +2031,21 @@ function handleAction(action: string, id?: string) {
     } else if (action === 'epilogue-reincarnate' && panel === 'epilogue') {
       panel = 'epilogue-reincarnate';
       panelFrame(
-        '再问长生',
-        '轮回转世 · 开启新的一世',
-        `<p class="pause-description">此世已在仙门前落幕。除所选传承遗物外，轮回将清空此世修为、年岁、法宝、物资与履历，重新抽取灵根，从十五岁启程。</p>${inheritanceContent(save)}<figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回</button></div>`,
+        '临行留缘',
+        '真仙离界 · 少年接续',
+        `<p class="pause-description">仙门已开，你将离开此界，继续追寻大道。青岚渡口的少年却才刚要启程，临行可赠他一物，也可只留一句指引。</p>${inheritanceContent(save)}<p class="panel-note">确认后将从这名十五岁青年开始新的修行。除所选赠物外，原修士的境界、物资、根基与履历不会带入，当前进度将替换为青年的旅程；确认前可返回终章留存此世。</p><label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>从少年离乡看起<small>阅读开场，再走故居与渡口；不勾选则可径直启程。</small></span></label><figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">留缘离界</button></div>`,
       );
     } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
       ui.inert = false;
       trackReincarnation('epilogue');
       resetLifetime(
-        '前世叩入仙门，已证长生。如今重回十五岁，再赴一程山河。',
-        true,
+        '修士离界，少年启程。一段指路的话，一场未尽的仙缘。',
+        modal.querySelector<HTMLInputElement>('#reincarnate-full-opening')?.checked ? 'full' : true,
         resolveInheritance(
           save,
           modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
         ),
+        true,
       );
     } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
     else if (action === 'epilogue-sound' && panel === 'epilogue') {
@@ -2057,7 +2075,8 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (panel === 'root-reveal') {
-    if (action === 'reroll-root') resetLifetime(undefined, false, save.birthInheritance);
+    if (action === 'reroll-root')
+      resetLifetime(undefined, false, save.birthInheritance, isImmortalSuccessor(save));
     else if (action === 'accept-root' || action === 'close') {
       ui.inert = false;
       panel = '';
@@ -2175,8 +2194,8 @@ function handleAction(action: string, id?: string) {
     panel = 'immortal-gate';
     panelFrame(
       '叩入仙门',
-      '越过此门，此世落幕',
-      '<p class="pause-description">确认后进入终章，此世将永久结束。历练、洞府和青岚镇均不可再返回，未完成的历练也会终止；刷新页面仍保留结束状态。</p><p class="panel-note">之后只能轮回转世，可选择一件法宝或一枚丹药传承，其余此世进度清空，从十五岁重新启程。也可暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 结束此世</button></div>',
+      '此界修行圆满 · 走向终章',
+      '<p class="pause-description">你已证得长生，此界的修行即将圆满。确认后进入终章，历练、洞府和青岚镇均不可再返回，未完成的历练也会终止；刷新仍停留在终章。</p><p class="panel-note">终章可留存此世，也可在离界时赠青岚少年一件法宝或一枚丹药，让他接续问道之路。你也可以暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 走向终章</button></div>',
     );
     return;
   }
@@ -2612,11 +2631,15 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'reincarnate' && !game) {
+    if (realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max) {
+      handleAction('immortal-gate');
+      return;
+    }
     panel = 'reincarnate';
     panelFrame(
       '轮回转世',
       '重启仙途',
-      `<p class="pause-description">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max ? '除所选传承遗物外，将清空此世进度' : '将清空此浏览器在当前网址的全部进度'}：累计年岁、境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，收藏新本命五行对应的正魔入门法宝，重新随机灵根资质与五行，资质可能低于当前。</p>${inheritanceContent(save)}<label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>重走十五岁那一程<small>重走序章、故居告别与离乡；不勾选则直接看新命盘。</small></span></label><div class="pause-actions"><button class="secondary-button" data-action="home">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>`,
+      `<p class="pause-description">将清空此浏览器在当前网址的全部进度：累计年岁、境界修为、灵石玄铁、关卡、根基、法宝收藏与炼器，以及未完成的历练。</p><p class="panel-note">确认后无法撤销。从炼气初期重新开始，收藏新本命五行对应的正魔入门法宝，重新随机灵根资质与五行，资质可能低于当前。</p><label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>重走十五岁那一程<small>重走序章、故居告别与离乡；不勾选则直接看新命盘。</small></span></label><div class="pause-actions"><button class="secondary-button" data-action="home">保留此世修行</button><button class="primary-button" data-action="confirm-reincarnate">确认轮回 · 清空进度</button></div>`,
     );
     return;
   }

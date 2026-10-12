@@ -119,10 +119,10 @@ const reasons = await query(
 const reasonNames: Record<string, string> = {
   lifespan: '寿尽',
   tribulation: '天劫',
-  epilogue: '叩门后',
+  epilogue: '离界传承',
   manual: '主动',
 };
-console.log('\n轮回原因（境界阶：0 为炼气初期，每 3 阶一个大境界）');
+console.log('\n轮回与离界（境界阶：0 为炼气初期，每 3 阶一个大境界）');
 console.table(
   reasons.map((row) => ({
     原因: reasonNames[String(row.reason)] ?? row.reason,

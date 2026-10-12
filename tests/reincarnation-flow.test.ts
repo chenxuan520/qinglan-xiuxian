@@ -16,7 +16,13 @@ import {
   SAVE_KEY,
   type SaveData,
 } from '../src/progress.ts';
-import { inheritanceContent } from '../src/inheritance-ui.ts';
+import {
+  inheritanceContent,
+  birthInheritanceNotice,
+  isImmortalSuccessor,
+} from '../src/inheritance-ui.ts';
+import { recordChronicle } from '../src/chronicle.ts';
+import { exportSave, importSave } from '../src/save-transfer.ts';
 import { spiritRootDiagram, spiritRootEffects, ROOT_IMPRESSIONS } from '../src/common-ui.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
@@ -35,6 +41,7 @@ const flow = new Script(
       'resetLifetime',
       'rootRevealContent',
       'refreshRootReveal',
+      'renderRootReveal',
       'resumeHometown',
       'handleAction',
       'renderLobby',
@@ -75,11 +82,12 @@ function harness(save: SaveData) {
   };
   const writes: string[] = [];
   const routes: string[] = [];
+  const titles: string[] = [];
   const messages: string[] = [];
   const tracked: Record<string, unknown>[] = [];
   const openingChoice = { checked: false };
   const inheritanceChoice = { value: '' };
-  const rootFrame = { scrollTop: 0 };
+  const rootFrame = { ...element, scrollTop: 0 };
   const rootLayout = { innerHTML: '' };
   let rolls = 0;
   const context = createContext({
@@ -91,9 +99,13 @@ function harness(save: SaveData) {
     rootElementsFor: (root: data.SpiritRootId) => data.rootElementsFor(root, [], () => 0),
     lifespanInfo,
     realmInfo,
+    enterImmortalGate,
     applyBirthInheritance,
     resolveInheritance,
     inheritanceContent,
+    birthInheritanceNotice,
+    isImmortalSuccessor,
+    recordChronicle,
     spiritRootDiagram,
     spiritRootEffects,
     ROOT_IMPRESSIONS,
@@ -120,6 +132,7 @@ function harness(save: SaveData) {
     lastSaveText: null,
     writes,
     routes,
+    titles,
     messages,
     tracked,
     telemetry: { track: (event: Record<string, unknown>) => tracked.push(event), flush: noop },
@@ -132,7 +145,8 @@ function harness(save: SaveData) {
     modal: {
       innerHTML: '',
       querySelector: (selector: string) =>
-        selector === '.root-reveal-panel'
+        selector === '.root-reveal-panel' ||
+        (selector === '.panel' && context.panel === 'root-reveal')
           ? context.panel === 'root-reveal'
             ? rootFrame
             : null
@@ -196,6 +210,7 @@ function harness(save: SaveData) {
         'smallIcon',
         'assetUrl',
         'updateStorySoundButton',
+        'closeNpcChat',
       ].map((name) => [name, () => '']),
     ),
   });
@@ -207,6 +222,8 @@ function harness(save: SaveData) {
       context.modal.innerHTML = content;
       if (content.includes('id="reincarnate-full-opening"')) openingChoice.checked = false;
       inheritanceChoice.value = '';
+      titles.push(_title);
+      if (context.panel === 'root-reveal') rootLayout.innerHTML = context.rootRevealContent();
       routes.push(context.panel);
     },
     renderRootReveal() {
@@ -726,7 +743,7 @@ test('完整重开仍可主动跳过开场，此后命盘重抽不继承完整�
   assert.deepEqual(context.routes, []);
 });
 
-test('真仙主动传承魔道法宝：取消不清档，确认仅入藏，刷新与命盘重抽保留且不累积其他法宝', () => {
+test('真仙主动重启进入同一离界终章：取消保留修行，赠魔道法宝仅入青年收藏', () => {
   const save = previousLife();
   save.completed = [data.FINAL_TRIAL_STAGE];
   save.cultivation = 1e9;
@@ -734,15 +751,30 @@ test('真仙主动传承魔道法宝：取消不清档，确认仅入藏，刷�
   const old = JSON.stringify(save);
   const context = harness(save);
   context.handleAction('reincarnate');
-  assert.match(context.modal.innerHTML, /真仙传承/);
-  context.inheritanceChoice.value = 'artifact:skull';
-  context.handleAction('home');
+  assert.equal(context.panel, 'immortal-gate');
+  assert.doesNotMatch(context.modal.innerHTML, /只能轮回|确认轮回/);
+  context.handleAction('close');
   assert.equal(JSON.stringify(save), old);
   context.handleAction('reincarnate');
+  context.handleAction('confirm-immortal-gate');
+  assert.equal(context.panel, 'epilogue');
+  assert.equal(save.journeyEnded, true);
+  const ended = JSON.stringify(save);
+  context.handleAction('epilogue-reincarnate');
+  assert.match(context.modal.innerHTML, /真仙传承/);
+  context.inheritanceChoice.value = 'artifact:skull';
+  context.handleAction('close');
+  assert.equal(JSON.stringify(save), ended);
+  context.handleAction('epilogue-reincarnate');
   assert.equal(context.inheritanceChoice.value, '');
   context.inheritanceChoice.value = 'artifact:skull';
   context.handleAction('confirm-reincarnate');
+  context.handleAction('hometown-skip');
   assertNewReveal(context);
+  assert.equal(isImmortalSuccessor(save), true);
+  assert.equal(context.titles.at(-1), '少年承缘，始问长生');
+  assert.match(context.modal.innerHTML, /重看命盘/);
+  assert.doesNotMatch(context.modal.innerHTML, /轮回转世/);
   assert.equal(save.path, 'orthodox');
   assert.notEqual(save.starter, 'skull');
   assert.equal(save.forge.skull, 10);
@@ -758,6 +790,7 @@ test('真仙主动传承魔道法宝：取消不清档，确认仅入藏，刷�
   for (let i = 0; i < 4; i++) {
     restored.renderLobby();
     restored.handleAction('reroll-root');
+    assert.equal(isImmortalSuccessor(restored.save), true);
     assert.equal(restored.save.forge.skull, 10);
     assert.deepEqual(Array.from(restored.save.artifacts), [
       ...new Set([...data.ROOT_STARTERS[data.treasure(restored.save.starter).element], 'skull']),
@@ -767,29 +800,32 @@ test('真仙主动传承魔道法宝：取消不清档，确认仅入藏，刷�
         .length,
       1,
     );
+    assert.equal(
+      restored.save.chronicle.entries.filter((e: { title: string }) => e.title === '承缘启程')
+        .length,
+      1,
+    );
     restored = harness(parseSave(restored.writes.at(-1)));
   }
   restored.renderLobby();
   restored.handleAction('accept-root');
   assert.equal(restored.save.birthInheritance, null);
   assert.equal(restored.save.forge.skull, 10);
-  assert.equal(parseSave(restored.writes.at(-1)).birthInheritance, null);
+  const imported = importSave(exportSave(restored.save, null)).save;
+  assert.equal(imported.birthInheritance, null);
+  assert.equal(isImmortalSuccessor(imported), true);
 });
 
-test('终章传一枚丹药：故乡步行、跳过、完整序章和刷新均保留，重抽不增加库存', () => {
+test('离界赠一枚丹药：青年故乡、完整序章和刷新均保留，重抽不增加库存', () => {
   for (const route of ['skip', 'walk', 'full'] as const) {
     const save = previousLife();
     save.cultivation = 1e9;
     save.completed = [data.FINAL_TRIAL_STAGE];
     const context = harness(save);
-    if (route === 'full') {
-      context.handleAction('reincarnate');
-      context.openingChoice.checked = true;
-    } else {
-      assert.equal(enterImmortalGate(save), true);
-      context.renderLobby();
-      context.handleAction('epilogue-reincarnate');
-    }
+    assert.equal(enterImmortalGate(save), true);
+    context.renderLobby();
+    context.handleAction('epilogue-reincarnate');
+    context.openingChoice.checked = route === 'full';
     context.inheritanceChoice.value = 'medicine:huanglong';
     context.handleAction('confirm-reincarnate');
     let restored = harness(parseSave(context.writes.at(-1)));
@@ -803,6 +839,8 @@ test('终章传一枚丹药：故乡步行、跳过、完整序章和刷新均�
       restored.finishDeparture();
     } else restored.handleAction('hometown-skip');
     assertNewReveal(restored);
+    assert.equal(isImmortalSuccessor(restored.save), true);
+    assert.equal(restored.titles.at(-1), '少年承缘，始问长生');
     assert.deepEqual(restored.save.medicine.bag, { huanglong: 1 });
     assert.deepEqual(restored.save.medicine.active, {});
     restored = harness(parseSave(restored.writes.at(-1)));
@@ -812,5 +850,62 @@ test('终章传一枚丹药：故乡步行、跳过、完整序章和刷新均�
     restored.handleAction('accept-root');
     assert.equal(restored.save.birthInheritance, null);
     assert.deepEqual(restored.save.medicine.bag, { huanglong: 1 });
+  }
+});
+
+test('终章不赠物也由青年接续，接受、导出导入与重抽均保留来历', () => {
+  const save = previousLife();
+  save.cultivation = 1e9;
+  save.completed = [data.FINAL_TRIAL_STAGE];
+  enterImmortalGate(save);
+  const context = harness(save);
+  context.renderLobby();
+  context.handleAction('epilogue-reincarnate');
+  assert.equal(context.openingChoice.checked, false);
+  assert.equal(context.inheritanceChoice.value, '');
+  context.handleAction('confirm-reincarnate');
+  assert.equal(context.save.birthInheritance, null);
+  assert.equal(isImmortalSuccessor(context.save), true);
+  const restored = harness(importSave(exportSave(context.save, null)).save);
+  restored.renderLobby();
+  assert.equal(restored.titles.at(-1), '少年将行');
+  restored.handleAction('hometown-skip');
+  assertNewReveal(restored);
+  assert.equal(restored.titles.at(-1), '少年承缘，始问长生');
+  assert.match(restored.modal.innerHTML, /你是渡口那个十五岁的少年/);
+  for (let i = 0; i < 3; i++) restored.handleAction('reroll-root');
+  assert.equal(isImmortalSuccessor(restored.save), true);
+  assert.equal(restored.save.birthInheritance, null);
+  assert.deepEqual(restored.save.forge, {});
+  assert.deepEqual(restored.save.medicine.bag, {});
+  assert.equal(
+    restored.save.chronicle.entries.filter((e: { title: string }) => e.title === '承缘启程').length,
+    1,
+  );
+  restored.handleAction('accept-root');
+  assert.equal(isImmortalSuccessor(parseSave(restored.writes.at(-1))), true);
+});
+
+test('承缘少年普通主动轮回、寿尽与弃劫均重启人生，不携带前人的身份或赠物', () => {
+  for (const route of ['manual', 'lifespan', 'tribulation'] as const) {
+    const save = previousLife();
+    recordChronicle(save, '承缘启程', '此前接续了一名修士的问道之路。', 'immortal-successor');
+    const context = harness(save);
+    if (route === 'manual') {
+      context.handleAction('reincarnate');
+      context.handleAction('confirm-reincarnate');
+    } else {
+      if (route === 'lifespan') save.age = lifespanInfo(save).limit;
+      else {
+        save.cultivation = 1e9;
+        save.age = save.nextTribulationAge;
+      }
+      context.beginJourneyFarewell(route);
+      context.handleAction('confirm-journey-reincarnate');
+    }
+    assertNewReveal(context);
+    assert.equal(isImmortalSuccessor(save), false);
+    assert.equal(save.birthInheritance, null);
+    assert.doesNotMatch(context.modal.innerHTML, /少年承缘|前人所赠|重看命盘/);
   }
 });

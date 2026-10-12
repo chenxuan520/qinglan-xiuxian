@@ -43,7 +43,7 @@ export function monitorRealm(value: unknown) {
     : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`;
 }
 export const monitorReason = (value: unknown) =>
-  ({ lifespan: '寿尽', tribulation: '天劫', epilogue: '叩门后', manual: '主动轮回' })[
+  ({ lifespan: '寿尽', tribulation: '天劫', epilogue: '离界传承', manual: '主动轮回' })[
     String(value)
   ] ?? '未记录';
 export function monitorTable(headers: string[], rows: unknown[][]) {
