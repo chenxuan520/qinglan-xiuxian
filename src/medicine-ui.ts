@@ -59,12 +59,12 @@ export function medicineContent(
       const useReason = medicineUseReason(save, m.id, unfinished);
       const craftReason = medicineCraftReason(save, m.id, unfinished);
       const source = !m.years
-        ? '高阶妖王或青岚镇仙人赠药的稀有机缘；不可购买、不可炼制。'
+        ? '高阶妖王或青岚镇仙人赠药的稀有机缘；高境界坊市修士可用同类本世珍品互换，不可购买、不可炼制。'
         : m.tier === '凡品'
-          ? '青岚镇药铺每十年轮售三种；采药或听书偶有获赠。'
+          ? '青岚镇药铺每十年轮售三种；采药或听书偶有获赠，也可在宗门坊市同品互换。'
           : m.tier === '灵品'
-            ? '妖王概率掉落，亦可炼制。'
-            : `第 ${m.stage + 1} 境起妖王概率掉落，亦可炼制。`;
+            ? '妖王概率掉落，亦可炼制或在宗门坊市同品互换。'
+            : `第 ${m.stage + 1} 境起妖王概率掉落，亦可炼制或在宗门坊市同品互换。`;
       const formula = medicineFormula(save.medicine, m.id)
         .map(
           (item) =>

@@ -21,6 +21,8 @@ import { icon } from './icons.ts';
 import { type TownResident } from './town-population.ts';
 import { npcDefaultLine, type NpcDialogueRequest } from './npc-dialogue.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
+import { sectMarketOpen } from './sect-market.ts';
+import { isMarketCultivatorId } from './sect-market-data.ts';
 import { smithAt, smithStoryView } from './town-story.ts';
 import {
   HUMAN_STORIES,
@@ -78,6 +80,11 @@ export function townPage(save: SaveData, fullscreenButton: string) {
     return `<main class="town-scene hometown-departure" aria-label="十五岁离乡"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，方向键或触屏拖动移动，也可点击前往渡口自动走动"></div><header class="town-scene-heading"><div class="town-hud"><small>十五岁 · 青岚镇</small><h2>前往渡口</h2><small>沿街向东，循河到渡口</small></div><div class="town-scene-actions">${fullscreenButton}</div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">WASD / 方向键移动</span><span class="touch-hint">按住空白处拖动行走</span><br>手动移动可接管自动前往</p><button class="primary-button" data-action="town-talk">前往渡口</button></footer></main>`;
   return `<main class="town-scene" aria-label="青岚镇游历"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，触屏拖动或方向键移动，靠近镇民点击交谈或按 E"></div><header class="town-scene-heading"><div class="town-hud"><h2>青岚镇</h2>${save.mortal.scenery?.since !== undefined ? `<small>自记城景 · 已过 ${Math.floor(save.mortal.scenery.lastVisitAge - save.mortal.scenery.since)} 年</small>` : ''}<small>现实 1 分钟 = 1 年</small><div id="town-status">${townStatus(save)}</div></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="town-exit">离开城镇</button></div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">WASD / 方向键移动</span><span class="touch-hint">按住空白处拖动行走</span><br>靠近镇民，<span class="keyboard-hint">按 E 或</span>点击交谈</p><button class="primary-button" data-action="town-talk" disabled>走近镇民可交谈</button></footer></main>`;
 }
+export function sectMarketEntrance(save: SaveData) {
+  const open = sectMarketOpen(save);
+  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，看看能否互通有无。</p><small>${open ? '无需入宗 · 闲逛沿用人间计龄，交谈与互换时暂停' : '首次历练结束后开放，成败皆可'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '先去历练一程'}</button></section>`;
+}
+
 export function mortalPage(
   save: SaveData,
   tab: 'town' | 'sects',
@@ -115,7 +122,7 @@ export function mortalTabContent(
   const plan = studyPlan(save);
   const dues = sectDues(save);
   const effectiveLevel = Math.min(plan.level, plan.limit);
-  return `<section class="mortal-membership"><div><small>我的仙门 · ${sectRole(save)}</small><h2>${member?.name ?? '尚未拜入宗门'}</h2><p>${member ? `${passive(member.id).name} · 精研 ${plan.level} / ${MAX_MASTERY} 阶 · 当前生效 ${effectiveLevel} 阶 · 正向效果 +${effectiveLevel * 3}%` : '同时只能加入一个宗门；入宗锁定本门正魔路线，不能兼修。开局赠本门功法一重，退宗后可重新选择路线。'}</p><p>入宗后锁定本门路线，不能兼修；退宗才可换道或改投他门。精研每阶增强本门功法正向效果 3%，满阶 30%；离宗保留成果，加成暂停。新历练自动获本门功法一重，占 4 个功法槽之一；局内修满五重才能参与仙器觉醒。</p></div>${member ? `<div class="mortal-study"><button class="primary-button" data-action="mortal-activity" data-id="study" data-cost-stones="${plan.stones}" ${world.activity || !plan.eligible ? 'disabled' : ''}>${plan.level >= MAX_MASTERY ? '本门精研已满' : !plan.eligible ? `需${plan.requiredRealm}解锁` : world.activity ? '有事项待结算' : `精研下一阶 · ${plan.stones} 灵石 / ${plan.years} 年`}</button><small>当前境界可精研至 ${plan.limit} 阶${plan.requiredRealm ? ` · 下一阶需${plan.requiredRealm}` : ''}<br>境界只作门槛，不消耗修为；超出的旧成果在突破后恢复。<br>${spiritRootInfo(save.spiritRoot).name} · 消耗 ${plan.years} 年<br>点击即扣灵石与年岁，立即精研；遇供奉、寿尽或天劫时先处理，未完成时退宗不退费。精研五阶赠随机凡品丹药一颗，十阶赠随机灵品丹药一颗；每门各一次，自动收入丹囊。</small><button class="mortal-leave" data-action="mortal-leave">退出宗门</button></div>` : ''}</section>    <section class="mortal-sects"><div class="section-heading"><div><span class="section-number">仙门</span><h2>十六宗门，各有其道</h2></div><div class="mortal-filters" role="group" aria-label="宗门流派">${[
+  return `${sectMarketEntrance(save)}<section class="mortal-membership"><div><small>我的仙门 · ${sectRole(save)}</small><h2>${member?.name ?? '尚未拜入宗门'}</h2><p>${member ? `${passive(member.id).name} · 精研 ${plan.level} / ${MAX_MASTERY} 阶 · 当前生效 ${effectiveLevel} 阶 · 正向效果 +${effectiveLevel * 3}%` : '同时只能加入一个宗门；入宗锁定本门正魔路线，不能兼修。开局赠本门功法一重，退宗后可重新选择路线。'}</p><p>入宗后锁定本门路线，不能兼修；退宗才可换道或改投他门。精研每阶增强本门功法正向效果 3%，满阶 30%；离宗保留成果，加成暂停。新历练自动获本门功法一重，占 4 个功法槽之一；局内修满五重才能参与仙器觉醒。</p></div>${member ? `<div class="mortal-study"><button class="primary-button" data-action="mortal-activity" data-id="study" data-cost-stones="${plan.stones}" ${world.activity || !plan.eligible ? 'disabled' : ''}>${plan.level >= MAX_MASTERY ? '本门精研已满' : !plan.eligible ? `需${plan.requiredRealm}解锁` : world.activity ? '有事项待结算' : `精研下一阶 · ${plan.stones} 灵石 / ${plan.years} 年`}</button><small>当前境界可精研至 ${plan.limit} 阶${plan.requiredRealm ? ` · 下一阶需${plan.requiredRealm}` : ''}<br>境界只作门槛，不消耗修为；超出的旧成果在突破后恢复。<br>${spiritRootInfo(save.spiritRoot).name} · 消耗 ${plan.years} 年<br>点击即扣灵石与年岁，立即精研；遇供奉、寿尽或天劫时先处理，未完成时退宗不退费。精研五阶赠随机凡品丹药一颗，十阶赠随机灵品丹药一颗；每门各一次，自动收入丹囊。</small><button class="mortal-leave" data-action="mortal-leave">退出宗门</button></div>` : ''}</section>    <section class="mortal-sects"><div class="section-heading"><div><span class="section-number">仙门</span><h2>十六宗门，各有其道</h2></div><div class="mortal-filters" role="group" aria-label="宗门流派">${[
     ['all', '全部'],
     ['orthodox', '正道'],
     ['demonic', '魔道'],
@@ -152,9 +159,10 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     .join('')}${npcDialogueContent(npc.id, npc.name)}${actions}`;
 }
 
-function npcDialogueContent(id: NpcDialogueRequest['npcId'], name: string) {
+export function npcDialogueContent(id: NpcDialogueRequest['npcId'], name: string) {
   const family = id === 'father' || id === 'mother';
-  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(id)}</p></div><small class="npc-chat-status" role="status">${family ? '家中叙话' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '说些家常，无任务或奖励；暂时无法回应时沿用本地对白。' : '闲谈不改变修为与物资，办事请用故事或委托按钮。'}</small></section>`;
+  const market = isMarketCultivatorId(id);
+  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(id)}</p></div><small class="npc-chat-status" role="status">${family ? '家中叙话' : market ? '坊间闲谈' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : market ? '想对修士说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '说些家常，无任务或奖励；暂时无法回应时沿用本地对白。' : market ? '闲谈不改变修为与物资，丹药互换请用下方操作。' : '闲谈不改变修为与物资，办事请用故事或委托按钮。'}</small></section>`;
 }
 
 export function humanStoryContent(save: SaveData, id: HumanStoryId, atNpc = false) {

@@ -133,6 +133,7 @@ function harness(t: TestContext) {
     pendingRun: null,
     panel: 'town-event',
     inTown: true,
+    inMarket: false,
     inMortalWorld: true,
     assetsReady: true,
     storageAvailable: true,

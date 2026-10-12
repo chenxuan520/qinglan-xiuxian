@@ -7,6 +7,7 @@ import { smithStoryLine } from './town-story.ts';
 import { humanStoryGreeting } from './human-stories.ts';
 import { StorySpeech } from './story-speech.ts';
 import { hometownParents } from './hometown.ts';
+import { isMarketCultivatorId, marketCultivators, marketLocalReply } from './sect-market-data.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
@@ -296,6 +297,7 @@ export function mountNpcChat(
 ) {
   closeNpcChat();
   const population = save.mortal.population!;
+  const market = isMarketCultivatorId(npc.id);
   const townId = npc.id === 'father' || npc.id === 'mother' ? null : npc.id;
   const home = save.mortal.hometown;
   if (
@@ -359,24 +361,44 @@ export function mountNpcChat(
         realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
         message,
         history,
-        ...(townId ? { smithStory: save.mortal.smithStory } : { hometown: home }),
+        ...(market
+          ? {
+              marketVisit: {
+                visit: save.mortal.sectMarket!.visit,
+                realmIndex: save.mortal.sectMarket!.realmIndex,
+              },
+            }
+          : townId
+            ? { smithStory: save.mortal.smithStory }
+            : { hometown: home }),
       },
       controller.signal,
     );
     if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
     activeRequest = null;
-    messages.push({ role: 'assistant', content: reply ?? fallback });
+    const localReply = market
+      ? marketLocalReply(
+          marketCultivators(population, save.mortal.sectMarket!).find((n) => n.id === npc.id)!,
+          message,
+          realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
+        )
+      : fallback;
+    messages.push({ role: 'assistant', content: reply ?? localReply });
     messages.splice(0, Math.max(0, messages.length - NPC_AI_SETTINGS.maxHistoryMessages));
     render();
     button.disabled = input.disabled = false;
     log.setAttribute('aria-busy', 'false');
-    status.textContent = townId
+    status.textContent = market
       ? reply
-        ? '街巷闲谈 · 随口聊聊'
-        : '闲谈暂歇 · 仍可照常买卖、接取委托'
-      : reply
-        ? '家中叙话 · 随口聊聊'
-        : '家常依旧 · 暂用本地对白';
+        ? '坊间闲谈 · 同道往来'
+        : '坊间闲谈 · 暂用本地对白，互换照常'
+      : townId
+        ? reply
+          ? '街巷闲谈 · 随口聊聊'
+          : '闲谈暂歇 · 仍可照常买卖、接取委托'
+        : reply
+          ? '家中叙话 · 随口聊聊'
+          : '家常依旧 · 暂用本地对白';
     if (!greeting) input.focus({ preventScroll: true });
   };
   form.addEventListener('submit', (event) => {

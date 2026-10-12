@@ -1,5 +1,6 @@
 import { syncHumanStories } from './human-stories.ts';
 import { freshHometown, validHometown } from './hometown.ts';
+import { validSectMarket } from './sect-market-data.ts';
 import {
   freshMedicine,
   validMedicine,
@@ -83,7 +84,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 12;
+export const SAVE_SCHEMA = 13;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -262,6 +263,8 @@ export function readSave(
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
     // 旧档本世不补父母；损坏的故乡字段不连带丢弃其余人间进度。
     delete base.mortal.hometown;
+    if (s.mortal?.sectMarket !== undefined && !validSectMarket(s.mortal.sectMarket, base.age))
+      delete s.mortal.sectMarket;
     if (
       s.mortal &&
       typeof s.mortal === 'object' &&

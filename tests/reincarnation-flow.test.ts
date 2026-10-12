@@ -189,6 +189,7 @@ function harness(save: SaveData) {
     schoolFilter: 'all',
     bookTab: 'treasures',
     inTown: false,
+    inMarket: false,
     inMortalWorld: false,
     assetsReady: false,
     storageAvailable: true,

@@ -35,6 +35,7 @@
 | `src/render.ts`、`src/style.css`      | Canvas 绘制、桌面和移动布局               |
 | `src/item-art.ts`、`src/sprites.ts`   | 统一图集映射，列表和战场共用              |
 | `src/town.ts`、`src/town-scene.ts`    | 城镇坐标、行走与交互、模块地图及镜头      |
+| `src/sect-market*.ts`                 | 宗门坊市场地、修士身份与丹药互换          |
 | `src/scene-assets.ts`                 | 按关卡生成预载素材清单                    |
 | `src/asset-url.ts`                    | 静态素材的部署基础路径处理                |
 | `src/guide.ts`                        | 游戏内说明，玩法变化时同步维护            |

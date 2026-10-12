@@ -2,6 +2,12 @@ import { type TownPopulation } from './town-population.ts';
 import { type TownNpc } from './town.ts';
 import type { SmithStory } from './town-story.ts';
 import type { HometownState, ParentId } from './hometown.ts';
+import {
+  MARKET_CULTIVATORS,
+  isMarketCultivatorId,
+  type MarketCultivatorId,
+  type SectMarketState,
+} from './sect-market-data.ts';
 
 export const NPC_DEFAULT_LINES = {
   herbs: '山中草药正当时，可愿帮我采来一篓？',
@@ -22,7 +28,8 @@ const VILLAGER_LINES = [
   '今年雨水好，盼着秋收能多攒些粮。山上的日子，想来也有山上的难处。',
   '集上新到的布料好看，我正挑一块带回去。人间的小欢喜，也不过这些。',
 ];
-export function npcDefaultLine(id: TownNpc['id'] | ParentId) {
+export function npcDefaultLine(id: TownNpc['id'] | ParentId | MarketCultivatorId) {
+  if (isMarketCultivatorId(id)) return MARKET_CULTIVATORS.find((npc) => npc.id === id)!.greeting;
   return id.startsWith('villager-')
     ? VILLAGER_LINES[Number(id.slice('villager-'.length)) % VILLAGER_LINES.length]
     : NPC_DEFAULT_LINES[id as keyof typeof NPC_DEFAULT_LINES];
@@ -35,7 +42,8 @@ export interface NpcDialogueRequest {
   mode?: 'tea-story';
   population: TownPopulation;
   age: number;
-  npcId: TownNpc['id'] | ParentId;
+  npcId: TownNpc['id'] | ParentId | MarketCultivatorId;
+  marketVisit?: Pick<SectMarketState, 'visit' | 'realmIndex'>;
   realm: string;
   message: string;
   history: NpcMessage[];

@@ -10,6 +10,8 @@ export const NPC_SETTINGS = {
 
 export const TOWN_SETTINGS = { sceneryChangeYears: 100 } as const;
 
+export const SECT_MARKET_SETTINGS = { exchangeCost: 2 } as const;
+
 export const NPC_AI_SETTINGS = {
   // 可用构建环境变量 VITE_NPC_AI_URL 覆盖；地址不要带 /chat。
   baseUrl: 'https://qinglan-npc-ai.011203.xyz',

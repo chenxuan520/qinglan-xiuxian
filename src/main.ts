@@ -136,6 +136,20 @@ import { ScreenAwake } from './screen-awake.ts';
 import { FrameRate } from './frame-rate.ts';
 import { runLootContent } from './run-loot-ui.ts';
 import { TownScene } from './town-scene.ts';
+import { SectMarketScene } from './sect-market-scene.ts';
+import { MARKET_START, isMarketCultivatorId, type MarketCultivator } from './sect-market-data.ts';
+import {
+  sectMarketOpen,
+  beginSectMarketVisit,
+  exchangeSectMedicine,
+  sectMarketExchangeReason,
+  sectMarketOffer,
+} from './sect-market.ts';
+import {
+  sectMarketPage,
+  sectMarketEventContent,
+  sectMarketTradeContent,
+} from './sect-market-ui.ts';
 import { TOWN_START, HOMETOWN_START, townClockRunning } from './town.ts';
 import {
   departHometown,
@@ -286,6 +300,10 @@ let inTown = false;
 let townScene: TownScene | null = null;
 let townPosition = { ...TOWN_START };
 let townNpc: TownResident | null = null;
+let inMarket = false;
+let marketScene: SectMarketScene | null = null;
+let marketPosition = { ...MARKET_START };
+let marketNpc: MarketCultivator | null = null;
 const shownHumanLetters = new Set<string>();
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
@@ -635,6 +653,11 @@ function renderPrologue(replay = false) {
   modal.querySelector<HTMLElement>('.prologue-scene')?.focus({ preventScroll: true });
 }
 function releaseTownScene() {
+  if (marketScene) {
+    marketPosition = { ...marketScene.position };
+    marketScene.destroy();
+    marketScene = null;
+  }
   if (!townScene) return;
   townPosition = { ...townScene.position };
   townScene.destroy();
@@ -643,12 +666,20 @@ function releaseTownScene() {
 function leaveTown() {
   closeNpcChat();
   releaseTownScene();
-  if (inTown) void mobileDisplay.leave();
+  if (inTown || inMarket) void mobileDisplay.leave();
   document.body.classList.remove('in-town');
   inTown = false;
+  inMarket = false;
+  marketNpc = null;
   lastMortalTick = performance.now();
 }
 function mountTownScene() {
+  if (inMarket) {
+    const marketHost = document.getElementById('sect-market-view');
+    if (marketHost)
+      marketScene = new SectMarketScene(marketHost, { ...marketPosition }, save, showMarketEvent);
+    return;
+  }
   const host = document.getElementById('town-view');
   if (!inTown || !host) return;
   if (!save.mortal.population) {
@@ -726,6 +757,7 @@ function renderDeparture() {
   closeNpcChat();
   // 同一段离乡行程的素材重试只重建场景，保留玩家当前的全屏状态。
   releaseTownScene();
+  inMarket = false;
   inMortalWorld = inTown = true;
   townPosition = { ...HOMETOWN_START };
   save.mortal.population ??= freshTownPopulation(15);
@@ -815,6 +847,18 @@ function showTownEvent(npc: TownResident) {
   panelFrame(npc.name, `${npc.place} · ${npc.role}`, townEventContent(save, npc));
   mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
 }
+function showMarketEvent(npc: MarketCultivator) {
+  if (!inMarket || marketScene?.nearbyNpc?.id !== npc.id) return;
+  marketNpc = npc;
+  panel = 'sect-market-event';
+  panelFrame(npc.name, '宗门坊市 · 同道往来', sectMarketEventContent(save, npc));
+  mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
+}
+function refreshMarketTrade(selected?: string) {
+  if (!marketNpc || panel !== 'sect-market-event') return;
+  const host = modal.querySelector<HTMLElement>('#sect-market-trade');
+  if (host) host.innerHTML = sectMarketTradeContent(save, marketNpc, selected);
+}
 function showTeaStory() {
   panel = 'tea-story';
   panelFrame(
@@ -840,6 +884,7 @@ function renderMortal(enter = false) {
   if (enter) {
     inMortalWorld = true;
     inTown = false;
+    inMarket = false;
     mortalTab = 'town';
     lastMortalTick = performance.now();
     panel = '';
@@ -849,11 +894,13 @@ function renderMortal(enter = false) {
   }
   document.body.classList.remove('in-game', 'journey-complete', 'immortal-home');
   document.body.classList.add('in-mortal');
-  document.body.classList.toggle('in-town', inTown);
-  ui.innerHTML = inTown
-    ? townPage(save, fullscreenButton(mobileDisplay.available, mobileDisplay.active))
-    : mortalPage(save, mortalTab, mortalFilter, pendingRun?.path);
-  ui.scrollTop = inTown ? 0 : scroll;
+  document.body.classList.toggle('in-town', inTown || inMarket);
+  ui.innerHTML = inMarket
+    ? sectMarketPage(save, fullscreenButton(mobileDisplay.available, mobileDisplay.active))
+    : inTown
+      ? townPage(save, fullscreenButton(mobileDisplay.available, mobileDisplay.active))
+      : mortalPage(save, mortalTab, mortalFilter, pendingRun?.path);
+  ui.scrollTop = inTown || inMarket ? 0 : scroll;
   mountTownScene();
   if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
   else if (tribulationDue(save)) renderTribulationPending();
@@ -881,7 +928,13 @@ function tickMortal(now: number) {
   if (
     !inMortalWorld ||
     (save.mortal.hometown && save.mortal.hometown.stage !== 'departed') ||
-    !townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel)
+    !townClockRunning(
+      inTown || inMarket,
+      inMarket ? !!marketScene?.ready : !!townScene?.ready,
+      !document.hidden,
+      document.hasFocus(),
+      panel,
+    )
   ) {
     lastMortalTick = now;
     return;
@@ -2215,7 +2268,7 @@ function handleAction(action: string, id?: string) {
     renderEpilogue();
     return;
   }
-  if (action === 'fullscreen' && (game || inTown)) {
+  if (action === 'fullscreen' && (game || inTown || inMarket)) {
     void (mobileDisplay.active ? mobileDisplay.leave() : mobileDisplay.enter());
     return;
   }
@@ -2320,6 +2373,73 @@ function handleAction(action: string, id?: string) {
     }
     renderMortal(true);
     persist();
+    return;
+  }
+  if (action.startsWith('sect-market-') && inMortalWorld && !game) {
+    if (
+      action === 'sect-market-enter' &&
+      !panel &&
+      !inMarket &&
+      !inTown &&
+      mortalTab === 'sects' &&
+      sectMarketOpen(save)
+    ) {
+      const next = structuredClone(save);
+      next.mortal.population ??= freshTownPopulation(next.age);
+      if (!beginSectMarketVisit(next)) return;
+      try {
+        writeSave(next, pendingRun);
+      } catch {
+        if (!saveLock) toast('浏览器暂时无法保存坊市进度，请重试');
+        return;
+      }
+      Object.assign(save, next);
+      inMarket = true;
+      inTown = false;
+      lastMortalTick = performance.now();
+      void mobileDisplay.enter();
+      renderMortal();
+      document.getElementById('sect-market-view')?.focus({ preventScroll: true });
+    } else if (action === 'sect-market-retry' && inMarket && !panel) renderMortal();
+    else if (action === 'sect-market-exit' && inMarket && !panel) {
+      leaveTown();
+      persist();
+      renderMortal();
+      document.querySelector<HTMLButtonElement>('[data-action="sect-market-enter"]')?.focus();
+    } else if (action === 'sect-market-talk' && inMarket && !panel) marketScene?.talk();
+    else if (
+      action === 'sect-market-exchange' &&
+      inMarket &&
+      panel === 'sect-market-event' &&
+      isMarketCultivatorId(id) &&
+      marketNpc?.id === id &&
+      marketScene?.nearbyNpc?.id === id
+    ) {
+      const give = modal.querySelector<HTMLSelectElement>('#sect-market-give')?.value ?? '';
+      const visit = Number(
+        modal.querySelector<HTMLButtonElement>('[data-action="sect-market-exchange"]')?.dataset
+          .visit,
+      );
+      const reason = sectMarketExchangeReason(save, id, give, visit);
+      if (reason) {
+        toast(reason);
+        return;
+      }
+      const next = structuredClone(save);
+      const received = sectMarketOffer(next, id)!;
+      if (!exchangeSectMedicine(next, id, give, visit)) return;
+      try {
+        writeSave(next, pendingRun);
+      } catch {
+        if (!saveLock) toast('互换未完成：浏览器暂时无法保存，请重试');
+        return;
+      }
+      Object.assign(save, next);
+      refreshMarketTrade();
+      const status = document.getElementById('town-status');
+      if (status) status.innerHTML = townStatus(save);
+      toast(`${received.name} ×1 已收入丹囊`);
+    }
     return;
   }
   if (
@@ -2722,6 +2842,7 @@ function handleAction(action: string, id?: string) {
     } else {
       panel = '';
       modal.innerHTML = '';
+      if (inMarket) document.getElementById('sect-market-view')?.focus({ preventScroll: true });
       if (wasHumanMemory && inMortalWorld && !inTown) renderMortal();
       if (returnToAbout)
         ui.querySelector<HTMLButtonElement>('[data-action="about"]')?.focus({
@@ -3095,6 +3216,14 @@ document.addEventListener('input', (event) => {
 });
 document.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (input.id === 'sect-market-give' && panel === 'sect-market-event' && inMarket) {
+    const scroll = modal.querySelector<HTMLElement>('.panel')?.scrollTop ?? 0;
+    refreshMarketTrade(input.value);
+    modal.querySelector<HTMLSelectElement>('#sect-market-give')?.focus({ preventScroll: true });
+    const section = modal.querySelector<HTMLElement>('.panel');
+    if (section) section.scrollTop = scroll;
+    return;
+  }
   if (
     input.id === 'reincarnate-inheritance' &&
     (panel === 'reincarnate' || panel === 'epilogue-reincarnate')
@@ -3415,6 +3544,10 @@ function frame(now: number) {
   townScene?.update(
     now,
     townClockRunning(inTown, !!townScene?.ready, !document.hidden, document.hasFocus(), panel),
+  );
+  marketScene?.update(
+    now,
+    townClockRunning(inMarket, !!marketScene?.ready, !document.hidden, document.hasFocus(), panel),
   );
   tickMortal(now);
   tick(now, true);
