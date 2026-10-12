@@ -292,6 +292,33 @@ export const MEDICINES: Medicine[] = [
   },
 ];
 export const medicineInfo = (id: string) => MEDICINES.find((m) => m.id === id);
+// 坊市估值独立于药铺售价、药效和炼丹费用；拍卖与求购共用。
+export const MEDICINE_MARKET_VALUES: Readonly<Record<string, number>> = {
+  heqi: 300,
+  zhenyuan: 320,
+  juyuan: 340,
+  jiangchen: 280,
+  fenyuan: 260,
+  lianqi: 240,
+  zengyuan: 360,
+  zhiyuan: 320,
+  mingqing: 1800,
+  lingru: 3000,
+  dingling: 1900,
+  xuling: 2000,
+  xuepo: 1800,
+  dulong: 1900,
+  wuchang: 1600,
+  jiangyun: 1700,
+  butian: 8000,
+  huiyang: 5000,
+  peiying: 4000,
+  jiuqu: 6000,
+};
+export function medicineMarketValue(id: string) {
+  const m = medicineInfo(id);
+  return m ? (m.tier === '凡品' ? m.price : MEDICINE_MARKET_VALUES[id] || 0) : 0;
+}
 export interface MedicineState {
   bag: Record<string, number>;
   active: Record<string, number>;

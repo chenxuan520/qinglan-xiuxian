@@ -14,13 +14,9 @@ import {
 import { freshSave, readSave } from '../src/progress.ts';
 
 function facts(patch: Partial<JourneyAppraisalFacts> = {}): JourneyAppraisalFacts {
-  return {
-    ...journeyAppraisalFacts(
-      freshSave('heaven', ['metal'], 'orthodox', () => 0),
-      'ongoing',
-    ),
-    ...patch,
-  };
+  const save = freshSave('heaven', ['metal'], 'orthodox', () => 0);
+  save.cultivation = 1;
+  return { ...journeyAppraisalFacts(save, 'ongoing'), ...patch };
 }
 function assertLength(f: JourneyAppraisalFacts) {
   const appraisal = localJourneyAppraisal(f);
@@ -32,6 +28,20 @@ function assertLength(f: JourneyAppraisalFacts) {
   assert.doesNotMatch(appraisal.detail, /记载|记录|存档|数据|缘簿|纪事|留白|空白|未载/);
   return appraisal;
 }
+test('零修为纪念评语使用凡人事实，获得修为后才称炼气，原摘要协议仍能读取', () => {
+  const save = freshSave();
+  const mortal = journeyAppraisalFacts(save, 'ongoing');
+  assert.equal(mortal.mortal, true);
+  assert.equal(validJourneyAppraisalFacts(mortal), true);
+  assert.match(localJourneyAppraisal(mortal).detail, /凡人/);
+  assert.doesNotMatch(localJourneyAppraisal(mortal).detail, /炼气初期/);
+  save.cultivation = 1;
+  const cultivator = journeyAppraisalFacts(save, 'ongoing');
+  assert.equal(cultivator.mortal, undefined);
+  assert.equal(validJourneyAppraisalFacts(cultivator), true);
+  assert.equal(validJourneyAppraisalFacts({ ...mortal, mortal: 'true' }), false);
+  assert.equal(validJourneyAppraisalFacts({ ...mortal, realmIndex: 1 }), false);
+});
 
 test('事实只含封闭摘要，忽略日志正文及未知成就且不改存档', () => {
   const save = freshSave('none', [], 'demonic', () => 0);

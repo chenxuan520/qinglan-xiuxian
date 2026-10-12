@@ -32,6 +32,7 @@ const flow = new Script(
 function harness(pending = false) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.runs = 1;
+  save.cultivation = 1;
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
   save.age = 30;

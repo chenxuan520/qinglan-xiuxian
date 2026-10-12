@@ -331,3 +331,9 @@ Use case: stylized-concept. Asset type: one square seamless terrain texture for 
 ## 天劫首领（2026-09-19）
 
 `public/assets/boss-tribulation.webp` 为本次通过 imagegen 生成的独立透明立绘，1254 × 1254 RGBA，Sprite 81。紫色劫云凝成雷霆巨人，白金雷面与破碎冠环；用于每两万年的独立天劫，不替换第七境仙尊。使用原图，未裁切或重新采样。渡劫场复用终关地形并绘制可见边界、护盾和核心状态。
+
+## 宗门坊市建筑图集（2026-10-12）
+
+`public/assets/sect-market-buildings.webp` 为独立九宫格建筑，采用青玉瓦、白石台基与青铜器具，区别于青岚镇民居。包括丹阁、拍卖楼、法器阁、符箓摊、小院、门楼、两类行馆与游商摊；现有功能入口仍由场内修士及拍卖行提供，装饰建筑不新增玩法。仅生成建筑，地板、树木、灯笼和三类修士继续复用已有素材。
+
+按用户要求缩至 768 × 768，再经 `scripts/compress-assets.py` 以 WebP quality=65、method=6 压缩，保留输入 alpha；整张 225512 字节，约 220.2 KiB，低于 250000 字节。`src/market-art.ts` 按完整屋檐取景，避免拍卖楼宽屋檐被等宽切片裁掉。原始 PNG 与验证截图仅保留在工作区临时目录，不提交 Git。

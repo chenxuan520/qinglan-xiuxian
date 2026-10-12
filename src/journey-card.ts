@@ -290,7 +290,10 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
   return {
     realm: realm.name,
     realmIndex: realm.index,
-    realmVerse: REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]],
+    realmVerse:
+      save.cultivation === 0
+        ? '十五离乡问道，凡骨亦可登仙。'
+        : REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]],
     age: save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false }),
     lifespan: Number.isFinite(life.limit)
       ? `寿限 ${life.limit.toLocaleString('zh-CN', { useGrouping: false })} 年`

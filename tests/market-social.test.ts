@@ -27,6 +27,7 @@ function fixture(seed = 12345) {
   s.mortal.hometown!.stage = 'departed';
   s.age = 30;
   s.runs = 1;
+  s.cultivation = 1;
   s.stones = 10000;
   s.unlocked = 6;
   s.mortal.population = { seed, since: 15 };
@@ -169,8 +170,8 @@ test('假货及垫款骗局损失有上限，不产生伪药/改永久效果，�
     const before = structuredClone(s);
     const result = chooseMarketOpportunity(s, id, 1, 'accept')!;
     assert.equal(result.kind, 'fraud');
-    assert.equal(s.stones, before.stones - o.cost);
-    assert.ok(o.cost <= 80);
+    assert.equal(s.stones, before.stones - (kind === 'goods' ? o.deposit : o.cost));
+    assert.ok(o.deposit <= 80);
     assert.deepEqual(s.medicine, before.medicine);
     assert.equal(s.age, 30.5);
     assert.equal(chooseMarketOpportunity(s, id, 1, 'accept'), undefined);

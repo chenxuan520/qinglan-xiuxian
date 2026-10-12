@@ -47,7 +47,7 @@ test('纪念卡只写当前资质与真实成果，不把年岁写成寿终或�
   const save = freshSave('none', [], 'orthodox', () => 0);
   const before = JSON.stringify(save);
   const card = journeyCardData(save);
-  assert.equal(card.realm, '炼气初期');
+  assert.equal(card.realm, '凡人');
   assert.equal(card.age, '15');
   assert.equal(card.lifespan, '寿限 100 年');
   assert.equal(card.identity, '正道 · 散修');

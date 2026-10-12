@@ -52,6 +52,7 @@ export const JOURNEY_APPRAISAL_TIES = [
   'student-letter-read',
 ] as const;
 export interface JourneyAppraisalFacts {
+  mortal?: boolean;
   ending: JourneyCardEnding;
   realmIndex: number;
   ascending: boolean;
@@ -106,6 +107,7 @@ export function journeyAppraisalFacts(
   }
   return {
     ending,
+    ...(save.cultivation === 0 ? { mortal: true } : {}),
     realmIndex: realm.index,
     ascending: realm.ascending,
     age: save.age,
@@ -130,8 +132,10 @@ export function validJourneyAppraisalFacts(value: unknown): value is JourneyAppr
     new Set(list).size === list.length &&
     list.every((item) => allowed.includes(item));
   if (
-    keys.length !== FACT_KEYS.length ||
-    !keys.every((key) => FACT_KEYS.includes(key)) ||
+    keys.filter((key) => key !== 'mortal').length !== FACT_KEYS.length ||
+    !keys.every((key) => FACT_KEYS.includes(key) || key === 'mortal') ||
+    (f.mortal !== undefined &&
+      (typeof f.mortal !== 'boolean' || (f.mortal && f.realmIndex !== 0))) ||
     !['ongoing', 'lifespan', 'tribulation', 'immortal'].includes(f.ending) ||
     !Number.isInteger(f.realmIndex) ||
     f.realmIndex < 0 ||
@@ -343,7 +347,7 @@ function cultivationWords(f: JourneyAppraisalFacts, pick: (words: readonly strin
     };
   }
   const root = ROOT_WORDS[f.root];
-  const realm = REALMS[f.realmIndex];
+  const realm = f.mortal ? '凡人' : REALMS[f.realmIndex];
   const allStages = STAGES.every((_, index) => f.stages.includes(index));
   const stage = allStages
     ? '七境皆破'

@@ -37,9 +37,9 @@ function visitor(realm = 0, seed = 12345) {
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
   save.runs = 1;
-  save.cultivation = Array.from({ length: realm * 3 }, (_, i) => realmCost(i)).reduce(
-    (a, b) => a + b,
-    0,
+  save.cultivation = Math.max(
+    1,
+    Array.from({ length: realm * 3 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0),
   );
   save.unlocked = Math.min(6, realm);
   if (realm === 8) save.completed = [0, 1, 2, 3, 4, 5, 6];
@@ -64,12 +64,13 @@ function visitWithNpcRealm(rank: number, id: MarketCultivatorId) {
   assert.fail(`没有找到${REALMS[rank]}来访者`);
 }
 
-test('首次历练结算即开放，不要求通关、路线或入宗；结束的一世不开放', () => {
+test('修为为零不开放，首次获得修为即开放，无需结算、通关或入宗；结束的一世不开放', () => {
   const save = freshSave();
   assert.equal(sectMarketOpen(save), false);
   assert.match(sectMarketEntrance(save), /disabled/);
   for (const path of ['orthodox', 'demonic', 'dual'] as const) {
-    save.runs = 1;
+    save.runs = 0;
+    save.cultivation = 1;
     save.path = path;
     assert.equal(sectMarketOpen(save), true);
     assert.match(mortalTabContent(save, 'sects', 'all'), /宗门坊市/);

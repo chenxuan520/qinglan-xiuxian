@@ -7,7 +7,7 @@ import { smithStoryLine } from './town-story.ts';
 import { humanStoryGreeting } from './human-stories.ts';
 import { StorySpeech } from './story-speech.ts';
 import { hometownParents } from './hometown.ts';
-import { isMarketCultivatorId, marketCultivators, marketLocalReply } from './sect-market-data.ts';
+import { isMarketCultivatorId, marketCharacters, marketLocalReply } from './sect-market-data.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
@@ -378,7 +378,7 @@ export function mountNpcChat(
     activeRequest = null;
     const localReply = market
       ? marketLocalReply(
-          marketCultivators(population, save.mortal.sectMarket!).find((n) => n.id === npc.id)!,
+          marketCharacters(population, save.mortal.sectMarket!).find((n) => n.id === npc.id)!,
           message,
           realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
         )
@@ -391,7 +391,7 @@ export function mountNpcChat(
     status.textContent = market
       ? reply
         ? '坊间闲谈 · 同道往来'
-        : '坊间闲谈 · 暂用本地对白，互换照常'
+        : '坊间闲谈 · 暂用本地对白'
       : townId
         ? reply
           ? '街巷闲谈 · 随口聊聊'

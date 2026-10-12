@@ -9,13 +9,14 @@ import {
   MARKET_HEIGHT,
   MARKET_CULTIVATORS,
   isMarketCultivatorId,
+  isMarketTraderId,
   marketMedicinePool,
   type MarketCultivatorId,
 } from './sect-market-data.ts';
 import { SECT_MARKET_SETTINGS } from './setting.ts';
 
 export function sectMarketOpen(save: SaveData) {
-  return save.runs > 0 && !save.journeyEnded && !save.pendingReincarnation;
+  return save.cultivation > 0 && !save.journeyEnded && !save.pendingReincarnation;
 }
 export function beginSectMarketVisit(save: SaveData) {
   if (!sectMarketOpen(save)) return false;
@@ -51,7 +52,7 @@ export function beginSectMarketVisit(save: SaveData) {
 }
 export function sectMarketOffer(save: SaveData, id: MarketCultivatorId) {
   const state = save.mortal.sectMarket;
-  if (!state || !isMarketCultivatorId(id)) return undefined;
+  if (!state || !isMarketTraderId(id)) return undefined;
   const pool = marketMedicinePool(save.mortal.population!, state, id);
   const index = MARKET_CULTIVATORS.findIndex((npc) => npc.id === id);
   const seed = (save.medicine.recipeSeed ^ Math.imul(state.visit, 2654435761)) >>> 0;
@@ -111,11 +112,15 @@ export function moveInSectMarket(position: TownPoint, input: TownPoint, seconds:
     y: Math.max(24, Math.min(MARKET_HEIGHT - 24, next.y)),
   };
 }
-export function nearbyMarketCultivator(position: TownPoint) {
-  return MARKET_CULTIVATORS.map((npc) => ({
-    npc,
-    distance: Math.hypot(npc.x - position.x, npc.y - position.y),
-  }))
+export function nearbyMarketCultivator(
+  position: TownPoint,
+  residents: readonly (TownPoint & { id: MarketCultivatorId })[] = MARKET_CULTIVATORS,
+) {
+  return residents
+    .map((npc) => ({
+      npc,
+      distance: Math.hypot(npc.x - position.x, npc.y - position.y),
+    }))
     .filter(({ distance }) => distance <= 145)
     .sort((a, b) => a.distance - b.distance)[0]?.npc.id;
 }

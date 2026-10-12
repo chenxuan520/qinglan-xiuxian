@@ -329,6 +329,13 @@
 .sect-market-map {
   background-size: auto, 600px;
 }
+.market-world {
+  position: absolute;
+  z-index: 1;
+}
+.market-border-tree {
+  pointer-events: none;
+}
 .sect-market-auction-sign {
   position: absolute;
   z-index: 330;
@@ -1588,5 +1595,108 @@
   }
   .market-ambush-stats meter {
     width: 80px;
+  }
+}
+
+/* 修士坊市使用独立建筑图集，地景、人物沿用已有素材。 */
+.sect-market-map {
+  background:
+    radial-gradient(ellipse at 50% 48%, #646d4e44, #263f2b55),
+    url('/assets/town-ground.webp') repeat;
+  background-size: auto, 600px;
+}
+.market-lane {
+  position: absolute;
+  z-index: 0;
+  background:
+    linear-gradient(#a8a17b24, #aaa38024),
+    url('/assets/town-ground.webp') repeat;
+  background-size: auto, 440px;
+  border: 2px solid #c1b28c30;
+  box-shadow: 0 0 20px #102c2222;
+}
+.market-shop {
+  background-image: url('/assets/sect-market-buildings.webp');
+  filter: saturate(0.9);
+}
+.market-tree {
+  transform: translate(-50%, -100%);
+}
+.market-lanterns {
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+.sect-market-auction-sign {
+  z-index: 480;
+  padding: 3px 10px;
+  box-shadow: none;
+  border: 0;
+  background: #1b382dcc;
+  pointer-events: none;
+}
+.sect-market-npc {
+  width: 64px;
+  height: 86px;
+}
+.sect-market-npc-art {
+  width: 100%;
+  height: 100%;
+}
+.sect-market-npc::before {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 16%;
+  width: 68%;
+  height: 10px;
+  background: #10291d66;
+  border-radius: 50%;
+  z-index: -1;
+}
+.sect-market-npc-name {
+  top: 90px;
+  font-size: 12px;
+  padding: 3px 7px;
+}
+.market-visitor {
+  width: 52px;
+  height: 70px;
+}
+.market-visitor .sect-market-npc-name {
+  top: 73px;
+  background: transparent;
+  border-color: transparent;
+  text-shadow:
+    0 1px 3px #102b21,
+    0 0 4px #102b21;
+  font-size: 11px;
+  padding: 2px 5px;
+}
+.market-visitor .sect-market-npc-name small {
+  display: none;
+}
+.market-visitor.nearby .sect-market-npc-name small {
+  display: block;
+}
+.market-visitor.nearby .sect-market-npc-name {
+  background: #15392fe8;
+}
+.sect-market-npc.walking .sect-market-npc-art {
+  animation: market-walking 0.7s ease-in-out infinite alternate;
+}
+.town-paused .sect-market-npc-art {
+  animation-play-state: paused;
+}
+@keyframes market-walking {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-1.5px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sect-market-npc-art {
+    animation: none !important;
   }
 }

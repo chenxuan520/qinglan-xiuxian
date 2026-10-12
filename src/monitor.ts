@@ -295,7 +295,7 @@ function render(data: MonitorData) {
               count(r.age),
             ]),
           ) +
-          '<p class="note">境界阶 0＝炼气初期，每 3 阶一个大境界，24＝真仙；均值不对应单个玩家。</p>';
+          '<p class="note">境界阶 0 包含尚无修为的凡人与炼气初期，每 3 阶一个大境界，24＝真仙；均值不对应单个玩家。</p>';
         break;
       case 'sites':
         $(id).innerHTML = table(

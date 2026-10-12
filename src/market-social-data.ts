@@ -1,5 +1,5 @@
 import {
-  isMarketCultivatorId,
+  isMarketTraderId,
   type MarketCultivatorId,
   type SectMarketState,
 } from './sect-market-data.ts';
@@ -51,10 +51,7 @@ export function validMarketSocial(
     Number.isSafeInteger(v) && Number(v) > 0 && Number(v) <= market.visit;
   const at = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= age;
   const ids = (v: unknown) =>
-    Array.isArray(v) &&
-    v.length <= 3 &&
-    new Set(v).size === v.length &&
-    v.every(isMarketCultivatorId);
+    Array.isArray(v) && v.length <= 3 && new Set(v).size === v.length && v.every(isMarketTraderId);
   return (
     visit(s.visit) &&
     ids(s.fulfilled) &&
@@ -66,7 +63,7 @@ export function validMarketSocial(
       (!!s.ambush &&
         visit(s.ambush.visit) &&
         s.ambush.visit === s.visit &&
-        isMarketCultivatorId(s.ambush.npcId) &&
+        isMarketTraderId(s.ambush.npcId) &&
         s.used.includes(s.ambush.npcId) &&
         at(s.ambush.at) &&
         Number.isSafeInteger(s.ambush.held) &&
@@ -78,7 +75,7 @@ export function validMarketSocial(
       (l) =>
         !!l &&
         visit(l.visit) &&
-        isMarketCultivatorId(l.npcId) &&
+        isMarketTraderId(l.npcId) &&
         at(l.at) &&
         MARKET_LOG_KINDS.some((k) => k === l.kind) &&
         typeof l.text === 'string' &&

@@ -1,5 +1,5 @@
 import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES, treasure } from './data.ts';
-import { medicineInfo } from './medicine-data.ts';
+import { medicineInfo, medicineMarketValue } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import {
   forgeCost,
@@ -40,18 +40,7 @@ function roll(save: SaveData, key: string) {
 }
 export function auctionValue(item: AuctionItem) {
   if (item.kind === 'medicine') {
-    const m = medicineInfo(item.id);
-    if (!m) return 0;
-    const value = m.years
-      ? m.tier === '凡品'
-        ? m.price
-        : m.tier === '灵品'
-          ? 60
-          : 180
-      : ({ butian: 3000, huiyang: 2000, peiying: 1800, jiuqu: 2200 } as Record<string, number>)[
-          m.id
-        ] || 2000;
-    return value * item.quantity;
+    return medicineMarketValue(item.id) * item.quantity;
   }
   if (!TREASURES.some((t) => t.id === item.id)) return 0;
   let value = freeStarter(item.id) ? 0 : 180;

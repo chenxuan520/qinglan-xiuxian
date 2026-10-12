@@ -297,7 +297,8 @@ test('死亡会结算失败，回血不会复活已结束的一局', () => {
   assert.equal(game.player.hp, 0);
 });
 test('前八境三阶段逐级突破，真仙只有一个境界并封顶', () => {
-  assert.equal(realmInfo(0).name, '炼气初期');
+  assert.equal(realmInfo(0).name, '凡人');
+  assert.equal(realmInfo(1).name, '炼气初期');
   assert.equal(realmInfo(realmCost(0)).name, '炼气中期');
   const toFoundation = realmCost(0) + realmCost(1) + realmCost(2);
   assert.equal(realmInfo(toFoundation).name, '筑基初期');

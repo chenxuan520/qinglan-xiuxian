@@ -2,6 +2,7 @@
 
 运行：python3 scripts/compress-assets.py（需要 Pillow 的 WebP 支持）。
 不缩放、不裁切；透明通道无损，纹理 quality=75，人物与物品 quality=82。
+坊市建筑在输入前按用户要求缩至 768px，使用 quality=65 并限制为 250,000 字节。
 """
 
 from pathlib import Path
@@ -15,12 +16,16 @@ for source in sorted(assets.glob("*.png")):
     pending = source.with_suffix(".webp.next")
     with Image.open(source) as image:
         quality = 75 if source.stem.startswith(("terrain", "town-ground")) else 82
+        if source.stem == "sect-market-buildings":
+            quality = 65
         image.save(pending, "WEBP", quality=quality, method=6, alpha_quality=100)
         with Image.open(pending) as result:
             assert result.size == image.size, source.name
             if image.mode == "RGBA":
                 assert result.getchannel("A").tobytes() == image.getchannel("A").tobytes(), source.name
     assert pending.stat().st_size < source.stat().st_size, source.name
+    if source.stem == "sect-market-buildings":
+        assert pending.stat().st_size <= 250_000, "坊市建筑图集超过 250KB"
     pending.replace(target)
     before += source.stat().st_size
     after += target.stat().st_size

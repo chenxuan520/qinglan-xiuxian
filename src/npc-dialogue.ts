@@ -29,7 +29,11 @@ const VILLAGER_LINES = [
   '集上新到的布料好看，我正挑一块带回去。人间的小欢喜，也不过这些。',
 ];
 export function npcDefaultLine(id: TownNpc['id'] | ParentId | MarketCultivatorId) {
-  if (isMarketCultivatorId(id)) return MARKET_CULTIVATORS.find((npc) => npc.id === id)!.greeting;
+  if (isMarketCultivatorId(id))
+    return (
+      MARKET_CULTIVATORS.find((npc) => npc.id === id)?.greeting ??
+      '我来坊市看看器物，也听听山外的见闻。道友慢慢逛，买东西记得验明来路。'
+    );
   return id.startsWith('villager-')
     ? VILLAGER_LINES[Number(id.slice('villager-'.length)) % VILLAGER_LINES.length]
     : NPC_DEFAULT_LINES[id as keyof typeof NPC_DEFAULT_LINES];

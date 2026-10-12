@@ -132,7 +132,7 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
       content: JSON.stringify({
         ...facts,
         outcome: ending,
-        realm: facts.ascending ? '渡劫' : REALMS[facts.realmIndex],
+        realm: facts.ascending ? '渡劫' : facts.mortal ? '凡人' : REALMS[facts.realmIndex],
         currentRoot: spiritRootInfo(facts.root).name,
         pathName: pathInfo(facts.path).name,
         weaponName: treasure(facts.weapon).name,

@@ -22,7 +22,7 @@ import {
 import { validAuction, type AuctionItem } from '../src/auction-data.ts';
 import { marketMedicinePool, MARKET_CULTIVATORS } from '../src/sect-market-data.ts';
 import { ROOT_STARTERS, TREASURES, MAX_FORGE_LEVEL } from '../src/data.ts';
-import { MEDICINES } from '../src/medicine-data.ts';
+import { MEDICINES, medicineMarketValue } from '../src/medicine-data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { Game } from '../src/game.ts';
 import { auctionContent } from '../src/auction-ui.ts';
@@ -30,6 +30,7 @@ import { auctionContent } from '../src/auction-ui.ts';
 function fixture(seed = 12345) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.runs = 1;
+  save.cultivation = 1;
   save.age = 30;
   save.stones = 100000;
   save.mortal.population = { seed, since: 15 };
@@ -37,6 +38,38 @@ function fixture(seed = 12345) {
   prepareAuction(save);
   return save;
 }
+test('坊市药价按品级及价值分档，药铺凡品价格不变，同品同类二换一不能求购套利', () => {
+  for (const m of MEDICINES) {
+    const value = medicineMarketValue(m.id);
+    assert.ok(value > 0, `${m.name} 必须有估值`);
+    assert.equal(
+      auctionValue({ kind: 'medicine', id: m.id, quantity: 3, forgeLevel: 0 }),
+      value * 3,
+    );
+    if (m.tier === '凡品') assert.equal(value, m.price);
+    else if (m.tier === '灵品') assert.ok(value >= 240 && value <= 360);
+    else if (m.id === 'lingru') assert.equal(value, 3000);
+    else if (m.years) assert.ok(value >= 1200 && value <= 2000);
+    else assert.ok(value >= 4000);
+    for (const other of MEDICINES.filter((n) => n.tier === m.tier && !!n.years === !!m.years)) {
+      assert.ok(value * 2 * 1.05 > medicineMarketValue(other.id) * 0.95);
+    }
+  }
+  assert.ok(medicineMarketValue('butian') > medicineMarketValue('jiuqu'));
+  assert.equal(medicineMarketValue('unknown'), 0);
+});
+
+test('成交录只接纳真实竞价摊主，访客买家不能绕过校验使历史展示崩溃', () => {
+  const save = fixture();
+  const lot = auctionLots(save)[0];
+  buyAuction(save, 0, lot.start + auctionFee(lot.start), 1);
+  const receipt = save.mortal.auction!.history[0];
+  receipt.outcome = 'lost';
+  receipt.price = lot.start;
+  receipt.bidder = 'market-visitor-0';
+  assert.equal(validAuction(save.mortal.auction, save.age, save.mortal.sectMarket), false);
+  assert.throws(() => importSave(JSON.stringify(save)));
+});
 test('拍品本批稳定，不随收藏、预算、卖物、关闭或读档重抽；真正重入换批', () => {
   const save = fixture();
   const expected = auctionLots(save);
@@ -242,15 +275,18 @@ test('半年寿元、天劫与未完成事项阻断；供奉先预留，不能�
   }
   const save = fixture();
   save.mortal.member = { id: 'power', dues: 50, dueAt: 0.3 };
-  save.stones = 1000;
+  save.stones = 10000;
   const old = JSON.stringify(save);
-  assert.equal(buyAuction(save, 0, 1000, 1), undefined);
+  assert.equal(buyAuction(save, 0, 10000, 1), undefined);
   assert.equal(JSON.stringify(save), old);
-  const result = buyAuction(save, 0, 950, 1)!;
+  const result = buyAuction(save, 0, 9950, 1)!;
   assert.ok(result);
   assert.equal(save.age, 30.5);
   assert.equal(save.mortal.years, 0.5);
-  assert.equal(save.stones, 1000 - 50 - (result.outcome === 'won' ? result.price + result.fee : 0));
+  assert.equal(
+    save.stones,
+    10000 - 50 - (result.outcome === 'won' ? result.price + result.fee : 0),
+  );
   assert.ok(save.mortal.member!.dueAt > 0.5);
 });
 

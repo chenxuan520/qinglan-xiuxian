@@ -7,7 +7,7 @@ import {
   marketCultivators,
   marketMedicinePool,
   MARKET_CULTIVATORS,
-  isMarketCultivatorId,
+  isMarketTraderId,
   type MarketCultivatorId,
 } from './sect-market-data.ts';
 import { marketSocialRoll, marketDisposition, type MarketSocialLog } from './market-social-data.ts';
@@ -63,7 +63,7 @@ export function marketSocialReason(
   unfinished = false,
 ) {
   if (
-    !isMarketCultivatorId(id) ||
+    !isMarketTraderId(id) ||
     !save.mortal.marketSocial ||
     save.mortal.marketSocial.visit !== visit
   )
@@ -288,6 +288,7 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
       ? MEDICINES.filter((m) => m.tier === '凡品')[roll(save, `opportunity-item:${id}`) % 8]
       : pool[roll(save, `opportunity-item:${id}`) % pool.length];
   const item: AuctionItem = { kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 };
+  const goodsPrice = Math.max(15, Math.floor(auctionValue(item) * 0.9));
   const cost =
     kind === 'invitation'
       ? Math.min(MARKET_SOCIAL_SETTINGS.maxLoss, Math.max(1, Math.floor(save.stones * 0.1)))
@@ -295,12 +296,13 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
         ? 20 + (roll(save, `opportunity-price:${id}`) % 41)
         : kind === 'haggle'
           ? Math.min(80, Math.ceil(m.price * 1.6))
-          : Math.min(80, Math.max(15, Math.floor(auctionValue(item) * 0.6)));
+          : goodsPrice;
   return {
     kind,
     honest,
     item,
     cost,
+    deposit: Math.min(MARKET_SOCIAL_SETTINGS.maxLoss, cost),
     price: Math.floor(auctionValue(item) * 0.9),
     n: npc(save, id),
   };
@@ -384,7 +386,8 @@ export function chooseMarketOpportunity(
     o.kind === 'invitation'
       ? MARKET_SOCIAL_SETTINGS.invitationYears
       : MARKET_SOCIAL_SETTINGS.opportunityYears;
-  save.stones -= o.cost;
+  const paid = o.kind === 'goods' && !o.honest ? o.deposit : o.cost;
+  save.stones -= paid;
   advanceMortal(save, years * 60);
   s.used.push(id);
   s.lastOpportunityAt = save.age;
@@ -422,7 +425,7 @@ export function chooseMarketOpportunity(
     id,
     'fraud',
     o.kind === 'goods'
-      ? `你花${o.cost}灵石拿到掺灰泥丸，无法服用，已弃去。封签与药香的疑点，原来都是破绽。`
+      ? `你拿到掺灰泥丸，无法服用，已弃去。损失先付的${paid}灵石，余款未付；封签与药香的疑点，原来都是破绽。`
       : `${o.n.name}收了${o.cost}灵石便推诿不再收货。所谓路费，是一笔骗取的垫款；你的丹药仍在丹囊。`,
   );
 }

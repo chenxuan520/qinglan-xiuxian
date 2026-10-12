@@ -45,6 +45,7 @@ const script = new Script(
 function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pending = false) {
   let save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.runs = 1;
+  save.cultivation = 1;
   save.age = 30;
   save.stones = 10000;
   save.prologueSeen = save.hometownSeen = true;

@@ -69,6 +69,7 @@ export function controls(
   return `${autoplayButton(save.autoplay, inGame)}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span>${inGame ? '' : `<button class="round-button settings-button" data-action="settings" aria-label="设置" aria-haspopup="dialog" title="设置 · 自动历练、声音与离线资源">${smallIcon('settings')}</button>`}<button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton(display.available, display.active)}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 export function realmVerse(realm: ReturnType<typeof realmInfo>) {
+  if (realm.name === '凡人') return '十五离乡问道，凡骨亦可登仙。';
   return REALM_VERSES[realm.ascending ? '渡劫' : REALMS[realm.index]];
 }
 export function completedJourney(

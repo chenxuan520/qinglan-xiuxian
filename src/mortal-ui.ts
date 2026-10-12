@@ -22,7 +22,7 @@ import { type TownResident } from './town-population.ts';
 import { npcDefaultLine, type NpcDialogueRequest } from './npc-dialogue.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
 import { sectMarketOpen } from './sect-market.ts';
-import { isMarketCultivatorId } from './sect-market-data.ts';
+import { isMarketCultivatorId, isMarketTraderId } from './sect-market-data.ts';
 import { smithAt, smithStoryView } from './town-story.ts';
 import {
   HUMAN_STORIES,
@@ -82,7 +82,7 @@ export function townPage(save: SaveData, fullscreenButton: string) {
 }
 export function sectMarketEntrance(save: SaveData) {
   const open = sectMarketOpen(save);
-  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，互换余丹，或到中央拍卖行竞宝、委托出售。</p><small>${open ? '无需入宗 · 闲逛沿用人间计龄，交谈与互换时暂停' : '首次历练结束后开放，成败皆可'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '先去历练一程'}</button></section>`;
+  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，互换余丹，或到中央拍卖行竞宝、委托出售。</p><small>${open ? '无需入宗 · 闲逛沿用人间计龄，交谈与互换时暂停' : '积累修为、踏入炼气后开放，无需完成整场历练'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '踏入炼气后开放'}</button></section>`;
 }
 
 export function mortalPage(
@@ -162,7 +162,7 @@ export function townEventContent(save: SaveData, npc: TownResident) {
 export function npcDialogueContent(id: NpcDialogueRequest['npcId'], name: string) {
   const family = id === 'father' || id === 'mother';
   const market = isMarketCultivatorId(id);
-  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(id)}</p></div><small class="npc-chat-status" role="status">${family ? '家中叙话' : market ? '坊间闲谈' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : market ? '想对修士说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '说些家常，无任务或奖励；暂时无法回应时沿用本地对白。' : market ? '闲谈不改变修为与物资，丹药互换请用下方操作。' : '闲谈不改变修为与物资，办事请用故事或委托按钮。'}</small></section>`;
+  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(id)}</p></div><small class="npc-chat-status" role="status">${family ? '家中叙话' : market ? '坊间闲谈' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : market ? '想对修士说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '说些家常，无任务或奖励；暂时无法回应时沿用本地对白。' : market ? (isMarketTraderId(id) ? '闲谈不改变修为与物资，丹药互换请用下方操作。' : '闲谈不改变修为与物资；交易可找设摊的修士。') : '闲谈不改变修为与物资，办事请用故事或委托按钮。'}</small></section>`;
 }
 
 export function humanStoryContent(save: SaveData, id: HumanStoryId, atNpc = false) {

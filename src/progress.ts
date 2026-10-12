@@ -426,11 +426,13 @@ export function realmInfo(cultivation: number, finalTrialCleared = false) {
     step,
     index: Math.floor(step / 3),
     name:
-      step === 24
-        ? REALMS[8]
-        : ascending
-          ? '渡劫'
-          : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
+      cultivation <= 0
+        ? '凡人'
+        : step === 24
+          ? REALMS[8]
+          : ascending
+            ? '渡劫'
+            : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
     progress: remaining,
     needed: realmCost(step),
     max: step === 24,
