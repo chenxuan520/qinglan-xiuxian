@@ -11,6 +11,7 @@ import { Game } from './game.ts';
 import { readSave, SAVE_KEY, validBirthInheritance, type SaveData } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
+import { settleMarketAmbush } from './market-social.ts';
 
 export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 export const UNREADABLE_SAVE_PREFIX = `${SAVE_KEY}-unreadable-`;
@@ -165,5 +166,6 @@ export function importSave(text: string) {
   )
     throw new Error('存档中的本世落幕状态无效，当前进度未更改');
   const run = restoreSavedRun(save, data.activeRun);
+  if (save.mortal.marketSocial?.ambush) settleMarketAmbush(save, 'escaped');
   return { save, run };
 }

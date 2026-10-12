@@ -1459,3 +1459,134 @@
       max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
 }
+
+.market-social-cards {
+  margin: 22px 0;
+}
+.market-social-section {
+  border-top: 1px solid var(--border);
+  padding: 14px 0;
+}
+.market-social-section > summary {
+  cursor: pointer;
+  color: var(--gold);
+  font-size: 17px;
+  line-height: 1.7;
+}
+.market-social-section > summary small {
+  margin-left: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.market-social-section p,
+.market-social-result {
+  font-size: 14px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.market-social-section > button {
+  width: 100%;
+  white-space: normal;
+}
+.market-social-result {
+  border-left: 2px solid var(--gold);
+  padding: 12px 16px;
+  background: #183e3533;
+}
+.market-social-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.market-social-actions button {
+  flex: 1 1 160px;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.6;
+}
+.market-opportunity > summary {
+  color: #dac29a;
+}
+.market-inspection {
+  color: var(--jade);
+}
+.market-ambush-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0;
+}
+.market-ambush-stats span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.market-ambush-stats meter {
+  width: 100px;
+}
+.market-ambush-field {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  min-height: 160px;
+  background:
+    linear-gradient(#15352a44, #15352a88),
+    url('/assets/town-ground.webp') center / cover;
+  border: 1px solid var(--border);
+  touch-action: none;
+}
+.ambush-figure {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  transform: translate(-50%, -70%) scale(0.7);
+  z-index: 2;
+  pointer-events: none;
+}
+.ambush-figure small {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -8px;
+  text-align: center;
+  color: #e7e8d6;
+}
+.ambush-warning {
+  position: absolute;
+  width: 20.3%;
+  aspect-ratio: 1;
+  border: 2px dashed #df945d;
+  background: #d76b403d;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.ambush-shots i {
+  position: absolute;
+  width: 10px;
+  height: 4px;
+  background: #c0ead7;
+  box-shadow: 0 0 8px #c0ead7;
+  border-radius: 50%;
+}
+.ambush-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: #15352ae8;
+  padding: 20px;
+  z-index: 3;
+}
+@media (max-width: 400px) {
+  .market-social-section > summary small {
+    display: block;
+    margin-left: 18px;
+  }
+  .market-ambush-stats meter {
+    width: 80px;
+  }
+}

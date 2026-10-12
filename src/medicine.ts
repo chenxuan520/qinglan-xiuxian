@@ -131,7 +131,7 @@ export function medicineCraftReason(save: SaveData, id: string, unfinished = fal
   const m = medicineInfo(id);
   if (!m || !m.years) return '此药无方可炼，只待机缘';
   if (m.tier === '凡品') return '凡品无需炼制，可向药铺购买';
-  if (!save.medicine.recipes.includes(id)) return '尚未购得药方';
+  if (!save.medicine.recipes.includes(id)) return '尚未习得药方';
   if (unfinished) return '请先结束当前历练';
   if (save.journeyEnded) return '此世仙途已结束';
   if (save.unlocked < m.stage) return `探索第 ${m.stage + 1} 境后解锁配方`;

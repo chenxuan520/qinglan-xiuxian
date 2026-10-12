@@ -7,6 +7,7 @@ import { validHumanStories, type HumanStories } from './human-stories.ts';
 import { validHometown, type HometownState } from './hometown.ts';
 import { validSectMarket, type SectMarketState } from './sect-market-data.ts';
 import { validAuction, type AuctionState } from './auction-data.ts';
+import { validMarketSocial, type MarketSocialState } from './market-social-data.ts';
 
 export const SECTS = PASSIVES.map((manual, index) => ({
   id: manual.id,
@@ -103,6 +104,7 @@ export interface MortalState {
   years: number;
   sectMarket?: SectMarketState;
   auction?: AuctionState;
+  marketSocial?: MarketSocialState;
   hometown?: HometownState;
   population?: TownPopulation;
   scenery?: TownScenery;
@@ -131,6 +133,7 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
     number(s.years) &&
     (s.sectMarket === undefined || (validSectMarket(s.sectMarket, age) && !!s.population)) &&
     (s.auction === undefined || validAuction(s.auction, age, s.sectMarket)) &&
+    (s.marketSocial === undefined || validMarketSocial(s.marketSocial, age, s.sectMarket)) &&
     (s.hometown === undefined || validHometown(s.hometown, age)) &&
     (s.immortal == null || validTownImmortal(s.immortal, age)) &&
     (s.population === undefined || validTownPopulation(s.population)) &&

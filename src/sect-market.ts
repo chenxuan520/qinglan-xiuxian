@@ -19,6 +19,7 @@ export function sectMarketOpen(save: SaveData) {
 }
 export function beginSectMarketVisit(save: SaveData) {
   if (!sectMarketOpen(save)) return false;
+  if (save.mortal.marketSocial?.ambush) return false;
   const visit = (save.mortal.sectMarket?.visit ?? 0) + 1;
   if (!Number.isSafeInteger(visit)) return false;
   save.mortal.sectMarket = {
@@ -31,6 +32,21 @@ export function beginSectMarketVisit(save: SaveData) {
     save.mortal.auction.visit = visit;
     save.mortal.auction.closed = [];
   }
+  save.mortal.auction ??= { visit, closed: [], releasedArtifacts: [], history: [] };
+  save.mortal.marketSocial ??= {
+    visit,
+    fulfilled: [],
+    used: [],
+    inspected: [],
+    lastDebateAt: null,
+    lastOpportunityAt: null,
+    ambush: null,
+    logs: [],
+  };
+  save.mortal.marketSocial.visit = visit;
+  save.mortal.marketSocial.fulfilled = [];
+  save.mortal.marketSocial.used = [];
+  save.mortal.marketSocial.inspected = [];
   return true;
 }
 export function sectMarketOffer(save: SaveData, id: MarketCultivatorId) {

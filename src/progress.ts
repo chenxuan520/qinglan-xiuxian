@@ -2,6 +2,7 @@ import { syncHumanStories } from './human-stories.ts';
 import { freshHometown, validHometown } from './hometown.ts';
 import { validSectMarket } from './sect-market-data.ts';
 import { validAuction } from './auction-data.ts';
+import { validMarketSocial } from './market-social-data.ts';
 import {
   freshMedicine,
   validMedicine,
@@ -85,7 +86,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 14;
+export const SAVE_SCHEMA = 15;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -280,6 +281,11 @@ export function readSave(
       !validAuction(s.mortal.auction, base.age, s.mortal.sectMarket)
     )
       delete s.mortal.auction;
+    if (
+      s.mortal?.marketSocial !== undefined &&
+      !validMarketSocial(s.mortal.marketSocial, base.age, s.mortal.sectMarket)
+    )
+      delete s.mortal.marketSocial;
     if (
       s.mortal &&
       typeof s.mortal === 'object' &&

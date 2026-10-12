@@ -22,26 +22,27 @@
 
 前端使用 Vite + TypeScript + Canvas 2D，无运行时游戏框架。战斗与存档本地运行，NPC 闲谈使用独立 Cloudflare Workers AI，失败回退本地对白。需要 Node.js **22.18+**。
 
-| 路径                                  | 职责                                      |
-| ------------------------------------- | ----------------------------------------- |
-| `src/data.ts`                         | 法宝、功法、灵根、境界、关卡与难度数据    |
-| `src/game.ts`                         | 无 DOM 战斗模拟、升级、伤害统计、对局快照 |
-| `src/autoplay.ts`                     | AI 走位及选技，实战与平衡模拟共用         |
-| `src/progress.ts`                     | 永久存档、成长、寿元、闭关、天劫与结算    |
-| `src/mortal-data.ts`、`src/mortal.ts` | 人间时间、十六宗门、供奉与精研规则        |
-| `src/mortal-ui.ts`、`src/mortal.css`  | 人间界面、宗门图集和响应式布局            |
-| `src/save-transfer.ts`                | 存档导入导出及校验                        |
-| `src/main.ts`                         | 界面、输入、音频、存档写入与状态衔接      |
-| `src/render.ts`、`src/style.css`      | Canvas 绘制、桌面和移动布局               |
-| `src/item-art.ts`、`src/sprites.ts`   | 统一图集映射，列表和战场共用              |
-| `src/town.ts`、`src/town-scene.ts`    | 城镇坐标、行走与交互、模块地图及镜头      |
-| `src/sect-market*.ts`                 | 宗门坊市场地、修士身份与丹药互换          |
-| `src/auction*.ts`                     | 坊市拍卖、物品估值、结拍记录与状态校验    |
-| `src/scene-assets.ts`                 | 按关卡生成预载素材清单                    |
-| `src/asset-url.ts`                    | 静态素材的部署基础路径处理                |
-| `src/guide.ts`                        | 游戏内说明，玩法变化时同步维护            |
-| `public/assets/`                      | 已生成的图片及背景音乐                    |
-| `tests/`、`scripts/`                  | 逻辑测试、固定种子平衡模拟、素材生成脚本  |
+| 路径                                             | 职责                                      |
+| ------------------------------------------------ | ----------------------------------------- |
+| `src/data.ts`                                    | 法宝、功法、灵根、境界、关卡与难度数据    |
+| `src/game.ts`                                    | 无 DOM 战斗模拟、升级、伤害统计、对局快照 |
+| `src/autoplay.ts`                                | AI 走位及选技，实战与平衡模拟共用         |
+| `src/progress.ts`                                | 永久存档、成长、寿元、闭关、天劫与结算    |
+| `src/mortal-data.ts`、`src/mortal.ts`            | 人间时间、十六宗门、供奉与精研规则        |
+| `src/mortal-ui.ts`、`src/mortal.css`             | 人间界面、宗门图集和响应式布局            |
+| `src/save-transfer.ts`                           | 存档导入导出及校验                        |
+| `src/main.ts`                                    | 界面、输入、音频、存档写入与状态衔接      |
+| `src/render.ts`、`src/style.css`                 | Canvas 绘制、桌面和移动布局               |
+| `src/item-art.ts`、`src/sprites.ts`              | 统一图集映射，列表和战场共用              |
+| `src/town.ts`、`src/town-scene.ts`               | 城镇坐标、行走与交互、模块地图及镜头      |
+| `src/sect-market*.ts`                            | 宗门坊市场地、修士身份与丹药互换          |
+| `src/market-social*.ts`、`src/market-ambush*.ts` | 论道、求购、私下机缘与独立劫修遭遇        |
+| `src/auction*.ts`                                | 坊市拍卖、物品估值、结拍记录与状态校验    |
+| `src/scene-assets.ts`                            | 按关卡生成预载素材清单                    |
+| `src/asset-url.ts`                               | 静态素材的部署基础路径处理                |
+| `src/guide.ts`                                   | 游戏内说明，玩法变化时同步维护            |
+| `public/assets/`                                 | 已生成的图片及背景音乐                    |
+| `tests/`、`scripts/`                             | 逻辑测试、固定种子平衡模拟、素材生成脚本  |
 
 开发及验证命令：
 

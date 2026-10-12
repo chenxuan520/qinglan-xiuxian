@@ -335,6 +335,8 @@ test('旧档正常升级 schema、保留药方与宗门，损坏坊市字段不�
   const save = visitor(2);
   save.schema = 12;
   delete save.mortal.sectMarket;
+  delete save.mortal.auction;
+  delete save.mortal.marketSocial;
   save.mortal.member = { id: 'power', dues: 150, dueAt: 100 };
   save.mortal.mastery.power = 2;
   save.medicine.recipes = ['heqi'];

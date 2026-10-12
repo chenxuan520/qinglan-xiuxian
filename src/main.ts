@@ -138,6 +138,17 @@ import { runLootContent } from './run-loot-ui.ts';
 import { TownScene } from './town-scene.ts';
 import { SectMarketScene } from './sect-market-scene.ts';
 import {
+  debateMarket,
+  fulfillMarketRequest,
+  chooseMarketOpportunity,
+  settleMarketAmbush,
+  prepareMarketSocial,
+} from './market-social.ts';
+import { marketSocialContent } from './market-social-ui.ts';
+import { MarketAmbushScene } from './market-ambush-scene.ts';
+import type { AmbushOutcome } from './market-ambush.ts';
+import { marketCultivators } from './sect-market-data.ts';
+import {
   prepareAuction,
   auctionBuyReason,
   auctionSellReason,
@@ -311,6 +322,7 @@ let townPosition = { ...TOWN_START };
 let townNpc: TownResident | null = null;
 let inMarket = false;
 let marketScene: SectMarketScene | null = null;
+let ambushScene: MarketAmbushScene | null = null;
 let marketPosition = { ...MARKET_START };
 let marketNpc: MarketCultivator | null = null;
 let auctionView: AuctionView = 'buy';
@@ -567,6 +579,25 @@ function unlockAudio() {
 }
 
 function renderLobby(returnYears?: number) {
+  if (ambushScene) return;
+  if (save.mortal.marketSocial?.ambush && !ambushScene && !saveLock) {
+    const next = structuredClone(save);
+    settleMarketAmbush(next, 'escaped');
+    try {
+      writeSave(next, pendingRun);
+    } catch {
+      if (!saveLock) {
+        panel = 'market-ambush-recovery';
+        panelFrame(
+          '尚有一场劫修遭遇未结',
+          '坊外险路',
+          '<p>重新载入按脱身结算，暂扣限额不会重复扣除；浏览器暂时无法保存，请重试后继续。</p><button class="secondary-button" data-action="market-ambush-recover">重试保存脱身结果</button>',
+        );
+      }
+      return;
+    }
+    Object.assign(save, next);
+  }
   if (save.journeyEnded) {
     renderEpilogue();
     return;
@@ -868,13 +899,82 @@ function showMarketEvent(npc: MarketCultivator) {
   if (!inMarket || marketScene?.nearbyNpc?.id !== npc.id) return;
   marketNpc = npc;
   panel = 'sect-market-event';
-  panelFrame(npc.name, '宗门坊市 · 同道往来', sectMarketEventContent(save, npc));
+  panelFrame(npc.name, '宗门坊市 · 同道往来', sectMarketEventContent(save, npc, !!pendingRun));
   mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
 }
 function refreshMarketTrade(selected?: string) {
   if (!marketNpc || panel !== 'sect-market-event') return;
   const host = modal.querySelector<HTMLElement>('#sect-market-trade');
   if (host) host.innerHTML = sectMarketTradeContent(save, marketNpc, selected);
+}
+function refreshMarketActivities() {
+  if (!marketNpc || panel !== 'sect-market-event') return;
+  const host = modal.querySelector<HTMLElement>('#market-social');
+  const section = modal.querySelector<HTMLElement>('.panel');
+  const scroll = section?.scrollTop ?? 0;
+  const opened = host
+    ? [...host.querySelectorAll<HTMLDetailsElement>('details')].map((d) => d.open)
+    : [];
+  if (host) {
+    host.innerHTML = marketSocialContent(save, marketNpc, !!pendingRun);
+    host
+      .querySelectorAll<HTMLDetailsElement>('details')
+      .forEach((d, index) => (d.open = opened[index] ?? false));
+  }
+  if (section) section.scrollTop = scroll;
+}
+function showMarketAmbush() {
+  const a = save.mortal.marketSocial?.ambush;
+  if (!a) return;
+  closeNpcChat();
+  panel = 'market-ambush';
+  panelFrame(
+    '话中藏刃',
+    '坊外 · 劫修伏击',
+    `<p class="panel-note">${a.held} 灵石已暂扣，击退后全数取回；败退、离开或刷新仅损失此额，行囊中的法宝和丹药保留。</p><div id="market-ambush"></div>`,
+  );
+  const npc = marketCultivators(save.mortal.population!, save.mortal.sectMarket!).find(
+    (n) => n.id === a.npcId,
+  )!;
+  ambushScene?.destroy();
+  ambushScene = new MarketAmbushScene(
+    modal.querySelector<HTMLElement>('#market-ambush')!,
+    save,
+    npc,
+    finishMarketAmbush,
+  );
+}
+function finishMarketAmbush(outcome: AmbushOutcome) {
+  ambushScene?.lockOutcome(outcome);
+  const next = structuredClone(save);
+  const result = settleMarketAmbush(next, outcome);
+  if (!result) return;
+  try {
+    writeSave(next, pendingRun);
+  } catch {
+    if (!saveLock) {
+      const note = modal.querySelector<HTMLElement>('.ambush-result');
+      if (note) {
+        note.hidden = false;
+        note.textContent = '结算暂时无法保存，暂扣记录保留；请重试保存后返回。';
+      }
+      const button = modal.querySelector<HTMLButtonElement>('[data-action="market-ambush-exit"]');
+      if (button) button.textContent = '重试保存结果';
+    }
+    return;
+  }
+  Object.assign(save, next);
+  ambushScene?.destroy();
+  ambushScene = null;
+  if (marketNpc) showMarketEvent(marketNpc);
+  else {
+    panel = '';
+    modal.innerHTML = '';
+    renderLobby();
+  }
+  const status = document.getElementById('town-status');
+  if (status) status.innerHTML = townStatus(save);
+  toast(result.text);
 }
 function showAuction() {
   if (!inMarket || !marketScene?.nearAuction) return;
@@ -2118,6 +2218,19 @@ function handleAction(action: string, id?: string) {
     }
     return;
   }
+  if (panel === 'market-ambush-recovery') {
+    if (action === 'market-ambush-recover') {
+      panel = '';
+      modal.innerHTML = '';
+      renderLobby();
+    }
+    return;
+  }
+  if (panel === 'market-ambush') {
+    if (action === 'market-ambush-exit' || action === 'close' || action === 'home')
+      finishMarketAmbush(ambushScene?.duel.outcome ?? 'escaped');
+    return;
+  }
   if (action === 'close' && panel === 'journey-card') {
     journeyCardRequest?.abort();
     journeyCardRequest = null;
@@ -2532,6 +2645,68 @@ function handleAction(action: string, id?: string) {
       document.querySelector<HTMLButtonElement>('[data-action="sect-market-enter"]')?.focus();
     } else if (action === 'sect-market-talk' && inMarket && !panel) marketScene?.talk();
     else if (
+      [
+        'sect-market-debate',
+        'sect-market-request',
+        'sect-market-inspect',
+        'sect-market-opportunity',
+        'sect-market-decline',
+      ].includes(action) &&
+      inMarket &&
+      panel === 'sect-market-event' &&
+      isMarketCultivatorId(id) &&
+      marketNpc?.id === id &&
+      marketScene?.nearbyNpc?.id === id
+    ) {
+      const button = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+      if (!button || button.disabled) return;
+      const visit = Number(button.dataset.visit);
+      const next = structuredClone(save);
+      if (!prepareMarketSocial(next)) return;
+      const result =
+        action === 'sect-market-debate'
+          ? debateMarket(next, id, visit)
+          : action === 'sect-market-request'
+            ? fulfillMarketRequest(next, id, visit, Number(button.dataset.level), !!pendingRun)
+            : chooseMarketOpportunity(
+                next,
+                id,
+                visit,
+                action === 'sect-market-inspect'
+                  ? 'inspect'
+                  : action === 'sect-market-decline'
+                    ? 'decline'
+                    : 'accept',
+                !!pendingRun,
+              );
+      if (!result) {
+        toast('这桩互动已变化，请重新查看；当前物资未改动');
+        return;
+      }
+      try {
+        writeSave(next, pendingRun);
+      } catch {
+        if (!saveLock) toast('互动未完成：浏览器暂时无法保存，请重试');
+        return;
+      }
+      Object.assign(save, next);
+      if (next.mortal.marketSocial?.ambush) showMarketAmbush();
+      else {
+        refreshMarketActivities();
+        refreshMarketTrade();
+        toast(
+          result.kind === 'debate'
+            ? '论道已完成 · 本次所得已记在此处'
+            : result.kind === 'exposed'
+              ? '核验完成 · 可查看本次线索'
+              : result.text.length > 75
+                ? `${result.text.slice(0, 72)}…`
+                : result.text,
+        );
+      }
+      const status = document.getElementById('town-status');
+      if (status) status.innerHTML = townStatus(save);
+    } else if (
       action === 'sect-market-exchange' &&
       inMarket &&
       panel === 'sect-market-event' &&
@@ -3683,6 +3858,10 @@ function frame(now: number) {
   marketScene?.update(
     now,
     townClockRunning(inMarket, !!marketScene?.ready, !document.hidden, document.hasFocus(), panel),
+  );
+  ambushScene?.update(
+    now,
+    !saveLock && panel === 'market-ambush' && !document.hidden && document.hasFocus(),
   );
   tickMortal(now);
   tick(now, true);

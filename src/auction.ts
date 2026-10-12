@@ -101,11 +101,11 @@ export function auctionFee(price: number, selling = false) {
     (price * (selling ? AUCTION_SETTINGS.sellerFee : AUCTION_SETTINGS.buyerFee)) / 100,
   );
 }
-export function auctionDues(save: SaveData) {
+export function auctionDues(save: SaveData, years = AUCTION_SETTINGS.years) {
   const member = save.mortal.member;
   return member?.dues &&
     sectDues(save).stones > 0 &&
-    member.dueAt <= save.mortal.years + AUCTION_SETTINGS.years + 1e-9
+    member.dueAt <= save.mortal.years + years + 1e-9
     ? Math.min(member.dues, sectDues(save).stones)
     : 0;
 }
@@ -151,6 +151,7 @@ export function auctionReason(
   visit: number,
   artifact: boolean,
   unfinished = false,
+  years = AUCTION_SETTINGS.years,
 ) {
   if (
     !sectMarketOpen(save) ||
@@ -161,16 +162,17 @@ export function auctionReason(
     return '请先进入拍卖行';
   if (lifespanInfo(save).remaining <= 0 || tribulationDue(save) || sectDuesPending(save))
     return '请先处理寿元、天劫或供奉';
-  if (lifespanInfo(save).remaining <= AUCTION_SETTINGS.years + 1e-9)
-    return '寿元不足半年，请先借寿';
+  const duration = years === 0.5 ? '半年' : `${years}年`;
+  if (lifespanInfo(save).remaining <= years + 1e-9) return `寿元不足${duration}，请先借寿`;
   if (
     save.nextTribulationAge > 0 &&
     !save.completed.includes(FINAL_TRIAL_STAGE) &&
-    save.nextTribulationAge <= save.age + AUCTION_SETTINGS.years + 1e-9
+    save.nextTribulationAge <= save.age + years + 1e-9
   )
-    return '半年内将迎天劫，请先处理天劫';
+    return `${duration}内将迎天劫，请先处理天劫`;
   if (save.mortal.activity) return '请先完成当前委托或研习';
-  if (save.stones < auctionDues(save)) return '请先备足本场到期的宗门供奉';
+  if (save.stones < auctionDues(save, years)) return '请先备足本场到期的宗门供奉';
+  if (save.mortal.marketSocial?.ambush) return '请先处理尚未结束的劫修遭遇';
   if (save.mortal.sectMarket.visit !== visit || save.mortal.auction.visit !== visit)
     return '本批拍卖已结束，请重新入席';
   if (artifact && (unfinished || save.tribulationReturn != null))
@@ -271,8 +273,9 @@ export function auctionSellReason(
   item: AuctionItem,
   visit: number,
   unfinished = false,
+  years = AUCTION_SETTINGS.years,
 ) {
-  const reason = auctionReason(save, visit, item.kind === 'artifact', unfinished);
+  const reason = auctionReason(save, visit, item.kind === 'artifact', unfinished, years);
   if (reason) return reason;
   if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)
     return '每次可委托一至九十九份';
@@ -296,6 +299,16 @@ export function auctionSellReason(
   if (auctionValue(item) <= 0) return '入门赠品未炼器，无人出价';
   return '';
 }
+export function releaseAuctionItem(save: SaveData, item: AuctionItem) {
+  if (item.kind === 'medicine') save.medicine.bag[item.id] -= item.quantity;
+  else {
+    save.artifacts = save.artifacts.filter((id) => id !== item.id);
+    save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);
+    save.forge[item.id] = 0;
+    if (freeStarter(item.id) && !save.mortal.auction!.releasedArtifacts.includes(item.id))
+      save.mortal.auction!.releasedArtifacts.push(item.id);
+  }
+}
 export function sellAuction(
   save: SaveData,
   item: AuctionItem,
@@ -313,14 +326,7 @@ export function sellAuction(
   if (bidder.price < reserve) return receipt(save, item, 'unsold', 0, 0, null);
   const fee = auctionFee(bidder.price, true);
   if (!Number.isSafeInteger(save.stones + (bidder.price - fee))) return undefined;
-  if (item.kind === 'medicine') save.medicine.bag[item.id] -= item.quantity;
-  else {
-    save.artifacts = save.artifacts.filter((id) => id !== item.id);
-    save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);
-    save.forge[item.id] = 0;
-    if (freeStarter(item.id) && !save.mortal.auction!.releasedArtifacts.includes(item.id))
-      save.mortal.auction!.releasedArtifacts.push(item.id);
-  }
+  releaseAuctionItem(save, item);
   save.stones += bidder.price - fee;
   return receipt(save, item, 'sold', bidder.price, fee, bidder.id);
 }

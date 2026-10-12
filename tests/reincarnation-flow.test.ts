@@ -92,6 +92,7 @@ function harness(save: SaveData) {
   let rolls = 0;
   const context = createContext({
     ...data,
+    ambushScene: null,
     save,
     freshSave: (root: data.SpiritRootId, elements: data.ElementId[], path: data.CultivationPath) =>
       freshSave(root, elements, path, () => 0),

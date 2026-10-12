@@ -134,6 +134,12 @@ export function marketRelation(npcRealm: number, playerRealm: number) {
   return npcRealm > playerRealm ? '前辈' : npcRealm === playerRealm ? '道友' : '蝼蚁';
 }
 export function marketLocalReply(npc: MarketCultivator, message: string, playerRealm: number) {
+  if (/论道|请教|指点/.test(message))
+    return '论道需静心一年，相隔十个游戏年可有所获。你的灵根、路线和本命各有取舍，丹方或余丹以坐而论道的结果为准。';
+  if (/委托|求购/.test(message))
+    return '求购有明示的物品和报酬，当面交货，半年便结清。若有人催你先垫路费，或邀你去僻处，先核验再决定。';
+  if (/骗|险|劫|机缘/.test(message))
+    return '话说得好听，未必有真货。看封签，问凭据，辨来路；私下机缘可核验或作别。普通拍卖照明示规则，闲聊不扣物资。';
   if (/拍卖|竞拍|买|卖/.test(message))
     return '坊市中央有拍卖行，可竞拍丹药和法宝，也可委托出售余物。每场花半年，报价、手续费和成交以拍卖行按钮为准；闲聊不会扣钱或换物。';
   if (/丹|药|换/.test(message))

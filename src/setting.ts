@@ -79,3 +79,13 @@ export const TELEMETRY_SETTINGS = {
 // 域名绑定、来源白名单和边缘限流绑定属于部署设置，见 workers/npc-ai/wrangler.jsonc。
 
 export const AUCTION_SETTINGS = { years: 0.5, buyerFee: 5, sellerFee: 10 };
+export const MARKET_SOCIAL_SETTINGS = {
+  debateYears: 1,
+  debateInterval: 10,
+  requestYears: 0.5,
+  inspectYears: 0.5,
+  opportunityYears: 0.5,
+  invitationYears: 1,
+  opportunityInterval: 10,
+  maxLoss: 80,
+};
