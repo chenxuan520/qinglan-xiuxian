@@ -27,12 +27,16 @@ export function beginSectMarketVisit(save: SaveData) {
     realmIndex: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
     exchanged: [],
   };
+  if (save.mortal.auction) {
+    save.mortal.auction.visit = visit;
+    save.mortal.auction.closed = [];
+  }
   return true;
 }
 export function sectMarketOffer(save: SaveData, id: MarketCultivatorId) {
   const state = save.mortal.sectMarket;
   if (!state || !isMarketCultivatorId(id)) return undefined;
-  const pool = marketMedicinePool(state, id);
+  const pool = marketMedicinePool(save.mortal.population!, state, id);
   const index = MARKET_CULTIVATORS.findIndex((npc) => npc.id === id);
   const seed = (save.medicine.recipeSeed ^ Math.imul(state.visit, 2654435761)) >>> 0;
   return pool[(seed + index) % pool.length];
@@ -53,7 +57,9 @@ export function sectMarketExchangeReason(
   if (
     !received ||
     received.id === giveId ||
-    !marketMedicinePool(state, id).some((m) => m.id === giveId && !!m.years === !!received.years)
+    !marketMedicinePool(save.mortal.population!, state, id).some(
+      (m) => m.id === giveId && !!m.years === !!received.years,
+    )
   )
     return '请选同品级、同类的另一种丹药';
   if ((save.medicine.bag[giveId] || 0) < SECT_MARKET_SETTINGS.exchangeCost)
@@ -70,7 +76,9 @@ export function exchangeSectMedicine(
 ) {
   if (sectMarketExchangeReason(save, id, giveId, visit)) return false;
   const received = sectMarketOffer(save, id)!;
-  const given = marketMedicinePool(save.mortal.sectMarket!, id).find((m) => m.id === giveId)!;
+  const given = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id).find(
+    (m) => m.id === giveId,
+  )!;
   save.medicine.bag[giveId] -= SECT_MARKET_SETTINGS.exchangeCost;
   save.medicine.bag[received.id] = (save.medicine.bag[received.id] || 0) + 1;
   save.mortal.sectMarket!.exchanged.push(id);

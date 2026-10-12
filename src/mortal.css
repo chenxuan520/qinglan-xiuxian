@@ -329,6 +329,131 @@
 .sect-market-map {
   background-size: auto, 600px;
 }
+.sect-market-auction-sign {
+  position: absolute;
+  z-index: 330;
+  transform: translate(-50%, -50%);
+  padding: 12px 22px;
+  border: 1px solid #d8c89480;
+  background: #153b33e8;
+  color: #e7d7a6;
+  text-align: center;
+  box-shadow: 0 4px 18px #091f2360;
+}
+.sect-market-auction-sign strong,
+.sect-market-auction-sign small {
+  display: block;
+}
+.sect-market-auction-sign strong {
+  font-size: 21px;
+  letter-spacing: 0.14em;
+}
+.sect-market-auction-sign small {
+  margin-top: 5px;
+  font-size: 12px;
+}
+.auction-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.auction-toolbar strong {
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+.auction-tabs {
+  margin-bottom: 20px;
+}
+.auction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.auction-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #c5d3aa40;
+  background: #153b3320;
+}
+.auction-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.auction-card h3 {
+  margin: 5px 0;
+}
+.auction-card p {
+  line-height: 1.7;
+}
+.auction-art {
+  display: inline-block;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  background-size: 400% 300%;
+}
+.auction-card label,
+.auction-seller label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.auction-card input,
+.auction-seller input,
+.auction-seller select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  color: #e7e8d6;
+  border: 1px solid #c5d3aa66;
+  background: #16372e;
+  font: inherit;
+}
+.auction-card button,
+.auction-seller > button {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.auction-seller {
+  max-width: 640px;
+  margin: 20px 0;
+}
+.auction-receipt {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid #c5d3aa40;
+}
+.auction-receipt > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.auction-receipt p {
+  margin: 6px 0;
+  line-height: 1.7;
+}
+.auction-result {
+  padding: 14px 16px;
+  border: 1px solid #d8c89480;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .auction-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .auction-card {
+    padding: 14px;
+  }
+}
 .sect-market-building {
   position: absolute;
   width: 195px;

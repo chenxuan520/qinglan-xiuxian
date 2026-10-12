@@ -12,6 +12,7 @@ import { moveInSectMarket, nearbyMarketCultivator } from './sect-market.ts';
 import { realmInfo, type SaveData } from './progress.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 import type { TownPoint } from './town.ts';
+import { AUCTION_SPOT } from './auction-data.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -43,10 +44,11 @@ export class SectMarketScene {
     public position: TownPoint,
     save: SaveData,
     private interact: (npc: MarketCultivator) => void,
+    private openAuction: () => void = () => {},
   ) {
     this.residents = marketCultivators(save.mortal.population!, save.mortal.sectMarket!);
     const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
-    host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_WIDTH}px;height:${MARKET_HEIGHT}px">${MARKET_BUILDINGS.map((b) => `<div class="sect-market-building ${b.school}" style="left:${b.x}px;top:${b.y}px;z-index:${b.y}"></div>`).join('')}<div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${npc.realm}<br>${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${this.residents.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="28" fill="#dbc17a"/>`).join('')}<circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
+    host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_WIDTH}px;height:${MARKET_HEIGHT}px">${MARKET_BUILDINGS.map((b) => `<div class="sect-market-building ${b.school}" style="left:${b.x}px;top:${b.y}px;z-index:${b.y}"></div>`).join('')}<div class="sect-market-auction-sign" style="left:${AUCTION_SPOT.x}px;top:${AUCTION_SPOT.y}px"><strong>拍卖行</strong><small>丹药 · 法宝</small></div><div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${npc.realm}<br>${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${this.residents.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="28" fill="#dbc17a"/>`).join('')}<rect x="${AUCTION_SPOT.x - 25}" y="${AUCTION_SPOT.y - 25}" width="50" height="50" fill="#f1db9a"/><circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.sect-market-map')!;
     this.player = host.querySelector('.town-player')!;
     this.observer = new ResizeObserver(() => {
@@ -132,6 +134,9 @@ export class SectMarketScene {
     const id = nearbyMarketCultivator(this.position);
     return this.residents.find((npc) => npc.id === id);
   }
+  get nearAuction() {
+    return Math.hypot(this.position.x - AUCTION_SPOT.x, this.position.y - AUCTION_SPOT.y) <= 145;
+  }
   update(now: number, enabled: boolean) {
     const dt = this.last ? (now - this.last) / 1000 : 0;
     this.last = now;
@@ -154,13 +159,18 @@ export class SectMarketScene {
         dt,
       );
     const near = this.nearbyNpc;
-    if (this.nearbyId !== (near?.id ?? '') || !this.host.dataset.initialized) {
-      this.nearbyId = near?.id ?? '';
+    const nearId = this.nearAuction ? 'auction' : (near?.id ?? '');
+    if (this.nearbyId !== nearId || !this.host.dataset.initialized) {
+      this.nearbyId = nearId;
       this.host.dataset.initialized = 'true';
       const button = document.querySelector<HTMLButtonElement>('[data-action="sect-market-talk"]');
       if (button) {
-        button.disabled = !near;
-        button.textContent = near ? `与${near.name}交谈` : '走近修士可交谈';
+        button.disabled = !nearId;
+        button.textContent = this.nearAuction
+          ? '进入拍卖行'
+          : near
+            ? `与${near.name}交谈`
+            : '走近可互动';
       }
       this.host
         .querySelectorAll<HTMLElement>('.sect-market-npc')
@@ -190,7 +200,9 @@ export class SectMarketScene {
     this.host.dataset.y = this.position.y.toFixed(1);
   }
   talk() {
-    if (this.enabled && this.nearbyNpc) this.interact(this.nearbyNpc);
+    if (!this.enabled) return;
+    if (this.nearAuction) this.openAuction();
+    else if (this.nearbyNpc) this.interact(this.nearbyNpc);
   }
   private clearPointer() {
     this.pointer = null;

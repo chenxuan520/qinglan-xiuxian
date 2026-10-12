@@ -1,6 +1,7 @@
 import { syncHumanStories } from './human-stories.ts';
 import { freshHometown, validHometown } from './hometown.ts';
 import { validSectMarket } from './sect-market-data.ts';
+import { validAuction } from './auction-data.ts';
 import {
   freshMedicine,
   validMedicine,
@@ -84,7 +85,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 13;
+export const SAVE_SCHEMA = 14;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -97,9 +98,18 @@ function initialStarter(
     path === 'dual' ? pairs.flat() : pairs.map((pair) => pair[path === 'demonic' ? 1 : 0]);
   return candidates[Math.floor(random() * candidates.length)];
 }
-function recordCollectionAchievement(save: SaveData) {
+export function recordCollectionAchievement(save: SaveData) {
   if (save.artifacts.length >= TREASURES.length)
     recordChronicle(save, '万宝归藏', '三十六件法宝尽入珍藏。', 'collection');
+}
+function grantRootArtifacts(save: SaveData, starter: string) {
+  const released = save.mortal.auction?.releasedArtifacts ?? [];
+  const granted = ROOT_STARTERS[treasure(starter).element].filter(
+    (id) => id === starter || !released.includes(id),
+  );
+  save.artifacts = [...new Set([...save.artifacts, ...granted])];
+  if (save.mortal.auction)
+    save.mortal.auction.releasedArtifacts = released.filter((id) => !save.artifacts.includes(id));
 }
 export function alignStarterWithPath(save: SaveData) {
   if (
@@ -111,7 +121,7 @@ export function alignStarterWithPath(save: SaveData) {
     save.rootElements.length ? save.rootElements : [treasure(save.starter).element],
     save.path,
   );
-  save.artifacts = [...new Set([...save.artifacts, ...ROOT_STARTERS[treasure(starter).element]])];
+  grantRootArtifacts(save, starter);
   save.artifactDrops = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
   save.starter = starter;
   recordCollectionAchievement(save);
@@ -266,6 +276,11 @@ export function readSave(
     if (s.mortal?.sectMarket !== undefined && !validSectMarket(s.mortal.sectMarket, base.age))
       delete s.mortal.sectMarket;
     if (
+      s.mortal?.auction !== undefined &&
+      !validAuction(s.mortal.auction, base.age, s.mortal.sectMarket)
+    )
+      delete s.mortal.auction;
+    if (
       s.mortal &&
       typeof s.mortal === 'object' &&
       !Array.isArray(s.mortal) &&
@@ -318,7 +333,16 @@ export function readSave(
       base.rootElements[0] ?? TREASURES.find((t) => t.id === s.starter)?.element ?? 'metal';
     const initialArtifacts =
       base.rootElements.length || s.artifacts === undefined ? ROOT_STARTERS[starterElement] : [];
-    base.artifacts = [...new Set([...initialArtifacts, ...legacy])];
+    base.artifacts = [
+      ...new Set([
+        ...initialArtifacts.filter((id) => !base.mortal.auction?.releasedArtifacts.includes(id)),
+        ...legacy,
+      ]),
+    ];
+    if (base.mortal.auction)
+      base.mortal.auction.releasedArtifacts = base.mortal.auction.releasedArtifacts.filter(
+        (id) => !base.artifacts.includes(id),
+      );
     base.artifactDrops = [...new Set(validIds(s.artifactDrops))].filter(
       (id) => !base.artifacts.includes(id),
     );
@@ -410,7 +434,7 @@ export function attuneSpiritRoot(
   const starter = initialStarter(elements, save.path, random);
   save.rootElements = [...elements];
   save.spiritRoot = root;
-  save.artifacts = [...new Set([...save.artifacts, ...ROOT_STARTERS[treasure(starter).element]])];
+  grantRootArtifacts(save, starter);
   save.artifactDrops = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
   save.starter = starter;
   recordCollectionAchievement(save);
@@ -709,6 +733,10 @@ export function dropArtifacts(save: SaveData, random: () => number) {
 export function claimArtifacts(save: SaveData) {
   const claimed = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
   save.artifacts.push(...claimed);
+  if (save.mortal.auction)
+    save.mortal.auction.releasedArtifacts = save.mortal.auction.releasedArtifacts.filter(
+      (id) => !claimed.includes(id),
+    );
   save.artifactDrops = [];
   if (claimed.length)
     recordChronicle(save, '妖王遗宝', `收藏${claimed.map((id) => treasure(id).name).join('、')}。`);

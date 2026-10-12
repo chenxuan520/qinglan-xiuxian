@@ -45,7 +45,9 @@ function harness(pending = false) {
   beginSectMarketVisit(save);
   const npc = marketCultivators(save.mortal.population, save.mortal.sectMarket!)[1];
   const offer = sectMarketOffer(save, npc.id)!;
-  const give = marketMedicinePool(save.mortal.sectMarket!, npc.id).find((m) => m.id !== offer.id)!;
+  const give = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, npc.id).find(
+    (m) => m.id !== offer.id,
+  )!;
   save.medicine.bag[give.id] = 4;
   const game = pending ? new Game(save, 0, 0, () => 0.5) : null;
   game?.pause();

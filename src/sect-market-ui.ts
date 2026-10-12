@@ -7,13 +7,13 @@ import { realmInfo, type SaveData } from './progress.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 
 export function sectMarketPage(save: SaveData, fullscreenButton: string) {
-  return `<main class="town-scene sect-market-scene" aria-label="宗门坊市游历"><div id="sect-market-view" class="town-view" tabindex="0" role="region" aria-label="宗门坊市，触屏拖动或方向键移动，走近修士交谈"></div><header class="town-scene-heading"><div class="town-hud"><h2>宗门坊市</h2><small>同道往来 · 坊间机缘</small><div id="town-status">${townStatus(save)}</div><small>现实 1 分钟 = 1 年</small></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="sect-market-exit">离开坊市</button></div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">WASD / 方向键移动</span><span class="touch-hint">按住空白处拖动行走</span><br>走近修士，<span class="keyboard-hint">按 E 或</span>点击交谈</p><button class="primary-button" data-action="sect-market-talk" disabled>走近修士可交谈</button></footer></main>`;
+  return `<main class="town-scene sect-market-scene" aria-label="宗门坊市游历"><div id="sect-market-view" class="town-view" tabindex="0" role="region" aria-label="宗门坊市，触屏拖动或方向键移动，走近修士交谈"></div><header class="town-scene-heading"><div class="town-hud"><h2>宗门坊市</h2><small>同道往来 · 坊间机缘</small><div id="town-status">${townStatus(save)}</div><small>现实 1 分钟 = 1 年</small></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="sect-market-exit">离开坊市</button></div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">WASD / 方向键移动</span><span class="touch-hint">按住空白处拖动行走</span><br>走近修士或中央拍卖行，<span class="keyboard-hint">按 E 或</span>点击互动</p><button class="primary-button" data-action="sect-market-talk" disabled>走近可互动</button></footer></main>`;
 }
 export function sectMarketTradeContent(save: SaveData, npc: MarketCultivator, selected?: string) {
   const state = save.mortal.sectMarket;
   const receive = sectMarketOffer(save, npc.id);
   if (!state || !receive) return '';
-  const choices = marketMedicinePool(state, npc.id).filter(
+  const choices = marketMedicinePool(save.mortal.population!, state, npc.id).filter(
     (m) => m.id !== receive.id && !!m.years === !!receive.years,
   );
   const give =

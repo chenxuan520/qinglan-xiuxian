@@ -137,6 +137,15 @@ import { FrameRate } from './frame-rate.ts';
 import { runLootContent } from './run-loot-ui.ts';
 import { TownScene } from './town-scene.ts';
 import { SectMarketScene } from './sect-market-scene.ts';
+import {
+  prepareAuction,
+  auctionBuyReason,
+  auctionSellReason,
+  buyAuction,
+  sellAuction,
+} from './auction.ts';
+import { auctionContent, auctionResult, type AuctionView } from './auction-ui.ts';
+import type { AuctionKind, AuctionItem } from './auction-data.ts';
 import { MARKET_START, isMarketCultivatorId, type MarketCultivator } from './sect-market-data.ts';
 import {
   sectMarketOpen,
@@ -304,6 +313,8 @@ let inMarket = false;
 let marketScene: SectMarketScene | null = null;
 let marketPosition = { ...MARKET_START };
 let marketNpc: MarketCultivator | null = null;
+let auctionView: AuctionView = 'buy';
+let auctionKind: AuctionKind = 'medicine';
 const shownHumanLetters = new Set<string>();
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
@@ -677,7 +688,13 @@ function mountTownScene() {
   if (inMarket) {
     const marketHost = document.getElementById('sect-market-view');
     if (marketHost)
-      marketScene = new SectMarketScene(marketHost, { ...marketPosition }, save, showMarketEvent);
+      marketScene = new SectMarketScene(
+        marketHost,
+        { ...marketPosition },
+        save,
+        showMarketEvent,
+        showAuction,
+      );
     return;
   }
   const host = document.getElementById('town-view');
@@ -858,6 +875,35 @@ function refreshMarketTrade(selected?: string) {
   if (!marketNpc || panel !== 'sect-market-event') return;
   const host = modal.querySelector<HTMLElement>('#sect-market-trade');
   if (host) host.innerHTML = sectMarketTradeContent(save, marketNpc, selected);
+}
+function showAuction() {
+  if (!inMarket || !marketScene?.nearAuction) return;
+  const next = structuredClone(save);
+  if (!prepareAuction(next)) return;
+  try {
+    writeSave(next, pendingRun);
+  } catch {
+    if (!saveLock) toast('暂时无法保存拍卖进度，请重试');
+    return;
+  }
+  Object.assign(save, next);
+  marketNpc = null;
+  panel = 'sect-auction';
+  auctionView = 'buy';
+  auctionKind = 'medicine';
+  panelFrame(
+    '坊间竞宝',
+    '宗门坊市 · 拍卖行',
+    `<div id="auction-content">${auctionContent(save, auctionView, !!pendingRun)}</div>`,
+  );
+}
+function refreshAuction(selected = '') {
+  const host = modal.querySelector<HTMLElement>('#auction-content');
+  if (!host || panel !== 'sect-auction') return;
+  const section = modal.querySelector<HTMLElement>('.panel');
+  const scroll = section?.scrollTop ?? 0;
+  host.innerHTML = auctionContent(save, auctionView, !!pendingRun, auctionKind, selected);
+  if (section) section.scrollTop = scroll;
 }
 function showTeaStory() {
   panel = 'tea-story';
@@ -2375,6 +2421,84 @@ function handleAction(action: string, id?: string) {
     persist();
     return;
   }
+  if (
+    action.startsWith('auction-') &&
+    inMortalWorld &&
+    inMarket &&
+    !game &&
+    panel === 'sect-auction' &&
+    marketScene?.nearAuction
+  ) {
+    if (action === 'auction-view' && (id === 'buy' || id === 'sell' || id === 'history')) {
+      auctionView = id;
+      refreshAuction();
+      return;
+    }
+    const button = modal.querySelector<HTMLButtonElement>(
+      action === 'auction-buy'
+        ? `[data-action="auction-buy"][data-id="${Number(id)}"]`
+        : '[data-action="auction-sell"]',
+    );
+    if (!button || button.disabled) return;
+    const visit = Number(button.dataset.visit);
+    const next = structuredClone(save);
+    let result;
+    if (action === 'auction-buy') {
+      const index = Number(id);
+      const reason = auctionBuyReason(save, index, visit, !!pendingRun);
+      if (reason) {
+        toast(reason);
+        return;
+      }
+      const budget = Number(
+        modal.querySelector<HTMLInputElement>(`#auction-budget-${index}`)?.value,
+      );
+      result = buyAuction(next, index, budget, visit, !!pendingRun);
+      if (!result) {
+        toast('请输入扣除到期供奉后可负担、且足够起拍的整数预算（含手续费）');
+        return;
+      }
+    } else if (action === 'auction-sell') {
+      const selected = modal.querySelector<HTMLSelectElement>('#auction-item')?.value ?? '';
+      const item: AuctionItem = {
+        kind: auctionKind,
+        id: selected,
+        quantity:
+          auctionKind === 'artifact'
+            ? 1
+            : Number(modal.querySelector<HTMLInputElement>('#auction-quantity')?.value),
+        forgeLevel: auctionKind === 'artifact' ? save.forge[selected] || 0 : 0,
+      };
+      const reason = auctionSellReason(save, item, visit, !!pendingRun);
+      if (reason) {
+        toast(reason);
+        return;
+      }
+      const reserve = Number(modal.querySelector<HTMLInputElement>('#auction-reserve')?.value);
+      result = sellAuction(next, item, reserve, visit, !!pendingRun);
+      if (!result) {
+        toast('请输入有效的整数保留价，灵石余额不能超出上限');
+        return;
+      }
+    } else return;
+    try {
+      writeSave(next, pendingRun);
+    } catch {
+      if (!saveLock) toast('拍卖未完成：浏览器暂时无法保存，请重试');
+      return;
+    }
+    Object.assign(save, next);
+    refreshAuction(result.id);
+    const status = document.getElementById('town-status');
+    if (status) status.innerHTML = townStatus(save);
+    const note = modal.querySelector<HTMLElement>('#auction-result');
+    if (note) {
+      note.hidden = false;
+      note.textContent = auctionResult(save, result);
+    }
+    toast(auctionResult(save, result));
+    return;
+  }
   if (action.startsWith('sect-market-') && inMortalWorld && !game) {
     if (
       action === 'sect-market-enter' &&
@@ -3216,6 +3340,17 @@ document.addEventListener('input', (event) => {
 });
 document.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (
+    (input.id === 'auction-kind' || input.id === 'auction-item') &&
+    panel === 'sect-auction' &&
+    inMarket
+  ) {
+    if (input.id === 'auction-kind')
+      auctionKind = input.value === 'artifact' ? 'artifact' : 'medicine';
+    refreshAuction(input.id === 'auction-item' ? input.value : '');
+    modal.querySelector<HTMLElement>(`#${input.id}`)?.focus({ preventScroll: true });
+    return;
+  }
   if (input.id === 'sect-market-give' && panel === 'sect-market-event' && inMarket) {
     const scroll = modal.querySelector<HTMLElement>('.panel')?.scrollTop ?? 0;
     refreshMarketTrade(input.value);

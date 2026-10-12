@@ -6,6 +6,7 @@ import { validTownImmortal, type TownImmortal } from './town-immortal.ts';
 import { validHumanStories, type HumanStories } from './human-stories.ts';
 import { validHometown, type HometownState } from './hometown.ts';
 import { validSectMarket, type SectMarketState } from './sect-market-data.ts';
+import { validAuction, type AuctionState } from './auction-data.ts';
 
 export const SECTS = PASSIVES.map((manual, index) => ({
   id: manual.id,
@@ -101,6 +102,7 @@ export type TownJob = keyof typeof TOWN_JOBS;
 export interface MortalState {
   years: number;
   sectMarket?: SectMarketState;
+  auction?: AuctionState;
   hometown?: HometownState;
   population?: TownPopulation;
   scenery?: TownScenery;
@@ -128,6 +130,7 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
   return (
     number(s.years) &&
     (s.sectMarket === undefined || (validSectMarket(s.sectMarket, age) && !!s.population)) &&
+    (s.auction === undefined || validAuction(s.auction, age, s.sectMarket)) &&
     (s.hometown === undefined || validHometown(s.hometown, age)) &&
     (s.immortal == null || validTownImmortal(s.immortal, age)) &&
     (s.population === undefined || validTownPopulation(s.population)) &&

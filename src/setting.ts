@@ -10,7 +10,14 @@ export const NPC_SETTINGS = {
 
 export const TOWN_SETTINGS = { sceneryChangeYears: 100 } as const;
 
-export const SECT_MARKET_SETTINGS = { exchangeCost: 2 } as const;
+export const SECT_MARKET_SETTINGS = {
+  exchangeCost: 2,
+  // 炼气至大乘的基础比例：28%、22%、18%、12%、8%、6%、4%、2%；真仙不来坊市。
+  realmWeights: [28, 22, 18, 12, 8, 6, 4, 2],
+  // 比玩家低三阶及以上的来访者仅保留普通权重的 1/20，后期不会满街低阶丹药。
+  nearbyRealmDistance: 2,
+  nearbyRealmWeight: 20,
+} as const;
 
 export const NPC_AI_SETTINGS = {
   // 可用构建环境变量 VITE_NPC_AI_URL 覆盖；地址不要带 /chat。
@@ -70,3 +77,5 @@ export const TELEMETRY_SETTINGS = {
 } as const;
 
 // 域名绑定、来源白名单和边缘限流绑定属于部署设置，见 workers/npc-ai/wrangler.jsonc。
+
+export const AUCTION_SETTINGS = { years: 0.5, buyerFee: 5, sellerFee: 10 };

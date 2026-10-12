@@ -82,7 +82,7 @@ export function townPage(save: SaveData, fullscreenButton: string) {
 }
 export function sectMarketEntrance(save: SaveData) {
   const open = sectMarketOpen(save);
-  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，看看能否互通有无。</p><small>${open ? '无需入宗 · 闲逛沿用人间计龄，交谈与互换时暂停' : '首次历练结束后开放，成败皆可'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '先去历练一程'}</button></section>`;
+  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，互换余丹，或到中央拍卖行竞宝、委托出售。</p><small>${open ? '无需入宗 · 闲逛沿用人间计龄，交谈与互换时暂停' : '首次历练结束后开放，成败皆可'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '先去历练一程'}</button></section>`;
 }
 
 export function mortalPage(

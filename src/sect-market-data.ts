@@ -1,6 +1,7 @@
 import { MEDICINES } from './medicine-data.ts';
 import { REALMS, type CultivationPath } from './data.ts';
 import type { TownPopulation } from './town-population.ts';
+import { SECT_MARKET_SETTINGS } from './setting.ts';
 
 export const MARKET_WIDTH = 1600;
 export const MARKET_HEIGHT = 1100;
@@ -14,7 +15,6 @@ export const MARKET_CULTIVATORS = [
     id: 'market-alchemist',
     role: '行脚丹修',
     path: 'dual' as CultivationPath,
-    realmOffset: 1,
     x: 580,
     y: 550,
     greeting: '这一炉药香还没散。道友若有余丹，我们可以各取所需；只想歇脚聊聊，也欢迎。',
@@ -23,7 +23,6 @@ export const MARKET_CULTIVATORS = [
     id: 'market-disciple',
     role: '游历剑修',
     path: 'orthodox' as CultivationPath,
-    realmOffset: 0,
     x: 1010,
     y: 565,
     greeting: '宗门之外，山河自有道理。我刚从山中归来，带了些丹药，也听到几桩修行见闻。',
@@ -32,7 +31,6 @@ export const MARKET_CULTIVATORS = [
     id: 'market-wanderer',
     role: '魔道散修',
     path: 'demonic' as CultivationPath,
-    realmOffset: -1,
     x: 810,
     y: 890,
     greeting: '出身不同，求道的路却都不好走。这里只论互通有无，不问你拜在哪一门。',
@@ -81,7 +79,7 @@ export function marketCultivators(
   const names = ['清和', '行舟', '望舒', '知秋', '怀瑾', '听澜', '远山', '云归'];
   return MARKET_CULTIVATORS.map((npc, index) => {
     const offset = (population.seed + Math.imul(generation + 1, 2654435761)) >>> 0;
-    const realmIndex = marketCultivatorRealm(visit, npc.id);
+    const realmIndex = marketCultivatorRealm(population, visit, npc.id);
     return {
       ...npc,
       generation,
@@ -93,8 +91,12 @@ export function marketCultivators(
     };
   });
 }
-export function marketMedicinePool(state: SectMarketState, id: MarketCultivatorId) {
-  const realm = marketCultivatorRealm(state, id);
+export function marketMedicinePool(
+  population: TownPopulation,
+  state: SectMarketState,
+  id: MarketCultivatorId,
+) {
+  const realm = marketCultivatorRealm(population, state, id);
   const tier = realm === 0 ? '凡品' : realm < 3 ? '灵品' : '珍品';
   const stage = realm === 0 ? 0 : Math.max(1, Math.min(6, realm - 1));
   return MEDICINES.filter(
@@ -102,17 +104,39 @@ export function marketMedicinePool(state: SectMarketState, id: MarketCultivatorI
   );
 }
 export function marketCultivatorRealm(
-  visit: Pick<SectMarketState, 'realmIndex'>,
+  population: TownPopulation,
+  visit: Pick<SectMarketState, 'visit' | 'realmIndex'>,
   id: MarketCultivatorId,
 ) {
-  const offset = MARKET_CULTIVATORS.find((npc) => npc.id === id)!.realmOffset;
-  return Math.max(0, Math.min(REALMS.length - 1, visit.realmIndex + offset));
+  // 每位来访者独立抽取；人口种子与访次使界面、携药、读档及 Worker 身份一致。
+  // 远低于玩家的境界降权，但不固定为玩家±一阶，不在交谈或重绘时重抽。
+  let hash = population.seed;
+  for (const char of `sect-market:${id}:${visit.visit}`)
+    hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x7feb352d);
+  hash = Math.imul(hash ^ (hash >>> 15), 0x846ca68b);
+  hash ^= hash >>> 16;
+  const commonFloor = Math.max(
+    0,
+    Math.min(7, visit.realmIndex) - SECT_MARKET_SETTINGS.nearbyRealmDistance,
+  );
+  const weights = SECT_MARKET_SETTINGS.realmWeights.map((weight, realm) =>
+    realm < commonFloor ? weight : weight * SECT_MARKET_SETTINGS.nearbyRealmWeight,
+  );
+  let roll = (hash >>> 0) % weights.reduce<number>((sum, weight) => sum + weight, 0);
+  for (let realm = 0; realm < weights.length; realm++) {
+    roll -= weights[realm];
+    if (roll < 0) return realm;
+  }
+  return weights.length - 1;
 }
 export function marketRelation(npcRealm: number, playerRealm: number) {
   return npcRealm > playerRealm ? '前辈' : npcRealm === playerRealm ? '道友' : '蝼蚁';
 }
 export function marketLocalReply(npc: MarketCultivator, message: string, playerRealm: number) {
-  if (/丹|药|换|买|卖/.test(message))
+  if (/拍卖|竞拍|买|卖/.test(message))
+    return '坊市中央有拍卖行，可竞拍丹药和法宝，也可委托出售余物。每场花半年，报价、手续费和成交以拍卖行按钮为准；闲聊不会扣钱或换物。';
+  if (/丹|药|换/.test(message))
     return '互通有无，要先看看你我各自带了什么。下方列着我愿换出的丹药，两份同品级、同类余丹可换一份，这批只换一次。';
   if (/境界|修为|前辈|道友|蝼蚁/.test(message))
     return `我如今修至${npc.realm}。${npc.realmIndex > playerRealm ? '小友莫急，先走稳眼前这一程。' : npc.realmIndex === playerRealm ? '你我同一大境界，各有所得，不妨互通见闻。' : '前辈走得更远，我还得慢慢磨砺。'}`;
