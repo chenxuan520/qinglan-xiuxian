@@ -25,9 +25,11 @@
 
 ## 本地中文字体 · 离线缓存（2026-10-05）
 
-界面继续使用 Noto Serif SC，改为本站提供的变量字体用字子集，不再依赖 Google Fonts 在线请求。`public/assets/fonts/noto-serif-sc-2275c0dc339f.woff2` 约 590 KiB，保留 200–900 字重，使用 `font-display: swap`；包含源码中的界面用字，未包含的动态 AI 用字沿用系统宋体回退。字体许可为 SIL Open Font License 1.1，完整授权随资源保存在 `public/assets/fonts/OFL.txt`。
+界面使用本站 Noto Serif SC 变量字体，保留 200–900 字重和原有排布，不依赖 Google Fonts 在线请求。界面用字包约 630 KiB；动态对白首次需要时才加载约 2 MiB 的常用字包，其他生僻字按码点区间加载。所有分包合计约 12 MiB，覆盖官方源字体支持的 30,928 个码点，包括汉字扩展 A、兼容字与已收录的补充区汉字；不会只因不在源码里而把 AI 用字换成系统字体。字体许可为 SIL Open Font License 1.1，完整授权保存在 `public/assets/fonts/OFL.txt`。
 
-原始字体来源：[Google Fonts 的 Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，原始 24 MB TTF 不入仓库。扩充界面用字时，在仓库外取得官方 `NotoSerifSC[wght].ttf`，安装 `fonttools` 与 `brotli` 后运行 `python3 scripts/subset-font.py /tmp/NotoSerifSC.ttf`；脚本按 `src` 与首页用字生成带内容 hash 的 WOFF2 并更新 CSS。字体预处理不参与普通 npm 构建，不增加玩家需要安装的依赖。
+同一家族的分包实际 cmap 不交叉，`unicode-range` 与 cmap 的交集决定有效覆盖；界面包最后声明，首页只请求界面包。留影按实际 AI 评语及卡片内容，在不可见 DOM 中触发布局与所需字体加载，再绘制 Canvas；不用宽范围的 `document.fonts.load` 批量拉取无关分包。字体失败、超时或取消会清理临时节点，失败仍可重试。设置里的「缓存所有离线资源」包括全部字库，缓存完成后本地对白和留影可离线使用；新 AI 内容仍需联网。
+
+原始字体来源：[Google Fonts 的 Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，原始 24 MB TTF 不入仓库。扩充界面用字时，在仓库外取得官方 `NotoSerifSC[wght].ttf`，安装 `fonttools` 与 `brotli` 后运行 `python3 scripts/subset-font.py /tmp/NotoSerifSC.ttf`，再格式化 `src/style.css`。脚本生成带内容 hash 的 WOFF2、校验所有实际 cmap 与源字体完全覆盖且不重复，并更新 CSS、删除旧分包。字体预处理不参与普通 npm 构建，不增加玩家需要安装的依赖。
 
 ## 微信赞赏码 · 关于面板与轮回确认（2026-10-04）
 

@@ -2033,7 +2033,10 @@ function resetLifetime(
       '渡口的修士已证长生，离界而去。十五岁的少年循着他的指引，接续问道之路。',
       'immortal-successor',
     );
-  if (revisitHometown === 'full') {
+  if (successor && revisitHometown === true) {
+    save.prologueSeen = true;
+    save.hometownSeen = true;
+  } else if (revisitHometown === 'full') {
     save.prologueSeen = false;
     save.hometownSeen = false;
   } else if (!revisitHometown) {
@@ -2240,14 +2243,14 @@ function handleAction(action: string, id?: string) {
       panelFrame(
         '临行留缘',
         '真仙离界 · 少年接续',
-        `<p class="pause-description">仙门已开，你将离开此界，继续追寻大道。青岚渡口的少年却才刚要启程，临行可赠他一物，也可只留一句指引。</p>${inheritanceContent(save)}<p class="panel-note">确认后将从这名十五岁青年开始新的修行。除所选赠物外，原修士的境界、物资、根基与履历不会带入，当前进度将替换为青年的旅程；确认前可返回终章留存此世。</p><label class="reincarnate-opening"><input id="reincarnate-full-opening" type="checkbox"><span>从少年离乡看起<small>阅读开场，再走故居与渡口；不勾选则可径直启程。</small></span></label><figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">留缘离界</button></div>`,
+        `<p class="pause-description">仙门已开，你将离开此界，继续追寻大道。青岚渡口的少年却才刚要启程，临行可赠他一物，也可只留一句指引。</p>${inheritanceContent(save)}<p class="panel-note">确认后将从这名十五岁青年开始新的修行。除所选赠物外，原修士的境界、物资、根基与履历不会带入，当前进度将替换为青年的旅程；确认前可返回终章留存此世。</p><figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">留缘离界</button></div>`,
       );
     } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
       ui.inert = false;
       trackReincarnation('epilogue');
       resetLifetime(
         '修士离界，少年启程。一段指路的话，一场未尽的仙缘。',
-        modal.querySelector<HTMLInputElement>('#reincarnate-full-opening')?.checked ? 'full' : true,
+        true,
         resolveInheritance(
           save,
           modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
@@ -2354,6 +2357,15 @@ function handleAction(action: string, id?: string) {
     !tribulationDue(save)
   ) {
     if (action === 'hometown-walk' && panel === 'hometown-choice') {
+      const next = structuredClone(save);
+      next.hometownSeen = false;
+      try {
+        writeSave(next, null);
+      } catch {
+        if (!saveLock) toast('暂时无法保存启程选择，请重试');
+        return;
+      }
+      Object.assign(save, next);
       void mobileDisplay.enter();
       renderDeparture();
     } else if (action === 'hometown-skip' && panel === 'hometown-choice') finishDeparture();

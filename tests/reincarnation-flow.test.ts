@@ -818,8 +818,8 @@ test('真仙主动重启进入同一离界终章：取消保留修行，赠魔�
   assert.equal(isImmortalSuccessor(imported), true);
 });
 
-test('离界赠一枚丹药：青年故乡、完整序章和刷新均保留，重抽不增加库存', () => {
-  for (const route of ['skip', 'walk', 'full'] as const) {
+test('离界赠一枚丹药：仅在少年将行选择故乡路线，刷新和重抽均不增加库存', () => {
+  for (const route of ['skip', 'walk'] as const) {
     const save = previousLife();
     save.cultivation = 1e9;
     save.completed = [data.FINAL_TRIAL_STAGE];
@@ -827,16 +827,13 @@ test('离界赠一枚丹药：青年故乡、完整序章和刷新均保留，�
     assert.equal(enterImmortalGate(save), true);
     context.renderLobby();
     context.handleAction('epilogue-reincarnate');
-    context.openingChoice.checked = route === 'full';
+    assert.doesNotMatch(context.modal.innerHTML, /reincarnate-full-opening|从少年离乡看起/);
     context.inheritanceChoice.value = 'medicine:huanglong';
     context.handleAction('confirm-reincarnate');
     let restored = harness(parseSave(context.writes.at(-1)));
-    if (route === 'full') {
-      restored.renderPrologue();
-      restored.handleAction('prologue-enter');
-    } else restored.renderLobby();
-    if (route === 'full') restored.finishDeparture();
-    else if (route === 'walk') {
+    restored.renderLobby();
+    assert.equal(restored.titles.at(-1), '少年将行');
+    if (route === 'walk') {
       restored.handleAction('hometown-walk');
       restored.finishDeparture();
     } else restored.handleAction('hometown-skip');
@@ -909,5 +906,56 @@ test('承缘少年普通主动轮回、寿尽与弃劫均重启人生，不携�
     assert.equal(isImmortalSuccessor(save), false);
     assert.equal(save.birthInheritance, null);
     assert.doesNotMatch(context.modal.innerHTML, /少年承缘|前人所赠|重看命盘/);
+  }
+});
+
+test('终章未看过开场的存档也只在少年将行选择一次，旧勾选不能另开一条路线', () => {
+  const save = previousLife();
+  save.cultivation = 1e9;
+  save.completed = [data.FINAL_TRIAL_STAGE];
+  enterImmortalGate(save);
+  save.prologueSeen = false;
+  save.hometownSeen = false;
+  const context = harness(save);
+  context.renderLobby();
+  context.handleAction('epilogue-reincarnate');
+  assert.doesNotMatch(context.modal.innerHTML, /reincarnate-full-opening|从少年离乡看起/);
+  context.openingChoice.checked = true;
+  context.handleAction('confirm-reincarnate');
+  assert.equal(context.panel, 'hometown-choice');
+  assert.equal(context.titles.at(-1), '少年将行');
+  assert.equal(save.prologueSeen, true);
+  assert.equal(save.hometownSeen, true);
+  const restored = harness(parseSave(context.writes.at(-1)));
+  restored.renderLobby();
+  assert.equal(restored.panel, 'hometown-choice');
+  restored.handleAction('hometown-walk');
+  assert.equal(restored.panel, 'hometown-loading');
+  restored.finishDeparture();
+  assertNewReveal(restored);
+});
+
+test('少年已选故乡后，中途刷新和导入只恢复告别，不再次选择路线', () => {
+  const save = previousLife();
+  save.cultivation = 1e9;
+  save.completed = [data.FINAL_TRIAL_STAGE];
+  enterImmortalGate(save);
+  const context = harness(save);
+  context.renderLobby();
+  context.handleAction('epilogue-reincarnate');
+  context.handleAction('confirm-reincarnate');
+  context.handleAction('hometown-walk');
+  assert.equal(context.save.hometownSeen, false);
+  assert.equal(context.save.mortal.hometown?.stage, 'farewell');
+  for (const save of [
+    parseSave(context.writes.at(-1)),
+    importSave(exportSave(context.save, null)).save,
+  ]) {
+    const restored = harness(save);
+    restored.renderLobby();
+    assert.equal(restored.panel, 'hometown-loading');
+    assert.ok(!restored.routes.includes('hometown-choice'));
+    restored.finishDeparture();
+    assertNewReveal(restored);
   }
 });
