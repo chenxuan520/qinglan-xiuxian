@@ -641,7 +641,7 @@ export class Renderer {
       c.restore();
     }
     for (const e of game.enemies) {
-      if (e.dead || !game.encounterVersion || !ENEMY_TACTICS[e.type].boundSummons) continue;
+      if (e.dead || !ENEMY_TACTICS[e.type].boundSummons) continue;
       c.save();
       c.strokeStyle = '#cbb0e978';
       c.setLineDash([5, 8]);

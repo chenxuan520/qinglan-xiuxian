@@ -31,61 +31,36 @@ test('十种五行本命符合路线，各路线配套功法不重复，水魔�
   }
 });
 
-test('旧木土本命、收藏及炼器保留，不用新默认本命覆盖玩家选择', () => {
-  for (const [id, element, path] of [
-    ['orbit', 'wood', 'orthodox'],
-    ['poison', 'wood', 'demonic'],
-    ['vortex', 'earth', 'demonic'],
+test('芭蕉扇和缚妖索的待觉醒选项、自动选技均使用当前配方', () => {
+  for (const [id, path, newPassive] of [
+    ['fan', 'orthodox', 'crit'],
+    ['chain', 'demonic', 'abyss'],
   ] as const) {
-    const save = freshSave('heaven', [element], path);
-    save.schema = 9;
-    save.starter = id;
-    save.artifacts = ['sword', 'nail', id];
-    save.forge[id] = 7;
-    const restored = parseSave(JSON.stringify(save));
-    assert.equal(restored.starter, id);
-    assert.equal(restored.forge[id], 7);
-    assert.ok(restored.artifacts.includes(id));
-    assert.equal(new Game(restored, 0, 0).weapons[0].id, id);
+    const save = freshSave('heaven', ['wood'], path);
+    save.cultivation = 1e9;
+    save.unlocked = 6;
+    const g = new Game(save, 0, 0);
+    g.weapons = [{ id, level: 6, evolved: false, timer: 0 }];
+    g.passives = { [newPassive]: 5 };
+    g.state = 'upgrade';
+    g.choices = [
+      { type: 'evolve', id, level: 7 },
+      { type: 'weapon', id: 'sword', level: 1 },
+    ];
+    const restored = Game.restore(save, structuredClone(g.snapshot()))!;
+    assert.ok(restored);
+    assert.deepEqual(restored.evolutionRequirements(id), [newPassive]);
+    assert.match(choiceCard(restored, save, restored.choices[0], 0), /仙器觉醒/);
+    assert.equal(autoplayChoice(restored)!.index, 0);
+    const tribulation = Game.createTribulation(save, restored);
+    assert.deepEqual(tribulation.evolutionRequirements(id), [newPassive]);
+    assert.equal(restored.choose(0), true);
+    assert.equal(restored.weapons[0].evolved, true);
+    assert.equal(Game.restore(save, restored.snapshot())!.weapons[0].evolved, true);
   }
 });
 
-test('旧芭蕉扇和缚妖索的待觉醒选项、自动选技、天劫均沿用原配方', () => {
-  for (const [id, path, oldPassive, newPassive] of [
-    ['fan', 'orthodox', 'haste', 'crit'],
-    ['chain', 'demonic', 'devour', 'abyss'],
-  ] as const) {
-    for (const version of [0, 1]) {
-      const save = freshSave('heaven', ['wood'], path);
-      save.cultivation = 1e9;
-      save.unlocked = 6;
-      const g = new Game(save, 0, 0);
-      g.artifactVersion = version;
-      g.weapons = [{ id, level: 6, evolved: false, timer: 0 }];
-      g.passives = { [oldPassive]: 5 };
-      g.state = 'upgrade';
-      g.choices = [
-        { type: 'evolve', id, level: 7 },
-        { type: 'weapon', id: 'sword', level: 1 },
-      ];
-      const restored = Game.restore(save, structuredClone(g.snapshot()))!;
-      assert.ok(restored);
-      assert.deepEqual(restored.evolutionRequirements(id), [oldPassive]);
-      assert.match(choiceCard(restored, save, restored.choices[0], 0), /仙器觉醒/);
-      assert.equal(autoplayChoice(restored)!.index, 0);
-      const tribulation = Game.createTribulation(save, restored);
-      assert.equal(tribulation.artifactVersion, version);
-      assert.deepEqual(tribulation.evolutionRequirements(id), [oldPassive]);
-      assert.equal(restored.choose(0), true);
-      assert.equal(restored.weapons[0].evolved, true);
-      assert.equal(Game.restore(save, restored.snapshot())!.weapons[0].evolved, true);
-    }
-    const current = new Game(freshSave('heaven', ['wood'], path), 0, 0);
-    assert.deepEqual(current.evolutionRequirements(id), [newPassive]);
-  }
-});
-
-test('青莲灯与七宝塔低重补强单独乘算、逐重增伤，旧局及魔道原曲线保留', () => {
+test('青莲灯与七宝塔低重补强单独乘算、逐重增伤，其余法宝原曲线保留', () => {
   for (const id of [
     'orbit',
     'pagoda',
@@ -107,17 +82,10 @@ test('青莲灯与七宝塔低重补强单独乘算、逐重增伤，旧局及�
       assert.ok(Math.abs(actual / baseline - weaponDamageMultiplier(id, level)) < 1e-10);
       assert.ok(actual > previous);
       previous = actual;
-      for (const version of [0, 1]) {
-        assert.equal(weaponDamageMultiplier(id, level, version), weaponLevelDamage(level));
-      }
       if (!['orbit', 'pagoda'].includes(id)) {
         assert.equal(weaponDamageMultiplier(id, level), weaponLevelDamage(level));
       }
     }
-    g.artifactVersion = 1;
-    const oldAwakened = g.weaponHitDamage({ id, level: 6, evolved: true, timer: 0 });
-    g.artifactVersion = 2;
-    assert.equal(g.weaponHitDamage({ id, level: 6, evolved: true, timer: 0 }), oldAwakened);
   }
 });
 
@@ -131,8 +99,6 @@ test('洞府一重预览与升级卡使用实际新旧倍率，三升四不会�
     assert.equal(spiritPower(save).weaponDamage, g.weaponHitDamage(g.weapons[0]));
     assert.match(choiceCard(g, save, { type: 'weapon', id, level: 2 }, 0), /×1.20 → ×1.58/);
     assert.match(choiceCard(g, save, { type: 'weapon', id, level: 4 }, 0), /×1.80 → ×1.96/);
-    g.artifactVersion = 1;
-    assert.match(choiceCard(g, save, { type: 'weapon', id, level: 2 }, 0), /×1.00 → ×1.32/);
   }
 });
 

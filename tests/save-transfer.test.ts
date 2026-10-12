@@ -189,7 +189,7 @@ test('导入保存的战斗、升级与待复活对局，修为不重复领取�
     g.kills = 200;
     g.level = 20;
     g.damageBySource.lightning = g.damageDealt = 12345;
-    g.revivesUsed = 3;
+    g.revivesUsed = 1;
     g.state = state;
     if (state === 'lost') g.player.hp = 0;
     if (state === 'upgrade') g.choices = g.makeChoices();
@@ -202,7 +202,7 @@ test('导入保存的战斗、升级与待复活对局，修为不重复领取�
     assert.equal(restored.run!.state, state === 'playing' ? 'paused' : state);
     assert.deepEqual(restored.run!.damageBySource, g.damageBySource);
     assert.deepEqual(restored.run!.rootElements, ['fire']);
-    assert.equal(restored.run!.revivesUsed, 3);
+    assert.equal(restored.run!.revivesUsed, 1);
     assert.equal(
       importSave(exportSave(restored.save, restored.run)).save.cultivation,
       save.cultivation,
@@ -210,7 +210,7 @@ test('导入保存的战斗、升级与待复活对局，修为不重复领取�
     assert.equal(JSON.stringify(save), before);
     const damaged = JSON.parse(file);
     damaged.save.activeRun.weapons[0].id = 'bad';
-    assert.throws(() => importSave(JSON.stringify(damaged)), /历练数据已损坏/);
+    assert.throws(() => importSave(JSON.stringify(damaged)), /历练数据无法识别/);
   }
 });
 

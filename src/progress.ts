@@ -269,7 +269,9 @@ export function readSave(
     }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return { save: base, status: 'unreadable' };
+    // 只接受当前版本档；旧版本存档留底后重新开局，更高版本只读展示。
     newer = Number.isSafeInteger(s.schema) && s.schema > SAVE_SCHEMA;
+    if (s.schema !== SAVE_SCHEMA && !newer) return { save: base, status: 'unreadable' };
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
     // 旧档本世不补父母；损坏的故乡字段不连带丢弃其余人间进度。
@@ -326,29 +328,18 @@ export function readSave(
     for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], MAX_FORGE_LEVEL);
     const validIds = (ids: unknown): string[] =>
       Array.isArray(ids) ? ids.filter((id) => TREASURES.some((t) => t.id === id)) : [];
-    // 旧档保留已经投入资源的法宝和本命，未投入的法宝开始收集。
-    const legacy =
-      s.artifacts === undefined
-        ? [
-            ...TREASURES.filter((t) => base.forge[t.id] > 0).map((t) => t.id),
-            ...validIds([s.starter]),
-          ]
-        : validIds(s.artifacts);
-    // 不合入兜底新档的金系收藏；已有收藏的无灵根换本命后也不额外赠宝。
-    const starterElement =
-      base.rootElements[0] ?? TREASURES.find((t) => t.id === s.starter)?.element ?? 'metal';
-    const initialArtifacts =
-      base.rootElements.length || s.artifacts === undefined ? ROOT_STARTERS[starterElement] : [];
+    // 无灵根不赠送入门法宝；有灵根时确保首位五行入门法宝在收藏中，拍卖放出的除外。
+    const released = base.mortal.auction?.releasedArtifacts ?? [];
     base.artifacts = [
       ...new Set([
-        ...initialArtifacts.filter((id) => !base.mortal.auction?.releasedArtifacts.includes(id)),
-        ...legacy,
+        ...(base.rootElements.length
+          ? ROOT_STARTERS[base.rootElements[0]].filter((id) => !released.includes(id))
+          : []),
+        ...validIds(s.artifacts),
       ]),
     ];
     if (base.mortal.auction)
-      base.mortal.auction.releasedArtifacts = base.mortal.auction.releasedArtifacts.filter(
-        (id) => !base.artifacts.includes(id),
-      );
+      base.mortal.auction.releasedArtifacts = released.filter((id) => !base.artifacts.includes(id));
     base.artifactDrops = [...new Set(validIds(s.artifactDrops))].filter(
       (id) => !base.artifacts.includes(id),
     );
@@ -361,21 +352,7 @@ export function readSave(
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
     const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);
     if (sect) base.path = sect.school;
-    const migrateEarthStarter =
-      (s.schema ?? 0) < 10 && base.path === 'demonic' && base.starter === 'meteor';
-    if (migrateEarthStarter) {
-      base.starter = 'vortex';
-      base.artifacts = [...new Set([...base.artifacts, 'vortex'])];
-    }
     alignStarterWithPath(base);
-    if (migrateEarthStarter)
-      base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
-    // 已通关的旧档也补齐成仙门槛；只补差额，不补发整局或妖王奖励。
-    const ascensionCultivation =
-      !newer && base.completed.includes(FINAL_TRIAL_STAGE)
-        ? Math.max(0, IMMORTAL_CULTIVATION - base.cultivation)
-        : 0;
-    base.cultivation += ascensionCultivation;
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
     base.journeyEnded = s.journeyEnded === true && realm.max;
     if (base.mortal.member) {
@@ -383,15 +360,6 @@ export function readSave(
       if (realm.max) base.mortal.member.dueAt = 0;
     }
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
-    if (ascensionCultivation > 0) {
-      // 旧记录无法证明当年通关的灵根、难度和年岁，不补造相关成就。
-      base.chronicle.milestones['realm-24'] ??= null;
-      recordChronicle(
-        base,
-        '通关成仙补录',
-        `已有第七境通关记录，补足成仙修为 ${ascensionCultivation}。原通关年岁沿用已有记录。`,
-      );
-    }
     syncHumanStories(base);
     claimArtifacts(base);
     syncTribulationClock(base);
@@ -446,15 +414,14 @@ export function attuneSpiritRoot(
   recordCollectionAchievement(save);
   return true;
 }
-export function realmInfo(cultivation: number, finalTrialCleared = false, progressionVersion = 4) {
+export function realmInfo(cultivation: number, finalTrialCleared = false) {
   let remaining = cultivation;
   let step = 0;
-  while (step < (finalTrialCleared ? 24 : 23) && remaining >= realmCost(step, progressionVersion)) {
-    remaining -= realmCost(step, progressionVersion);
+  while (step < (finalTrialCleared ? 24 : 23) && remaining >= realmCost(step)) {
+    remaining -= realmCost(step);
     step++;
   }
-  const ascending =
-    step === 23 && !finalTrialCleared && remaining >= realmCost(step, progressionVersion);
+  const ascending = step === 23 && !finalTrialCleared && remaining >= realmCost(step);
   return {
     step,
     index: Math.floor(step / 3),
@@ -465,18 +432,18 @@ export function realmInfo(cultivation: number, finalTrialCleared = false, progre
           ? '渡劫'
           : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`,
     progress: remaining,
-    needed: realmCost(step, progressionVersion),
+    needed: realmCost(step),
     max: step === 24,
     locked: step === 23 && !finalTrialCleared,
     ascending,
   };
 }
-export const legacyRealmCost = (step: number) => Math.round(90 * 1.28 ** step);
-export function realmCost(step: number, progressionVersion = 4) {
-  if (progressionVersion < 4) return legacyRealmCost(step);
+// 原始经验曲线；每个大境界三阶合计以此为预算再重新分配。
+export const baseRealmCost = (step: number) => Math.round(90 * 1.28 ** step);
+export function realmCost(step: number) {
   // 每个大境界三阶合计完全保留；小突破提前，跨境界承担主要修为成本。
   const first = Math.floor(step / 3) * 3;
-  const budget = legacyRealmCost(first) + legacyRealmCost(first + 1) + legacyRealmCost(first + 2);
+  const budget = baseRealmCost(first) + baseRealmCost(first + 1) + baseRealmCost(first + 2);
   const early = Math.round(budget / 9),
     middle = Math.round((budget * 1.25) / 9);
   return step % 3 === 0 ? early : step % 3 === 1 ? middle : budget - early - middle;
@@ -602,24 +569,11 @@ export function retreat(save: SaveData, requested: number, random: () => number 
   syncTribulationClock(save);
   return { years, gains, cultivation, cultivationPercent: (cultivation / budget) * 100 };
 }
-export function cultivationFactor(step: number) {
-  if (step < 15) return 1;
-  return [2, 6, 16, 28][Math.min(3, Math.floor(step / 3) - 5)] * 1.15 ** (step % 3);
-}
-// 新历练按秘境给出固定奖励；旧续局保留原奖励直到本局结束。
-export function bossCultivationReward(stage: number, bossStage = stage, progressionVersion = 2) {
-  if (progressionVersion >= 2)
-    return stage === FINAL_TRIAL_STAGE && bossStage !== FINAL_TRIAL_STAGE
-      ? STAGE_BOSS_CULTIVATION[stage] * 0.4
-      : STAGE_BOSS_CULTIVATION[stage];
-  const major = Math.min(7, stage + 1);
-  const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
-  return Math.max(
-    2500 * (stage + 1),
-    Math.round(
-      budget * (stage === FINAL_TRIAL_STAGE ? (bossStage === FINAL_TRIAL_STAGE ? 1 : 0.3) : 0.8),
-    ),
-  );
+// 历练按秘境给出固定妖王奖励；终关重返旧王单独折算。
+export function bossCultivationReward(stage: number, bossStage = stage) {
+  return stage === FINAL_TRIAL_STAGE && bossStage !== FINAL_TRIAL_STAGE
+    ? STAGE_BOSS_CULTIVATION[stage] * 0.4
+    : STAGE_BOSS_CULTIVATION[stage];
 }
 const REALM_HP_BONUSES = [0, 45, 95, 155, 225, 310, 415, 545];
 const REALM_DAMAGE_BONUSES = [0, 35, 75, 125, 185, 260, 355, 475];
@@ -667,11 +621,10 @@ export function cultivationReward(
     combatCultivation?: number;
     spiritRoot?: SpiritRootId;
     stage?: number;
-    progressionVersion?: number;
   },
   bonus = 0,
 ) {
-  const rate = cultivationRate(run.stage ?? 0, run.progressionVersion ?? 1);
+  const rate = cultivationRate(run.stage ?? 0);
   return Math.floor(
     ((run.kills * 0.7 + run.level * 8 + bonus) * rate + (run.combatCultivation || 0)) *
       DIFFICULTIES[run.difficulty].reward *
@@ -764,16 +717,12 @@ export function settleRun(
     spiritRoot?: SpiritRootId;
     path?: CultivationPath;
     startedImmortal?: boolean;
-    progressionVersion?: number;
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
   const stoneRate = STAGE_STONE_RATES[run.stage];
   const firstClearCultivation =
-    run.victory &&
-    run.stage === 0 &&
-    !save.completed.includes(0) &&
-    (run.progressionVersion ?? 1) >= 2
+    run.victory && run.stage === 0 && !save.completed.includes(0)
       ? Math.floor(
           FIRST_STAGE_CLEAR_CULTIVATION *
             multiplier *

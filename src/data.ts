@@ -907,7 +907,6 @@ export function tribulationRules(round: number) {
 }
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [60, 105, 150, 195, 240, 285, 330];
-export const LEGACY_TRIAL_BOSS_TIMES = [60, 120, 180, 240, 300, 360, 420];
 export const TRIAL_PRESSURE_SECONDS = 300;
 export const TRIAL_BOSS_CAP = 2;
 export const TRIAL_BOSS_BUFFER_SECONDS = 5;
@@ -922,16 +921,9 @@ export const BOSS_COMBAT = {
   trialHp: 1.1,
   trialDamage: 1.08,
 };
-// 未结束的旧历练沿用原定标与奖励，新开局才切换到新梯度。
-export const LEGACY_STAGE_REALM_STEPS = [0, 9, 13, 16, 18, 20, 22];
 // 永久修为按秘境递增；局内灵气和既有境界突破需求独立计算。
-export const LEGACY_STAGE_CULTIVATION_RATES = [0.15, 0.9, 0.9, 1.1, 1.5, 2, 2.4];
 export const STAGE_CULTIVATION_RATES = [0.3, 0.9, 0.9, 1.1, 1.5, 2, 2.4];
-export function cultivationRate(stage: number, progressionVersion: number) {
-  return progressionVersion < 2
-    ? 1
-    : (progressionVersion < 4 ? LEGACY_STAGE_CULTIVATION_RATES : STAGE_CULTIVATION_RATES)[stage];
-}
+export const cultivationRate = (stage: number) => STAGE_CULTIVATION_RATES[stage];
 export const STAGE_BOSS_CULTIVATION = [120, 1000, 2400, 5000, 11000, 24000, 64000];
 // 将首境开荒所需成长与重复奖励分开，避免反复刷首境妖王代替推进。
 export const FIRST_STAGE_CLEAR_CULTIVATION = 3000;
@@ -1452,7 +1444,6 @@ export const STAGE_ENEMIES = [
   // 终关按原来的四批时间混合前境招式。
   [65, 33, 59, 67, 45, 54, 69, 24, 26, 27, 63, 71],
 ];
-export const LEGACY_TRIAL_ENEMIES = [65, 66, 59, 67, 61, 62, 69, 24, 25, 27, 63, 71];
 export const ENEMY_CAST_RANGE = 360;
 export const ENEMY_FIELD_REACH = 200;
 export const CACHE_CHALLENGE = {
@@ -1517,8 +1508,7 @@ export const ENEMY_SKILLS = {
   },
 };
 export type EnemySkill = keyof typeof ENEMY_SKILLS;
-// 旧续局保留原技能组合；新开局在下方覆盖地域招式。
-export const LEGACY_ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
+export const ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
   const netherEnemy = STAGE_ENEMIES[4].includes(type);
   const soulCaster = netherEnemy && /咒师|祭师|巫师|毒巫|咒鬼|法使/.test(enemy.name);
   const flank = enemy.behavior === 'chase' && /狼|獒|剑卒/.test(enemy.name);
@@ -1541,10 +1531,7 @@ export const LEGACY_ENEMY_TACTICS = ENEMIES.map((enemy, type) => {
       : netherEnemy && ['ranged', 'explode'].includes(enemy.behavior)
         ? 'soul'
         : skill;
-  return { flank, skill, eliteSkill };
-});
-export const ENEMY_TACTICS = LEGACY_ENEMY_TACTICS.map((tactics, type) => {
-  const skill: EnemySkill | undefined = (
+  const regionalSkill = (
     {
       10: 'roots',
       31: 'firecharge',
@@ -1557,9 +1544,10 @@ export const ENEMY_TACTICS = LEGACY_ENEMY_TACTICS.map((tactics, type) => {
     } as Record<number, EnemySkill>
   )[type];
   return {
-    ...tactics,
-    ...(skill ? { skill, eliteSkill: skill } : {}),
-    regional: !!skill || type === 54 || type === 63,
+    flank,
+    skill: regionalSkill ?? skill,
+    eliteSkill: regionalSkill ?? eliteSkill,
+    regional: !!regionalSkill || type === 54 || type === 63,
     deathMiasma: type === 54,
     boundSummons: type === 63,
   };
@@ -1569,11 +1557,9 @@ export function enemyWave(stage: number, seconds: number) {
     return TRIAL_ENEMY_TIMES.filter((time) => time <= Math.max(0, seconds)).length - 1;
   return Math.min(3, Math.floor((Math.max(0, seconds) / (STAGES[stage].minutes * 60)) * 4));
 }
-export function enemyRoster(stage: number, seconds: number, legacy = false) {
+export function enemyRoster(stage: number, seconds: number) {
   const count = stage === 0 && seconds < 20 ? 1 : (enemyWave(stage, seconds) + 1) * 3;
-  return (
-    legacy && stage === FINAL_TRIAL_STAGE ? LEGACY_TRIAL_ENEMIES : STAGE_ENEMIES[stage]
-  ).slice(0, count);
+  return STAGE_ENEMIES[stage].slice(0, count);
 }
 export const MAX_WEAPONS = 6;
 export const MAX_PASSIVES = 4;
@@ -1603,16 +1589,10 @@ export const EVOLVED_DAMAGE = 1.8;
 export const EVOLVED_COOLDOWN = 0.7;
 export const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05 };
 export const weaponLevelDamage = (level: number) => 1 + (level - 1) * 0.32;
-// 新局只补护体与灵塔的低重伤害；升阶继续递增，高重与仙器沿用原曲线。
-export function weaponDamageMultiplier(id: string, level: number, artifactVersion = 2) {
+// 护体与灵塔的低重伤害补强；升阶继续递增，高重与仙器沿用原曲线。
+export function weaponDamageMultiplier(id: string, level: number) {
   const opening =
-    artifactVersion >= 2 && (id === 'orbit' || id === 'pagoda')
-      ? level <= 2
-        ? 1.2
-        : level === 3
-          ? 1.1
-          : 1
-      : 1;
+    id === 'orbit' || id === 'pagoda' ? (level <= 2 ? 1.2 : level === 3 ? 1.1 : 1) : 1;
   return weaponLevelDamage(level) * opening;
 }
 export const TAU = Math.PI * 2;

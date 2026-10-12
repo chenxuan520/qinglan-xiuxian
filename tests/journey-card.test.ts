@@ -220,6 +220,7 @@ test('评语区分未竟、寿尽、天劫、成仙未叩门与终章，不虚�
 test('合法缺项旧档成为真仙后，评语不补造七境全通历史', () => {
   const old = freshSave();
   old.completed = [6];
+  old.cultivation = 119940;
   const save = readSave(JSON.stringify(old)).save;
   const card = journeyCardData(save);
   assert.equal(card.realm, '真仙');

@@ -20,18 +20,23 @@ test('读档区分空档、正常、新版本与无法读取，parseSave 返回�
   const ok = readSave(JSON.stringify(saved));
   assert.equal(ok.status, 'ok');
   assert.equal(ok.save.stones, 321);
-  assert.equal(readSave('{"version":1}').status, 'ok');
-  for (const raw of ['{bad json', '[]', 'null', '{"version":2,"stones":9}'])
+  for (const raw of [
+    '{bad json',
+    '[]',
+    'null',
+    '{"version":2,"stones":9}',
+    '{"version":1}',
+    JSON.stringify({ ...saved, schema: SAVE_SCHEMA - 1 }),
+    JSON.stringify({ ...saved, schema: 'x' }),
+  ])
     assert.equal(readSave(raw).status, 'unreadable', raw);
-  const fallback = parseSave('{"version":2,"stones":9}');
-  assert.equal(fallback.version, 1);
+  const fallback = parseSave('{"version":1,"schema":12}');
   assert.equal(fallback.stones, 0);
   assert.equal(fallback.schema, SAVE_SCHEMA);
 
   const newer = readSave(JSON.stringify({ ...saved, schema: SAVE_SCHEMA + 1 }));
   assert.equal(newer.status, 'newer');
   assert.equal(newer.save.stones, 321);
-  assert.equal(readSave(JSON.stringify({ ...saved, schema: 'x' })).status, 'ok');
 
   // 迁移途中抛错不能被当作正常档继续写回。
   const legacy = { ...saved, rootElements: undefined };

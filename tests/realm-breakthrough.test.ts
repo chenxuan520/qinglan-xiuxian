@@ -114,18 +114,6 @@ test('连续跨境只保留最新演出，暂停冻结，读档不重播，视�
   earn(immortal);
   assert.equal(immortal.realm, 24);
   assert.equal(realmBreakthroughCue(immortal), null, '真仙仍用原反馈，不能残留上一次大乘名号');
-  const legacyGame = new Game(freshSave(), 0, 0, () => 0.5);
-  legacyGame.level = 25;
-  legacyGame.kills = 500;
-  const legacy = JSON.parse(JSON.stringify(legacyGame.snapshot()));
-  delete legacy.creditedCultivation;
-  delete legacy.progressionVersion;
-  const legacySave = freshSave();
-  const migrated = Game.restore(legacySave, legacy)!;
-  assert.ok(migrated);
-  assert.equal(legacySave.cultivation, 550, '保留旧档补发修为');
-  assert.equal(migrated.realm, 4);
-  assert.equal(realmBreakthroughCue(migrated), null, '旧档补发修为跨境界也不播放新演出');
 });
 
 test('七个大境界适配手机和横屏，减少动态效果静止，动态阵纹不建立画布缓存', async () => {

@@ -90,19 +90,22 @@ test('十阶炼器含圆满奖励，实际攻击伤害增加百分之二百，�
   assert.ok(Math.abs(damage(10) / damage(0) - 3) < 1e-10);
 });
 
-test('音量保存与旧档兼容，零音量和最大音量均有效，越界值被限制', () => {
+test('音量保存，零音量和最大音量均有效，越界值被限制', () => {
   assert.equal(freshSave().volume, 0.6);
   for (const volume of [0, 0.37, 1])
     assert.equal(parseSave(JSON.stringify({ ...freshSave(), volume })).volume, volume);
-  assert.equal(parseSave('{"version":1,"volume":-1}').volume, 0);
-  assert.equal(parseSave('{"version":1,"volume":8}').volume, 1);
-  assert.equal(parseSave('{"version":1,"volume":"bad"}').volume, 0.6);
+  const base = JSON.stringify(freshSave());
+  const patched = (volume: string) =>
+    JSON.stringify({ ...JSON.parse(base), volume: JSON.parse(volume) });
+  assert.equal(parseSave(patched('-1')).volume, 0);
+  assert.equal(parseSave(patched('8')).volume, 1);
+  assert.equal(parseSave(patched('"bad"')).volume, 0.6);
 });
 
 test('新角色默认静音，存档解析仍保留显式声音设置', () => {
   assert.equal(freshSave().sound, false);
   assert.equal(parseSave(null).sound, false);
-  assert.equal(parseSave('{"version":1}').sound, false);
+  assert.equal(parseSave('{"version":1,"schema":12}').sound, false);
   for (const sound of [false, true])
     assert.equal(parseSave(JSON.stringify({ ...freshSave(), sound })).sound, sound);
 });
@@ -182,23 +185,18 @@ test('无灵根每种随机本命仅收藏对应五行两件，反复读档不�
   }
 });
 
-test('非金系旧档已收藏的青霄剑、追魂钉和炼器保留，缺少收藏字段时不凭空补送', () => {
+test('非金系档已收藏的青霄剑、追魂钉和炼器保留', () => {
   const save = freshSave('heaven', ['wood'], 'orthodox', () => 0.5);
   save.artifacts.push('sword', 'nail', 'orbit');
   save.forge.sword = 7;
   save.forge.nail = 3;
   save.stones = 1234;
-  const loaded = parseSave(JSON.stringify({ ...save, schema: 10 }));
+  const loaded = parseSave(JSON.stringify(save));
   assert.deepEqual(new Set(loaded.artifacts), new Set(save.artifacts));
   assert.equal(loaded.forge.sword, 7);
   assert.equal(loaded.forge.nail, 3);
   assert.equal(loaded.stones, 1234);
   assert.equal(loaded.starter, 'fan');
-  const { artifacts, ...legacy } = freshSave('heaven', ['wood'], 'orthodox', () => 0.5);
-  const migrated = parseSave(JSON.stringify({ ...legacy, starter: 'orbit', forge: { sand: 2 } }));
-  assert.deepEqual(new Set(migrated.artifacts), new Set(['fan', 'chain', 'orbit', 'sand']));
-  assert.equal(migrated.starter, 'orbit');
-  assert.equal(migrated.forge.sand, 2);
 });
 
 test('无灵根领取遗宝再改选本命，刷新不按新本命五行额外赠宝', () => {
@@ -219,8 +217,6 @@ test('无灵根领取遗宝再改选本命，刷新不按新本命五行额外�
       Object.assign(save, loaded);
     }
   }
-  const { artifacts, ...legacy } = freshSave('none', [], 'orthodox', () => 0.99);
-  assert.deepEqual(parseSave(JSON.stringify(legacy)).artifacts, ['pagoda', 'skull']);
 });
 
 test('只有击败妖王才掉三件未拥有法宝，收入藏器阁，收齐后不重复掉落', () => {
@@ -265,22 +261,22 @@ test('手动与自动历练击败妖王后立即解锁炼器，重复击杀和�
   }
 });
 
-test('旧档保留已炼器和当前本命，其余法宝待收集；无效、重复收藏被过滤', () => {
-  const { artifacts, artifactDrops, ...old } = freshSave();
-  const migrated = parseSave(JSON.stringify({ ...old, starter: 'orbit', forge: { fire: 3 } }));
-  assert.deepEqual(new Set(migrated.artifacts), new Set(['sword', 'nail', 'orbit', 'fire']));
-  assert.equal(migrated.starter, 'orbit');
+test('无效与重复收藏被过滤，炼器与收藏跨刷新保留', () => {
+  const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  save.artifacts.push('lightning');
+  save.forge.lightning = 3;
+  save.starter = 'lightning';
   const parsed = parseSave(
     JSON.stringify({
-      ...freshSave(),
-      starter: 'fire',
-      artifacts: ['nail', 'invalid', 'nail'],
+      ...save,
+      artifacts: [...save.artifacts, 'nail', 'invalid', 'nail'],
       artifactDrops: ['orbit', 'orbit', 'nail', 'bad'],
     }),
   );
-  assert.deepEqual(parsed.artifacts, ['sword', 'nail', 'orbit']);
+  assert.deepEqual(parsed.artifacts, ['sword', 'nail', 'lightning', 'orbit']);
   assert.deepEqual(parsed.artifactDrops, []);
-  assert.equal(parsed.starter, 'sword');
+  assert.equal(parsed.starter, 'lightning');
+  assert.equal(parsed.forge.lightning, 3);
   assert.deepEqual(parseSave(JSON.stringify(parsed)), parsed);
 });
 

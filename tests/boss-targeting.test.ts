@@ -31,43 +31,38 @@ test('七位妖王恢复原地面目标，远距离也能锁定主角，落点�
     '6/2': 9,
     '6/5': 1,
   };
-  for (const version of [0, 1])
-    for (const range of [180, 1000])
-      for (let stage = 0; stage < 7; stage++)
-        for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
-          const g = fixture(stage);
-          g.encounterVersion = version;
-          const e = g.spawnEnemy(10, false, true, { x: 510, y: -700 }, stage);
-          const target = { x: e.x + range, y: e.y + 80 };
-          Object.assign(g.player, target);
-          e.skillStep = phase;
-          delete e.bossSkillQueue;
-          const d = Math.hypot(range, 80);
-          g.castBossSkill(e, range / d, 80 / d);
-          assert.notEqual(e.skillStep, phase);
-          assert.equal(g.zones.length, counts[`${stage}/${phase}`] ?? 0);
-          if (g.zones.length) {
-            const center = stage === 6 && phase === 5 ? e : target;
-            for (const axis of ['x', 'y']) {
-              const mean = g.zones.reduce((sum, z) => sum + z[axis], 0) / g.zones.length;
-              assert.ok(
-                Math.abs(mean - center[axis]) < 1e-8,
-                `${version}/${range}/${stage}/${phase}/${axis}`,
-              );
-            }
-            for (const zone of g.zones) {
-              assert.ok(zone.delay >= 1.2 && zone.delay <= 2);
-              assert.equal(zone.castDelay, zone.delay);
-              assert.ok(zone.kind.startsWith('boss-'));
-              assert.equal(zone.damage, e.damage);
-            }
+  for (const range of [180, 1000])
+    for (let stage = 0; stage < 7; stage++)
+      for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
+        const g = fixture(stage);
+        const e = g.spawnEnemy(10, false, true, { x: 510, y: -700 }, stage);
+        const target = { x: e.x + range, y: e.y + 80 };
+        Object.assign(g.player, target);
+        e.skillStep = phase;
+        delete e.bossSkillQueue;
+        const d = Math.hypot(range, 80);
+        g.castBossSkill(e, range / d, 80 / d);
+        assert.notEqual(e.skillStep, phase);
+        assert.equal(g.zones.length, counts[`${stage}/${phase}`] ?? 0);
+        if (g.zones.length) {
+          const center = stage === 6 && phase === 5 ? e : target;
+          for (const axis of ['x', 'y']) {
+            const mean = g.zones.reduce((sum, z) => sum + z[axis], 0) / g.zones.length;
+            assert.ok(Math.abs(mean - center[axis]) < 1e-8, `${range}/${stage}/${phase}/${axis}`);
           }
-          for (const shot of g.shots) assert.equal(shot.life, 6);
-          const before = structuredClone(g.zones);
-          g.player.x += 900;
-          g.player.y -= 900;
-          assert.deepEqual(g.zones, before);
+          for (const zone of g.zones) {
+            assert.ok(zone.delay >= 1.2 && zone.delay <= 2);
+            assert.equal(zone.castDelay, zone.delay);
+            assert.ok(zone.kind.startsWith('boss-'));
+            assert.equal(zone.damage, e.damage);
+          }
         }
+        for (const shot of g.shots) assert.equal(shot.life, 6);
+        const before = structuredClone(g.zones);
+        g.player.x += 900;
+        g.player.y -= 900;
+        assert.deepEqual(g.zones, before);
+      }
 });
 
 test('妖王脚下落阵先预警再伤害，暂停与续局不改落点，移动可避开', () => {

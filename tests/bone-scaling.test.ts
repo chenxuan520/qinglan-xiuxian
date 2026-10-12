@@ -68,20 +68,3 @@ test('骨刺按未加境界乘区的最大气血12%每重反击，无敌期间�
   game.hurtPlayer(game.player.maxHp * 2);
   near(game.damageBySource.bone, expected);
 });
-
-test('固定气血白骨旧局迁移保留损失气血，重复续局不加血，死者不复活', () => {
-  const save = freshSave();
-  save.training.vitality = 30;
-  const game = new Game(save, 0, 0);
-  const old = game.snapshot();
-  old.passives = { bone: 2 };
-  old.player.maxHp = 428;
-  old.player.hp = 391;
-  const restored = Game.restore(save, old)!;
-  assert.equal(restored.player.maxHp, 340);
-  assert.equal(restored.player.hp, 303);
-  assert.equal(Game.restore(save, restored.snapshot())!.player.hp, 303);
-  old.state = 'lost';
-  old.player.hp = 0;
-  assert.equal(Game.restore(save, old)!.player.hp, 0);
-});

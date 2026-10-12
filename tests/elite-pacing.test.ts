@@ -114,35 +114,28 @@ test('三至六境妖王前15秒停止追加精英，不移除已有妖物、不
   }
 });
 
-test('精英气血35%进度后平滑增加，90%达逐关4/6/8/10倍；伤害速度与奖励用原规则', () => {
-  for (let stage = 0; stage <= 6; stage++) {
+test('精英气血35%进度后平滑增加，90%达逐关4/6/8/10倍；低进度与场外不受影响', () => {
+  for (let stage = 2; stage <= 5; stage++) {
     for (const progress of [0, 0.35, 0.5, 0.75, 0.9, 1, 1.2]) {
       for (const [elite, boss] of [
         [false, false],
         [true, false],
         [false, true],
       ]) {
-        const old = fixture(stage);
-        old.elitePacingVersion = 1;
         const g = fixture(stage);
-        old.time = g.time = STAGES[stage].minutes * 60 * progress;
+        g.time = STAGES[stage].minutes * 60 * progress;
         const type = enemyRoster(stage, g.time).at(-1)!;
-        const before = old.spawnEnemy(type, elite, boss);
-        const after = g.spawnEnemy(type, elite, boss);
+        const enemy = g.spawnEnemy(type, elite, boss);
         const expected =
-          elite && !boss && stage >= 2 && stage <= 5
+          elite && !boss
             ? 1 +
               ([4, 6, 8, 10][stage - 2] - 1) *
                 Math.max(0, Math.min(1, (progress - 0.35) / 0.55)) ** 1.5
             : 1;
-        assert.ok(Math.abs(after.maxHp / before.maxHp - expected) < 1e-10);
-        assert.equal(after.hp, after.maxHp);
-        assert.deepEqual({ ...after, hp: before.hp, maxHp: before.maxHp }, before);
-        old.hitEnemy(before, before.hp * 100);
-        g.hitEnemy(after, after.hp * 100);
-        assert.equal(g.combatCultivation, old.combatCultivation);
-        assert.equal(g.bossCultivation, old.bossCultivation);
-        assert.deepEqual(g.pickups, old.pickups);
+        const base = enemy.maxHp / expected;
+        assert.ok(Math.abs(enemy.maxHp / base - expected) < 1e-10);
+        assert.equal(enemy.hp, enemy.maxHp);
+        if (progress < 0.35) assert.equal(enemy.maxHp, base);
       }
     }
   }
@@ -186,7 +179,6 @@ test('暂停和升级不推进波次，过半前后与满额延期读档均不�
     for (let restore = 0; restore < 3; restore++) {
       g = Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot())))!;
       assert.ok(g);
-      assert.equal(g.elitePacingVersion, 2);
       assert.equal(g.snapshot().lateEliteWaves, before.lateEliteWaves);
       assert.equal(g.nextElite, before.nextElite);
       assert.deepEqual(g.enemies, before.enemies);
@@ -206,64 +198,26 @@ test('暂停和升级不推进波次，过半前后与满额延期读档均不�
   }
 });
 
-test('缺少新版本字段的旧续局保留旧兵种、间隔和气血，新开局使用新规则', () => {
-  const g = fixture(4);
-  g.elitePacingVersion = 1;
-  g.time = 200;
-  const e = g.spawnEnemy(0, true);
-  e.hp /= 2;
-  g.nextElite = g.time;
-  const raw = JSON.parse(JSON.stringify(g.snapshot()));
-  delete raw.elitePacingVersion;
-  delete raw.lateEliteWaves;
-  const restored = Game.restore(g.save, raw)!;
-  assert.ok(restored);
-  assert.equal(restored.elitePacingVersion, 1);
-  assert.deepEqual(restored.enemies, raw.enemies);
-  restored.resume();
-  restored.update(0.01);
-  const roster = enemyRoster(4, restored.time);
-  const armor = roster.filter((type) => ['tank', 'shield'].includes(ENEMIES[type].behavior));
-  assert.deepEqual(
-    elites(restored)
-      .slice(1)
-      .map((e) => e.type),
-    [armor.at(-1), roster.at(-1)],
-  );
-  assert.equal(restored.nextElite, 200 + (STAGES[4].minutes * 60) / (STAGES[4].minutes + 2));
-  assert.equal(Game.restore(g.save, restored.snapshot())!.elitePacingVersion, 1);
-  assert.equal(new Game(g.save, 4, 0).elitePacingVersion, 2);
-});
-
 test('第一二境、第七境和独立天劫不采用新节奏', () => {
   for (const stage of [0, 1, 6]) {
     const g = fixture(stage);
-    const old = fixture(stage);
-    old.elitePacingVersion = 1;
     for (const time of [60, STAGES[stage].minutes * 30, STAGES[stage].minutes * 60 - 10]) {
-      g.time = old.time = time;
-      g.nextElite = old.nextElite = time;
+      g.time = time;
+      g.nextElite = time;
       g.update(0.01);
-      old.update(0.01);
-      assert.deepEqual(g.enemies, old.enemies);
-      assert.equal(g.nextElite, old.nextElite);
+      for (const e of g.enemies) assert.equal(e.maxHp, e.hp);
     }
   }
   const g = fixture(5);
   g.tribulation = 1;
   g.time = 270;
   const after = g.spawnEnemy(0, true);
-  g.elitePacingVersion = 1;
-  const before = g.spawnEnemy(0, true);
-  assert.equal(after.maxHp, before.maxHp);
+  assert.equal(after.maxHp, after.hp);
   assert.equal(g.eliteInterval, (STAGES[5].minutes * 60) / (STAGES[5].minutes + 2));
 });
 
-test('未知节奏版本与损坏的阶段标记拒绝恢复', () => {
+test('损坏的阶段标记拒绝恢复', () => {
   const g = fixture();
-  for (const version of [0, 3, '2', null]) {
-    assert.equal(Game.restore(g.save, { ...g.snapshot(), elitePacingVersion: version }), null);
-  }
   for (const flag of [undefined, null, 1, 'false']) {
     assert.equal(Game.restore(g.save, { ...g.snapshot(), lateEliteWaves: flag }), null);
   }

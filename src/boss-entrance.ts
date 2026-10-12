@@ -27,7 +27,6 @@ export function bossEntranceCue(game: Game) {
     };
   if (
     game.isFinalTrial &&
-    game.trialBossSchedule >= 5 &&
     (game.trialBossBlocked ||
       game.enemies.filter((e) => e.boss && !e.dead).length >= TRIAL_BOSS_CAP)
   )

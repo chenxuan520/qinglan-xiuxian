@@ -7,7 +7,6 @@ import {
   ENEMIES,
   ENEMY_TACTICS,
   STAGE_ENEMIES,
-  LEGACY_TRIAL_ENEMIES,
   STAGES,
   enemyRoster,
   evolutionPassives,
@@ -152,7 +151,7 @@ test('毒孢只在死亡位置出现一次，召唤者死亡令护卫散去且�
   assert.equal(g.pickups.filter((p) => p.kind === 'xp').length, 1);
 });
 
-test('终关分批复用地域机制，旧续局兵种与原技能不被替换', () => {
+test('终关分批复用地域机制', () => {
   assert.deepEqual(enemyRoster(6, 0), [65, 33, 59]);
   assert.ok(enemyRoster(6, 45).includes(45));
   assert.ok(enemyRoster(6, 45).includes(54));
@@ -164,14 +163,6 @@ test('终关分批复用地域机制，旧续局兵种与原技能不被替换',
   e.cooldown = 0;
   g.update(0.01);
   assert.equal(e.pendingSkill, 'firebolt');
-  const old = g.snapshot();
-  delete old.encounterVersion;
-  delete old.cacheChallenge;
-  delete old.nextEnemySlowAt;
-  const restored = Game.restore(g.save, old)!;
-  assert.ok(restored);
-  assert.equal(restored.encounterVersion, 0);
-  assert.deepEqual(enemyRoster(6, 420, true), LEGACY_TRIAL_ENEMIES);
 });
 
 function offered(stage = 0) {
@@ -293,10 +284,9 @@ test('前六境中段各提供一次守匣，必须靠近且不挤破精英上�
     g.updateEliteWave();
     assert.equal(g.enemies.filter((e) => e.elite).length, 4);
   }
-  for (const disabled of ['old', 'trial', 'tribulation']) {
+  for (const disabled of ['trial', 'tribulation']) {
     const g = fixture(disabled === 'trial' ? 6 : 0);
     g.time = 120;
-    if (disabled === 'old') g.encounterVersion = 0;
     if (disabled === 'tribulation') g.tribulation = 1;
     g.updateCacheChallenge();
     assert.equal(g.cacheChallenge, null);
@@ -409,7 +399,6 @@ test('挑战进行、已清场与已拾取续局均不重复出怪或奖励，�
 test('新遭遇快照拒绝损坏时间、阶段、守卫清单、技能和不适用场景', () => {
   const g = started();
   for (const change of [
-    (s) => (s.encounterVersion = 2),
     (s) => (s.nextEnemySlowAt = NaN),
     (s) => (s.cacheChallenge.deadline = -1),
     (s) => (s.cacheChallenge.x = Infinity),
@@ -446,7 +435,7 @@ test('摄魂镰可暴击，同次横扫共用判定，处决倍率和厄运咒�
   assert.ok(Math.abs(damage(true, 5, true) / normal - 4.8) < 1e-6);
 });
 
-test('开天斧由防御功法觉醒，旧续局保留原配方和已待选觉醒', () => {
+test('开天斧由防御功法觉醒', () => {
   assert.deepEqual(evolutionPassives(treasure('axe'), 'demonic'), ['bone']);
   assert.deepEqual(evolutionPassives(treasure('axe'), 'dual'), ['guard', 'bone']);
   for (const path of ['orthodox', 'demonic', 'dual']) {
@@ -457,20 +446,6 @@ test('开天斧由防御功法觉醒，旧续局保留原配方和已待选觉�
     g.passives = { [id]: 5 };
     assert.equal(g.canEvolve('axe'), true);
   }
-  const g = fixture();
-  g.path = 'demonic';
-  g.encounterVersion = 0;
-  g.weapons = [{ id: 'axe', level: 6, evolved: false, timer: 0 }];
-  g.passives = { blood: 5 };
-  assert.equal(g.canEvolve('axe'), true);
-  g.state = 'upgrade';
-  g.choices = [{ type: 'evolve', id: 'axe', level: 7 }];
-  const s = g.snapshot();
-  delete s.encounterVersion;
-  const restored = Game.restore(g.save, s)!;
-  assert.ok(restored);
-  assert.equal(restored.state, 'paused');
-  assert.equal(restored.weapons[0].evolved, true);
 });
 
 test('地域技能在大量混合精英场景下遵守弹丸、法阵与召唤预算', () => {
@@ -500,23 +475,4 @@ test('地域技能在大量混合精英场景下遵守弹丸、法阵与召唤�
     summons = Math.max(summons, currentSummons);
   }
   assert.ok(shots > 0 && zones > 0 && summons > 0);
-});
-
-test('旧开天斧待选界面与自动选技都沿用该局的功法配方', async () => {
-  const { choiceCard } = await import('../src/common-ui.ts');
-  const { autoplayChoice } = await import('../src/autoplay.ts');
-  const g = fixture();
-  g.path = 'demonic';
-  g.encounterVersion = 0;
-  g.state = 'upgrade';
-  g.weapons = [{ id: 'axe', level: 6, evolved: false, timer: 0 }];
-  g.passives = { blood: 4 };
-  g.choices = [
-    { type: 'passive', id: 'blood', level: 5 },
-    { type: 'passive', id: 'bone', level: 1 },
-  ];
-  assert.equal(autoplayChoice(g)!.index, 0);
-  const html = choiceCard(g, g.save, { type: 'weapon', id: 'axe', level: 6 }, 0);
-  assert.ok(html.includes('血煞真经五重'));
-  assert.ok(!html.includes('白骨魔功五重'));
 });

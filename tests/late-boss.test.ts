@@ -59,55 +59,6 @@ test('三难度七境妖王使用固定强化倍率，终关单列，移动速�
     }
   }
 });
-
-test('旧节奏三难度全部关卡仅非妖王精英移速再增10%，普通怪、气血与伤害不变', () => {
-  for (const [difficulty, rules] of DIFFICULTIES.entries()) {
-    for (let stage = 0; stage < STAGES.length; stage++) {
-      const g = new Game(freshSave(), stage, difficulty, () => 0.5);
-      g.elitePacingVersion = 1;
-      const scaling = STAGE_COMBAT_SCALING[stage];
-      const final = stage === FINAL_TRIAL_STAGE;
-      for (const progress of [0, 0.5, 1]) {
-        g.time = (final ? TRIAL_PRESSURE_SECONDS : g.stageDuration) * progress;
-        const strength = (1 + (final ? progress * 600 : g.time) / 260) * (1 + stage * 0.22);
-        for (const [type, template] of ENEMIES.entries()) {
-          for (const elite of [false, true]) {
-            const enemy = g.spawnEnemy(type, elite, false, { x: 100, y: 0 });
-            const isElite = final || elite;
-            const eliteScaling = isElite ? scaling.elite : undefined;
-            const hp =
-              template.hp *
-              strength *
-              rules.hp *
-              (isElite ? 7 : 1) *
-              (eliteScaling?.hp ?? 1) *
-              scaling.hp *
-              realmDamageMultiplier(STAGE_REALM_STEPS[stage]);
-            const speed =
-              (final
-                ? Math.max(95 + progress * 35, template.speed * (1.05 + progress * 0.3))
-                : template.speed) *
-              (1 + progress * 0.3) *
-              (isElite ? 1.1 : 1) *
-              (eliteScaling?.speed ?? 1);
-            const damage =
-              template.damage *
-              (1 + stage * 0.12) *
-              (final ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
-              rules.damage *
-              (isElite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
-              (final ? 1 : isElite ? 2.2 : 1.3) *
-              realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
-              (eliteScaling?.damage ?? 1);
-            assert.deepEqual([enemy.hp, enemy.maxHp, enemy.damage], [hp, hp, damage]);
-            assert.ok(Math.abs(enemy.speed - speed * (isElite ? 1.1 : 1)) < 1e-8);
-          }
-        }
-      }
-    }
-  }
-});
-
 test('各关三难度新旧精英连续恢复不重算场内速度，也不叠加10%倍率', () => {
   for (let difficulty = 0; difficulty < DIFFICULTIES.length; difficulty++) {
     for (let stage = 0; stage < STAGES.length; stage++) {

@@ -205,23 +205,12 @@ test('无灵根跨路线时解锁并使用原本命五行的配对法宝', () =>
   assert.ok(Object.hasOwn(almostComplete.chronicle.milestones, 'collection'));
 });
 
-test('旧魔道番天印校正为阴阳盘并保留炼器阶数', () => {
-  const save = freshSave('heaven', ['earth']);
-  save.path = 'demonic';
-  save.starter = 'meteor';
-  save.schema = 9;
-  save.forge.meteor = 7;
-  const restored = parseSave(JSON.stringify(save));
-  assert.equal(restored.starter, 'vortex');
-  assert.equal(restored.forge.meteor, 7);
-  assert.equal(restored.forge.vortex, 7);
-  assert.equal(new Game(restored, 0, 0).weapons[0].id, 'vortex');
-
+test('魔道路线与土系灵根对齐本命，路径对齐不改炼器', () => {
   const current = freshSave('heaven', ['earth']);
   current.path = 'demonic';
   current.starter = 'meteor';
   current.forge.meteor = 7;
   assert.equal(alignStarterWithPath(current), true);
   assert.equal(current.starter, 'skull');
-  assert.equal(current.forge.vortex || 0, 0);
+  assert.equal(current.forge.meteor, 7);
 });

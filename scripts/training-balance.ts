@@ -62,7 +62,6 @@ for (const root of ['heaven', 'dual', 'triple'] as const)
           level: game.level,
           creditedCultivation: game.creditedCultivation,
           combatCultivation: game.combatCultivation,
-          progressionVersion: game.progressionVersion,
           spiritRoot: game.spiritRoot,
         });
         campaign.push({

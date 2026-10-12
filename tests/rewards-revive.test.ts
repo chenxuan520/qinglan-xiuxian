@@ -133,10 +133,10 @@ test('每局最多复活一次，满血三秒无敌，保留敌人、法宝与�
     assert.equal(Game.restore(g.save, { ...before, revivesUsed: invalid }), null);
 });
 
-test('旧版已复活多次的续局仍可读取，但不再获得复活机会', () => {
+test('已用完复活次数的续局不再获得复活机会', () => {
   const g = create();
   g.time = 30;
-  for (const used of [1, 2, 9, 10]) {
+  for (const used of [1]) {
     for (const state of ['playing', 'lost']) {
       const snapshot = JSON.parse(JSON.stringify(g.snapshot()));
       snapshot.revivesUsed = used;
@@ -149,6 +149,11 @@ test('旧版已复活多次的续局仍可读取，但不再获得复活机会',
       assert.deepEqual(restored.weapons, g.weapons);
       assert.equal(restored.revive(), false);
     }
+  }
+  for (const used of [2, 9, 10]) {
+    const snapshot = JSON.parse(JSON.stringify(g.snapshot()));
+    snapshot.revivesUsed = used;
+    assert.equal(Game.restore(g.save, snapshot), null);
   }
 });
 

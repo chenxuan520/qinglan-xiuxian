@@ -331,9 +331,8 @@ test('寿尽、天劫及供奉边界禁止互换，不能借 NPC 操作越过原
     assert.equal(JSON.stringify(save), text);
   }
 });
-test('旧档正常升级 schema、保留药方与宗门，损坏坊市字段不会丢其余人间数据；导入损坏字段拒绝', () => {
+test('缺失坊市字段正常读取、保留药方与宗门，损坏坊市字段不会丢其余人间数据；导入损坏字段拒绝', () => {
   const save = visitor(2);
-  save.schema = 12;
   delete save.mortal.sectMarket;
   delete save.mortal.auction;
   delete save.mortal.marketSocial;
@@ -356,6 +355,8 @@ test('旧档正常升级 schema、保留药方与宗门，损坏坊市字段不�
   assert.equal(restored.status, 'ok');
   assert.deepEqual(restored.save.mortal, save.mortal);
   assert.throws(() => importSave(JSON.stringify(bad)));
+  const older = { ...save, schema: SAVE_SCHEMA - 1 };
+  assert.equal(readSave(JSON.stringify(older)).status, 'unreadable');
   const future = { ...save, schema: SAVE_SCHEMA + 1 };
   assert.equal(readSave(JSON.stringify(future)).status, 'newer');
   assert.equal(

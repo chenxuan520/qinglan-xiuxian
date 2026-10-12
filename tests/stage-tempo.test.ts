@@ -36,98 +36,18 @@ test('前六境按三分钟、三分半、四分钟两两分档，四批敌人�
   }
 });
 
-test('无时长标记的早期续局按原始5至10分钟换算，重复读档不再压缩', () => {
-  for (let stage = 0; stage < 7; stage++) {
-    const save = freshSave();
-    save.unlocked = stage;
-    const g = new Game(save, stage, 0, () => 0.5);
-    g.trialBossSchedule = 4;
-    const duration = g.stageDuration;
-    const oldDuration = stage === 6 ? 600 : (stage + 5) * 60;
-    g.time = oldDuration / 2;
-    g.nextElite = oldDuration / 2 + 60;
-    g.player.hp -= 15;
-    g.level = 30;
-    const snapshot = JSON.parse(JSON.stringify(g.snapshot()));
-    delete snapshot.stageDuration;
-    const restored = Game.restore(save, snapshot)!;
-    assert.ok(restored);
-    assert.equal(restored.time, duration / 2);
-    assert.ok(Math.abs(restored.nextElite - (g.nextElite * duration) / oldDuration) < 1e-9);
-    assert.equal(restored.level, 30);
-    assert.equal(restored.player.maxHp - restored.player.hp, 15);
-    assert.equal(Game.restore(save, restored.snapshot())!.time, restored.time);
-    assert.equal(Game.restore(save, restored.snapshot())!.nextElite, restored.nextElite);
-    assert.equal(Game.restore(save, { ...snapshot, stageDuration: 0 }), null);
-  }
-});
-
-test('上一版续局按完成比例换算，已出场妖王、收益和消耗寿元保持不变', () => {
-  for (const oldMinutes of [
-    [3, 3, 4, 4, 5, 5, 7],
-    [3, 4, 5, 6, 7, 8, 10],
-    [3, 3, 5, 5, 7, 7, 10],
-  ]) {
-    for (let stage = 0; stage < 7; stage++) {
-      for (const bossSpawned of [false, true]) {
-        const save = freshSave('heaven');
-        save.unlocked = stage;
-        const g = new Game(save, stage, 0, () => 0.5);
-        const oldDuration = oldMinutes[stage] * 60;
-        g.trialBossSchedule = 4;
-        const duration = g.stageDuration;
-        g.time = oldDuration * (bossSpawned ? 1.1 : 0.6);
-        g.nextElite = g.time + 20;
-        g.kills = 100;
-        g.creditCultivation();
-        g.iron = 7;
-        g.player.hp -= 12;
-        if (bossSpawned) {
-          g.bossSpawned = true;
-          g.spawnEnemy(10, false, true, undefined, 0);
-          g.boss!.hp /= 2;
-          if (stage === 6) g.trialBossesSpawned = 1;
-        }
-        const saveBefore = JSON.stringify(save);
-        const snapshot = { ...g.snapshot(), stageDuration: oldDuration };
-        const restored = Game.restore(save, snapshot)!;
-        assert.ok(restored);
-        assert.equal(restored.time, g.time * (duration / oldDuration));
-        assert.equal(restored.nextElite, g.nextElite * (duration / oldDuration));
-        assert.equal(restored.remaining, Math.max(0, duration - restored.time));
-        assert.equal(restored.bossSpawned, bossSpawned);
-        assert.deepEqual(restored.enemies, g.enemies);
-        assert.equal(restored.kills, 100);
-        assert.equal(restored.iron, 7);
-        assert.equal(restored.player.maxHp - restored.player.hp, 12);
-        assert.equal(JSON.stringify(save), saveBefore);
-        const again = Game.restore(save, restored.snapshot())!;
-        assert.equal(again.time, restored.time);
-        assert.equal(again.nextElite, restored.nextElite);
-        if (bossSpawned) {
-          again.weapons = [];
-          again.resume();
-          again.update(0.01);
-          if (stage < 6) assert.equal(again.enemies.filter((e) => e.boss).length, 1);
-        }
-      }
-    }
-  }
-});
-
-test('旧局缩时保留技能、丹药和减速保护的剩余秒数，预警、弹幕及年岁不压缩', () => {
+test('续局恢复保留技能、丹药和减速保护的剩余秒数与年岁', () => {
   for (const stage of [2, 3, 4, 5]) {
     const save = freshSave();
     save.unlocked = 6;
     const g = new Game(save, stage, 0, () => 0.5);
-    const oldDuration = stage < 4 ? 240 : 300;
-    g.time = oldDuration * 0.6;
+    g.time = 200;
     g.nextEnemySkillAt = g.time + 0.18;
     g.nextEnemySlowAt = g.time + 2.5;
     g.nextMedicinePulse = g.time + 6;
     g.zone(100, 100, 60, 0.8, 20, '#fff', 'blast', 1.2, true);
     const before = g.snapshot();
-    const restored = Game.restore(save, { ...before, stageDuration: oldDuration })!;
+    const restored = Game.restore(save, structuredClone(before))!;
     assert.ok(restored);
     for (const [key, remaining] of [
       ['nextEnemySkillAt', 0.18],
@@ -139,16 +59,6 @@ test('旧局缩时保留技能、丹药和减速保护的剩余秒数，预警�
     }
     assert.deepEqual(restored.zones, g.zones);
     assert.equal(restored.elapsedYears, g.elapsedYears);
-    const dormant = Game.restore(save, {
-      ...before,
-      stageDuration: oldDuration,
-      nextEnemySkillAt: 0,
-      nextEnemySlowAt: 0,
-      nextMedicinePulse: 0,
-    })!;
-    assert.equal(dormant.nextEnemySkillAt, 0);
-    assert.equal(dormant.nextEnemySlowAt, 0);
-    assert.equal(dormant.nextMedicinePulse, 0);
   }
 });
 
@@ -166,11 +76,9 @@ test('旧守匣剩余窗口保留但避开妖王出场，已完成或过期不�
         deadline: time + 25,
         guardians: phase === 'active' || phase === 'cleared' ? [999, 1000] : [],
       };
-      const restored = Game.restore(save, { ...g.snapshot(), stageDuration: 300 })!;
+      const restored = Game.restore(save, structuredClone(g.snapshot()))!;
       assert.ok(restored);
-      const expected = ['active', 'offered'].includes(phase)
-        ? Math.min(restored.time + 25, 240 - (phase === 'active' ? 12 : 60))
-        : restored.time + 25;
+      const expected = time + 25;
       assert.equal(restored.cacheChallenge!.deadline, expected);
       assert.equal(restored.cacheChallenge!.phase, phase);
       const again = Game.restore(save, restored.snapshot())!;
@@ -196,7 +104,7 @@ test('独立天劫时间轴不随秘境缩时', () => {
   g.nextMedicinePulse = 80;
   g.nextEnemySkillAt = 75.18;
   g.tribulationNextAt = 76.2;
-  const restored = Game.restore(save, { ...g.snapshot(), stageDuration: 600 })!;
+  const restored = Game.restore(save, structuredClone(g.snapshot()))!;
   assert.ok(restored);
   assert.equal(restored.time, 75);
   assert.equal(restored.nextMedicinePulse, 80);

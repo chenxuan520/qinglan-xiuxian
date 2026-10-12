@@ -51,7 +51,8 @@ export function restoreSavedRun(save: SaveData, snapshot: unknown) {
     save.tribulationReturn = null;
   }
   const run = snapshot == null ? null : Game.restore(save, snapshot);
-  if (snapshot != null && !run) throw new Error('未完成的历练数据已损坏，当前进度未更改');
+  if (snapshot != null && !run)
+    throw new Error('未完成的历练数据无法识别（可能来自旧版本），当前进度未更改');
   if (save.tribulationReturn != null) {
     const original = Game.restore(save, save.tribulationReturn);
     if (!original || original.tribulation || !run?.tribulation)

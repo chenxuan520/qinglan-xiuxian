@@ -126,21 +126,3 @@ test('所有七十种四魔功满重组合保持可移动、可回血及承伤�
         }
   assert.equal(cases, 70);
 });
-
-test('天魔降血上限保留当前血量比例，残血领悟不致死，旧局反复恢复不加血', () => {
-  const s = freshSave();
-  const g = new Game(s, 0, 0);
-  g.player.hp = 1;
-  learn(g, 'frenzy');
-  near(g.player.hp, 0.9);
-  const old = g.snapshot();
-  old.player.maxHp = 100;
-  old.player.hp = 50;
-  const restored = Game.restore(s, old)!;
-  assert.equal(restored.player.maxHp, 90);
-  assert.equal(restored.player.hp, 40);
-  assert.equal(Game.restore(s, restored.snapshot())!.player.hp, 40);
-  old.state = 'lost';
-  old.player.hp = 0;
-  assert.equal(Game.restore(s, old)!.player.hp, 0);
-});

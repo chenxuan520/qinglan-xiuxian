@@ -10,12 +10,10 @@ import {
   BOSS_COMBAT,
   ELITE_PACING,
   STAGE_REALM_STEPS,
-  LEGACY_STAGE_REALM_STEPS,
   cultivationRate,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
   TRIAL_BOSS_TIMES,
-  LEGACY_TRIAL_BOSS_TIMES,
   TRIAL_PRESSURE_SECONDS,
   TRIAL_BOSS_CAP,
   TRIAL_BOSS_BUFFER_SECONDS,
@@ -23,7 +21,6 @@ import {
   DIFFICULTIES,
   ENEMIES,
   ENEMY_TACTICS,
-  LEGACY_ENEMY_TACTICS,
   ENEMY_CAST_RANGE,
   ENEMY_FIELD_REACH,
   CACHE_CHALLENGE,
@@ -67,7 +64,6 @@ import {
   realmHealthMultiplier,
   forgeDamageBonus,
   dropArtifacts,
-  cultivationFactor,
   bossCultivationReward,
   extendLifespan,
   syncTribulationClock,
@@ -231,17 +227,11 @@ export class Game {
   trialBossesDefeated = 0;
   trialBossesSpawned = 0;
   nextTrialBossAt = TRIAL_BOSS_TIMES[0];
-  trialBossSchedule = 5;
   trialBossBlocked = false;
-  bossOpeningVersion = 1;
   damageDealt = 0;
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
   revivesUsed = 0;
-  progressionVersion = 4;
-  elitePacingVersion = 2;
-  encounterVersion = 1;
-  artifactVersion = 2;
   cacheChallenge: CacheChallenge | null = null;
   private cacheApproachStartedAt: number | null = null;
   private nextEnemySlowAt = 0;
@@ -273,9 +263,7 @@ export class Game {
     difficulty: number,
     random: () => number = Math.random,
     path: CultivationPath = save.mortal.member ? passive(save.mortal.member.id).school : save.path,
-    progressionVersion = 4,
   ) {
-    this.progressionVersion = progressionVersion;
     this.save = save;
     this.medicine = medicineEffects(save.medicine, save.age);
     syncTribulationClock(save);
@@ -286,11 +274,7 @@ export class Game {
     this.path = path;
     this.spiritRoot = save.spiritRoot;
     this.rootElements = [...save.rootElements];
-    this.realm = realmInfo(
-      save.cultivation,
-      save.completed.includes(FINAL_TRIAL_STAGE),
-      this.progressionVersion,
-    ).step;
+    this.realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step;
     this.startedImmortal = this.realm === 24;
     this.baseHp = spiritRootInfo(this.spiritRoot).baseHp + realmBonuses(this.realm).hp;
     if (save.mortal.member) this.passives[save.mortal.member.id] = 1;
@@ -304,7 +288,7 @@ export class Game {
     this.announce('踏入秘境 · 妖物将至');
   }
   private passivePower(id: string) {
-    return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id, this.progressionVersion));
+    return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id));
   }
   private maximumHealth(medicineHp = this.medicine.hp) {
     const base =
@@ -333,7 +317,7 @@ export class Game {
       : (60 * STAGES[this.stage].minutes) / (STAGES[this.stage].minutes + 2);
   }
   private get usesElitePacing() {
-    return this.elitePacingVersion >= 2 && !this.tribulation && this.stage >= 2 && this.stage <= 5;
+    return !this.tribulation && this.stage >= 2 && this.stage <= 5;
   }
   // 绘制沿用当前战斗已结算的境界，不重复推算修为。
   get realmIndex() {
@@ -376,11 +360,9 @@ export class Game {
       0,
       Math.random,
       source?.path ?? save.path,
-      source?.progressionVersion ?? 4,
     );
     g.tribulation = save.tribulations + 1;
     if (source) {
-      g.artifactVersion = source.artifactVersion;
       g.spiritRoot = source.spiritRoot;
       g.rootElements = [...source.rootElements];
       g.weapons = source.weapons.map((w) => ({ ...w, timer: 0 }));
@@ -406,18 +388,13 @@ export class Game {
     return Math.max(0, this.stageDuration - this.time);
   }
   get stageDuration() {
-    return this.isFinalTrial && this.trialBossSchedule < 5
-      ? LEGACY_TRIAL_BOSS_TIMES.at(-1)!
-      : STAGES[this.stage].minutes * 60;
+    return STAGES[this.stage].minutes * 60;
   }
   private get combatProgress() {
     return Math.min(
       1,
       this.time / (this.isFinalTrial ? TRIAL_PRESSURE_SECONDS : this.stageDuration),
     );
-  }
-  private get trialBossTimes() {
-    return this.trialBossSchedule >= 5 ? TRIAL_BOSS_TIMES : LEGACY_TRIAL_BOSS_TIMES;
   }
   // 气血低于三成时返回 0–1 的危急程度，越接近 1 越危险；其余情况为 0。
   get lowHealth() {
@@ -524,11 +501,7 @@ export class Game {
     gainCultivation(this.save, delta, this.spiritRoot);
     syncTribulationClock(this.save);
     this.creditedCultivation = earned;
-    const realm = realmInfo(
-      this.save.cultivation,
-      this.save.completed.includes(FINAL_TRIAL_STAGE),
-      this.progressionVersion,
-    );
+    const realm = realmInfo(this.save.cultivation, this.save.completed.includes(FINAL_TRIAL_STAGE));
     if (realm.step > this.realm) {
       const hp = realmBonuses(realm.step).hp - realmBonuses(this.realm).hp;
       const major = realm.index > Math.floor(this.realm / 3);
@@ -563,12 +536,8 @@ export class Game {
       spiritRoot: this.spiritRoot,
       rootElements: [...this.rootElements],
       startedImmortal: this.startedImmortal,
-      version: 1,
+      version: 2,
       realmScaling: 3,
-      progressionVersion: this.progressionVersion,
-      elitePacingVersion: this.elitePacingVersion,
-      encounterVersion: this.encounterVersion,
-      artifactVersion: this.artifactVersion,
       cacheChallenge: this.cacheChallenge
         ? { ...this.cacheChallenge, guardians: [...this.cacheChallenge.guardians] }
         : null,
@@ -620,9 +589,7 @@ export class Game {
       trialBossesDefeated: this.trialBossesDefeated,
       trialBossesSpawned: this.trialBossesSpawned,
       nextTrialBossAt: this.nextTrialBossAt,
-      trialBossSchedule: this.trialBossSchedule,
       trialBossBlocked: this.trialBossBlocked,
-      bossOpeningVersion: this.bossOpeningVersion,
       nextElite: this.nextElite,
       damageDealt: this.damageDealt,
       damageBySource: { ...this.damageBySource },
@@ -647,9 +614,9 @@ export class Game {
       fields.every((key) => Number.isFinite((value as Record<string, unknown>)[key]));
     try {
       const s = raw as ReturnType<Game['snapshot']>;
-      if (!s || s.version !== 1 || !['playing', 'paused', 'upgrade', 'lost'].includes(s.state))
+      if (!s || s.version !== 2 || !['playing', 'paused', 'upgrade', 'lost'].includes(s.state))
         return null;
-      if (s.realmScaling !== undefined && ![1, 2, 3].includes(s.realmScaling)) return null;
+      if (s.realmScaling !== 3) return null;
       if (
         s.stageDuration !== undefined &&
         (!Number.isFinite(s.stageDuration) || s.stageDuration <= 0)
@@ -725,12 +692,7 @@ export class Game {
         s.rerolls > 3
       )
         return null;
-      if (s.encounterVersion !== undefined && ![0, 1].includes(s.encounterVersion)) return null;
-      if (s.artifactVersion !== undefined && ![0, 1, 2].includes(s.artifactVersion)) return null;
-      if (s.trialBossSchedule !== undefined && ![2, 3, 4, 5].includes(s.trialBossSchedule))
-        return null;
-      if (s.trialBossSchedule === 5 && typeof s.trialBossBlocked !== 'boolean') return null;
-      if (s.bossOpeningVersion !== undefined && ![0, 1].includes(s.bossOpeningVersion)) return null;
+      if (typeof s.trialBossBlocked !== 'boolean') return null;
       if (
         s.nextEnemySlowAt !== undefined &&
         (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
@@ -739,7 +701,6 @@ export class Game {
       if (s.cacheChallenge != null) {
         const c = s.cacheChallenge;
         if (
-          s.encounterVersion !== 1 ||
           s.stage >= FINAL_TRIAL_STAGE ||
           s.tribulation ||
           !numbers(c, ['x', 'y', 'deadline']) ||
@@ -754,14 +715,7 @@ export class Game {
         )
           return null;
       }
-      if (s.progressionVersion !== undefined && ![1, 2, 3, 4].includes(s.progressionVersion))
-        return null;
-      if (s.elitePacingVersion !== undefined && ![1, 2].includes(s.elitePacingVersion)) return null;
-      if (
-        (s.elitePacingVersion === 2 || s.lateEliteWaves !== undefined) &&
-        typeof s.lateEliteWaves !== 'boolean'
-      )
-        return null;
+      if (typeof s.lateEliteWaves !== 'boolean') return null;
       if (
         s.combatCultivation !== undefined &&
         (!Number.isFinite(s.combatCultivation) || s.combatCultivation < 0)
@@ -884,8 +838,7 @@ export class Game {
         s.enemies.some(
           (e) =>
             e.cacheGuardian &&
-            (s.encounterVersion !== 1 ||
-              !cache ||
+            (!cache ||
               cache.phase === 'offered' ||
               (!cache.guardians.includes(e.id) && !cache.guardians.includes(e.summonedBy ?? -1)) ||
               (['cleared', 'expired'].includes(cache.phase) && !e.dead)),
@@ -1030,25 +983,12 @@ export class Game {
           ))
       )
         return null;
-      const g = new Game(
-        save,
-        s.stage,
-        s.difficulty,
-        Math.random,
-        s.path ?? 'dual',
-        s.progressionVersion ?? 1,
-      );
-      g.encounterVersion = s.encounterVersion ?? 0;
-      g.artifactVersion = s.artifactVersion ?? 0;
-      g.trialBossSchedule = s.trialBossSchedule === 5 ? 5 : 4;
-      g.trialBossBlocked = g.trialBossSchedule === 5 ? s.trialBossBlocked : false;
-      g.bossOpeningVersion = s.bossOpeningVersion ?? 0;
+      const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      g.trialBossBlocked = s.trialBossBlocked;
       g.cacheChallenge = s.cacheChallenge
         ? { ...s.cacheChallenge, guardians: [...s.cacheChallenge.guardians] }
         : null;
-      g.progressionVersion = s.progressionVersion ?? 1;
-      g.elitePacingVersion = s.elitePacingVersion ?? 1;
-      g.lateEliteWaves = s.lateEliteWaves ?? false;
+      g.lateEliteWaves = s.lateEliteWaves;
       g.elapsedYears = s.elapsedYears;
       g.loot = s.loot
         ? {
@@ -1057,13 +997,7 @@ export class Game {
             complete: s.loot.complete,
           }
         : { artifacts: [], medicines: {}, complete: false };
-      g.startedImmortal =
-        s.startedImmortal ??
-        realmInfo(
-          Math.max(0, save.cultivation - (s.creditedCultivation ?? 0)),
-          save.completed.includes(FINAL_TRIAL_STAGE),
-          g.progressionVersion,
-        ).step === 24;
+      g.startedImmortal = s.startedImmortal ?? false;
       g.tribulation = s.tribulation ?? 0;
       g.tribulationStep = s.tribulationStep ?? 0;
       g.tribulationNextAt = s.tribulationNextAt ?? 1.2;
@@ -1071,20 +1005,8 @@ export class Game {
       g.spiritRoot = s.spiritRoot ?? 'heaven';
       g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
-      const duration = g.stageDuration;
-      // 无时长标记的早期六境固定为 5–10 分钟，终关按旧十分钟迁移。
-      const oldDuration = s.stageDuration ?? (g.isFinalTrial ? 600 : (s.stage + 5) * 60);
-      const timeScale = g.tribulation ? 1 : duration / oldDuration;
-      g.time = s.time * timeScale;
-      // 关卡进度按比例缩时，局部冷却保留剩余秒数，避免旧时间戳让技能停摆。
-      const shiftClock = (at: number) => Math.max(0, at + (g.time - s.time));
-      g.nextEnemySlowAt = shiftClock(s.nextEnemySlowAt ?? 0);
-      if (g.cacheChallenge && timeScale !== 1) {
-        const c = g.cacheChallenge;
-        c.deadline = shiftClock(c.deadline);
-        if (c.phase === 'offered' || c.phase === 'active')
-          c.deadline = Math.min(c.deadline, duration - (c.phase === 'active' ? 12 : 60));
-      }
+      g.time = s.time;
+      g.nextEnemySlowAt = s.nextEnemySlowAt ?? 0;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
@@ -1099,8 +1021,8 @@ export class Game {
         (!Number.isFinite(s.nextMedicinePulse) || s.nextMedicinePulse < 0)
       )
         return null;
-      g.nextMedicinePulse = shiftClock(s.nextMedicinePulse ?? 0);
-      g.nextEnemySkillAt = shiftClock(s.nextEnemySkillAt ?? 0);
+      g.nextMedicinePulse = s.nextMedicinePulse ?? 0;
+      g.nextEnemySkillAt = s.nextEnemySkillAt ?? 0;
       g.weapons = s.weapons.map((w) => ({ ...w }));
       g.passives = { ...s.passives };
       const maxHp = g.maximumHealth();
@@ -1109,10 +1031,10 @@ export class Game {
         (!Number.isFinite(s.medicineHpFactor) || s.medicineHpFactor <= 0)
       )
         return null;
-      const growth = g.maximumHealth(s.medicineHpFactor ?? 1) - g.player.maxHp;
-      // 旧对局补齐境界收益，保留已损失气血；新快照的差额为零。
-      g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + growth));
+      // 快照之后精研、功法或境界变化会重新计算上限；保留已损失气血，不重复回血。
+      const growth = g.maximumHealth(s.medicineHpFactor) - s.player.maxHp;
       g.player.maxHp = maxHp;
+      g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + growth));
       g.enemies = s.enemies.map((e) => ({
         ...e,
         ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
@@ -1135,66 +1057,24 @@ export class Game {
           : {}),
       }));
       g.zones = s.zones.map((z) => ({ ...z }));
-      if (s.realmScaling === undefined) {
-        const enemyHealth = realmDamageMultiplier(
-          g.tribulation ? 23 : LEGACY_STAGE_REALM_STEPS[g.stage],
-        );
-        const enemyDamage = realmHealthMultiplier(
-          g.tribulation ? g.realm : LEGACY_STAGE_REALM_STEPS[g.stage],
-        );
-        const playerDamage = realmDamageMultiplier(g.realm) / (g.realm >= 24 ? 2 : 1);
-        // 旧战场只换算一次，保留妖物剩余血量比例、弹幕与天劫窗口进度。
-        for (const enemy of g.enemies) {
-          enemy.hp *= enemyHealth;
-          enemy.maxHp *= enemyHealth;
-          enemy.damage *= enemyDamage;
-        }
-        for (const shot of g.shots)
-          shot.damage *= shot.kind === 'hostile' ? enemyDamage : playerDamage;
-        for (const zone of g.zones) zone.damage *= zone.hostile ? enemyDamage : playerDamage;
-        g.tribulationOpeningDamage *= enemyHealth;
-      } else if (s.realmScaling === 1 && g.realm >= 24) {
-        // 上一版真仙为两倍伤害，仅补齐场内己方攻击，不重复强化敌人。
-        for (const shot of g.shots) if (shot.kind !== 'hostile') shot.damage *= 5 / 2;
-        for (const zone of g.zones) if (!zone.hostile) zone.damage *= 5 / 2;
-      }
-      if (s.realmScaling !== 3) {
-        const realmDamage = 1 + realmBonuses(g.realm).damage;
-        const passiveDamage =
-          g.passivePower('power') * 0.12 +
-          g.passivePower('spirit') * 0.04 +
-          g.passivePower('blood') * 0.18 +
-          g.passivePower('forbidden') * 0.08 +
-          (g.path === 'demonic' ? 0.12 : 0);
-        const growth = (realmDamage * (1 + passiveDamage)) / (realmDamage + passiveDamage);
-        for (const shot of g.shots) if (shot.kind !== 'hostile') shot.damage *= growth;
-        for (const zone of g.zones) if (!zone.hostile) zone.damage *= growth;
-      }
       g.pickups = s.pickups
         .filter((p) => !g.isFinalTrial || p.kind !== 'heal')
         .map((p) => ({ ...p }));
       g.choices = s.choices.map((c) => ({ ...c }));
       g.bossSpawned = s.bossSpawned;
       g.trialBossesDefeated = Math.min(s.trialBossesDefeated ?? 0, TRIAL_BOSS_STAGES.length);
-      if ([3, 4, 5].includes(s.trialBossSchedule)) {
-        if (
-          !Number.isInteger(s.trialBossesSpawned) ||
-          s.trialBossesSpawned < g.trialBossesDefeated ||
-          s.trialBossesSpawned > TRIAL_BOSS_STAGES.length
-        )
-          return null;
-        g.trialBossesSpawned = s.trialBossesSpawned;
-      } else {
-        g.trialBossesSpawned = Math.min(
-          TRIAL_BOSS_STAGES.length,
-          g.trialBossesDefeated + g.enemies.filter((e) => e.boss && !e.dead).length,
-        );
-      }
-      g.nextTrialBossAt =
-        g.trialBossSchedule === 5
-          ? Math.max(s.nextTrialBossAt, g.trialBossTimes[g.trialBossesSpawned] ?? g.stageDuration)
-          : (g.trialBossTimes[g.trialBossesSpawned] ?? g.stageDuration);
-      g.nextElite = s.nextElite * timeScale;
+      if (
+        !Number.isInteger(s.trialBossesSpawned) ||
+        s.trialBossesSpawned < g.trialBossesDefeated ||
+        s.trialBossesSpawned > TRIAL_BOSS_STAGES.length
+      )
+        return null;
+      g.trialBossesSpawned = s.trialBossesSpawned;
+      g.nextTrialBossAt = Math.max(
+        s.nextTrialBossAt,
+        TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? g.stageDuration,
+      );
+      g.nextElite = s.nextElite;
       g.damageDealt = s.damageDealt;
       if (s.damageBySource !== undefined) {
         if (!s.damageBySource || typeof s.damageBySource !== 'object') return null;
@@ -1219,10 +1099,9 @@ export class Game {
       )
         return null;
       g.bossCultivation = s.bossCultivation ?? 0;
-      // 旧版可复活十次：保留续局已用次数，新版不补发复活机会。
       if (
         s.revivesUsed !== undefined &&
-        (!Number.isInteger(s.revivesUsed) || s.revivesUsed < 0 || s.revivesUsed > 10)
+        (!Number.isInteger(s.revivesUsed) || s.revivesUsed < 0 || s.revivesUsed > MAX_REVIVES)
       )
         return null;
       g.revivesUsed = s.revivesUsed ?? 0;
@@ -1338,21 +1217,7 @@ export class Game {
       }
       this.updateEliteWave();
       if (this.isFinalTrial) {
-        if (this.trialBossSchedule >= 5) this.updateTrialBosses();
-        else
-          while (
-            this.trialBossesSpawned < TRIAL_BOSS_STAGES.length &&
-            this.time >= this.nextTrialBossAt
-          ) {
-            const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
-            this.bossSpawned = true;
-            this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
-            this.trialBossesSpawned++;
-            this.nextTrialBossAt =
-              this.trialBossTimes[this.trialBossesSpawned] ?? this.stageDuration;
-            this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
-            this.onEvent('boss');
-          }
+        this.updateTrialBosses();
       } else if (!this.bossSpawned && this.remaining === 0) {
         this.bossSpawned = true;
         this.bossArrival(this.spawnEnemy(10, false, true));
@@ -1508,7 +1373,7 @@ export class Game {
       this.nextElite = this.time + 1;
       return;
     }
-    const available = enemyRoster(this.stage, this.time, this.encounterVersion === 0);
+    const available = enemyRoster(this.stage, this.time);
     const armored = available.filter((type) => ['tank', 'shield'].includes(ENEMIES[type].behavior));
     let first = armored.at(-1) ?? available.at(-1);
     let second = available.at(-1);
@@ -1553,7 +1418,7 @@ export class Game {
     this.bossArrival(this.spawnEnemy(10, false, true, undefined, bossStage));
     this.trialBossesSpawned++;
     this.nextTrialBossAt = Math.max(
-      this.trialBossTimes[this.trialBossesSpawned] ?? this.stageDuration,
+      TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? this.stageDuration,
       this.time + TRIAL_BOSS_INTERVAL,
     );
     this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
@@ -1567,7 +1432,7 @@ export class Game {
     bossStage = this.isFinalTrial ? TRIAL_BOSS_STAGES[this.trialBossesDefeated] : this.stage,
   ) {
     if (this.isFinalTrial && !boss) elite = true;
-    const available = enemyRoster(this.stage, this.time, this.encounterVersion === 0);
+    const available = enemyRoster(this.stage, this.time);
     if (type === undefined) {
       const pool =
         available.length > 3
@@ -1580,9 +1445,7 @@ export class Game {
     const template = ENEMIES[type],
       angle = this.random() * TAU;
     const difficulty = DIFFICULTIES[this.difficulty];
-    const realmStep = (this.progressionVersion >= 2 ? STAGE_REALM_STEPS : LEGACY_STAGE_REALM_STEPS)[
-      this.stage
-    ];
+    const realmStep = STAGE_REALM_STEPS[this.stage];
     const scaling = STAGE_COMBAT_SCALING[this.stage];
     const eliteScaling = elite && !boss ? scaling.elite : undefined;
     const progress = this.combatProgress;
@@ -1654,10 +1517,7 @@ export class Game {
       bossStage: boss ? bossStage : undefined,
       pursuitCooldown: boss ? 2.5 : undefined,
       cooldown: boss
-        ? this.bossOpeningVersion &&
-          !this.tribulation &&
-          !this.isFinalTrial &&
-          [1, 5].includes(this.stage)
+        ? !this.tribulation && !this.isFinalTrial && [1, 5].includes(this.stage)
           ? 1
           : 2.5
         : 1 + this.random() * 3,
@@ -1677,12 +1537,10 @@ export class Game {
     return enemy;
   }
   private enemyTactics(type: number) {
-    return this.encounterVersion ? ENEMY_TACTICS[type] : LEGACY_ENEMY_TACTICS[type];
+    return ENEMY_TACTICS[type];
   }
   usesRegionalSkill(e: Enemy) {
-    return (
-      this.stage < FINAL_TRIAL_STAGE || (!!this.encounterVersion && ENEMY_TACTICS[e.type].regional)
-    );
+    return this.stage < FINAL_TRIAL_STAGE || ENEMY_TACTICS[e.type].regional;
   }
   private updateEnemies(dt: number) {
     const p = this.player;
@@ -1731,9 +1589,9 @@ export class Game {
           e.y += e.dy * 380 * dt;
         }
       } else {
-        const localCaster =
-          this.encounterVersion &&
-          ['roots', 'frost', 'miasma', 'storm'].includes(this.enemyTactics(e.type).skill ?? '');
+        const localCaster = ['roots', 'frost', 'miasma', 'storm'].includes(
+          this.enemyTactics(e.type).skill ?? '',
+        );
         const move =
           ['ranged', 'volley', 'nova', 'summon'].includes(behavior) &&
           d < (localCaster ? 160 : 240) &&
@@ -1924,7 +1782,7 @@ export class Game {
         240 - this.enemies.length,
         12 - this.enemies.filter((v) => !v.dead && v.summonedBy !== undefined).length,
       );
-      const pool = enemyRoster(this.stage, this.time, this.encounterVersion === 0).slice(0, 2);
+      const pool = enemyRoster(this.stage, this.time).slice(0, 2);
       for (let i = 0; i < count; i++) {
         const a = (i / count) * TAU;
         const summoned = this.spawnEnemy(pool[i % pool.length], false, false, {
@@ -2131,9 +1989,7 @@ export class Game {
     };
     const summons = (count: number) => {
       const pool =
-        stage === FINAL_TRIAL_STAGE
-          ? [24, 25]
-          : enemyRoster(stage, STAGES[stage].minutes * 60, this.encounterVersion === 0);
+        stage === FINAL_TRIAL_STAGE ? [24, 25] : enemyRoster(stage, STAGES[stage].minutes * 60);
       for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++)
         this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], false, false, {
           x: e.x + Math.cos((i / count) * TAU) * 90,
@@ -2224,7 +2080,7 @@ export class Game {
     const t = treasure(w.id);
     return (
       t.damage *
-      weaponDamageMultiplier(w.id, w.level, this.artifactVersion) *
+      weaponDamageMultiplier(w.id, w.level) *
       this.stats.damage *
       (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
       (w.evolved ? EVOLVED_DAMAGE : 1) *
@@ -2876,7 +2732,7 @@ export class Game {
     );
   }
   private enemyDeath(e: Enemy) {
-    if (!this.encounterVersion || e.boss) return;
+    if (e.boss) return;
     const tactics = ENEMY_TACTICS[e.type];
     if (tactics.deathMiasma)
       this.enemyField(e, 0, 0, 50, 2.4, e.damage * 0.35, '#bdcc79', 'enemy-miasma');
@@ -2935,13 +2791,7 @@ export class Game {
     return true;
   }
   private updateCacheChallenge() {
-    if (
-      !this.encounterVersion ||
-      this.tribulation ||
-      this.isFinalTrial ||
-      this.state !== 'playing' ||
-      this.player.hp <= 0
-    )
+    if (this.tribulation || this.isFinalTrial || this.state !== 'playing' || this.player.hp <= 0)
       return;
     const duration = STAGES[this.stage].minutes * 60;
     if (
@@ -3139,15 +2989,12 @@ export class Game {
             ),
           )
         : Math.round(ENEMIES[e.type].xp * (1 + this.stage * 0.16) * (e.elite ? 8 : 1));
-      // 基础击杀收益保留，额外修为按地域与怪物强度结算；旧快照不追溯虚构击杀。
-      const cultivationScale = this.progressionVersion >= 2 ? 1 : cultivationFactor(this.realm);
-      const rate = cultivationRate(this.stage, this.progressionVersion);
-      // 终关全员精英属于战斗强度：新局永久修为按普通倍率，局内灵气仍按精英给。
-      // 旧续局沿用原奖励至结束，已入账修为不重算、不扣回。
-      const cultivationElite =
-        e.elite && (!this.isFinalTrial || this.progressionVersion < 3) ? 4 : 1;
+      // 基础击杀收益保留，额外修为按地域与怪物强度结算。
+      const rate = cultivationRate(this.stage);
+      // 终关全员精英属于战斗强度：永久修为按普通倍率，局内灵气仍按精英给。
+      const cultivationElite = e.elite && !this.isFinalTrial ? 4 : 1;
       const bossReward = e.boss
-        ? bossCultivationReward(this.stage, e.bossStage ?? this.stage, this.progressionVersion) *
+        ? bossCultivationReward(this.stage, e.bossStage ?? this.stage) *
           this.medicine.bossCultivation
         : 0;
       this.bossCultivation +=
@@ -3156,16 +3003,13 @@ export class Game {
         ? bossReward
         : Math.max(
             0,
-            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite) /
-              cultivationScale -
-              0.7,
+            (ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite - 0.7,
           ) * rate;
       if (!e.boss)
         this.combatCultivation +=
           Math.max(
             0.7,
-            ((ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite) /
-              cultivationScale,
+            (ENEMIES[e.type].xp / 3) * 0.7 * (1 + this.stage * 0.6) * cultivationElite,
           ) *
           (this.medicine.cultivation - 1) *
           rate;
@@ -3216,8 +3060,7 @@ export class Game {
           pull:
             !!this.passives.soul &&
             distance(e, this.player) <=
-              (110 + this.passives.soul * 50) *
-                (1 + masteryBonus(this.save, 'soul', this.progressionVersion)),
+              (110 + this.passives.soul * 50) * (1 + masteryBonus(this.save, 'soul')),
         });
       if (
         (e.elite && (!this.isFinalTrial || this.random() < 0.06)) ||
@@ -3307,18 +3150,7 @@ export class Game {
   }
   evolutionRequirements(id: string) {
     const t = treasure(id);
-    return evolutionPassives(
-      id === 'axe' && !this.encounterVersion
-        ? { ...t, passive: 'power' }
-        : id === 'skull' && !this.artifactVersion
-          ? { ...t, passive: 'spirit' }
-          : this.artifactVersion < 2 && id === 'fan'
-            ? { ...t, passive: 'haste' }
-            : this.artifactVersion < 2 && id === 'chain'
-              ? { ...t, passive: 'duration' }
-              : t,
-      this.path,
-    );
+    return evolutionPassives(t, this.path);
   }
   private canEvolve(id: string) {
     const item = TREASURES.find((treasure) => treasure.id === id);

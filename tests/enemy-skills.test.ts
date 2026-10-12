@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { registerHooks, stripTypeScriptTypes } from 'node:module';
 import { Game } from '../src/game.ts';
-import { ENEMIES, LEGACY_ENEMY_TACTICS as ENEMY_TACTICS, STAGE_ENEMIES } from '../src/data.ts';
+import { ENEMIES, ENEMY_TACTICS, STAGE_ENEMIES } from '../src/data.ts';
 import { autoplayInput } from '../src/autoplay.ts';
 import { freshSave } from '../src/progress.ts';
 
@@ -12,7 +12,6 @@ function encounter(stage: number, type: number, elite = false, distance = 200) {
   save.unlocked = 6;
   save.cultivation = 1e9;
   const g = new Game(save, stage, 0, () => 0.5);
-  g.encounterVersion = 0;
   g.weapons[0].timer = 9999;
   g.spawnBudget = -10000;
   g.nextElite = 9999;
@@ -139,8 +138,10 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
       if (!skill) {
         assert.equal(ENEMIES[type].behavior, 'explode');
         assert.equal(e.charge, 0);
-      } else if (skill === 'dash') assert.ok(e.charge > 0.55);
-      else if (['ranged', 'volley', 'nova', 'soul'].includes(skill)) {
+      } else if (skill === 'dash' || skill === 'firecharge') assert.ok(e.charge > 0.55);
+      else if (
+        ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(skill)
+      ) {
         assert.equal(g.shots.length, 0);
         advance(g, 0.7);
         assert.ok(g.shots.length > 0);
@@ -150,25 +151,6 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
       count++;
     }
   assert.equal(count, 72);
-});
-
-test('旧续局前六境地域法师保留蓄势直线灵弹，不再在玩家脚下生成地域法阵', () => {
-  for (const [stage, type] of [5, 33, 45, 53, 61, 69].entries()) {
-    for (const elite of [false, true]) {
-      const { g, e } = encounter(stage, type, elite);
-      g.update(0.01);
-      assert.equal(e.pendingSkill, stage === 4 ? 'soul' : 'ranged');
-      assert.ok(e.windup! > 0);
-      assert.equal(g.zones.length, 0);
-      assert.equal(g.shots.length, 0);
-      advance(g, 0.7);
-      assert.equal(g.shots.length, stage === 4 ? (elite ? 4 : 2) : 1);
-      if (stage === 4) {
-        assert.ok(g.shots.some((shot) => shot.vy < 0));
-        assert.ok(g.shots.some((shot) => shot.vy > 0));
-      }
-    }
-  }
 });
 
 test('第五境无面幽魂与爆魂冥瓮精英保留交叉灵弹', () => {
@@ -221,21 +203,16 @@ test('灵弹蓄势后沿锁定方向发射，施法者死亡可以打断', () =>
   assert.equal(g.shots.length, 0);
 });
 
-test('旧续局普通怪和精英不生成地域法阵，重甲近身震地保留', () => {
-  for (const stage of [0, 1, 2, 3, 4, 5]) {
-    const caster = [5, 33, 45, 53, 61, 69][stage];
-    for (const elite of [false, true]) {
-      const { g } = encounter(stage, caster, elite);
-      g.update(0.01);
-      assert.equal(g.zones.length, 0);
-    }
-  }
+test('重甲近身震地保留，地域法师按秘境生成法阵', () => {
   const tank = STAGE_ENEMIES[0].find((type) => ENEMIES[type].behavior === 'tank')!;
   for (const elite of [false, true]) {
     const { g } = encounter(0, tank, elite, 100);
     g.update(0.01);
     assert.ok(g.zones.some((zone) => zone.kind === 'enemy-stomp'));
   }
+  const { g: storm } = encounter(5, 69, false);
+  storm.update(0.01);
+  assert.ok(storm.zones.some((zone) => zone.kind === 'enemy-storm'));
 });
 
 test('精英冲刺AI侧移避开，续局后仍可辨认锁定路线', () => {
@@ -258,7 +235,7 @@ test('精英冲刺AI侧移避开，续局后仍可辨认锁定路线', () => {
   }
 });
 
-test('前六境大量精英施法受限：弹幕64、召唤护卫12，法师不生成地域法阵', () => {
+test('前六境大量精英施法受限：弹幕64、地域法阵与召唤护卫12', () => {
   const { g } = encounter(5, 69, true);
   g.enemies = [];
   g.player.invincible = 999;
@@ -283,10 +260,10 @@ test('前六境大量精英施法受限：弹幕64、召唤护卫12，法师不�
     assert.ok(g.zones.length <= 12);
     assert.ok(g.enemies.filter((e) => e.summonedBy !== undefined).length <= 12);
   }
-  assert.ok(maxShots > 0 && maxZones === 0 && maxSummons > 0);
+  assert.ok(maxShots > 0 && maxZones > 0 && maxSummons > 0);
 });
 
-test('旧档补默认迟滞字段，蓄势续局不丢技能，无效技能状态拒绝恢复', () => {
+test('蓄势续局不丢技能，无效技能状态拒绝恢复', () => {
   const { g } = encounter(4, 61, true);
   g.update(0.01);
   const restored = Game.restore(g.save, g.snapshot())!;
@@ -312,7 +289,7 @@ test('旧档补默认迟滞字段，蓄势续局不丢技能，无效技能状�
   assert.equal(Game.restore(g.save, bad), null);
 });
 
-test('终关继续使用原行为：法师立即发弹、追击精英第二批才冲刺，无新区域和减速', () => {
+test('终关非地域法师立即发弹、追击精英第二批才冲刺', () => {
   const { g, e } = encounter(6, 61, true);
   g.update(0.01);
   assert.equal(g.shots.length, 1);

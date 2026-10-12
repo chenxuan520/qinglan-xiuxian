@@ -163,43 +163,6 @@ test('白骨髅新配方、升级提示和自动选技都认白骨魔功，兼�
   }
 });
 
-test('更新前白骨续局保留逆命配方，重复恢复、已觉醒与进入天劫都不换配方', () => {
-  const g = fixture();
-  g.weapons = [{ id: 'skull', level: 6, evolved: false, timer: 0 }];
-  g.passives = { forbidden: 4, bone: 1 };
-  g.state = 'upgrade';
-  g.choices = [
-    { type: 'passive', id: 'forbidden', level: 5 },
-    { type: 'passive', id: 'bone', level: 2 },
-  ];
-  const old = g.snapshot();
-  delete old.artifactVersion;
-  const first = Game.restore(g.save, old)!;
-  assert.ok(first);
-  assert.equal(first.artifactVersion, 0);
-  const restored = Game.restore(g.save, first.snapshot())!;
-  assert.deepEqual(restored.evolutionRequirements('skull'), ['forbidden']);
-  assert.equal(autoplayChoice(restored)!.index, 0);
-  assert.ok(
-    choiceCard(restored, g.save, { type: 'weapon', id: 'skull', level: 6 }, 0).includes(
-      '逆命魔典五重',
-    ),
-  );
-  assert.equal(restored.choose(0), true);
-  assert.equal(restored.canEvolve('skull'), true);
-  restored.state = 'upgrade';
-  restored.choices = [{ type: 'evolve', id: 'skull', level: 7 }];
-  restored.choose(0);
-  const evolved = Game.restore(g.save, restored.snapshot())!;
-  assert.equal(evolved.weapons[0].evolved, true);
-  assert.equal(
-    evolved.effects.some((e) => e.kind === 'awaken'),
-    false,
-  );
-  assert.equal(Game.createTribulation(g.save, evolved).artifactVersion, 0);
-  assert.equal(new Game(g.save, 0, 0).artifactVersion, 2);
-});
-
 test('白骨每重给骨灵独立增伤8%，精研最高52%，不增加其他法宝伤害', () => {
   for (const evolved of [false, true]) {
     const g = fixture();
@@ -228,28 +191,25 @@ test('白骨每重给骨灵独立增伤8%，精研最高52%，不增加其他法
   near(g.weaponHitDamage(w), base * 1.52);
 });
 
-test('骨灵实际弹丸命中及觉醒一击使用白骨增益，新旧续局均可受益', () => {
-  for (const artifactVersion of [0, 1]) {
-    const g = fixture();
-    g.artifactVersion = artifactVersion;
-    const w = { id: 'skull' as const, level: 1, evolved: false, timer: 999 };
-    g.weapons = [w];
-    g.passives = { bone: 5 };
-    const e = g.spawnEnemy(0, false, false, { x: 250, y: 0 });
-    e.hp = e.maxHp = 1e7;
-    g.cast(w);
-    assert.ok(g.shots.length > 0);
-    const shot = g.shots[0];
-    near(shot.damage, treasure('skull').damage * g.stats.damage * 1.4);
-    g.shots = [shot];
-    e.x = shot.x + shot.vx * 0.01;
-    e.y = shot.y + shot.vy * 0.01;
-    g.updateShots(0.01);
-    near(e.maxHp - e.hp, shot.damage);
-    near(g.damageBySource.skull, shot.damage);
-    g.awaken(w);
-    near(e.maxHp - e.hp, shot.damage * 9);
-  }
+test('骨灵实际弹丸命中及觉醒一击使用白骨增益', () => {
+  const g = fixture();
+  const w = { id: 'skull' as const, level: 1, evolved: false, timer: 999 };
+  g.weapons = [w];
+  g.passives = { bone: 5 };
+  const e = g.spawnEnemy(0, false, false, { x: 250, y: 0 });
+  e.hp = e.maxHp = 1e7;
+  g.cast(w);
+  assert.ok(g.shots.length > 0);
+  const shot = g.shots[0];
+  near(shot.damage, treasure('skull').damage * g.stats.damage * 1.4);
+  g.shots = [shot];
+  e.x = shot.x + shot.vx * 0.01;
+  e.y = shot.y + shot.vy * 0.01;
+  g.updateShots(0.01);
+  near(e.maxHp - e.hp, shot.damage);
+  near(g.damageBySource.skull, shot.damage);
+  g.awaken(w);
+  near(e.maxHp - e.hp, shot.damage * 9);
 });
 
 test('斧、印、棺的落地反馈与既有伤害时机、半径保持一致', () => {
@@ -359,16 +319,14 @@ test('新存档字段校验与旧字段缺省兼容，不接受损坏动画数�
     broken.zones[0][key] = value;
     assert.equal(Game.restore(g.save, broken), null, String(key));
   }
-  assert.equal(Game.restore(g.save, { ...snapshot, artifactVersion: 3 }), null);
-  delete snapshot.artifactVersion;
+  assert.equal(Game.restore(g.save, { ...snapshot, version: 3 }), null);
   for (const z of snapshot.zones) {
     delete z.castDelay;
     delete z.castAngle;
     delete z.castEvolved;
   }
   assert.ok(Game.restore(g.save, snapshot));
-  assert.equal(parseSave(JSON.stringify({ ...g.save, schema: 4 })).schema, SAVE_SCHEMA);
-  assert.ok(SAVE_SCHEMA >= 5);
+  assert.equal(parseSave(JSON.stringify(g.save)).schema, SAVE_SCHEMA);
 });
 
 test('钟声和冰镜绘制不修改效果时钟，减少动态效果仍保留完整命中边界', () => {

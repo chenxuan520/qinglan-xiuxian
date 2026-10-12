@@ -86,20 +86,14 @@ test('本局年岁只累计实际战斗消耗，寿尽与天劫截停不多计',
   assert.equal(t.save.age, age);
 });
 
-test('本局年岁随续局保存且不受旧时长缩放影响，缺失旧记录不虚构', () => {
+test('本局年岁随续局保存，缺失旧记录不虚构', () => {
   const save = freshSave();
   const g = new Game(save, 0, 0);
   g.update(0.05);
   const snapshot = g.snapshot();
-  const restored = Game.restore(save, { ...snapshot, stageDuration: snapshot.stageDuration * 2 })!;
-  assert.equal(restored.time, g.time / 2);
+  const restored = Game.restore(save, { ...snapshot })!;
   assert.equal(restored.elapsedYears, g.elapsedYears);
   assert.equal(Game.restore(save, restored.snapshot())!.elapsedYears, g.elapsedYears);
-  const legacy = Game.restore(save, { ...snapshot, elapsedYears: undefined })!;
-  assert.equal(legacy.elapsedYears, undefined);
-  legacy.resume();
-  legacy.update(0.05);
-  assert.equal(legacy.elapsedYears, undefined);
   for (const elapsedYears of [-1, NaN, Infinity, null, '1'])
     assert.equal(Game.restore(save, { ...snapshot, elapsedYears }), null);
 });

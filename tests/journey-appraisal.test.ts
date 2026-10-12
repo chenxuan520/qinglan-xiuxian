@@ -201,6 +201,7 @@ test('炼器、通境与历劫也可组成修行段，不会只在取得勋章�
 test('缺项旧档真仙只说已证，不补造七境全通、初始灵根或未知年岁', () => {
   const old = freshSave();
   old.completed = [6];
+  old.cultivation = 119940;
   const save = readSave(JSON.stringify(old)).save;
   for (const ending of ['ongoing', 'immortal'] as const) {
     const f = journeyAppraisalFacts(save, ending);

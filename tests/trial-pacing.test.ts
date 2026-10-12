@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 import { bossEntranceCue } from '../src/boss-entrance.ts';
-import { TRIAL_BOSS_TIMES, LEGACY_TRIAL_BOSS_TIMES } from '../src/data.ts';
+import { TRIAL_BOSS_TIMES } from '../src/data.ts';
 
 function trial() {
   const save = freshSave();
@@ -82,21 +82,12 @@ test('时间已过很久也不在同帧补出多王，暂停、复活不重置�
   assert.equal(g.trialBossesSpawned, 1);
 });
 
-test('旧七分钟续局继续旧排程及并场规则，新局刷新不缩时且保存延期状态', () => {
-  const g = trial();
-  g.trialBossSchedule = 4;
-  for (const at of LEGACY_TRIAL_BOSS_TIMES) advance(g, at);
-  const old = Game.restore(g.save, structuredClone(g.snapshot()))!;
-  assert.equal(old.stageDuration, 420);
-  assert.equal(old.time, 420);
-  assert.equal(old.trialBossesSpawned, 7);
-  assert.equal(old.enemies.filter((e) => e.boss && !e.dead).length, 7);
+test('延期状态跨续局保存，损坏状态拒绝恢复', () => {
   const current = trial();
   current.time = 310;
   current.nextTrialBossAt = 380;
   current.trialBossBlocked = true;
   const restored = Game.restore(current.save, structuredClone(current.snapshot()))!;
-  assert.equal(restored.stageDuration, 330);
   assert.equal(restored.time, 310);
   assert.equal(restored.nextTrialBossAt, 380);
   assert.equal(restored.trialBossBlocked, true);
@@ -104,35 +95,14 @@ test('旧七分钟续局继续旧排程及并场规则，新局刷新不缩时�
     Game.restore(current.save, { ...current.snapshot(), trialBossBlocked: 'true' }),
     null,
   );
-  assert.equal(Game.restore(current.save, { ...current.snapshot(), trialBossSchedule: 6 }), null);
 });
 
-test('新旧出王排程均使用五分钟小怪压力曲线，排程不改变小怪属性', () => {
-  for (const time of [0, 60, 150, 299, 300, 330, 420, 900]) {
-    const current = trial();
-    const legacy = trial();
-    legacy.trialBossSchedule = 4;
-    current.time = legacy.time = time;
-    for (const type of [0, 3, 7]) {
-      const a = current.spawnEnemy(type, false, false, { x: 400, y: 0 });
-      const b = legacy.spawnEnemy(type, false, false, { x: 400, y: 0 });
-      assert.deepEqual([a.maxHp, a.speed, a.damage], [b.maxHp, b.speed, b.damage]);
-    }
-    current.update(0.01);
-    legacy.update(0.01);
-    assert.equal(current.spawnBudget, legacy.spawnBudget);
-  }
-});
-
-test('只有新局第二、第六境首招提前到1秒，旧局与独立天劫首招不变', () => {
+test('只有第二、第六境妖王首招提前到1秒，独立天劫首招不变', () => {
   for (let stage = 0; stage <= 6; stage++) {
     const save = freshSave();
     save.unlocked = 6;
     const g = new Game(save, stage, 0, () => 0.5);
     assert.equal(g.spawnEnemy(10, false, true).cooldown, [1, 5].includes(stage) ? 1 : 2.5);
-    g.bossOpeningVersion = 0;
-    const old = Game.restore(save, structuredClone(g.snapshot()))!;
-    assert.equal(old.spawnEnemy(10, false, true).cooldown, 2.5);
   }
   const g = trial();
   assert.equal(Game.createTribulation(g.save, g).boss!.cooldown, 2.5);

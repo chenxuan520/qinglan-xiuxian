@@ -23,33 +23,31 @@ const victory = {
   iron: 3,
   level: 100,
   combatCultivation: 217600,
-  progressionVersion: 3,
   victory: true,
 };
 
-test('七种灵根三档难度及旧奖励版本均在终关结算补足成仙，保留超额且不重复乘倍率', () => {
+test('七种灵根三档难度均在终关结算补足成仙，保留超额且不重复乘倍率', () => {
   assert.equal(IMMORTAL_CULTIVATION, 119940);
   for (const root of SPIRIT_ROOTS)
     for (const difficulty of [0, 1, 2])
-      for (const progressionVersion of [1, 2, 3])
-        for (const initial of [0, 57024, 119000, 1e6]) {
-          const save = freshSave(root.id);
-          const run = { ...victory, difficulty, progressionVersion, spiritRoot: root.id };
-          const ordinary = cultivationReward(run, 400);
-          const creditedCultivation = Math.floor(ordinary / 2);
-          save.cultivation = initial + creditedCultivation;
-          const before = save.cultivation;
-          const result = settleRun(save, { ...run, creditedCultivation });
-          const expected = Math.max(initial + ordinary, IMMORTAL_CULTIVATION);
-          assert.equal(save.cultivation, expected);
-          assert.equal(result.ascensionCultivation, expected - initial - ordinary);
-          assert.equal(result.cultivation, expected - initial);
-          assert.equal(result.cultivationRemaining, expected - before);
-          assert.equal(result.cultivation - result.cultivationRemaining, creditedCultivation);
-          assert.equal(realmInfo(save.cultivation, save.completed.includes(6)).name, '真仙');
-          assert.equal(save.chronicle.milestones['realm-24'], save.age);
-          assert.equal(enterImmortalGate(save), true);
-        }
+      for (const initial of [0, 57024, 119000, 1e6]) {
+        const save = freshSave(root.id);
+        const run = { ...victory, difficulty, spiritRoot: root.id };
+        const ordinary = cultivationReward(run, 400);
+        const creditedCultivation = Math.floor(ordinary / 2);
+        save.cultivation = initial + creditedCultivation;
+        const before = save.cultivation;
+        const result = settleRun(save, { ...run, creditedCultivation });
+        const expected = Math.max(initial + ordinary, IMMORTAL_CULTIVATION);
+        assert.equal(save.cultivation, expected);
+        assert.equal(result.ascensionCultivation, expected - initial - ordinary);
+        assert.equal(result.cultivation, expected - initial);
+        assert.equal(result.cultivationRemaining, expected - before);
+        assert.equal(result.cultivation - result.cultivationRemaining, creditedCultivation);
+        assert.equal(realmInfo(save.cultivation, save.completed.includes(6)).name, '真仙');
+        assert.equal(save.chronicle.milestones['realm-24'], save.age);
+        assert.equal(enterImmortalGate(save), true);
+      }
 });
 
 test('前六关、终关失败和放弃没有补足；足额但未通关仍被成仙门槛锁住', () => {
@@ -120,75 +118,17 @@ test('仙尊提前被杀不触发保底，六王后的读档不成仙，最后�
   }
 });
 
-test('已有终关通关记录的旧档只补差额，导入、刷新不补造历史成就或改变物资', () => {
-  for (const root of SPIRIT_ROOTS)
-    for (const initial of [0, 57024, IMMORTAL_CULTIVATION - 1, IMMORTAL_CULTIVATION, 1e6]) {
-      const old = freshSave(root.id);
-      old.schema = 7;
-      old.unlocked = 6;
-      old.completed = [0, 1, 2, 3, 4, 5, 6];
-      old.cultivation = initial;
-      old.stones = 4321;
-      old.iron = 91;
-      old.age = 1015;
-      old.forge.sword = 4;
-      old.medicine.bag.xuling = 2;
-      old.nextTribulationAge = 10000;
-      const raw = JSON.stringify(old);
-      const restored = parseSave(raw);
-      assert.equal(restored.schema, SAVE_SCHEMA);
-      assert.equal(restored.cultivation, Math.max(initial, IMMORTAL_CULTIVATION));
-      assert.equal(realmInfo(restored.cultivation, true).name, '真仙');
-      assert.equal(restored.age, old.age);
-      assert.equal(restored.stones, old.stones);
-      assert.equal(restored.iron, old.iron);
-      assert.equal(restored.forge.sword, old.forge.sword);
-      assert.deepEqual(restored.medicine, old.medicine);
-      assert.equal(restored.nextTribulationAge, 0);
-      assert.equal(Object.hasOwn(restored.chronicle.milestones, 'rootless-immortal'), false);
-      assert.equal(Object.hasOwn(restored.chronicle.milestones, 'hard-immortal'), false);
-      if (initial < IMMORTAL_CULTIVATION)
-        assert.equal(restored.chronicle.milestones['realm-24'], null);
-      const again = parseSave(JSON.stringify(restored));
-      assert.equal(again.cultivation, restored.cultivation);
-      assert.deepEqual(again.chronicle, restored.chronicle);
-      const imported = importSave(raw).save;
-      assert.equal(imported.cultivation, restored.cultivation);
-      assert.deepEqual(imported.chronicle, restored.chronicle);
-      assert.equal(JSON.stringify(old), raw, '迁移不改调用方原对象');
-    }
-});
-
-test('未通关及更新版本存档不触发旧档补足，轮回新世也不继承', () => {
+test('更新版本存档只读，旧版本档不可读', () => {
   const save = freshSave('none');
   save.cultivation = 1000;
-  save.completed = [0, 1, 2, 3, 4, 5];
-  assert.equal(parseSave(JSON.stringify(save)).cultivation, 1000);
-  save.completed.push(6);
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
   save.schema = SAVE_SCHEMA + 1;
   const newer = readSave(JSON.stringify(save));
   assert.equal(newer.status, 'newer');
   assert.equal(newer.save.cultivation, 1000);
   assert.throws(() => importSave(JSON.stringify(save)), /更新的版本/);
+  const older = freshSave('none');
+  older.schema = SAVE_SCHEMA - 1;
+  assert.equal(readSave(JSON.stringify(older)).status, 'unreadable');
   assert.equal(parseSave(JSON.stringify(freshSave('none'))).cultivation, 0);
-});
-
-test('旧通关档带受伤续局时补足只写永久修为，恢复成长加成不重复回血或入账', () => {
-  const save = freshSave('none');
-  save.schema = 7;
-  save.unlocked = 6;
-  save.completed = [0, 1, 2, 3, 4, 5, 6];
-  save.cultivation = 57024;
-  const g = new Game(save, 6, 0, () => 0.5);
-  g.player.hp -= 123;
-  g.time = 30;
-  const restored = importSave(exportSave(save, g));
-  assert.equal(restored.save.cultivation, IMMORTAL_CULTIVATION);
-  assert.ok(restored.run);
-  assert.equal(restored.run.time, 30);
-  assert.equal(restored.run.player.maxHp - restored.run.player.hp, 123);
-  assert.equal(restored.run.creditedCultivation, 0);
-  const again = importSave(exportSave(restored.save, restored.run));
-  assert.equal(again.save.cultivation, IMMORTAL_CULTIVATION);
-  assert.equal(again.run!.player.hp, restored.run.player.hp);
 });

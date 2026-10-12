@@ -395,7 +395,7 @@ test('通关存档迁移仍拒绝损坏的原历练，普通未完成历练正�
   const trial = Game.createTribulation(save, null);
   save.completed = [6];
   save.tribulationReturn = { bad: true };
-  assert.throws(() => importSave(exportSave(save, trial)), /已损坏/);
+  assert.throws(() => importSave(exportSave(save, trial)), /历练数据无法识别/);
   save.tribulationReturn = null;
   const regular = new Game(save, 0, 0);
   regular.time = 12;
