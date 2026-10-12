@@ -59,6 +59,27 @@ test('三难度七境妖王使用固定强化倍率，终关单列，移动速�
     }
   }
 });
+
+test('第二境新出场妖王气血恰增30%，固定强度不随玩家资质或境界变化', () => {
+  for (const [difficulty, rules] of DIFFICULTIES.entries()) {
+    const beforeHp =
+      27000 * rules.hp * 1.65 * STAGE_COMBAT_SCALING[1].hp * realmDamageMultiplier(6);
+    for (const root of ['heaven', 'none'] as const) {
+      for (const cultivation of [0, 1e9]) {
+        const save = freshSave(root);
+        save.cultivation = cultivation;
+        const g = new Game(save, 1, difficulty, () => 0.5);
+        const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, 1);
+        assert.ok(Math.abs(boss.maxHp / beforeHp - 1.3) < 1e-12);
+        assert.equal(boss.hp, boss.maxHp);
+        assert.equal(
+          boss.damage,
+          68 * rules.damage * STAGE_COMBAT_SCALING[1].damage * realmHealthMultiplier(6) * 1.15,
+        );
+      }
+    }
+  }
+});
 test('各关三难度新旧精英连续恢复不重算场内速度，也不叠加10%倍率', () => {
   for (let difficulty = 0; difficulty < DIFFICULTIES.length; difficulty++) {
     for (let stage = 0; stage < STAGES.length; stage++) {
@@ -123,7 +144,7 @@ test('第五、第六关编号的独立天劫不使用普通妖王强化', () =>
 
 test('三难度新旧场内妖王反复恢复保留原气血、缺血与移速，不叠加强化倍率', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
-    for (const stage of [4, 5]) {
+    for (const stage of [1, 4, 5]) {
       for (const legacy of [false, true]) {
         const save = freshSave();
         save.unlocked = stage;
@@ -131,7 +152,11 @@ test('三难度新旧场内妖王反复恢复保留原气血、缺血与移速�
         g.bossSpawned = true;
         const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 });
         if (legacy) {
-          boss.maxHp = (16000 + stage * 11000) * rules.hp * STAGE_COMBAT_SCALING[stage].hp;
+          boss.maxHp =
+            (16000 + stage * 11000) *
+            rules.hp *
+            STAGE_COMBAT_SCALING[stage].hp *
+            (stage === 1 ? 1.65 * realmDamageMultiplier(6) : 1);
           boss.speed = 70 + stage * 4;
         }
         boss.hp = boss.maxHp * 0.63;
