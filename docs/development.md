@@ -100,6 +100,10 @@ npm run deploy:cloudflare
 
 不同网址的浏览器存档独立。迁移时先在原网址的洞府导出存档，再到新网址导入。
 
+### 根域 ads.txt 验证代理（qinglan-ads-verify）
+
+AdSense 站点注册认注册根域 `011203.xyz`，而根域默认重定向到个人主页（`www.chenxuanweb.top`）；Cloudflare 的 Redirect Rule 位于 Worker 之前执行，单靠 Worker 路由抢不出 `/ads.txt`，需要在重定向规则的表达式里排除 `/ads.txt`（在控制台手动改，不在本仓库脚本里）。Worker `qinglan-ads-verify`（`workers/ads-verify/`）经路由 `011203.xyz/ads.txt` 返回授权行 `google.com, pub-9047842625721721, DIRECT, f08c47fec0942fa0`，pub ID 与 `src/setting.ts` 的 `ADS_SETTINGS.adsense.client` 同源；换账号时三处一起改。部署：`npx wrangler deploy --config workers/ads-verify/wrangler.jsonc`。
+
 ## NPC 对话 · Cloudflare Workers AI
 
 独立 Worker 名称为 `qinglan-npc-ai`，配置在 `workers/npc-ai/wrangler.jsonc`。默认入口为 `https://qinglan-npc-ai.011203.xyz`，`GET /health` 检查服务信息，`POST /chat` 生成对白，`POST /story-image` 生成茶馆故事配图，`POST /journey-appraisal` 生成留影评语；所有入口都必须携带受支持的 `Origin`。自定义域名已写入 routes，后续发布保留绑定；文字使用 `@cf/zai-org/glm-4.7-flash`，配图使用 `@cf/black-forest-labs/flux-1-schnell`，均通过原生 `AI` binding 调用，前端没有 API 密钥。

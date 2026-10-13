@@ -1,0 +1,7 @@
+{
+  "name": "qinglan-ads-verify",
+  "main": "index.ts",
+  "compatibility_date": "2026-10-10",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": ["011203.xyz/ads.txt"],
+}
