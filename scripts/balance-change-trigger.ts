@@ -8,6 +8,8 @@ export const BALANCE_FILES = new Set([
   'src/data.ts',
   'src/progress.ts',
   'src/game.ts',
+  'src/game-validation.ts',
+  'src/boss-followup.ts',
   'src/autoplay.ts',
   'src/spirit-power.ts',
   'src/ads.ts',

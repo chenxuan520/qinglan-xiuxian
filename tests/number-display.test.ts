@@ -9,10 +9,11 @@ import { spiritPower } from '../src/spirit-power.ts';
 import { mortalPage, townStatus } from '../src/mortal-ui.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, passive } from '../src/data.ts';
 import { Game } from '../src/game.ts';
+import { cultivationPanel } from '../src/cultivation-ui.ts';
 import { completedJourney, damageReport } from '../src/common-ui.ts';
 import { formatNumber } from '../src/number-format.ts';
 
-const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/battle-hud.ts', import.meta.url), 'utf8');
 
 test('共享数字格式保留小整数，万、亿、万亿最多一位小数且不加分隔符', () => {
   for (const [value, expected] of [
@@ -151,8 +152,6 @@ test('伤害统计总量、法宝、反伤与未分类条目共用简写，保�
 });
 
 test('洞府当前与突破预览沿用入场 helper，气血、伤害及增量只格式化显示', () => {
-  const preview = source.match(/else if \(panel === 'cultivation'\) \{([^]*?)\s+panelFrame\(/)![1];
-  const template = source.match(/<p><strong>当前入场气血[^]*?<\/p>/)![0];
   for (const step of [0, 15, 18, 21, 23, 24]) {
     const save = freshSave();
     save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
@@ -161,13 +160,7 @@ test('洞府当前与突破预览沿用入场 helper，气血、伤害及增量�
     );
     if (step === 24) save.completed = [FINAL_TRIAL_STAGE];
     const before = JSON.stringify(save);
-    const html = runInNewContext(`${stripTypeScriptTypes(preview)}; \`${template}\``, {
-      save,
-      realmInfo,
-      spiritPower,
-      FINAL_TRIAL_STAGE,
-      formatNumber,
-    });
+    const html = cultivationPanel(save, 0).body;
     const current = spiritPower(save);
     assert.equal(current.hp, new Game({ ...save }, 0, 0, () => 0.5).player.maxHp);
     assert.ok(html.includes(`当前入场气血 ${formatNumber(current.hp)}</strong>`));

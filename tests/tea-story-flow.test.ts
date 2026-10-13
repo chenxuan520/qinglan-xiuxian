@@ -12,6 +12,7 @@ import { syncHumanStories } from '../src/human-stories.ts';
 import { startActivity, resolveActivity, sectDuesPending, settleSectDues } from '../src/mortal.ts';
 import { TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { AD_SECONDS } from '../src/ads.ts';
+import { MedicinePanel } from '../src/medicine-panel.ts';
 
 // 不启动 main 的页面初始化；路由、结算、重试 onclick 和关闭清理均执行源码。
 const flow = new Script(
@@ -134,6 +135,7 @@ function harness(t: TestContext) {
     pendingRun: null,
     panel: 'town-event',
     inTown: true,
+    townNpc: { id: 'tea' },
     inMarket: false,
     inMortalWorld: true,
     assetsReady: true,
@@ -175,6 +177,14 @@ function harness(t: TestContext) {
     },
   });
   flow.runInContext(context);
+  context.medicinePanel = new MedicinePanel(save, modal as unknown as HTMLDivElement, {
+    show: noop,
+    render: noop,
+    refresh: noop,
+    persist: noop,
+    starterChanged: noop,
+    toast: noop,
+  });
   context.soundSettings = new SoundSettings(save, { sync: noop, play: noop }, () =>
     context.persist(),
   );

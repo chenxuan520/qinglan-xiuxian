@@ -2,7 +2,8 @@ import { CULTIVATION_PATHS, ROOT_STARTERS, SPIRIT_ROOTS } from '../src/data.ts';
 import type { CultivationPath, SpiritRootId, WeaponKind } from '../src/data.ts';
 
 // 对照版本只能在用户确认数值、完整实测和独立审查后更新，禁止自动接受当前结果。
-export const BALANCE_REFERENCE = 'd10f276c3e28bd6a4150069c8973d2167fdfc7e7';
+// 同一已确认提交在授权历史清理后的 SHA；不改变对照数值版本。
+export const BALANCE_REFERENCE = '02d2890729dee85e3a757f5a3f6305e6a1b10af0';
 export const BALANCE_PROTOCOL = 1;
 export const FULL_SEEDS = [
   41, 82, 123, 164, 205, 246, 287, 328, 369, 410, 451, 492, 533, 574, 615, 656, 697, 738, 779, 820,

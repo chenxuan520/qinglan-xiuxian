@@ -53,7 +53,7 @@ test('六境妖王按原时刻刷新，提前预警并且只生成一次登场�
 });
 
 test('出场效果消散后旧降临提示不回显，其他战斗提示仍正常显示', () => {
-  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/battle-hud.ts', import.meta.url), 'utf8');
   const block = source.match(
     /  const notice = document.getElementById\('notice'\)[^]*?(?=  const aliveBosses)/,
   )![0];

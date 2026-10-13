@@ -176,6 +176,25 @@ function parseArgs(args: string[]) {
     throw new Error('拒绝覆盖 artifacts 以外的现有文件');
   return options;
 }
+export function prepareBalanceReference(currentOnly: boolean, root = repository) {
+  if (currentOnly) return null;
+  const reference = mkdtempSync(join(tmpdir(), 'qinglan-balance-reference-'));
+  try {
+    const archive = execFileSync('git', ['archive', BALANCE_REFERENCE, 'src'], {
+      cwd: root,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    execFileSync('tar', ['-xf', '-', '-C', reference], { input: archive });
+    mkdirSync(join(reference, 'scripts'));
+    writeFileSync(join(reference, 'package.json'), '{"type":"module"}');
+    for (const name of ['balance-simulation.ts', 'balance-policy.ts'])
+      cpSync(join(root, 'scripts', name), join(reference, 'scripts', name));
+    return reference;
+  } catch (error) {
+    rmSync(reference, { recursive: true, force: true });
+    throw error;
+  }
+}
 export async function main(args: string[]) {
   const options = parseArgs(args);
   const started = Date.now();
@@ -183,22 +202,15 @@ export async function main(args: string[]) {
     cwd: repository,
     encoding: 'utf8',
   }).trim();
-  const reference = mkdtempSync(join(tmpdir(), 'qinglan-balance-reference-'));
+  const reference = prepareBalanceReference(options.currentOnly);
   try {
-    const archive = execFileSync('git', ['archive', BALANCE_REFERENCE, 'src'], {
-      cwd: repository,
-      maxBuffer: 32 * 1024 * 1024,
-    });
-    execFileSync('tar', ['-xf', '-', '-C', reference], { input: archive });
-    mkdirSync(join(reference, 'scripts'));
-    writeFileSync(join(reference, 'package.json'), '{"type":"module"}');
-    for (const name of ['balance-simulation.ts', 'balance-policy.ts'])
-      cpSync(join(repository, 'scripts', name), join(reference, 'scripts', name));
     const currentHash = sourceHash(repository),
-      referenceHash = sourceHash(reference);
+      referenceHash = reference ? sourceHash(reference) : undefined;
     const coreFiles = [
       'data.ts',
       'game.ts',
+      'game-validation.ts',
+      'boss-followup.ts',
       'progress.ts',
       'autoplay.ts',
       'medicine.ts',
@@ -207,12 +219,15 @@ export async function main(args: string[]) {
       'mortal-data.ts',
       'ads.ts',
     ];
-    const coreChanged = coreFiles.some(
-      (file) =>
-        !readFileSync(join(repository, 'src', file)).equals(
-          readFileSync(join(reference, 'src', file)),
-        ),
-    );
+    const coreChanged =
+      reference !== null &&
+      coreFiles.some(
+        (file) =>
+          !existsSync(join(reference, 'src', file)) ||
+          !readFileSync(join(repository, 'src', file)).equals(
+            readFileSync(join(reference, 'src', file)),
+          ),
+      );
     if (coreChanged) {
       options.full = true;
       options.acceptance = true;
@@ -228,7 +243,7 @@ export async function main(args: string[]) {
     const referenceRun =
       reuse || options.currentOnly
         ? currentRun
-        : await runCases(cases, reference, options.jobs, '对照');
+        : await runCases(cases, reference!, options.jobs, '对照');
     const current = currentRun.results,
       before = referenceRun.results;
     const currentMetrics = summarize(current, cases),
@@ -254,7 +269,7 @@ export async function main(args: string[]) {
     const referenceModule =
       reuse || options.currentOnly
         ? null
-        : await import(pathToFileURL(join(reference, 'scripts/balance-simulation.ts')).href);
+        : await import(pathToFileURL(join(reference!, 'scripts/balance-simulation.ts')).href);
     const beforeFarms =
       reuse || options.currentOnly ? farms : farmCases.map((c) => referenceModule.simulateFarm(c));
     for (const [index, farm] of farms.entries()) {
@@ -341,7 +356,7 @@ export async function main(args: string[]) {
       `${options.currentOnly ? '当前完整目标门禁' : '回归门禁'}通过 ${current.length}/${cases.length}；固定种子自动策略样本不等于真人胜率。`,
     );
   } finally {
-    rmSync(reference, { recursive: true, force: true });
+    if (reference) rmSync(reference, { recursive: true, force: true });
   }
 }
 function caseLabel(c: BalanceCase) {

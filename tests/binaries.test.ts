@@ -18,7 +18,7 @@ const approval = (data: Buffer) => ({
   sha256: createHash('sha256').update(data).digest('hex'),
 });
 
-function repository() {
+function repository(withLegacyCommit = false) {
   const cwd = mkdtempSync(join(tmpdir(), 'qinglan-binary-gate-'));
   const git = (...args: string[]) =>
     execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -27,16 +27,21 @@ function repository() {
   git('init');
   git('config', 'user.name', 'gate-test');
   git('config', 'user.email', 'gate-test@example.invalid');
-  mkdirSync(join(cwd, 'scripts'));
-  const approved = { 'approved.bin': approval(original) };
   const write = (path: string, data: string | Buffer) => writeFileSync(join(cwd, path), data);
-  write('approved.bin', original);
-  write('scripts/approved-binaries.json', JSON.stringify(approved));
   const commit = () => {
     git('add', '.');
     git('commit', '-m', 'test change');
     return git('rev-parse', 'HEAD');
   };
+  let legacy = '';
+  if (withLegacyCommit) {
+    write('legacy.md', '门禁建立前的既有历史');
+    legacy = commit();
+  }
+  mkdirSync(join(cwd, 'scripts'));
+  const approved = { 'approved.bin': approval(original) };
+  write('approved.bin', original);
+  write('scripts/approved-binaries.json', JSON.stringify(approved));
   const before = commit();
   const check = (eventName = 'push', missingBase = false) => {
     const after = git('rev-parse', 'HEAD'),
@@ -50,7 +55,7 @@ function repository() {
         : { before: base, after },
     );
   };
-  return { cwd, git, approved, write, commit, check };
+  return { cwd, git, approved, write, commit, check, legacy };
 }
 
 test('中文源代码可提交；NUL、非UTF8、ASCII PDF和伪装成文本的素材扩展被识别', () => {
@@ -92,6 +97,9 @@ test('禁止本地字体和未经批准的加载，批准公共源及系统回�
     ['index.html', '<link href="https://cdn.example.invalid/theme.css" rel="stylesheet">'],
     ['index.html', `<link href="${PUBLIC_FONT_CSS}&text=other" rel="stylesheet">`],
     ['index.html', '<link rel="preload" as="font" href="https://cdn.example.invalid/font">'],
+    ['public/extra.CSS', '@font-face{font-family:test;src:url(extra.woff2)}'],
+    ['public/extra.HTML', '<link rel="stylesheet" href="https://cdn.example.invalid/theme.css">'],
+    ['src/extra.TS', 'new FontFace("test", "url(extra.woff2)");'],
   ])
     assert.ok(binaryBreaches([{ path, data: Buffer.from(text) }], {}).length > 0, path);
   assert.deepEqual(
@@ -142,6 +150,61 @@ test('既有素材中间被替换后恢复，仍报告违规提交', () => {
     r.write('approved.bin', original);
     r.commit();
     assert.ok(r.check().some((x) => x.includes('替换了已批准')));
+  } finally {
+    rmSync(r.cwd, { recursive: true, force: true });
+  }
+});
+
+test('旧基点侧支加入再删除二进制，合并后 push、PR 和未知基点仍拒绝', () => {
+  const r = repository(true);
+  try {
+    const main = r.git('branch', '--show-current');
+    r.git('checkout', '-b', 'old-base', r.legacy);
+    r.write('temporary.bin', original);
+    r.commit();
+    rmSync(join(r.cwd, 'temporary.bin'));
+    r.commit();
+    r.git('checkout', main);
+    r.git('merge', '--no-ff', 'old-base', '-m', 'merge side branch');
+    for (const event of ['push', 'pull_request']) {
+      assert.ok(r.check(event).some((x) => x.includes('temporary.bin')));
+      assert.ok(r.check(event, true).some((x) => x.includes('temporary.bin')));
+    }
+  } finally {
+    rmSync(r.cwd, { recursive: true, force: true });
+  }
+});
+
+test('旧基点纯文本侧支合并通过，不将未继承基线误报为删除', () => {
+  const r = repository(true);
+  try {
+    const main = r.git('branch', '--show-current');
+    r.git('checkout', '-b', 'old-base', r.legacy);
+    r.write('note.md', '只添加文本。');
+    r.commit();
+    r.git('checkout', main);
+    r.git('merge', '--no-ff', 'old-base', '-m', 'merge text side branch');
+    assert.deepEqual(r.check(), []);
+    assert.deepEqual(r.check('pull_request'), []);
+    assert.deepEqual(r.check('push', true), []);
+  } finally {
+    rmSync(r.cwd, { recursive: true, force: true });
+  }
+});
+
+test('旧基点侧支写入损坏基线后删除，合并也不能绕过', () => {
+  const r = repository(true);
+  try {
+    const main = r.git('branch', '--show-current');
+    r.git('checkout', '-b', 'old-base', r.legacy);
+    mkdirSync(join(r.cwd, 'scripts'));
+    r.write('scripts/approved-binaries.json', 'not-json');
+    r.commit();
+    rmSync(join(r.cwd, 'scripts'), { recursive: true });
+    r.commit();
+    r.git('checkout', main);
+    r.git('merge', '--no-ff', 'old-base', '-m', 'merge side branch');
+    assert.ok(r.check().some((x) => x.includes('删除或损坏')));
   } finally {
     rmSync(r.cwd, { recursive: true, force: true });
   }

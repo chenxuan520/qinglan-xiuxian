@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { MedicinePanel } from '../src/medicine-panel.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
@@ -120,6 +121,14 @@ function harness(phase: 'first' | 'reunion' | 'choice' | 'read' = 'first', pendi
     },
   });
   script.runInContext(context);
+  context.medicinePanel = new MedicinePanel(save, context.modal, {
+    show: () => {},
+    render: () => {},
+    refresh: () => {},
+    persist: () => {},
+    starterChanged: () => {},
+    toast: () => {},
+  });
   return {
     save,
     context,

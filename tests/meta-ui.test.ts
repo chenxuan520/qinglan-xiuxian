@@ -10,8 +10,13 @@ import { autoplayButton, choiceCard, controls } from '../src/common-ui.ts';
 import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
 
-const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-const styles = ['style.css', 'battle-hud.css']
+const source = ['main.ts', 'battle-hud.ts', 'catalog-ui.ts', 'cultivation-ui.ts', 'bestiary-ui.ts']
+  .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
+  .join('\n');
+const styleEntry = readFileSync(new URL('../src/styles.ts', import.meta.url), 'utf8');
+const styles = [...styleEntry.matchAll(/import '\.\/([^']+\.css)'/g)]
+  .map((match) => match[1])
+  .concat('battle-hud.css')
   .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
   .join('\n');
 

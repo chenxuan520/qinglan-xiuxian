@@ -1,0 +1,1232 @@
+@media (min-width: 1650px) {
+  .lobby-main {
+    width: 1250px;
+  }
+  .hero {
+    min-height: 400px;
+  }
+  .stage-card {
+    height: 150px;
+  }
+  .stage-card strong {
+    font-size: 23px;
+    margin-top: 22px;
+  }
+  .lobby-header {
+    padding: 28px 5%;
+  }
+  .hero-copy > p {
+    font-size: 13px;
+  }
+}
+@media (max-width: 1190px) {
+  .lobby-header nav {
+    gap: 19px;
+  }
+  .brand {
+    font-size: 23px;
+    gap: 9px;
+    letter-spacing: 3px;
+  }
+  .header-right {
+    gap: 10px;
+  }
+  .lobby-header .currency.iron {
+    display: none;
+  }
+  .lobby-main {
+    width: 90%;
+  }
+  .stage-grid {
+    gap: 8px;
+  }
+  .stage-card {
+    padding: 15px 11px;
+  }
+  .stage-card strong {
+    font-size: 18px;
+    letter-spacing: 2px;
+  }
+  .stage-bottom {
+    font-size: 7px;
+    letter-spacing: 0;
+  }
+  .battle-controls,
+  .battle-objective {
+    display: none;
+  }
+  .battle-bottom {
+    justify-content: center;
+  }
+  .equipped-slot {
+    width: 130px;
+  }
+  .hero {
+    min-height: 325px;
+  }
+  .stage-card {
+    height: 125px;
+  }
+  .stage-description {
+    font-size: 10px;
+  }
+  .lobby-header {
+    height: 105px;
+  }
+  .lobby-main {
+    min-height: calc(100svh - 165px);
+  }
+  .lobby-footer {
+    height: 60px;
+  }
+  .currency span {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .lobby-header {
+    padding: 22px 5%;
+    height: 94px;
+  }
+  .brand {
+    font-size: 22px;
+  }
+  .brand-emblem {
+    width: 35px;
+    height: 47px;
+  }
+  .brand-emblem .icon {
+    width: 31px;
+  }
+  .seal {
+    display: none;
+  }
+  .lobby-header nav {
+    gap: 15px;
+  }
+  .nav-link {
+    font-size: 11px;
+    letter-spacing: 1px;
+  }
+  .lobby-header .currency {
+    display: none;
+  }
+  .lobby-header .header-right {
+    gap: 7px;
+  }
+  .round-button {
+    width: 33px;
+    height: 33px;
+  }
+  .hero {
+    min-height: 305px;
+    padding: 28px 0 35px;
+  }
+  h1 {
+    font-size: 42px;
+    letter-spacing: 6px;
+  }
+  .hero-copy > p {
+    font-size: 11px;
+  }
+  .hero-features {
+    font-size: 9px;
+  }
+  .stage-card strong {
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+  .stage-top {
+    font-size: 8px;
+  }
+  .stage-top > span:last-child {
+    display: none;
+  }
+  .stage-card {
+    height: 113px;
+    padding: 14px 9px;
+  }
+  .stage-bottom {
+    font-size: 7px;
+  }
+  .section-heading h2 {
+    font-size: 14px;
+  }
+  .realm-circle {
+    width: 110px;
+    height: 110px;
+  }
+  .realm-circle strong {
+    font-size: 28px;
+  }
+  .vertical-poem {
+    right: 134px;
+  }
+  .expedition-footer {
+    align-items: flex-start;
+  }
+  .stage-description {
+    max-width: 60%;
+  }
+  .difficulty-switch button {
+    padding: 8px 11px;
+    font-size: 10px;
+  }
+  .embark {
+    width: 185px;
+    font-size: 15px;
+  }
+  .lobby-main {
+    min-height: calc(100svh - 149px);
+  }
+  .lobby-footer {
+    height: 55px;
+  }
+  .collection-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .collection-card {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px 10px 24px;
+    gap: 5px;
+  }
+  .collection-card .icon {
+    width: 33px;
+    height: 37px;
+  }
+  .forge-dots {
+    left: 11px;
+  }
+  .collection-card strong {
+    font-size: 13px;
+  }
+  .treasure-detail {
+    gap: 14px;
+  }
+  .detail-emblem {
+    display: none;
+  }
+  .detail-copy h3 {
+    font-size: 19px;
+  }
+  .panel {
+    padding: 26px;
+  }
+  .bestiary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .equipped-slot {
+    width: 103px;
+    height: 59px;
+    padding: 6px;
+    gap: 4px;
+  }
+  .equipped-slot strong {
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+  .equipped-slot .icon {
+    width: 27px;
+    height: 36px;
+  }
+  .equipped-slots {
+    gap: 6px;
+  }
+  .battle-bottom {
+    left: 16px;
+    right: 16px;
+    bottom: 21px;
+  }
+  .passive-slots {
+    bottom: 91px;
+  }
+  .choice-grid {
+    gap: 13px;
+  }
+  .choice-card {
+    padding: 16px;
+  }
+  .choice-card h3 {
+    font-size: 23px;
+  }
+  .choice-art {
+    height: 110px;
+  }
+  .choice-card p {
+    font-size: 10px;
+    min-height: 76px;
+  }
+}
+@media (max-width: 650px) {
+  .lobby-header {
+    height: 80px;
+    padding: 16px 5%;
+    gap: 12px;
+  }
+  .brand {
+    font-size: 21px;
+    letter-spacing: 4px;
+  }
+  .brand-emblem {
+    width: 35px;
+    height: 43px;
+  }
+  .lobby-header nav {
+    position: absolute;
+    top: 92px;
+    left: 5%;
+    right: 5%;
+    justify-content: space-between;
+    border-bottom: 1px solid #c1d3a51c;
+    padding-bottom: 9px;
+    gap: 5px;
+  }
+  .nav-link {
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 6px 5px;
+    white-space: nowrap;
+  }
+  .nav-link.active:after {
+    bottom: -10px;
+    left: 17%;
+    right: 17%;
+  }
+  .header-right {
+    gap: 9px;
+  }
+  .lobby-main {
+    width: 90%;
+    display: block;
+    padding-top: 47px;
+    min-height: calc(100svh - 80px);
+  }
+  .hero {
+    min-height: 295px;
+    padding: 30px 0 25px;
+    align-items: center;
+  }
+  .eyebrow {
+    font-size: 8px;
+    letter-spacing: 2px;
+    gap: 9px;
+  }
+  .hero h1 {
+    font-size: 35px;
+    letter-spacing: 5px;
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+  .hero-copy > p {
+    font-size: 9px;
+    line-height: 2.1;
+    letter-spacing: 0.6px;
+    margin-top: 12px;
+    max-width: 245px;
+  }
+  .hero-features {
+    font-size: 8px;
+    gap: 10px;
+    letter-spacing: 1.5px;
+    margin-top: 17px;
+  }
+  .realm-preview {
+    align-self: flex-start;
+    margin: 63px 0 0 0;
+    gap: 16px;
+  }
+  .realm-circle {
+    width: 75px;
+    height: 75px;
+    gap: 2px;
+    box-shadow:
+      0 0 0 4px #c8c59b06,
+      0 0 0 5px #c8c59b25;
+  }
+  .realm-circle small {
+    font-size: 7px;
+    letter-spacing: 1px;
+  }
+  .realm-circle strong {
+    font-size: 23px;
+    letter-spacing: 3px;
+    padding-left: 3px;
+  }
+  .realm-circle > span {
+    font-size: 8px;
+    letter-spacing: 3px;
+  }
+  .realm-link {
+    font-size: 8px;
+    gap: 3px;
+    letter-spacing: 1px;
+  }
+  .realm-link svg {
+    width: 11px;
+  }
+  .vertical-poem {
+    display: none;
+  }
+  .section-heading {
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+  .section-heading > div:first-child {
+    gap: 9px;
+  }
+  .section-number {
+    font-size: 8px;
+    padding: 4px 6px;
+    letter-spacing: 1px;
+  }
+  .section-heading h2 {
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .muted {
+    font-size: 8px;
+    letter-spacing: 0;
+  }
+  .stage-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+  }
+  .stage-card {
+    height: 103px;
+    padding: 12px 10px;
+  }
+  .stage-card strong {
+    font-size: 18px;
+    margin-top: 11px;
+    letter-spacing: 2px;
+  }
+  .stage-top {
+    font-size: 8px;
+  }
+  .stage-bottom {
+    margin-top: 10px;
+    font-size: 7px;
+  }
+  .stage-ornament {
+    font-size: 65px;
+  }
+  .expedition-footer {
+    margin-top: 13px;
+    gap: 10px;
+    padding-bottom: 14px;
+    flex-direction: column;
+  }
+  .stage-description {
+    max-width: none;
+    font-size: 9px;
+    line-height: 1.8;
+  }
+  .loadout-preview {
+    font-size: 9px;
+    gap: 9px;
+  }
+  .loadout-preview button {
+    font-size: 10px;
+  }
+  .loadout-preview .icon {
+    height: 20px;
+  }
+  .depart-row {
+    padding-top: 14px;
+    gap: 14px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .difficulty-wrap {
+    gap: 12px;
+    justify-content: space-between;
+  }
+  .field-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .difficulty-switch {
+    gap: 1px;
+    flex: 1;
+    justify-content: flex-end;
+  }
+  .difficulty-switch button {
+    padding: 7px 10px;
+    font-size: 10px;
+  }
+  .difficulty-switch small {
+    font-size: 7px;
+  }
+  .embark {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+    justify-content: center;
+    gap: 25px;
+  }
+  .expedition {
+    padding-bottom: 25px;
+  }
+  .lobby-footer {
+    width: 90%;
+    height: 49px;
+    font-size: 8px;
+    justify-content: center;
+  }
+  .lobby-footer .control-hint {
+    display: none;
+  }
+  .lobby-main {
+    min-height: 0;
+  }
+  .modal-backdrop {
+    padding: 15px;
+  }
+  .panel {
+    padding: 23px 19px;
+    max-height: 92svh;
+  }
+  .panel-heading {
+    margin-bottom: 19px;
+    gap: 10px;
+  }
+  .panel-heading h2 {
+    font-size: 20px;
+    letter-spacing: 1px;
+  }
+  .panel-heading .eyebrow {
+    font-size: 7px;
+    letter-spacing: 2px;
+  }
+  .panel-heading .round-button {
+    width: 29px;
+    height: 29px;
+  }
+  .panel-toolbar {
+    gap: 10px;
+  }
+  .book-tabs {
+    gap: 2px;
+  }
+  .book-tabs button {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  .panel-toolbar .currency {
+    font-size: 8px;
+    gap: 3px;
+  }
+  .panel-toolbar .currency b {
+    font-size: 12px;
+  }
+  .panel-toolbar .currency svg {
+    width: 14px;
+  }
+  .panel-toolbar .header-right {
+    gap: 8px;
+  }
+  .collection-navigation {
+    gap: 6px;
+  }
+  .collection-filters {
+    gap: 2px;
+  }
+  .collection-filters button {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  .collection-pages {
+    gap: 2px;
+  }
+  .collection-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .collection-grid.treasure-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .collection-card {
+    padding: 13px 5px 19px;
+    align-items: center;
+    min-height: 97px;
+    gap: 7px;
+  }
+  .collection-card .icon {
+    width: 28px;
+    height: 31px;
+  }
+  .collection-card strong {
+    font-size: 10px;
+    text-align: center;
+    letter-spacing: 0;
+  }
+  .collection-card small {
+    display: none;
+  }
+  .forge-dots {
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 7px;
+    letter-spacing: 1px;
+    bottom: 6px;
+    white-space: nowrap;
+  }
+  .equipped-label {
+    font-size: 6px;
+    top: 4px;
+    right: 4px;
+  }
+  .treasure-detail {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+    padding-top: 16px;
+    margin-top: 18px;
+  }
+  .detail-copy h3 {
+    font-size: 20px;
+  }
+  .detail-copy p {
+    font-size: 10px;
+  }
+  .detail-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .detail-actions small {
+    grid-column: 1/-1;
+  }
+  .detail-actions button {
+    font-size: 9px;
+    padding: 8px 6px;
+    letter-spacing: 0.5px;
+  }
+  .panel-note {
+    font-size: 9px;
+    line-height: 1.9;
+  }
+  .passive-card {
+    padding: 10px;
+    grid-column: span 2;
+  }
+  .passive-card .icon {
+    width: 28px;
+    height: 30px;
+  }
+  .passive-card h3 {
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .passive-card p {
+    font-size: 9px;
+    min-height: 30px;
+  }
+  .passive-card small {
+    font-size: 8px;
+  }
+  .cultivation-overview {
+    gap: 22px;
+    padding: 15px 5px 28px;
+  }
+  .cultivation-progress h3 {
+    font-size: 18px;
+    display: block;
+  }
+  .cultivation-progress h3 span {
+    display: block;
+    font-size: 9px;
+    margin-top: 8px;
+  }
+  .thin-bar {
+    margin: 13px 0 10px;
+  }
+  .cultivation-progress p {
+    font-size: 9px;
+  }
+  .cultivation-progress > small {
+    font-size: 8px;
+    line-height: 1.8;
+  }
+  .realm-road {
+    margin-bottom: 24px;
+  }
+  .realm-road strong {
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+  .realm-road span {
+    font-size: 8px;
+    width: 25px;
+    height: 25px;
+  }
+  .realm-road > div:before {
+    top: 12px;
+  }
+  .training-grid {
+    gap: 9px;
+  }
+  .training-card {
+    padding: 13px 9px;
+  }
+  .training-card .icon {
+    width: 31px;
+    height: 35px;
+  }
+  .training-card h3 {
+    font-size: 19px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .training-card h3 small {
+    font-size: 8px;
+  }
+  .training-card p {
+    display: none;
+  }
+  .training-card > strong {
+    font-size: 9px;
+    line-height: 1.7;
+    min-height: 31px;
+    margin-top: 9px;
+  }
+  .training-card button {
+    font-size: 9px;
+    padding: 8px 3px;
+    letter-spacing: 0;
+    margin-top: 12px;
+    min-height: 34px;
+  }
+  .bestiary-grid {
+    gap: 8px;
+  }
+  .enemy-card {
+    padding: 9px;
+    flex-direction: column;
+    text-align: center;
+    gap: 5px;
+  }
+  .enemy-card .sprite-thumb {
+    width: 66px;
+    height: 85px;
+  }
+  .enemy-card h3 {
+    font-size: 13px;
+  }
+  .enemy-card p {
+    font-size: 8px;
+    margin-top: 5px;
+  }
+  .enemy-card small {
+    font-size: 7px;
+  }
+  .boss-note {
+    font-size: 9px;
+    padding: 10px;
+    gap: 8px;
+  }
+  .guide-steps h3 {
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .guide-steps p {
+    font-size: 11px;
+  }
+  .guide-steps > div {
+    padding-left: 35px;
+  }
+  .pickup-guide {
+    font-size: 8px;
+    gap: 10px;
+  }
+  .battle-bottom {
+    left: 10px;
+    right: 10px;
+    bottom: max(19px, env(safe-area-inset-bottom));
+    gap: 0;
+  }
+  .equipped-slots {
+    width: 100%;
+    gap: 5px;
+  }
+  .equipped-slot {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+    height: 64px;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 2px;
+  }
+  .equipped-slot .icon {
+    width: 25px;
+    height: 30px;
+  }
+  .equipped-slot strong {
+    font-size: 8px;
+    letter-spacing: 0;
+    display: block;
+    text-align: center;
+  }
+  .equipped-slot span {
+    font-size: 7px;
+    margin-top: 2px;
+    text-align: center;
+  }
+  .equipped-slot i {
+    display: none;
+  }
+  .equipped-slot.empty small {
+    font-size: 6px;
+    letter-spacing: 0;
+  }
+  .equipped-slot.empty span {
+    font-size: 18px;
+  }
+  .passive-slots {
+    bottom: 95px;
+    gap: 5px;
+    max-width: 96%;
+    flex-wrap: wrap;
+  }
+  .passive-slots > span {
+    font-size: 7px;
+    gap: 2px;
+    padding: 2px 4px;
+  }
+  .passive-slots .icon {
+    width: 15px;
+    height: 18px;
+  }
+  .passive-slots b {
+    font-size: 8px;
+    margin-left: 2px;
+  }
+  .battle-notice {
+    top: max(calc(29% + 20px), calc(var(--battle-info-bottom, 0px) + 10px));
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 10px 16px;
+    max-width: 95%;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.8;
+  }
+  .boss-bar {
+    --boss-top: 222px;
+    width: 65%;
+    padding: 8px 10px;
+  }
+  .boss-bar > div:first-child {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+  .boss-bar small {
+    font-size: 8px;
+  }
+  .upgrade-panel {
+    width: 100%;
+    max-height: calc(100vh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  .in-game .upgrade-backdrop {
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+      max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .upgrade-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .upgrade-heading .eyebrow,
+  .upgrade-instruction {
+    display: none;
+  }
+  .upgrade-heading h2 {
+    font-size: 22px;
+    letter-spacing: 3px;
+    margin: 0;
+  }
+  .upgrade-heading p {
+    font-size: 11px;
+    margin: 0;
+    letter-spacing: 0;
+  }
+  .upgrade-heading b {
+    font-size: 15px;
+  }
+  .choice-grid {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .choice-card {
+    padding: 8px 12px;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    align-items: start;
+  }
+  .choice-top {
+    position: absolute;
+    left: 54px;
+    top: 8px;
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .choice-top kbd {
+    display: none;
+  }
+  .choice-art {
+    position: absolute;
+    left: 10px;
+    top: 8px;
+    width: 34px;
+    height: 40px;
+  }
+  .choice-art .icon {
+    width: 30px;
+    height: 38px;
+  }
+  .choice-card h3 {
+    padding: 14px 0 0 42px;
+    font-size: 18px;
+    line-height: 24px;
+    letter-spacing: 1px;
+    text-align: left;
+  }
+  .choice-level {
+    text-align: right;
+    align-self: end;
+    font-size: 11px;
+    margin: 0 0 3px;
+    letter-spacing: 0;
+  }
+  .choice-card p {
+    grid-column: 1/-1;
+    font-size: 12px;
+    line-height: 1.45;
+    min-height: 0;
+    margin-top: 5px;
+  }
+  .choice-meta {
+    grid-column: 1/-1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 8px;
+    margin-top: 4px;
+  }
+  .choice-meta:empty {
+    display: none;
+  }
+  .choice-card .element-affinity {
+    font-size: 10px;
+    padding: 1px 5px;
+    line-height: 1.5;
+  }
+  .choice-benefit {
+    padding: 0;
+    margin: 0;
+    border: 0;
+    font-size: 11px;
+    line-height: 1.45;
+    min-height: 0;
+  }
+  .choice-select,
+  .choice-benefit-hint,
+  .choice-description-full,
+  .choice-card .evolution-recipe {
+    display: none;
+  }
+  .choice-description-compact {
+    display: inline;
+  }
+  .choice-recipe-compact {
+    display: block;
+    grid-column: 1/-1;
+    color: #c8cba7;
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .choice-card:hover {
+    transform: translateY(-2px);
+  }
+  .upgrade-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px 8px;
+    margin-top: 8px;
+    font-size: 10px;
+  }
+  .upgrade-footer > span {
+    grid-column: 1/-1;
+  }
+  .upgrade-footer .secondary-button,
+  .upgrade-footer .auto-button {
+    font-size: 11px;
+    min-height: 44px;
+    padding: 8px;
+    gap: 8px;
+    letter-spacing: 1px;
+    justify-content: center;
+  }
+  .upgrade-footer > small {
+    display: none;
+  }
+  .upgrade-footer i {
+    margin: 0 7px;
+  }
+  .pause-description {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .pause-build {
+    gap: 7px;
+  }
+  .pause-build > span {
+    padding: 8px;
+    gap: 6px;
+    font-size: 10px;
+  }
+  .pause-build .icon {
+    width: 25px;
+    height: 29px;
+  }
+  .pause-actions {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pause-actions button {
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 11px 10px;
+  }
+  .result-panel {
+    padding: 32px 22px;
+  }
+  .result-panel h2 {
+    font-size: 23px;
+    letter-spacing: 2px;
+  }
+  .result-panel > p {
+    font-size: 10px;
+  }
+  .result-stats {
+    margin: 23px 0;
+    padding: 20px 0;
+  }
+  .result-stats strong {
+    font-size: 25px;
+  }
+  .result-stats span {
+    font-size: 9px;
+  }
+  .reward-row {
+    gap: 15px;
+    font-size: 10px;
+  }
+  .reward-row b {
+    font-size: 16px;
+  }
+  .result-realm {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 12px 8px;
+  }
+  .result-actions {
+    gap: 10px;
+  }
+  .result-actions button {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 10px;
+    gap: 6px;
+  }
+  .result-actions .small-icon {
+    width: 16px;
+  }
+  #toast {
+    font-size: 10px;
+    padding: 12px 16px;
+    width: max-content;
+    max-width: 90%;
+  }
+}
+@media (max-width: 350px) {
+  .lobby-header {
+    gap: 4px;
+  }
+  .lobby-header .brand {
+    gap: 5px;
+  }
+  .lobby-header .header-right {
+    gap: 2px;
+  }
+  .lobby-header .auto-button {
+    padding: 0 5px;
+  }
+}
+@media (max-width: 420px) {
+  .lobby-header .header-right {
+    display: grid;
+    grid-template-columns: repeat(3, 44px);
+    gap: 6px;
+  }
+}
+@media (max-width: 650px), (pointer: coarse) {
+  .lobby-header .auto-button {
+    display: none;
+  }
+}
+@media (max-height: 650px) and (min-width: 651px) {
+  .lobby-header {
+    height: 80px;
+    padding-top: 15px;
+    padding-bottom: 15px;
+  }
+  .hero {
+    min-height: 240px;
+    padding: 20px 0;
+  }
+  .hero h1 {
+    font-size: 36px;
+    line-height: 1.35;
+    margin-top: 12px;
+  }
+  .hero-copy > p {
+    margin-top: 10px;
+    font-size: 10px;
+  }
+  .hero-features {
+    margin-top: 11px;
+    font-size: 9px;
+  }
+  .expedition {
+    padding-bottom: 20px;
+  }
+  .stage-card {
+    height: 107px;
+  }
+  .stage-card strong {
+    margin-top: 12px;
+  }
+  .lobby-main {
+    min-height: 0;
+  }
+  .lobby-footer {
+    height: 45px;
+  }
+  .choice-art {
+    height: 80px;
+  }
+  .choice-art .icon {
+    width: 55px;
+    height: 60px;
+  }
+  .choice-card p {
+    margin-top: 14px;
+    min-height: 60px;
+  }
+  .upgrade-heading {
+    margin-bottom: 20px;
+  }
+  .upgrade-heading h2 {
+    font-size: 29px;
+    margin-top: 9px;
+  }
+  .upgrade-footer {
+    margin-top: 15px;
+  }
+  .panel {
+    max-height: 94svh;
+  }
+  .battle-bottom {
+    bottom: 18px;
+  }
+  .boss-bar {
+    --boss-top: 107px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+body:not(.in-game) #ui {
+  pointer-events: auto;
+}
+@media (min-width: 651px) and (min-height: 651px) and (max-height: 900px) {
+  .hero {
+    min-height: 310px;
+    padding-top: 24px;
+    padding-bottom: 25px;
+  }
+  .hero h1 {
+    font-size: clamp(37px, 3.3vw, 51px);
+    margin-top: 14px;
+  }
+  .hero-copy > p {
+    margin-top: 12px;
+  }
+  .hero-features {
+    margin-top: 16px;
+  }
+  .stage-card {
+    height: 125px;
+  }
+  .expedition {
+    padding-bottom: 19px;
+  }
+}
+@media (max-width: 650px) {
+  .hero {
+    min-height: 267px;
+    padding-top: 22px;
+    padding-bottom: 18px;
+  }
+  .hero h1 {
+    font-size: 32px;
+  }
+  .stage-card {
+    height: 94px;
+  }
+  .stage-card strong {
+    font-size: 17px;
+    margin-top: 9px;
+  }
+  .stage-bottom {
+    margin-top: 8px;
+  }
+  .hero-features {
+    margin-top: 12px;
+  }
+  .realm-preview {
+    margin-top: 53px;
+  }
+  .expedition-footer {
+    gap: 8px;
+    margin-top: 10px;
+    padding-bottom: 10px;
+  }
+  .depart-row {
+    padding-top: 11px;
+    gap: 11px;
+  }
+  .expedition {
+    padding-bottom: 18px;
+  }
+  .lobby-footer {
+    height: 42px;
+  }
+}

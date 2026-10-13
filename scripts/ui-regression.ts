@@ -4,6 +4,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { freshSave, readSave, IMMORTAL_CULTIVATION, type SaveData } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
+import { formatTime, TRIAL_BOSS_TIMES } from '../src/data.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
@@ -209,6 +210,101 @@ async function finishPage() {
   pageId = 0;
 }
 
+async function checkHomePanels(name: string) {
+  for (const panel of ['cultivation', 'arsenal', 'medicine', 'bestiary', 'chronicle', 'about']) {
+    checkpoint = `${name}-${panel}`;
+    await click(`[data-action="${panel}"]`);
+    await wait(`() => !!document.querySelector('.panel[data-panel="${panel}"]')`);
+    await check(checkpoint);
+    if (panel === 'arsenal') {
+      await click('[data-action="school-filter"][data-id="demonic"]');
+      assert.equal(
+        await evaluate(
+          `() => document.querySelector('[data-action="school-filter"][data-id="demonic"]').getAttribute('aria-pressed')`,
+        ),
+        'true',
+      );
+      assert.equal(
+        await evaluate(
+          `() => [...document.querySelectorAll('.collection-card small')].every(node => node.textContent.startsWith('魔道'))`,
+        ),
+        true,
+      );
+      await click('[data-action="treasure-page"][data-id="next"]');
+      assert.deepEqual(
+        await evaluate(
+          `() => ({cards:document.querySelectorAll('.collection-card').length,previous:document.querySelector('[data-action="treasure-page"][data-id="previous"]').disabled,next:document.querySelector('[data-action="treasure-page"][data-id="next"]').disabled})`,
+        ),
+        { cards: 6, previous: false, next: true },
+      );
+      await evaluate(
+        `() => { document.querySelector('.collection-card:last-child').scrollIntoView({block:'center'}); return true; }`,
+      );
+      const previous = await evaluate(
+        `() => ({scroll:document.querySelector('.panel').scrollTop,id:document.querySelector('.collection-card:last-child').dataset.id})`,
+      );
+      await click('.collection-card:last-child');
+      await wait('() => !!document.querySelector(".panel[data-panel=treasure-detail]")');
+      await check(`${name}-treasure-detail`);
+      await click('.panel-close[data-action=close]');
+      await wait('() => !!document.querySelector(".panel[data-panel=arsenal]")');
+      const returned = await evaluate(
+        `() => ({scroll:document.querySelector('.panel').scrollTop,id:document.activeElement?.dataset.id})`,
+      );
+      assert.equal(returned.id, previous.id, '返回藏器阁恢复当前法宝焦点');
+      assert.ok(Math.abs(returned.scroll - previous.scroll) <= 1, '返回藏器阁保留列表滚动');
+      await click('[data-action="book-tab"][data-id="passives"]');
+      assert.deepEqual(
+        await evaluate(
+          `() => ({selected:document.querySelector('[data-action="book-tab"][data-id="passives"]').getAttribute('aria-pressed'),passives:!!document.querySelector('.passive-card'),treasures:!!document.querySelector('.collection-card')})`,
+        ),
+        { selected: 'true', passives: true, treasures: false },
+      );
+      await check(`${name}-passives`);
+    } else if (panel === 'medicine') {
+      for (const view of ['recipes', 'craft', 'bag']) {
+        await click('[data-action="medicine-tier"][data-id="灵品"]');
+        assert.equal(
+          await evaluate(
+            `() => document.querySelector('[data-action="medicine-tier"][data-id="灵品"]').getAttribute('aria-pressed')`,
+          ),
+          'true',
+        );
+        await click(`[data-action="medicine-view"][data-id="${view}"]`);
+        assert.equal(
+          await evaluate(
+            `() => document.querySelector('[data-action="medicine-view"][data-id="${view}"]').getAttribute('aria-pressed')`,
+          ),
+          'true',
+        );
+        assert.equal(
+          await evaluate(
+            `() => document.querySelector('[data-action="medicine-tier"][data-id="all"]').getAttribute('aria-pressed')`,
+          ),
+          'true',
+          '切换丹囊视图重置品级筛选',
+        );
+        await check(`${name}-medicine-${view}`);
+      }
+    } else if (panel === 'bestiary') {
+      await click('[data-action="bestiary-stage"][data-id="6"]');
+      assert.equal(
+        await evaluate(
+          `() => document.querySelector('[data-action="bestiary-stage"][data-id="6"]').getAttribute('aria-pressed')`,
+        ),
+        'true',
+      );
+      const bosses = await evaluate(
+        `() => [...document.querySelectorAll('.bestiary-grid')].at(-1).textContent`,
+      );
+      assert.match(bosses, /九天执劫仙尊/);
+      assert.ok(bosses.includes(`最早 ${formatTime(TRIAL_BOSS_TIMES.at(-1)!)} 后现身`));
+      await check(`${name}-bestiary-final`);
+    }
+    await click('.panel-close[data-action=close]');
+  }
+}
+
 try {
   // SPA 的 HTML 回退也会返回 200；先确认实际脚本可加载，避免误报成界面等待超时。
   const entry = await fetch(baseUrl, { signal: AbortSignal.timeout(15000) });
@@ -278,6 +374,7 @@ try {
       '重开默认折叠',
     );
     await click('[data-action=close]');
+    await checkHomePanels(name);
     await click('[data-action=sound]');
     await check(`${name}-volume`);
     await click('[data-action=mute]');

@@ -51,8 +51,8 @@ export function binaryBreaches(files: RepositoryFile[], approved: ApprovedBinari
   if (fonts.length) breaches.push(`禁止提交字体文件：${fonts.join('、')}`);
   for (const { path, data } of files.filter(
     (file) =>
-      /\.(css|html)$/.test(file.path) ||
-      (file.path.startsWith('src/') && /\.[cm]?[jt]s$/.test(file.path)),
+      /\.(css|html)$/i.test(file.path) ||
+      (file.path.startsWith('src/') && /\.[cm]?[jt]s$/i.test(file.path)),
   )) {
     const text = new TextDecoder()
       .decode(data)
@@ -62,8 +62,8 @@ export function binaryBreaches(files: RepositoryFile[], approved: ApprovedBinari
       /@font-face\b/i.test(text) ||
       /fonts\.(?:googleapis|gstatic)\.com/i.test(text) ||
       /\bFontFace\s*\(|\bfonts\s*\.\s*add\s*\(/.test(text) ||
-      (/\.css$/.test(path) && /@import\b/i.test(text)) ||
-      (/\.html$/.test(path) &&
+      (/\.css$/i.test(path) && /@import\b/i.test(text)) ||
+      (/\.html$/i.test(path) &&
         (/<link\b(?=[^>]*\bas\s*=\s*['"]font['"])[^>]*>/i.test(text) ||
           /<link\b(?=[^>]*\brel\s*=\s*['"]stylesheet['"])(?=[^>]*\bhref\s*=\s*['"](?:https?:|\/\/))[^>]*>/i.test(
             text,
@@ -108,7 +108,7 @@ export function commitBinaryBreaches(
       git(['cat-file', '-e', `${before}^{commit}`]);
       range.push(`^${before}`);
     } catch {
-      // 强推或新分支：扫描所有已启用本门禁的提交，不能只检查最终文件树。
+      // 强推或新分支：扫描历史，不能只检查最终文件树。
     }
   }
   const commits = git(['rev-list', ...range])
@@ -119,16 +119,35 @@ export function commitBinaryBreaches(
   const breaches: string[] = [];
   if (!sameApproval(approved)) breaches.push('禁止修改已批准二进制基线来放行新增素材');
   for (const commit of commits) {
+    // 只豁免基线建立时已经存在的历史。旧提交分出的新侧支也必须逐提交检查。
+    if (commit !== bootstrap) {
+      try {
+        git(['merge-base', '--is-ancestor', commit, bootstrap]);
+        continue;
+      } catch {
+        // 本次新增的提交，即使其分支没有继承基线，也不能放过中间二进制。
+      }
+    }
+    let inheritsPolicy = false;
     try {
       git(['merge-base', '--is-ancestor', bootstrap, commit]);
+      inheritsPolicy = true;
     } catch {
-      continue; // 门禁启用前的既有素材不追溯拒绝。
+      // 旧基点上的文本分支可能尚无基线，不把这种情况误报为删除。
     }
+    let policy: Buffer | null = null;
     try {
-      if (!sameApproval(JSON.parse(git(['show', `${commit}:${policyPath}`]).toString())))
-        breaches.push(`提交 ${commit.slice(0, 7)} 禁止修改二进制基线`);
+      policy = git(['show', `${commit}:${policyPath}`]);
     } catch {
-      breaches.push(`提交 ${commit.slice(0, 7)} 删除或损坏了二进制基线`);
+      if (inheritsPolicy) breaches.push(`提交 ${commit.slice(0, 7)} 删除或损坏了二进制基线`);
+    }
+    if (policy !== null) {
+      try {
+        if (!sameApproval(JSON.parse(policy.toString())))
+          breaches.push(`提交 ${commit.slice(0, 7)} 禁止修改二进制基线`);
+      } catch {
+        breaches.push(`提交 ${commit.slice(0, 7)} 删除或损坏了二进制基线`);
+      }
     }
     const added = git([
       'diff-tree',

@@ -21,6 +21,15 @@ test('纯界面/文档不触发全量，经验与实际判定文件触发', () =
   assert.deepEqual(balanceChangedFiles(['src/style.css', 'src/guide.ts', 'docs/gameplay.md']), []);
   assert.deepEqual(
     balanceChangedFiles([
+      'src/boss-followup.ts',
+      'src/game-validation.ts',
+      'src/game-types.ts',
+      'src/render-overlays.ts',
+    ]),
+    ['src/boss-followup.ts', 'src/game-validation.ts'],
+  );
+  assert.deepEqual(
+    balanceChangedFiles([
       'src/data.ts',
       'src/progress.ts',
       'src/ads.ts',

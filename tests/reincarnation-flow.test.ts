@@ -31,6 +31,8 @@ import { sectDuesPending } from '../src/mortal.ts';
 import { Game } from '../src/game.ts';
 import { AD_SECONDS } from '../src/ads.ts';
 import { SUPPORT_CODE_IMAGE } from '../src/setting.ts';
+import { MedicinePanel } from '../src/medicine-panel.ts';
+import { JourneyCardPanel } from '../src/journey-card-panel.ts';
 
 // 执行实际函数和调用入口，不导入 main 的游戏、音频、Worker 与页面初始化。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -121,7 +123,6 @@ function harness(save: SaveData) {
     SUPPORT_CODE_IMAGE,
     structuredClone,
     AbortController,
-    journeyCardRequest: null,
     localStorage: {
       getItem: () => writes.at(-1) ?? null,
       setItem(key: string, value: string) {
@@ -246,6 +247,17 @@ function harness(save: SaveData) {
     },
   });
   flow.runInContext(context);
+  context.medicinePanel = new MedicinePanel(save, context.modal, {
+    show: noop,
+    render: noop,
+    refresh: noop,
+    persist: noop,
+    starterChanged: noop,
+    toast: noop,
+  });
+  context.journeyCardPanel = new JourneyCardPanel(context.modal, (title, subtitle, body) =>
+    context.panelFrame(title, subtitle, body),
+  );
   context.soundSettings = new SoundSettings(save, context.gameAudio, () => context.persist());
   return context;
 }

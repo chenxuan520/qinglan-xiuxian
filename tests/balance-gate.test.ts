@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { main } from '../scripts/balance-gate.ts';
+import { main, prepareBalanceReference } from '../scripts/balance-gate.ts';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   BARE_CLEAR_TARGETS,
   balanceCases,
@@ -18,6 +20,23 @@ import {
 } from '../scripts/balance-metrics.ts';
 import { initialSave, simulateCampaign } from '../scripts/balance-simulation.ts';
 import type { CampaignSample } from '../scripts/balance-simulation.ts';
+
+test('当前独立验收不读取旧提交，即使给出的仓库路径不存在', () => {
+  assert.equal(prepareBalanceReference(true, '/tmp/qinglan-no-such-reference-repository'), null);
+});
+
+test('历史对照仍能从清理后的同一已确认提交生成独立源码', () => {
+  const reference = prepareBalanceReference(false);
+  assert.ok(reference);
+  try {
+    assert.ok(existsSync(join(reference, 'src/game.ts')));
+    assert.ok(existsSync(join(reference, 'src/data.ts')));
+    assert.ok(existsSync(join(reference, 'scripts/balance-simulation.ts')));
+    assert.equal(JSON.parse(readFileSync(join(reference, 'package.json'), 'utf8')).type, 'module');
+  } finally {
+    rmSync(reference, { recursive: true, force: true });
+  }
+});
 import type { BalanceCase } from '../scripts/balance-policy.ts';
 import { CULTIVATION_PATHS, ROOT_STARTERS, SPIRIT_ROOTS, treasure } from '../src/data.ts';
 
