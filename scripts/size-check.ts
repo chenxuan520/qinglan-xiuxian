@@ -1,7 +1,7 @@
 // 产物体积门禁：独立目录构建后检查入口 JS/CSS 原始与 gzip 字节数，防止依赖或素材意外膨胀。
 // 预算约为 2026-10 基线的 120% 以上（docs/development.md 有基线记录），只拦明显异常增长。
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,7 @@ export const SIZE_BUDGET = {
   jsGzip: 210_000,
   cssBytes: 150_000,
   cssGzip: 35_000,
+  distBytes: 18_000_000,
 };
 
 export interface SizeMeasure {
@@ -18,6 +19,13 @@ export interface SizeMeasure {
   jsGzip: number;
   cssBytes: number;
   cssGzip: number;
+  distBytes: number;
+}
+export function directoryBytes(directory: string): number {
+  return readdirSync(directory, { withFileTypes: true }).reduce((total, entry) => {
+    const path = join(directory, entry.name);
+    return total + (entry.isDirectory() ? directoryBytes(path) : statSync(path).size);
+  }, 0);
 }
 export function measureEntry(outDir: string): SizeMeasure {
   const html = readFileSync(join(outDir, 'index.html'), 'utf8');
@@ -42,6 +50,7 @@ export function measureEntry(outDir: string): SizeMeasure {
     jsGzip: jsFiles.gzip,
     cssBytes: cssFiles.bytes,
     cssGzip: cssFiles.gzip,
+    distBytes: directoryBytes(outDir),
   };
 }
 export function budgetBreaches(measure: SizeMeasure, budget = SIZE_BUDGET): string[] {
@@ -54,17 +63,27 @@ export function budgetBreaches(measure: SizeMeasure, budget = SIZE_BUDGET): stri
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const outDir = 'artifacts/size-check';
-  mkdirSync(outDir, { recursive: true });
-  execFileSync('npx', ['vite', 'build', '--base', '/', '--outDir', outDir, '--emptyOutDir'], {
-    stdio: 'inherit',
-  });
+  const directoryArgument = process.argv.indexOf('--dir');
+  if (directoryArgument >= 0 && !process.argv[directoryArgument + 1])
+    throw new Error('--dir 需要指定已构建目录');
+  const outDir =
+    directoryArgument >= 0 ? process.argv[directoryArgument + 1] : 'artifacts/size-check';
+  if (directoryArgument < 0) {
+    mkdirSync(outDir, { recursive: true });
+    execFileSync('npx', ['vite', 'build', '--base', '/', '--outDir', outDir, '--emptyOutDir'], {
+      stdio: 'inherit',
+    });
+  }
+  mkdirSync('artifacts/size-check', { recursive: true });
   const measure = measureEntry(outDir);
   console.log(
     `入口 JS ${measure.jsBytes} 字节（gzip ${measure.jsGzip}）· CSS ${measure.cssBytes} 字节（gzip ${measure.cssGzip}）`,
   );
   console.log(
     `预算 JS ≤ ${SIZE_BUDGET.jsBytes}（gzip ≤ ${SIZE_BUDGET.jsGzip}）· CSS ≤ ${SIZE_BUDGET.cssBytes}（gzip ≤ ${SIZE_BUDGET.cssGzip}）`,
+  );
+  console.log(
+    `整个构建目录 ${measure.distBytes} 字节，预算 ≤ ${SIZE_BUDGET.distBytes} 字节（18 MB），包含全部静态资源和清单。`,
   );
   const breaches = budgetBreaches(measure);
   writeFileSync(
@@ -77,7 +96,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   );
   writeFileSync(
     'artifacts/size-check/summary.md',
-    `# 产物体积检查\n\n| 指标 | 实测字节 | 预算 |\n| --- | ---: | ---: |\n| 入口 JS | ${measure.jsBytes} | ${SIZE_BUDGET.jsBytes} |\n| 入口 JS gzip | ${measure.jsGzip} | ${SIZE_BUDGET.jsGzip} |\n| 入口 CSS | ${measure.cssBytes} | ${SIZE_BUDGET.cssBytes} |\n| 入口 CSS gzip | ${measure.cssGzip} | ${SIZE_BUDGET.cssGzip} |\n\n${breaches.length ? `未达标 ${breaches.length} 项。` : '通过。'}\n`,
+    `# 产物体积检查\n\n| 指标 | 实测字节 | 预算 |\n| --- | ---: | ---: |\n| 入口 JS | ${measure.jsBytes} | ${SIZE_BUDGET.jsBytes} |\n| 入口 JS gzip | ${measure.jsGzip} | ${SIZE_BUDGET.jsGzip} |\n| 入口 CSS | ${measure.cssBytes} | ${SIZE_BUDGET.cssBytes} |\n| 入口 CSS gzip | ${measure.cssGzip} | ${SIZE_BUDGET.cssGzip} |\n| 完整构建目录 | ${measure.distBytes} | ${SIZE_BUDGET.distBytes} |\n\n${breaches.length ? `未达标 ${breaches.length} 项。` : '通过。'}\n`,
   );
   if (breaches.length) {
     for (const text of breaches) console.error(`未达标：${text}`);

@@ -34,6 +34,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Reject new binary files and extra fonts
+        run: npm run assets:check
       - name: Check formatting and tests
         run: |
           npm run format:check
@@ -49,6 +51,8 @@ jobs:
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: npm run build -- --base "$BASE_PATH/"
+      - name: Check complete production build size
+        run: node --experimental-strip-types scripts/size-check.ts --dir dist
       - name: Install isolated browser regression tools
         run: npm ci --prefix scripts/browser-tools
       - name: Check desktop and mobile interfaces

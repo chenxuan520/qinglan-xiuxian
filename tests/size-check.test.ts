@@ -17,12 +17,16 @@ test('体积超预算时逐项报告，未超则通过', () => {
     jsGzip: SIZE_BUDGET.jsGzip,
     cssBytes: SIZE_BUDGET.cssBytes,
     cssGzip: SIZE_BUDGET.cssGzip,
+    distBytes: SIZE_BUDGET.distBytes,
   };
   assert.deepEqual(budgetBreaches(within), []);
   const over = { ...within, jsBytes: SIZE_BUDGET.jsBytes + 1, cssGzip: SIZE_BUDGET.cssGzip + 1 };
   const breaches = budgetBreaches(over);
   assert.equal(breaches.length, 2);
   assert.ok(breaches[0].startsWith('jsBytes') && breaches[1].startsWith('cssGzip'));
+  assert.deepEqual(budgetBreaches({ ...within, distBytes: within.distBytes + 1 }), [
+    `distBytes ${within.distBytes + 1} 字节超预算 ${within.distBytes} 字节`,
+  ]);
 });
 
 test('measureEntry 从 index.html 引用解析入口 JS/CSS 并给出 gzip 尺寸', () => {
@@ -60,4 +64,5 @@ test('共享预加载计入游戏体积并去重，不计入独立监控入口',
   const result = measureEntry(dir);
   assert.equal(result.jsBytes, 10);
   assert.equal(result.cssBytes, 5);
+  assert.ok(result.distBytes >= 715, '完整目录必须包含独立监控入口，不得只统计游戏入口');
 });

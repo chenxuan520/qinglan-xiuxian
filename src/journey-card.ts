@@ -342,44 +342,6 @@ export async function createJourneyCard(
   ]);
   signal.throwIfAborted();
   card.appraisal = appraisal;
-  // 等 AI 评语到达后，按实际绘制文字加载所有字库分包，再生成一次性图片。
-  let fontTimeout: ReturnType<typeof setTimeout> | undefined;
-  const fontProbe = document.createElement('span');
-  fontProbe.setAttribute('aria-hidden', 'true');
-  fontProbe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none;left:0;top:0';
-  for (const weight of [400, 600]) {
-    const text = document.createElement('span');
-    text.style.font = `${weight} 30px "Noto Serif SC"`;
-    text.textContent = JSON.stringify(card);
-    fontProbe.append(text);
-  }
-  document.body.append(fontProbe);
-  fontProbe.getBoundingClientRect();
-  let cancelFonts = () => {};
-  const cancelled = new Promise<never>((_, reject) => {
-    cancelFonts = () => reject(signal.reason ?? new Error('留影已取消'));
-    signal.addEventListener('abort', cancelFonts, { once: true });
-  });
-  try {
-    await Promise.race([
-      document.fonts.ready,
-      cancelled,
-      new Promise<never>((_, reject) => {
-        fontTimeout = setTimeout(() => reject(new Error('留影字体加载超时')), 15000);
-      }),
-    ]);
-    if (
-      [...document.fonts].some(
-        (font) => font.family.includes('Noto Serif SC') && font.status === 'error',
-      )
-    )
-      throw new Error('留影字体加载失败');
-  } finally {
-    clearTimeout(fontTimeout);
-    signal.removeEventListener('abort', cancelFonts);
-    fontProbe.remove();
-  }
-  signal.throwIfAborted();
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 1740;

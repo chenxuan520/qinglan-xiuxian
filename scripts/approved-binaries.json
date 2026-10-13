@@ -1,0 +1,178 @@
+{
+  "public/assets/audio/qinglan-mist.m4a": {
+    "bytes": 962626,
+    "sha256": "b10de43f233fb666f396af5921a802221a7d27aa09c9a43f5ee6a1bfe7c266ba"
+  },
+  "public/assets/boss-immortal.webp": {
+    "bytes": 484248,
+    "sha256": "559862b3aaa36b333d75d066af87aca69ff08bddd5b5df28855173a96672da75"
+  },
+  "public/assets/boss-tribulation.webp": {
+    "bytes": 385062,
+    "sha256": "eb80c03d53ccc1c79387a8f8cbceaecd91e52586cb02370b524e951e43b921cb"
+  },
+  "public/assets/bosses-six.webp": {
+    "bytes": 680972,
+    "sha256": "c4d0e8a6ba67d12013e0c910456bdee50edc7619c8ca5fdd32079807ff3702c4"
+  },
+  "public/assets/characters.webp": {
+    "bytes": 317786,
+    "sha256": "0d3e0bf5e4c2bb23538be50414d7e1e36b6385e383c5783e540ed4b11cfc0c36"
+  },
+  "public/assets/cultivation-manuals.webp": {
+    "bytes": 225910,
+    "sha256": "b6712e127b5d65f136c86e156ce989f730b4e020d57a5e510da35dd5b3d6e998"
+  },
+  "public/assets/enemies-ascended-1.webp": {
+    "bytes": 478530,
+    "sha256": "ea21e91dab170f803b2bcd22a7fad2b8e837486491bcdc8733310179ad7ca9c0"
+  },
+  "public/assets/enemies-ascended-2.webp": {
+    "bytes": 582244,
+    "sha256": "04a8ec348734dd78ad0c2a3264a5052b1a08c8902ccc85913101dd90d9fc01f5"
+  },
+  "public/assets/enemies-distinct.webp": {
+    "bytes": 473220,
+    "sha256": "7ca9c4fbad021260f7642a70d5cc661f1f6dd3e3be36ea247297b4ddf54edc5a"
+  },
+  "public/assets/enemies-heaven.webp": {
+    "bytes": 513904,
+    "sha256": "ee2521d704989b91a51f12214e00cc225a3e8bf79339eb0d5abe8779deb6b02b"
+  },
+  "public/assets/enemies-ice.webp": {
+    "bytes": 468406,
+    "sha256": "7ffa81dca57e4e20903f36843efcdf8c755feb1ced607c3bed97472536f92e06"
+  },
+  "public/assets/enemies-marsh.webp": {
+    "bytes": 433378,
+    "sha256": "17c6f9ae4c838695c9169703c09d7869943c31712b68683da0460701811d843a"
+  },
+  "public/assets/enemies-nether.webp": {
+    "bytes": 490784,
+    "sha256": "e804c9cd7596b1725f70859c4c940f592efbbda2bcfdb90616d9bc8f1b5f2980"
+  },
+  "public/assets/enemies-ruins.webp": {
+    "bytes": 450336,
+    "sha256": "1598f944fa6b6b432d651de382c93d577e2e17fd91d4101faba8dbba5fffa298"
+  },
+  "public/assets/journey-map-mobile.webp": {
+    "bytes": 280160,
+    "sha256": "de8be3581e7eca0be96456829b4d9e402e57c057a09d89abc0b0dee391af274c"
+  },
+  "public/assets/journey-map.webp": {
+    "bytes": 251582,
+    "sha256": "131e80b9a2ae067e39ae2e93ab609d0876ea36ceeea7207b2c2cc0aaa9e96f14"
+  },
+  "public/assets/medicines.webp": {
+    "bytes": 204474,
+    "sha256": "2a179ed6f8f8d874f248158a80c39dadef1c2bc19dbafac2f5dbe772b57d6016"
+  },
+  "public/assets/og-cover.jpg": {
+    "bytes": 211715,
+    "sha256": "b5aedb0dd806a88e1cf3ef03db7996ff1e22ed860705722262b7e303d3c943d4"
+  },
+  "public/assets/player-demonic.webp": {
+    "bytes": 320706,
+    "sha256": "bb113914dd9bbaa9bd59019c3dbbd6618b7f1614e188b2020a848ebf1ed68e0a"
+  },
+  "public/assets/player-dual.webp": {
+    "bytes": 262040,
+    "sha256": "0db0b5f7190c6b086043fa1a1d4fe96271cbd6de0e21c3ae3e186d0f6a3450b2"
+  },
+  "public/assets/qinglan-prologue-dark.webp": {
+    "bytes": 212726,
+    "sha256": "3633df313c58dfaf2a22464162021a9efd6491cb2fbc60327453cd10052f775e"
+  },
+  "public/assets/qinglan-prologue.webp": {
+    "bytes": 249902,
+    "sha256": "76ec7e55663e80bae53575efd09e256dbff548e3b9e544f3685d0f90c2bced46"
+  },
+  "public/assets/sect-market-buildings.webp": {
+    "bytes": 225512,
+    "sha256": "ac3d4f856d129ab581eeb7cb4bc8c017d0064718921007e920602e3e9acb1423"
+  },
+  "public/assets/sects-demonic.webp": {
+    "bytes": 531932,
+    "sha256": "365f76ea0a787d3b3f36bc2b4837db13dca659212b57dece38ad6120ff371ea8"
+  },
+  "public/assets/sects-orthodox.webp": {
+    "bytes": 535650,
+    "sha256": "2bd3b9ed23ae18495d2d8ba61e1e0d60ede38853d7844a85eac8106ebc0e263f"
+  },
+  "public/assets/support-wechat.webp": {
+    "bytes": 23010,
+    "sha256": "5a6f7f6dd914a151af336dd77130b21475e1ee7f61ebefee06e8b9865aab00f2"
+  },
+  "public/assets/terrain-heaven.webp": {
+    "bytes": 124468,
+    "sha256": "9770a96b61b3560ed24fc88dcc10b04ce65a35d4c1a8ef86395a53de50a63d5d"
+  },
+  "public/assets/terrain-ice.webp": {
+    "bytes": 285166,
+    "sha256": "a926127519ebe7d0a86edb9e33ebc9d57cb06ff659c2a649a3244311076e477f"
+  },
+  "public/assets/terrain-marsh.webp": {
+    "bytes": 241228,
+    "sha256": "d3cf4e1c7c270cc6496bd73cad29c71ed174699869527bef560c4bcd27b356fb"
+  },
+  "public/assets/terrain-nether.webp": {
+    "bytes": 229648,
+    "sha256": "81b5fe9df4932571c94d163180a104ec5ddd6de406cf1e3f2f3d37b8876fd5cb"
+  },
+  "public/assets/terrain-ruins.webp": {
+    "bytes": 275744,
+    "sha256": "92f81664d925846d9916a441d5a9e369cb7606181053a47531bf2108811251c0"
+  },
+  "public/assets/terrain-trial.webp": {
+    "bytes": 195974,
+    "sha256": "b84a15fbae060da94aa1d7f144b85e9c6576a9e913bcbf31077ae6f8bd44c1bd"
+  },
+  "public/assets/terrain.webp": {
+    "bytes": 289230,
+    "sha256": "8e1ac481a433eab57c43a03707401754c59936a38c9df3baf8737ce55f50f7e3"
+  },
+  "public/assets/town-buildings.webp": {
+    "bytes": 472856,
+    "sha256": "824da4974d3c1b110dbf22da215fdd771e818be3d9cab75cdf0b743f45322de0"
+  },
+  "public/assets/town-ground.webp": {
+    "bytes": 240728,
+    "sha256": "f5aba7623f7bdf22b6c99648f87c2a37f9ed0ddc983c56816bcf48fb2dfa8db9"
+  },
+  "public/assets/town-npcs.webp": {
+    "bytes": 333998,
+    "sha256": "7d2546faf8f80a1216426f28fef4b3d4003262d64a282ff7192bab42df50f1c1"
+  },
+  "public/assets/town-props.webp": {
+    "bytes": 313364,
+    "sha256": "7e5b8156b275e329bb5eda6bd0f05d78efd830ae5e9dac02017ef60963fcc5af"
+  },
+  "public/assets/treasures-1.webp": {
+    "bytes": 181246,
+    "sha256": "a635d2bd7d74f1d94b0aae88a4582458d683a82103acc5b95445807c489a477d"
+  },
+  "public/assets/treasures-2.webp": {
+    "bytes": 172068,
+    "sha256": "7ad1123f836072e72f61baa79b3eb38b41694339d9346dec819bd09cf5f20039"
+  },
+  "public/assets/treasures-3.webp": {
+    "bytes": 170640,
+    "sha256": "c9a62df9ab0272bb68b30274a5a6ab52cbe6892cbd57c5964c9c68ffaecd1498"
+  },
+  "public/icons/apple-touch-icon.png": {
+    "bytes": 2460,
+    "sha256": "2e1b25a61f633bec4d63ac28b2c0027885ec80362c6b319e0d1fea46ec20879f"
+  },
+  "public/icons/icon-192.png": {
+    "bytes": 5386,
+    "sha256": "37a5cb9c3479a69449898b063bab7934dc5d1cd69f7058a1f849df9a1db3eec0"
+  },
+  "public/icons/icon-512.png": {
+    "bytes": 14240,
+    "sha256": "e7c2987fa6a28f2a75bfe6f47984cb9b0de32bb15a2badffbb1163fddb5f0ce7"
+  },
+  "public/icons/icon-maskable-512.png": {
+    "bytes": 5216,
+    "sha256": "e0e4ff62dc948b195fd05885d21e20e2f283b2d2a99cce266865150218769ec6"
+  }
+}

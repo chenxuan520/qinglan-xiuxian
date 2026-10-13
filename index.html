@@ -39,6 +39,14 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="青岚纪" />
     <title>叩仙门：青岚纪</title>
+    <!-- 公共字体异步加载；不可用或离线时使用系统字体，不纳入构建或离线缓存。 -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.loli.net/css2?family=Noto+Serif+SC:wght@200..900&display=swap"
+      media="print"
+      onload="this.media='all'"
+      onerror="this.remove()"
+    />
   </head>
   <body>
     <div id="app"></div>

@@ -23,13 +23,11 @@
 
 `public/icons/` 的 PNG 由 `python3 scripts/generate-icons.py` 生成（需要 Pillow），图案与 `public/favicon.svg` 同源同配色：manifest 用图保留圆角与透明角；maskable 满幅铺底并把画作缩进 76% 安全区，供系统圆形裁切；apple-touch-icon（180×180）满幅铺底，画作缩至 90%，避免 iOS 把透明角填黑。PNG 是 Web App Manifest 与苹果主屏幕的硬性格式要求，不经 `compress-assets.py` 转 WebP。调整标志时同步更新 `favicon.svg` 与脚本中的几何常量，再重跑脚本；`tests/pwa.test.ts` 校验 manifest 声明与图标文件尺寸一致。
 
-## 本地中文字体 · 离线缓存（2026-10-05）
+## 二进制资源与构建体积约束
 
-界面使用本站 Noto Serif SC 变量字体，保留 200–900 字重和原有排布，不依赖 Google Fonts 在线请求。界面用字包约 630 KiB；动态对白首次需要时才加载约 2 MiB 的常用字包，其他生僻字按码点区间加载。所有分包合计约 12 MiB，覆盖官方源字体支持的 30,928 个码点，包括汉字扩展 A、兼容字与已收录的补充区汉字；不会只因不在源码里而把 AI 用字换成系统字体。字体许可为 SIL Open Font License 1.1，完整授权保存在 `public/assets/fonts/OFL.txt`。
+界面、战斗 Canvas 与留影可使用公共 `fonts.loli.net` / `gstatic.loli.net` 提供的 Noto Serif SC；样式异步加载且使用 `display=swap`，失败、被拦截或离线时立即使用设备上的系统字体。外部字体不写入仓库，不打包进构建，不纳入离线缓存，也不让游戏或留影等待字体请求。不维护字库生成脚本。
 
-同一家族的分包实际 cmap 不交叉，`unicode-range` 与 cmap 的交集决定有效覆盖；界面包最后声明，首页只请求界面包。留影按实际 AI 评语及卡片内容，在不可见 DOM 中触发布局与所需字体加载，再绘制 Canvas；不用宽范围的 `document.fonts.load` 批量拉取无关分包。字体失败、超时或取消会清理临时节点，失败仍可重试。设置里的「缓存所有离线资源」包括全部字库，缓存完成后本地对白和留影可离线使用；新 AI 内容仍需联网。
-
-原始字体来源：[Google Fonts 的 Noto Serif SC](https://github.com/google/fonts/tree/main/ofl/notoserifsc)，原始 24 MB TTF 不入仓库。扩充界面用字时，在仓库外取得官方 `NotoSerifSC[wght].ttf`，安装 `fonttools` 与 `brotli` 后运行 `python3 scripts/subset-font.py /tmp/NotoSerifSC.ttf`，再格式化 `src/style.css`。脚本生成带内容 hash 的 WOFF2、校验所有实际 cmap 与源字体完全覆盖且不重复，并更新 CSS、删除旧分包。字体预处理不参与普通 npm 构建，不增加玩家需要安装的依赖。
+未经用户明确授权，禁止新增或替换仓库二进制素材。`npm run assets:check` 按已批准素材的路径、长度和 SHA-256 基线检查文件，并检查本次 push / PR 每个提交中的新增与替换；独立 CI 与发布流程均执行，失败阻止发布。字体文件必须为零，只允许既定公共样式地址，禁止其他字体加载；禁止修改基线来放行新增文件。截图、原图、生成结果只放 `/tmp` 或忽略的 `artifacts/`，不提交 Git。完整构建目录上限 18000000 字节（18 MB），包含全部静态资源、代码与清单；`npm run size:check` 和正式两站构建均检查。
 
 ## 微信赞赏码 · 关于面板与轮回确认（2026-10-04）
 

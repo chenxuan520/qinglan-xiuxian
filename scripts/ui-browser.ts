@@ -9,6 +9,32 @@ interface UiBrowserOptions {
   timeoutMs?: number;
 }
 
+// MCP 的资源错误没有 URL：仅在全部错误是资源加载失败、失败请求全部属于可选字体源时放行。
+export function optionalFontFailures(consoleText: string, networkText: string) {
+  const errors = consoleText.split('\n').filter((line) => /\bmsgid=\d+/.test(line));
+  if (
+    !errors.length ||
+    !errors.every((line) => /^\s*msgid=\d+ \[error\] Failed to load resource:/.test(line))
+  )
+    return false;
+  const requests = [...networkText.matchAll(/\breqid=\d+\s+\S+\s+(\S+)\s+\[([^\]]+)\]/g)].filter(
+    (match) => /ERR_|failed|\b[45]\d\d\b/i.test(match[2]),
+  );
+  return (
+    requests.length >= errors.length &&
+    requests.every((match) => {
+      try {
+        const url = new URL(match[1]);
+        return (
+          url.protocol === 'https:' && ['fonts.loli.net', 'gstatic.loli.net'].includes(url.hostname)
+        );
+      } catch {
+        return false;
+      }
+    })
+  );
+}
+
 function chromePath(): string {
   const candidates = process.env.CHROME_PATH
     ? [process.env.CHROME_PATH]
