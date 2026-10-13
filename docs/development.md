@@ -202,30 +202,42 @@ git push origin v0.0.1
 
 ## 项目结构
 
-| 文件                 | 职责                                  |
-| -------------------- | ------------------------------------- |
-| `src/data.ts`        | 法宝、功法、妖物、秘境、难度数据      |
-| `src/game.ts`        | 独立于 DOM 的战斗模拟、选技、对局快照 |
-| `src/autoplay.ts`    | AI 走位与选技策略，游戏和难度模拟共用 |
-| `src/render.ts`      | Canvas 场景、角色、弹道与特效         |
-| `src/item-art.ts`    | 法宝与功法共用的生成图集映射          |
-| `src/sprites.ts`     | 战斗和妖物志共享的立绘图集映射        |
-| `src/progress.ts`    | 永久境界、资源、炼器、修炼与结算      |
-| `src/main.ts`        | 页面、输入、音效、存档、游戏状态衔接  |
-| `src/guide.ts`       | 游戏内修行指南                        |
-| `src/ads.ts`         | 激励广告位时长与占位，商业化替换点    |
-| `src/common-ui.ts`   | 首页、洞府与战斗共用的纯展示片段      |
-| `src/style.css`      | 桌面和移动布局                        |
-| `tests/game.test.ts` | 逻辑回归测试                          |
-| `scripts/balance.ts` | 可复现的自动战斗和成长模拟            |
+| 文件                 | 职责                                                 |
+| -------------------- | ---------------------------------------------------- |
+| `src/data.ts`        | 法宝、功法、妖物、秘境、难度数据                     |
+| `src/game.ts`        | 独立于 DOM 的战斗模拟、选技、对局快照                |
+| `src/autoplay.ts`    | AI 走位与选技策略，游戏和难度模拟共用                |
+| `src/render.ts`      | Canvas 场景、角色、弹道与特效                        |
+| `src/item-art.ts`    | 法宝与功法共用的生成图集映射                         |
+| `src/sprites.ts`     | 战斗和妖物志共享的立绘图集映射                       |
+| `src/progress.ts`    | 永久境界、资源、炼器、修炼与结算                     |
+| `src/main.ts`        | 页面、输入、音效、存档、游戏状态衔接                 |
+| `src/guide.ts`       | 游戏内修行指南                                       |
+| `src/ads.ts`         | 激励广告位的 provider 接口与可插拔供给（含占位兜底） |
+| `src/common-ui.ts`   | 首页、洞府与战斗共用的纯展示片段                     |
+| `src/style.css`      | 桌面和移动布局                                       |
+| `tests/game.test.ts` | 逻辑回归测试                                         |
+| `scripts/balance.ts` | 可复现的自动战斗和成长模拟                           |
 
 使用 TypeScript、Canvas 2D 与 Vite，不依赖运行时游戏框架。战斗和存档在本地运行，NPC 闲谈使用可失败回退的独立 Worker。开发模式提供 `window.__qinglan` 以验证场景，生产构建会移除该入口。中文字体优先使用 Noto Serif SC，加载失败时回退到系统宋体。中文 UI 数字统一不使用千分位逗号，数值格式化设置 `useGrouping: false`，保留原有万 / 亿缩写。
 
 图片为本项目通过内置 imagegen 工具生成，运行素材统一压缩为 WebP，保留原尺寸和透明边缘，不携带未压缩 PNG。秘境预载当前地图、本境敌人和首领以及法宝图集，首页同时预载当前屏宽对应的仙途山河图；城镇地图及九职业 NPC 按进入场景加载。预加载显示进度条，全部就绪才开放场景，失败提供重试。背景音乐为本项目原创编曲并离线合成，已保存于 `public/assets/`。生成方法见 [素材说明](assets.md)，测试范围与限制见 [验证记录](verification.md)，开发及部署约定见 [AGENTS.md](../AGENTS.md)。
 
-## 激励广告位（占位实现）
+## 激励广告位（provider 架构与 AdSense 接入指引）
 
-四处广告位共用 `src/ads.ts` 的时长与占位 Markup：复活（`showReviveAd`）、自选灵根与物资补给（`showRewardAd`）、借寿（`showLifespanAd`）。当前为 5 秒占位倒计时，由 `startAdCountdown` 播放、`adCompleted` 判定完成；奖励发放仍在各领取点（`game.revive`、灵根洗练、`adSupplies(save.unlocked)`、借寿）。接入真实广告 SDK 时替换播放与完成判定即可，弹窗结构与奖励逻辑不变。物资补给暂无每日次数限制，上线真实广告前需按数值定。
+四处广告位共用同一套 provider 接口（`src/ads.ts`）：复活（`showReviveAd`）、自选灵根与物资补给（`showRewardAd`）、借寿（`showLifespanAd`）。main.ts 只管界面与奖励判定；「算看完的时刻」由当前 provider 决定，任何 provider 不可用（未配置、SDK 加载失败、无库存、玩家中途关闭）都自动回退 5 秒占位倒计时，线上任何状态都能玩。
+
+- **provider 接口**：`RewardAdProvider`（`prepare()` 检测与 `play()` 回调 `onWatched` / `onFailed`）。接新平台（微信、巨量、其他 H5 激励平台）= 写一个实现并注册进 `src/ads.ts` 的 `PROVIDERS`，`setting.ts` 的 `ADS_SETTINGS.provider` 指名启用；main.ts 零改动。
+- **占位 provider（默认）**：保持当前线上语义——5 秒倒计时由 `adReadyAt` 判定完成，不发真实广告、不阻断游戏。provider 未切换时玩家看到的就是现在的行为。
+- **AdSense provider（`src/ads-adsense.ts`）**：Google H5 Placement API 的真实实现骨架。以下四步全是账号域事务，只能由本人完成：
+  1. 注册 AdSense 账号并添加 `xiuxian.011203.xyz`（后台 → 网站 → 添加网站）；通过域名所有权验证与内容审核。
+  2. 在 `public/` 放 `ads.txt`，内容为审核面板提供的 `google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0` 行；AdSense 要求它在域名根可达，即 `https://xiuxian.011203.xyz/ads.txt`（投 GitHub Pages 子路径只是备份站，官网挂牌在 Cloudflare 主站，两边部署链路都走 `public/`）。
+  3. 审核通过后把 `pub-…` 填进 `src/setting.ts` 的 `ADS_SETTINGS.adsense.client`，并把 `ADS_SETTINGS.provider` 改为 `'adsense'`。
+  4. 部署后回各家单元自检：复活看完 → 立即复活；中途关闭 → 按钮保持原地可走后置倒计时态，不给奖励。
+
+  SDK 代码按需注入（`<script>` + `preloadAdBreaks: 'auto'`），一次广告只看一次；库存为空、SDK 未加载、脚本被广告拦截器拦截或玩家中途关闭，全部回调 `onFailed` 走占位倒计时，线上不会出现"广告看不了、奖励也领不到"的死局。Placement name 固定为 `qinglan-revive` / `qinglan-reward-root` / `qinglan-reward-supplies` / `qinglan-lifespan`。
+
+- **奖励发放全部留在 main.ts 领取点**（`game.revive`、灵根洗练、`adSupplies(save.unlocked)`、借寿），SDK 只管判定。物资补给暂无每日次数限制，上线真实广告前需按数值定。
 
 `src/common-ui.ts` 收纳首页、洞府与战斗共用的纯展示片段，只按参数渲染 HTML，不读写全局游戏状态。新增同类片段时优先放这里，保持 `main.ts` 只做状态衔接与事件路由。
 

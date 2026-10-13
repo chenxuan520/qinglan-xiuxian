@@ -20,7 +20,13 @@ import {
 import { recordChronicle } from './chronicle.ts';
 import './mortal.css';
 import './journey-map.css';
-import { AD_DURATION_MS, AD_SECONDS, AD_PLACEHOLDER_HTML } from './ads.ts';
+import {
+  AD_DURATION_MS,
+  AD_SECONDS,
+  AD_PLACEHOLDER_HTML,
+  getAdProvider,
+  type AdPlacement,
+} from './ads.ts';
 import { GAME_VERSION } from './version.ts';
 import {
   currency,
@@ -336,6 +342,8 @@ let volumeOpen = false;
 let resumeAfterDamage = false;
 let adReadyAt = 0;
 let adTimer: number | undefined;
+// 真实广告 SDK 看完回调置位；占位路径（倒计时走完）仍按 adReadyAt 判定。
+let adWatched = false;
 let victoryTimer: number | undefined;
 let rewardAd: 'root' | 'supplies' | null = null;
 let rewardReturn: PanelLocation | null = null;
@@ -1131,6 +1139,7 @@ function finishRun() {
   }
   clearInterval(adTimer);
   adReadyAt = 0;
+  adWatched = false;
   panel = '';
   settled = true;
   rewards = settleRun(save, {
@@ -1218,12 +1227,57 @@ function showReviveAd() {
     return;
   panel = 'revive-ad';
   modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div>${AD_PLACEHOLDER_HTML}<p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>${AD_SECONDS} 秒后可复活</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
-  startAdCountdown('ad-revive', '满血复活');
+  startAdWatch('ad-revive', '满血复活', 'revive');
 }
-// 广告是否已完整播放；接入真实 SDK 后改走 SDK 的完成回调。
+// 广告是否已完整播放：真实 SDK 由观看回调置位，占位模式按倒计时完成判定。
 function adCompleted() {
-  return adReadyAt !== 0 && Date.now() >= adReadyAt;
+  return adWatched || (adReadyAt !== 0 && Date.now() >= adReadyAt);
 }
+
+// 真实 SDK 看过广告后的统一入口：解锁当前进程中的奖励按钮。
+function markAdWatched(action: string, label: string) {
+  adWatched = true;
+  refreshAdCountdown(action, label); // 按钮文本切到「广告已结束 · …」并解除禁用
+}
+
+// 三个广告位的公共启动：能用 provider 就由 provider 播放，任何原因不可用都回退占位倒计时。
+// 玩家中途关广告不会收到 onWatched，按钮不可用但不崩塌，仍走占位倒计时完成态。
+async function startAdWatch(action: string, label: string, placement: AdPlacement) {
+  adWatched = false;
+  const provider = getAdProvider();
+  if (provider.name !== 'placeholder') {
+    // SDK 分支与倒计时互不承认：先掐断任何遗留的 adReadyAt，避免上个面板的倒计时残留放行领取。
+    adReadyAt = 0;
+    const watchPanel = panel;
+    let ready = false;
+    try {
+      ready = await provider.prepare();
+    } catch {
+      ready = false;
+    }
+    // prepare 期间面板可能被玩家关闭或切换：那个时刻什么都不做，迟来的 SDK 回调同样照废。
+    if (panel !== watchPanel) return;
+    if (ready) {
+      // 真实广告全屏播放期间按钮保持禁用；看完回调会解锁为「广告已结束 · …」。
+      const waiting = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+      if (waiting) {
+        waiting.disabled = true;
+        waiting.textContent = '观看广告中…';
+      }
+      provider.play(placement, {
+        onWatched: () => {
+          if (panel === watchPanel) markAdWatched(action, label);
+        },
+        onFailed: () => {
+          if (panel === watchPanel) startAdCountdown(action, label);
+        },
+      });
+      return;
+    }
+  }
+  startAdCountdown(action, label);
+}
+
 function startAdCountdown(action: string, label: string) {
   adReadyAt = Date.now() + AD_DURATION_MS;
   clearInterval(adTimer);
@@ -1288,7 +1342,7 @@ function showRewardAd(kind: 'root' | 'supplies') {
       : `领取 ${adSupplies(save.unlocked).stones} 灵石与 ${adSupplies(save.unlocked).iron} 玄铁，可再次观看领取。`;
   modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${kind === 'root' ? 'root-ad-panel' : ''}" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '自选灵根' : '仙缘补给'}</div>${AD_PLACEHOLDER_HTML}<p>${reward}<br>完整观看 ${AD_SECONDS} 秒后点击领取，中途离开不发放奖励。</p>${kind === 'root' ? '<div id="root-picker"></div>' : ''}<div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>${AD_SECONDS} 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
   if (kind === 'root') renderRootPicker();
-  startAdCountdown('claim-ad-reward', '领取奖励');
+  startAdWatch('claim-ad-reward', '领取奖励', kind === 'root' ? 'reward-root' : 'reward-supplies');
   modal
     .querySelector<HTMLButtonElement>('[data-action="cancel-reward-ad"]')
     ?.focus({ preventScroll: true });
@@ -1699,7 +1753,7 @@ function showLifespanAd() {
   if (!Number.isFinite(life.base) || life.remaining > 0 || panel !== 'lifespan-ended') return;
   panel = 'lifespan-ad';
   modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div>${AD_PLACEHOLDER_HTML}<p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>再次寿尽时可再借，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>${AD_SECONDS} 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
-  startAdCountdown('claim-lifespan', '领取寿元');
+  startAdWatch('claim-lifespan', '领取寿元', 'lifespan');
 }
 function clearInput() {
   keys.clear();

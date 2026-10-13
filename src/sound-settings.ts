@@ -1,4 +1,5 @@
 import type { SaveData } from './progress.ts';
+import { setAdSoundEnabled } from './ads.ts';
 
 type SoundState = Pick<SaveData, 'sound' | 'volume'>;
 type SoundOutput = { sync(): void; play(name: string): void };
@@ -17,6 +18,7 @@ export class SoundSettings {
 
   setEnabled(enabled: boolean, feedback = false) {
     this.state.sound = enabled;
+    setAdSoundEnabled(enabled); // 广告 SDK 的 sound 标记跟随同一静音状态
     this.output.sync();
     if (enabled && feedback) this.output.play('select');
     this.persist();

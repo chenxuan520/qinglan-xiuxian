@@ -2,6 +2,18 @@ export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
 // 微信赞赏码是小程序码，二维码库无法重新生成；更换时直接替换这张图片。
 export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 
+// 激励广告供给。provider='placeholder' 保持占位倒计时（当前线上行为）；
+// 接入真实 SDK 时新增对应 RewardAdProvider（src/ads.ts 接口），注册后在此指名启用。
+// 任何 provider 不可用（未配置、SDK 加载失败、无库存）都自动回退占位倒计时，不影响游戏。
+export const ADS_SETTINGS = {
+  provider: 'placeholder' as 'placeholder' | 'adsense',
+  adsense: {
+    // AdSense 审核通过后填入 ca-pub-XXXXXXXXXXXXXXXX，把 provider 改为 'adsense'，
+    // 并在站点根路径补 ads.txt（见 docs/development.md 激励广告位小节）。
+    client: '',
+  },
+} as const;
+
 // NPC 相关常量集中在这里；改动后重新构建前端，并部署 npc-ai Worker。
 export const NPC_SETTINGS = {
   lifespanMinYears: 50,
