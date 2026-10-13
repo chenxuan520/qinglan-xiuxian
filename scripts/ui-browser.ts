@@ -23,7 +23,7 @@ function chromePath(): string {
   return path;
 }
 
-function assertLocalPage(url: unknown) {
+export function assertLocalPage(url: unknown) {
   if (url === 'about:blank') return;
   if (typeof url !== 'string') throw new Error('界面回归需要明确指定本机页面 URL');
   const parsed = new URL(url);

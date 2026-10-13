@@ -4,9 +4,10 @@ import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { freshSave, readSave, IMMORTAL_CULTIVATION, type SaveData } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
-import { openUiBrowser } from './ui-browser.ts';
+import { assertLocalPage, openUiBrowser } from './ui-browser.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
+assertLocalPage(baseUrl);
 const output = resolve('artifacts/ui-regression');
 const screenshots = process.env.UI_SCREENSHOTS === '1';
 const viewports = [
@@ -17,8 +18,8 @@ const viewports = [
 ] as const;
 await mkdir(output, { recursive: true });
 await Promise.all(
-  ['failure.png', 'failure.txt', 'report.json'].map((name) =>
-    rm(resolve(output, name), { force: true }),
+  ['failure.png', 'failure.txt', 'report.json', 'console-errors.txt', 'network-requests.txt'].map(
+    (name) => rm(resolve(output, name), { force: true }),
   ),
 );
 const browser = await openUiBrowser({ workspace: output });
@@ -199,6 +200,23 @@ async function finishPage() {
 }
 
 try {
+  // SPA 的 HTML 回退也会返回 200；先确认实际脚本可加载，避免误报成界面等待超时。
+  const entry = await fetch(baseUrl, { signal: AbortSignal.timeout(15000) });
+  assert.ok(entry.ok, `入口请求失败：${entry.status}`);
+  const html = await entry.text();
+  const scripts = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>/g)];
+  assert.ok(scripts.length, '入口中没有可加载的页面脚本');
+  for (const [, source] of scripts) {
+    const url = new URL(source, baseUrl);
+    assertLocalPage(url.href);
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const contentType = response.headers.get('content-type') || '';
+    await response.body?.cancel();
+    assert.ok(
+      response.ok && /(?:javascript|ecmascript)/i.test(contentType),
+      `页面脚本未正确提供：${url.pathname}（${response.status}，${contentType}），请核对构建与预览的 base 路径`,
+    );
+  }
   for (const [name, viewport] of viewports) {
     checkpoint = `${name}-settings`;
     await open(viewport, fixture());
@@ -337,6 +355,14 @@ try {
       .call('take_snapshot', { pageId })
       .then((text) => writeFile(resolve(output, 'failure.txt'), text))
       .catch(() => {});
+    await Promise.allSettled([
+      browser
+        .call('list_console_messages', { pageId, types: ['error'], pageSize: 100 })
+        .then((text) => writeFile(resolve(output, 'console-errors.txt'), text)),
+      browser
+        .call('list_network_requests', { pageId, pageSize: 100 })
+        .then((text) => writeFile(resolve(output, 'network-requests.txt'), text)),
+    ]);
   }
   throw error;
 } finally {
