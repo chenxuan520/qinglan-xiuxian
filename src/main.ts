@@ -25,6 +25,7 @@ import {
   AD_SECONDS,
   AD_PLACEHOLDER_HTML,
   getAdProvider,
+  watchAdPlacement,
   type AdPlacement,
 } from './ads.ts';
 import { GAME_VERSION } from './version.ts';
@@ -1240,53 +1241,30 @@ function markAdWatched(action: string, label: string) {
   refreshAdCountdown(action, label); // 按钮文本切到「广告已结束 · …」并解除禁用
 }
 
-// 三个广告位的公共启动：能用 provider 就由 provider 播放，任何原因不可用都回退占位倒计时。
-// 玩家中途关广告不会收到 onWatched，按钮不可用但不崩塌，仍走占位倒计时完成态。
-async function startAdWatch(action: string, label: string, placement: AdPlacement) {
+// 三个广告位的公共启动：能用 provider 就由 provider 播放，任何原因不可用（装死沉默也算）都回退占位倒计时。
+function startAdWatch(action: string, label: string, placement: AdPlacement) {
   adWatched = false;
   const provider = getAdProvider();
-  if (provider.name !== 'placeholder') {
-    // SDK 分支与倒计时互不承认：先掐断任何遗留的 adReadyAt，避免上个面板的倒计时残留放行领取。
-    adReadyAt = 0;
-    const watchPanel = panel;
-    let ready = false;
-    try {
-      ready = await provider.prepare();
-    } catch {
-      ready = false;
-    }
-    // prepare 期间面板可能被玩家关闭或切换：那个时刻什么都不做，迟来的 SDK 回调同样照废。
-    if (panel !== watchPanel) return;
-    if (ready) {
-      // 真实广告全屏播放期间按钮保持禁用；看完回调会解锁为「广告已结束 · …」。
-      const waiting = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
-      if (waiting) {
-        waiting.disabled = true;
-        waiting.textContent = '观看广告中…';
-      }
-      // 保险丝：SDK 静默挂起时没有回调——3 秒无响应立刻回退占位倒计时，绝不让玩家死等。
-      let responded = false;
-      const failSafe = window.setTimeout(() => {
-        if (!responded && panel === watchPanel) startAdCountdown(action, label);
-      }, 3_000);
-      provider.play(placement, {
-        onWatched: () => {
-          if (responded || panel !== watchPanel) return;
-          responded = true;
-          clearTimeout(failSafe);
-          markAdWatched(action, label);
-        },
-        onFailed: () => {
-          if (responded || panel !== watchPanel) return;
-          responded = true;
-          clearTimeout(failSafe);
-          startAdCountdown(action, label);
-        },
-      });
-      return;
-    }
+  if (provider.name === 'placeholder') {
+    startAdCountdown(action, label);
+    return;
   }
-  startAdCountdown(action, label);
+  // SDK 分支与倒计时互不承认：先掐断任何遗留的 adReadyAt，避免上个面板的倒计时残留放行领取。
+  adReadyAt = 0;
+  const watchPanel = panel;
+  // 真实广告全屏播放期间按钮保持禁用；看完回调会解锁为「广告已结束 · …」。
+  const waiting = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+  if (waiting) {
+    waiting.disabled = true;
+    waiting.textContent = '观看广告中…';
+  }
+  watchAdPlacement({
+    provider,
+    placement,
+    alive: () => panel === watchPanel,
+    onWatched: () => markAdWatched(action, label),
+    onFallback: () => startAdCountdown(action, label),
+  });
 }
 
 function startAdCountdown(action: string, label: string) {

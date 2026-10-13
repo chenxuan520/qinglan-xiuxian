@@ -51,3 +51,51 @@ const PROVIDERS: Record<string, RewardAdProvider> = {
 export function getAdProvider(): RewardAdProvider {
   return PROVIDERS[ADS_SETTINGS.provider] ?? placeholderProvider;
 }
+
+// 广告播放质量上的超时：无回调等待阈值。任何外部广告库（尤其未过审的 AdSense）都可能完全静默、
+// 不给任何回调信号（吸附/未加载/拒载/未过审全堵不成信号），超时必回退占位倒计时，不把玩家卡死。
+export const AD_WATCH_TIMEOUT_MS = 3000;
+
+export interface WatchPlacementOptions {
+  provider: RewardAdProvider;
+  placement: AdPlacement;
+  // 面板仍存活检查（玩家可能中途关闭/切换面板）；不满足时本次播放结果完全作废。
+  alive(): boolean;
+  onWatched(): void;
+  onFallback(reason: string): void;
+  timeoutMs?: number;
+}
+
+// 触发 provider.prepare → play 的完整一轮，SDK 任何装死/出错都能在 timeoutMs 内落回占位。
+export function watchAdPlacement(options: WatchPlacementOptions): void {
+  const { provider, placement, alive, onWatched, onFallback } = options;
+  const timeoutMs = options.timeoutMs ?? AD_WATCH_TIMEOUT_MS;
+  let finished = false;
+  const timer = setTimeout(() => finishFallback('广告无响应，回退占位'), timeoutMs);
+  const done = () => {
+    finished = true;
+    clearTimeout(timer);
+  };
+  const finishWatched = () => {
+    if (finished || !alive()) return;
+    done();
+    onWatched();
+  };
+  const finishFallback = (reason: string) => {
+    if (finished || !alive()) return;
+    done();
+    onFallback(reason);
+  };
+  provider
+    .prepare()
+    .then((ready) => {
+      if (finished) return;
+      if (!alive()) return done();
+      if (!ready) return finishFallback('广告 SDK 不可用');
+      provider.play(placement, {
+        onWatched: finishWatched,
+        onFailed: finishFallback,
+      });
+    })
+    .catch(() => finishFallback('广告 SDK 准备失败'));
+}

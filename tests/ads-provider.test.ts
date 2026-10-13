@@ -2,7 +2,12 @@
 // AdSense 未配置 client 时准备阶段直接失败、回退占位（当前线上行为）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getAdProvider, setAdSoundEnabled, type RewardAdProvider } from '../src/ads.ts';
+import {
+  getAdProvider,
+  setAdSoundEnabled,
+  watchAdPlacement,
+  type RewardAdProvider,
+} from '../src/ads.ts';
 import { adsenseProvider } from '../src/ads-adsense.ts';
 
 // 官方 adBreak() 合法参数全集（Placement API Reference，2023-12-05 版）。
@@ -155,6 +160,70 @@ test('声音开关实时同步到广告 SDK 的 sound 参数', () => {
     quiet.sdk.cleanup();
     setAdSoundEnabled(false);
   }
+});
+
+test('SDK 装死（prepare 通过但 play 永不返回回调）时，超时自动回退占位倒计时', async () => {
+  const silent: RewardAdProvider = {
+    name: 'silent',
+    placementName: (p) => p,
+    prepare: async () => true,
+    play: () => {
+      // 故意一句话不多说：模拟未过审账号或库加载失败的完全沉默。
+    },
+  };
+  const outcome = await new Promise<{ watched: boolean; fallback: string | null }>(
+    (resolvePromise) => {
+      const result = { watched: false, fallback: null as string | null };
+      watchAdPlacement({
+        provider: silent,
+        placement: 'revive',
+        alive: () => true,
+        timeoutMs: 10,
+        onWatched: () => {
+          result.watched = true;
+          resolvePromise(result);
+        },
+        onFallback: (reason) => {
+          result.fallback = reason;
+          resolvePromise(result);
+        },
+      });
+    },
+  );
+  assert.equal(outcome.watched, false);
+  assert.match(outcome.fallback!, /无响应/);
+});
+
+test('面板被关闭时（alive 未真），即使 SDK 之后发言也完全作废', async () => {
+  const eager: RewardAdProvider = {
+    name: 'eager',
+    placementName: (p) => p,
+    prepare: async () => true,
+    play: (_placement, callbacks) => callbacks.onWatched(),
+  };
+  const outcome = await new Promise<{ watched: boolean; fallback: string | null }>(
+    (resolvePromise) => {
+      const result = { watched: false, fallback: null as string | null };
+      watchAdPlacement({
+        provider: eager,
+        placement: 'revive',
+        alive: () => false,
+        timeoutMs: 5_000,
+        onWatched: () => {
+          result.watched = true;
+          resolvePromise(result);
+        },
+        onFallback: (reason) => {
+          result.fallback = reason;
+          resolvePromise(result);
+        },
+      });
+      // 两步等候master：先等准备+播放的微任务都过了一遍，确认没有任何做一次调用。
+      setTimeout(() => resolvePromise(result), 30);
+    },
+  );
+  assert.equal(outcome.watched, false);
+  assert.equal(outcome.fallback, null);
 });
 
 test('provider 接口可被第三方实现：注册语义成立', () => {
