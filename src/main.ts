@@ -1,4 +1,5 @@
 import { MedicinePanel } from './medicine-panel.ts';
+import { homeTownEntrance } from './home-town.ts';
 import { catalogPanel } from './catalog-ui.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
 import { bestiaryPanel } from './bestiary-ui.ts';
@@ -19,6 +20,7 @@ import {
 } from './inheritance-ui.ts';
 import { recordChronicle } from './chronicle.ts';
 import './mortal.css';
+import './home-town.css';
 import './journey-map.css';
 import {
   AD_DURATION_MS,
@@ -521,6 +523,7 @@ function renderLobby(returnYears?: number) {
       </section>`
       }
       ${spiritRootSummary(save, true)}
+      ${homeTownEntrance()}
       <section class="expedition" aria-label="选择秘境">
         ${pendingRun ? `<div class="resume-banner"><div><span class="status-dot"></span>尚有一段仙缘未了<small>${pendingRun.encounterName} · ${formatTime(pendingRun.time)} · ${pathInfo(pendingRun.path).name} · 局内 ${pendingRun.level} 级</small></div><button class="secondary-button" data-action="restore">继续上次历练 ${smallIcon('arrow')}</button></div>` : ''}
         <div class="journey-selection"><div class="journey-destination" aria-live="polite"><small>第${stage.chapter}境 · ${save.completed.includes(selectedStage) ? '故地重游' : '此行将至'}</small><h3>${stage.name}</h3><p>${stage.description}</p><div class="journey-destination-facts"><span>${selectedStage === FINAL_TRIAL_STAGE ? `仙尊最早 ${formatTime(TRIAL_BOSS_TIMES.at(-1)!)}` : `历练 ${stage.minutes} 分钟`}</span><span>每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><span>妖王 · ${stage.boss}</span></div></div><div class="journey-depart"><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? (completed ? '再入山河' : '踏入秘境') : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button><small>${pathInfo(save.path).name} · ${DIFFICULTIES[difficulty].name}</small></div></div>

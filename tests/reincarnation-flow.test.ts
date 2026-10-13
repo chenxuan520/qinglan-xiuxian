@@ -1,3 +1,4 @@
+import { homeTownEntrance } from '../src/home-town.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -94,6 +95,7 @@ function harness(save: SaveData) {
   const rootLayout = { innerHTML: '' };
   let rolls = 0;
   const context = createContext({
+    homeTownEntrance,
     ...data,
     ambushScene: null,
     save,

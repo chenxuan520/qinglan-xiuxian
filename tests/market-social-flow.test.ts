@@ -1,3 +1,4 @@
+import { homeTownEntrance } from '../src/home-town.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -100,6 +101,7 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     },
   };
   const context = createContext({
+    homeTownEntrance,
     save,
     SAVE_KEY,
     structuredClone,
