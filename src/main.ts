@@ -1264,12 +1264,23 @@ async function startAdWatch(action: string, label: string, placement: AdPlacemen
         waiting.disabled = true;
         waiting.textContent = '观看广告中…';
       }
+      // 保险丝：SDK 静默挂起时没有回调——3 秒无响应立刻回退占位倒计时，绝不让玩家死等。
+      let responded = false;
+      const failSafe = window.setTimeout(() => {
+        if (!responded && panel === watchPanel) startAdCountdown(action, label);
+      }, 3_000);
       provider.play(placement, {
         onWatched: () => {
-          if (panel === watchPanel) markAdWatched(action, label);
+          if (responded || panel !== watchPanel) return;
+          responded = true;
+          clearTimeout(failSafe);
+          markAdWatched(action, label);
         },
         onFailed: () => {
-          if (panel === watchPanel) startAdCountdown(action, label);
+          if (responded || panel !== watchPanel) return;
+          responded = true;
+          clearTimeout(failSafe);
+          startAdCountdown(action, label);
         },
       });
       return;
