@@ -21,6 +21,7 @@ import {
   MARKET_SCENE_HEIGHT,
 } from './market-roaming.ts';
 import { marketBuildingArt } from './market-art.ts';
+import { marketFellowCharacter } from './market-fellow.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -52,11 +53,13 @@ export class SectMarketScene {
   constructor(
     private host: HTMLElement,
     public position: TownPoint,
-    save: SaveData,
+    private save: SaveData,
     private interact: (npc: MarketCultivator) => void,
     private openAuction: () => void = () => {},
   ) {
     this.residents = marketCharacters(save.mortal.population!, save.mortal.sectMarket!);
+    const fellow = marketFellowCharacter(save);
+    if (fellow) this.residents.push(fellow);
     for (const n of this.residents) if (n.roaming) Object.assign(n, marketVisitorPosition(n, 0));
     const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
     host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_SCENE_WIDTH}px;height:${MARKET_SCENE_HEIGHT}px">${[
@@ -207,6 +210,7 @@ export class SectMarketScene {
     return Math.hypot(this.position.x - AUCTION_SPOT.x, this.position.y - AUCTION_SPOT.y) <= 145;
   }
   update(now: number, enabled: boolean) {
+    this.refreshFellow();
     const dt = this.last && this.enabled && enabled ? Math.min(0.1, (now - this.last) / 1000) : 0;
     this.last = now;
     this.enabled = enabled && this.ready;
@@ -277,6 +281,28 @@ export class SectMarketScene {
     if (!this.enabled) return;
     if (this.nearAuction) this.openAuction();
     else if (this.nearbyNpc) this.interact(this.nearbyNpc);
+  }
+  private refreshFellow() {
+    // 仍在坊市闲逛时也会跨年；只更新这位故人的身份与境界，不重绘场景或换批。
+    const npc = this.residents.find((n) => n.id === 'market-fellow');
+    const current = marketFellowCharacter(this.save);
+    if (
+      !npc ||
+      !current ||
+      (npc.generation === current.generation && npc.realmIndex === current.realmIndex)
+    )
+      return;
+    Object.assign(npc, current);
+    const label = this.host.querySelector(
+      '[data-market-npc="market-fellow"] .sect-market-npc-name',
+    );
+    const realm = realmInfo(
+      this.save.cultivation,
+      this.save.completed.includes(FINAL_TRIAL_STAGE),
+    ).index;
+    if (label)
+      label.innerHTML = `${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${npc.realm}<br>${npc.role}</small>`;
+    this.nearbyId = '';
   }
   private clearPointer() {
     this.pointer = null;

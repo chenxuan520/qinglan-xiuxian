@@ -37,6 +37,7 @@
 | `src/town.ts`、`src/town-scene.ts`                                  | 城镇坐标、行走与交互、模块地图及镜头      |
 | `src/sect-market*.ts`、`src/market-roaming.ts`、`src/market-art.ts` | 坊市场景、镜头覆盖、散步修士及建筑取景    |
 | `src/market-social*.ts`、`src/market-ambush*.ts`                    | 论道、求购、私下机缘与独立劫修遭遇        |
+| `src/market-fellow*.ts`                                             | 同道重逢、寿数与后人、交易见闻线索        |
 | `src/auction*.ts`                                                   | 坊市拍卖、物品估值、结拍记录与状态校验    |
 | `src/scene-assets.ts`                                               | 按关卡生成预载素材清单                    |
 | `src/asset-url.ts`                                                  | 静态素材的部署基础路径处理                |

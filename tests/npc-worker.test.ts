@@ -7,6 +7,7 @@ import worker, {
   issueStoryImageToken,
   NPC_MODEL,
   STORY_IMAGE_MODEL,
+  validDialogue,
   validStoryImage,
   verifyStoryImageToken,
 } from '../workers/npc-ai/index.ts';
@@ -14,6 +15,7 @@ import { townResidents } from '../src/town-population.ts';
 import { NPC_AI_SETTINGS, TEA_STORY_IMAGE_SETTINGS, TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { freshSave } from '../src/progress.ts';
 import { chooseSmithStory, smithAt } from '../src/town-story.ts';
+import { marketCharacters } from '../src/sect-market-data.ts';
 
 const origins = [
   'https://xiuxian.011203.xyz',
@@ -66,6 +68,70 @@ const teaInput = {
   npcId: 'tea',
   message: TEA_STORY_SETTINGS.requestMessage,
 };
+
+test('固定同道不进入随机来客的 AI 协议，真实请求返回 400 且不占限流或推理', async () => {
+  let limits = 0;
+  let inferences = 0;
+  const bindings = {
+    ...env(),
+    NPC_LIMITER: {
+      limit: async () => {
+        limits++;
+        return { success: true };
+      },
+    },
+    AI: {
+      run: async () => {
+        inferences++;
+        return { response: '不应触发' };
+      },
+    },
+  };
+  for (const marketVisit of [
+    undefined,
+    { visit: 1, realmIndex: 0 },
+    { visit: 12, realmIndex: 7 },
+  ]) {
+    const body = { ...input, npcId: 'market-fellow', marketVisit };
+    assert.equal(validDialogue(body), false);
+    const response = await worker.fetch(request(body), bindings);
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'http://localhost:5173');
+    const failure = await response.json();
+    assert.equal(failure.error, 'invalid-dialogue');
+    assert.equal(failure.retryable, false);
+    assert.equal(failure.fallback, true);
+  }
+  assert.equal(limits, 0);
+  assert.equal(inferences, 0);
+});
+
+test('原十五位坊市来客的真实 Worker 请求仍使用各自生成身份并正常回复', async () => {
+  const marketVisit = { visit: 12, realmIndex: 7 };
+  const people = marketCharacters(input.population, marketVisit);
+  assert.equal(people.length, 15);
+  let calls = 0;
+  for (const person of people) {
+    const body = { ...input, npcId: person.id, marketVisit };
+    assert.equal(validDialogue(body), true, person.id);
+    const bindings = env(async (model, options) => {
+      calls++;
+      assert.equal(model, NPC_MODEL);
+      assert.ok(options.messages[0].content.includes(`修士${person.name}`), person.id);
+      assert.ok(
+        options.messages[0].content.includes(`是${person.realm}的${person.role}`),
+        person.id,
+      );
+      assert.equal(options.messages.at(-1).content, body.message);
+      return { response: '道友且看，市中又添了些新物。' };
+    });
+    const response = await worker.fetch(request(body), bindings);
+    assert.equal(response.status, 200, person.id);
+    assert.deepEqual(await response.json(), { reply: '道友且看，市中又添了些新物。' });
+  }
+  assert.equal(calls, 15);
+});
+
 async function inferenceRequests() {
   const story = '一回旧闻';
   const token = await issueStoryImageToken(story, env().STORY_IMAGE_SECRET);

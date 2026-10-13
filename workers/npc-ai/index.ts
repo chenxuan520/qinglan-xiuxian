@@ -94,6 +94,8 @@ const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 export function validDialogue(value: unknown): value is NpcDialogueRequest {
   if (!record(value)) return false;
+  // 固定同道沿本地存档演绎，不属于每批生成身份的 AI 闲谈协议。
+  if (value.npcId === 'market-fellow') return false;
   return (
     (value.mode === undefined ||
       (value.mode === 'tea-story' &&

@@ -3,6 +3,7 @@ import { freshHometown, validHometown } from './hometown.ts';
 import { validSectMarket } from './sect-market-data.ts';
 import { validAuction } from './auction-data.ts';
 import { validMarketSocial } from './market-social-data.ts';
+import { validMarketFellow } from './market-fellow-data.ts';
 import {
   freshMedicine,
   validMedicine,
@@ -86,7 +87,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 15;
+export const SAVE_SCHEMA = 16;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -290,6 +291,11 @@ export function readSave(
     )
       delete s.mortal.marketSocial;
     if (
+      s.mortal?.marketFellow !== undefined &&
+      !validMarketFellow(s.mortal.marketFellow, base.age, s.mortal.population)
+    )
+      delete s.mortal.marketFellow;
+    if (
       s.mortal &&
       typeof s.mortal === 'object' &&
       !Array.isArray(s.mortal) &&
@@ -372,9 +378,10 @@ export function readSave(
     if (migratingEarthStarter)
       base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
     // 已通关的旧档补齐成仙门槛；只补差额，不补发整局或妖王奖励。
-    const ascensionCultivation = upgrading
-      ? Math.max(0, IMMORTAL_CULTIVATION - base.cultivation)
-      : 0;
+    const ascensionCultivation =
+      upgrading && base.completed.includes(FINAL_TRIAL_STAGE)
+        ? Math.max(0, IMMORTAL_CULTIVATION - base.cultivation)
+        : 0;
     base.cultivation += base.completed.includes(FINAL_TRIAL_STAGE) ? ascensionCultivation : 0;
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
     base.journeyEnded = s.journeyEnded === true && realm.max;

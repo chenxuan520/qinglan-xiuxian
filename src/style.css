@@ -2490,6 +2490,17 @@ kbd {
 .choice-recipe-compact {
   display: none;
 }
+.choice-guidance-compact {
+  display: none;
+}
+@media (max-width: 650px), (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+  .choice-guidance-full {
+    display: none;
+  }
+  .choice-guidance-compact {
+    display: inline;
+  }
+}
 .choice-meta {
   display: contents;
 }

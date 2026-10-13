@@ -145,6 +145,8 @@ import {
   prepareMarketSocial,
 } from './market-social.ts';
 import { marketSocialContent } from './market-social-ui.ts';
+import { marketFellowCharacter, meetMarketFellow, chooseMarketFellow } from './market-fellow.ts';
+import { marketFellowContent } from './market-fellow-ui.ts';
 import { MarketAmbushScene } from './market-ambush-scene.ts';
 import type { AmbushOutcome } from './market-ambush.ts';
 import { marketCultivators } from './sect-market-data.ts';
@@ -897,6 +899,24 @@ function showTownEvent(npc: TownResident) {
 }
 function showMarketEvent(npc: MarketCultivator) {
   if (!inMarket || marketScene?.nearbyNpc?.id !== npc.id) return;
+  if (npc.id === 'market-fellow') {
+    const next = structuredClone(save);
+    if (meetMarketFellow(next)) {
+      try {
+        writeSave(next, pendingRun);
+      } catch {
+        if (!saveLock) toast('相逢未能保存，请稍后重新交谈');
+        return;
+      }
+      Object.assign(save, next);
+    }
+    const fellow = marketFellowCharacter(save);
+    if (!fellow) return;
+    marketNpc = fellow;
+    panel = 'sect-market-event';
+    panelFrame(fellow.name, '宗门坊市 · 炉边故人', marketFellowContent(save));
+    return;
+  }
   marketNpc = npc;
   panel = 'sect-market-event';
   panelFrame(npc.name, '宗门坊市 · 同道往来', sectMarketEventContent(save, npc, !!pendingRun));
@@ -2652,6 +2672,28 @@ function handleAction(action: string, id?: string) {
       document.querySelector<HTMLButtonElement>('[data-action="sect-market-enter"]')?.focus();
     } else if (action === 'sect-market-talk' && inMarket && !panel) marketScene?.talk();
     else if (
+      action === 'sect-market-fellow' &&
+      inMarket &&
+      panel === 'sect-market-event' &&
+      marketNpc?.id === 'market-fellow' &&
+      marketScene?.nearbyNpc?.id === 'market-fellow' &&
+      (id === 'stay' || id === 'travel' || id === 'read')
+    ) {
+      const button = modal.querySelector<HTMLButtonElement>(
+        `[data-action="sect-market-fellow"][data-id="${id}"]`,
+      );
+      if (!button || button.disabled) return;
+      const next = structuredClone(save);
+      if (!chooseMarketFellow(next, id, Number(button.dataset.visit))) return;
+      try {
+        writeSave(next, pendingRun);
+      } catch {
+        if (!saveLock) toast('这次交谈未能保存，请重试');
+        return;
+      }
+      Object.assign(save, next);
+      showMarketEvent(marketNpc);
+    } else if (
       [
         'sect-market-debate',
         'sect-market-request',

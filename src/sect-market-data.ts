@@ -44,7 +44,7 @@ export const MARKET_CULTIVATORS = [
 ] as const;
 export type MarketTraderId = (typeof MARKET_CULTIVATORS)[number]['id'];
 export type MarketVisitorId = `market-visitor-${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11}`;
-export type MarketCultivatorId = MarketTraderId | MarketVisitorId;
+export type MarketCultivatorId = MarketTraderId | MarketVisitorId | 'market-fellow';
 export interface MarketCultivator {
   id: MarketCultivatorId;
   x: number;
@@ -63,7 +63,9 @@ export function isMarketTraderId(id: unknown): id is MarketTraderId {
 }
 export function isMarketCultivatorId(id: unknown): id is MarketCultivatorId {
   return (
-    isMarketTraderId(id) || (typeof id === 'string' && /^market-visitor-(?:[0-9]|1[01])$/.test(id))
+    id === 'market-fellow' ||
+    isMarketTraderId(id) ||
+    (typeof id === 'string' && /^market-visitor-(?:[0-9]|1[01])$/.test(id))
   );
 }
 export interface SectMarketState {
