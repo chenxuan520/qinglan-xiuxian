@@ -242,8 +242,12 @@ export function marketLocalReply(npc: MarketCultivator, message: string, playerR
     return '坊市中央有拍卖行，可竞拍丹药和法宝，也可委托出售余物。每场花半年，报价、手续费和成交以拍卖行按钮为准；闲聊不会扣钱或换物。';
   if (/丹|药|换/.test(message))
     return '互通有无，要先看看你我各自带了什么。下方列着我愿换出的丹药，两份同品级、同类余丹可换一份，这批只换一次。';
+  if (/精进|进境|进展|突破/.test(message) && /我|看(?:得|不)?出|看穿|察觉/.test(message))
+    return npc.realmIndex < playerRealm
+      ? '前辈的修为，我看不透，也不敢妄评。若愿指点一二，晚辈洗耳恭听。'
+      : '只凭一面，难知你这一程如何精进。不妨说说近来修行的难处，我们再慢慢谈。';
   if (/境界|修为|前辈|道友|蝼蚁/.test(message))
-    return `我如今修至${npc.realm}。${npc.realmIndex > playerRealm ? '小友莫急，先走稳眼前这一程。' : npc.realmIndex === playerRealm ? '你我同一大境界，各有所得，不妨互通见闻。' : '前辈走得更远，我还得慢慢磨砺。'}`;
+    return `我如今修至${npc.realm}。${npc.realmIndex > playerRealm ? '小友莫急，先走稳眼前这一程。' : npc.realmIndex === playerRealm ? '你我同一大境界，不妨互通见闻。' : '前辈的修为我看不透，晚辈不敢妄评。'}`;
   if (/门|正道|魔道|身份|是谁|谁啊/.test(message))
     return `我是${npc.role}，在这里暂歇一程。${npc.path === 'demonic' ? '求道手段虽不同，今日相逢只论互通有无。' : npc.path === 'orthodox' ? '山门教人根基，游历教人取舍。' : '炼丹讲究火候，修行也是如此。'}`;
   const lines = [

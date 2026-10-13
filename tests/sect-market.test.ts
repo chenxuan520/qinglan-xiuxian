@@ -421,6 +421,71 @@ test('渡劫仍属大乘，AI 与界面的前辈/道友/蝼蚁分类严格一致
   assert.equal(new Set(next.map((n) => n.name)).size, next.length);
   next.forEach((npc, i) => assert.notEqual(npc.name, original[i].name));
 });
+test('低境界修士不能从系统提示获知前辈的具体境界或精进，同阶与高阶只能知道当前境界', () => {
+  const save = visitor();
+  const visit = save.mortal.sectMarket!;
+  for (const npc of marketCultivators(save.mortal.population!, visit)) {
+    for (let rank = 0; rank < REALMS.length; rank++) {
+      const body = {
+        population: save.mortal.population!,
+        age: save.age,
+        npcId: npc.id,
+        realm: `${REALMS[rank]}初期`,
+        message: '你看得出我近来怎么精进的吗？',
+        history: [],
+        marketVisit: { visit: visit.visit, realmIndex: visit.realmIndex },
+      };
+      assert.equal(validDialogue(body), true);
+      const prompt = dialogueMessages(body)[0].content;
+      assert.match(prompt, /没有对方明确讲述的前后变化，不评价其精进快慢/);
+      assert.match(prompt, /助手未经证实的判断不是事实/);
+      if (rank > npc.realmIndex) {
+        assert.ok(!prompt.includes(body.realm), `${npc.realm}不应得知${body.realm}`);
+        assert.match(prompt, /看不透对方的具体境界、小阶段和修为深浅/);
+        assert.match(prompt, /可称「前辈」/);
+      } else {
+        assert.ok(prompt.includes(body.realm));
+        assert.match(prompt, /不知道对方此前的境界、修炼经历或精进速度/);
+      }
+    }
+  }
+});
+test('前辈未自述时，实际境界及小阶段的变化不会给低阶修士额外的 AI 信息', () => {
+  const save = visitWithNpcRealm(0, 'market-alchemist');
+  const body = {
+    population: save.mortal.population!,
+    age: save.age,
+    npcId: 'market-alchemist' as const,
+    realm: '筑基初期',
+    message: '近来如何？',
+    history: [],
+    marketVisit: save.mortal.sectMarket!,
+  };
+  const messages = dialogueMessages(body);
+  for (const realm of ['筑基中期', '化神后期', '大乘初期', '渡劫', '真仙'])
+    assert.deepEqual(dialogueMessages({ ...body, realm }), messages, realm);
+  const history = [
+    { role: 'assistant' as const, content: '前辈刚突破化神，精进得真快。' },
+    { role: 'user' as const, content: '我并没有告诉你这些。' },
+  ];
+  const reported = dialogueMessages({ ...body, history });
+  assert.deepEqual(reported.slice(1), [...history, { role: 'user', content: body.message }]);
+  assert.match(reported[0].content, /玩家自述只能作为自述转述/);
+  assert.match(reported[0].content, /不能接着编造/);
+});
+test('离线闲聊同样不看穿前辈，也不凭当前境界推断同阶或小友的精进经历', () => {
+  const save = visitWithNpcRealm(1, 'market-alchemist');
+  const npc = marketCultivators(save.mortal.population!, save.mortal.sectMarket!).find(
+    (n) => n.id === 'market-alchemist',
+  )!;
+  assert.match(marketLocalReply(npc, '我怎么精进了？', 4), /看不透，也不敢妄评/);
+  assert.match(marketLocalReply(npc, '我的修为怎样？', 4), /看不透/);
+  for (const rank of [0, 1])
+    assert.match(marketLocalReply(npc, '你看得出我的突破和进展吗？', rank), /只凭一面，难知/);
+  assert.match(marketLocalReply(npc, '你的境界呢？', 4), /我如今修至筑基/);
+  assert.doesNotMatch(marketLocalReply(npc, '你自己近来如何精进？', 4), /前辈的修为/);
+  assert.match(marketLocalReply(npc, '换丹药怎么弄？', 4), /两份同品级、同类/);
+});
 test('场地可达三位修士、保持距离才可交谈；边界与两处建筑挡住脚点，移动速度不随帧间隔爆跳', () => {
   for (const npc of MARKET_CULTIVATORS) {
     let pos = { ...MARKET_START };

@@ -182,7 +182,10 @@ test('父母提示使用当前亲属事实与孩子称呼，不透出寿数或�
     assert.equal(messages[0].role, 'system');
     assert.match(prompt, new RegExp(`你是孩子的${id === 'father' ? '父亲' : '母亲'}`));
     assert.ok(prompt.includes(`你目前${id === 'father' ? '47.5' : '42.5'}岁`));
-    assert.match(prompt, /孩子目前22\.5岁，境界为炼气初期/);
+    assert.match(prompt, /孩子目前22\.5岁，十五岁离乡/);
+    assert.doesNotMatch(prompt, /炼气初期/);
+    assert.match(prompt, /看不透孩子的境界和修为/);
+    assert.match(prompt, /不能自行判断突破、精进速度或修为变化/);
     assert.match(prompt, /十五岁离乡/);
     assert.match(prompt, new RegExp(`孩子的${id === 'father' ? '母亲' : '父亲'}目前仍在世`));
     assert.match(prompt, /只称“孩子”/);

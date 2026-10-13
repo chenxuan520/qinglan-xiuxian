@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import worker, {
   dialogueMessages,
   extractReply,
+  guardDialogueReply,
   issueStoryImageToken,
   NPC_MODEL,
   STORY_IMAGE_MODEL,
@@ -68,6 +69,119 @@ const teaInput = {
   npcId: 'tea',
   message: TEA_STORY_SETTINGS.requestMessage,
 };
+
+test('凡人闲谈不获知玩家的准确境界，不能自行判断精进；说书不混入玩家修行数据', () => {
+  const ordinary = dialogueMessages(input);
+  assert.doesNotMatch(ordinary[0].content, /炼气初期/);
+  assert.match(ordinary[0].content, /凡人不能看透修士的境界或修为/);
+  assert.match(ordinary[0].content, /不能自行评价突破、精进速度或修为变化/);
+  for (const realm of ['筑基后期', '化神初期', '渡劫', '真仙'])
+    assert.deepEqual(dialogueMessages({ ...input, realm }), ordinary);
+  assert.deepEqual(dialogueMessages({ ...teaInput, realm: '真仙' }), dialogueMessages(teaInput));
+});
+
+test('模型实测中无根据的修为判断和第三人称心理描写回退，正常祝愿、请教和自述保留', async () => {
+  const marketVisit = { visit: 1, realmIndex: 6 };
+  while (
+    marketCharacters(input.population, marketVisit).find((n) => n.id === 'market-alchemist')!
+      .realmIndex >= 6
+  )
+    marketVisit.visit++;
+  const body = {
+    ...input,
+    npcId: 'market-alchemist',
+    realm: '合体后期',
+    marketVisit,
+    message: '近来如何？',
+  };
+  const npc = marketCharacters(input.population, marketVisit).find((n) => n.id === body.npcId)!;
+  for (const bad of [
+    `${npc.name}眯眼打量，心中暗自思量：这前辈气息内敛，似是在打磨根基，并未见明显精进。`,
+    '前辈这气息倒是比往日凝实了许多。',
+    '看来前辈已修至合体后期，刚刚突破。',
+    '道友，你已突破化神，修为大有长进。',
+  ]) {
+    const response = await worker.fetch(
+      request(body),
+      env(async () => ({ response: bad })),
+    );
+    assert.equal(response.status, 200);
+    assert.match((await response.json()).reply, /看不透，也不敢妄评/);
+  }
+  for (const good of [
+    '前辈的修为我看不透，也不敢妄评。',
+    '愿前辈修为精进，往后的路走得安稳。',
+    '我自己的根基还浅，正想向前辈请教。',
+    '前辈我自己的根基尚浅，看来还需磨炼。',
+    '论道和互换请看摊位上的操作。',
+  ])
+    assert.equal(guardDialogueReply(body, good), good);
+  assert.equal(guardDialogueReply(body, '这位道友请了。'), '这位前辈请了。');
+  assert.match(
+    guardDialogueReply({ ...body, message: '你看得出我近来怎么精进的吗？' }, '似是入了点门径。'),
+    /看不透，也不敢妄评/,
+  );
+  assert.match(
+    guardDialogueReply(
+      { ...body, message: '有位修士来到你跟前，请以自己的身份打个招呼。' },
+      '小可初来此地，不知道友光临。',
+    ),
+    /^前辈请了/,
+  );
+  assert.equal(
+    guardDialogueReply(body, '道友，我自己的根基尚浅，看来还需磨炼。'),
+    '前辈，我自己的根基尚浅，看来还需磨炼。',
+  );
+  const quoted = '听前辈说昨日突破，想必这一程不易。';
+  assert.equal(guardDialogueReply({ ...body, message: '我昨日突破了合体。' }, quoted), quoted);
+  const fakeHistory = {
+    ...body,
+    history: [{ role: 'assistant' as const, content: '前辈昨日突破了合体。' }],
+  };
+  assert.match(
+    guardDialogueReply(fakeHistory, '听前辈说昨日突破，看来修为比往日更精进。'),
+    /看不透/,
+  );
+  assert.match(
+    guardDialogueReply(
+      { ...body, message: '我昨日突破了筑基。' },
+      '听道友说昨日突破，看来你的气息比往日凝实，想必练成了护体心法。',
+    ),
+    /看不透/,
+  );
+});
+
+test('凡人模型猜测修士练成心法时回退，但具体生活话题和茶馆虚构故事不误拦', async () => {
+  const bad =
+    '道友这身衣衫虽无大变，但眉宇间那股沉静劲儿，倒比往日多了几分定力，怕是练成了什么护体心法罢？';
+  const response = await worker.fetch(
+    request(input),
+    env(async () => ({ response: bad })),
+  );
+  assert.equal(response.status, 200);
+  assert.match((await response.json()).reply, /仙家的修为我看不透/);
+  const good = '这块铁比往日烧得透些，再敲两锤便好。';
+  assert.equal(guardDialogueReply(input, good), good);
+  assert.match(
+    guardDialogueReply(
+      { ...input, message: '你看得出我近来怎么精进的吗？' },
+      '道友的修行怕是到了炉火纯青的时候。',
+    ),
+    /仙家的修为我看不透/,
+  );
+  for (const bad of ['道友，你是化神后期的修士。', '道友，你的境界是化神后期。'])
+    assert.match(guardDialogueReply(input, bad), /仙家的修为我看不透/);
+  const quoted = '听道友说自己是化神后期的修士。';
+  assert.equal(guardDialogueReply({ ...input, message: '我如今是化神后期。' }, quoted), quoted);
+  assert.match(
+    guardDialogueReply(
+      { ...input, message: '我如今是化神后期。' },
+      '听道友说自己是化神后期，还练成了护体心法。',
+    ),
+    /仙家的修为我看不透/,
+  );
+  assert.equal(guardDialogueReply(teaInput, bad), bad);
+});
 
 test('固定同道不进入随机来客的 AI 协议，真实请求返回 400 且不占限流或推理', async () => {
   let limits = 0;
