@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
+import { SoundSettings } from '../src/sound-settings.ts';
 import * as data from '../src/data.ts';
 import {
   freshSave,
@@ -168,7 +169,7 @@ function harness(save: SaveData) {
     window: { clearTimeout: noop, matchMedia: () => ({ matches: false }) },
     clearInterval: noop,
     clearInput: noop,
-    unlockAudio: noop,
+    gameAudio: { sync: noop, play: noop },
     mobileDisplay: { available: false, active: false, enter: noop, leave: noop },
     toast: (text: string) => messages.push(text),
     shownHumanLetters: new Set(['previous-life']),
@@ -245,6 +246,7 @@ function harness(save: SaveData) {
     },
   });
   flow.runInContext(context);
+  context.soundSettings = new SoundSettings(save, context.gameAudio, () => context.persist());
   return context;
 }
 

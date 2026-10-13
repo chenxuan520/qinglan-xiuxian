@@ -1,0 +1,14 @@
+{
+  "name": "qinglan-ui-browser-tools",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "仅界面回归安装的 Chrome DevTools MCP 工具，不参与游戏构建",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "chrome-devtools-mcp": "1.10.1"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

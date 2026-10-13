@@ -49,6 +49,28 @@ jobs:
         env:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: npm run build -- --base "$BASE_PATH/"
+      - name: Install isolated browser regression tools
+        run: npm ci --prefix scripts/browser-tools
+      - name: Check desktop and mobile interfaces
+        env:
+          UI_BASE_URL: http://localhost:5173${{ steps.pages.outputs.base_path }}/
+        run: |
+          npm run preview -- --port 5173 --strictPort > "$RUNNER_TEMP/qinglan-ui-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "$UI_BASE_URL" > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run ui:check
+      - name: Preserve UI regression result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ui-regression
+          path: artifacts/ui-regression/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Keep latest daily report alongside the game
         env:
           GH_TOKEN: ${{ github.token }}

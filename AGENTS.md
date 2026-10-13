@@ -32,6 +32,8 @@
 | `src/mortal-ui.ts`、`src/mortal.css`                                | 人间界面、宗门图集和响应式布局            |
 | `src/save-transfer.ts`                                              | 存档导入导出及校验                        |
 | `src/main.ts`                                                       | 界面、输入、音频、存档写入与状态衔接      |
+| `src/game-audio.ts`、`src/sound-settings.ts`                        | 单实例音频输出、声音偏好操作与保存衔接    |
+| `src/battle-hud.css`                                                | 战斗顶部状态、按钮与横竖屏布局            |
 | `src/render.ts`、`src/style.css`                                    | Canvas 绘制、桌面和移动布局               |
 | `src/item-art.ts`、`src/sprites.ts`                                 | 统一图集映射，列表和战场共用              |
 | `src/town.ts`、`src/town-scene.ts`                                  | 城镇坐标、行走与交互、模块地图及镜头      |
@@ -54,6 +56,8 @@ npm test
 npm run build
 npm run format:check
 ```
+
+声音与战斗界面重构后运行 `npm ci --prefix scripts/browser-tools`、`npm run ui:check`（需要正常 5173 首页已启动）。回归只经 Chrome DevTools MCP 操作独立浏览器上下文，覆盖电脑、手机窄屏、竖屏及横屏的设置、声音、自动历练、暂停/帮助/伤害返回、刷新续局、升级选择与后期长数字/药效；`UI_BASE_URL` 可指定本机子路径，`CHROME_PATH` 可指定 Chrome。GitHub Pages 在正式构建后、上传前执行同一检查，失败阻止此次发布。工具依赖单独锁定在 `scripts/browser-tools`，不进入游戏依赖或平衡作业。报告与失败截图只写 `artifacts/ui-regression/`；本机需逐张视检时使用 `UI_SCREENSHOTS=1 npm run ui:check`，截图不提交 Git。布局重构同时保留改动前后截图/计算样式基线，自动检查不代替实际视觉审查。
 
 有人正在使用 5173 时，不启动第二个服务，不自动换成 5174。先检查现有进程，并按下一节更新生产预览。`npm run preview -- --port 5173 --strictPort` 用于尚无服务时预览 `dist`。
 

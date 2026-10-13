@@ -11,7 +11,9 @@ import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-const styles = readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
+const styles = ['style.css', 'battle-hud.css']
+  .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('境界展示直接给出气血与本命伤害，指南示例与实际入场一致', () => {
   assert.match(source, /当前入场气血/);

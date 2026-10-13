@@ -9,6 +9,7 @@ import {
 import { activeMedicines, refreshMedicineShop, medicineInfo } from './medicine-data.ts';
 import { useMedicine, buyMedicine, craftMedicine, buyMedicineRecipe } from './medicine.ts';
 import './style.css';
+import './battle-hud.css';
 import {
   inheritanceContent,
   inheritancePreview,
@@ -134,6 +135,8 @@ import { MobileDisplay } from './mobile-display.ts';
 import { imageDownloadUrl, shareImage } from './image-share.ts';
 import { ScreenAwake } from './screen-awake.ts';
 import { FrameRate } from './frame-rate.ts';
+import { GameAudio } from './game-audio.ts';
+import { SoundSettings } from './sound-settings.ts';
 import { runLootContent } from './run-loot-ui.ts';
 import { TownScene } from './town-scene.ts';
 import { SectMarketScene } from './sect-market-scene.ts';
@@ -353,13 +356,9 @@ const keys = new Set<string>();
 let touchInput = { x: 0, y: 0 },
   pointer: number | null = null,
   touchOrigin = { x: 0, y: 0 };
-let audio: AudioContext | null = null,
-  pickupStreak = 0,
-  assetsReady = false;
-const lastSounds: Record<string, number> = {};
-let masterGain: GainNode | null = null;
-let music: HTMLAudioElement | null = null;
-let musicStarting = false;
+let assetsReady = false;
+const gameAudio = new GameAudio(save);
+const soundSettings = new SoundSettings(save, gameAudio, persist);
 let volumeOpen = false;
 let resumeAfterDamage = false;
 let adReadyAt = 0;
@@ -463,123 +462,6 @@ const mobileDisplay = new MobileDisplay(() => {
   button.setAttribute('aria-label', mobileDisplay.active ? '退出全屏' : '进入全屏');
   button.setAttribute('aria-pressed', String(mobileDisplay.active));
 });
-const SOUND_GAPS: Record<string, number> = { cast: 0.3, pickup: 0.045, elite: 0.08, iron: 0.1 };
-const PICKUP_NOTES = [523.25, 587.33, 659.25, 783.99, 880, 1046.5, 1174.66, 1318.51, 1567.98, 1760];
-function tone(
-  frequency: number,
-  start: number,
-  length: number,
-  volume: number,
-  type: OscillatorType = 'sine',
-  glide = 1,
-) {
-  const osc = audio!.createOscillator(),
-    gain = audio!.createGain();
-  osc.type = type;
-  osc.frequency.setValueAtTime(frequency, start);
-  if (glide !== 1)
-    osc.frequency.exponentialRampToValueAtTime(frequency * glide, start + length * 0.6);
-  gain.gain.setValueAtTime(0.0001, start);
-  gain.gain.exponentialRampToValueAtTime(volume, start + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-  osc.connect(gain);
-  gain.connect(masterGain!);
-  osc.start(start);
-  osc.stop(start + length + 0.02);
-}
-function sound(name: string) {
-  if (!save.sound || !audio || audio.state !== 'running') return;
-  const now = audio.currentTime;
-  const previous = lastSounds[name] ?? -Infinity;
-  if (now - previous < (SOUND_GAPS[name] ?? 0.035)) return;
-  lastSounds[name] = now;
-  if (name === 'pickup') {
-    // 连续拾取沿五声音阶逐级升高，停顿后回到起音。
-    pickupStreak = now - previous < 0.4 ? Math.min(pickupStreak + 1, PICKUP_NOTES.length - 1) : 0;
-    tone(PICKUP_NOTES[pickupStreak], now, 0.11, 0.014, 'triangle');
-  } else if (name === 'evolve') {
-    for (const [index, note] of [659.25, 987.77, 1318.51].entries())
-      tone(note, now + index * 0.09, 0.9, 0.05);
-  } else if (name === 'chest') {
-    tone(1318.51, now, 0.7, 0.035);
-    tone(1975.53, now + 0.06, 0.6, 0.02);
-    tone(1760, now + 0.14, 0.8, 0.03);
-  } else if (name === 'heal') {
-    tone(659.25, now, 0.3, 0.03);
-    tone(987.77, now + 0.08, 0.4, 0.03);
-  } else if (name === 'iron') {
-    tone(1567.98, now, 0.18, 0.02, 'triangle');
-    tone(2349.32, now + 0.03, 0.12, 0.012, 'triangle');
-  } else if (name === 'magnet') {
-    tone(392, now, 0.45, 0.03, 'sine', 3);
-  } else if (name === 'elite') {
-    tone(150, now, 0.22, 0.07, 'sine', 0.4);
-    tone(1200, now, 0.05, 0.012, 'triangle');
-  } else if (name === 'boss') {
-    tone(73.42, now, 0.9, 0.045, 'sine', 0.65);
-    tone(146.83, now + 0.08, 0.65, 0.025, 'triangle', 0.75);
-    tone(220, now + 0.18, 0.7, 0.015);
-  } else if (name === 'loot') {
-    tone(98, now, 1.4, 0.06);
-    tone(196, now, 1.1, 0.035);
-    tone(293.66, now, 0.9, 0.02);
-    tone(1567.98, now + 0.12, 0.8, 0.025);
-  } else genericSound(name, now);
-}
-function genericSound(name: string, now: number) {
-  const notes: Record<string, number> = {
-    cast: 440,
-    hurt: 110,
-    upgrade: 660,
-    breakthrough: 784,
-    select: 880,
-    lightning: 160,
-    boss: 98,
-    win: 1046,
-    lose: 147,
-  };
-  tone(
-    notes[name] || 523,
-    now,
-    0.35,
-    name === 'cast' ? 0.015 : 0.06,
-    name === 'hurt' ? 'triangle' : 'sine',
-    name === 'hurt' ? 0.5 : 1.5,
-  );
-}
-function unlockAudio() {
-  if (!save.sound) {
-    if (masterGain && audio) masterGain.gain.setTargetAtTime(0, audio.currentTime, 0.02);
-    music?.pause();
-    return;
-  }
-  audio ??= new AudioContext();
-  if (!masterGain) {
-    masterGain = audio.createGain();
-    masterGain.connect(audio.destination);
-  }
-  masterGain.gain.setTargetAtTime(save.volume, audio.currentTime, 0.02);
-  if (!music) {
-    music = new Audio(assetUrl('assets/audio/qinglan-mist.m4a'));
-    music.loop = true;
-    const musicGain = audio.createGain();
-    musicGain.gain.value = 0.4;
-    audio.createMediaElementSource(music).connect(musicGain);
-    musicGain.connect(masterGain);
-  }
-  // 音乐独立加载，不阻塞场景；播放被浏览器拦截时，在下次操作重试。
-  if (audio.state === 'suspended') void audio.resume().catch(() => {});
-  if (music.paused && !musicStarting) {
-    musicStarting = true;
-    void music
-      .play()
-      .catch(() => {})
-      .finally(() => {
-        musicStarting = false;
-      });
-  }
-}
-
 function renderLobby(returnYears?: number) {
   if (ambushScene) return;
   if (save.mortal.marketSocial?.ambush && !ambushScene && !saveLock) {
@@ -1033,10 +915,7 @@ function showTeaStory() {
     '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">正在生成故事，请稍候…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div><p class="tea-story-image-status panel-note" role="status"></p><p class="panel-note">本次听书已消耗半载并判定机缘（30% 概率获赠 8 灵石）。失败重试不再扣年岁；再听一回会另耗半载并判定机缘。配图不阻塞正文，阅读与朗读不再计龄。</p><div class="save-actions"><button class="primary-button" data-action="close">回到街巷</button><button class="secondary-button tea-story-next" data-action="mortal-activity" data-id="tea" disabled>再听一回 · 半载</button><button class="secondary-button tea-story-retry" hidden disabled>重试这一回</button></div></section>',
   );
   void mountTeaStory(modal.querySelector<HTMLElement>('.tea-story')!, save, () => {
-    save.sound = true;
-    if (save.volume === 0) save.volume = 0.6;
-    unlockAudio();
-    persist();
+    soundSettings.enableNarration();
   });
 }
 function renderMortal(enter = false) {
@@ -1627,7 +1506,7 @@ function renderPause() {
   );
 }
 function gameEvent(name: string) {
-  sound(name);
+  gameAudio.play(name);
   if (['loot', 'cache'].includes(name)) persist();
 }
 
@@ -1935,7 +1814,7 @@ function startRun() {
     save.completed.includes(FINAL_TRIAL_STAGE),
   ).name;
   renderHud();
-  if (save.sound) unlockAudio();
+  if (save.sound) gameAudio.sync();
   persist();
 }
 function restoreRun() {
@@ -1963,7 +1842,7 @@ function restoreRun() {
   if (game.state === 'upgrade') renderChoices();
   else if (game.state === 'lost') renderDeath();
   else renderPause();
-  if (save.sound) unlockAudio();
+  if (save.sound) gameAudio.sync();
   persist();
 }
 function returnLobby() {
@@ -2063,7 +1942,7 @@ function resetLifetime(
     save.prologueSeen = true;
     departHometown(save);
   }
-  unlockAudio();
+  gameAudio.sync();
   selectedStage = difficulty = treasurePage = 0;
   selectedTreasure = save.starter;
   schoolFilter = 'all';
@@ -2279,9 +2158,7 @@ function handleAction(action: string, id?: string) {
       );
     } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
     else if (action === 'epilogue-sound' && panel === 'epilogue') {
-      save.sound = !save.sound;
-      unlockAudio();
-      persist();
+      soundSettings.toggle();
       updateStorySoundButton(
         modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
         save.sound,
@@ -2321,9 +2198,7 @@ function handleAction(action: string, id?: string) {
   }
   if (panel === 'prologue') {
     if (action === 'prologue-sound') {
-      save.sound = !save.sound;
-      unlockAudio();
-      persist();
+      soundSettings.toggle();
       updateStorySoundButton(
         modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!,
         save.sound,
@@ -2971,7 +2846,7 @@ function handleAction(action: string, id?: string) {
     difficulty = 0;
     schoolFilter = 'all';
     bookTab = 'treasures';
-    unlockAudio();
+    gameAudio.sync();
     returnLobby();
     if (save.journeyEnded) return;
     if (save.pendingReincarnation) {
@@ -3142,10 +3017,7 @@ function handleAction(action: string, id?: string) {
   }
   if (action === 'sound' || action === 'mute') {
     volumeOpen = action === 'sound' && !volumeOpen;
-    save.sound = action === 'sound';
-    unlockAudio();
-    if (save.sound) sound('select');
-    persist();
+    soundSettings.setEnabled(action === 'sound', true);
     if (game) renderHud();
     else renderLobby();
     return;
@@ -3220,9 +3092,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   if (action === 'settings-sound' && panel === 'settings') {
-    save.sound = !save.sound;
-    unlockAudio();
-    persist();
+    soundSettings.toggle();
     renderLobby();
     renderPanel();
     return;
@@ -3453,7 +3323,7 @@ function handleAction(action: string, id?: string) {
     persist();
     renderLobby();
     renderPanel();
-    sound('upgrade');
+    gameAudio.play('upgrade');
     if (tribulationDue(save)) renderTribulationPending();
   }
   if (action === 'start' || action === 'retry') {
@@ -3555,12 +3425,10 @@ document.addEventListener('input', (event) => {
   }
   const input = event.target as HTMLInputElement;
   if (!input.matches('input[data-volume]')) return;
-  save.volume = Number(input.value) / 100;
+  soundSettings.setVolume(Number(input.value) / 100);
   input.parentElement!.querySelector('output')!.textContent = `${input.value}%`;
   const settingsNote = modal.querySelector<HTMLElement>('[data-settings-sound-note]');
   if (settingsNote) settingsNote.textContent = settingsSoundNote(save);
-  unlockAudio();
-  persist();
 });
 document.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
