@@ -118,7 +118,7 @@ test('仙尊提前被杀不触发保底，六王后的读档不成仙，最后�
   }
 });
 
-test('更新版本存档只读，旧版本档不可读', () => {
+test('更新版本存档只读，旧版本档升级读取', () => {
   const save = freshSave('none');
   save.cultivation = 1000;
   save.completed = [0, 1, 2, 3, 4, 5, 6];
@@ -129,6 +129,94 @@ test('更新版本存档只读，旧版本档不可读', () => {
   assert.throws(() => importSave(JSON.stringify(save)), /更新的版本/);
   const older = freshSave('none');
   older.schema = SAVE_SCHEMA - 1;
-  assert.equal(readSave(JSON.stringify(older)).status, 'unreadable');
+  const upgraded = readSave(JSON.stringify(older));
+  assert.equal(upgraded.status, 'ok');
+  assert.equal(upgraded.save.schema, SAVE_SCHEMA);
   assert.equal(parseSave(JSON.stringify(freshSave('none'))).cultivation, 0);
+});
+
+test('旧档升级：成仙补足、收藏反推与番天印校正，导入往返幂等', () => {
+  // schema 7 的老档：completed 含终关但修为不足 → 升级补足成仙缺口。
+  const old = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  old.schema = 7;
+  old.unlocked = 6;
+  old.completed = [0, 1, 2, 3, 4, 5, 6];
+  old.cultivation = 57024;
+  old.stones = 4321;
+  old.iron = 91;
+  old.age = 1015;
+  old.forge.sword = 4;
+  old.medicine.bag.xuling = 2;
+  old.nextTribulationAge = 10000;
+  const raw = JSON.stringify(old);
+  const restored = parseSave(raw);
+  assert.equal(restored.schema, SAVE_SCHEMA);
+  assert.equal(restored.cultivation, IMMORTAL_CULTIVATION);
+  assert.equal(realmInfo(restored.cultivation, true).name, '真仙');
+  assert.equal(restored.age, old.age);
+  assert.equal(restored.stones, old.stones);
+  assert.equal(restored.forge.sword, old.forge.sword);
+  assert.deepEqual(restored.medicine, old.medicine);
+  assert.equal(restored.nextTribulationAge, 0);
+  assert.equal(restored.chronicle.milestones['realm-24'], null);
+  const again = parseSave(JSON.stringify(restored));
+  assert.equal(again.cultivation, restored.cultivation);
+  assert.deepEqual(again.chronicle, restored.chronicle);
+  const imported = importSave(raw).save;
+  assert.equal(imported.cultivation, restored.cultivation);
+  assert.deepEqual(imported.chronicle, restored.chronicle);
+  assert.equal(JSON.stringify(old), raw, '迁移不改调用方原对象');
+
+  // 缺收藏字段的旧档：保留已投入炼器与当前本命，其余重新收集。
+  const { artifacts, artifactDrops, ...bare } = freshSave(
+    'heaven',
+    ['metal'],
+    'orthodox',
+    () => 0.5,
+  );
+  bare.schema = 7;
+  bare.forge.fire = 3;
+  bare.starter = 'lightning';
+  const revived = parseSave(JSON.stringify(bare));
+  assert.deepEqual(new Set(revived.artifacts), new Set(['sword', 'nail', 'fire', 'lightning']));
+  assert.equal(revived.starter, 'lightning');
+  assert.equal(revived.forge.fire, 3);
+});
+
+test('老档带天劫原历练与旧版续局，升级导入成功且不阻塞', () => {
+  const build = (schema?: number) => {
+    const save = freshSave('none', [], 'orthodox', () => 0.5);
+    if (schema === undefined) delete (save as { schema?: number }).schema;
+    else save.schema = schema;
+    save.unlocked = 6;
+    save.completed = [0, 1, 2, 3, 4, 5, 6];
+    save.cultivation = 119940;
+    save.tribulations = 2;
+    save.tribulationReturn = {
+      version: 1,
+      state: 'paused',
+      stage: 3,
+      time: 100,
+      player: { x: 0, y: 0, hp: 1e6, maxHp: 1e6, invincible: 0, facing: 1, moving: false },
+      weapons: [],
+      passives: {},
+      enemies: [],
+      shots: [],
+      zones: [],
+      pickups: [],
+      choices: [],
+      bossSpawned: false,
+      elapsedYears: 0,
+    };
+    save.activeRun = null;
+    return JSON.parse(JSON.stringify(save));
+  };
+  for (const schema of [12, undefined] as const) {
+    const file = { format: 'qinglan-save', version: 1, save: build(schema) };
+    const restored = importSave(JSON.stringify(file));
+    assert.equal(restored.save.schema, SAVE_SCHEMA);
+    assert.equal(restored.run, null, '老档的进行中对局在升级时放弃');
+    assert.equal(realmInfo(restored.save.cultivation, true).name, '真仙');
+    assert.equal(restored.save.tribulations, 2);
+  }
 });

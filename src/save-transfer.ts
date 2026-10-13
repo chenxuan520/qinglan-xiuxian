@@ -8,7 +8,13 @@ import {
   spiritRootInfo,
 } from './data.ts';
 import { Game } from './game.ts';
-import { readSave, SAVE_KEY, validBirthInheritance, type SaveData } from './progress.ts';
+import {
+  readSave,
+  SAVE_KEY,
+  SAVE_SCHEMA,
+  validBirthInheritance,
+  type SaveData,
+} from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
 import { settleMarketAmbush } from './market-social.ts';
@@ -166,7 +172,9 @@ export function importSave(text: string) {
     data.pendingReincarnation !== save.pendingReincarnation
   )
     throw new Error('存档中的本世落幕状态无效，当前进度未更改');
-  const run = restoreSavedRun(save, data.activeRun);
+  // 老版本档的进行中对局格式不保证兼容，升级时直接放弃历练、保留永久进度。
+  const legacyRun = data.schema !== SAVE_SCHEMA;
+  const run = restoreSavedRun(save, legacyRun ? null : data.activeRun);
   if (save.mortal.marketSocial?.ambush) settleMarketAmbush(save, 'escaped');
   return { save, run };
 }

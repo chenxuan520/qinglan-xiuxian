@@ -357,7 +357,7 @@ test('缺失坊市字段正常读取、保留药方与宗门，损坏坊市字�
   assert.deepEqual(restored.save.mortal, save.mortal);
   assert.throws(() => importSave(JSON.stringify(bad)));
   const older = { ...save, schema: SAVE_SCHEMA - 1 };
-  assert.equal(readSave(JSON.stringify(older)).status, 'unreadable');
+  assert.equal(readSave(JSON.stringify(older)).status, 'ok');
   const future = { ...save, schema: SAVE_SCHEMA + 1 };
   assert.equal(readSave(JSON.stringify(future)).status, 'newer');
   assert.equal(

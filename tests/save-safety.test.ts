@@ -20,19 +20,18 @@ test('读档区分空档、正常、新版本与无法读取，parseSave 返回�
   const ok = readSave(JSON.stringify(saved));
   assert.equal(ok.status, 'ok');
   assert.equal(ok.save.stones, 321);
-  for (const raw of [
-    '{bad json',
-    '[]',
-    'null',
-    '{"version":2,"stones":9}',
-    '{"version":1}',
-    JSON.stringify({ ...saved, schema: SAVE_SCHEMA - 1 }),
-    JSON.stringify({ ...saved, schema: 'x' }),
-  ])
+  for (const raw of ['{bad json', '[]', 'null', '{"version":2,"stones":9}'])
     assert.equal(readSave(raw).status, 'unreadable', raw);
-  const fallback = parseSave('{"version":1,"schema":12}');
-  assert.equal(fallback.stones, 0);
-  assert.equal(fallback.schema, SAVE_SCHEMA);
+  // 低版本档读取时升级到当前结构；无法识别 schema 的按最老档升级。
+  const older = readSave(JSON.stringify({ ...saved, schema: SAVE_SCHEMA - 1 }));
+  assert.equal(older.status, 'ok');
+  assert.equal(older.save.schema, SAVE_SCHEMA);
+  assert.equal(older.save.stones, 321);
+  // 最老档没有 schema 字段，同样走升级读取。
+  const oldest = readSave('{"version":1}');
+  assert.equal(oldest.status, 'ok');
+  assert.equal(oldest.save.schema, SAVE_SCHEMA);
+  assert.equal(readSave(JSON.stringify({ ...saved, schema: 'x' })).status, 'ok');
 
   const newer = readSave(JSON.stringify({ ...saved, schema: SAVE_SCHEMA + 1 }));
   assert.equal(newer.status, 'newer');

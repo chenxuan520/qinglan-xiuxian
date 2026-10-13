@@ -269,9 +269,10 @@ export function readSave(
     }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return { save: base, status: 'unreadable' };
-    // 只接受当前版本档；旧版本存档留底后重新开局，更高版本只读展示。
+    // 兼容老版本档：读取时归一到当前结构（缺失字段用默认值、语义差异就地迁移）；
+    // 不保留逐版本运行时兼容。更高版本档只读不写。
     newer = Number.isSafeInteger(s.schema) && s.schema > SAVE_SCHEMA;
-    if (s.schema !== SAVE_SCHEMA && !newer) return { save: base, status: 'unreadable' };
+    const upgrading = !newer && s.schema !== SAVE_SCHEMA;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
     // 旧档本世不补父母；损坏的故乡字段不连带丢弃其余人间进度。
@@ -304,7 +305,8 @@ export function readSave(
     base.tribulations = int(s.tribulations);
     if (typeof s.nextTribulationAge === 'number' && Number.isFinite(s.nextTribulationAge))
       base.nextTribulationAge = Math.max(0, s.nextTribulationAge);
-    base.tribulationReturn = s.tribulationReturn ?? null;
+    // 旧档的天劫原历练快照不保证格式兼容，升级时一并放弃、保留永久进度。
+    base.tribulationReturn = upgrading ? null : (s.tribulationReturn ?? null);
     base.spiritRoot = SPIRIT_ROOTS.find((root) => root.id === s.spiritRoot)?.id ?? 'heaven';
     base.rootElements = rootElementsFor(base.spiritRoot, s.rootElements, random);
     for (const key of ['stones', 'iron', 'cultivation', 'bestKills', 'runs'] as const)
@@ -328,14 +330,21 @@ export function readSave(
     for (const t of TREASURES) base.forge[t.id] = int(s.forge?.[t.id], MAX_FORGE_LEVEL);
     const validIds = (ids: unknown): string[] =>
       Array.isArray(ids) ? ids.filter((id) => TREASURES.some((t) => t.id === id)) : [];
+    // 旧档缺收藏字段时，保留已投入炼器与当前本命，其余法宝重新收集。
+    const legacy =
+      s.artifacts === undefined
+        ? [
+            ...TREASURES.filter((t) => base.forge[t.id] > 0).map((t) => t.id),
+            ...validIds([s.starter]),
+          ]
+        : validIds(s.artifacts);
     // 无灵根不赠送入门法宝；有灵根时确保首位五行入门法宝在收藏中，拍卖放出的除外。
     const released = base.mortal.auction?.releasedArtifacts ?? [];
+    const initialRoot = base.rootElements.length ? base.rootElements[0] : undefined;
     base.artifacts = [
       ...new Set([
-        ...(base.rootElements.length
-          ? ROOT_STARTERS[base.rootElements[0]].filter((id) => !released.includes(id))
-          : []),
-        ...validIds(s.artifacts),
+        ...(initialRoot ? ROOT_STARTERS[initialRoot].filter((id) => !released.includes(id)) : []),
+        ...legacy,
       ]),
     ];
     if (base.mortal.auction)
@@ -352,7 +361,21 @@ export function readSave(
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
     const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);
     if (sect) base.path = sect.school;
+    // 旧档土系魔道本命番天印校正为阴阳盘，继承炼器阶数。
+    const migratingEarthStarter =
+      (s.schema ?? 0) < 10 && base.path === 'demonic' && base.starter === 'meteor';
+    if (migratingEarthStarter) {
+      base.starter = 'vortex';
+      base.artifacts = [...new Set([...base.artifacts, 'vortex'])];
+    }
     alignStarterWithPath(base);
+    if (migratingEarthStarter)
+      base.forge.vortex = Math.max(base.forge.vortex || 0, base.forge.meteor || 0);
+    // 已通关的旧档补齐成仙门槛；只补差额，不补发整局或妖王奖励。
+    const ascensionCultivation = upgrading
+      ? Math.max(0, IMMORTAL_CULTIVATION - base.cultivation)
+      : 0;
+    base.cultivation += base.completed.includes(FINAL_TRIAL_STAGE) ? ascensionCultivation : 0;
     const realm = realmInfo(base.cultivation, base.completed.includes(FINAL_TRIAL_STAGE));
     base.journeyEnded = s.journeyEnded === true && realm.max;
     if (base.mortal.member) {
@@ -360,6 +383,15 @@ export function readSave(
       if (realm.max) base.mortal.member.dueAt = 0;
     }
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
+    if (upgrading && ascensionCultivation > 0) {
+      // 旧记录无法证明当年通关的灵根、难度和年岁，不补造相关成就。
+      base.chronicle.milestones['realm-24'] ??= null;
+      recordChronicle(
+        base,
+        '通关成仙补录',
+        `已有第七境通关记录，补足成仙修为 ${ascensionCultivation}。原通关年岁沿用已有记录。`,
+      );
+    }
     syncHumanStories(base);
     claimArtifacts(base);
     syncTribulationClock(base);
