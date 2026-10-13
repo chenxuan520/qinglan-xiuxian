@@ -6,11 +6,10 @@ export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 // 接入真实 SDK 时新增对应 RewardAdProvider（src/ads.ts 接口），注册后在此指名启用。
 // 任何 provider 不可用（未配置、SDK 加载失败、无库存）都自动回退占位倒计时，不影响游戏。
 export const ADS_SETTINGS = {
-  provider: 'placeholder' as 'placeholder' | 'adsense',
+  provider: 'adsense' as 'placeholder' | 'adsense',
   adsense: {
-    // AdSense 审核通过后填入 ca-pub-XXXXXXXXXXXXXXXX，把 provider 改为 'adsense'，
-    // 并在站点根路径补 ads.txt（见 docs/development.md 激励广告位小节）。
-    client: '',
+    // AdSense 审核通过后把 pub ID 填入此处；SDK 按需注入，失败全回退占位。
+    client: 'ca-pub-9047842625721721',
   },
 } as const;
 

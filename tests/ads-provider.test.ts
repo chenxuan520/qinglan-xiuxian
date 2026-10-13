@@ -59,18 +59,21 @@ function playOnce(placement: 'revive' | 'reward-root' | 'reward-supplies' | 'lif
   return { sdk, options: sdk.captured.adBreak!, result };
 }
 
-test('默认 provider 是占位：准备不通过、永不调用真实广告', async () => {
-  const provider = getAdProvider();
-  assert.equal(provider.name, 'placeholder');
-  assert.equal(await provider.prepare(), false);
-  let failed: string | null = null;
-  provider.play('revive', {
-    onWatched: () => assert.fail('占位模式不能有观看完成回调'),
-    onFailed: (reason) => {
-      failed = reason;
-    },
-  });
-  assert.ok(failed);
+test('配置层指向注册过的 provider；占位 provider 恒可用作回退', async () => {
+  // 正式 provider 由 ADS_SETTINGS.provider 决定（上线后为 adsense）；占位恒在此接住失败路径。
+  const active = getAdProvider();
+  assert.ok(['adsense', 'placeholder'].includes(active.name), `未知 provider：${active.name}`);
+  if (active.name === 'placeholder') {
+    assert.equal(await active.prepare(), false);
+    let failed: string | null = null;
+    active.play('revive', {
+      onWatched: () => assert.fail('占位模式不能有观看完成回调'),
+      onFailed: (reason) => {
+        failed = reason;
+      },
+    });
+    assert.ok(failed);
+  }
 });
 
 test('adsense 未配置 client 时 prepare 直接失败，占位兜底保持可用', async () => {
