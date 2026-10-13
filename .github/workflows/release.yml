@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -27,11 +29,14 @@ jobs:
         run: npm ci
       - name: Check project
         run: |
+          npm run assets:check
           npm run format:check
           npm test
           npm run check:npc-ai
       - name: Build offline package
         run: npm run build -- --outDir artifacts/release/qinglan-xiuxian --emptyOutDir
+      - name: Check complete offline build size
+        run: node --experimental-strip-types scripts/size-check.ts --dir artifacts/release/qinglan-xiuxian
       - name: Package release
         working-directory: artifacts/release
         run: zip -q -r "../qinglan-xiuxian-${{ github.ref_name }}-offline.zip" qinglan-xiuxian
@@ -49,9 +54,9 @@ jobs:
               --clobber
           else
             gh release create "${{ github.ref_name }}" \
-              "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip#Offline web package" \
-              "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip.sha256#SHA-256 checksum" \
-              --verify-tag \
-              --generate-notes \
-              --title "叩仙门：青岚纪 ${{ github.ref_name }}"
+            "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip#Offline web package" \
+            "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip.sha256#SHA-256 checksum" \
+            --verify-tag \
+            --generate-notes \
+            --title "叩仙门：青岚纪 ${{ github.ref_name }}"
           fi
