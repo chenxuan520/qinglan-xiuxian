@@ -2222,7 +2222,9 @@ export class Game {
             this.hitEnemy(target, z.damage * (i === 0 ? 1 : 0.2), false, z.kind);
           }
         } else {
-          const hits = this.enemies.some((e) => !e.dead && distance(e, z) < z.radius + e.radius);
+          const hits = this.enemies.some(
+            (e) => !e.dead && e.illusionOf === undefined && distance(e, z) < z.radius + e.radius,
+          );
           this.areaDamage(z, z.radius, z.damage, z.kind);
           if (hits && (z.kind === 'cauldron' || z.kind === 'bloodpool'))
             this.heal(this.player.maxHp * (z.kind === 'cauldron' ? 0.0015 : 0.001));

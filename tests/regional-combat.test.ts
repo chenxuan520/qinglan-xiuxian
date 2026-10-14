@@ -222,6 +222,76 @@ test('条带、移动瘴云、幻影和狼王二段扑击暂停/导入导出后�
   assert.equal(read!.activeRun, undefined);
 });
 
+test('神农鼎和化血盏命中幻影不吸取气血，命中真实妖物仍正常回血', () => {
+  for (const kind of ['cauldron', 'bloodpool']) {
+    const { g, boss } = encounter(4);
+    boss.skillStep = 1;
+    g.castBossSkill(boss, 1, 0);
+    const shadow = g.enemies.find((e) => e.illusionOf !== undefined)!;
+    boss.x = 900;
+    g.player.hp = g.player.maxHp / 2;
+    const hp = g.player.hp;
+    const before = { kills: g.kills, damage: g.damageDealt, xp: g.xp };
+    const zone: Zone = {
+      x: shadow.x,
+      y: shadow.y,
+      radius: 20,
+      life: 2,
+      maxLife: 2,
+      delay: 0,
+      damage: 1,
+      tick: 0,
+      kind,
+      color: '#fff',
+      hostile: false,
+    };
+    g.zones = [zone];
+    g.updateZones(0.02);
+    assert.ok(shadow.dead);
+    assert.equal(g.player.hp, hp, kind);
+    assert.deepEqual({ kills: g.kills, damage: g.damageDealt, xp: g.xp }, before);
+    const real = g.spawnEnemy(58, false, false, { x: zone.x, y: zone.y });
+    zone.tick = 0;
+    g.updateZones(0.02);
+    assert.ok(g.player.hp > hp, kind);
+    assert.ok(real.hp < real.maxHp, kind);
+  }
+});
+
+test('移动魂障在旋转线段的预警和激活期都显示实际世界方向的箭头', () => {
+  for (const angle of [0, 0.7, -1.2]) {
+    const { boss } = encounter(4);
+    const fields = regionalBossFields(
+      4,
+      2,
+      boss,
+      { x: 0, y: 0 },
+      Math.cos(angle),
+      Math.sin(angle),
+    )!;
+    assert.equal(fields.length, 2);
+    for (const field of fields)
+      for (const delay of [field.delay, 0]) {
+        const rotations: number[] = [];
+        const c = new Proxy({} as CanvasRenderingContext2D, {
+          get:
+            (_, method: string) =>
+            (...args: number[]) => {
+              if (method === 'rotate') rotations.push(args[0]);
+            },
+        });
+        const z = { ...field, delay, damage: 1, tick: 0, maxLife: field.life };
+        assert.ok(drawRegionalField(c, z, 0, true, true));
+        assert.equal(rotations.length, 2);
+        const worldAngle = rotations.reduce((a, b) => a + b, 0);
+        const magnitude = Math.hypot(z.vx!, z.vy!);
+        assert.ok(
+          (Math.cos(worldAngle) * z.vx! + Math.sin(worldAngle) * z.vy!) / magnitude > 0.999,
+        );
+      }
+  }
+});
+
 test('AI按120ms决策避开条带和移动云，拾取不会压过躲避优先级', () => {
   for (const shape of ['lane', 'cloud']) {
     const { g } = encounter(3);

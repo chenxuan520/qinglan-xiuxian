@@ -44,13 +44,16 @@ export function drawRegionalField(
       } else c.arc(0, 0, z.radius * 0.88, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
       c.stroke();
     }
-    if (!length && z.vx !== undefined && (z.vx || z.vy)) {
-      c.rotate(Math.atan2(z.vy!, z.vx));
+    if (z.vx !== undefined && (z.vx || z.vy)) {
+      c.save();
+      c.translate(length / 2, 0);
+      c.rotate(Math.atan2(z.vy!, z.vx) - (length ? Math.atan2(z.endY! - z.y, z.endX! - z.x) : 0));
       c.beginPath();
       c.moveTo(-8, -7);
       c.lineTo(7, 0);
       c.lineTo(-8, 7);
       c.stroke();
+      c.restore();
     }
     c.restore();
     return true;

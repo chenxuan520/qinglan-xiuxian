@@ -89,6 +89,7 @@ import {
   resolveInheritance,
   enterImmortalGate,
   SAVE_KEY,
+  SAVE_SCHEMA,
   realmInfo,
   train,
   forge,
@@ -291,8 +292,9 @@ catalogTreasures.splice(
 );
 let pendingRun: Game | null = null;
 try {
-  if (saveRead.status !== 'unreadable')
-    pendingRun = restoreSavedRun(save, JSON.parse(raw || '{}').activeRun);
+  const stored = JSON.parse(raw || '{}');
+  if (saveRead.status !== 'unreadable' && stored.schema === SAVE_SCHEMA)
+    pendingRun = restoreSavedRun(save, stored.activeRun);
 } catch {
   /* 无有效对局时仍保留永久进度。 */
 }
