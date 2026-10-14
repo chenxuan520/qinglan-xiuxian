@@ -50,12 +50,12 @@ test('七王所有招式在本关和终关保留自身主题，半血加快施�
 });
 
 test('狐火垂直封路、冰牙分层推进、毒池留出逃生方向、交错雷阵分批落地', () => {
-  const fire = encounter(1);
+  const fire = encounter(1, 6);
   fire.e.skillStep = 1;
   fire.g.castBossSkill(fire.e, 0.6, 0.8);
   for (const z of fire.g.zones) assert.ok(Math.abs(z.x * 0.6 + z.y * 0.8) < 1e-8);
   assert.deepEqual([...new Set(fire.g.zones.map((z) => z.delay))].sort(), [1.2, 1.38, 1.56]);
-  const ice = encounter(2);
+  const ice = encounter(2, 6);
   ice.e.skillStep = 1;
   ice.g.castBossSkill(ice.e, 1, 0);
   ice.g.updateShots(0.5);
@@ -64,18 +64,18 @@ test('狐火垂直封路、冰牙分层推进、毒池留出逃生方向、交�
     [130, 180, 240],
   );
   assert.ok(ice.g.shots.every((s) => s.age === 0.5));
-  const poison = encounter(3);
+  const poison = encounter(3, 6);
   poison.g.castBossSkill(poison.e, 1, 0);
   assert.equal(poison.g.zones.filter((z) => z.x === 0 && z.y === 0).length, 1);
   assert.ok(poison.g.zones.every((z) => Math.hypot(z.x, z.y - 150) > z.radius + 12));
-  const rift = encounter(5);
+  const rift = encounter(5, 6);
   rift.g.castBossSkill(rift.e, 1, 0);
   assert.ok(rift.g.zones.filter((z) => z.y === 0).every((z) => z.delay === 1.2));
   assert.ok(rift.g.zones.filter((z) => z.y !== 0).every((z) => z.delay === 1.65));
 });
 
 test('幽魂先转弯再直飞，暂停与续局保留弹幕轨迹；旧弹不追加主题', () => {
-  const { g, e } = encounter(4);
+  const { g, e } = encounter(4, 6);
   e.skillStep = 1;
   g.castBossSkill(e, 1, 0);
   g.updateShots(0.4);
@@ -103,7 +103,7 @@ test('幽魂先转弯再直飞，暂停与续局保留弹幕轨迹；旧弹不�
   }
 });
 
-test('木阵冰牢只在落地后减速，毒君的池与毒矢受解毒丹减伤，残圈不再伤人', () => {
+test('木阵冰牢只在落地后减速，毒君的瘴云与毒息受解毒丹减伤，残圈不再伤人', () => {
   for (const stage of [0, 2, 3]) {
     const { g, e } = encounter(stage, stage, stage === 3);
     e.skillStep = stage === 2 ? 2 : 0;
@@ -128,12 +128,12 @@ test('木阵冰牢只在落地后减速，毒君的池与毒矢受解毒丹减�
     if (stage === 3) {
       e.skillStep = 1;
       g.castBossSkill(e, 1, 0);
-      const s = g.shots[0];
-      Object.assign(g.player, { x: s.x, y: s.y });
-      s.vx = s.vy = 0;
-      g.shots = [s];
-      g.updateShots(0.01);
-      assert.ok(Math.abs(after - g.player.hp - s.damage * 0.8) < 1e-8);
+      const breath = g.zones.at(-1)!;
+      Object.assign(g.player, { x: breath.x, y: breath.y });
+      breath.delay = 0;
+      g.zones = [breath];
+      g.updateZones(0.01);
+      assert.ok(Math.abs(after - g.player.hp - breath.damage * 0.8) < 1e-8);
     }
   }
 });

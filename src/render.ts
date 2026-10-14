@@ -1,5 +1,7 @@
 import { drawRealmBreakthrough, drawBossEntrance } from './render-overlays.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
+import { drawRegionalField } from './regional-render.ts';
+import { hazardMargin } from './regional-hazards.ts';
 import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
 import type { CultivationPath, ElementId } from './data.ts';
 import type { Game, Point } from './game.ts';
@@ -360,7 +362,8 @@ export class Renderer {
       if (hasArtifactField(z) && this.visible(z, p, z.radius + 50))
         drawArtifactField(c, z, time, this.reducedMotion.matches);
     for (const z of game.zones) {
-      if (hasArtifactField(z) || !this.visible(z, p, z.radius + 50)) continue;
+      if (hasArtifactField(z) || !this.visible(z, p, hazardMargin(z))) continue;
+      if (drawRegionalField(c, z, time, this.reducedMotion.matches)) continue;
       if (drawBossField(c, z, time, this.reducedMotion.matches)) continue;
       c.save();
       c.translate(z.x, z.y);
@@ -489,6 +492,8 @@ export class Renderer {
         radius: 20,
         boss: false,
         bossStage: undefined,
+        illusionOf: undefined,
+        summonedBy: undefined,
         elite: false,
         slow: 0,
         flash: 0,
@@ -528,6 +533,32 @@ export class Renderer {
           c.fillText('迟滞 · 移速 −25%', p.x, p.y + 46);
         }
       } else {
+        if (e.illusionOf !== undefined) {
+          c.save();
+          c.globalAlpha = 0.38;
+          this.sprite(STAGES[4].sprite, e.x, e.y, e.radius * 3.1, 1, false);
+          c.globalAlpha = 0.85;
+          c.fillStyle = '#d8c6ed';
+          c.font = '14px serif';
+          c.textAlign = 'center';
+          c.fillText('影', e.x, e.y - e.radius * 1.7);
+          c.restore();
+          continue;
+        }
+        if (game.stage === 4 && e.summonedBy !== undefined) {
+          const owner = game.enemies.find((v) => v.id === e.summonedBy && !v.dead);
+          if (owner) {
+            c.save();
+            c.strokeStyle = '#c3a4e380';
+            c.lineWidth = 2;
+            c.setLineDash([5, 7]);
+            c.beginPath();
+            c.moveTo(owner.x, owner.y);
+            c.lineTo(e.x, e.y);
+            c.stroke();
+            c.restore();
+          }
+        }
         if (e.elite || e.boss)
           this.cachedFormation(
             e.x,

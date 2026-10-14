@@ -212,6 +212,18 @@ export function validateRunSnapshot(
             'dy',
           ]) &&
           ENEMIES[e.type] &&
+          (e.chargeFollowup === undefined ||
+            (typeof e.chargeFollowup === 'boolean' &&
+              e.boss &&
+              (e.bossStage ?? s.stage) === 2 &&
+              s.stage < 6)) &&
+          (e.illusionOf === undefined ||
+            (Number.isSafeInteger(e.illusionOf) &&
+              e.illusionOf > 0 &&
+              !e.boss &&
+              s.stage === 4 &&
+              e.damage === 0 &&
+              e.speed === 0)) &&
           (e.windup === undefined ||
             (Number.isFinite(e.windup) && e.windup >= 0 && e.windup <= 1.2)) &&
           (e.pendingSkill === undefined ||
@@ -346,6 +358,26 @@ export function validateRunSnapshot(
         (z) =>
           numbers(z, ['x', 'y', 'radius', 'life', 'maxLife', 'damage', 'tick', 'delay']) &&
           typeof z.color === 'string' &&
+          typeof z.kind === 'string' &&
+          typeof z.hostile === 'boolean' &&
+          z.radius > 0 &&
+          ((z.endX === undefined && z.endY === undefined) ||
+            (z.hostile === true &&
+              s.stage < 6 &&
+              Number.isFinite(z.endX) &&
+              Number.isFinite(z.endY) &&
+              Math.hypot(z.endX! - z.x, z.endY! - z.y) <= 600)) &&
+          ((z.vx === undefined && z.vy === undefined) ||
+            (z.hostile === true &&
+              s.stage < 6 &&
+              Number.isFinite(z.vx) &&
+              Number.isFinite(z.vy) &&
+              Math.hypot(z.vx!, z.vy!) <= 40)) &&
+          (z.sourceId === undefined ||
+            (z.hostile === true &&
+              s.stage < 6 &&
+              Number.isSafeInteger(z.sourceId) &&
+              z.sourceId > 0)) &&
           (z.castDelay === undefined || (Number.isFinite(z.castDelay) && z.castDelay >= 0)) &&
           (z.castAngle === undefined ||
             (Number.isFinite(z.castAngle) && Math.abs(z.castAngle) <= Math.PI)) &&

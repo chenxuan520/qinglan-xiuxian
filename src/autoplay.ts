@@ -1,5 +1,6 @@
 import { MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
+import { hazardDistance, regionalExposure, regionalHazard } from './regional-hazards.ts';
 
 const favored = [
   'sword',
@@ -62,7 +63,21 @@ export function autoplayInput(g: Game) {
       nearestDistance = d;
     }
   }
-  const target = nearest ?? g.enemies[0];
+  // 可见魂线指出控魂者；经验近在身边时先拾取，不为追主魂穿越整幅地图。
+  const owner =
+    g.stage === 4 && nearestDistance > 120 ** 2
+      ? g.enemies.find(
+          (e) =>
+            !e.dead &&
+            e.illusionOf === undefined &&
+            Math.hypot(e.x - p.x, e.y - p.y) < 300 &&
+            g.enemies.some((child) => !child.dead && child.summonedBy === e.id),
+        )
+      : undefined;
+  const target =
+    owner ??
+    nearest ??
+    (g.stage === 6 ? g.enemies[0] : g.enemies.find((e) => !e.dead && e.illusionOf === undefined));
   if (target) {
     const d = Math.hypot(target.x - p.x, target.y - p.y) || 1;
     dx += ((target.x - p.x) / d) * (nearest ? 1 : 0.7);
@@ -72,6 +87,7 @@ export function autoplayInput(g: Game) {
     dy = Math.sin(g.time * 0.3);
   }
   for (const e of g.enemies) {
+    if (e.illusionOf !== undefined || (g.stage < 6 && e.dead)) continue;
     const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
     const radius = e.radius + (e.boss ? 135 : 100);
     if (d < radius) {
@@ -95,7 +111,10 @@ export function autoplayInput(g: Game) {
   );
   const speed = g.stats.speed;
   const zones = g.zones.filter(
-    (z) => z.hostile && z.life > 0 && Math.hypot(z.x - p.x, z.y - p.y) < z.radius + 8 + speed * 1.6,
+    (z) =>
+      z.hostile &&
+      z.life > 0 &&
+      hazardDistance(z, p) < z.radius + 8 + speed * 1.6 + Math.hypot(z.vx || 0, z.vy || 0) * 1.6,
   );
   if (!charges.length && !zones.length) return preferred;
   // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
@@ -123,6 +142,10 @@ export function autoplayInput(g: Game) {
       score -= (x * g.input.x + y * g.input.y) * 0.02;
       let risk = 0;
       for (const z of zones) {
+        if (regionalHazard(z)) {
+          risk += (regionalExposure(z, p, x, y, speed) / 0.5) * (z.damage / Math.max(1, p.hp)) * 4;
+          continue;
+        }
         const zx = p.x - z.x,
           zy = p.y - z.y,
           radius = z.radius + 8;
@@ -153,7 +176,7 @@ export function autoplayInput(g: Game) {
         risk += (exposure / 0.5) * (z.damage / Math.max(1, p.hp)) * 4;
       }
       for (const e of g.enemies) {
-        if (e.dead) continue;
+        if (e.dead || e.illusionOf !== undefined) continue;
         const distance = Math.hypot(e.x - p.x, e.y - p.y) || 1;
         if (distance > e.radius + 13 + (speed + e.speed) * 0.36) continue;
         for (const seconds of [0.12, 0.24, 0.36]) {

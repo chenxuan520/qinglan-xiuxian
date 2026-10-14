@@ -25,9 +25,17 @@ test('纯界面/文档不触发全量，经验与实际判定文件触发', () =
       'src/boss-followup.ts',
       'src/game-validation.ts',
       'src/game-types.ts',
+      'src/regional-combat.ts',
+      'src/regional-hazards.ts',
       'src/render-overlays.ts',
     ]),
-    ['src/boss-followup.ts', 'src/game-validation.ts'],
+    [
+      'src/boss-followup.ts',
+      'src/game-types.ts',
+      'src/game-validation.ts',
+      'src/regional-combat.ts',
+      'src/regional-hazards.ts',
+    ],
   );
   assert.deepEqual(
     balanceChangedFiles([

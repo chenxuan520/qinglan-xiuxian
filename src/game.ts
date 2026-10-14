@@ -25,6 +25,15 @@ export type {
 } from './game-types.ts';
 import { validateRunSnapshot } from './game-validation.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
+import {
+  regionalBossFields,
+  regionalEnemyFields,
+  regionalEnemyTactics,
+  regionalBossSkills,
+  regionalPursuit,
+  type RegionalField,
+} from './regional-combat.ts';
+import { hazardDistance } from './regional-hazards.ts';
 import { medicineEffects, medicineLoot } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
@@ -1069,7 +1078,7 @@ export class Game {
     return enemy;
   }
   private enemyTactics(type: number) {
-    return ENEMY_TACTICS[type];
+    return regionalEnemyTactics(this.stage, type, ENEMY_TACTICS[type], ENEMIES[type].behavior);
   }
   usesRegionalSkill(e: Enemy) {
     return this.stage < FINAL_TRIAL_STAGE || ENEMY_TACTICS[e.type].regional;
@@ -1079,6 +1088,15 @@ export class Game {
     const progress = this.combatProgress;
     for (const e of this.enemies) {
       if (e.dead) continue;
+      if (e.illusionOf !== undefined) {
+        e.cooldown -= dt;
+        if (
+          e.cooldown <= 0 ||
+          !this.enemies.some((owner) => owner.id === e.illusionOf && !owner.dead)
+        )
+          e.dead = true;
+        continue;
+      }
       e.slow -= dt;
       e.flash -= dt;
       e.cooldown -= dt;
@@ -1093,8 +1111,22 @@ export class Game {
       if (e.boss) {
         e.pursuitCooldown = (e.pursuitCooldown ?? 2.5) - dt;
         if (d > 330 && e.charge <= 0 && e.pursuitCooldown <= 0) {
-          this.startBossCharge(e, nx, ny);
-          this.announce(`${STAGES[e.bossStage ?? this.stage].boss} · 裂空追袭`);
+          const stage = e.bossStage ?? this.stage;
+          const pursuit = !this.isFinalTrial ? regionalPursuit(stage, e, p, nx, ny) : null;
+          if (pursuit) {
+            e.pursuitCooldown = e.hp < e.maxHp / 2 ? 6.5 : 9;
+            e.cooldown = Math.max(e.cooldown, 1.8);
+            this.addRegionalFields(e, pursuit.fields);
+            if (pursuit.destination) {
+              this.effect(e.x, e.y, 0.7, e.radius, STAGES[stage].color, 'pulse');
+              e.x = pursuit.destination.x;
+              e.y = pursuit.destination.y;
+            }
+            this.announce(`${STAGES[stage].boss} · ${pursuit.label}`);
+          } else {
+            this.startBossCharge(e, nx, ny);
+            this.announce(`${STAGES[stage].boss} · 裂空追袭`);
+          }
         }
       }
       const charging = e.charge > 0;
@@ -1119,6 +1151,11 @@ export class Game {
         } else if (e.charge < 0.55) {
           e.x += e.dx * 380 * dt;
           e.y += e.dy * 380 * dt;
+        }
+        if (e.charge === 0 && e.chargeFollowup) {
+          e.chargeFollowup = false;
+          const d = distance(e, p) || 1;
+          this.startBossCharge(e, (p.x - e.x) / d, (p.y - e.y) / d);
         }
       } else {
         const localCaster = ['roots', 'frost', 'miasma', 'storm'].includes(
@@ -1287,8 +1324,10 @@ export class Game {
     e.dx = nx;
     e.dy = ny;
     if (skill === 'dash' || skill === 'firecharge') {
-      e.charge = 1.25;
-      if (skill === 'firecharge')
+      e.charge = 1.25 + (!this.isFinalTrial && this.stage === 2 ? (e.id % 2) * 0.3 : 0);
+      if (skill === 'firecharge' && !this.isFinalTrial) {
+        this.addRegionalFields(e, regionalEnemyFields(e, skill, nx, ny)!);
+      } else if (skill === 'firecharge')
         for (let i = 0; i < (e.elite ? 3 : 2); i++)
           this.enemyField(
             e,
@@ -1329,6 +1368,13 @@ export class Game {
       return;
     }
     e.windup = 0.9;
+    if (!this.isFinalTrial) {
+      const fields = regionalEnemyFields(e, skill, nx, ny);
+      if (fields) {
+        this.addRegionalFields(e, fields);
+        return;
+      }
+    }
     const p = { x: e.x + nx * 80, y: e.y + ny * 80 };
     const circle = (
       x: number,
@@ -1526,9 +1572,36 @@ export class Game {
         this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], false, false, {
           x: e.x + Math.cos((i / count) * TAU) * 90,
           y: e.y + Math.sin((i / count) * TAU) * 90,
-        });
+        }).summonedBy = !this.isFinalTrial && stage === 4 ? e.id : undefined;
     };
-    this.announce(`${STAGES[stage].boss} · ${STAGES[stage].skills[phase]}`);
+    this.announce(
+      `${STAGES[stage].boss} · ${(this.isFinalTrial ? STAGES[stage].skills : regionalBossSkills(stage, STAGES[stage].skills))[phase]}`,
+    );
+    if (!this.isFinalTrial) {
+      const fields = regionalBossFields(stage, phase, e, p, nx, ny);
+      if (fields) {
+        this.addRegionalFields(e, fields);
+        return;
+      }
+      if (stage === 4 && phase === 1) {
+        for (const side of [-150, 0, 300]) {
+          if (this.enemies.length >= 240) break;
+          const illusion = this.spawnEnemy(58, false, false, {
+            x: e.x - ny * side,
+            y: e.y + nx * side,
+          });
+          illusion.illusionOf = e.id;
+          illusion.hp = illusion.maxHp = 1;
+          illusion.damage = illusion.speed = 0;
+          illusion.radius = e.radius;
+          illusion.cooldown = 3;
+        }
+        this.effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
+        e.x -= ny * 150;
+        e.y += nx * 150;
+        return;
+      }
+    }
     switch (stage) {
       case 0:
         if (phase === 0) ringZones(6, 130, 42, 2, 0.3);
@@ -1545,6 +1618,7 @@ export class Game {
       case 2:
         if (phase === 0) {
           this.startBossCharge(e, nx, ny);
+          if (!this.isFinalTrial) e.chargeFollowup = true;
         } else if (phase === 1) {
           // 快慢三层冰牙，施法时锁定方向，玩家侧移后不再追踪。
           fan(3, 0.5, 240);
@@ -2090,9 +2164,21 @@ export class Game {
   }
   private updateZones(dt: number) {
     for (const z of this.zones) {
+      if (z.sourceId !== undefined && !this.enemies.some((e) => e.id === z.sourceId && !e.dead)) {
+        z.life = 0;
+        continue;
+      }
       if (z.delay > 0) {
         z.delay -= dt;
         continue;
+      }
+      if (z.vx !== undefined) {
+        z.x += z.vx * dt;
+        z.y += z.vy! * dt;
+        if (z.endX !== undefined) {
+          z.endX += z.vx * dt;
+          z.endY! += z.vy! * dt;
+        }
       }
       z.life -= dt;
       z.tick -= dt;
@@ -2101,7 +2187,7 @@ export class Game {
         z.life > 0 &&
         ['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind) &&
         this.player.invincible <= 0 &&
-        distance(z, this.player) < z.radius + 8
+        hazardDistance(z, this.player) < z.radius + 8
       )
         this.enemySlow();
       if (z.kind === 'vortex')
@@ -2117,7 +2203,7 @@ export class Game {
         if (z.hostile) {
           if (this.tribulation && z.kind === 'blast' && z.life > 0)
             this.effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
-          if (z.life > 0 && distance(z, this.player) < z.radius + 8)
+          if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8)
             this.hurtPlayer(
               z.damage *
                 (['poison', 'enemy-miasma', 'boss-miasma'].includes(z.kind)
@@ -2136,7 +2222,9 @@ export class Game {
             this.hitEnemy(target, z.damage * (i === 0 ? 1 : 0.2), false, z.kind);
           }
         } else {
-          const hits = this.enemies.some((e) => !e.dead && distance(e, z) < z.radius + e.radius);
+          const hits = this.enemies.some(
+            (e) => !e.dead && e.illusionOf === undefined && distance(e, z) < z.radius + e.radius,
+          );
           this.areaDamage(z, z.radius, z.damage, z.kind);
           if (hits && (z.kind === 'cauldron' || z.kind === 'bloodpool'))
             this.heal(this.player.maxHp * (z.kind === 'cauldron' ? 0.0015 : 0.001));
@@ -2237,6 +2325,18 @@ export class Game {
     this.slowed = 0.55;
     this.nextEnemySlowAt = this.time + 2.5;
   }
+  private addRegionalFields(e: Enemy, fields: RegionalField[]) {
+    for (const { damageScale, ...field } of fields) {
+      if (this.zones.filter((z) => z.hostile && z.life > 0).length >= (e.boss ? 14 : 10)) break;
+      this.zones.push({
+        ...field,
+        color: e.boss ? STAGES[e.bossStage ?? this.stage].color : field.color,
+        damage: e.damage * damageScale,
+        tick: 0,
+        maxLife: field.life,
+      });
+    }
+  }
   private enemyField(
     e: Enemy,
     dx: number,
@@ -2264,6 +2364,24 @@ export class Game {
     );
   }
   private enemyDeath(e: Enemy) {
+    if (!this.isFinalTrial && (e.bossStage === 4 || e.illusionOf !== undefined)) {
+      const dissolved = new Set([e.id]);
+      let found = true;
+      while (found) {
+        found = false;
+        for (const child of this.enemies) {
+          if (dissolved.has(child.id)) continue;
+          if (
+            (child.summonedBy !== undefined && dissolved.has(child.summonedBy)) ||
+            (child.illusionOf !== undefined && dissolved.has(child.illusionOf))
+          ) {
+            child.dead = true;
+            dissolved.add(child.id);
+            found = true;
+          }
+        }
+      }
+    }
     if (e.boss) return;
     const tactics = ENEMY_TACTICS[e.type];
     if (tactics.deathMiasma)
@@ -2463,6 +2581,10 @@ export class Game {
   }
   hitEnemy(e: Enemy, damage: number, crit = false, source = 'other', attack?: BossAttack) {
     if (e.dead) return;
+    if (e.illusionOf !== undefined) {
+      if (damage > 0) e.dead = true;
+      return;
+    }
     if (e.boss && !this.tribulation && attack) {
       let multiplier = attack.multipliers[e.id];
       if (multiplier === undefined) {

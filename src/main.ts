@@ -89,6 +89,7 @@ import {
   resolveInheritance,
   enterImmortalGate,
   SAVE_KEY,
+  SAVE_SCHEMA,
   realmInfo,
   train,
   forge,
@@ -115,7 +116,7 @@ import {
 import { autoplayChoice, autoplayInput } from './autoplay.ts';
 import { Renderer } from './render.ts';
 import { icon, smallIcon } from './icons.ts';
-import { GUIDE_TABS, guideContent } from './guide.ts';
+import { GuideSource } from './guide-source.ts';
 import { GAME_SITE_URL, SUPPORT_CODE_IMAGE, TELEMETRY_SETTINGS } from './setting.ts';
 import { createTelemetry, type TelemetryEvent } from './telemetry.ts';
 import { createErrorWatch } from './error-report.ts';
@@ -291,8 +292,9 @@ catalogTreasures.splice(
 );
 let pendingRun: Game | null = null;
 try {
-  if (saveRead.status !== 'unreadable')
-    pendingRun = restoreSavedRun(save, JSON.parse(raw || '{}').activeRun);
+  const stored = JSON.parse(raw || '{}');
+  if (saveRead.status !== 'unreadable' && stored.schema === SAVE_SCHEMA)
+    pendingRun = restoreSavedRun(save, stored.activeRun);
 } catch {
   /* 无有效对局时仍保留永久进度。 */
 }
@@ -323,6 +325,7 @@ let auctionKind: AuctionKind = 'medicine';
 const shownHumanLetters = new Set<string>();
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
+const guideSource = new GuideSource();
 let guideTab = 'basics';
 
 let guideReturn: PanelLocation | null = null;
@@ -1097,6 +1100,29 @@ function renderPanel() {
     const view = bestiaryPanel(bestiaryStage);
     panelFrame(view.title, view.subtitle, view.body, view.wide);
   } else if (panel === 'guide') {
+    if (!guideSource.current) {
+      const tab = guideTab;
+      panelFrame(
+        '修行指南',
+        '道法有迹',
+        '<p class="panel-note" role="status">正在展开修行指南…</p>',
+      );
+      void guideSource
+        .load()
+        .then(() => {
+          if (panel === 'guide' && guideTab === tab) renderPanel();
+        })
+        .catch(() => {
+          if (panel === 'guide' && guideTab === tab)
+            panelFrame(
+              '修行指南',
+              '道法有迹',
+              '<p class="panel-note" role="status">暂未展开指南，请重试。</p><button class="secondary-button" data-action="guide">重新展开</button>',
+            );
+        });
+      return;
+    }
+    const { GUIDE_TABS, guideContent } = guideSource.current;
     panelFrame(
       '修行指南',
       '道法有迹',
