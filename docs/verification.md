@@ -1927,3 +1927,12 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 - 独立审查另在五种尺寸实走地图四角、查看全部截图；小数年岁45.25结丹、115.25结婴、450.25寿尽时，场景姓名、境界及互动按钮即时更新。手机普通交易页逐一验证留坊真/假丹、访药真/假邀约四种故人线索。发现的场景整岁缓存延迟、后人换代浮点边界及Worker输入问题均已修复并复审，无未解决问题。
 - 最终840条前六关快检通过，287.503秒，零异常，源码摘要 `4646d2866fc9c3918f9fdbf523e0cfe227d8c30b840b1ca6cac510db9181db4f` 匹配；天/异/双/三/四/五/无灵根连通率95.0/86.7/55.8/27.5/0/0/0%，均在用户允许范围。首轮因运行期间修正存档代码而摘要变化作废，未拿作通过证据。按用户要求不在本机运行10,080全矩阵，GitHub触发规则保留。
 - 最终完整单测903/903通过；前端类型、Worker类型、格式、独立构建与原体积预算通过。指南新增说明在320×640与1440×1000实际切换「人间宗门」「法宝与成长」、滚动到底和关闭返回，标签随内容正常滚动，无横向溢出。主审与独立审查均已查看实际截图；所有发现问题完成修正和复审。
+
+## 静态首页与抓取入口（2026-10-14）
+
+- 背景：AdSense 审核以「不包含发布商内容的屏幕/低价值内容」拒绝。实测爬虫视角：官网正文剥离脚本样式后仅 7 个字（纯 SPA 空壳），无 noscript、无隐私说明页、无 robots.txt/sitemap.xml；根域 `011203.xyz` 为用户停用重定向规则前的 302 跳转。本次按用户指令（页面规则已由用户停用）重做首页本体。
+- 改动：`index.html` 的 `#app` 内加入完整静态内容页（主视觉图、标题、玩法、山河与大道四则、操作说明、隐私说明区块），内联 `.static-home` 作用域样式（深色主题、系统衬线回退、不依赖构建产物与远程字体），`noscript` 同置于 `#app` 内以便禁用脚本时一并显示；`main.ts` 启动即以 `app.innerHTML` 整体替换，无需改动游戏代码。新增 `public/robots.txt`（Allow 全部 + 官网 sitemap）与 `public/sitemap.xml`（唯一官网入口）。广告 provider 保持 `placeholder`，未触碰游戏逻辑、存档与灵根盘。
+- `npm test` 949/949 通过（新增 static-home 5 项：标题/隐私区块/正文不少于三百字（实测 819 字）、内联样式与 noscript、`%BASE_URL%` 主视觉、robots、sitemap）；`npm run format:check` 通过。双 base 构建（`/` 与 `/qinglan-xiuxian/`）成功，`%BASE_URL%` 替换正确，构建产物剥离标签后静态正文 819 字（此前 7 字），robots/sitemap 随构建拷贝；离线清单 build id 随 index.html 与 public 内容正常变化。
+- 5173 按「尚无服务」流程以 `npm run preview -- --port 5173 --strictPort` 启动（更新前 pgrep 确认无服务；顺手清理了遗留的 5199 perf-render 预览进程），dist 走 assets 追加 + `index.html.next` 原子替换，旧 hash 文件保留。`http://localhost:5173/`、robots.txt、sitemap.xml、og-cover.jpg 均 200。
+- Chrome DevTools MCP 隔离上下文：1440×900 与 390×844 实测 JS 启动后 `.static-home` 完全消失、`#app` 被 canvas 与 ui 正常接管（序章显示、布局正常）；另在 390×844 与 1440×900 把构建后静态内容重新注入验证慢网络中间态（构建 CSS 已载、脚本未替换），手机单列、桌面 760px 居中、图文完整、全页可滚动、深色主题一致；再移除全部外部样式表模拟构建 CSS 拉取失败的故障态，内联 body 归零兜底无白边。独立审查无必须修复项，两条建议（记录措辞、body 兜底）已当场修复并复跑通过。截图仅在 `/tmp`。
+- 未验证/待办：GitHub Pages 与 Cloudflare 正式站尚未部署本次改动；AdSense 复审结果未知，不宣称会通过。根域 `011203.xyz` 停用重定向规则后 `https://011203.xyz/` 已无法访问（curl 000，仅 `/ads.txt` 由 Worker 服务 200）——若 AdSense 后台登记站点仍为根域，需用户确认站点 URL 或恢复可访问性后再提交复审。
