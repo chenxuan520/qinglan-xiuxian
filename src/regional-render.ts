@@ -34,15 +34,14 @@ export function drawRegionalField(
     c.setLineDash(z.delay > 0 ? [8, 5] : []);
     c.stroke();
     if (z.delay > 0) {
-      const progress = Math.max(0, Math.min(1, 1 - z.delay / (z.castDelay || 1.2)));
       c.setLineDash([]);
       c.strokeStyle = '#ffe1a5';
-      c.beginPath();
-      if (length) {
-        c.moveTo(0, 0);
-        c.lineTo(length * progress, 0);
-      } else c.arc(0, 0, z.radius * 0.88, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
-      c.stroke();
+      if (!length) {
+        const progress = Math.max(0, Math.min(1, 1 - z.delay / (z.castDelay || 1.2)));
+        c.beginPath();
+        c.arc(0, 0, z.radius * 0.88, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+        c.stroke();
+      }
     }
     if (z.vx !== undefined && (z.vx || z.vy)) {
       c.save();
