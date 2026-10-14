@@ -89,22 +89,24 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
         realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
         BOSS_COMBAT.damage[stage];
       assert.equal(boss.damage, expected);
-      boss.skillStep = stage === 1 ? 0 : 1;
-      boss.cooldown = 0;
-      g.update(0.01);
-      assert.ok(g.shots.length > 0);
-      assert.ok(g.shots.every((shot) => shot.damage === expected * 0.75));
-      g.shots = [g.shots[0]];
-      Object.assign(g.shots[0], { x: 0, y: 0, vx: 0, vy: 0 });
-      const before = g.player.hp;
-      g.update(0.01);
-      assert.ok(Math.abs(before - g.player.hp - expected * 0.75) < 1e-8);
+      if (stage <= 2) {
+        boss.skillStep = stage === 1 ? 0 : 1;
+        boss.cooldown = 0;
+        g.update(0.01);
+        assert.ok(g.shots.length > 0);
+        assert.ok(g.shots.every((shot) => shot.damage === expected * 0.75));
+        g.shots = [g.shots[0]];
+        Object.assign(g.shots[0], { x: 0, y: 0, vx: 0, vy: 0 });
+        const before = g.player.hp;
+        g.update(0.01);
+        assert.ok(Math.abs(before - g.player.hp - expected * 0.75) < 1e-8);
+      }
       g.shots = [];
       boss.skillStep = stage === 1 ? 1 : stage === 2 || stage === 4 ? 2 : 0;
       boss.cooldown = 0;
       g.update(0.01);
       assert.ok(g.zones.length > 0);
-      assert.ok(g.zones.every((zone) => zone.damage === expected));
+      assert.ok(g.zones.every((zone) => zone.damage === expected * (stage === 4 ? 0.85 : 1)));
     }
   }
 });

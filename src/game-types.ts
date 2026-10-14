@@ -27,6 +27,8 @@ export interface Enemy extends Point {
   windup?: number;
   pendingSkill?: EnemySkill;
   summonedBy?: number;
+  illusionOf?: number;
+  chargeFollowup?: boolean;
   cacheGuardian?: boolean;
   cooldown: number;
   slow: number;
@@ -59,6 +61,11 @@ export interface Shot extends Point {
   bossStage?: number;
 }
 export interface Zone extends Point {
+  endX?: number;
+  endY?: number;
+  vx?: number;
+  vy?: number;
+  sourceId?: number;
   radius: number;
   life: number;
   maxLife: number;

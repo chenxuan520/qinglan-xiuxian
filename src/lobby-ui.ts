@@ -36,7 +36,6 @@ import { medicineEntrance } from './medicine-ui.ts';
 import { activeMedicines } from './medicine-data.ts';
 import { journeyMap } from './journey-map.ts';
 import { chronicleEntrance } from './chronicle-ui.ts';
-import { GUIDE_TABS, guideContent } from './guide.ts';
 import { runLootContent } from './run-loot-ui.ts';
 import { icon, smallIcon } from './icons.ts';
 import { currentRealm } from './opening-ui.ts';
@@ -123,11 +122,16 @@ export function lobbyView(
     <footer class="lobby-footer"><span class="control-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>/ 方向键移动</span><i></i><span>自动施法 · 触屏拖动</span></span><button class="lobby-save-status lobby-about${storageAvailable ? '' : ' storage-warning'}" data-action="about">${storageAvailable ? '关于《叩仙门》 · GitHub' : '本机存档不可用 · 关于《叩仙门》'}</button><span class="lobby-footer-links"><button class="prologue-revisit" data-action="prologue-revisit">重温序章</button>${chronicleEntrance(save)}</span></footer>`;
 }
 
-export function guidePanel(guideTab: string, inGame: boolean): PanelParts {
+export function guidePanel(
+  guideTab: string,
+  inGame: boolean,
+  tabs: readonly { id: string; title: string }[],
+  content: (tab: string) => string,
+): PanelParts {
   return [
     '修行指南',
     '道法有迹',
-    `<div class="guide-tabs" role="group" aria-label="说明分类">${GUIDE_TABS.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，同样会清空本世进度。真仙终章则由承缘少年接续，可选赠一物，也可选择先走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${guideContent(guideTab)}<button class="primary-button guide-close" data-action="close">${inGame ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+    `<div class="guide-tabs" role="group" aria-label="说明分类">${tabs.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，同样会清空本世进度。真仙终章则由承缘少年接续，可选赠一物，也可选择先走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${content(guideTab)}<button class="primary-button guide-close" data-action="close">${inGame ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
   ];
 }
 

@@ -15,6 +15,7 @@ export function eligibleBalanceReportRun(
     head_repository?: { full_name: string };
     event: string;
     status: string;
+    conclusion?: string | null;
   },
   repository: string,
 ) {
@@ -23,6 +24,7 @@ export function eligibleBalanceReportRun(
     run.head_branch === 'master' &&
     run.head_repository?.full_name === repository &&
     run.status === 'completed' &&
+    run.conclusion !== 'cancelled' &&
     ['schedule', 'workflow_dispatch', 'push'].includes(run.event)
   );
 }

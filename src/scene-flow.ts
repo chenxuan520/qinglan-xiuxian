@@ -298,7 +298,30 @@ export function renderPanel(shell: ActionShell) {
     const view = shell.bestiaryPanel(shell.bestiaryStage);
     shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
   } else if (shell.panel === 'guide') {
-    shell.panelFrame(...shell.guidePanel(shell.guideTab, !!shell.game));
+    if (!shell.guideSource.current) {
+      const tab = shell.guideTab;
+      shell.panelFrame(
+        '修行指南',
+        '道法有迹',
+        '<p class="panel-note" role="status">正在展开修行指南…</p>',
+      );
+      void shell.guideSource
+        .load()
+        .then(() => {
+          if (shell.panel === 'guide' && shell.guideTab === tab) shell.renderPanel();
+        })
+        .catch(() => {
+          if (shell.panel === 'guide' && shell.guideTab === tab)
+            shell.panelFrame(
+              '修行指南',
+              '道法有迹',
+              '<p class="panel-note" role="status">暂未展开指南，请重试。</p><button class="secondary-button" data-action="guide">重新展开</button>',
+            );
+        });
+      return;
+    }
+    const { GUIDE_TABS, guideContent } = shell.guideSource.current;
+    shell.panelFrame(...shell.guidePanel(shell.guideTab, !!shell.game, GUIDE_TABS, guideContent));
   }
 }
 

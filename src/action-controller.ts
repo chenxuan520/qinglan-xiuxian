@@ -209,6 +209,7 @@ export interface ActionShell {
   readonly gameEvent: any;
   readonly getAdProvider: any;
   readonly guidePanel: any;
+  readonly guideSource: any;
   readonly hometownContent: any;
   readonly hometownFarewellModal: any;
   readonly hometownParents: any;

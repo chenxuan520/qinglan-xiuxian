@@ -18,7 +18,7 @@ function fixture(stage = 0) {
   return g;
 }
 
-test('七位妖王恢复原地面目标，远距离也能锁定主角，落点不追踪后续移动', () => {
+test('终关七位妖王保留原地面目标，远距离也能锁定主角，落点不追踪后续移动', () => {
   const counts = {
     '0/0': 6,
     '1/1': 5,
@@ -34,7 +34,7 @@ test('七位妖王恢复原地面目标，远距离也能锁定主角，落点�
   for (const range of [180, 1000])
     for (let stage = 0; stage < 7; stage++)
       for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
-        const g = fixture(stage);
+        const g = fixture(6);
         const e = g.spawnEnemy(10, false, true, { x: 510, y: -700 }, stage);
         const target = { x: e.x + range, y: e.y + 80 };
         Object.assign(g.player, target);
@@ -69,6 +69,7 @@ test('妖王脚下落阵先预警再伤害，暂停与续局不改落点，移�
   for (const move of [false, true]) {
     const g = fixture(5);
     const e = g.spawnEnemy(10, false, true, { x: -1000, y: 0 }, 5);
+    e.skillStep = 1;
     g.castBossSkill(e, 1, 0);
     g.state = 'paused';
     const restored = Game.restore(g.save, g.snapshot())!;
@@ -130,6 +131,7 @@ test('自动走位能离开妖王锁定主角的十字雷阵，原地停留会�
   for (const moving of [false, true]) {
     const g = fixture(5);
     const e = g.spawnEnemy(10, false, true, { x: -1000, y: 0 }, 5);
+    e.skillStep = 1;
     g.castBossSkill(e, 1, 0);
     e.speed = 0;
     e.cooldown = e.pursuitCooldown = 9999;

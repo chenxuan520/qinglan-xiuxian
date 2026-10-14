@@ -4,18 +4,24 @@ import { autoplayInput } from '../src/autoplay.ts';
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 
-function encounter(stage: number, angle = 0, distance = 500) {
+function encounter(stage: number, angle = 0, distance = 500, arena = stage) {
   const save = freshSave();
   save.unlocked = 6;
-  const g = new Game(save, stage, 0, () => 0.5);
+  const g = new Game(save, arena, 0, () => 0.5);
   g.weapons[0].timer = 999;
   g.spawnBudget = -1000;
   g.nextTrialBossAt = 999;
   g.bossSpawned = true;
-  const boss = g.spawnEnemy(10, false, true, {
-    x: -Math.cos(angle) * distance,
-    y: -Math.sin(angle) * distance,
-  });
+  const boss = g.spawnEnemy(
+    10,
+    false,
+    true,
+    {
+      x: -Math.cos(angle) * distance,
+      y: -Math.sin(angle) * distance,
+    },
+    stage,
+  );
   boss.pursuitCooldown = distance > 330 ? 0 : 999;
   boss.cooldown = distance > 330 ? 999 : 0;
   g.update(0.01);
@@ -25,23 +31,23 @@ function encounter(stage: number, angle = 0, distance = 500) {
   return { g, boss };
 }
 
-function dodge(g: Game) {
+function dodge(g: Game, frames = 85) {
   let hits = 0;
   g.onEvent = (event) => {
     if (event === 'hurt') hits++;
   };
   // 实际页面每120ms决策；预警恰好出现在上次决策之后，留出最坏反应延迟。
-  for (let frame = 1; frame <= 85; frame++) {
+  for (let frame = 1; frame <= frames; frame++) {
     if (frame % 6 === 0) g.input = autoplayInput(g);
     g.update(0.02);
   }
   return hits;
 }
 
-test('七位妖王的远距离冲撞在预警期侧向躲避，路径上经验不抢优先级', () => {
+test('终关七位妖王的远距离冲撞在预警期侧向躲避，路径上经验不抢优先级', () => {
   for (let stage = 0; stage < 7; stage++) {
     for (const angle of [0, Math.PI / 4, Math.PI / 2, Math.PI, -Math.PI / 3]) {
-      const { g, boss } = encounter(stage, angle);
+      const { g, boss } = encounter(stage, angle, 500, 6);
       const input = autoplayInput(g);
       assert.ok(Math.abs(input.x * boss.dy - input.y * boss.dx) > 0.9);
       assert.equal(dodge(g), 0, `妖王 ${stage}，方向 ${angle}`);
@@ -55,7 +61,7 @@ test('狼王近距离突袭和连续突袭能躲开，已侧移的玩家不会�
       const { g, boss } = encounter(2, 0, distance);
       g.player.y = side;
       for (let round = 0; round < 3; round++) {
-        assert.equal(dodge(g), 0, `距离 ${distance}，偏移 ${side}，第 ${round} 次`);
+        assert.equal(dodge(g, 170), 0, `距离 ${distance}，偏移 ${side}，第 ${round} 次`);
         assert.equal(boss.charge, 0);
         boss.x = g.player.x - distance;
         boss.y = g.player.y;

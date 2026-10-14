@@ -9,7 +9,9 @@ import {
   exportSave,
   importSave,
   UNREADABLE_SAVE_PREFIX,
+  restoreSavedRun,
 } from '../src/save-transfer.ts';
+import { Game } from '../src/game.ts';
 import { saveLockPanel } from '../src/lobby-ui.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -226,11 +228,42 @@ test('main.ts 所有存档写入都经过 writeSave，启动与多窗口入口�
   );
   assert.match(source, /const save = saveRead\.status === 'unreadable' \? parseSave\(null\)/);
   assert.match(source, /backupUnreadableSave\(localStorage, raw\)/);
-  assert.match(source, /if \(saveRead\.status !== 'unreadable'\)\s+pendingRun = restoreSavedRun/);
+  assert.match(
+    source,
+    /if \(saveRead\.status !== 'unreadable' && stored\.schema === SAVE_SCHEMA\)\s+pendingRun = restoreSavedRun/,
+  );
   assert.match(
     source,
     /window\.addEventListener\('storage'[^]*?event\.key !== SAVE_KEY[^]*?lockStaleSave\(\)/,
   );
   assert.match(source, /if \(saveLock\) renderSaveLock\(\);\npersist\(\);/);
   assert.match(source, /function handleAction\([^)]*\) \{\n {2}if \(saveLock\) \{/);
+});
+
+test('实际启动恢复代码只续同结构对局，旧档和高版本保留永久进度而不续局', () => {
+  const startup = source.slice(
+    source.indexOf('let pendingRun: Game | null = null;'),
+    source.indexOf('let selectedStage = save.unlocked'),
+  );
+  const code = stripTypeScriptTypes(startup + '\npendingRun;');
+  const original = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  original.stones = 321;
+  const run = new Game(original, 0, 0, () => 0.5);
+  run.time = 35;
+  run.pause();
+  original.activeRun = run.snapshot();
+  for (const schema of [SAVE_SCHEMA - 1, undefined, SAVE_SCHEMA, SAVE_SCHEMA + 1]) {
+    const raw = JSON.stringify({ ...original, schema });
+    const saveRead = readSave(raw);
+    const save = saveRead.save;
+    const restored = new Script(code).runInContext(
+      createContext({ raw, saveRead, save, SAVE_SCHEMA, restoreSavedRun }),
+    );
+    assert.equal(save.stones, 321);
+    assert.equal(!!restored, schema === SAVE_SCHEMA, `结构${schema}`);
+    if (restored) {
+      assert.equal(restored.state, 'paused');
+      assert.equal(restored.time, 35);
+    }
+  }
 });

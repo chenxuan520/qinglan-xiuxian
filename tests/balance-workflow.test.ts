@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { runInNewContext } from 'node:vm';
 import { balanceChangedFiles, detectBalanceChanges } from '../scripts/balance-change-trigger.ts';
 import { checkReportDiagnostics } from '../scripts/check-balance-report.ts';
 import { eligibleBalanceReportRun } from '../scripts/ci-artifacts.ts';
@@ -24,9 +25,17 @@ test('纯界面/文档不触发全量，经验与实际判定文件触发', () =
       'src/boss-followup.ts',
       'src/game-validation.ts',
       'src/game-types.ts',
+      'src/regional-combat.ts',
+      'src/regional-hazards.ts',
       'src/render-overlays.ts',
     ]),
-    ['src/boss-followup.ts', 'src/game-validation.ts'],
+    [
+      'src/boss-followup.ts',
+      'src/game-types.ts',
+      'src/game-validation.ts',
+      'src/regional-combat.ts',
+      'src/regional-hazards.ts',
+    ],
   );
   assert.deepEqual(
     balanceChangedFiles([
@@ -224,6 +233,7 @@ test('后续游戏发布接受可信 master push 全量报告，失败结果不�
     { head_repository: { full_name: 'fork/other' } },
     { path: '.github/workflows/evil.yml' },
     { status: 'in_progress' },
+    { conclusion: 'cancelled' },
   ])
     assert.equal(eligibleBalanceReportRun({ ...run, ...patch }, repo), false);
 });
@@ -237,10 +247,10 @@ test('正式恢复脚本选中新失败 push 日报，跳过外仓并保留失�
       `#!${process.execPath}
 const fs=require('node:fs'),path=require('node:path'),args=process.argv.slice(2);
 const repo=process.env.GITHUB_REPOSITORY;
-const artifacts=[{id:33,created_at:'2026-10-10T14:00:00Z'},{id:22,created_at:'2026-10-10T13:00:00Z'},{id:11,created_at:'2026-10-10T12:00:00Z'}].map(a=>({...a,expired:false,workflow_run:{id:a.id,head_branch:'master'}}));
+const artifacts=[{id:44,created_at:'2026-10-10T15:00:00Z'},{id:33,created_at:'2026-10-10T14:00:00Z'},{id:22,created_at:'2026-10-10T13:00:00Z'},{id:11,created_at:'2026-10-10T12:00:00Z'}].map(a=>({...a,expired:false,workflow_run:{id:a.id,head_branch:'master'}}));
 if(args[0]==='api'){
  if(args[1].includes('/actions/artifacts?'))process.stdout.write(JSON.stringify([{artifacts}]));
- else{const id=Number(args[1].split('/').pop());process.stdout.write(JSON.stringify({id,path:'.github/workflows/balance.yml',head_branch:'master',head_repository:{full_name:id===33?'fork/evil':repo},event:id===11?'schedule':'push',status:'completed',conclusion:id===22?'failure':'success',head_sha:String(id).slice(0,1).repeat(40)}));}
+ else{const id=Number(args[1].split('/').pop());process.stdout.write(JSON.stringify({id,path:'.github/workflows/balance.yml',head_branch:'master',head_repository:{full_name:id===33?'fork/evil':repo},event:id===11?'schedule':'push',status:'completed',conclusion:id===44?'cancelled':id===22?'failure':'success',head_sha:String(id).slice(0,1).repeat(40)}));}
 }else if(args[0]==='run'&&args[1]==='download'){
  fs.appendFileSync(path.join(__dirname,'downloads'),args[2]+'\\n');
  const out=args[args.indexOf('--dir')+1];fs.mkdirSync(out,{recursive:true});
@@ -272,4 +282,79 @@ if(args[0]==='api'){
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+const workflow = readFileSync(new URL('../.github/workflows/balance.yml', import.meta.url), 'utf8');
+const fullJob = workflow.match(/^  full:\n([^]*?)(?=^  [a-z-]+:)/m)![0];
+const publishJob = workflow.match(/^  publish-report:\n([^]*)/m)![0];
+
+function actionExpression(expression: string, context: Record<string, unknown>) {
+  return runInNewContext(
+    expression
+      .replace(/needs\.perf-render/g, "needs['perf-render']")
+      .replace(/outputs\.report-id/g, "outputs['report-id']"),
+    context,
+  );
+}
+
+test('同源分支的 push/PR 全量共用取消组，定时/手动同组、外仓及其他分支隔离', () => {
+  const template = fullJob.match(/^      group: (.+)$/m)![1];
+  const group = (branch: string, fork = '', pr = false) => {
+    const github = {
+      repository: 'chenxuan520/qinglan-xiuxian',
+      head_ref: pr ? branch : '',
+      ref_name: pr ? '9/merge' : branch,
+      event: { pull_request: { head: { repo: { full_name: fork } } } },
+    };
+    return template.replace(/\$\{\{(.*?)\}\}/g, (_, expression) =>
+      actionExpression(expression, { github }),
+    );
+  };
+  assert.match(fullJob, /^      cancel-in-progress: true$/m);
+  assert.equal(group('feat/combat'), group('feat/combat', 'chenxuan520/qinglan-xiuxian', true));
+  assert.equal(group('master'), group('master', 'chenxuan520/qinglan-xiuxian', true));
+  assert.notEqual(group('feat/combat'), group('feat/other'));
+  assert.notEqual(group('feat/combat'), group('feat/combat', 'other/fork', true));
+  assert.notEqual(group('master'), group('master', 'other/fork', true));
+  // 并发只设在全量作业，快检和渲染不因另一次全量被取消。
+  assert.ok(!workflow.slice(0, workflow.indexOf('jobs:')).includes('concurrency:'));
+  assert.ok(!workflow.match(/^  quick:\n([^]*?)(?=^  [a-z-]+:)/m)![0].includes('concurrency:'));
+});
+
+test('取消矩阵跳过日报和诊断，真实失败仍生成上传并让CI失败', () => {
+  for (const name of [
+    'Generate daily web report even on failure',
+    'Preserve daily web report',
+    'Fail CI on report Error after preserving artifacts',
+  ]) {
+    const expression = fullJob.match(new RegExp(`name: ${name}\\n\\s+if: ([^\\n]+)`))![1];
+    for (const cancelled of [false, true])
+      assert.equal(
+        actionExpression(expression, { always: () => true, cancelled: () => cancelled }),
+        !cancelled,
+        name,
+      );
+  }
+});
+
+test('已取消的全量/渲染不能发布，真实失败日报及render-only仍可发布', () => {
+  const expression = publishJob.match(/^    if: (.+)$/m)![1];
+  const publish = (full: string, render = 'success', cancelled = false, renderOnly = false) =>
+    actionExpression(expression, {
+      always: () => true,
+      cancelled: () => cancelled,
+      github: { ref: 'refs/heads/master' },
+      inputs: { render_only: renderOnly },
+      needs: {
+        full: { result: full, outputs: { 'report-id': full === 'skipped' ? '' : '123' } },
+        'perf-render': { result: render },
+      },
+    });
+  assert.equal(publish('success'), true);
+  assert.equal(publish('failure'), true);
+  assert.equal(publish('cancelled'), false);
+  assert.equal(publish('success', 'cancelled'), false);
+  assert.equal(publish('success', 'success', true), false);
+  assert.equal(publish('skipped', 'success', false, true), true);
+  assert.equal(publish('skipped'), false);
 });

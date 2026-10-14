@@ -68,7 +68,7 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
   for (let stage = 0; stage < 6; stage++)
     for (const type of STAGE_ENEMIES[stage])
       for (const elite of [false, true]) {
-        const tactics = ENEMY_TACTICS[type];
+        const tactics = encounter(stage, type, elite).g.enemyTactics(type);
         if (
           !['ranged', 'volley', 'nova', 'soul'].includes(
             (elite ? tactics.eliteSkill : tactics.skill)!,
@@ -111,13 +111,10 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
   const boss = g.spawnEnemy(10, false, true, { x: -500, y: 0 });
   boss.pursuitCooldown = 0;
   g.update(0.01);
-  const warning = g.effects.find((e) => e.kind === 'line')!;
+  const warning = g.zones.find((z) => z.endX !== undefined)!;
   assert.ok(warning);
-  assert.ok(
-    draw(g).some(
-      (c) => c.method === 'lineTo' && c.args[0] === warning.x2 && c.args[1] === warning.y2,
-    ),
-  );
+  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === warning.radius));
+  g.zones = [];
   boss.charge = 0;
   boss.pursuitCooldown = 999;
   boss.cooldown = 0;
@@ -125,7 +122,7 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
   boss.x = -300;
   g.update(0.01);
   assert.ok(g.zones.some((z) => z.delay > 0));
-  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 50));
+  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 32));
 });
 
 test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近身自爆', () => {
@@ -133,7 +130,7 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
   for (let stage = 0; stage < 6; stage++)
     for (const type of STAGE_ENEMIES[stage]) {
       const { g, e } = encounter(stage, type, true, 140);
-      const skill = ENEMY_TACTICS[type].eliteSkill;
+      const skill = g.enemyTactics(type).eliteSkill;
       g.update(0.01);
       if (!skill) {
         assert.equal(ENEMIES[type].behavior, 'explode');
@@ -155,7 +152,7 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
 
 test('第五境无面幽魂与爆魂冥瓮精英保留交叉灵弹', () => {
   for (const [type, elite, expectedSkill, shots] of [
-    [58, false, 'ranged', 1],
+    [58, false, 'soul', 2],
     [58, true, 'soul', 4],
     [61, false, 'soul', 2],
     [61, true, 'soul', 4],
@@ -182,7 +179,7 @@ test('狼群分别包抄两翼，保持原速度；首境菇妖仍直接追击',
 });
 
 test('灵弹蓄势后沿锁定方向发射，施法者死亡可以打断', () => {
-  const { g, e } = encounter(0, 2);
+  const { g, e } = encounter(0, 5);
   g.update(0.01);
   assert.equal(g.shots.length, 0);
   assert.equal(e.pendingSkill, 'ranged');

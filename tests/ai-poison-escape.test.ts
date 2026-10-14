@@ -185,7 +185,13 @@ test('重叠毒圈撤离仍避开精英和妖王冲刺路径', () => {
     g.pickups[0].x = -1000;
     ring(g, 8, 125, 60, 1.6);
     g.zones.push(poison(0, 0, 80, 1.6));
-    const enemy = g.spawnEnemy(boss ? 10 : 0, !boss, boss, { x: boss ? -500 : -180, y: 0 });
+    const enemy = g.spawnEnemy(
+      boss ? 10 : 0,
+      !boss,
+      boss,
+      { x: boss ? -500 : -180, y: 0 },
+      boss ? 2 : undefined,
+    );
     enemy.cooldown = boss ? 999 : 0;
     enemy.pursuitCooldown = 0;
     g.update(0.01);
@@ -222,8 +228,8 @@ test('撤离途中按毒圈伤害和剩余寿命取舍，不因最短出口有�
 
 test('第六王无后续伤害的五圈残影不阻挡低血量玩家避开致命敌弹', (t) => {
   for (const control of ['up', 'ai']) {
-    const g = encounter(0, 5);
-    const boss = g.spawnEnemy(10, false, true, { x: -90, y: 0 });
+    const g = encounter(0, 6);
+    const boss = g.spawnEnemy(10, false, true, { x: -90, y: 0 }, 5);
     // 两批陨星均落地后、第一批消散前，只剩不会再次伤害的残影。
     boss.speed = 0;
     boss.skillStep = 2;
