@@ -339,6 +339,12 @@ try {
       assert.equal(home.autoVisible, false, '手机首页自动历练只在设置中显示');
       assert.ok(home.width >= 44 && home.height >= 44, '手机首页设置保持44px点击区');
     }
+    await click('[data-action=watch-root-ad]');
+    await wait('() => !!document.querySelector(".root-ad-panel")');
+    await check(`${name}-root-ad`);
+    await click('[data-action=cancel-reward-ad]');
+    await wait('() => !document.querySelector(".root-ad-panel")');
+    assert.equal((await saved()).spiritRoot, 'heaven', '放弃广告不改变灵根');
     await click('[data-action=settings]');
     assert.equal(
       await evaluate("() => document.querySelector('[data-disclosure=offline]').open"),
@@ -403,6 +409,16 @@ try {
     await check(`${name}-pause`, true);
     await browser.call('navigate_page', { pageId, type: 'reload' });
     await wait('() => !!document.querySelector("[data-action=restore]")');
+    assert.equal(
+      await evaluate(`() => {
+        const banner = document.querySelector('.resume-banner');
+        const town = document.querySelector('.home-town-entry');
+        return !!banner && !!town && banner.getBoundingClientRect().bottom <= town.getBoundingClientRect().top + 1;
+      }`),
+      true,
+      '未完历练提示位于青岚镇上方',
+    );
+    await check(`${name}-resume-entrance`);
     assert.equal((await saved()).sound, false, '刷新保留音量并重新静音');
     assert.equal((await saved()).volume, 1);
     await click('[data-action=restore]');

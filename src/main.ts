@@ -1132,8 +1132,10 @@ function clearInput() {
   if (game) game.input = { x: 0, y: 0 };
 }
 function shellBindings(): ActionShell {
+  // 同一组实时绑定供事件、HUD 和场景共用，避免高频重建 getter 闭包。
+  const bindings = shellBindings as typeof shellBindings & { cached?: ActionShell };
   // prettier-ignore
-  return {
+  return (bindings.cached ??= {
     get ELEMENTS() { return ELEMENTS; },
     get FINAL_TRIAL_STAGE() { return FINAL_TRIAL_STAGE; },
     get Game() { return Game; },
@@ -1180,7 +1182,7 @@ function shellBindings(): ActionShell {
     get chooseMarketFellow() { return chooseMarketFellow; },
     get chooseSmithStory() { return chooseSmithStory; },
     get clearInput() { return clearInput; },
-    get clearInterval() { return clearInterval; },
+    get clearInterval() { return clearInterval.bind(globalThis); },
     get closeNpcChat() { return closeNpcChat; },
     get closeRewardAd() { return closeRewardAd; },
     get damagePanel() { return damagePanel; },
@@ -1326,7 +1328,7 @@ function shellBindings(): ActionShell {
     get startRun() { return startRun; },
     get storageAvailable() { return storageAvailable; },
     set storageAvailable(next) { storageAvailable = next; },
-    get structuredClone() { return structuredClone; },
+    get structuredClone() { return structuredClone.bind(globalThis); },
     get syncHumanStories() { return syncHumanStories; },
     get syncMortalChange() { return syncMortalChange; },
     get telemetry() { return telemetry; },
@@ -1434,7 +1436,7 @@ function shellBindings(): ActionShell {
     set victoryTimer(next) { victoryTimer = next; },
     get visitHometown() { return visitHometown; },
     get watchAdPlacement() { return watchAdPlacement; },
-  };
+  });
 }
 function handleAction(action: string, id?: string) {
   if (saveLock) {
