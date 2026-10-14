@@ -6,20 +6,18 @@ import { createContext, Script } from 'node:vm';
 import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { freshTownPopulation } from '../src/town-population.ts';
-import {
-  marketCultivators,
-  isMarketCultivatorId,
-  marketMedicinePool,
-} from '../src/sect-market-data.ts';
+import { marketCultivators, isMarketCultivatorId } from '../src/sect-market-data.ts';
 import {
   beginSectMarketVisit,
   sectMarketOpen,
   sectMarketOffer,
+  sectMarketDeals,
   sectMarketExchangeReason,
   exchangeSectMedicine,
 } from '../src/sect-market.ts';
 import { sectMarketTradeContent } from '../src/sect-market-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
+import { medicineInfo } from '../src/medicine-data.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 import { dispatchAction } from '../src/action-controller.ts';
 
@@ -47,14 +45,13 @@ function harness(pending = false) {
   beginSectMarketVisit(save);
   const npc = marketCultivators(save.mortal.population, save.mortal.sectMarket!)[1];
   const offer = sectMarketOffer(save, npc.id)!;
-  const give = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, npc.id).find(
-    (m) => m.id !== offer.id,
-  )!;
-  save.medicine.bag[give.id] = 4;
+  const deal = sectMarketDeals(save, npc.id).find((d) => d.category === 'medicine')!;
+  const give = medicineInfo(deal.give[0].id)!;
+  save.medicine.bag[give.id] = deal.give[0].quantity * 2;
   const game = pending ? new Game(save, 0, 0, () => 0.5) : null;
   game?.pause();
   let stored = JSON.stringify({ ...save, activeRun: game?.snapshot() ?? null });
-  let html = sectMarketTradeContent(save, npc, give.id);
+  let html = sectMarketTradeContent(save, npc, deal.id);
   let blocked = false;
   const messages: string[] = [];
   const tradeHost = {
@@ -70,7 +67,7 @@ function harness(pending = false) {
     querySelector(selector: string) {
       if (selector === '#sect-market-trade') return tradeHost;
       if (selector === '#sect-market-give')
-        return html.includes('id="sect-market-give"') ? { value: give.id } : null;
+        return html.includes('id="sect-market-give"') ? { value: deal.id } : null;
       if (selector === '[data-action="sect-market-exchange"]') {
         const attrs = html.match(/<button[^>]*data-action="sect-market-exchange"[^>]*>/)?.[0];
         return attrs
@@ -108,6 +105,7 @@ function harness(pending = false) {
     exchangeSectMedicine,
     sectMarketExchangeReason,
     sectMarketOffer,
+    sectMarketDeals,
     isMarketCultivatorId,
     sectMarketTradeContent,
     townStatus,
@@ -135,6 +133,7 @@ function harness(pending = false) {
     npc,
     offer,
     give,
+    deal,
     messages,
     get stored() {
       return stored;
@@ -150,14 +149,14 @@ function harness(pending = false) {
     },
   };
 }
-test('实际按钮 visit 属性经真实路由完成二换一，额度/物资一次保存且保留原续局', () => {
+test('实际按钮 visit 属性经真实路由完成组合互换，额度/物资一次保存且保留原续局', () => {
   for (const pending of [false, true]) {
     const h = harness(pending);
     const before = JSON.parse(h.stored);
     h.context.handleAction('sect-market-exchange', h.npc.id);
     const after = JSON.parse(h.stored);
-    assert.equal(after.medicine.bag[h.give.id], 2);
-    assert.equal(after.medicine.bag[h.offer.id], 1);
+    assert.equal(after.medicine.bag[h.give.id], h.deal.give[0].quantity);
+    assert.equal(after.medicine.bag[h.offer.id], h.deal.receive.quantity);
     assert.deepEqual(after.activeRun, before.activeRun);
     if (pending) {
       const restored = Game.restore(h.save, after.activeRun);
@@ -185,8 +184,8 @@ test('写入失败不扣药、不改额度；恢复后原按钮正常重试', ()
   assert.match(h.messages.at(-1)!, /互换未完成/);
   h.block(false);
   h.context.handleAction('sect-market-exchange', h.npc.id);
-  assert.equal(h.save.medicine.bag[h.give.id], 2);
-  assert.equal(h.save.medicine.bag[h.offer.id], 1);
+  assert.equal(h.save.medicine.bag[h.give.id], h.deal.give[0].quantity);
+  assert.equal(h.save.medicine.bag[h.offer.id], h.deal.receive.quantity);
 });
 test('多窗口写档后锁住旧页，保留新存档，旧页不扣药', () => {
   const h = harness();

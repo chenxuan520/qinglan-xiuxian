@@ -1,3 +1,4 @@
+import { validIronMarket, type IronMarketState } from './iron-market-data.ts';
 import { PASSIVES } from './data.ts';
 import { validTownPopulation, type TownPopulation } from './town-population.ts';
 import { validTownScenery, type TownScenery } from './town-history.ts';
@@ -103,6 +104,7 @@ export const TOWN_JOBS = {
 export type TownJob = keyof typeof TOWN_JOBS;
 export interface MortalState {
   years: number;
+  ironMarket?: IronMarketState;
   sectMarket?: SectMarketState;
   auction?: AuctionState;
   marketSocial?: MarketSocialState;
@@ -133,6 +135,7 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
   const sect = (id: unknown) => SECTS.some((s) => s.id === id);
   return (
     number(s.years) &&
+    (s.ironMarket === undefined || validIronMarket(s.ironMarket, age)) &&
     (s.sectMarket === undefined || (validSectMarket(s.sectMarket, age) && !!s.population)) &&
     (s.auction === undefined || validAuction(s.auction, age, s.sectMarket)) &&
     (s.marketSocial === undefined || validMarketSocial(s.marketSocial, age, s.sectMarket)) &&

@@ -227,7 +227,7 @@ test('材料、钱、寿元不足或有续局时合成原子失败；到期供�
   assert.equal(s.age, 65);
   assert.equal(s.mortal.member!.dueAt, 60);
 });
-test('补天丹严格提升一个品质档，随机新数量与五行，不降级、不提供选择', () => {
+test('补天丹严格提升一个品质档并收束灵根数量，不降级、不提供自选', () => {
   const ranks = { none: 0, quad: 1, five: 1, dual: 2, triple: 2, variant: 3, heaven: 4 };
   for (const root of SPIRIT_ROOTS)
     for (const roll of [0, 0.99]) {

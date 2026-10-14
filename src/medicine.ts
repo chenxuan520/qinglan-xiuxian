@@ -1,6 +1,11 @@
-import { rootElementsFor, spiritRootInfo, elementInfo, type SpiritRootId } from './data.ts';
 import {
-  attuneSpiritRoot,
+  rootElementsFor,
+  spiritRootInfo,
+  elementInfo,
+  treasure,
+  type SpiritRootId,
+} from './data.ts';
+import {
   gainCultivation,
   lifespanInfo,
   realmCost,
@@ -78,7 +83,13 @@ export function useMedicine(
     };
     const pool = upgrades[save.spiritRoot];
     const root = pool[Math.floor(random() * pool.length)];
-    attuneSpiritRoot(save, root, rootElementsFor(root, [], random));
+    // 补天只提资质：以当前本命五行为先，收束原灵根，不重抽本命与收藏。
+    save.rootElements = rootElementsFor(
+      root,
+      [treasure(save.starter).element, ...save.rootElements],
+      random,
+    );
+    save.spiritRoot = root;
     message = `补天有成 · ${spiritRootInfo(root).name} · ${save.rootElements.map((e) => elementInfo(e).name).join('、')}灵根`;
   } else if (id === 'huiyang') {
     const years = Math.round(lifespanInfo(save).base * 0.25);

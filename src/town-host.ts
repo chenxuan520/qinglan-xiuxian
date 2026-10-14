@@ -89,9 +89,9 @@ export function executeMortalAction(
       : action === 'mortal-activity'
         ? startActivity(save, id ?? '')
         : action === 'mortal-buy'
-          ? tradeIron(save, true)
+          ? tradeIron(save, true, Number(id?.split(':')[1]), Number(id?.split(':')[0]))
           : action === 'mortal-sell'
-            ? tradeIron(save, false)
+            ? tradeIron(save, false, Number(id?.split(':')[1]), Number(id?.split(':')[0]))
             : false;
 }
 

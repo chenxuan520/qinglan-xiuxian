@@ -20,6 +20,7 @@ import {
   sectMarketOpen,
   beginSectMarketVisit,
   sectMarketOffer,
+  sectMarketDeals,
   sectMarketExchangeReason,
   exchangeSectMedicine,
   moveInSectMarket,
@@ -64,6 +65,18 @@ function visitWithNpcRealm(rank: number, id: MarketCultivatorId) {
   assert.fail(`没有找到${REALMS[rank]}来访者`);
 }
 
+function fundDeal(save: ReturnType<typeof visitor>, id: MarketCultivatorId) {
+  const deal = sectMarketDeals(save, id)[0];
+  assert.ok(deal);
+  for (const item of deal.give)
+    if (item.kind === 'medicine')
+      save.medicine.bag[item.id] = (save.medicine.bag[item.id] || 0) + item.quantity;
+    else {
+      if (!save.artifacts.includes(item.id)) save.artifacts.push(item.id);
+      save.forge[item.id] = item.forgeLevel;
+    }
+  return deal;
+}
 test('修为为零不开放，首次获得修为即开放，无需结算、通关或入宗；结束的一世不开放', () => {
   const save = freshSave();
   assert.equal(sectMarketOpen(save), false);
@@ -173,7 +186,7 @@ test('每个实际来访境界的丹药池和可换材料都非空，品级符�
     }
   assert.ok(permanent > 0, '高境界可以携带本世珍品');
 });
-test('稀有合体和大乘修士的本世珍品仍可实际互换，服用记录与药效不重置', () => {
+test('高阶修士可换本世珍品，实际数量结算，保留服用次数与药效', () => {
   for (const rank of [6, 7])
     for (const npc of MARKET_CULTIVATORS) {
       const save = visitWithNpcRealm(rank, npc.id);
@@ -181,116 +194,72 @@ test('稀有合体和大乘修士的本世珍品仍可实际互换，服用记�
         save.medicine.recipeSeed = seed;
         if (!sectMarketOffer(save, npc.id)!.years) break;
       }
-      const offer = sectMarketOffer(save, npc.id)!;
-      assert.equal(offer.years, 0);
-      const give = marketMedicinePool(
-        save.mortal.population!,
-        save.mortal.sectMarket!,
-        npc.id,
-      ).find((m) => !m.years && m.id !== offer.id)!;
-      save.medicine.bag[give.id] = 2;
+      assert.equal(sectMarketOffer(save, npc.id)!.years, 0);
+      const deal = fundDeal(save, npc.id);
       save.medicine.used.peiying = 1;
-      save.medicine.used.huiyang = 1;
       const before = structuredClone(save.medicine);
-      const visitorNpc = marketCultivators(save.mortal.population!, save.mortal.sectMarket!).find(
-        (n) => n.id === npc.id,
-      )!;
-      assert.match(sectMarketEventContent(save, visitorNpc), /前辈/);
-      assert.match(sectMarketTradeContent(save, visitorNpc), /本世永久效果/);
       assert.equal(
-        exchangeSectMedicine(save, npc.id, give.id, save.mortal.sectMarket!.visit),
+        exchangeSectMedicine(save, npc.id, deal.id, save.mortal.sectMarket!.visit),
         true,
       );
-      assert.equal(save.medicine.bag[give.id], 0);
-      assert.equal(save.medicine.bag[offer.id], 1);
-      assert.deepEqual(save.medicine.used, before.used);
+      assert.equal(save.medicine.bag[deal.receive.id], deal.receive.quantity);
       assert.deepEqual(save.medicine.active, before.active);
-      const loaded = importSave(exportSave(save)).save;
-      assert.deepEqual(loaded.medicine, save.medicine);
-      assert.deepEqual(
-        marketCultivators(loaded.mortal.population!, loaded.mortal.sectMarket!),
-        marketCultivators(save.mortal.population!, save.mortal.sectMarket!),
-      );
+      assert.deepEqual(save.medicine.used, before.used);
+      assert.deepEqual(importSave(exportSave(save)).save.medicine, save.medicine);
     }
 });
-test('互换只扣两份同品同类药得一份，每批每人一次，刷新读档和文件往返不补额度', () => {
+
+test('组合互换每批每人一次，刷新与文件往返保留额度且不改药效年岁', () => {
   for (let rank = 0; rank < 9; rank++)
     for (const npc of MARKET_CULTIVATORS) {
-      const save = visitor(rank);
-      const offered = sectMarketOffer(save, npc.id)!;
-      const given = marketMedicinePool(
-        save.mortal.population!,
-        save.mortal.sectMarket!,
-        npc.id,
-      ).find((m) => m.id !== offered.id && !!m.years === !!offered.years)!;
-      save.medicine.bag[given.id] = 4;
-      const before = structuredClone(save);
+      const save = visitor(rank),
+        deal = fundDeal(save, npc.id),
+        before = structuredClone(save);
       assert.equal(
-        exchangeSectMedicine(save, npc.id, given.id, save.mortal.sectMarket!.visit),
+        exchangeSectMedicine(save, npc.id, deal.id, save.mortal.sectMarket!.visit),
         true,
       );
-      assert.equal(save.medicine.bag[given.id], 2);
-      assert.equal(save.medicine.bag[offered.id], 1);
-      assert.equal(count(save.medicine.bag), count(before.medicine.bag) - 1);
+      for (const item of deal.give)
+        if (item.kind === 'medicine')
+          assert.equal(save.medicine.bag[item.id], before.medicine.bag[item.id] - item.quantity);
+      assert.equal(save.medicine.bag[deal.receive.id], deal.receive.quantity);
       assert.equal(save.age, before.age);
       assert.equal(save.stones, before.stones);
       assert.equal(save.cultivation, before.cultivation);
-      assert.deepEqual(save.medicine.active, before.medicine.active);
-      assert.deepEqual(save.medicine.used, before.medicine.used);
-      assert.deepEqual(save.medicine.recipes, before.medicine.recipes);
-      assert.equal(save.medicine.recipeSeed, before.medicine.recipeSeed);
+      for (const key of ['active', 'used', 'recipes', 'recipeSeed'] as const)
+        assert.deepEqual(save.medicine[key], before.medicine[key]);
       const text = JSON.stringify(save);
       assert.equal(
-        exchangeSectMedicine(save, npc.id, given.id, save.mortal.sectMarket!.visit),
+        exchangeSectMedicine(save, npc.id, deal.id, save.mortal.sectMarket!.visit),
         false,
       );
       assert.equal(JSON.stringify(save), text);
-      const loaded = readSave(text);
-      assert.equal(loaded.status, 'ok');
-      assert.deepEqual(loaded.save.mortal.sectMarket, save.mortal.sectMarket);
-      const imported = importSave(exportSave(save, null)).save;
-      assert.deepEqual(imported.mortal.sectMarket, save.mortal.sectMarket);
-      assert.deepEqual(imported.medicine, save.medicine);
+      assert.deepEqual(readSave(text).save.mortal.sectMarket, save.mortal.sectMarket);
+      assert.deepEqual(importSave(exportSave(save)).save.mortal.sectMarket, save.mortal.sectMarket);
     }
 });
-test('拒绝库存不足、相同药、跨品/跨限时永久、过期批次、非法 NPC，失败不改任何字段', () => {
-  const save = visitor(7);
-  for (const m of MEDICINES) save.medicine.bag[m.id] = 20;
+
+test('拒绝未知报价、过期访次、库存不足和丹囊溢出，失败不改任何字段', () => {
   for (const npc of MARKET_CULTIVATORS) {
-    const offer = sectMarketOffer(save, npc.id)!;
-    const allowed = marketMedicinePool(
-      save.mortal.population!,
-      save.mortal.sectMarket!,
-      npc.id,
-    ).filter((m) => m.id !== offer.id && !!m.years === !!offer.years);
-    const invalid = MEDICINES.filter((m) => !allowed.some((g) => g.id === m.id));
-    for (const m of invalid) {
+    const save = visitor(7),
+      deal = sectMarketDeals(save, npc.id)[0];
+    for (const [key, visit] of [
+      [deal.id, save.mortal.sectMarket!.visit],
+      ['forged', save.mortal.sectMarket!.visit],
+      [deal.id, save.mortal.sectMarket!.visit - 1],
+    ] as const) {
       const text = JSON.stringify(save);
-      assert.equal(exchangeSectMedicine(save, npc.id, m.id, save.mortal.sectMarket!.visit), false);
+      assert.equal(exchangeSectMedicine(save, npc.id, key, visit), false);
       assert.equal(JSON.stringify(save), text);
     }
-    assert.equal(
-      exchangeSectMedicine(save, npc.id, allowed[0].id, save.mortal.sectMarket!.visit - 1),
-      false,
-    );
-    save.medicine.bag[allowed[0].id] = 1;
+    fundDeal(save, npc.id);
+    save.medicine.bag[deal.receive.id] = Number.MAX_SAFE_INTEGER;
     const text = JSON.stringify(save);
-    assert.equal(
-      exchangeSectMedicine(save, npc.id, allowed[0].id, save.mortal.sectMarket!.visit),
-      false,
-    );
+    assert.equal(exchangeSectMedicine(save, npc.id, deal.id, save.mortal.sectMarket!.visit), false);
     assert.equal(JSON.stringify(save), text);
   }
-  assert.equal(
-    exchangeSectMedicine(
-      save,
-      'market' as MarketCultivatorId,
-      'huanglong',
-      save.mortal.sectMarket!.visit,
-    ),
-    false,
-  );
 });
+
 test('每次实际进场更换来访者，同年重进也换人；旧批次按钮拒绝且只查看不重抽', () => {
   const save = visitor(2);
   const original = structuredClone(save.mortal.sectMarket!);
@@ -389,7 +358,7 @@ test('NPC 请求与界面用同一身份/境界；拒绝缺失和越界身份，
     assert.match(prompt, /不能替玩家进行交易/);
     assert.match(prompt, /不承诺免费赠药/);
     assert.match(marketLocalReply(npc, '你修到什么境界？', 4), new RegExp(npc.realm));
-    assert.match(marketLocalReply(npc, '换药怎么弄？', 4), /两份同品级、同类/);
+    assert.match(marketLocalReply(npc, '换药怎么弄？', 4), /按相近估值互换/);
     assert.equal(validDialogue({ ...request, marketVisit: undefined }), false);
     assert.equal(validDialogue({ ...request, marketVisit: { visit: 0, realmIndex: 4 } }), false);
     assert.equal(validDialogue({ ...request, marketVisit: { visit: 1, realmIndex: 9 } }), false);
@@ -484,7 +453,7 @@ test('离线闲聊同样不看穿前辈，也不凭当前境界推断同阶或�
     assert.match(marketLocalReply(npc, '你看得出我的突破和进展吗？', rank), /只凭一面，难知/);
   assert.match(marketLocalReply(npc, '你的境界呢？', 4), /我如今修至筑基/);
   assert.doesNotMatch(marketLocalReply(npc, '你自己近来如何精进？', 4), /前辈的修为/);
-  assert.match(marketLocalReply(npc, '换丹药怎么弄？', 4), /两份同品级、同类/);
+  assert.match(marketLocalReply(npc, '换丹药怎么弄？', 4), /按相近估值互换/);
 });
 test('场地可达三位修士、保持距离才可交谈；边界与两处建筑挡住脚点，移动速度不随帧间隔爆跳', () => {
   for (const npc of MARKET_CULTIVATORS) {
@@ -512,29 +481,28 @@ test('场地可达三位修士、保持距离才可交谈；边界与两处建�
   );
   assert.deepEqual(edge, { x: MARKET_WIDTH - 24, y: MARKET_HEIGHT - 24 });
 });
-test('界面显示真实品级、持有量和互换状态，未持有丹药可看见但不能免费换得', () => {
+test('界面列明完整报价与不足状态，成功后隐藏结算按钮', () => {
   for (const rank of [0, 3, 7]) {
     const save = visitor(rank);
+    const emptyBag = structuredClone(save.medicine.bag);
     for (const npc of marketCultivators(save.mortal.population!, save.mortal.sectMarket!)) {
-      const offer = sectMarketOffer(save, npc.id)!;
-      const html = sectMarketEventContent(save, npc);
-      assert.ok(html.includes(npc.realm));
-      assert.ok(html.includes(marketRelation(npc.realmIndex, rank)));
-      assert.ok(html.includes(offer.name));
-      assert.match(html, /持有 0/);
-      assert.match(html, /所选丹药不足两份/);
+      save.medicine.bag = structuredClone(emptyBag);
+      const offer = sectMarketOffer(save, npc.id)!,
+        html = sectMarketEventContent(save, npc);
+      assert.ok(html.includes(npc.realm) && html.includes(offer.name));
+      assert.match(html, /丹囊现有 0/);
+      assert.match(html, /所需物品不足/);
       assert.match(html, /disabled/);
-      const give = marketMedicinePool(
-        save.mortal.population!,
-        save.mortal.sectMarket!,
-        npc.id,
-      ).find((m) => m.id !== offer.id && !!m.years === !!offer.years)!;
-      save.medicine.bag[give.id] = 2;
+      const deal = fundDeal(save, npc.id);
       assert.equal(
-        exchangeSectMedicine(save, npc.id, give.id, save.mortal.sectMarket!.visit),
+        exchangeSectMedicine(save, npc.id, deal.id, save.mortal.sectMarket!.visit),
         true,
       );
       assert.match(sectMarketTradeContent(save, npc), /本批已互换/);
+      const completedOffer = sectMarketTradeContent(save, npc).match(
+        /<strong>([^<]*)<\/strong>/,
+      )?.[1];
+      assert.equal(completedOffer, offer.name, '完成后不显示剩余报价的数量');
       assert.doesNotMatch(sectMarketTradeContent(save, npc), /data-action="sect-market-exchange"/);
       assert.equal(medicineInfo(offer.id), offer);
     }

@@ -23,7 +23,6 @@ export const NPC_SETTINGS = {
 export const TOWN_SETTINGS = { sceneryChangeYears: 100 } as const;
 
 export const SECT_MARKET_SETTINGS = {
-  exchangeCost: 2,
   // 炼气至大乘的基础比例：28%、22%、18%、12%、8%、6%、4%、2%；真仙不来坊市。
   realmWeights: [28, 22, 18, 12, 8, 6, 4, 2],
   // 比玩家低三阶及以上的来访者仅保留普通权重的 1/20，后期不会满街低阶丹药。

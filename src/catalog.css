@@ -127,6 +127,30 @@
 .collection-card:hover {
   border-color: #afc49c77;
 }
+.collection-card.is-forged-max {
+  border-color: #d8b76f;
+  background: linear-gradient(130deg, #ad84331a, #0a282930 56%, #d4b1650a);
+  box-shadow:
+    inset 0 0 0 3px #132f2d,
+    inset 0 0 0 4px #b8954945;
+}
+.collection-card.is-forged-max.selected {
+  border-color: #f0d490;
+  box-shadow:
+    inset 0 0 0 3px #132f2d,
+    inset 0 0 0 4px #dfc17b99,
+    0 0 12px #d8b76f16;
+}
+.collection-card.is-forged-max strong,
+.collection-card.is-forged-max .forge-dots,
+.treasure-detail.is-forged-max .detail-copy h3 {
+  color: #efd18b;
+}
+.treasure-detail.is-forged-max .detail-emblem {
+  outline: 1px solid #d8b76f;
+  outline-offset: 5px;
+  box-shadow: 0 0 18px #d8b76f20;
+}
 .collection-card .icon {
   width: 41px;
   height: 48px;

@@ -1,3 +1,4 @@
+import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { catalogPanel } from './catalog-ui.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
@@ -607,7 +608,7 @@ function showMarketEvent(npc: MarketCultivator) {
 function refreshMarketTrade(selected?: string) {
   if (!marketNpc || panel !== 'sect-market-event') return;
   const host = modal.querySelector<HTMLElement>('#sect-market-trade');
-  if (host) host.innerHTML = sectMarketTradeContent(save, marketNpc, selected);
+  if (host) host.innerHTML = sectMarketTradeContent(save, marketNpc, selected, !!pendingRun);
 }
 function refreshMarketActivities() {
   if (!marketNpc || panel !== 'sect-market-event') return;
@@ -1226,6 +1227,7 @@ function shellBindings(): ActionShell {
     get isCultivationPath() { return isCultivationPath; },
     get isHumanStoryId() { return isHumanStoryId; },
     get isImmortalSuccessor() { return isImmortalSuccessor; },
+    get ironMarketContent() { return ironMarketContent; },
     get isMarketCultivatorId() { return isMarketCultivatorId; },
     get journeyCardPanel() { return journeyCardPanel; },
     get journeyCardReturn() { return journeyCardReturn; },
@@ -1509,6 +1511,20 @@ document.addEventListener('change', async (event) => {
       auctionKind = input.value === 'artifact' ? 'artifact' : 'medicine';
     refreshAuction(input.id === 'auction-item' ? input.value : '');
     modal.querySelector<HTMLElement>(`#${input.id}`)?.focus({ preventScroll: true });
+    return;
+  }
+  if (
+    input.id === 'iron-quantity' &&
+    panel === 'town-event' &&
+    townNpc?.id === 'market' &&
+    inTown
+  ) {
+    const scroll = modal.querySelector<HTMLElement>('.panel')?.scrollTop ?? 0;
+    const host = modal.querySelector<HTMLElement>('#iron-market-trade');
+    if (host) host.outerHTML = ironMarketContent(save, Number(input.value));
+    modal.querySelector<HTMLElement>('#iron-quantity')?.focus({ preventScroll: true });
+    const section = modal.querySelector<HTMLElement>('.panel');
+    if (section) section.scrollTop = scroll;
     return;
   }
   if (input.id === 'sect-market-give' && panel === 'sect-market-event' && inMarket) {

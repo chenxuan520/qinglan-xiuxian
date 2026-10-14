@@ -1,3 +1,4 @@
+import { ironMarketContent } from './iron-market-ui.ts';
 import { assetUrl } from './asset-url.ts';
 import {
   passive,
@@ -147,7 +148,7 @@ export function mortalTabContent(
 export function townEventContent(save: SaveData, npc: TownResident) {
   let actions = '';
   if (npc.id === 'market') {
-    actions = `<p>每枚玄铁：买入 30 灵石 · 卖出 12 灵石</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。</p><div class="save-actions"><button class="secondary-button" data-action="mortal-buy" data-cost-stones="30">购入 1 枚玄铁</button><button class="secondary-button" data-action="mortal-sell" ${save.iron < 1 ? 'disabled' : ''}>售出 1 枚玄铁</button></div>`;
+    actions = ironMarketContent(save);
   } else if (npc.id === 'herbs' || npc.id === 'tea' || npc.id === 'escort') {
     const job = TOWN_JOBS[npc.id];
     actions = `<p>${job.desc}</p><p class="panel-note">消耗 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>点击即增加年岁并结算收益，完成后不自动重复。</p>${npc.id === 'herbs' ? '<div class="town-event-actions">' : ''}<button class="primary-button" data-action="mortal-activity" data-id="${npc.id}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '有事项待结算' : npc.id === 'tea' ? '入座听书' : '接下这件事'}</button>${npc.id === 'herbs' ? '<button class="secondary-button" data-action="medicine-shop">药铺 · 看看本批丹药</button></div>' : ''}`;

@@ -1,3 +1,4 @@
+import { ironMarket, ironTradeQuote } from './iron-market.ts';
 import { grantMedicine, MEDICINES, townMedicineReward } from './medicine-data.ts';
 import { FINAL_TRIAL_STAGE, spiritRootInfo, passive, type CultivationPath } from './data.ts';
 import {
@@ -154,10 +155,24 @@ export function resolveActivity(save: SaveData, random = Math.random) {
   advanceMortal(save, activity.remaining * 60, random);
   return save.age > age;
 }
-export function tradeIron(save: SaveData, buy: boolean) {
-  if (!canAct(save) || (buy ? save.stones < 30 : save.iron < 1)) return false;
-  save.stones += buy ? -30 : 12;
-  save.iron += buy ? 1 : -1;
+export function tradeIron(
+  save: SaveData,
+  buy: boolean,
+  quantity = 1,
+  period = ironMarket(save).period,
+) {
+  const quote = ironTradeQuote(save, buy, quantity);
+  if (
+    !canAct(save) ||
+    save.journeyEnded ||
+    save.pendingReincarnation ||
+    quote.period !== period ||
+    quote.reason
+  )
+    return false;
+  save.stones += buy ? -quote.total : quote.total;
+  save.iron += buy ? quantity : -quantity;
+  if (buy) save.mortal.ironMarket = { period: quote.period, bought: quote.bought + quantity };
   return true;
 }
 // 城镇前台计时与主动消耗年岁共用边界结算；不使用墙钟，不补算离线时间。

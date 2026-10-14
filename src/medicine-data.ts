@@ -255,7 +255,7 @@ export const MEDICINES: Medicine[] = [
     name: '补天丹',
     tier: '珍品',
     years: 0,
-    desc: '灵根品质提升一档，新灵根的数量与五行随机生成，不能自选；最高天灵根。',
+    desc: '灵根品质提升一档，保留本命法宝，优先保留本命五行并收束原灵根，不能自选；最高天灵根。',
     stage: 4,
     price: 0,
     craftYears: 0,

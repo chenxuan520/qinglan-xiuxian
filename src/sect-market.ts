@@ -8,12 +8,17 @@ import {
   MARKET_WIDTH,
   MARKET_HEIGHT,
   MARKET_CULTIVATORS,
-  isMarketCultivatorId,
   isMarketTraderId,
   marketMedicinePool,
   type MarketCultivatorId,
 } from './sect-market-data.ts';
-import { SECT_MARKET_SETTINGS } from './setting.ts';
+import {
+  marketExchangeDeals,
+  exchangeGiveText,
+  exchangeItemText,
+  exchangeOwned,
+} from './market-exchange.ts';
+import { releaseAuctionItem } from './auction-items.ts';
 
 export function sectMarketOpen(save: SaveData) {
   return save.cultivation > 0 && !save.journeyEnded && !save.pendingReincarnation;
@@ -58,48 +63,52 @@ export function sectMarketOffer(save: SaveData, id: MarketCultivatorId) {
   const seed = (save.medicine.recipeSeed ^ Math.imul(state.visit, 2654435761)) >>> 0;
   return pool[(seed + index) % pool.length];
 }
+export function sectMarketDeals(save: SaveData, id: MarketCultivatorId) {
+  const receive = sectMarketOffer(save, id);
+  return receive ? marketExchangeDeals(save, id, receive) : [];
+}
 export function sectMarketExchangeReason(
   save: SaveData,
   id: MarketCultivatorId,
-  giveId: string,
+  dealId: string,
   visit: number,
+  unfinished = false,
 ) {
   const state = save.mortal.sectMarket;
-  if (!sectMarketOpen(save) || !state || !isMarketCultivatorId(id)) return '暂时无法互换';
+  if (!sectMarketOpen(save) || !state || !isMarketTraderId(id)) return '暂时无法互换';
   if (lifespanInfo(save).remaining <= 0 || tribulationDue(save) || sectDuesPending(save))
     return '请先处理寿元、天劫或供奉';
   if (state.visit !== visit) return '来访修士已更换，请重新交谈';
   if (state.exchanged.includes(id)) return '本批已互换';
-  const received = sectMarketOffer(save, id);
+  const deal = sectMarketDeals(save, id).find((d) => d.id === dealId);
+  if (!deal) return '报价已变化，请重新选择';
   if (
-    !received ||
-    received.id === giveId ||
-    !marketMedicinePool(save.mortal.population!, state, id).some(
-      (m) => m.id === giveId && !!m.years === !!received.years,
-    )
+    deal.give.some((i) => i.kind === 'artifact') &&
+    (unfinished || save.tribulationReturn != null)
   )
-    return '请选同品级、同类的另一种丹药';
-  if ((save.medicine.bag[giveId] || 0) < SECT_MARKET_SETTINGS.exchangeCost)
-    return '所选丹药不足两份';
-  if (!Number.isSafeInteger((save.medicine.bag[received.id] || 0) + 1)) return '丹囊数量已达上限';
+    return '请先结束未完成的历练，再交换法宝';
+  if (deal.give.some((i) => i.kind === 'artifact' && i.id === save.starter))
+    return '当前本命不可交换';
+  if (!exchangeOwned(save, deal)) return '所需物品不足，请选择其他报价';
+  if (!Number.isSafeInteger((save.medicine.bag[deal.receive.id] || 0) + deal.receive.quantity))
+    return '丹囊数量已达上限';
   return '';
 }
-// 调用者在独立存档副本上互换，成功保存后才应用；对话或 AI 不调用此函数。
+// 在独立存档副本上结算，成功写入后再应用；对话不能扣物资。
 export function exchangeSectMedicine(
   save: SaveData,
   id: MarketCultivatorId,
-  giveId: string,
+  dealId: string,
   visit: number,
+  unfinished = false,
 ) {
-  if (sectMarketExchangeReason(save, id, giveId, visit)) return false;
-  const received = sectMarketOffer(save, id)!;
-  const given = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id).find(
-    (m) => m.id === giveId,
-  )!;
-  save.medicine.bag[giveId] -= SECT_MARKET_SETTINGS.exchangeCost;
-  save.medicine.bag[received.id] = (save.medicine.bag[received.id] || 0) + 1;
+  if (sectMarketExchangeReason(save, id, dealId, visit, unfinished)) return false;
+  const deal = sectMarketDeals(save, id).find((d) => d.id === dealId)!;
+  for (const item of deal.give) releaseAuctionItem(save, item);
+  save.medicine.bag[deal.receive.id] =
+    (save.medicine.bag[deal.receive.id] || 0) + deal.receive.quantity;
   save.mortal.sectMarket!.exchanged.push(id);
-  const text = `宗门坊市：以${given.name}两份换得${received.name}一份，已收入丹囊。`;
+  const text = `宗门坊市：以${exchangeGiveText(deal)}换得${exchangeItemText(deal.receive)}，已收入丹囊。`;
   save.mortal.events.unshift(`${save.age.toFixed(1)} 岁 · ${text}`);
   save.mortal.events.splice(6);
   recordChronicle(save, '同道互通', text);

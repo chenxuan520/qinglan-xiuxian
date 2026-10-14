@@ -4,7 +4,6 @@ import { hazardDistance, regionalExposure, regionalHazard } from './regional-haz
 
 const favored = [
   'sword',
-  'orbit',
   'lightning',
   'pulse',
   'fire',
@@ -20,7 +19,17 @@ function choiceScore(c: Choice, g: Game) {
   if (c.type === 'evolve') return 100;
   if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
   if (c.type === 'weapon')
-    return (favored.includes(c.id) ? 15 : 10) + (c.level > 1 ? 8 : 2) + c.level;
+    return (
+      (c.id === 'orbit'
+        ? g.save.starter === 'orbit' || c.level > 1
+          ? 15
+          : 14.5
+        : favored.includes(c.id)
+          ? 15
+          : 10) +
+      (c.level > 1 ? 8 : 2) +
+      c.level
+    );
   // 六重法宝优先从领悟起补满配套功法；实际觉醒仍是最高优先级。
   if (
     c.level >= 1 &&

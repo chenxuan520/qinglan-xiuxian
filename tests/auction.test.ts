@@ -38,7 +38,7 @@ function fixture(seed = 12345) {
   prepareAuction(save);
   return save;
 }
-test('坊市药价按品级及价值分档，药铺凡品价格不变，同品同类二换一不能求购套利', () => {
+test('坊市药价按品级及价值分档，药铺凡品价格不变', () => {
   for (const m of MEDICINES) {
     const value = medicineMarketValue(m.id);
     assert.ok(value > 0, `${m.name} 必须有估值`);
@@ -51,9 +51,6 @@ test('坊市药价按品级及价值分档，药铺凡品价格不变，同品�
     else if (m.id === 'lingru') assert.equal(value, 3000);
     else if (m.years) assert.ok(value >= 1200 && value <= 2000);
     else assert.ok(value >= 4000);
-    for (const other of MEDICINES.filter((n) => n.tier === m.tier && !!n.years === !!m.years)) {
-      assert.ok(value * 2 * 1.05 > medicineMarketValue(other.id) * 0.95);
-    }
   }
   assert.ok(medicineMarketValue('butian') > medicineMarketValue('jiuqu'));
   assert.equal(medicineMarketValue('unknown'), 0);
@@ -213,7 +210,7 @@ test('免费赠品出售后读档、改道、换根均不补副本；必要本�
   for (const id of Object.values(ROOT_STARTERS).flat())
     assert.equal(auctionValue({ kind: 'artifact', id, quantity: 1, forgeLevel: 0 }), 0);
 });
-test('购买后转卖总是亏损，二换一不能把低价同类丹转换为套利', () => {
+test('拍卖购买后立即转卖不会获利', () => {
   for (let seed = 1; seed <= 100; seed++) {
     for (let index = 0; index < 4; index++) {
       const save = fixture(seed);
@@ -225,10 +222,6 @@ test('购买后转卖总是亏损，二换一不能把低价同类丹转换为�
       if (sold?.outcome === 'sold') assert.ok(sold.price - sold.fee < bought.price + bought.fee);
     }
   }
-  const permanent = MEDICINES.filter((m) => !m.years).map((m) =>
-    auctionValue({ kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 }),
-  );
-  assert.ok(Math.max(...permanent) * 0.8 * 0.9 < Math.min(...permanent) * 2 * 1.05);
 });
 test('历史有界，导出导入保留交易与可续局快照；损坏拍卖仅正常读档丢弃字段、导入拒绝', () => {
   const save = fixture();

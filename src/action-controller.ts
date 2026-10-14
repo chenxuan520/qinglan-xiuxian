@@ -72,6 +72,7 @@ export interface ActionShell {
   readonly isCultivationPath: any;
   readonly isHumanStoryId: any;
   readonly isImmortalSuccessor: any;
+  readonly ironMarketContent: any;
   readonly isMarketCultivatorId: any;
   readonly journeyCardPanel: any;
   readonly journeyCardReturn: any;
@@ -756,14 +757,19 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.modal.querySelector<HTMLButtonElement>('[data-action="sect-market-exchange"]')
           ?.dataset.visit,
       );
-      const reason = shell.sectMarketExchangeReason(shell.save, id, give, visit);
+      const reason = shell.sectMarketExchangeReason(
+        shell.save,
+        id,
+        give,
+        visit,
+        !!shell.pendingRun,
+      );
       if (reason) {
         shell.toast(reason);
         return;
       }
       const next = shell.structuredClone(shell.save);
-      const received = shell.sectMarketOffer(next, id)!;
-      if (!shell.exchangeSectMedicine(next, id, give, visit)) return;
+      if (!shell.exchangeSectMedicine(next, id, give, visit, !!shell.pendingRun)) return;
       try {
         shell.writeSave(next, shell.pendingRun);
       } catch {
@@ -774,7 +780,9 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.refreshMarketTrade();
       const status = shell.document.getElementById('town-status');
       if (status) status.innerHTML = shell.townStatus(shell.save);
-      shell.toast(`${received.name} ×1 已收入丹囊`);
+      shell.toast(
+        next.mortal.events[0]?.split(' · ').slice(1).join(' · ') || '互换完成，丹药已收入丹囊',
+      );
     }
     return;
   }
@@ -853,6 +861,40 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     } else if (action === 'town-talk') shell.townScene?.talk();
     return;
   }
+  if (
+    (action === 'mortal-buy' || action === 'mortal-sell') &&
+    shell.inTown &&
+    shell.inMortalWorld &&
+    !shell.game &&
+    shell.panel === 'town-event' &&
+    shell.townNpc?.id === 'market' &&
+    shell.townScene?.nearbyNpc?.id === 'market'
+  ) {
+    const next = shell.structuredClone(shell.save);
+    if (!shell.executeMortalAction(next, action, id, shell.pendingRun?.path)) {
+      shell.toast('交易未完成，请检查数量、额度、灵石及当前行情');
+      return;
+    }
+    try {
+      shell.writeSave(next, shell.pendingRun);
+    } catch {
+      if (!shell.saveLock) shell.toast('交易未完成：浏览器暂时无法保存，请重试');
+      return;
+    }
+    Object.assign(shell.save, next);
+    const host = shell.modal.querySelector<HTMLElement>('#iron-market-trade');
+    if (host) host.outerHTML = shell.ironMarketContent(shell.save, Number(id?.split(':')[1]));
+    const status = shell.modal.querySelector<HTMLElement>('#iron-trade-status');
+    if (status)
+      status.textContent =
+        action === 'mortal-buy'
+          ? '玄铁已收入行囊，灵石与本期额度已扣除。'
+          : '玄铁已售出，灵石已到账。';
+    const town = shell.document.getElementById('town-status');
+    if (town) town.innerHTML = shell.townStatus(shell.save);
+    return;
+  }
+  if (action === 'mortal-buy' || action === 'mortal-sell') return;
   if (
     action.startsWith('mortal-') &&
     shell.inMortalWorld &&

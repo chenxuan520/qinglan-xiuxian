@@ -1,8 +1,7 @@
-import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES, treasure } from './data.ts';
-import { medicineInfo, medicineMarketValue } from './medicine-data.ts';
+import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { medicineInfo } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import {
-  forgeCost,
   lifespanInfo,
   tribulationDue,
   recordCollectionAchievement,
@@ -18,6 +17,8 @@ import {
   type AuctionReceipt,
 } from './auction-data.ts';
 
+export { auctionValue, auctionItemName, releaseAuctionItem } from './auction-items.ts';
+import { auctionValue, auctionItemName, releaseAuctionItem } from './auction-items.ts';
 import { AUCTION_SETTINGS } from './setting.ts';
 
 export function prepareAuction(save: SaveData) {
@@ -37,21 +38,6 @@ function roll(save: SaveData, key: string) {
   hash = Math.imul(hash ^ (hash >>> 16), 0x7feb352d);
   hash = Math.imul(hash ^ (hash >>> 15), 0x846ca68b);
   return (hash ^ (hash >>> 16)) >>> 0;
-}
-export function auctionValue(item: AuctionItem) {
-  if (item.kind === 'medicine') {
-    return medicineMarketValue(item.id) * item.quantity;
-  }
-  if (!TREASURES.some((t) => t.id === item.id)) return 0;
-  let value = freeStarter(item.id) ? 0 : 180;
-  for (let level = 0; level < item.forgeLevel; level++) {
-    const cost = forgeCost(level);
-    value += cost.stones + cost.iron * 12;
-  }
-  return value;
-}
-export function auctionItemName(item: AuctionItem) {
-  return item.kind === 'medicine' ? medicineInfo(item.id)!.name : treasure(item.id).name;
 }
 export function auctionLots(
   save: SaveData,
@@ -287,16 +273,6 @@ export function auctionSellReason(
   } else return '拍品不存在';
   if (auctionValue(item) <= 0) return '入门赠品未炼器，无人出价';
   return '';
-}
-export function releaseAuctionItem(save: SaveData, item: AuctionItem) {
-  if (item.kind === 'medicine') save.medicine.bag[item.id] -= item.quantity;
-  else {
-    save.artifacts = save.artifacts.filter((id) => id !== item.id);
-    save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);
-    save.forge[item.id] = 0;
-    if (freeStarter(item.id) && !save.mortal.auction!.releasedArtifacts.includes(item.id))
-      save.mortal.auction!.releasedArtifacts.push(item.id);
-  }
 }
 export function sellAuction(
   save: SaveData,

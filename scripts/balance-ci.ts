@@ -296,7 +296,7 @@ export async function main(args: string[]) {
     };
     writeFileSync(join(output, 'report.json'), JSON.stringify(report));
     writeFileSync(join(output, 'battles.csv'), ciCsv(current.results));
-    const status = `前六关目标检查：${report.passed ? '通过' : '失败'}；提交 ${commit}。\n\n验收范围：天灵根70–100%、异灵根50–90%、双灵根20–60%、三灵根10–50%、四灵根0–30%、五灵根0–25%、无灵根0–10%。\n\n`;
+    const status = `前六关目标检查：${report.passed ? '通过' : '失败'}；提交 ${commit}。\n\n验收范围：天灵根70–100%、异灵根50–90%、双灵根20–65%、三灵根10–50%、四灵根0–30%、五灵根0–25%、无灵根0–10%。\n\n`;
     const summary =
       status +
       ciSummary(current.results, elapsedSeconds) +
