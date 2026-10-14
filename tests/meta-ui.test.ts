@@ -10,7 +10,15 @@ import { autoplayButton, choiceCard, controls } from '../src/common-ui.ts';
 import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
 
-const source = ['main.ts', 'battle-hud.ts', 'catalog-ui.ts', 'cultivation-ui.ts', 'bestiary-ui.ts']
+const source = [
+  'main.ts',
+  'battle-hud.ts',
+  'catalog-ui.ts',
+  'cultivation-ui.ts',
+  'bestiary-ui.ts',
+  'opening-ui.ts',
+  'lobby-ui.ts',
+]
   .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
   .join('\n');
 const styleEntry = readFileSync(new URL('../src/styles.ts', import.meta.url), 'utf8');
@@ -72,7 +80,11 @@ test('关于面板与离界传承确认放置微信赞赏码，终章正文不�
       source.slice(source.indexOf('function renderEpilogue()')).indexOf('\nfunction '),
   );
   assert.doesNotMatch(epilogue, /SUPPORT_CODE_IMAGE|请作者喝杯茶/);
-  const confirmation = source.match(/'临行留缘',[^]*?\n      \);/)![0];
+  const confirmationStart = source.indexOf("'临行留缘'");
+  const confirmation = source.slice(
+    confirmationStart,
+    source.indexOf('export function immortalGatePanel'),
+  );
   assert.match(
     confirmation,
     /<figure class="reincarnate-support"><img src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}"/,

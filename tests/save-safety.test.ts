@@ -10,6 +10,7 @@ import {
   importSave,
   UNREADABLE_SAVE_PREFIX,
 } from '../src/save-transfer.ts';
+import { saveLockPanel } from '../src/lobby-ui.ts';
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 
@@ -141,6 +142,7 @@ function harness(options: {
     downloadJson: (text: string) => context.downloads.push(text),
     prologues: 0,
     renderPrologue: () => context.prologues++,
+    saveLockPanel,
   });
   flow.runInContext(context);
   return { context, storage, writes };

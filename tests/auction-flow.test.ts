@@ -16,6 +16,7 @@ import {
 } from '../src/auction.ts';
 import { auctionContent, auctionResult } from '../src/auction-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
+import { executeAuctionTrade } from '../src/town-host.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = new Script(
@@ -117,6 +118,7 @@ function harness(pending = false) {
     auctionContent,
     auctionResult,
     townStatus,
+    executeAuctionTrade,
     clearInput: () => {},
     renderSaveLock: () => {},
     toast: (s: string) => messages.push(s),
