@@ -10,7 +10,17 @@ import { autoplayButton, choiceCard, controls } from '../src/common-ui.ts';
 import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
 
-const source = ['main.ts', 'battle-hud.ts', 'catalog-ui.ts', 'cultivation-ui.ts', 'bestiary-ui.ts']
+const source = [
+  'main.ts',
+  'action-controller.ts',
+  'scene-flow.ts',
+  'battle-hud.ts',
+  'catalog-ui.ts',
+  'cultivation-ui.ts',
+  'bestiary-ui.ts',
+  'opening-ui.ts',
+  'lobby-ui.ts',
+]
   .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
   .join('\n');
 const styleEntry = readFileSync(new URL('../src/styles.ts', import.meta.url), 'utf8');
@@ -50,11 +60,11 @@ test('境界展示直接给出气血与本命伤害，指南示例与实际入�
 test('首页底部以轻量关于入口替代自动保存提示', () => {
   assert.match(source, /data-action="about">\$\{storageAvailable \? '关于《叩仙门》 · GitHub'/);
   assert.doesNotMatch(source, /修行进度自动保存于本机/);
-  assert.match(source, /if \(action === 'about' && !game\)/);
+  assert.match(source, /if \(action === 'about' && !shell\.game\)/);
   assert.match(source, /程序员 chenxuan，和一堆 AI 工具/);
   assert.match(source, /https:\/\/github\.com\/chenxuan520\/qinglan-xiuxian\/issues/);
   assert.equal(GAME_SITE_URL, 'https://xiuxian.011203.xyz/');
-  assert.match(source, /href="\$\{GAME_SITE_URL\}"/);
+  assert.match(source, /href="\$\{shell\.GAME_SITE_URL\}"/);
   assert.match(source, /querySelector<HTMLButtonElement>\('\[data-action="about"\]'\)\?\.focus/);
 });
 
@@ -62,17 +72,22 @@ test('关于面板与离界传承确认放置微信赞赏码，终章正文不�
   assert.equal(SUPPORT_CODE_IMAGE, '/assets/support-wechat.webp');
   assert.ok(existsSync(new URL(`../public${SUPPORT_CODE_IMAGE}`, import.meta.url)));
   const support = source.match(/<div class="about-support">[^]*?<\/div><\/div>/)![0];
-  assert.match(support, /src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}" alt="微信赞赏码"/);
+  assert.match(
+    support,
+    /src="\$\{shell\.assetUrl\(shell\.SUPPORT_CODE_IMAGE\)\}" alt="微信赞赏码"/,
+  );
   assert.match(support, /请道友喝杯茶/);
   assert.match(support, /茶钱不换道具，也不换修为/);
   assert.match(support, /先截图，再在「扫一扫」里从相册选取/);
-  const epilogue = source.slice(
-    source.indexOf('function renderEpilogue()'),
-    source.indexOf('function renderEpilogue()') +
-      source.slice(source.indexOf('function renderEpilogue()')).indexOf('\nfunction '),
-  );
+  const epilogueStart = source.indexOf('export function renderEpilogue');
+  const epilogueRest = source.slice(epilogueStart);
+  const epilogue = epilogueRest.slice(0, epilogueRest.indexOf('\nexport function ', 1));
   assert.doesNotMatch(epilogue, /SUPPORT_CODE_IMAGE|请作者喝杯茶/);
-  const confirmation = source.match(/'临行留缘',[^]*?\n      \);/)![0];
+  const confirmationStart = source.indexOf("'临行留缘'");
+  const confirmation = source.slice(
+    confirmationStart,
+    source.indexOf('export function immortalGatePanel'),
+  );
   assert.match(
     confirmation,
     /<figure class="reincarnate-support"><img src="\$\{assetUrl\(SUPPORT_CODE_IMAGE\)\}"/,

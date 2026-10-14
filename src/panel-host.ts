@@ -87,3 +87,4 @@ export interface PanelDefinition {
   body: string;
   wide?: boolean;
 }
+export type PanelParts = [string, string, string, boolean?];

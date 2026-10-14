@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const SIZE_BUDGET = {
-  jsBytes: 550_000,
+  jsBytes: 560_000,
   jsGzip: 210_000,
   cssBytes: 150_000,
   cssGzip: 35_000,

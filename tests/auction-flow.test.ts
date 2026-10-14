@@ -16,11 +16,13 @@ import {
 } from '../src/auction.ts';
 import { auctionContent, auctionResult } from '../src/auction-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
+import { executeAuctionTrade } from '../src/town-host.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = new Script(
   stripTypeScriptTypes(
-    ['handleAction', 'writeSave', 'lockStaleSave', 'refreshAuction']
+    ['shellBindings', 'handleAction', 'writeSave', 'lockStaleSave', 'refreshAuction']
       .map((name) => {
         const match = main.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match);
@@ -90,6 +92,7 @@ function harness(pending = false) {
     },
   };
   const context = createContext({
+    dispatchAction,
     save,
     SAVE_KEY,
     lifespanInfo,
@@ -117,6 +120,7 @@ function harness(pending = false) {
     auctionContent,
     auctionResult,
     townStatus,
+    executeAuctionTrade,
     clearInput: () => {},
     renderSaveLock: () => {},
     toast: (s: string) => messages.push(s),

@@ -14,12 +14,13 @@ import {
   chooseMarketFellow,
 } from '../src/market-fellow.ts';
 import { Game } from '../src/game.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 
 // 执行实际主界面路由及写档函数，仅替换浏览器叶节点；不复制交谈的保存逻辑。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const script = new Script(
   stripTypeScriptTypes(
-    ['handleAction', 'showMarketEvent', 'writeSave', 'lockStaleSave']
+    ['shellBindings', 'handleAction', 'showMarketEvent', 'writeSave', 'lockStaleSave']
       .map((name) => {
         const match = source.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match, name);
@@ -60,6 +61,7 @@ function harness(phase: 'first' | 'reunion' | 'choice' | 'read' = 'first', pendi
     locks = 0;
   const logs: string[] = [];
   const context = createContext({
+    dispatchAction,
     save,
     SAVE_KEY,
     structuredClone,

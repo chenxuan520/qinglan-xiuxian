@@ -13,6 +13,10 @@ import { startActivity, resolveActivity, sectDuesPending, settleSectDues } from 
 import { TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { AD_SECONDS } from '../src/ads.ts';
 import { MedicinePanel } from '../src/medicine-panel.ts';
+import { executeMortalAction, teaStoryPanel } from '../src/town-host.ts';
+import { dispatchAction } from '../src/action-controller.ts';
+import { lifespanEndPanel, tribulationPendingPanel } from '../src/opening-ui.ts';
+import { sectDuesModal } from '../src/lobby-ui.ts';
 
 // 不启动 main 的页面初始化；路由、结算、重试 onclick 和关闭清理均执行源码。
 const flow = new Script(
@@ -22,6 +26,7 @@ const flow = new Script(
         'main',
         [
           'showTeaStory',
+          'shellBindings',
           'handleAction',
           'syncMortalChange',
           'persist',
@@ -109,6 +114,7 @@ function harness(t: TestContext) {
   const writes: string[] = [];
   const messages: string[] = [];
   const context = createContext({
+    dispatchAction,
     save,
     modal,
     writes,
@@ -130,6 +136,11 @@ function harness(t: TestContext) {
     SAVE_KEY,
     AD_SECONDS,
     TEA_STORY_SETTINGS,
+    executeMortalAction,
+    teaStoryPanel,
+    lifespanEndPanel,
+    tribulationPendingPanel,
+    sectDuesModal,
     AbortController,
     game: null,
     pendingRun: null,
