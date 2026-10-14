@@ -23,12 +23,14 @@ import {
 import { marketSocialContent } from '../src/market-social-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
 import { executeMarketSocial, marketAmbushRecoveryPanel } from '../src/town-host.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 import { Game } from '../src/game.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const script = new Script(
   stripTypeScriptTypes(
     [
+      'shellBindings',
       'handleAction',
       'writeSave',
       'lockStaleSave',
@@ -102,6 +104,7 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     },
   };
   const context = createContext({
+    dispatchAction,
     homeTownEntrance,
     save,
     SAVE_KEY,

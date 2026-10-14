@@ -21,12 +21,13 @@ import {
 import { sectMarketTradeContent } from '../src/sect-market-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 
 // 使用真实按钮模板、主路由与写档防护，仅替换 DOM 叶节点和浏览器存储。
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = new Script(
   stripTypeScriptTypes(
-    ['handleAction', 'writeSave', 'lockStaleSave', 'refreshMarketTrade']
+    ['shellBindings', 'handleAction', 'writeSave', 'lockStaleSave', 'refreshMarketTrade']
       .map((name) => {
         const match = main.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match, `missing actual ${name}`);
@@ -84,6 +85,7 @@ function harness(pending = false) {
     },
   };
   const context = createContext({
+    dispatchAction,
     save,
     SAVE_KEY,
     modal,

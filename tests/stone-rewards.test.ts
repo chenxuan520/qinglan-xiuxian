@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { adSupplies, FINAL_TRIAL_STAGE, MAX_REVIVES, STAGES } from '../src/data.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 import {
   freshSave,
   parseSave,
@@ -29,9 +30,17 @@ test('广告灵石按最高解锁秘境递增，重游前关与刷新不降低�
 });
 
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-const action = source.match(/^function handleAction\([^]*?^\}/m);
-assert.ok(action);
-const flow = new Script(stripTypeScriptTypes(action[0]));
+const flow = new Script(
+  stripTypeScriptTypes(
+    ['shellBindings', 'handleAction']
+      .map((name) => {
+        const match = source.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
+        assert.ok(match, name);
+        return match[0];
+      })
+      .join('\n'),
+  ),
+);
 
 test('实际领取入口须广告结束，分档提示与到账一致，重复点击不再次发奖', () => {
   for (const unlocked of [0, 3, 6]) {
@@ -41,6 +50,7 @@ test('实际领取入口须广告结束，分档提示与到账一致，重复�
     save.hometownSeen = true;
     if (save.mortal.hometown) save.mortal.hometown.stage = 'departed';
     const context = createContext({
+      dispatchAction,
       save,
       saveLock: null,
       panel: 'reward-ad',

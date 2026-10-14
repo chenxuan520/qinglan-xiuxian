@@ -51,6 +51,8 @@ import {
   teaStoryPanel,
 } from './town-host.ts';
 import { computeManualInput, trapModalTab } from './input-controller.ts';
+import { dispatchAction, type ActionShell } from './action-controller.ts';
+import * as sceneFlow from './scene-flow.ts';
 
 import './styles.ts';
 import './battle-hud.css';
@@ -486,26 +488,7 @@ function renderLobby(returnYears?: number) {
 }
 
 function renderEpilogue() {
-  leaveTown();
-  inMortalWorld = false;
-  game = pendingRun = null;
-  clearInput();
-  void mobileDisplay.leave();
-  document.body.classList.remove('in-game', 'in-mortal', 'journey-complete', 'immortal-home');
-  ui.innerHTML = '';
-  ui.inert = true;
-  panel = 'epilogue';
-  modal.innerHTML = epilogueModal(save);
-  updateStorySoundButton(
-    modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
-    save.sound,
-  );
-  const scene = modal.querySelector<HTMLElement>('.epilogue-scene')!;
-  scene.style.setProperty(
-    '--prologue-image',
-    `url("${assetUrl('/assets/qinglan-prologue.webp')}")`,
-  );
-  scene.focus({ preventScroll: true });
+  return sceneFlow.renderEpilogue(shellBindings());
 }
 function renderPrologue(replay = false) {
   if (save.journeyEnded) return;
@@ -523,72 +506,13 @@ function renderPrologue(replay = false) {
   modal.querySelector<HTMLElement>('.prologue-scene')?.focus({ preventScroll: true });
 }
 function releaseTownScene() {
-  if (marketScene) {
-    marketPosition = { ...marketScene.position };
-    marketScene.destroy();
-    marketScene = null;
-  }
-  if (!townScene) return;
-  townPosition = { ...townScene.position };
-  townScene.destroy();
-  townScene = null;
+  return sceneFlow.releaseTownScene(shellBindings());
 }
 function leaveTown() {
-  closeNpcChat();
-  releaseTownScene();
-  if (inTown || inMarket) void mobileDisplay.leave();
-  document.body.classList.remove('in-town');
-  inTown = false;
-  inMarket = false;
-  marketNpc = null;
-  lastMortalTick = performance.now();
+  return sceneFlow.leaveTown(shellBindings());
 }
 function mountTownScene() {
-  if (inMarket) {
-    const marketHost = document.getElementById('sect-market-view');
-    if (marketHost)
-      marketScene = new SectMarketScene(
-        marketHost,
-        { ...marketPosition },
-        save,
-        showMarketEvent,
-        showAuction,
-      );
-    return;
-  }
-  const host = document.getElementById('town-view');
-  if (!inTown || !host) return;
-  if (!save.mortal.population) {
-    save.mortal.population = freshTownPopulation(save.age);
-    persist();
-  }
-  townScene = new TownScene(
-    host,
-    { ...townPosition },
-    save.mortal.population,
-    save.age,
-    showTownEvent,
-    () => save.path,
-    save.mortal.scenery,
-    save.mortal.hometown
-      ? {
-          state: save.mortal.hometown,
-          interact: (target) => (target === 'dock' ? finishDeparture() : showHometown()),
-          ready: () => {
-            if (panel !== 'hometown-loading') return;
-            if (save.mortal.hometown?.stage === 'farewell') {
-              panel = 'hometown-farewell';
-              ui.inert = true;
-              modal.innerHTML = hometownFarewellModal();
-              modal.querySelector<HTMLButtonElement>('button')?.focus();
-            } else {
-              panel = '';
-              document.getElementById('town-view')?.focus({ preventScroll: true });
-            }
-          },
-        }
-      : undefined,
-  );
+  return sceneFlow.mountTownScene(shellBindings());
 }
 function resumeHometown() {
   const home = save.mortal.hometown;
@@ -626,23 +550,7 @@ function resumeHometown() {
   return true;
 }
 function renderDeparture() {
-  closeNpcChat();
-  // 同一段离乡行程的素材重试只重建场景，保留玩家当前的全屏状态。
-  releaseTownScene();
-  inMarket = false;
-  inMortalWorld = inTown = true;
-  townPosition = { ...HOMETOWN_START };
-  save.mortal.population ??= freshTownPopulation(15);
-  save.mortal.scenery ??= townVisit(undefined, 15);
-  persist();
-  panel = 'hometown-loading';
-  modal.innerHTML = '';
-  ui.inert = false;
-  clearInput();
-  document.body.classList.remove('in-game', 'journey-complete', 'immortal-home');
-  document.body.classList.add('in-mortal', 'in-town');
-  ui.innerHTML = townPage(save, fullscreenButton(mobileDisplay.available, mobileDisplay.active));
-  mountTownScene();
+  return sceneFlow.renderDeparture(shellBindings());
 }
 function finishDeparture(skipOpening = false) {
   const next = structuredClone(save);
@@ -662,55 +570,10 @@ function finishDeparture(skipOpening = false) {
   if (!isImmortalSuccessor(save)) toast('十五岁，离乡问道。', 1800);
 }
 function showHometown(parent?: ParentId) {
-  const home = save.mortal.hometown;
-  if (
-    !home ||
-    home.stage !== 'departed' ||
-    !inTown ||
-    !townScene ||
-    Math.hypot(townScene.position.x - HOMETOWN_START.x, townScene.position.y - HOMETOWN_START.y) >
-      160
-  )
-    return;
-  const parents = hometownParents(home, save.age);
-  if (parent && !parents.some((p) => p.id === parent && p.alive)) return;
-  closeNpcChat();
-  const content = hometownContent(save, parent);
-  if ((parent || parents.every((p) => !p.alive)) && visitHometown(save, parent)) persist();
-  panel = 'hometown-home';
-  panelFrame(
-    parent ? parents.find((p) => p.id === parent)!.name : '故居',
-    '青岚镇 · 门前旧路',
-    content,
-  );
-  if (parent)
-    mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, {
-      id: parent,
-      name: parents.find((p) => p.id === parent)!.name,
-      generation: 0,
-    });
+  return sceneFlow.showHometown(shellBindings(), parent);
 }
 function showTownEvent(npc: TownResident) {
-  if (!inTown || townScene?.nearbyNpc?.id !== npc.id) return;
-  townNpc = npc;
-  panel = 'town-event';
-  const visitor = save.mortal.immortal;
-  if (visitor?.npcId === npc.id && !save.journeyEnded) {
-    closeNpcChat();
-    const granted = meetTownImmortal(save, npc.id, npc.name);
-    if (granted) persist();
-
-    panelFrame(...immortalEncounterPanel(save, npc, granted));
-    return;
-  }
-  const storyId = Object.keys(HUMAN_STORIES).find(
-    (id) => isHumanStoryId(id) && HUMAN_STORIES[id].npcId === npc.id,
-  );
-  const changed = syncHumanStories(save);
-  const read = storyId && isHumanStoryId(storyId) && chooseHumanStory(save, storyId, 'read');
-  if (changed || read) persist();
-  panelFrame(npc.name, `${npc.place} · ${npc.role}`, townEventContent(save, npc));
-  mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
+  return sceneFlow.showTownEvent(shellBindings(), npc);
 }
 function showMarketEvent(npc: MarketCultivator) {
   if (!inMarket || marketScene?.nearbyNpc?.id !== npc.id) return;
@@ -759,22 +622,7 @@ function refreshMarketActivities() {
   if (section) section.scrollTop = scroll;
 }
 function showMarketAmbush() {
-  const a = save.mortal.marketSocial?.ambush;
-  if (!a) return;
-  closeNpcChat();
-  panel = 'market-ambush';
-  const ambush = marketAmbushPanel(a.held);
-  panelFrame(...ambush);
-  const npc = marketCultivators(save.mortal.population!, save.mortal.sectMarket!).find(
-    (n) => n.id === a.npcId,
-  )!;
-  ambushScene?.destroy();
-  ambushScene = new MarketAmbushScene(
-    modal.querySelector<HTMLElement>('#market-ambush')!,
-    save,
-    npc,
-    finishMarketAmbush,
-  );
+  return sceneFlow.showMarketAmbush(shellBindings());
 }
 function finishMarketAmbush(outcome: AmbushOutcome) {
   ambushScene?.lockOutcome(outcome);
@@ -809,25 +657,7 @@ function finishMarketAmbush(outcome: AmbushOutcome) {
   toast(result.text);
 }
 function showAuction() {
-  if (!inMarket || !marketScene?.nearAuction) return;
-  const next = structuredClone(save);
-  if (!prepareAuction(next)) return;
-  try {
-    writeSave(next, pendingRun);
-  } catch {
-    if (!saveLock) toast('暂时无法保存拍卖进度，请重试');
-    return;
-  }
-  Object.assign(save, next);
-  marketNpc = null;
-  panel = 'sect-auction';
-  auctionView = 'buy';
-  auctionKind = 'medicine';
-  panelFrame(
-    '坊间竞宝',
-    '宗门坊市 · 拍卖行',
-    `<div id="auction-content">${auctionContent(save, auctionView, !!pendingRun)}</div>`,
-  );
+  return sceneFlow.showAuction(shellBindings());
 }
 function refreshAuction(selected = '') {
   const host = modal.querySelector<HTMLElement>('#auction-content');
@@ -941,20 +771,16 @@ function tickMortal(now: number) {
 }
 
 function showPanel(name: string) {
-  panel = name;
-  renderPanel();
+  return sceneFlow.showPanel(shellBindings(), name);
 }
 function rememberPanel(): PanelLocation {
-  return panelHost.remember(panel);
+  return sceneFlow.rememberPanel(shellBindings());
 }
 function restorePanel(location: PanelLocation) {
-  panel = location.name;
-  panelHost.restore(location, renderPanel);
+  return sceneFlow.restorePanel(shellBindings(), location);
 }
 function panelFrame(title: string, subtitle: string, body: string, wide = false) {
-  journeyCardPanel.cancel();
-  closeNpcChat();
-  panelHost.frame(panel, title, subtitle, body, wide);
+  return sceneFlow.panelFrame(shellBindings(), title, subtitle, body, wide);
 }
 async function renderJourneyCard() {
   if (
@@ -975,76 +801,24 @@ async function renderJourneyCard() {
   );
 }
 function renderPanel() {
-  if (panel === 'settings') {
-    panelFrame('设置', '游戏选项', settingsContent(save));
-    void openOfflinePanel();
-  } else if (panel === 'about') {
-    panelFrame(
-      '关于《叩仙门》',
-      '独立制作 · 持续更新',
-      `<div class="about-copy"><p class="about-lead">《叩仙门：青岚纪》是一款独立制作的 Web 修仙小游戏。三十六法宝 · 七重秘境 · 正魔兼修。</p><div class="about-maker"><span>制作</span><strong>一个想做点自己喜欢的东西的程序员 chenxuan，和一堆 AI 工具。</strong><p>从幸存者玩法出发，慢慢做成了一场关于修行、岁月与故人的仙途。</p></div><p class="panel-note">程序设计、玩法与内容由作者持续迭代；部分开发、美术生成与辅助工作使用 AI 工具完成。项目持续更新中，源码公开于 GitHub。</p><div class="about-meta"><p><span>GitHub</span><a href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">chenxuan520/qinglan-xiuxian</a></p><p><span>官网</span><a href="${GAME_SITE_URL}" target="_blank" rel="noopener noreferrer" tabindex="0">${new URL(GAME_SITE_URL).host}</a></p><p><span>版本</span>${GAME_VERSION}</p><p><span>运行监控</span><a href="${assetUrl('/monitor/')}" target="_blank" rel="noopener noreferrer">公开统计与每日测试</a></p>${telemetryRow(telemetry.enabled(), telemetry.active)}</div><div class="save-actions about-actions"><a class="primary-button" href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">GitHub 源码</a><a class="secondary-button" href="https://github.com/chenxuan520/qinglan-xiuxian/issues" target="_blank" rel="noopener noreferrer" tabindex="0">反馈问题</a></div><div class="about-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="128" height="128" loading="lazy"><div><strong>请道友喝杯茶</strong><p>这一程山水不收分文。若觉得值得，请作者喝杯茶便好——茶钱不换道具，也不换修为，只换作者多写几段山水。</p><small>微信扫码即可；手机上可先截图，再在「扫一扫」里从相册选取。</small></div></div></div>`,
-    );
-  } else if (panel === 'medicine') {
-    panelFrame(
-      '丹香入道',
-      '炼丹炉',
-      medicinePanel.content(
-        selectedStage,
-        !!(game || pendingRun),
-        inTown && townNpc?.id === 'herbs',
-      ),
-      true,
-    );
-  } else if (panel === 'arsenal' || panel === 'treasure-detail') {
-    const view = catalogPanel(save, {
-      panel,
-      catalogTreasures,
-      schoolFilter,
-      treasurePage,
-      selectedTreasure,
-      bookTab,
-    });
-    panelFrame(view.title, view.subtitle, view.body, view.wide);
-    if (panel === 'treasure-detail') return;
-  } else if (panel === 'cultivation') {
-    const view = cultivationPanel(save, selectedStage);
-    panelFrame(view.title, view.subtitle, view.body, view.wide);
-  } else if (panel === 'chronicle') {
-    panelFrame(
-      '仙途履历',
-      '岁月留痕 · 此世道果',
-      chronicleContent(save) +
-        '<button class="secondary-button journey-card-entry" data-action="journey-card">留存此世</button>',
-      true,
-    );
-  } else if (panel === 'bestiary') {
-    const view = bestiaryPanel(bestiaryStage);
-    panelFrame(view.title, view.subtitle, view.body, view.wide);
-  } else if (panel === 'guide') {
-    panelFrame(...guidePanel(guideTab, !!game));
-  }
+  return sceneFlow.renderPanel(shellBindings());
 }
 function renderHud() {
-  if (game) battleHud.render(game, volumeOpen, touchHintDismissed);
+  return sceneFlow.renderHud(shellBindings());
 }
 
 function updateHud() {
-  if (game) battleHud.update(game);
+  return sceneFlow.updateHud(shellBindings());
 }
 
 function renderChoices() {
-  if (!game) return;
-  modal.innerHTML = upgradeChoicesModal(game, save);
-  modal.querySelector<HTMLButtonElement>('.choice-card')?.focus();
+  return sceneFlow.renderChoices(shellBindings());
 }
 function renderPause() {
-  if (!game) return;
-
-  panelFrame(...pausePanel(game, save, frameRate.value, abandonConfirm));
+  return sceneFlow.renderPause(shellBindings());
 }
 function gameEvent(name: string) {
-  gameAudio.play(name);
-  if (['loot', 'cache'].includes(name)) persist();
+  return sceneFlow.gameEvent(shellBindings(), name);
 }
 
 function finishRun() {
@@ -1105,13 +879,7 @@ function finishRun() {
   } else renderResult();
 }
 function renderVictory() {
-  if (!game || !rewards) return;
-  panel = 'victory';
-  modal.innerHTML = victoryModal(game);
-  modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
-  victoryTimer = window.setTimeout(() => {
-    if (panel === 'victory') renderResult();
-  }, 3000);
+  return sceneFlow.renderVictory(shellBindings());
 }
 function renderDeath() {
   if (!game || game.state !== 'lost' || settled) return;
@@ -1128,17 +896,7 @@ function renderDeath() {
   modal.querySelector<HTMLButtonElement>('button')?.focus();
 }
 function showReviveAd() {
-  if (
-    !game ||
-    game.state !== 'lost' ||
-    game.revivesUsed >= MAX_REVIVES ||
-    settled ||
-    panel === 'revive-ad'
-  )
-    return;
-  panel = 'revive-ad';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div>${AD_PLACEHOLDER_HTML}<p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>${AD_SECONDS} 秒后可复活</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
-  startAdWatch('ad-revive', '满血复活', 'revive');
+  return sceneFlow.showReviveAd(shellBindings());
 }
 // 广告是否已完整播放：真实 SDK 由观看回调置位，占位模式按倒计时完成判定。
 function adCompleted() {
@@ -1147,64 +905,25 @@ function adCompleted() {
 
 // 真实 SDK 看过广告后的统一入口：解锁当前进程中的奖励按钮。
 function markAdWatched(action: string, label: string) {
-  adWatched = true;
-  refreshAdCountdown(action, label); // 按钮文本切到「广告已结束 · …」并解除禁用
+  return sceneFlow.markAdWatched(shellBindings(), action, label);
 }
 
 // 三个广告位的公共启动：能用 provider 就由 provider 播放，任何原因不可用（装死沉默也算）都回退占位倒计时。
 function startAdWatch(action: string, label: string, placement: AdPlacement) {
-  adWatched = false;
-  const provider = getAdProvider();
-  if (provider.name === 'placeholder') {
-    startAdCountdown(action, label);
-    return;
-  }
-  // SDK 分支与倒计时互不承认：先掐断任何遗留的 adReadyAt，避免上个面板的倒计时残留放行领取。
-  adReadyAt = 0;
-  const watchPanel = panel;
-  // 真实广告全屏播放期间按钮保持禁用；看完回调会解锁为「广告已结束 · …」。
-  const waiting = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
-  if (waiting) {
-    waiting.disabled = true;
-    waiting.textContent = '观看广告中…';
-  }
-  watchAdPlacement({
-    provider,
-    placement,
-    alive: () => panel === watchPanel,
-    onWatched: () => markAdWatched(action, label),
-    onFallback: () => startAdCountdown(action, label),
-  });
+  return sceneFlow.startAdWatch(shellBindings(), action, label, placement);
 }
 
 function startAdCountdown(action: string, label: string) {
-  adReadyAt = Date.now() + AD_DURATION_MS;
-  clearInterval(adTimer);
-  adTimer = window.setInterval(() => {
-    if (!refreshAdCountdown(action, label)) clearInterval(adTimer);
-  }, 200);
+  return sceneFlow.startAdCountdown(shellBindings(), action, label);
 }
 function refreshAdCountdown(action: string, label: string) {
-  const button = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
-  if (!button) return 0;
-  const seconds = Math.max(0, Math.ceil((adReadyAt - Date.now()) / 1000));
-  const incomplete = rewardAd === 'root' && adElements.length !== spiritRootInfo(adRoot).count;
-  button.disabled = seconds > 0 || incomplete;
-  button.textContent =
-    seconds > 0
-      ? `${seconds} 秒后${label}`
-      : incomplete
-        ? '请选满对应数量的五行'
-        : `广告已结束 · ${label}`;
-  return seconds;
+  return sceneFlow.refreshAdCountdown(shellBindings(), action, label);
 }
 function renderRootPicker() {
-  const container = modal.querySelector('#root-picker');
-  if (!container) return;
-  container.innerHTML = rootPickerView(save, adRoot, adElements);
+  return sceneFlow.renderRootPicker(shellBindings());
 }
 function rememberRewardReturn() {
-  rewardReturn = rememberPanel();
+  return sceneFlow.rememberRewardReturn(shellBindings());
 }
 function renderSectDues() {
   if (!sectDuesPending(save)) return;
@@ -1213,190 +932,28 @@ function renderSectDues() {
   modal.querySelector<HTMLButtonElement>('button')?.focus();
 }
 function showSuppliesShortage(stones: number, iron: number) {
-  if (game || (save.stones >= stones && save.iron >= iron)) return false;
-  rememberRewardReturn();
-  const missing = [
-    stones > save.stones ? `${stones - save.stones} 灵石` : '',
-    iron > save.iron ? `${iron - save.iron} 玄铁` : '',
-  ]
-    .filter(Boolean)
-    .join('、');
-  panel = 'supplies-shortage';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${save.stones} 灵石、${save.iron} 玄铁。<br>可观看 ${AD_SECONDS} 秒广告，领取 ${adSupplies(save.unlocked).stones} 灵石与 ${adSupplies(save.unlocked).iron} 玄铁。领取后返回原页面，再选择要进行的操作。</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad">看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
-  modal.querySelector<HTMLButtonElement>('[data-action="cancel-supplies"]')?.focus();
-  return true;
+  return sceneFlow.showSuppliesShortage(shellBindings(), stones, iron);
 }
 function showRewardAd(kind: 'root' | 'supplies') {
-  if (game || rewardAd) return;
-  if (panel !== 'supplies-shortage') rememberRewardReturn();
-  rewardAd = kind;
-  adRoot = 'heaven';
-  adElements = rootElementsFor(adRoot, save.rootElements);
-  panel = 'reward-ad';
-  const reward =
-    kind === 'root'
-      ? '自选灵根资质与五行，解锁对应入门法宝。后续新历练生效，未完成的历练保留原来的灵根和武器。'
-      : `领取 ${adSupplies(save.unlocked).stones} 灵石与 ${adSupplies(save.unlocked).iron} 玄铁，可再次观看领取。`;
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${kind === 'root' ? 'root-ad-panel' : ''}" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '自选灵根' : '仙缘补给'}</div>${AD_PLACEHOLDER_HTML}<p>${reward}<br>完整观看 ${AD_SECONDS} 秒后点击领取，中途离开不发放奖励。</p>${kind === 'root' ? '<div id="root-picker"></div>' : ''}<div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>${AD_SECONDS} 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
-  if (kind === 'root') renderRootPicker();
-  startAdWatch('claim-ad-reward', '领取奖励', kind === 'root' ? 'reward-root' : 'reward-supplies');
-  modal
-    .querySelector<HTMLButtonElement>('[data-action="cancel-reward-ad"]')
-    ?.focus({ preventScroll: true });
+  return sceneFlow.showRewardAd(shellBindings(), kind);
 }
 function closeRewardAd() {
-  clearInterval(adTimer);
-  adReadyAt = 0;
-  rewardAd = null;
-  panel = '';
-  modal.innerHTML = '';
-  if (inMortalWorld) renderMortal();
-  else renderLobby();
-  if (rewardReturn) {
-    if (rewardReturn.name === 'sect-dues') renderSectDues();
-    else if (rewardReturn.name === 'town-event' && townNpc) showTownEvent(townNpc);
-    else restorePanel(rewardReturn);
-    rewardReturn = null;
-  }
+  return sceneFlow.closeRewardAd(shellBindings());
 }
 function renderResult() {
-  if (!game || !rewards) return;
-  window.clearTimeout(victoryTimer);
-  panel = '';
-  modal.innerHTML = settlementModal(save, game, rewards, oldRealm);
-  modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
+  return sceneFlow.renderResult(shellBindings());
 }
 function ensureScene(stage: number, next: () => void, run?: Game | null, tribulation = false) {
-  const extra =
-    run?.enemies.map((e) =>
-      e.boss ? STAGES[e.bossStage ?? run.stage].sprite : ENEMIES[e.type].sprite,
-    ) ?? [];
-  const isTribulation = tribulation || !!run?.tribulation;
-  const extraImages = [
-    window.matchMedia('(max-width: 640px)').matches ? JOURNEY_MAP_MOBILE_IMAGE : JOURNEY_MAP_IMAGE,
-    ...(save.prologueSeen ? [] : [PROLOGUE_IMAGE]),
-  ];
-  if (realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max)
-    extraImages.push('/assets/qinglan-prologue.webp');
-  if (renderer.hasScene(stage, isTribulation, extra, extraImages)) return true;
-  if (sceneLoading) return false;
-  sceneLoading = true;
-  const loading = document.createElement('div');
-  loading.className = 'scene-loading';
-  loading.setAttribute('role', 'dialog');
-  loading.setAttribute('aria-label', '场景资源加载');
-  loading.setAttribute('aria-modal', 'true');
-  loading.innerHTML = `<section><div class="eyebrow">叩仙门：青岚纪</div><h2>${isTribulation ? '天劫将至' : STAGES[stage].name}</h2><p>正在准备地图、人物与法宝</p><progress max="1" value="0" aria-label="素材加载进度"></progress><p class="load-progress" role="status">0%</p><button class="secondary-button" hidden>重新加载</button></section>`;
-  app.append(loading);
-  let failed = false;
-  renderer
-    .prepareScene(
-      stage,
-      isTribulation,
-      extra,
-      (done, total) => {
-        if (failed) return;
-        const progress = loading.querySelector('progress')!;
-        progress.max = total;
-        progress.value = done;
-        loading.querySelector('.load-progress')!.textContent =
-          `${Math.round((done / total) * 100)}% · ${done} / ${total} 项资源`;
-      },
-      extraImages,
-    )
-    .then(() => {
-      loading.remove();
-      sceneLoading = false;
-      assetsReady = true;
-      next();
-    })
-    .catch(() => {
-      failed = true;
-      loading.querySelector('.load-progress')!.textContent =
-        '素材加载失败，请检查网络后重试。尚未进入场景。';
-      const retry = loading.querySelector('button')!;
-      retry.hidden = false;
-      retry.onclick = () => {
-        loading.remove();
-        sceneLoading = false;
-        ensureScene(stage, next, run, tribulation);
-      };
-      retry.focus();
-    });
-  return false;
+  return sceneFlow.ensureScene(shellBindings(), stage, next, run, tribulation);
 }
 function startRun() {
-  if (!assetsReady || selectedStage > save.unlocked) return;
-  if (tribulationDue(save)) {
-    renderTribulationPending();
-    return;
-  }
-  if (pendingRun) {
-    panel = 'restart';
-
-    panelFrame(...restartRunPanel());
-    return;
-  }
-  if (!ensureScene(selectedStage, startRun)) {
-    return;
-  }
-  clearInput();
-  panel = '';
-  modal.innerHTML = '';
-  battleHud.reset();
-  settled = false;
-  rewards = null;
-  abandonConfirm = false;
-  game = new Game(save, selectedStage, difficulty);
-  frameRate.reset();
-  game.onEvent = gameEvent;
-  telemetry.track({ type: 'run-start', ...lifeStats(), stage: selectedStage, difficulty });
-  previousState = 'playing';
-  oldRealm = realmInfo(
-    save.cultivation - game.creditedCultivation,
-    save.completed.includes(FINAL_TRIAL_STAGE),
-  ).name;
-  renderHud();
-  if (save.sound) gameAudio.sync();
-  persist();
+  return sceneFlow.startRun(shellBindings());
 }
 function restoreRun() {
-  if (!pendingRun || !assetsReady) return;
-  if (!ensureScene(pendingRun.stage, restoreRun, pendingRun)) {
-    return;
-  }
-  game = pendingRun;
-  frameRate.reset();
-  pendingRun = null;
-  settled = false;
-  rewards = null;
-  abandonConfirm = false;
-  selectedStage = game.stage;
-  difficulty = game.difficulty;
-  game.onEvent = gameEvent;
-  clearInput();
-  panel = '';
-  previousState = game.state;
-  oldRealm = realmInfo(
-    save.cultivation - game.creditedCultivation,
-    save.completed.includes(FINAL_TRIAL_STAGE),
-  ).name;
-  renderHud();
-  if (game.state === 'upgrade') renderChoices();
-  else if (game.state === 'lost') renderDeath();
-  else renderPause();
-  if (save.sound) gameAudio.sync();
-  persist();
+  return sceneFlow.restoreRun(shellBindings());
 }
 function returnLobby() {
-  const years =
-    game && settled && save.runs === 1 && !game.tribulation ? game.elapsedYears : undefined;
-  game = null;
-  panel = '';
-  modal.innerHTML = '';
-  previousState = '';
-  clearInput();
-  renderLobby(years);
+  return sceneFlow.returnLobby(shellBindings());
 }
 function rootRevealContent() {
   return rootRevealBody(save);
@@ -1506,31 +1063,7 @@ function renderTribulationPending() {
   modal.querySelector('[data-action="close"]')?.remove();
 }
 function beginTribulation() {
-  if (!assetsReady || !tribulationDue(save)) return;
-  if (pendingRun?.tribulation) {
-    restoreRun();
-    return;
-  }
-  if (!ensureScene(6, beginTribulation, null, true)) {
-    return;
-  }
-  const source = game && !settled ? game : pendingRun;
-  save.tribulationReturn = source?.snapshot() ?? null;
-  game = Game.createTribulation(save, source);
-  frameRate.reset();
-  pendingRun = null;
-  settled = false;
-  rewards = null;
-  abandonConfirm = false;
-  panel = '';
-  previousState = 'playing';
-  modal.innerHTML = '';
-  clearInput();
-  game.onEvent = gameEvent;
-  telemetry.track({ type: 'run-start', ...lifeStats(), tribulation: game.tribulation });
-  renderHud();
-  lastFrame = performance.now();
-  persist();
+  return sceneFlow.beginTribulation(shellBindings());
 }
 function renderTribulationForfeit() {
   if (game) {
@@ -1544,29 +1077,7 @@ function renderTribulationForfeit() {
   modal.querySelector('[data-action="close"]')?.remove();
 }
 function finishTribulation() {
-  if (!game?.tribulation || game.state !== 'won') return;
-  const report = damageReport(game);
-  if (!completeTribulation(save, game.tribulation)) return;
-  telemetry.track({
-    type: 'run-end',
-    ...lifeStats(),
-    result: 'won',
-    tribulation: save.tribulations,
-    seconds: Math.round(game.time),
-  });
-  telemetry.flush();
-  resolveActivity(save);
-  const original = save.tribulationReturn;
-  save.tribulationReturn = null;
-  pendingRun = Game.restore(save, original);
-  game = null;
-  settled = false;
-  clearInput();
-  persist();
-  renderLobby();
-  panel = 'tribulation-won';
-
-  panelFrame(...tribulationWonPanel(save, report, !!pendingRun));
+  return sceneFlow.finishTribulation(shellBindings());
 }
 function endLifetime() {
   const life = lifespanInfo(save);
@@ -1607,11 +1118,7 @@ function renderLifespanEnd() {
   modal.querySelector('[data-action="close"]')?.remove();
 }
 function showLifespanAd() {
-  const life = lifespanInfo(save);
-  if (!Number.isFinite(life.base) || life.remaining > 0 || panel !== 'lifespan-ended') return;
-  panel = 'lifespan-ad';
-  modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div>${AD_PLACEHOLDER_HTML}<p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>再次寿尽时可再借，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>${AD_SECONDS} 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
-  startAdWatch('claim-lifespan', '领取寿元', 'lifespan');
+  return sceneFlow.showLifespanAd(shellBindings());
 }
 function clearInput() {
   keys.clear();
@@ -1619,6 +1126,310 @@ function clearInput() {
   pointer = null;
   joystick.classList.remove('active');
   if (game) game.input = { x: 0, y: 0 };
+}
+function shellBindings(): ActionShell {
+  // prettier-ignore
+  return {
+    get ELEMENTS() { return ELEMENTS; },
+    get FINAL_TRIAL_STAGE() { return FINAL_TRIAL_STAGE; },
+    get Game() { return Game; },
+    get HOMETOWN_START() { return HOMETOWN_START; },
+    get HUMAN_STORIES() { return HUMAN_STORIES; },
+    get SPIRIT_ROOTS() { return SPIRIT_ROOTS; },
+    get STAGES() { return STAGES; },
+    get abandonConfirm() { return abandonConfirm; },
+    set abandonConfirm(next) { abandonConfirm = next; },
+    get acceptHometownRoot() { return acceptHometownRoot; },
+    get adCompleted() { return adCompleted; },
+    get adElements() { return adElements; },
+    set adElements(next) { adElements = next; },
+    get adReadyAt() { return adReadyAt; },
+    set adReadyAt(next) { adReadyAt = next; },
+    get adRoot() { return adRoot; },
+    set adRoot(next) { adRoot = next; },
+    get adSupplies() { return adSupplies; },
+    get adTimer() { return adTimer; },
+    set adTimer(next) { adTimer = next; },
+    get aiChoiceTime() { return aiChoiceTime; },
+    set aiChoiceTime(next) { aiChoiceTime = next; },
+    get alignStarterWithPath() { return alignStarterWithPath; },
+    get allowsSchool() { return allowsSchool; },
+    get ambushScene() { return ambushScene; },
+    set ambushScene(next) { ambushScene = next; },
+    get assetsReady() { return assetsReady; },
+    set assetsReady(next) { assetsReady = next; },
+    get attuneSpiritRoot() { return attuneSpiritRoot; },
+    get auctionKind() { return auctionKind; },
+    set auctionKind(next) { auctionKind = next; },
+    get auctionResult() { return auctionResult; },
+    get auctionView() { return auctionView; },
+    set auctionView(next) { auctionView = next; },
+    get beginJourneyFarewell() { return beginJourneyFarewell; },
+    get beginSectMarketVisit() { return beginSectMarketVisit; },
+    get beginTribulation() { return beginTribulation; },
+    get bestiaryStage() { return bestiaryStage; },
+    set bestiaryStage(next) { bestiaryStage = next; },
+    get bookTab() { return bookTab; },
+    set bookTab(next) { bookTab = next; },
+    get catalogTreasures() { return catalogTreasures; },
+    get chooseHumanStory() { return chooseHumanStory; },
+    get chooseMarketFellow() { return chooseMarketFellow; },
+    get chooseSmithStory() { return chooseSmithStory; },
+    get clearInput() { return clearInput; },
+    get clearInterval() { return clearInterval; },
+    get closeNpcChat() { return closeNpcChat; },
+    get closeRewardAd() { return closeRewardAd; },
+    get damagePanel() { return damagePanel; },
+    get difficulty() { return difficulty; },
+    set difficulty(next) { difficulty = next; },
+    get document() { return document; },
+    get downloadJson() { return downloadJson; },
+    get endLifetime() { return endLifetime; },
+    get ensureScene() { return ensureScene; },
+    get enterImmortalGate() { return enterImmortalGate; },
+    get enterTownVisit() { return enterTownVisit; },
+    get epilogueReincarnatePanel() { return epilogueReincarnatePanel; },
+    get exchangeSectMedicine() { return exchangeSectMedicine; },
+    get executeAuctionTrade() { return executeAuctionTrade; },
+    get executeMarketSocial() { return executeMarketSocial; },
+    get executeMortalAction() { return executeMortalAction; },
+    get exportSave() { return exportSave; },
+    get extendLifespan() { return extendLifespan; },
+    get finishDeparture() { return finishDeparture; },
+    get finishMarketAmbush() { return finishMarketAmbush; },
+    get finishRun() { return finishRun; },
+    get forge() { return forge; },
+    get freshTownPopulation() { return freshTownPopulation; },
+    get game() { return game; },
+    set game(next) { game = next; },
+    get gameAudio() { return gameAudio; },
+    get guideReturn() { return guideReturn; },
+    set guideReturn(next) { guideReturn = next; },
+    get guideTab() { return guideTab; },
+    set guideTab(next) { guideTab = next; },
+    get handleAction() { return handleAction; },
+    get hometownLetterContent() { return hometownLetterContent; },
+    get humanStoryContent() { return humanStoryContent; },
+    get immortalGatePanel() { return immortalGatePanel; },
+    get inMarket() { return inMarket; },
+    set inMarket(next) { inMarket = next; },
+    get inMortalWorld() { return inMortalWorld; },
+    set inMortalWorld(next) { inMortalWorld = next; },
+    get inTown() { return inTown; },
+    set inTown(next) { inTown = next; },
+    get isCultivationPath() { return isCultivationPath; },
+    get isHumanStoryId() { return isHumanStoryId; },
+    get isImmortalSuccessor() { return isImmortalSuccessor; },
+    get isMarketCultivatorId() { return isMarketCultivatorId; },
+    get journeyCardPanel() { return journeyCardPanel; },
+    get journeyCardReturn() { return journeyCardReturn; },
+    get lastFrame() { return lastFrame; },
+    set lastFrame(next) { lastFrame = next; },
+    get lastMortalTick() { return lastMortalTick; },
+    set lastMortalTick(next) { lastMortalTick = next; },
+    get leaveTown() { return leaveTown; },
+    get lifeStats() { return lifeStats; },
+    get lifespanInfo() { return lifespanInfo; },
+    get marketNpc() { return marketNpc; },
+    set marketNpc(next) { marketNpc = next; },
+    get marketScene() { return marketScene; },
+    set marketScene(next) { marketScene = next; },
+    get medicinePanel() { return medicinePanel; },
+    get mobileDisplay() { return mobileDisplay; },
+    get modal() { return modal; },
+    get mortalFilter() { return mortalFilter; },
+    set mortalFilter(next) { mortalFilter = next; },
+    get mortalTab() { return mortalTab; },
+    set mortalTab(next) { mortalTab = next; },
+    get mortalTabContent() { return mortalTabContent; },
+    get nextAiMove() { return nextAiMove; },
+    set nextAiMove(next) { nextAiMove = next; },
+    get offlineAction() { return offlineAction; },
+    get panel() { return panel; },
+    set panel(next) { panel = next; },
+    get panelFrame() { return panelFrame; },
+    get pendingImport() { return pendingImport; },
+    set pendingImport(next) { pendingImport = next; },
+    get pendingRun() { return pendingRun; },
+    set pendingRun(next) { pendingRun = next; },
+    get performance() { return performance; },
+    get persist() { return persist; },
+    get previousState() { return previousState; },
+    set previousState(next) { previousState = next; },
+    get readHometownLetter() { return readHometownLetter; },
+    get realmInfo() { return realmInfo; },
+    get refreshAdCountdown() { return refreshAdCountdown; },
+    get refreshAuction() { return refreshAuction; },
+    get refreshMarketActivities() { return refreshMarketActivities; },
+    get refreshMarketTrade() { return refreshMarketTrade; },
+    get reincarnatePanel() { return reincarnatePanel; },
+    get rememberPanel() { return rememberPanel; },
+    get renderChoices() { return renderChoices; },
+    get renderDeath() { return renderDeath; },
+    get renderDeparture() { return renderDeparture; },
+    get renderEpilogue() { return renderEpilogue; },
+    get renderHud() { return renderHud; },
+    get renderJourneyCard() { return renderJourneyCard; },
+    get renderJourneyFarewell() { return renderJourneyFarewell; },
+    get renderLifespanEnd() { return renderLifespanEnd; },
+    get renderLobby() { return renderLobby; },
+    get renderMortal() { return renderMortal; },
+    get renderPanel() { return renderPanel; },
+    get renderPause() { return renderPause; },
+    get renderPrologue() { return renderPrologue; },
+    get renderResult() { return renderResult; },
+    get renderRootPicker() { return renderRootPicker; },
+    get renderTribulationForfeit() { return renderTribulationForfeit; },
+    get renderTribulationPending() { return renderTribulationPending; },
+    get resetLifetime() { return resetLifetime; },
+    get resolveActivity() { return resolveActivity; },
+    get resolveInheritance() { return resolveInheritance; },
+    get restorePanel() { return restorePanel; },
+    get restoreRun() { return restoreRun; },
+    get resumeAfterDamage() { return resumeAfterDamage; },
+    set resumeAfterDamage(next) { resumeAfterDamage = next; },
+    get retreat() { return retreat; },
+    get retreatResultPanel() { return retreatResultPanel; },
+    get returnLobby() { return returnLobby; },
+    get rewardAd() { return rewardAd; },
+    set rewardAd(next) { rewardAd = next; },
+    get rootElementsFor() { return rootElementsFor; },
+    get save() { return save; },
+    get saveLock() { return saveLock; },
+    get schoolFilter() { return schoolFilter; },
+    set schoolFilter(next) { schoolFilter = next; },
+    get sectMarketExchangeReason() { return sectMarketExchangeReason; },
+    get sectMarketOffer() { return sectMarketOffer; },
+    get sectMarketOpen() { return sectMarketOpen; },
+    get selectedStage() { return selectedStage; },
+    set selectedStage(next) { selectedStage = next; },
+    get selectedTreasure() { return selectedTreasure; },
+    set selectedTreasure(next) { selectedTreasure = next; },
+    get settleSectDues() { return settleSectDues; },
+    get settled() { return settled; },
+    set settled(next) { settled = next; },
+    get showHometown() { return showHometown; },
+    get showLifespanAd() { return showLifespanAd; },
+    get showMarketAmbush() { return showMarketAmbush; },
+    get showMarketEvent() { return showMarketEvent; },
+    get showPanel() { return showPanel; },
+    get showReviveAd() { return showReviveAd; },
+    get showRewardAd() { return showRewardAd; },
+    get showTeaStory() { return showTeaStory; },
+    get showTownEvent() { return showTownEvent; },
+    get soundSettings() { return soundSettings; },
+    get spiritRootInfo() { return spiritRootInfo; },
+    get startRun() { return startRun; },
+    get storageAvailable() { return storageAvailable; },
+    set storageAvailable(next) { storageAvailable = next; },
+    get structuredClone() { return structuredClone; },
+    get syncHumanStories() { return syncHumanStories; },
+    get syncMortalChange() { return syncMortalChange; },
+    get telemetry() { return telemetry; },
+    get toast() { return toast; },
+    get townNpc() { return townNpc; },
+    set townNpc(next) { townNpc = next; },
+    get townPosition() { return townPosition; },
+    set townPosition(next) { townPosition = next; },
+    get townScene() { return townScene; },
+    set townScene(next) { townScene = next; },
+    get townStatus() { return townStatus; },
+    get trackReincarnation() { return trackReincarnation; },
+    get train() { return train; },
+    get treasure() { return treasure; },
+    get treasurePage() { return treasurePage; },
+    set treasurePage(next) { treasurePage = next; },
+    get treasureReturn() { return treasureReturn; },
+    set treasureReturn(next) { treasureReturn = next; },
+    get tribulationDue() { return tribulationDue; },
+    get ui() { return ui; },
+    get updateHud() { return updateHud; },
+    get updateStorySoundButton() { return updateStorySoundButton; },
+    get volumeOpen() { return volumeOpen; },
+    set volumeOpen(next) { volumeOpen = next; },
+    get window() { return window; },
+    get writeSave() { return writeSave; },
+    get AD_DURATION_MS() { return AD_DURATION_MS; },
+    get AD_PLACEHOLDER_HTML() { return AD_PLACEHOLDER_HTML; },
+    get AD_SECONDS() { return AD_SECONDS; },
+    get ENEMIES() { return ENEMIES; },
+    get GAME_SITE_URL() { return GAME_SITE_URL; },
+    get GAME_VERSION() { return GAME_VERSION; },
+    get JOURNEY_MAP_IMAGE() { return JOURNEY_MAP_IMAGE; },
+    get JOURNEY_MAP_MOBILE_IMAGE() { return JOURNEY_MAP_MOBILE_IMAGE; },
+    get MAX_REVIVES() { return MAX_REVIVES; },
+    get MarketAmbushScene() { return MarketAmbushScene; },
+    get PROLOGUE_IMAGE() { return PROLOGUE_IMAGE; },
+    get SUPPORT_CODE_IMAGE() { return SUPPORT_CODE_IMAGE; },
+    get SectMarketScene() { return SectMarketScene; },
+    get TownScene() { return TownScene; },
+    get URL() { return URL; },
+    get adWatched() { return adWatched; },
+    set adWatched(next) { adWatched = next; },
+    get app() { return app; },
+    get assetUrl() { return assetUrl; },
+    get auctionContent() { return auctionContent; },
+    get battleHud() { return battleHud; },
+    get bestiaryPanel() { return bestiaryPanel; },
+    get catalogPanel() { return catalogPanel; },
+    get chronicleContent() { return chronicleContent; },
+    get completeTribulation() { return completeTribulation; },
+    get cultivationPanel() { return cultivationPanel; },
+    get damageReport() { return damageReport; },
+    get epilogueModal() { return epilogueModal; },
+    get frameRate() { return frameRate; },
+    get fullscreenButton() { return fullscreenButton; },
+    get gameEvent() { return gameEvent; },
+    get getAdProvider() { return getAdProvider; },
+    get guidePanel() { return guidePanel; },
+    get hometownContent() { return hometownContent; },
+    get hometownFarewellModal() { return hometownFarewellModal; },
+    get hometownParents() { return hometownParents; },
+    get immortalEncounterPanel() { return immortalEncounterPanel; },
+    get markAdWatched() { return markAdWatched; },
+    get marketAmbushPanel() { return marketAmbushPanel; },
+    get marketCultivators() { return marketCultivators; },
+    get marketPosition() { return marketPosition; },
+    set marketPosition(next) { marketPosition = next; },
+    get meetTownImmortal() { return meetTownImmortal; },
+    get mountNpcChat() { return mountNpcChat; },
+    get mountTownScene() { return mountTownScene; },
+    get oldRealm() { return oldRealm; },
+    set oldRealm(next) { oldRealm = next; },
+    get openOfflinePanel() { return openOfflinePanel; },
+    get panelHost() { return panelHost; },
+    get pausePanel() { return pausePanel; },
+    get prepareAuction() { return prepareAuction; },
+    get releaseTownScene() { return releaseTownScene; },
+    get rememberRewardReturn() { return rememberRewardReturn; },
+    get renderSectDues() { return renderSectDues; },
+    get renderer() { return renderer; },
+    get restartRunPanel() { return restartRunPanel; },
+    get rewardReturn() { return rewardReturn; },
+    set rewardReturn(next) { rewardReturn = next; },
+    get rewards() { return rewards; },
+    set rewards(next) { rewards = next; },
+    get rootPickerView() { return rootPickerView; },
+    get sceneLoading() { return sceneLoading; },
+    set sceneLoading(next) { sceneLoading = next; },
+    get settingsContent() { return settingsContent; },
+    get settlementModal() { return settlementModal; },
+    get showAuction() { return showAuction; },
+    get startAdCountdown() { return startAdCountdown; },
+    get startAdWatch() { return startAdWatch; },
+    get telemetryRow() { return telemetryRow; },
+    get touchHintDismissed() { return touchHintDismissed; },
+    get townEventContent() { return townEventContent; },
+    get townPage() { return townPage; },
+    get townVisit() { return townVisit; },
+    get tribulationWonPanel() { return tribulationWonPanel; },
+    get upgradeChoicesModal() { return upgradeChoicesModal; },
+    get victoryModal() { return victoryModal; },
+    get victoryTimer() { return victoryTimer; },
+    set victoryTimer(next) { victoryTimer = next; },
+    get visitHometown() { return visitHometown; },
+    get watchAdPlacement() { return watchAdPlacement; },
+  };
 }
 function handleAction(action: string, id?: string) {
   if (saveLock) {
@@ -1635,1137 +1446,7 @@ function handleAction(action: string, id?: string) {
     }
     return;
   }
-  if (panel === 'market-ambush-recovery') {
-    if (action === 'market-ambush-recover') {
-      panel = '';
-      modal.innerHTML = '';
-      renderLobby();
-    }
-    return;
-  }
-  if (panel === 'market-ambush') {
-    if (action === 'market-ambush-exit' || action === 'close' || action === 'home')
-      finishMarketAmbush(ambushScene?.duel.outcome ?? 'escaped');
-    return;
-  }
-  if (action === 'close' && panel === 'journey-card') {
-    journeyCardPanel.cancel();
-  }
-  if (save.journeyEnded) {
-    if (action === 'journey-card' && (panel === 'epilogue' || panel === 'journey-card')) {
-      void renderJourneyCard();
-    } else if (action === 'close' && panel === 'journey-card') {
-      renderEpilogue();
-    } else if (action === 'epilogue-reincarnate' && panel === 'epilogue') {
-      panel = 'epilogue-reincarnate';
-
-      panelFrame(...epilogueReincarnatePanel(save));
-    } else if (action === 'confirm-reincarnate' && panel === 'epilogue-reincarnate') {
-      ui.inert = false;
-      trackReincarnation('epilogue');
-      resetLifetime(
-        '修士离界，少年启程。一段指路的话，一场未尽的仙缘。',
-        true,
-        resolveInheritance(
-          save,
-          modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
-        ),
-        true,
-      );
-    } else if (action === 'close' && panel === 'epilogue-reincarnate') renderEpilogue();
-    else if (action === 'epilogue-sound' && panel === 'epilogue') {
-      soundSettings.toggle();
-      updateStorySoundButton(
-        modal.querySelector<HTMLButtonElement>('[data-action="epilogue-sound"]')!,
-        save.sound,
-      );
-    }
-    return;
-  }
-  // 留影只切换面板，不能解除已结束的人生状态。
-  if (save.pendingReincarnation) {
-    if (action === 'journey-card') void renderJourneyCard();
-    else if (action === 'close' && panel === 'journey-card')
-      renderJourneyFarewell(save.pendingReincarnation);
-    else if (
-      action === 'confirm-journey-reincarnate' &&
-      (panel === 'lifespan-farewell' || panel === 'tribulation-farewell')
-    ) {
-      trackReincarnation(panel === 'lifespan-farewell' ? 'lifespan' : 'tribulation');
-      if (panel === 'lifespan-farewell') endLifetime();
-      else resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
-    }
-    return;
-  }
-  if (panel === 'root-reveal') {
-    if (action === 'reroll-root')
-      resetLifetime(undefined, false, save.birthInheritance, isImmortalSuccessor(save));
-    else if (action === 'accept-root' || action === 'close') {
-      ui.inert = false;
-      panel = '';
-      modal.innerHTML = '';
-      const hadInheritance = save.birthInheritance !== null;
-      save.birthInheritance = null;
-      if (acceptHometownRoot(save) || hadInheritance) persist();
-      renderLobby();
-      ui.querySelector<HTMLButtonElement>('[data-action="start"]')?.focus({ preventScroll: true });
-    }
-    return;
-  }
-  if (panel === 'prologue') {
-    if (action === 'prologue-sound') {
-      soundSettings.toggle();
-      updateStorySoundButton(
-        modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!,
-        save.sound,
-      );
-      return;
-    }
-    if (
-      action === 'prologue-skip' &&
-      !save.prologueSeen &&
-      !pendingRun &&
-      save.mortal.hometown &&
-      ['farewell', 'walk'].includes(save.mortal.hometown.stage)
-    ) {
-      finishDeparture(true);
-      return;
-    }
-    if (action === 'prologue-enter' || action === 'prologue-skip' || action === 'close') {
-      const replay = save.prologueSeen;
-      if (
-        action === 'prologue-enter' &&
-        !replay &&
-        !pendingRun &&
-        save.mortal.hometown &&
-        ['farewell', 'walk'].includes(save.mortal.hometown.stage)
-      )
-        void mobileDisplay.enter();
-      save.prologueSeen = true;
-      ui.inert = false;
-      panel = '';
-      modal.innerHTML = '';
-      persist();
-      renderLobby();
-      if (replay)
-        ui.querySelector<HTMLButtonElement>('[data-action="prologue-revisit"]')?.focus({
-          preventScroll: true,
-        });
-    }
-    return;
-  }
-  if (action === 'prologue-revisit') {
-    renderPrologue(true);
-    return;
-  }
-  if (
-    save.mortal.hometown &&
-    ['farewell', 'walk'].includes(save.mortal.hometown.stage) &&
-    !save.pendingReincarnation &&
-    !game &&
-    !pendingRun &&
-    lifespanInfo(save).remaining > 0 &&
-    !tribulationDue(save)
-  ) {
-    if (action === 'hometown-walk' && panel === 'hometown-choice') {
-      const next = structuredClone(save);
-      next.hometownSeen = false;
-      try {
-        writeSave(next, null);
-      } catch {
-        if (!saveLock) toast('暂时无法保存启程选择，请重试');
-        return;
-      }
-      Object.assign(save, next);
-      void mobileDisplay.enter();
-      renderDeparture();
-    } else if (action === 'hometown-skip' && panel === 'hometown-choice') finishDeparture();
-    else if (action === 'hometown-continue' && panel === 'hometown-farewell') {
-      save.mortal.hometown.stage = 'walk';
-      persist();
-      ui.inert = false;
-      panel = '';
-      modal.innerHTML = '';
-      document.getElementById('town-view')?.focus({ preventScroll: true });
-      townScene?.toggleDockNavigation();
-    } else if (action === 'town-retry') renderDeparture();
-    else if (action === 'town-talk' && !panel) townScene?.talk();
-    if (action !== 'fullscreen') return;
-  }
-  if (action === 'hometown-home' && panel === 'hometown-home') {
-    showHometown();
-    return;
-  }
-  if (
-    action === 'hometown-parent' &&
-    panel === 'hometown-home' &&
-    (id === 'father' || id === 'mother')
-  ) {
-    showHometown(id);
-    return;
-  }
-  if (
-    action === 'hometown-letter' &&
-    inMortalWorld &&
-    save.mortal.hometown?.letterFoundAt != null &&
-    ['hometown-home', 'human-journal', 'human-memory', ''].includes(panel)
-  ) {
-    if (readHometownLetter(save)) persist();
-    panel = 'human-memory';
-    panelFrame('故居家书', '人间缘簿 · 家中旧字', hometownLetterContent(save));
-    return;
-  }
-  if (
-    action === 'immortal-gate' &&
-    !game &&
-    !inMortalWorld &&
-    realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max
-  ) {
-    panel = 'immortal-gate';
-    const gate = immortalGatePanel();
-    panelFrame(...gate);
-    return;
-  }
-  if (action === 'confirm-immortal-gate' && panel === 'immortal-gate' && !game) {
-    const ended = structuredClone(save);
-    if (!enterImmortalGate(ended)) return;
-    try {
-      writeSave(ended, null);
-    } catch {
-      if (!saveLock) toast('浏览器无法保存终章，此世尚未结束，请释放存储空间后重试');
-      return;
-    }
-    Object.assign(save, ended);
-    pendingRun = null;
-    telemetry.track({ type: 'epilogue', ...lifeStats() });
-    telemetry.flush();
-    renderEpilogue();
-    return;
-  }
-  if (action === 'fullscreen' && (game || inTown || inMarket)) {
-    void (mobileDisplay.active ? mobileDisplay.leave() : mobileDisplay.enter());
-    return;
-  }
-  if (action === 'journey-map' && !game) {
-    ui.querySelector<HTMLButtonElement>('.journey-node.selected')?.focus({ preventScroll: true });
-    ui.querySelector('.journey-map-heading')?.scrollIntoView({
-      block: 'start',
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'instant'
-        : 'smooth',
-    });
-    return;
-  }
-  if ((action === 'revisit' || action === 'journey-prepare') && !game) {
-    ui.querySelector<HTMLButtonElement>('.journey-depart [data-action="start"]')?.focus({
-      preventScroll: true,
-    });
-    ui.querySelector('.journey-selection')?.scrollIntoView({
-      block: 'start',
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'instant'
-        : 'smooth',
-    });
-    return;
-  }
-  if (panel === 'tribulation-forfeit') {
-    if (action === 'confirm-forfeit') {
-      beginJourneyFarewell('tribulation');
-    } else if (action === 'cancel-forfeit' || action === 'close') {
-      if (game?.tribulation) game.state === 'lost' ? renderDeath() : renderPause();
-      else renderTribulationPending();
-    }
-    return;
-  }
-  if (action === 'tribulation-start' && tribulationDue(save)) {
-    if (assetsReady) void mobileDisplay.enter();
-    beginTribulation();
-    return;
-  }
-  if (action === 'tribulation-forfeit' && tribulationDue(save)) {
-    renderTribulationForfeit();
-    return;
-  }
-  if (tribulationDue(save) && !game?.tribulation) {
-    renderTribulationPending();
-    return;
-  }
-
-  if (panel === 'lifespan-ended' && !['watch-lifespan-ad', 'end-lifetime'].includes(action)) return;
-  if (
-    action === 'end-lifetime' &&
-    panel === 'lifespan-ended' &&
-    lifespanInfo(save).remaining === 0
-  ) {
-    beginJourneyFarewell('lifespan');
-    return;
-  }
-  if (action === 'watch-lifespan-ad') {
-    showLifespanAd();
-    return;
-  }
-  if (panel === 'lifespan-ad' && ['close', 'cancel-lifespan', 'claim-lifespan'].includes(action)) {
-    const claim = action === 'claim-lifespan';
-    if (claim && !adCompleted()) return;
-    const target = game ?? pendingRun;
-    const years = claim ? (target ? target.borrowLife() : extendLifespan(save)) : 0;
-    if (years) resolveActivity(save);
-    clearInterval(adTimer);
-    adReadyAt = 0;
-    persist();
-    if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
-    else if (game) {
-      panel = '';
-      previousState = game.state;
-      renderPause();
-      updateHud();
-    } else {
-      panel = '';
-      modal.innerHTML = '';
-      renderLobby();
-    }
-    if (years) toast(`向天借寿 · 寿元 +${years} 年`);
-    return;
-  }
-  if (panel === 'sect-dues') {
-    if (action === 'dues-ad') showRewardAd('supplies');
-    else if (action === 'dues-pay' || action === 'dues-decline') {
-      if (!settleSectDues(save, action === 'dues-decline')) return;
-      panel = '';
-      modal.innerHTML = '';
-      persist();
-      if (inMortalWorld) syncMortalChange();
-      else renderLobby();
-      toast(action === 'dues-pay' ? '供奉已补缴，继续游历' : '已离宗，精研成果仍保留');
-    }
-    return;
-  }
-  if (action === 'mortal-enter' && !game) {
-    if (lifespanInfo(save).remaining === 0) {
-      renderLifespanEnd();
-      return;
-    }
-    renderMortal(true);
-    persist();
-    return;
-  }
-  if (
-    action.startsWith('auction-') &&
-    inMortalWorld &&
-    inMarket &&
-    !game &&
-    panel === 'sect-auction' &&
-    marketScene?.nearAuction
-  ) {
-    if (action === 'auction-view' && (id === 'buy' || id === 'sell' || id === 'history')) {
-      auctionView = id;
-      refreshAuction();
-      return;
-    }
-    const button = modal.querySelector<HTMLButtonElement>(
-      action === 'auction-buy'
-        ? `[data-action="auction-buy"][data-id="${Number(id)}"]`
-        : '[data-action="auction-sell"]',
-    );
-    if (!button || button.disabled) return;
-    const visit = Number(button.dataset.visit);
-    const next = structuredClone(save);
-    const traded = executeAuctionTrade(
-      save,
-      next,
-      action,
-      id,
-      visit,
-      auctionKind,
-      !!pendingRun,
-      modal,
-    );
-    if (!traded) return;
-    if (!traded.ok) {
-      toast(traded.error);
-      return;
-    }
-    const result = traded.result;
-    try {
-      writeSave(next, pendingRun);
-    } catch {
-      if (!saveLock) toast('拍卖未完成：浏览器暂时无法保存，请重试');
-      return;
-    }
-    Object.assign(save, next);
-    refreshAuction(result.id);
-    const status = document.getElementById('town-status');
-    if (status) status.innerHTML = townStatus(save);
-    const note = modal.querySelector<HTMLElement>('#auction-result');
-    if (note) {
-      note.hidden = false;
-      note.textContent = auctionResult(save, result);
-    }
-    toast(auctionResult(save, result));
-    return;
-  }
-  if (action.startsWith('sect-market-') && inMortalWorld && !game) {
-    if (
-      action === 'sect-market-enter' &&
-      !panel &&
-      !inMarket &&
-      !inTown &&
-      mortalTab === 'sects' &&
-      sectMarketOpen(save)
-    ) {
-      const next = structuredClone(save);
-      next.mortal.population ??= freshTownPopulation(next.age);
-      if (!beginSectMarketVisit(next)) return;
-      try {
-        writeSave(next, pendingRun);
-      } catch {
-        if (!saveLock) toast('浏览器暂时无法保存坊市进度，请重试');
-        return;
-      }
-      Object.assign(save, next);
-      inMarket = true;
-      inTown = false;
-      lastMortalTick = performance.now();
-      void mobileDisplay.enter();
-      renderMortal();
-      document.getElementById('sect-market-view')?.focus({ preventScroll: true });
-    } else if (action === 'sect-market-retry' && inMarket && !panel) renderMortal();
-    else if (action === 'sect-market-exit' && inMarket && !panel) {
-      leaveTown();
-      persist();
-      renderMortal();
-      document.querySelector<HTMLButtonElement>('[data-action="sect-market-enter"]')?.focus();
-    } else if (action === 'sect-market-talk' && inMarket && !panel) marketScene?.talk();
-    else if (
-      action === 'sect-market-fellow' &&
-      inMarket &&
-      panel === 'sect-market-event' &&
-      marketNpc?.id === 'market-fellow' &&
-      marketScene?.nearbyNpc?.id === 'market-fellow' &&
-      (id === 'stay' || id === 'travel' || id === 'read')
-    ) {
-      const button = modal.querySelector<HTMLButtonElement>(
-        `[data-action="sect-market-fellow"][data-id="${id}"]`,
-      );
-      if (!button || button.disabled) return;
-      const next = structuredClone(save);
-      if (!chooseMarketFellow(next, id, Number(button.dataset.visit))) return;
-      try {
-        writeSave(next, pendingRun);
-      } catch {
-        if (!saveLock) toast('这次交谈未能保存，请重试');
-        return;
-      }
-      Object.assign(save, next);
-      showMarketEvent(marketNpc);
-    } else if (
-      [
-        'sect-market-debate',
-        'sect-market-request',
-        'sect-market-inspect',
-        'sect-market-opportunity',
-        'sect-market-decline',
-      ].includes(action) &&
-      inMarket &&
-      panel === 'sect-market-event' &&
-      isMarketCultivatorId(id) &&
-      marketNpc?.id === id &&
-      marketScene?.nearbyNpc?.id === id
-    ) {
-      const button = modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
-      if (!button || button.disabled) return;
-      const visit = Number(button.dataset.visit);
-      const next = structuredClone(save);
-      const social = executeMarketSocial(
-        next,
-        action,
-        id,
-        visit,
-        Number(button.dataset.level),
-        !!pendingRun,
-      );
-      if (!social.ok) {
-        if (social.stale) toast('这桩互动已变化，请重新查看；当前物资未改动');
-        return;
-      }
-      try {
-        writeSave(next, pendingRun);
-      } catch {
-        if (!saveLock) toast('互动未完成：浏览器暂时无法保存，请重试');
-        return;
-      }
-      Object.assign(save, next);
-      if (next.mortal.marketSocial?.ambush) showMarketAmbush();
-      else {
-        refreshMarketActivities();
-        refreshMarketTrade();
-        toast(social.message);
-      }
-      const status = document.getElementById('town-status');
-      if (status) status.innerHTML = townStatus(save);
-    } else if (
-      action === 'sect-market-exchange' &&
-      inMarket &&
-      panel === 'sect-market-event' &&
-      isMarketCultivatorId(id) &&
-      marketNpc?.id === id &&
-      marketScene?.nearbyNpc?.id === id
-    ) {
-      const give = modal.querySelector<HTMLSelectElement>('#sect-market-give')?.value ?? '';
-      const visit = Number(
-        modal.querySelector<HTMLButtonElement>('[data-action="sect-market-exchange"]')?.dataset
-          .visit,
-      );
-      const reason = sectMarketExchangeReason(save, id, give, visit);
-      if (reason) {
-        toast(reason);
-        return;
-      }
-      const next = structuredClone(save);
-      const received = sectMarketOffer(next, id)!;
-      if (!exchangeSectMedicine(next, id, give, visit)) return;
-      try {
-        writeSave(next, pendingRun);
-      } catch {
-        if (!saveLock) toast('互换未完成：浏览器暂时无法保存，请重试');
-        return;
-      }
-      Object.assign(save, next);
-      refreshMarketTrade();
-      const status = document.getElementById('town-status');
-      if (status) status.innerHTML = townStatus(save);
-      toast(`${received.name} ×1 已收入丹囊`);
-    }
-    return;
-  }
-  if (
-    action === 'smith-story' &&
-    panel === 'town-event' &&
-    inTown &&
-    !game &&
-    townNpc?.id === 'smith'
-  ) {
-    if (townScene?.nearbyNpc?.id === 'smith' && chooseSmithStory(save, id ?? '')) {
-      persist();
-      showTownEvent(townNpc);
-      toast(save.mortal.events[0]);
-    }
-    return;
-  }
-  if (
-    action === 'human-memory' &&
-    inMortalWorld &&
-    !game &&
-    (!panel || panel === 'human-journal') &&
-    id &&
-    isHumanStoryId(id) &&
-    save.mortal.humanStories?.[id]
-  ) {
-    syncHumanStories(save);
-    chooseHumanStory(save, id, 'read');
-    persist();
-    panel = 'human-memory';
-    panelFrame(HUMAN_STORIES[id].title, '人间缘簿 · 此世旧事', humanStoryContent(save, id));
-    return;
-  }
-  if (action === 'human-story' && inMortalWorld && !game) {
-    const [storyId, choice] = (id ?? '').split(':');
-    if (!isHumanStoryId(storyId)) return;
-    const atNpc =
-      panel === 'town-event' &&
-      inTown &&
-      townNpc?.id === HUMAN_STORIES[storyId].npcId &&
-      townScene?.nearbyNpc?.id === townNpc.id;
-    if (atNpc && chooseHumanStory(save, storyId, choice)) {
-      persist();
-      showTownEvent(townNpc!);
-    }
-    return;
-  }
-  if (action.startsWith('town-') && inMortalWorld && !game && !panel) {
-    if (action === 'town-enter' && mortalTab === 'town') {
-      const memory = enterTownVisit(save);
-      persist();
-      telemetry.track({ type: 'town', ...lifeStats() });
-      void mobileDisplay.enter();
-      inTown = true;
-      if (save.mortal.hometown) townPosition = { ...HOMETOWN_START };
-      lastMortalTick = performance.now();
-      renderMortal();
-      document.getElementById('town-view')?.focus({ preventScroll: true });
-      if (memory) townScene?.showArrival(memory);
-    } else if (action === 'town-retry' && inTown) {
-      const memory = document.querySelector('.town-return-note')?.textContent;
-      renderMortal();
-      if (memory) townScene?.showArrival(memory);
-    } else if (action === 'town-exit') {
-      leaveTown();
-      persist();
-      renderMortal();
-      document.querySelector<HTMLButtonElement>('[data-action="town-enter"]')?.focus();
-    } else if (action === 'town-talk') townScene?.talk();
-    return;
-  }
-  if (
-    action.startsWith('mortal-') &&
-    inMortalWorld &&
-    !game &&
-    (!panel ||
-      panel === 'town-event' ||
-      (panel === 'tea-story' && action === 'mortal-activity' && id === 'tea'))
-  ) {
-    if (
-      panel === 'tea-story' &&
-      modal.querySelector<HTMLButtonElement>('.tea-story-next')?.disabled !== false
-    )
-      return;
-    if (action === 'mortal-tab' && (id === 'town' || id === 'sects')) {
-      leaveTown();
-      mortalTab = id;
-      document.getElementById('mortal-content')!.innerHTML = mortalTabContent(
-        save,
-        mortalTab,
-        mortalFilter,
-        pendingRun?.path,
-      );
-      ui.querySelectorAll<HTMLButtonElement>('[data-action="mortal-tab"]').forEach((button) => {
-        const active = button.dataset.id === mortalTab;
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-pressed', String(active));
-      });
-    } else if (action === 'mortal-filter' && ['all', 'orthodox', 'demonic'].includes(id ?? '')) {
-      mortalFilter = id!;
-      renderMortal();
-    } else {
-      const changed = executeMortalAction(save, action, id, pendingRun?.path);
-      if (changed) {
-        const fromTown = panel === 'town-event' || panel === 'tea-story';
-        if (fromTown) {
-          closeNpcChat();
-          panel = '';
-          modal.innerHTML = '';
-        }
-        if (action === 'mortal-join') {
-          selectedTreasure = save.starter;
-          treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
-        }
-        syncMortalChange();
-        if (
-          fromTown &&
-          action === 'mortal-activity' &&
-          id === 'tea' &&
-          !panel &&
-          !save.mortal.activity
-        )
-          showTeaStory();
-        if (fromTown && (action === 'mortal-buy' || action === 'mortal-sell') && townNpc)
-          showTownEvent(townNpc);
-        if (action === 'mortal-join' || action === 'mortal-leave') toast(save.mortal.events[0]);
-        if (action === 'mortal-activity' && !save.mortal.activity) toast(save.mortal.events[0]);
-      } else if (panel === 'tea-story') toast('暂时不能继续听书，请先处理寿元或未完成的事项。');
-    }
-    return;
-  }
-  if (action === 'export-save' && !game) {
-    downloadJson(exportSave(save, pendingRun), '存档');
-    toast('已导出存档，请保留下载的 JSON 文件');
-    return;
-  }
-  if (action === 'import-save' && !game && panel === 'cultivation') {
-    document.querySelector<HTMLInputElement>('#save-import')?.click();
-    return;
-  }
-  if (action === 'confirm-import' && !game && panel === 'import-confirm' && pendingImport) {
-    const candidate = pendingImport;
-    try {
-      writeSave(candidate.save, candidate.run);
-    } catch {
-      if (!saveLock) toast('浏览器无法写入存档，当前进度未更改');
-      return;
-    }
-    Object.assign(save, candidate.save, { sound: save.sound });
-    if (!save.journeyEnded && !save.pendingReincarnation) resolveActivity(save);
-    pendingRun = candidate.run ? Game.restore(save, candidate.run.snapshot()) : null;
-    storageAvailable = true;
-    persist();
-    pendingImport = null;
-    selectedStage = save.unlocked;
-    selectedTreasure = save.starter;
-    treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
-    difficulty = 0;
-    schoolFilter = 'all';
-    bookTab = 'treasures';
-    gameAudio.sync();
-    returnLobby();
-    if (save.journeyEnded) return;
-    if (save.pendingReincarnation) {
-      renderJourneyFarewell(save.pendingReincarnation);
-      return;
-    }
-    if (lifespanInfo(save).remaining === 0) {
-      renderLifespanEnd();
-      return;
-    }
-    if (tribulationDue(save)) {
-      renderTribulationPending();
-      return;
-    }
-    if (!save.prologueSeen && save.mortal.hometown?.stage !== 'departed') renderPrologue();
-    toast('存档已导入，修行进度已恢复');
-    return;
-  }
-  if (panel === 'import-confirm' && ['close', 'cultivation', 'home'].includes(action))
-    pendingImport = null;
-  if (panel === 'reward-ad' && rewardAd === 'root') {
-    if (action === 'ad-root-quality' && SPIRIT_ROOTS.some((r) => r.id === id)) {
-      adRoot = id as SpiritRootId;
-      adElements = rootElementsFor(adRoot, adElements);
-      renderRootPicker();
-      refreshAdCountdown('claim-ad-reward', '领取奖励');
-      return;
-    }
-    if (action === 'ad-root-element' && ELEMENTS.some((e) => e.id === id)) {
-      const element = id as ElementId;
-      const count = spiritRootInfo(adRoot).count;
-      if (!count) return;
-      if (adElements.includes(element)) adElements = adElements.filter((e) => e !== element);
-      else {
-        if (adElements.length === count) adElements.pop();
-        adElements.push(element);
-      }
-      renderRootPicker();
-      refreshAdCountdown('claim-ad-reward', '领取奖励');
-      return;
-    }
-  }
-  if (panel === 'supplies-shortage' && ['close', 'cancel-supplies'].includes(action)) {
-    closeRewardAd();
-    return;
-  }
-  if (
-    action === 'watch-root-ad' ||
-    (action === 'watch-supplies-ad' && panel === 'supplies-shortage')
-  ) {
-    showRewardAd(action === 'watch-root-ad' ? 'root' : 'supplies');
-    return;
-  }
-  if (panel === 'reward-ad' && (action === 'close' || action === 'cancel-reward-ad')) {
-    closeRewardAd();
-    return;
-  }
-  if (action === 'claim-ad-reward') {
-    if (game || panel !== 'reward-ad' || !rewardAd || !adCompleted()) return;
-    const kind = rewardAd;
-    const supplies = adSupplies(save.unlocked);
-    if (kind === 'root') {
-      if (!attuneSpiritRoot(save, adRoot, adElements)) return;
-      selectedTreasure = save.starter;
-      treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
-    } else {
-      save.stones += supplies.stones;
-      save.iron += supplies.iron;
-    }
-    persist();
-    closeRewardAd();
-    toast(
-      kind === 'root'
-        ? `${spiritRootInfo(save.spiritRoot).name}已成 · ${treasure(save.starter).name}为本命 · 下次历练生效`
-        : `仙缘补给 · 灵石 +${supplies.stones} · 玄铁 +${supplies.iron}`,
-    );
-    return;
-  }
-  if (action === 'root-guide') {
-    guideTab = 'roots';
-    handleAction('guide');
-    return;
-  }
-  if (panel === 'victory' && (action === 'victory-result' || action === 'close')) {
-    renderResult();
-    return;
-  }
-  if (action === 'damage' && game && (game.state === 'playing' || game.state === 'paused')) {
-    resumeAfterDamage = game.state === 'playing';
-    clearInput();
-    game.pause();
-    previousState = game.state;
-    panel = 'damage';
-
-    panelFrame(...damagePanel(game, resumeAfterDamage));
-    persist();
-    return;
-  }
-  if (action === 'watch-ad') {
-    showReviveAd();
-    return;
-  }
-  if (action === 'finish-run' && game?.state === 'lost') {
-    finishRun();
-    return;
-  }
-  if (action === 'ad-revive') {
-    if (panel !== 'revive-ad' || !adCompleted() || settled || !game?.revive()) return;
-    clearInterval(adTimer);
-    adReadyAt = 0;
-    clearInput();
-    panel = '';
-    modal.innerHTML = '';
-    previousState = 'playing';
-    if (game.state === 'won') {
-      finishRun();
-      return;
-    }
-    lastFrame = performance.now();
-    updateHud();
-    persist();
-    return;
-  }
-  if (action === 'reincarnate' && !game) {
-    if (realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max) {
-      handleAction('immortal-gate');
-      return;
-    }
-    panel = 'reincarnate';
-
-    panelFrame(...reincarnatePanel());
-    return;
-  }
-  if (action === 'confirm-reincarnate' && panel === 'reincarnate' && !game) {
-    trackReincarnation('manual');
-    resetLifetime(
-      undefined,
-      modal.querySelector<HTMLInputElement>('#reincarnate-full-opening')?.checked ? 'full' : false,
-      resolveInheritance(
-        save,
-        modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
-      ),
-    );
-    return;
-  }
-  if (action === 'autoplay') {
-    save.autoplay = !save.autoplay;
-    clearInput();
-    aiChoiceTime = 0;
-    nextAiMove = 0;
-    persist();
-    if (game) {
-      renderHud();
-      if (game.state === 'upgrade') renderChoices();
-      else if (game.state === 'paused' && panel !== 'guide') renderPause();
-    } else {
-      renderLobby();
-      if (panel === 'settings') renderPanel();
-    }
-    toast(save.autoplay ? '自动历练已开启 · 自动走位与选技' : '已切回手动操作');
-    return;
-  }
-  if (action === 'sound' || action === 'mute') {
-    volumeOpen = action === 'sound' && !volumeOpen;
-    soundSettings.setEnabled(action === 'sound', true);
-    if (game) renderHud();
-    else renderLobby();
-    return;
-  }
-  if (action === 'close') {
-    if (panel === 'treasure-detail' && treasureReturn) {
-      const location = treasureReturn;
-      treasureReturn = null;
-      restorePanel(location);
-      return;
-    }
-    if (panel === 'guide' && !game && guideReturn) {
-      const location = guideReturn;
-      guideReturn = null;
-      restorePanel(location);
-      return;
-    }
-    if (panel === 'journey-card') {
-      if (journeyCardReturn === 'lifespan-farewell') renderJourneyFarewell('lifespan');
-      else if (journeyCardReturn === 'tribulation-farewell') renderJourneyFarewell('tribulation');
-      else showPanel('chronicle');
-      return;
-    }
-    closeNpcChat();
-    const wasHumanMemory = panel === 'human-memory';
-    const returnToAbout = panel === 'about';
-    const returnToSettings = panel === 'settings';
-    if (game?.state === 'lost' && !settled) return;
-    if (game?.state === 'paused' && panel === 'damage') {
-      panel = '';
-      if (resumeAfterDamage) {
-        game.resume();
-        modal.innerHTML = '';
-      } else renderPause();
-      resumeAfterDamage = false;
-    } else if (game?.state === 'paused' && panel === 'guide') {
-      panel = '';
-      renderPause();
-    } else if (game?.state === 'paused') {
-      game.resume();
-      modal.innerHTML = '';
-    } else {
-      panel = '';
-      modal.innerHTML = '';
-      if (inMarket) document.getElementById('sect-market-view')?.focus({ preventScroll: true });
-      if (wasHumanMemory && inMortalWorld && !inTown) renderMortal();
-      if (returnToAbout)
-        ui.querySelector<HTMLButtonElement>('[data-action="about"]')?.focus({
-          preventScroll: true,
-        });
-      if (returnToSettings)
-        ui.querySelector<HTMLButtonElement>('[data-action="settings"]')?.focus({
-          preventScroll: true,
-        });
-    }
-    return;
-  }
-  if (action === 'home') {
-    if (!game) {
-      panel = '';
-      modal.innerHTML = '';
-      renderLobby();
-    }
-    return;
-  }
-  if (action === 'about' && !game) {
-    showPanel('about');
-    return;
-  }
-  if (action === 'settings' && !game) {
-    showPanel('settings');
-    return;
-  }
-  if (action === 'settings-sound' && panel === 'settings') {
-    soundSettings.toggle();
-    renderLobby();
-    renderPanel();
-    return;
-  }
-  if (action.startsWith('offline-') && panel === 'settings') {
-    void offlineAction(action);
-    return;
-  }
-  if (action === 'telemetry-toggle' && panel === 'about') {
-    telemetry.setEnabled(!telemetry.enabled());
-    renderPanel();
-    modal.querySelector<HTMLButtonElement>('[data-action="telemetry-toggle"]')?.focus();
-    return;
-  }
-  if (action === 'guide') {
-    if (!game || game.state === 'playing' || game.state === 'paused') {
-      if (panel !== 'guide') guideReturn = game ? null : rememberPanel();
-      if (game) {
-        clearInput();
-        game.pause();
-        previousState = 'paused';
-        persist();
-      }
-      showPanel('guide');
-    }
-    return;
-  }
-  if (action === 'bestiary-stage') {
-    bestiaryStage = Number(id);
-    renderPanel();
-    modal.querySelector('.panel')?.scrollTo(0, 0);
-  }
-  if (
-    medicinePanel.handle(action, id, {
-      panel,
-      hasGame: !!game,
-      pendingRun: !!pendingRun,
-      herbsShop: inTown && townNpc?.id === 'herbs',
-    })
-  )
-    return;
-
-  if (action === 'guide-tab') {
-    guideTab = id!;
-    renderPanel();
-    modal.querySelector('.panel')?.scrollTo(0, 0);
-    return;
-  }
-  if (action === 'journey-card' && (panel === 'chronicle' || panel === 'journey-card')) {
-    void renderJourneyCard();
-    return;
-  }
-  if (
-    action === 'cultivation' ||
-    action === 'arsenal' ||
-    action === 'bestiary' ||
-    action === 'chronicle'
-  ) {
-    if (!game) showPanel(action);
-    return;
-  }
-  if (action === 'stage') {
-    if (Number(id) <= save.unlocked) {
-      selectedStage = Number(id);
-      const showStage = () => {
-        renderLobby();
-        ui.querySelector<HTMLButtonElement>(`.journey-node[data-id="${selectedStage}"]`)?.focus({
-          preventScroll: true,
-        });
-      };
-      if (ensureScene(selectedStage, showStage)) showStage();
-    }
-  }
-  if (action === 'path' && !game && !save.mortal.member && isCultivationPath(id)) {
-    save.path = id;
-    if (alignStarterWithPath(save)) {
-      selectedTreasure = save.starter;
-      treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
-      schoolFilter = 'all';
-    }
-    persist();
-    renderLobby();
-  }
-  if (action === 'treasure-page') {
-    const treasures = catalogTreasures.filter(
-      (t) => schoolFilter === 'all' || t.school === schoolFilter,
-    );
-    treasurePage = Math.max(
-      0,
-      Math.min(Math.ceil(treasures.length / 12) - 1, treasurePage + (id === 'next' ? 1 : -1)),
-    );
-    selectedTreasure = treasures[treasurePage * 12].id;
-    renderPanel();
-    modal.querySelector('.panel')?.scrollTo(0, 0);
-    (
-      modal.querySelector<HTMLButtonElement>(
-        `.collection-pages button[data-id="${id}"]:not(:disabled)`,
-      ) ?? modal.querySelector<HTMLButtonElement>('.collection-pages button:not(:disabled)')
-    )?.focus({ preventScroll: true });
-  }
-  if (action === 'school-filter') {
-    schoolFilter = id!;
-    treasurePage = 0;
-    selectedTreasure = catalogTreasures.find(
-      (t) => schoolFilter === 'all' || t.school === schoolFilter,
-    )!.id;
-    renderPanel();
-    modal.querySelector('.panel')?.scrollTo(0, 0);
-  }
-  if (action === 'difficulty') {
-    difficulty = Number(id);
-    renderLobby();
-  }
-  if (action === 'treasure') {
-    treasureReturn = rememberPanel();
-    selectedTreasure = id!;
-    showPanel('treasure-detail');
-  }
-  if (action === 'book-tab') {
-    bookTab = id!;
-    renderPanel();
-    modal.querySelector('.panel')?.scrollTo(0, 0);
-  }
-  if (
-    action === 'equip' &&
-    save.artifacts.includes(selectedTreasure) &&
-    allowsSchool(save.path, treasure(selectedTreasure).school)
-  ) {
-    save.starter = selectedTreasure;
-    persist();
-    renderLobby();
-    renderPanel();
-    toast(`已将${treasure(selectedTreasure).name}设为本命法宝`);
-  }
-  if (action === 'forge' && forge(save, selectedTreasure)) {
-    persist();
-    renderLobby();
-    renderPanel();
-    toast(`${treasure(selectedTreasure).name}炼器成功 · 伤害永久提升`);
-  }
-  if (action === 'retreat' && !game && panel === 'cultivation') {
-    const input = document.querySelector<HTMLInputElement>('#retreat-years');
-    if (!input || !input.reportValidity()) return;
-    const result = retreat(save, Number(input.value));
-    if (!result) return;
-    if (pendingRun) pendingRun = Game.restore(save, pendingRun.snapshot());
-    persist();
-    renderLobby();
-    if (tribulationDue(save)) {
-      renderTribulationPending();
-      return;
-    }
-    panel = 'retreat-result';
-
-    panelFrame(...retreatResultPanel(save, result));
-    return;
-  }
-  if (
-    action === 'train' &&
-    !game &&
-    panel === 'cultivation' &&
-    train(save, id as 'vitality' | 'power' | 'speed')
-  ) {
-    if (pendingRun) pendingRun = Game.restore(save, pendingRun.snapshot());
-    persist();
-    renderLobby();
-    renderPanel();
-    gameAudio.play('upgrade');
-    if (tribulationDue(save)) renderTribulationPending();
-  }
-  if (action === 'start' || action === 'retry') {
-    if (assetsReady && selectedStage <= save.unlocked && !pendingRun && !tribulationDue(save))
-      void mobileDisplay.enter();
-    startRun();
-  }
-  if (action === 'restore') {
-    if (assetsReady && pendingRun) void mobileDisplay.enter();
-    restoreRun();
-  }
-  if (action === 'new-run') {
-    pendingRun = null;
-    if (assetsReady && selectedStage <= save.unlocked && !tribulationDue(save))
-      void mobileDisplay.enter();
-    startRun();
-  }
-  if (action === 'next' && game) {
-    selectedStage = Math.min(STAGES.length - 1, game.stage + 1);
-    if (assetsReady && selectedStage <= save.unlocked && !tribulationDue(save))
-      void mobileDisplay.enter();
-    startRun();
-  }
-  if (action === 'return') returnLobby();
-  if (action === 'pause' && game) {
-    clearInput();
-    panel = '';
-    game.pause();
-    renderPause();
-    persist();
-  }
-  if (action === 'resume' && game) {
-    clearInput();
-    panel = '';
-    game.resume();
-    modal.innerHTML = '';
-  }
-  if (action === 'abandon' && game) {
-    if (game.tribulation) {
-      renderTribulationForfeit();
-      return;
-    }
-    if (!abandonConfirm) {
-      abandonConfirm = true;
-      renderPause();
-    } else {
-      game.state = 'lost';
-    }
-  }
-  if (action === 'choose' && game?.choose(Number(id))) {
-    // 经验可跨多级：下帧再次进入 upgrade 时也必须显示新选项。
-    previousState = game.state;
-    clearInput();
-    modal.innerHTML = '';
-    updateHud();
-    if (game.state === 'won') finishRun();
-    else persist();
-  }
-  if (action === 'reroll' && game?.reroll()) {
-    renderChoices();
-    persist();
-  }
+  dispatchAction(shellBindings(), action, id);
 }
 document.addEventListener('click', (event) => {
   if (

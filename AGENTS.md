@@ -48,7 +48,7 @@
 | `public/assets/`                                                    | 已生成的图片及背景音乐                    |
 | `tests/`、`scripts/`                                                | 逻辑测试、固定种子平衡模拟、素材生成脚本  |
 
-续局结构校验与战斗公共类型在 `game-validation.ts` / `game-types.ts`，连击系数在 `boss-followup.ts`；续局校验与连击系数文件的变更同样触发完整平衡测试。战斗 HUD 在 `battle-hud.ts`，面板框架、返回焦点与滚动在 `panel-host.ts`。序章、轮回与终章模板在 `opening-ui.ts`，首页与战斗结果模板在 `lobby-ui.ts`，入镇、坊市互动与拍卖执行在 `town-host.ts`，弹窗焦点与手动走位在 `input-controller.ts`。异步留影和丹囊交互分别在 `journey-card-panel.ts` / `medicine-panel.ts`；藏器阁、洞府和妖物志纯模板在各自的 `*-ui.ts`。出场、突破与预警绘制在 `render-overlays.ts` / `render-warnings.ts`。`styles.ts` 按原顺序加载十一份连续样式，禁止为了归类移动媒体覆盖顺序；`battle-hud.css` 仍在其后加载。
+续局结构校验与战斗公共类型在 `game-validation.ts` / `game-types.ts`，连击系数在 `boss-followup.ts`；续局校验与连击系数文件的变更同样触发完整平衡测试。战斗 HUD 在 `battle-hud.ts`，面板框架、返回焦点与滚动在 `panel-host.ts`。序章、轮回与终章模板在 `opening-ui.ts`，首页与战斗结果模板在 `lobby-ui.ts`，入镇、坊市互动与拍卖执行在 `town-host.ts`，弹窗焦点与手动走位在 `input-controller.ts`，点击与按键动作分发在 `action-controller.ts`，城镇挂载、入场与广告面板在 `scene-flow.ts`。异步留影和丹囊交互分别在 `journey-card-panel.ts` / `medicine-panel.ts`；藏器阁、洞府和妖物志纯模板在各自的 `*-ui.ts`。出场、突破与预警绘制在 `render-overlays.ts` / `render-warnings.ts`。`styles.ts` 按原顺序加载十一份连续样式，禁止为了归类移动媒体覆盖顺序；`battle-hud.css` 仍在其后加载。
 
 开发及验证命令：
 

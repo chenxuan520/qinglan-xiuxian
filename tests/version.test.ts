@@ -11,6 +11,6 @@ test('构建注入 git describe 版本并展示在关于面板', () => {
   const config = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
   assert.match(config, /git describe --tags --always/);
   assert.match(config, /__QINGLAN_VERSION__/);
-  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
-  assert.match(source, /<span>版本<\/span>\$\{GAME_VERSION\}/);
+  const source = readFileSync(new URL('../src/scene-flow.ts', import.meta.url), 'utf8');
+  assert.match(source, /<span>版本<\/span>\$\{shell\.GAME_VERSION\}/);
 });

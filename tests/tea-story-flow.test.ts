@@ -14,6 +14,7 @@ import { TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { AD_SECONDS } from '../src/ads.ts';
 import { MedicinePanel } from '../src/medicine-panel.ts';
 import { executeMortalAction, teaStoryPanel } from '../src/town-host.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 import { lifespanEndPanel, tribulationPendingPanel } from '../src/opening-ui.ts';
 import { sectDuesModal } from '../src/lobby-ui.ts';
 
@@ -25,6 +26,7 @@ const flow = new Script(
         'main',
         [
           'showTeaStory',
+          'shellBindings',
           'handleAction',
           'syncMortalChange',
           'persist',
@@ -112,6 +114,7 @@ function harness(t: TestContext) {
   const writes: string[] = [];
   const messages: string[] = [];
   const context = createContext({
+    dispatchAction,
     save,
     modal,
     writes,

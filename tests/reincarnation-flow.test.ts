@@ -37,6 +37,7 @@ import { JourneyCardPanel } from '../src/journey-card-panel.ts';
 import * as openingUi from '../src/opening-ui.ts';
 import * as lobbyUi from '../src/lobby-ui.ts';
 import * as townHost from '../src/town-host.ts';
+import { dispatchAction } from '../src/action-controller.ts';
 
 // 执行实际函数和调用入口，不导入 main 的游戏、音频、Worker 与页面初始化。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -50,6 +51,7 @@ const flow = new Script(
       'refreshRootReveal',
       'renderRootReveal',
       'resumeHometown',
+      'shellBindings',
       'handleAction',
       'renderLobby',
       'renderPrologue',
@@ -98,6 +100,7 @@ function harness(save: SaveData) {
   const rootLayout = { innerHTML: '' };
   let rolls = 0;
   const context = createContext({
+    dispatchAction,
     homeTownEntrance,
     ...data,
     ambushScene: null,
