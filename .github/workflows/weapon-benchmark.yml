@@ -1,0 +1,136 @@
+name: Weapon benchmark
+
+on:
+  schedule:
+    # 每天北京时间12:00；GitHub可能排队延迟。
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: weapon-benchmark-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      report-id: ${{ steps.report.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Run complete weapon experience evaluation
+        run: npm run balance:weapons -- --extended --workers 3 --out artifacts/weapon-benchmark
+      - name: Publish readable summary
+        if: always() && !cancelled()
+        run: |
+          if [ -f artifacts/weapon-benchmark/summary.md ]; then
+            cat artifacts/weapon-benchmark/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve public report even on evaluation failure
+        if: always() && !cancelled()
+        id: report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: weapon-daily-report
+          path: |
+            artifacts/weapon-benchmark/index.html
+            artifacts/weapon-benchmark/summary.json
+            artifacts/weapon-benchmark/summary.md
+            artifacts/weapon-benchmark/battles.csv
+            artifacts/weapon-benchmark/pairs.csv
+          if-no-files-found: error
+          retention-days: 90
+
+  publish-report:
+    needs: benchmark
+    if: always() && !cancelled() && needs.benchmark.result != 'cancelled' && needs.benchmark.outputs.report-id != '' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}weapon-report/
+    steps:
+      # 日报发布只重建已经通过游戏发布检查的提交。
+      - name: Select latest deployed game
+        id: game
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          game_sha=$(gh run list --repo "$REPOSITORY" --workflow pages.yml --branch master --status success --limit 1 --json headSha --jq '.[0].headSha')
+          test -n "$game_sha"
+          echo "sha=$game_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.game.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Build deployed game
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: npm run build -- --base "$BASE_PATH/"
+      - name: Preserve latest balance report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types scripts/restore-balance-report.ts
+      - name: Preserve performance summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types scripts/restore-monitor-performance.ts
+      - name: Include this weapon report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_RUN: ${{ github.run_id }}
+          REPORT_COMMIT: ${{ github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh run download "$REPORT_RUN" --repo "$REPOSITORY" --name weapon-daily-report --dir dist/weapon-report
+      - name: Checkout current report validation tools after building the game
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: artifacts/report-tools
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            package.json
+            scripts/restore-weapon-report.ts
+            scripts/ci-artifacts.ts
+            src/weapon-report.ts
+            src/data.ts
+      - name: Validate current report without changing the built game
+        env:
+          REPORT_RUN: ${{ github.run_id }}
+          REPORT_COMMIT: ${{ github.sha }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-weapon-report.ts --check dist/weapon-report
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

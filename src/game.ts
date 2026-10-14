@@ -2047,7 +2047,11 @@ export class Game {
         damage: dmg * (crit ? s.criticalDamage : 1),
         color: t.color,
         kind: w.id,
-        pierce: ['sword', 'fan', 'blade', 'dragon'].includes(w.id) ? 2 + w.level : 1,
+        pierce: ['sword', 'fan', 'blade', 'dragon'].includes(w.id)
+          ? 2 + w.level
+          : w.id === 'talisman'
+            ? 2
+            : 1,
         hit: new Set(),
         origin: { x: p.x, y: p.y },
         age: 0,
@@ -2219,7 +2223,7 @@ export class Game {
             if (!target) break;
             hit.add(target.id);
             this.effect(z.x, z.y, 0.3, 4, z.color, 'tower-ray', undefined, target.x, target.y);
-            this.hitEnemy(target, z.damage * (i === 0 ? 1 : 0.2), false, z.kind);
+            this.hitEnemy(target, z.damage * (i === 0 ? 1 : 0.35), false, z.kind);
           }
         } else {
           const hits = this.enemies.some(

@@ -29,6 +29,7 @@ import {
   validMonitorCI,
 } from './monitor-view.ts';
 import './monitor.css';
+import { mountWeaponMonitor } from './monitor-weapons.ts';
 import { monitorDeadline } from './monitor-request.ts';
 import {
   validPerformanceSnapshot,
@@ -65,6 +66,7 @@ root.innerHTML = `<main>
 </main>`;
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+mountWeaponMonitor(root);
 const charts: Chart[] = [];
 let liveController: AbortController | undefined;
 let ciController: AbortController | undefined;

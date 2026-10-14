@@ -39,7 +39,7 @@ function pagodaFixture(level: number, evolved = false) {
   return { g, z, enemies };
 }
 
-test('七宝塔低重每轮镇压两只，三重及仙器三只，副目标两成且不越出圆形范围', () => {
+test('七宝塔低重每轮镇压两只，三重及仙器三只，副目标三成半且不越出圆形范围', () => {
   for (const [level, evolved] of [
     [1, false],
     [2, false],
@@ -52,8 +52,8 @@ test('七宝塔低重每轮镇压两只，三重及仙器三只，副目标两�
     near(z.radius, (210 + level * 15) * g.stats.area);
     near(z.maxLife, 4.5 * g.stats.duration);
     g.updateZones(0.01);
-    enemies.forEach((e, i) => near(e.maxHp - e.hp, i < count ? z.damage * (i ? 0.2 : 1) : 0));
-    near(g.damageBySource.pagoda, z.damage * (1 + (count - 1) * 0.2));
+    enemies.forEach((e, i) => near(e.maxHp - e.hp, i < count ? z.damage * (i ? 0.35 : 1) : 0));
+    near(g.damageBySource.pagoda, z.damage * (1 + (count - 1) * 0.35));
     assert.equal(g.effects.filter((e) => e.kind === 'tower-ray').length, count);
     const hp = enemies.map((e) => e.hp);
     g.updateZones(0.2);
@@ -62,7 +62,7 @@ test('七宝塔低重每轮镇压两只，三重及仙器三只，副目标两�
       hp,
     );
     g.updateZones(0.3);
-    enemies.forEach((e, i) => near(e.maxHp - e.hp, i < count ? z.damage * (i ? 0.4 : 2) : 0));
+    enemies.forEach((e, i) => near(e.maxHp - e.hp, i < count ? z.damage * (i ? 0.7 : 2) : 0));
   }
 });
 
@@ -73,8 +73,8 @@ test('七宝塔跳过已死目标，主目标死亡后也不会重复命中或�
   g.updateZones(0.01);
   assert.equal(enemies[0].hp, enemies[0].maxHp);
   assert.equal(enemies[1].dead, true);
-  near(enemies[2].maxHp - enemies[2].hp, z.damage * 0.2);
-  near(enemies[3].maxHp - enemies[3].hp, z.damage * 0.2);
+  near(enemies[2].maxHp - enemies[2].hp, z.damage * 0.35);
+  near(enemies[3].maxHp - enemies[3].hp, z.damage * 0.35);
   assert.equal(enemies[4].hp, enemies[4].maxHp);
   const solo = pagodaFixture(6, true);
   solo.g.enemies = [];
@@ -119,7 +119,7 @@ test('多个七宝塔圈独立镇压，重叠圈续局后不漏伤或在单圈�
   g.cast(g.weapons[0]);
   assert.equal(g.zones.length, 2);
   g.updateZones(0.01);
-  enemies.forEach((e, i) => near(e.maxHp - e.hp, i < 3 ? z.damage * (i ? 0.4 : 2) : 0));
+  enemies.forEach((e, i) => near(e.maxHp - e.hp, i < 3 ? z.damage * (i ? 0.7 : 2) : 0));
   const restored = Game.restore(g.save, g.snapshot());
   assert.ok(restored);
   g.updateZones(0.5);
@@ -520,4 +520,29 @@ test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普�
         );
       assert.equal(stack.length, 0);
     }
+});
+
+test('镇魂符只穿透两只不同妖物，不重复伤害同一目标，也不因穿透对单王翻倍', () => {
+  for (const boss of [false, true]) {
+    const save = freshSave('heaven', ['fire'], 'demonic', () => 0.99);
+    save.starter = 'talisman';
+    save.artifacts.push('talisman');
+    const g = new Game(save, 0, 0, () => 0.99);
+    g.weapons = [{ id: 'talisman', level: 1, evolved: false, timer: 999 }];
+    const enemies = [80, 160, 240].map((x) => {
+      const e = g.spawnEnemy(0, false, boss, { x, y: -8 });
+      e.hp = e.maxHp = 10000;
+      return e;
+    });
+    if (boss) g.enemies = [enemies[0]];
+    g.cast(g.weapons[0]);
+    g.shots = [g.shots.find((s) => Math.abs(s.vy) < 1e-9)!];
+    assert.ok(g.shots[0]);
+    const damage = g.shots[0].damage;
+    for (let i = 0; i < 50; i++) g.updateShots(0.02);
+    near(enemies[0].maxHp - enemies[0].hp, damage);
+    near(enemies[1].maxHp - enemies[1].hp, boss ? 0 : damage);
+    near(enemies[2].maxHp - enemies[2].hp, 0);
+    near(g.damageBySource.talisman, damage * (boss ? 1 : 2));
+  }
 });

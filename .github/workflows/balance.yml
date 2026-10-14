@@ -229,6 +229,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node --experimental-strip-types scripts/restore-monitor-performance.ts
+      - name: Preserve latest weapon evaluation report
+        # 最后已部署游戏可能还没有新日报工具；只在构建完后取当前任务的控制脚本。
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: artifacts/report-tools
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            package.json
+            scripts/restore-weapon-report.ts
+            scripts/ci-artifacts.ts
+            src/weapon-report.ts
+            src/data.ts
+      - name: Restore weapon report with current validation tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-weapon-report.ts
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
