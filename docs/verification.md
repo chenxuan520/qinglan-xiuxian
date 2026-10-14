@@ -1936,3 +1936,8 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 - 5173 按「尚无服务」流程以 `npm run preview -- --port 5173 --strictPort` 启动（更新前 pgrep 确认无服务；顺手清理了遗留的 5199 perf-render 预览进程），dist 走 assets 追加 + `index.html.next` 原子替换，旧 hash 文件保留。`http://localhost:5173/`、robots.txt、sitemap.xml、og-cover.jpg 均 200。
 - Chrome DevTools MCP 隔离上下文：1440×900 与 390×844 实测 JS 启动后 `.static-home` 完全消失、`#app` 被 canvas 与 ui 正常接管（序章显示、布局正常）；另在 390×844 与 1440×900 把构建后静态内容重新注入验证慢网络中间态（构建 CSS 已载、脚本未替换），手机单列、桌面 760px 居中、图文完整、全页可滚动、深色主题一致；再移除全部外部样式表模拟构建 CSS 拉取失败的故障态，内联 body 归零兜底无白边。独立审查无必须修复项，两条建议（记录措辞、body 兜底）已当场修复并复跑通过。截图仅在 `/tmp`。
 - 未验证/待办：GitHub Pages 与 Cloudflare 正式站尚未部署本次改动；AdSense 复审结果未知，不宣称会通过。根域 `011203.xyz` 停用重定向规则后 `https://011203.xyz/` 已无法访问（curl 000，仅 `/ads.txt` 由 Worker 服务 200）——若 AdSense 后台登记站点仍为根域，需用户确认站点 URL 或恢复可访问性后再提交复审。
+
+## 移除静态首页（2026-10-14）
+
+- 用户验收后要求移除上午新增的静态初始界面（脚本加载前的内容页）：`index.html` 恢复到 2099e5b 的原始空壳形态，删除 tests/static-home.test.ts。AdSense 站点与复审安排用户已自行处理。robots.txt 与 sitemap.xml 保留（用户未要求删除，纯文本不影响视觉与游戏）。
+- 复查：全仓 grep 无 `.static-home` 代码残留；`npm test` 944/944 通过（回落到引入前数量）；`npm run format:check` 通过；根路径构建产物确认 `#app` 为空、无静态页残留。
