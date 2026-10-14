@@ -99,10 +99,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node --experimental-strip-types scripts/restore-balance-report.ts
-      - name: Preserve performance summaries
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types scripts/restore-monitor-performance.ts
       - name: Include this weapon report
         env:
           GH_TOKEN: ${{ github.token }}
@@ -120,9 +116,15 @@ jobs:
           sparse-checkout: |
             package.json
             scripts/restore-weapon-report.ts
+            scripts/restore-monitor-performance.ts
+            src/monitor-performance.ts
             scripts/ci-artifacts.ts
             src/weapon-report.ts
             src/data.ts
+      - name: Preserve performance summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-monitor-performance.ts
       - name: Validate current report without changing the built game
         env:
           REPORT_RUN: ${{ github.run_id }}

@@ -225,10 +225,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node --experimental-strip-types scripts/restore-balance-report.ts
-      - name: Publish latest performance summaries
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types scripts/restore-monitor-performance.ts
       - name: Preserve latest weapon evaluation report
         # 最后已部署游戏可能还没有新日报工具；只在构建完后取当前任务的控制脚本。
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -239,9 +235,15 @@ jobs:
           sparse-checkout: |
             package.json
             scripts/restore-weapon-report.ts
+            scripts/restore-monitor-performance.ts
+            src/monitor-performance.ts
             scripts/ci-artifacts.ts
             src/weapon-report.ts
             src/data.ts
+      - name: Publish latest performance summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-monitor-performance.ts
       - name: Restore weapon report with current validation tools
         env:
           GH_TOKEN: ${{ github.token }}

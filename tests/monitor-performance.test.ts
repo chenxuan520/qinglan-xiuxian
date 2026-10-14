@@ -5,7 +5,10 @@ import {
   validPerformanceSnapshot,
   type PerformanceSnapshot,
 } from '../src/monitor-performance.ts';
-import { eligiblePerformanceRun } from '../scripts/restore-monitor-performance.ts';
+import {
+  eligiblePerformanceRun,
+  quickPerformanceReady,
+} from '../scripts/restore-monitor-performance.ts';
 import { newestArtifacts } from '../scripts/ci-artifacts.ts';
 
 const generatedAt = '2026-10-10T12:00:00Z',
@@ -145,4 +148,48 @@ test('产物内部编号及列表乱序时，仍选最新生成结果并排除�
   assert.equal(artifacts[0].id, 11666011051);
   const newestFailure = { id: 1, created_at: '2026-10-10T09:40:00Z', state: 'failed' };
   assert.equal(newestArtifacts([...artifacts, newestFailure])[0].state, 'failed');
+});
+
+test('快检性能产物上传完成即可发布，不等待并行全量；取消、未上传与外仓仍拒绝', () => {
+  const repo = 'chenxuan520/qinglan-xiuxian';
+  const run = {
+    path: '.github/workflows/balance.yml',
+    head_branch: 'master',
+    head_repository: { full_name: repo },
+    event: 'push',
+    status: 'in_progress',
+    conclusion: null,
+  };
+  const ready = {
+    name: 'quick',
+    conclusion: null,
+    steps: [{ name: 'Preserve performance summaries', status: 'completed', conclusion: 'success' }],
+  };
+  assert.equal(quickPerformanceReady([ready]), true);
+  assert.equal(eligiblePerformanceRun(run, repo, false, true), true);
+  assert.equal(eligiblePerformanceRun(run, repo, false, false), false);
+  for (const change of [
+    { name: 'full' },
+    { conclusion: 'cancelled' },
+    { steps: [] },
+    {
+      steps: [{ name: 'Preserve performance summaries', status: 'in_progress', conclusion: null }],
+    },
+    {
+      steps: [
+        { name: 'Preserve performance summaries', status: 'completed', conclusion: 'failure' },
+      ],
+    },
+  ])
+    assert.equal(quickPerformanceReady([{ ...ready, ...change }]), false);
+  for (const change of [
+    { conclusion: 'cancelled' },
+    { head_repository: { full_name: 'fork/other' } },
+    { event: 'pull_request' },
+    { head_branch: 'feat/other' },
+    { status: 'queued' },
+  ])
+    for (const render of [true, false])
+      assert.equal(eligiblePerformanceRun({ ...run, ...change }, repo, render, true), false);
+  assert.equal(quickPerformanceReady([{ ...ready, conclusion: 'failure' }]), true);
 });

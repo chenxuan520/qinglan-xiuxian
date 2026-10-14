@@ -17,17 +17,43 @@ export function eligiblePerformanceRun(
     head_repository?: { full_name: string };
     event: string;
     status: string;
+    conclusion?: string | null;
   },
   repository: string,
   render: boolean,
+  quickReady = false,
 ) {
   return (
     run.path === '.github/workflows/balance.yml' &&
     run.head_branch === 'master' &&
     run.head_repository?.full_name === repository &&
+    run.conclusion !== 'cancelled' &&
+    ['completed', 'in_progress'].includes(run.status) &&
     (render
       ? ['schedule', 'workflow_dispatch', 'push'].includes(run.event)
-      : run.status === 'completed' && ['push', 'workflow_dispatch'].includes(run.event))
+      : (run.status === 'completed' || quickReady) &&
+        ['push', 'workflow_dispatch'].includes(run.event))
+  );
+}
+
+// 上传步骤结束后artifact已完整；不必等待同一workflow里数小时的全量矩阵。
+export function quickPerformanceReady(
+  jobs: {
+    name: string;
+    conclusion?: string | null;
+    steps?: { name: string; status: string; conclusion?: string | null }[];
+  }[],
+) {
+  return jobs.some(
+    (job) =>
+      job.name === 'quick' &&
+      job.conclusion !== 'cancelled' &&
+      job.steps?.some(
+        (step) =>
+          step.name === 'Preserve performance summaries' &&
+          step.status === 'completed' &&
+          step.conclusion === 'success',
+      ),
   );
 }
 
@@ -92,7 +118,19 @@ export function restorePerformance(
     for (const artifact of artifacts) {
       if (artifact.expired || artifact.workflow_run?.head_branch !== 'master') continue;
       const run = api(`repos/${repository}/actions/runs/${artifact.workflow_run.id}`);
-      if (!eligiblePerformanceRun(run, repository, name === 'perf-render')) continue;
+      let quickReady = false;
+      if (
+        name === 'perf-checks' &&
+        run.status === 'in_progress' &&
+        eligiblePerformanceRun(run, repository, false, true)
+      ) {
+        const jobs = api(
+          `repos/${repository}/actions/runs/${run.id}/jobs?per_page=100`,
+          true,
+        ).flatMap((page: { jobs: Parameters<typeof quickPerformanceReady>[0] }) => page.jobs);
+        quickReady = quickPerformanceReady(jobs);
+      }
+      if (!eligiblePerformanceRun(run, repository, name === 'perf-render', quickReady)) continue;
       const temporary = mkdtempSync(join(tmpdir(), 'qinglan-monitor-perf-'));
       try {
         execFileSync(
