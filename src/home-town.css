@@ -1,28 +1,30 @@
 .home-town-entry {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) auto;
+  grid-template-columns: 240px 230px minmax(0, 1fr);
+  grid-template-areas: 'copy art link';
   align-items: center;
   gap: 28px;
   width: 100%;
-  padding: 20px 30px;
-  margin: 4px 0 28px;
-  border: 1px solid var(--border);
-  background: #183b333d;
+  padding: 12px 0 20px;
+  margin: 4px 0 12px;
+  border: 0;
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color 180ms,
-    background-color 180ms;
 }
-.home-town-entry:hover {
-  border-color: var(--gold);
+.home-town-entry:hover .home-town-link {
+  color: #e9dba9;
+}
+.home-town-entry:hover .home-town-link svg {
+  transform: translateX(4px);
 }
 .home-town-entry:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 4px;
 }
 .home-town-art {
+  grid-area: art;
   position: relative;
   height: 140px;
   min-width: 0;
@@ -48,6 +50,7 @@
   width: 46%;
 }
 .home-town-copy {
+  grid-area: copy;
   display: grid;
   gap: 9px;
 }
@@ -68,13 +71,14 @@
   line-height: 1.8;
 }
 .home-town-link {
+  grid-area: link;
+  justify-self: end;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
   min-height: 44px;
-  padding: 10px 18px;
-  border: 1px solid var(--border);
+  padding: 10px 0;
   color: var(--gold);
   font-size: 13px;
   white-space: nowrap;
@@ -82,12 +86,13 @@
 .home-town-link svg {
   width: 20px;
   height: 20px;
+  transition: transform 180ms;
 }
 @media (max-width: 900px) {
   .home-town-entry {
-    grid-template-columns: 170px minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 170px auto;
     gap: 18px;
-    padding: 18px 22px;
+    padding: 12px 0 18px;
   }
   .home-town-art {
     height: 110px;
@@ -95,13 +100,15 @@
 }
 @media (max-width: 640px) {
   .home-town-entry {
-    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 112px;
+    grid-template-areas:
+      'copy art'
+      'link art';
     gap: 10px 14px;
-    padding: 16px;
-    margin-bottom: 20px;
+    padding: 12px 0 16px;
+    margin-bottom: 12px;
   }
   .home-town-art {
-    grid-row: 1 / 3;
     height: 100px;
   }
   .home-town-copy {
@@ -120,7 +127,7 @@
   }
   .home-town-link {
     justify-self: start;
-    padding: 8px 12px;
+    padding: 8px 0;
     font-size: 12px;
     gap: 8px;
   }
