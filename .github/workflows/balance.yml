@@ -90,10 +90,10 @@ jobs:
 
   full:
     needs: changes
-    # 同一分支不并行重算；保留正在执行的矩阵及最后进入队列的待运行作业。
+    # 同一来源分支的 push/PR 共用队列，新全量任务取消旧任务；外仓和其他分支互不影响。
     concurrency:
-      group: balance-full-${{ github.ref }}
-      cancel-in-progress: false
+      group: balance-full-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.head_ref || github.ref_name }}
+      cancel-in-progress: true
     outputs:
       report-id: ${{ steps.report.outputs.artifact-id }}
     if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.full == true || needs.changes.outputs.full == 'true' || needs.changes.result == 'failure') && inputs.render_only != true }}
@@ -111,12 +111,12 @@ jobs:
       - run: npm test
       - run: npm run balance:gate:full
       - name: Generate daily web report even on failure
-        if: always()
+        if: always() && !cancelled()
         run: |
           npm run balance:report
           cat artifacts/balance-daily-report/summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Preserve daily web report
-        if: always()
+        if: always() && !cancelled()
         id: report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -135,7 +135,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Fail CI on report Error after preserving artifacts
-        if: always()
+        if: always() && !cancelled()
         run: node --experimental-strip-types scripts/check-balance-report.ts
 
   # 每日渲染实测：无头 Chrome 恢复第六境后期高压对局采样 60 秒帧率与长任务，只报告不设门槛。
@@ -171,7 +171,7 @@ jobs:
 
   publish-report:
     needs: [full, perf-render]
-    if: always() && github.ref == 'refs/heads/master' && (needs.full.outputs.report-id != '' || inputs.render_only == true)
+    if: always() && !cancelled() && needs.full.result != 'cancelled' && needs.perf-render.result != 'cancelled' && github.ref == 'refs/heads/master' && (needs.full.outputs.report-id != '' || inputs.render_only == true)
     runs-on: ubuntu-latest
     permissions:
       contents: read
