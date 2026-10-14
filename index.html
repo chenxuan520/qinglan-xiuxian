@@ -49,9 +49,201 @@
       onload="this.media='all'"
       onerror="this.remove()"
     />
+    <!--
+      静态首页：脚本加载前、加载失败或禁用 JavaScript 时可见的完整内容页。
+      样式内联生效，不依赖构建产物与远程字体；main.ts 启动后 #app 整体替换为游戏界面。
+    -->
+    <style>
+      body {
+        margin: 0;
+      }
+      .static-home {
+        height: 100%;
+        min-height: 100vh;
+        overflow-y: auto;
+        margin: 0 auto;
+        padding: 44px 26px 40px;
+        max-width: 760px;
+        background: #102d29;
+        color: #dcebdd;
+        font-family: 'Noto Serif SC', 'Songti SC', 'STSong', SimSun, serif;
+        line-height: 1.85;
+      }
+      .static-home * {
+        box-sizing: border-box;
+      }
+      .static-home img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 10px;
+      }
+      .static-eyebrow {
+        margin: 26px 0 6px;
+        letter-spacing: 0.34em;
+        font-size: 13px;
+        color: #d4bd7e;
+      }
+      .static-home h1 {
+        margin: 0 0 14px;
+        font-size: 34px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: #f2e6c9;
+      }
+      .static-lead {
+        margin: 0 0 8px;
+        font-size: 16px;
+        color: #b8d4bb;
+      }
+      .static-entering {
+        margin: 6px 0 0;
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        color: #8fa893;
+      }
+      .static-home h2 {
+        margin: 40px 0 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(212, 189, 126, 0.35);
+        font-size: 20px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: #f2e6c9;
+      }
+      .static-home p {
+        margin: 10px 0;
+        font-size: 15px;
+      }
+      .static-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 22px;
+        margin: 16px 0 0;
+      }
+      .static-grid article {
+        margin: 0;
+        padding: 4px 0 0;
+      }
+      .static-grid b {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 15px;
+        color: #d4bd7e;
+      }
+      .static-grid p {
+        margin: 0;
+        font-size: 14px;
+        color: #b8d4bb;
+      }
+      .static-home ul {
+        margin: 10px 0 0;
+        padding-left: 1.3em;
+      }
+      .static-home li {
+        margin: 8px 0;
+        font-size: 14px;
+        color: #b8d4bb;
+      }
+      .static-nojs {
+        margin: 12px 0 0;
+        padding: 10px 14px;
+        border: 1px solid rgba(212, 189, 126, 0.45);
+        border-radius: 8px;
+        font-size: 14px;
+        color: #d4bd7e;
+      }
+      .static-footer {
+        margin-top: 44px;
+        padding-top: 14px;
+        border-top: 1px solid rgba(220, 235, 221, 0.14);
+        font-size: 12.5px;
+        letter-spacing: 0.06em;
+        color: #8fa893;
+      }
+      @media (max-width: 560px) {
+        .static-home {
+          padding: 30px 18px 28px;
+        }
+        .static-home h1 {
+          font-size: 27px;
+        }
+        .static-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <main class="static-home">
+        <img
+          src="%BASE_URL%assets/og-cover.jpg"
+          alt="青岚暮色里的修仙山河：云海群峰、山门金阙、灯火小镇与湖面归舟。"
+          width="1200"
+          height="630"
+        />
+        <p class="static-eyebrow">一款只需走位的修仙生存游戏</p>
+        <h1>叩仙门：青岚纪</h1>
+        <p class="static-lead">
+          山河未老，故人先秋。十五岁那年，一位过路修士告诉你：山河之外，还有求长生、问大道的路。你收拾行囊，向青岚山深处走去——从此法宝护身、灵潮为伴，每一步走位，都是向天地多问一句。
+        </p>
+        <p class="static-entering">青岚山水正在展开，稍候即入此间……</p>
+        <noscript>
+          <p class="static-nojs">
+            本游戏需要在启用 JavaScript 的现代浏览器中运行；以上介绍可随时阅读。
+          </p>
+        </noscript>
+        <h2>玩法：只需走位，法术自施</h2>
+        <p>
+          身入秘境，你只需专心走位：躲开妖物、妖王弹幕与险地，法宝会自动护主施法。击杀妖物汲取灵气与玄铁，升级时三选一「机缘」，三十六件法宝与各派功法自由搭配，走出每一世不同的求道之路。
+        </p>
+        <p>
+          五行灵根决定资质，灵根越纯修行越速；正道、魔道或兼修，各有妙处。一场秘境数分钟，胜负之外，还有人间岁月可回。
+        </p>
+        <h2>山河与大道</h2>
+        <div class="static-grid">
+          <article>
+            <b>三十六法宝</b>
+            <p>剑、印、铃、幡……每件法宝皆可觉醒，与功法、丹药相合，构筑专属流派。</p>
+          </article>
+          <article>
+            <b>七重秘境</b>
+            <p>自竹海妖雾至云海仙门，每境有独立地形、妖物与妖王，尽头是天劫与终关试炼。</p>
+          </article>
+          <article>
+            <b>人间岁月</b>
+            <p>出关可入小镇与坊市：十六宗门拜师、供奉与精研，与故人闲谈；百年城景，灯火明灭。</p>
+          </article>
+          <article>
+            <b>轮回传承</b>
+            <p>寿元有时而尽。渡天劫、借寿数，或坦然落幕——此世法宝与道缘，可传给下一位少年。</p>
+          </article>
+        </div>
+        <h2>开始修行</h2>
+        <p>
+          电脑使用方向键或 WASD 走位，手机使用虚拟摇杆；升级机缘按 1 / 2 / 3
+          快速选择。战斗之外，序章、人间与洞府各有山水可访，无需安装，打开网页即可游玩。
+        </p>
+        <h2 id="privacy">隐私说明</h2>
+        <ul>
+          <li>游戏进度保存在你的浏览器本地，不上传服务器；洞府中可导出备份、导入旧档。</li>
+          <li>
+            匿名游玩统计与运行错误摘要会发送到本站服务，仅用于改进体验，不包含个人信息，也不与账号关联。
+          </li>
+          <li>
+            与镇上修士、故人闲谈时，对白内容经本站对话服务（qinglan-npc-ai.011203.xyz）处理，仅用于生成当次回复。
+          </li>
+          <li>
+            游戏内的激励广告由 Google 提供；Google 及其合作伙伴可能使用 Cookie 等技术，可在 Google
+            广告设置中管理个性化选项。
+          </li>
+        </ul>
+        <footer class="static-footer">
+          叩仙门：青岚纪 · 官网 xiuxian.011203.xyz · 于浏览器本地运行，无需安装
+        </footer>
+      </main>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
