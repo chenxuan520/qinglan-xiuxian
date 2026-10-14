@@ -1,3 +1,4 @@
+import { regionalBossSkills } from '../src/regional-combat.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -28,7 +29,13 @@ function cast(g: Game, boss = g.boss!) {
   const stage = boss.bossStage ?? g.stage;
   const phase = boss.skillStep ?? 0;
   g.castBossSkill(boss, 1, 0);
-  assert.ok(g.notice.includes(STAGES[stage].skills[phase]));
+  assert.ok(
+    g.notice.includes(
+      (g.isFinalTrial ? STAGES[stage].skills : regionalBossSkills(stage, STAGES[stage].skills))[
+        phase
+      ],
+    ),
+  );
   assert.notEqual(boss.skillStep, phase, '不能连续重复同一招');
   return phase;
 }

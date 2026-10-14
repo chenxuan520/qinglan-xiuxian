@@ -1,5 +1,7 @@
 import type { Game, Point } from './game.ts';
 import { TAU } from './data.ts';
+import { drawRegionalField } from './regional-render.ts';
+import { hazardMargin } from './regional-hazards.ts';
 
 export function drawEnemyWarnings(
   ctx: CanvasRenderingContext2D,
@@ -10,7 +12,8 @@ export function drawEnemyWarnings(
     p = game.player;
   // 仅重绘清晰的边界与标记，不叠加第二层红色底色。
   for (const z of game.zones) {
-    if (!z.hostile || !visible(z, p, z.radius + 50)) continue;
+    if (!z.hostile || !visible(z, p, hazardMargin(z))) continue;
+    if (drawRegionalField(c, z, game.time, true, true)) continue;
     c.save();
     c.translate(z.x, z.y);
     c.setLineDash(z.delay > 0 ? [7, 5] : []);

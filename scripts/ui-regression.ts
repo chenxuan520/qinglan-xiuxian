@@ -391,6 +391,7 @@ try {
     await click('[data-action=close]');
     await click('[data-action=resume]');
     await click('.combat-actions [data-action=guide]');
+    await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=save]")');
     await click('[data-action=guide-tab][data-id=save]');
     const scroll = await evaluate(`() => {
       const panel=document.querySelector('.panel'), tabs=document.querySelector('.guide-tabs');

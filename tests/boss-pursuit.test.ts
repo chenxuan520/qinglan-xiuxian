@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 
-function encounter(stage = 0, x = -500) {
+function encounter(stage = 0, x = -500, arena = stage) {
   const save = freshSave();
   save.unlocked = 6;
-  const g = new Game(save, stage, 0, () => 0.5);
+  const g = new Game(save, arena, 0, () => 0.5);
   g.weapons[0].timer = 999;
   g.player.invincible = 999;
   const boss = g.spawnEnemy(10, false, true, { x, y: 0 }, stage);
@@ -15,9 +15,9 @@ function encounter(stage = 0, x = -500) {
   return { g, boss };
 }
 
-test('七位妖王远距离追袭先预警，锁定方向，冲刺距离与预警一致', () => {
+test('终关七位妖王远距离追袭先预警，锁定方向，冲刺距离与预警一致', () => {
   for (let stage = 0; stage < 7; stage++) {
-    const { g, boss } = encounter(stage);
+    const { g, boss } = encounter(stage, -500, 6);
     g.update(0.01);
     assert.ok(boss.charge > 1.5);
     const warning = g.effects.find((e) => e.kind === 'line')!;
