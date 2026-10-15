@@ -4,6 +4,8 @@ import type { SaveData } from './progress.ts';
 import { marketCultivatorRealm, type MarketCultivatorId } from './sect-market-data.ts';
 import { auctionValue, auctionItemName } from './auction-items.ts';
 import type { AuctionItem } from './auction-data.ts';
+import { marketTradeMotive, type MarketTradeMotiveKind } from './market-trade-motives.ts';
+import { marketIdentity, isMarketTraderId } from './sect-market-data.ts';
 
 export interface MarketExchangeDeal {
   id: string;
@@ -12,6 +14,9 @@ export interface MarketExchangeDeal {
   giveValue: number;
   receiveValue: number;
   category: 'medicine' | 'medicines' | 'artifact' | 'mixed';
+  motive: MarketTradeMotiveKind;
+  motiveMatched: boolean;
+  benefitText: string;
 }
 export const exchangeItemText = (item: AuctionItem) =>
   `${auctionItemName(item)}${item.kind === 'artifact' ? `（炼器${item.forgeLevel}阶）` : ''} ×${item.quantity}`;
@@ -38,7 +43,8 @@ export function marketExchangeDeals(
 ): MarketExchangeDeal[] {
   const state = save.mortal.sectMarket,
     population = save.mortal.population;
-  if (!state || !population) return [];
+  const motive = marketTradeMotive(save, id);
+  if (!state || !population || !motive || !isMarketTraderId(id)) return [];
   const realm = marketCultivatorRealm(population, state, id);
   const tier = ['凡品', '灵品', '珍品'].indexOf(medicine.tier);
   const cap = realm === 0 ? 0 : Math.max(1, Math.min(6, realm - 1));
@@ -56,14 +62,28 @@ export function marketExchangeDeals(
   if (unit <= 0) return [];
   const candidates: MarketExchangeDeal[] = [];
   const keys = new Set<string>();
-  function add(give: AuctionItem[], quantity: number, category: MarketExchangeDeal['category']) {
+  const add = (give: AuctionItem[], quantity: number, category: MarketExchangeDeal['category']) => {
     if (quantity < 1 || quantity > 6 || give.some((i) => i.quantity < 1 || i.quantity > 12)) return;
     const giveValue = give.reduce((sum, i) => sum + auctionValue(i), 0),
       receiveValue = unit * quantity;
+    const wantedValue = give.reduce(
+      (sum, item) =>
+        sum +
+        ((
+          item.kind === 'medicine'
+            ? motive.preferredMedicineIds.includes(item.id)
+            : motive.preferredWeaponIds.includes(item.id as WeaponKind)
+        )
+          ? auctionValue(item)
+          : 0),
+      0,
+    );
+    const motiveMatched = wantedValue * 2 >= giveValue,
+      premiumCap = motiveMatched ? (motive.friend ? 105 : 108) : 115;
     if (
       !Number.isSafeInteger(giveValue) ||
       giveValue < receiveValue ||
-      giveValue * 100 > receiveValue * 115
+      giveValue * 100 > receiveValue * premiumCap
     )
       return;
     const key =
@@ -77,9 +97,18 @@ export function marketExchangeDeals(
         giveValue,
         receiveValue,
         category,
+        motive: motive.kind,
+        motiveMatched,
+        benefitText: motiveMatched
+          ? motive.friend
+            ? give.length > 1
+              ? '故交照应：合用之物搭配余丹，估值补差不超过5%。'
+              : '故交照应：按合用之物相换，估值补差不超过5%。'
+            : `正合「${motive.title}」之需，估值补差不超过8%。`
+          : '',
       });
     }
-  }
+  };
   for (const m of pool)
     for (let quantity = 1; quantity <= 6; quantity++)
       add(
@@ -124,10 +153,32 @@ export function marketExchangeDeals(
           add([item, pill(m.id, Math.ceil(rest / medicineMarketValue(m.id)))], quantity, 'mixed');
       }
   }
-  const visit = state.visit;
+  // 故交愿把大份余丹拆开换，也接受低阶添头；不凭交情凭空增值。
+  // 原有普通双药报价只换一份，此处让真正合用的药搭配低阶余丹换多份。
+  if (motive.friend) {
+    const preferred = pool.filter((m) => motive.preferredMedicineIds.includes(m.id));
+    for (const wanted of preferred)
+      for (const extra of lower.filter((m) => m.id !== wanted.id))
+        for (let receive = 1; receive <= 6; receive++)
+          for (let count = 1; count <= 12; count++) {
+            const rest = unit * receive - medicineMarketValue(wanted.id) * count;
+            if (rest > 0)
+              add(
+                [
+                  pill(wanted.id, count),
+                  pill(extra.id, Math.ceil(rest / medicineMarketValue(extra.id))),
+                ],
+                receive,
+                'medicines',
+              );
+          }
+  }
+  const identity = marketIdentity(state, id);
+  const visit = identity.birthVisit;
   function hash(key: string) {
     let h = save.medicine.recipeSeed;
-    for (const ch of `${visit}:${id}:${key}`) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    for (const ch of `${visit}:${identity.slot}:${key}`)
+      h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
     return h >>> 0;
   }
   const result: MarketExchangeDeal[] = [];
@@ -142,6 +193,10 @@ export function marketExchangeDeals(
       .sort(
         (a, b) =>
           Number(exchangeOwned(save, b)) - Number(exchangeOwned(save, a)) ||
+          Number(b.motiveMatched) - Number(a.motiveMatched) ||
+          (a.motiveMatched && b.motiveMatched
+            ? a.giveValue / a.receiveValue - b.giveValue / b.receiveValue
+            : 0) ||
           hash(a.id) - hash(b.id),
       );
     result.push(...group.slice(0, limit));

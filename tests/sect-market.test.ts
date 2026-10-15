@@ -500,7 +500,7 @@ test('界面列明完整报价与不足状态，成功后隐藏结算按钮', ()
       );
       assert.match(sectMarketTradeContent(save, npc), /本批已互换/);
       const completedOffer = sectMarketTradeContent(save, npc).match(
-        /<strong>([^<]*)<\/strong>/,
+        /<div class="sect-market-offer">[\s\S]*?<strong>([^<]*)<\/strong>/,
       )?.[1];
       assert.equal(completedOffer, offer.name, '完成后不显示剩余报价的数量');
       assert.doesNotMatch(sectMarketTradeContent(save, npc), /data-action="sect-market-exchange"/);

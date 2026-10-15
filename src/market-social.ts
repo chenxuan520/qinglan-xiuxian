@@ -29,8 +29,9 @@ import {
   prepareAuction,
   auctionSellReason,
   releaseAuctionItem,
+  auctionItemName,
 } from './auction.ts';
-import type { AuctionItem } from './auction-data.ts';
+import { freeStarter, type AuctionItem } from './auction-data.ts';
 import {
   marketContact,
   prepareMarketOpportunity,
@@ -40,6 +41,8 @@ import {
 } from './market-relations.ts';
 import { initialAmbushSnapshot } from './market-ambush-data.ts';
 import { MARKET_SOCIAL_SETTINGS } from './setting.ts';
+import { marketInvitationReward } from './market-opportunities.ts';
+import { marketTradeMotive } from './market-trade-motives.ts';
 
 export function prepareMarketSocial(save: SaveData) {
   const market = save.mortal.sectMarket;
@@ -179,13 +182,16 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
     return undefined;
   const seed = roll(save, 'request-owner');
   if (MARKET_CULTIVATORS[seed % 3].id !== id) return undefined;
+  const motive = marketTradeMotive(save, id);
+  if (!motive) return undefined;
   const n = npc(save, id);
-  const medicine = n.id === 'market-alchemist' || roll(save, `request-kind:${id}`) % 2 === 0;
+  const medicine =
+    motive.kind !== 'journey' ||
+    !motive.preferredWeaponIds.length ||
+    roll(save, `request-kind:${id}`) % 2 === 0;
   let item: AuctionItem;
   if (medicine) {
-    const pool = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id).filter(
-      (m) => m.years > 0,
-    );
+    const pool = motive.preferredMedicineIds.map((medicine) => medicineInfo(medicine)!);
     const m = pool[roll(save, `request-item:${id}`) % pool.length];
     item = {
       kind: 'medicine',
@@ -194,17 +200,13 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
       forgeLevel: 0,
     };
   } else {
-    const pool = TREASURES.filter(
-      (t) =>
-        auctionValue({ kind: 'artifact', id: t.id, quantity: 1, forgeLevel: 0 }) > 0 &&
-        t.school === (n.path === 'demonic' ? 'demonic' : 'orthodox'),
-    );
+    const pool = motive.preferredWeaponIds.map((weapon) => treasure(weapon));
     const t = pool[roll(save, `request-item:${id}`) % pool.length];
     item = {
       kind: 'artifact',
       id: t.id,
       quantity: 1,
-      forgeLevel: Math.min(3, Math.max(0, n.realmIndex - 2)),
+      forgeLevel: Math.min(3, Math.max(freeStarter(t.id) ? 1 : 0, n.realmIndex - 2)),
     };
   }
   const minimumLevel = item.forgeLevel;
@@ -219,17 +221,36 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
     identity.slot,
   );
   const playerRealm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
-  const ratio =
-    disposition === '强横' && n.realmIndex > playerRealm
-      ? 70
-      : disposition === '精明'
-        ? 78
-        : 85 + (roll(save, `request-price:${id}`) % 11);
-  const price = Math.min(
-    1000 * (n.realmIndex + 1) ** 2,
-    Math.floor((auctionValue(item) * ratio) / 100),
-  );
-  return { ...item, minimumLevel, price };
+  const coerced = disposition === '强横' && n.realmIndex > playerRealm;
+  const baseRatio = coerced
+    ? 70
+    : disposition === '精明'
+      ? 78
+      : 85 + (roll(save, `request-price:${id}`) % 11);
+  const needBonus = motive.kind === 'recovery' || motive.kind === 'longevity' ? 4 : 2;
+  const ratio = coerced
+    ? baseRatio
+    : Math.min(motive.friend ? 98 : 95, baseRatio + needBonus + (motive.friend ? 3 : 0));
+  const budget = 1000 * (n.realmIndex + 1) ** 2;
+  const basePrice = Math.min(budget, Math.floor((auctionValue(item) * baseRatio) / 100));
+  const price = Math.min(budget, Math.floor((auctionValue(item) * ratio) / 100));
+  const priceText = coerced
+    ? '他仗着境界压低收货价，你可以拒绝，不必因威压交货。'
+    : price === budget
+      ? '他此行携带的灵石有限，以眼前明示的收货价为准；是否交货由你取舍。'
+      : motive.friend && price > basePrice
+        ? '故交愿为合用之物再添一点报酬；仍以眼前明示的收货价为准。'
+        : price > basePrice
+          ? '此物正合他眼下所需，收货价比他通常的报价略高；是否交货由你取舍。'
+          : '此物正合他眼下所需，按眼前明示的收货价结算；是否交货由你取舍。';
+  return {
+    ...item,
+    minimumLevel,
+    price,
+    motiveTitle: motive.title,
+    motiveText: motive.disclosure,
+    priceText,
+  };
 }
 export function marketWorldScene(save: SaveData, id: MarketCultivatorId) {
   const n = npc(save, id);
@@ -319,6 +340,7 @@ export function fulfillMarketRequest(
 }
 export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
   if (
+    !isMarketTraderId(id) ||
     !save.mortal.sectMarket ||
     !save.mortal.population ||
     save.mortal.sectMarket.absent?.includes(id as (typeof MARKET_CULTIVATORS)[number]['id'])
@@ -338,7 +360,16 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
     kind === 'haggle'
       ? MEDICINES.filter((m) => m.tier === '凡品')[roll(save, `opportunity-item:${id}`) % 8]
       : pool[roll(save, `opportunity-item:${id}`) % pool.length];
-  const item: AuctionItem = { kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 };
+  const invitation =
+    kind === 'invitation'
+      ? marketInvitationReward(save.mortal.population, save.mortal.sectMarket, id)
+      : undefined;
+  const item: AuctionItem = invitation?.item ?? {
+    kind: 'medicine',
+    id: m.id,
+    quantity: 1,
+    forgeLevel: 0,
+  };
   const goodsPrice = Math.max(15, Math.floor(auctionValue(item) * 0.9));
   const cost =
     kind === 'invitation'
@@ -353,6 +384,14 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
     honest,
     risk,
     item,
+    title:
+      invitation?.title ??
+      (kind === 'goods'
+        ? '低价转让一炉丹'
+        : kind === 'deposit'
+          ? '先垫路费的求购'
+          : '卖家的好价钱'),
+    purpose: invitation?.purpose ?? '',
     cost,
     deposit: Math.min(MARKET_SOCIAL_SETTINGS.maxLoss, cost),
     price: Math.floor(auctionValue(item) * 0.9),
@@ -366,6 +405,7 @@ export function opportunityReason(
   action: 'inspect' | 'accept' | 'decline',
   unfinished = false,
 ) {
+  if (!['inspect', 'accept', 'decline'].includes(action)) return '不支持的机缘操作';
   const o = marketOpportunity(save, id);
   if (!o) return '此处暂无坊间机缘';
   const years =
@@ -376,7 +416,14 @@ export function opportunityReason(
         : o.kind === 'invitation'
           ? MARKET_SOCIAL_SETTINGS.invitationYears
           : MARKET_SOCIAL_SETTINGS.opportunityYears;
-  const r = marketSocialReason(save, id, visit, years, o.kind === 'invitation', unfinished);
+  const r = marketSocialReason(
+    save,
+    id,
+    visit,
+    years,
+    o.kind === 'invitation' || o.item.kind === 'artifact',
+    unfinished,
+  );
   if (r) return r;
   const s = save.mortal.marketSocial!;
   if (s.used.includes(id)) return '这桩机缘已经结束';
@@ -394,7 +441,8 @@ export function opportunityReason(
       return '对方求购的丹药库存不足';
     if (
       (o.kind === 'goods' || o.kind === 'haggle' || (o.kind === 'invitation' && o.honest)) &&
-      !Number.isSafeInteger((save.medicine.bag[o.item.id] || 0) + 1)
+      o.item.kind === 'medicine' &&
+      !Number.isSafeInteger((save.medicine.bag[o.item.id] || 0) + o.item.quantity)
     )
       return '丹囊数量已达上限';
     if (o.kind === 'deposit' && o.honest && !Number.isSafeInteger(save.stones + o.price))
@@ -426,12 +474,12 @@ export function chooseMarketOpportunity(
       o.kind === 'haggle'
         ? `你查了价，${medicineInfo(o.item.id)!.name}只是凡品，药铺参考价${medicineInfo(o.item.id)!.price}灵石；对方却开价${o.cost}。`
         : o.honest
-          ? `你花半年验看封签、当面核实凭据，这桩${o.kind === 'invitation' ? '取药邀约' : '交易'}未见破绽；具体交付仍以界面为准。`
+          ? `你花半年${o.item.kind === 'artifact' ? '核对器纹与寄存凭据' : '验看封签、当面核实凭据'}，这桩${o.kind === 'invitation' ? '坊外邀约' : '交易'}未见破绽；具体交付仍以界面为准。`
           : o.kind === 'goods'
             ? '封签重贴，瓶中无药香，丹丸一捻便散。所谓好丹，不过掺灰泥丸。'
             : o.kind === 'deposit'
               ? '你追问收货凭据，对方只催你先垫路费，既不验货也说不出接应者，分明是骗取垫款。'
-              : '你在约定处外围看到陌生脚印与暗藏的兵刃，那是一场伏击，取药只是诱饵。',
+              : '你在约定处外围看到陌生脚印与暗藏的兵刃，那是一场伏击，许诺的宝物只是诱饵。',
     );
   }
   const years =
@@ -490,13 +538,15 @@ export function chooseMarketOpportunity(
     );
   }
   if (o.honest || o.kind === 'haggle') {
-    save.medicine.bag[o.item.id] = (save.medicine.bag[o.item.id] || 0) + 1;
+    const ownedLevel = save.artifacts.includes(o.item.id) ? save.forge[o.item.id] || 0 : -1;
+    receiveMarketItem(save, o.item);
+    recordCollectionAchievement(save);
     if (o.kind === 'invitation') save.stones += o.cost;
     return log(
       save,
       id,
       'gift',
-      `${o.kind === 'invitation' ? '赴约一年，取药归来，暂扣灵石全数返还。' : `花费${o.cost}灵石。`}${medicineInfo(o.item.id)!.name} ×1 已收入丹囊${o.kind === 'haggle' ? '；这笔要价比药铺更高，吃了些价差。' : ''}。`,
+      `${o.kind === 'invitation' ? '赴约一年，对方如约交付，暂扣灵石全数返还。' : `花费${o.cost}灵石。`}${auctionItemName(o.item)}${o.item.kind === 'artifact' ? `（炼器${o.item.forgeLevel}阶）已收入藏器阁${ownedLevel >= o.item.forgeLevel ? `；同名法宝不重复收录，保留原有炼器${ownedLevel}阶` : '，本命未改变'}` : ` ×${o.item.quantity} 已收入丹囊`}${o.kind === 'haggle' ? '；这笔要价比药铺更高，吃了些价差。' : ''}。`,
     );
   }
   return log(
@@ -507,6 +557,19 @@ export function chooseMarketOpportunity(
       ? `你拿到掺灰泥丸，无法服用，已弃去。损失先付的${paid}灵石，余款未付；封签与药香的疑点，原来都是破绽。`
       : `${o.n.name}收了${o.cost}灵石便推诿不再收货。所谓路费，是一笔骗取的垫款；你的丹药仍在丹囊。`,
   );
+}
+function receiveMarketItem(save: SaveData, item: AuctionItem) {
+  if (item.kind === 'medicine')
+    save.medicine.bag[item.id] = (save.medicine.bag[item.id] || 0) + item.quantity;
+  else {
+    if (!save.artifacts.includes(item.id)) save.artifacts.push(item.id);
+    save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);
+    save.forge[item.id] = Math.max(save.forge[item.id] || 0, item.forgeLevel);
+    if (save.mortal.auction)
+      save.mortal.auction.releasedArtifacts = save.mortal.auction.releasedArtifacts.filter(
+        (id) => id !== item.id,
+      );
+  }
 }
 export const MARKET_RISK_CLUES = {
   'secluded-road': '约定处在坊外僻路，离开了坊市的公开照应。',
@@ -594,19 +657,7 @@ export function settleMarketAmbush(save: SaveData, outcome: 'victory' | 'escaped
     )
       return undefined;
     save.stones += a.held;
-    for (const item of a.loot) {
-      if (item.kind === 'medicine')
-        save.medicine.bag[item.id] = (save.medicine.bag[item.id] || 0) + item.quantity;
-      else {
-        if (!save.artifacts.includes(item.id)) save.artifacts.push(item.id);
-        save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);
-        save.forge[item.id] = Math.max(save.forge[item.id] || 0, item.forgeLevel);
-        if (save.mortal.auction)
-          save.mortal.auction.releasedArtifacts = save.mortal.auction.releasedArtifacts.filter(
-            (id) => id !== item.id,
-          );
-      }
-    }
+    for (const item of a.loot) receiveMarketItem(save, item);
     recordCollectionAchievement(save);
   }
   rememberMarketAmbush(save, a.npcId, outcome);

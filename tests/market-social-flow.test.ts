@@ -1,3 +1,4 @@
+import * as marketEventUi from '../src/market-event-ui.ts';
 import { homeTownEntrance } from '../src/home-town.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,7 +67,10 @@ const script = new Script(
     ].join('\n'),
   ),
 );
-function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pending = false) {
+function harness(
+  kind: 'debate' | 'request' | 'fraud' | 'ambush' | 'gift-medicine' | 'gift-artifact' = 'debate',
+  pending = false,
+) {
   let save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.runs = 1;
   save.cultivation = 1;
@@ -89,9 +93,11 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
         chosen = id;
         break;
       }
-    } else if (kind === 'fraud' || kind === 'ambush') {
+    } else if (kind === 'fraud' || kind === 'ambush' || kind.startsWith('gift-')) {
       const id = ids.find((id) => {
         const o = marketOpportunity(save, id);
+        if (kind.startsWith('gift-'))
+          return o?.kind === 'invitation' && o.honest && `gift-${o.item.kind}` === kind;
         return o?.kind === (kind === 'fraud' ? 'goods' : 'invitation') && !o.honest;
       });
       if (id) {
@@ -104,7 +110,7 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     (n) => n.id === chosen,
   )!;
   const offer = marketRequest(save, chosen);
-  if (offer) save.medicine.bag[offer.id] = offer.quantity + 2;
+  if (offer?.kind === 'medicine') save.medicine.bag[offer.id] = offer.quantity + 2;
   const run = pending ? new Game(save, 0, 0, () => 0.5) : null;
   run?.pause();
   let stored = JSON.stringify({ ...save, activeRun: run?.snapshot() ?? null }),
@@ -137,6 +143,7 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     }
   }
   const context = createContext({
+    marketEventSource: { current: marketEventUi },
     dispatchAction,
     homeTownEntrance,
     save,
@@ -284,6 +291,39 @@ test('真实求购和诈骗路由同存物资/时间/额度，保存失败不显
     h.action(kind === 'request' ? 'sect-market-request' : 'sect-market-opportunity');
     assert.equal(h.save.age, 30.5);
     assert.deepEqual(h.stored().mortal.marketSocial, h.save.mortal.marketSocial);
+  }
+});
+test('真实赴约按钮的法宝与丹药承诺同存；保存失败和旧窗口拒绝后没有扣龄、赠物或冷却', () => {
+  for (const kind of ['gift-medicine', 'gift-artifact'] as const) {
+    for (const failure of ['write', 'stale'] as const) {
+      const h = harness(kind);
+      const before = JSON.stringify(h.save);
+      if (failure === 'write') h.fail();
+      else h.stale();
+      h.action('sect-market-opportunity');
+      assert.equal(JSON.stringify(h.save), before);
+      assert.equal(h.entered(), 0);
+      if (failure === 'stale') continue;
+      h.fail(false);
+      const promise = marketOpportunity(h.save, h.npc.id)!;
+      const owned = h.save.medicine.bag[promise.item.id] || 0;
+      h.action('sect-market-opportunity');
+      assert.equal(h.save.age, 31);
+      assert.equal(h.save.mortal.marketSocial!.lastOpportunityAt, 31);
+      assert.equal(h.save.mortal.marketSocial!.ambush, null);
+      if (promise.item.kind === 'medicine')
+        assert.equal(h.save.medicine.bag[promise.item.id], owned + promise.item.quantity);
+      else {
+        assert.ok(h.save.artifacts.includes(promise.item.id));
+        assert.equal(h.save.forge[promise.item.id], promise.item.forgeLevel);
+      }
+      assert.deepEqual(h.stored().medicine, h.save.medicine);
+      assert.deepEqual(h.stored().artifacts, h.save.artifacts);
+      assert.deepEqual(h.stored().forge, h.save.forge);
+      const current = JSON.stringify(h.save);
+      h.action('sect-market-opportunity');
+      assert.equal(JSON.stringify(h.save), current);
+    }
   }
 });
 test('伏击写成功才挂战斗；胜利快照持久化后结算失败可重试，退款与战利品仅一次', () => {

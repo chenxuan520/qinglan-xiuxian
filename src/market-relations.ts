@@ -46,7 +46,12 @@ export function rememberMarketContact(save: SaveData, id: MarketCultivatorId) {
       ];
       const oldest = contacts
         .filter((c) => c !== contact && !protectedIdentities.some((i) => same(c, i)))
-        .sort((a, b) => a.seenAt - b.seenAt || a.lastVisit - b.lastVisit)[0];
+        .sort(
+          (a, b) =>
+            Number(a.goodwill >= 2 || a.grudge > 0) - Number(b.goodwill >= 2 || b.grudge > 0) ||
+            a.seenAt - b.seenAt ||
+            a.lastVisit - b.lastVisit,
+        )[0];
       contacts.splice(contacts.indexOf(oldest), 1);
     }
   }

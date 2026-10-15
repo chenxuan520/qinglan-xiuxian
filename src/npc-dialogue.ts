@@ -13,7 +13,25 @@ import {
   marketIdentity,
   marketLocalReply,
 } from './sect-market-data.ts';
-import { REALMS } from './data.ts';
+import { MAX_FORGE_LEVEL, REALMS, TREASURES } from './data.ts';
+import { medicineInfo } from './medicine-data.ts';
+import type { MarketTradeMotiveKind } from './market-trade-motives.ts';
+
+export interface MarketDialogueTrade {
+  motive: MarketTradeMotiveKind;
+  friend: boolean;
+  wantedMedicineIds: string[];
+  wantedWeaponIds: string[];
+  lead: {
+    npcId: MarketTraderId;
+    kind: 'medicine' | 'artifact';
+    id: string;
+    quantity: number;
+    forgeLevel: number;
+    minimumLevel: number;
+    price: number;
+  } | null;
+}
 
 export const NPC_DEFAULT_LINES = {
   herbs: '山中草药正当时，可愿帮我采来一篓？',
@@ -87,6 +105,7 @@ export interface MarketDialogueContact {
 export interface MarketDialogueContext {
   contact: MarketDialogueContact | null;
   events: Array<(typeof MARKET_DIALOGUE_EVENTS)[number]>;
+  trade?: MarketDialogueTrade;
   risk: {
     kind: 'goods' | 'deposit' | 'haggle' | 'invitation';
     inspection: 'unexamined' | 'no-flaw-found' | 'fraud-exposed' | 'overpriced';
@@ -182,7 +201,7 @@ export function npcPlayerRealm(realm: string) {
   return realm === '渡劫' ? 7 : REALMS.findIndex((name) => realm.startsWith(name));
 }
 
-/** 每次只传当前真人的一份封闭摘要；不接受姓名、日志正文、背包或隐藏真假字段。 */
+/** 只传当前真人的一份封闭摘要；公开物品用合法 ID，不接受自由姓名、正文、背包或隐藏真假。 */
 export function validMarketDialogueContext(
   value: unknown,
   input: Pick<NpcDialogueRequest, 'population' | 'age' | 'npcId' | 'marketVisit' | 'realm'>,
@@ -194,7 +213,12 @@ export function validMarketDialogueContext(
     !validMarketDialogueVisit(input.marketVisit) ||
     !marketCharacters(input.population, input.marketVisit).some((npc) => npc.id === input.npcId) ||
     !record(value) ||
-    !exactKeys(value, ['contact', 'events', 'risk'])
+    !exactKeys(value, [
+      'contact',
+      'events',
+      'risk',
+      ...(value.trade === undefined ? [] : ['trade']),
+    ])
   )
     return false;
   const c = value.contact;
@@ -233,6 +257,7 @@ export function validMarketDialogueContext(
     new Set(items).size === items.length &&
     items.every((item) => typeof item === 'string' && allowed.includes(item));
   if (!list(value.events, MARKET_DIALOGUE_EVENTS)) return false;
+  if (value.trade !== undefined && !validMarketDialogueTrade(value.trade, input, c)) return false;
   const risk = value.risk;
   if (risk === null) return true;
   if (!record(risk) || !isMarketTraderId(input.npcId)) return false;
@@ -265,6 +290,92 @@ export function validMarketDialogueContext(
     ['谨慎', '危险', '凶险'].includes(String(risk.level)) &&
     list(risk.clues, MARKET_DIALOGUE_CLUES)
   );
+}
+
+function validMarketDialogueTrade(
+  value: unknown,
+  input: Pick<NpcDialogueRequest, 'population' | 'npcId' | 'marketVisit'>,
+  contact: unknown,
+): value is MarketDialogueTrade {
+  if (
+    !isMarketTraderId(input.npcId) ||
+    !record(value) ||
+    !exactKeys(value, ['motive', 'friend', 'wantedMedicineIds', 'wantedWeaponIds', 'lead']) ||
+    !['cultivation', 'recovery', 'longevity', 'journey'].includes(String(value.motive)) ||
+    typeof value.friend !== 'boolean'
+  )
+    return false;
+  const friend = !!(
+    record(contact) &&
+    Number(contact.goodwill) >= 2 &&
+    contact.grudge === 0 &&
+    Number(contact.birthVisit) < input.marketVisit!.visit
+  );
+  if (value.friend !== friend) return false;
+  const ids = (items: unknown, max: number, valid: (id: string) => boolean) =>
+    Array.isArray(items) &&
+    items.length <= max &&
+    new Set(items).size === items.length &&
+    items.every((id) => typeof id === 'string' && valid(id));
+  if (
+    !ids(value.wantedMedicineIds, 3, (id) => !!medicineInfo(id)) ||
+    !ids(value.wantedWeaponIds, 2, (id) => TREASURES.some((t) => t.id === id))
+  )
+    return false;
+  const lead = value.lead;
+  if (lead === null) return true;
+  return (
+    friend &&
+    record(lead) &&
+    exactKeys(lead, ['npcId', 'kind', 'id', 'quantity', 'forgeLevel', 'minimumLevel', 'price']) &&
+    isMarketTraderId(lead.npcId) &&
+    lead.npcId !== input.npcId &&
+    marketCharacters(input.population, input.marketVisit!).some((npc) => npc.id === lead.npcId) &&
+    typeof lead.id === 'string' &&
+    integer(lead.quantity, 1, 3) &&
+    integer(lead.forgeLevel, 0, MAX_FORGE_LEVEL) &&
+    integer(lead.minimumLevel, 0, Number(lead.forgeLevel)) &&
+    integer(lead.price, 1, 64000) &&
+    (lead.kind === 'medicine'
+      ? !!medicineInfo(lead.id) && lead.forgeLevel === 0 && lead.minimumLevel === 0
+      : lead.kind === 'artifact' && lead.quantity === 1 && TREASURES.some((t) => t.id === lead.id))
+  );
+}
+
+function marketDialogueLead(input: NpcDialogueRequest) {
+  const lead = input.marketContext?.trade?.lead;
+  if (!lead) return '';
+  const npc = marketCharacters(input.population, input.marketVisit!).find(
+    (n) => n.id === lead.npcId,
+  );
+  if (!npc) return '';
+  const item =
+    lead.kind === 'medicine'
+      ? medicineInfo(lead.id)!.name
+      : `${TREASURES.find((t) => t.id === lead.id)!.name}（至少${lead.minimumLevel}阶，按${lead.forgeLevel}阶估价）`;
+  return `${npc.name}眼下求购${item} ×${lead.quantity}，挂牌${lead.price}灵石。是否交货、实际报价，以他当面的求购为准`;
+}
+
+export function marketAsksForLead(message: string) {
+  return /求购|收购|余物|卖给|指路|门路|谁.{0,8}(?:要|收|买)|(?:上次|刚才|那位|他).{0,12}(?:还收|还要|还买)/.test(
+    message,
+  );
+}
+
+const TRADE_MOTIVE_MEMORY: Record<MarketTradeMotiveKind, string> = {
+  cultivation:
+    '你自己说修行遇到关隘，正为入山历练备药、多积修为；没有承诺服药立即突破或闭关获得药效',
+  recovery: '你自己说前次出山带伤，如今要调养；这是当事人自述，不是玩家看穿前辈伤势',
+  longevity: '你自己说寿数渐紧，正访药续命；没有提供具体年岁或余寿，不能编造倒计时',
+  journey: '你自己说即将远行，正备护身之物与丹药；没有额外护送任务',
+};
+
+function marketDialogueTradeMemory(input: NpcDialogueRequest) {
+  const trade = input.marketContext?.trade;
+  if (!trade) return '没有公开的备物用途与求购指引，不编造所需品种、同行或货源。';
+  const medicines = trade.wantedMedicineIds.map((id) => medicineInfo(id)!.name);
+  const weapons = trade.wantedWeaponIds.map((id) => TREASURES.find((t) => t.id === id)!.name);
+  return `${TRADE_MOTIVE_MEMORY[trade.motive]}。当面说想要的物品：${[...medicines, ...weapons].join('、') || '没有具体物品'}。${trade.friend ? '你们确有多次公平往来，重逢时可介绍眼下公开的求购；留货与报价以界面规则为准，不在闲聊里承诺免费赠物、赊账或额外折扣。' : '还未形成故交，不能声称专门留货、欠人情或愿意赊账。'}${trade.lead ? `当前仍有效的指引：${marketDialogueLead(input)}。` : '当前没有可介绍的求购，不沿用聊天历史里的旧求购。'}`;
 }
 
 const EVENT_MEMORY: Record<(typeof MARKET_DIALOGUE_EVENTS)[number], string> = {
@@ -318,9 +429,9 @@ export function marketDialogueMemory(input: NpcDialogueRequest) {
     context.events.map((kind) => EVENT_MEMORY[kind]).join('；') || '没有当批已完成事件。';
   const r = context.risk;
   const risk = r
-    ? `当面可见的私下机缘为${{ goods: '低价转丹', deposit: '先垫路费的求购', haggle: '卖方加价卖药', invitation: '坊外取药邀约' }[r.kind]}，${r.resolved ? '此事已经结束' : '玩家尚可自行取舍'}，界面风险为${r.level}。${r.clues.map((clue) => CLUE_MEMORY[clue]).join('；')}。${{ unexamined: '尚未核验，不能断言这次是真是假。', 'no-flaw-found': '玩家已核验，暂未见破绽；不能把未见破绽说成绝对安全。', 'fraud-exposed': '玩家已核验并查明骗局，可以承认已公开的破绽。', overpriced: '玩家已核对药铺价格，此次加价已经明示。' }[r.inspection]}`
+    ? `当面可见的私下机缘为${{ goods: '低价转丹', deposit: '先垫路费的求购', haggle: '卖方加价卖药', invitation: '坊外赴约' }[r.kind]}，${r.resolved ? '此事已经结束' : '玩家尚可自行取舍'}，界面风险为${r.level}。${r.clues.map((clue) => CLUE_MEMORY[clue]).join('；')}。${{ unexamined: '尚未核验，不能断言这次是真是假。', 'no-flaw-found': '玩家已核验，暂未见破绽；不能把未见破绽说成绝对安全。', 'fraud-exposed': '玩家已核验并查明骗局，可以承认已公开的破绽。', overpriced: '玩家已核对药铺价格，此次加价已经明示。' }[r.inspection]}`
     : '目前没有当面私下机缘线索，不编造邀约、埋伏或交易结果。';
-  return `${memory}\n已发生事件：${events}\n当面风险：${risk}\n往来记录没有玩家此前境界、精进速度或修炼方法；重逢不等于看得出前辈精进。`;
+  return `${memory}\n已发生事件：${events}\n当面风险：${risk}\n备物缘由与熟人指路：${marketDialogueTradeMemory(input)}\n往来记录没有玩家此前境界、精进速度或修炼方法；重逢不等于看得出前辈精进。其他人的私下伏击、死亡或骗术不在你的已知记录中，不能说成亲眼所见或全坊皆知；玩家自己提起时，只能回应其自述，不自行添设证人、报复或结算。`;
 }
 
 /** 离线与模型失实回退共用；风险与往来只引用同一份当前真人事实。 */
@@ -349,6 +460,28 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
       return `${address}，收货凭据尚未拿出，却先要你垫路费。尚未核验便先付钱，风险要自己担；可核实接应者与凭据，也可婉拒。`;
     if (context.risk.kind === 'haggle')
       return `${address}，这份凡品的卖价高于药铺明示参考价，价差摆在眼前。是否成交由你自己取舍，闲聊不扣灵石，也不替你买药。`;
+  }
+  const trade = context?.trade;
+  if (
+    trade &&
+    marketAsksForLead(input.message) &&
+    !/你.{0,8}(?:求购|收购|要什么)/.test(input.message)
+  )
+    return trade.lead
+      ? `${address}，${marketDialogueLead(input)}。`
+      : `${address}，眼下没有我能替你指明的求购。旧消息未必还作数，到各摊前看看当面的物品与报价再作打算。`;
+  if (trade && /你.{0,6}(?:要|需|寻|备|买)|为何|为什么|打算|用途|所需/.test(input.message)) {
+    const purpose: Record<MarketTradeMotiveKind, string> = {
+      cultivation: '修行遇了关隘，我想备药入山历练，多积些修为',
+      recovery: '前次出山带了些伤，如今要紧的是调养',
+      longevity: '寿数渐紧，此行只为访药续命',
+      journey: '过些时日要远行，想先备好路上的丹药与护身之物',
+    };
+    const wanted = [
+      ...trade.wantedMedicineIds.map((id) => medicineInfo(id)!.name),
+      ...trade.wantedWeaponIds.map((id) => TREASURES.find((t) => t.id === id)!.name),
+    ].join('、');
+    return `${address}，${purpose[trade.motive]}。${wanted ? `正寻${wanted}，若有余物，可按当面列出的组合商量。` : '是否相换，仍按当面列出的货色与报价。'}`;
   }
   if (
     context?.contact?.grudge &&

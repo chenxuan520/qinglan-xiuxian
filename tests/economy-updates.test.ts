@@ -259,24 +259,27 @@ test('合法坊市档缺少拍卖记录时仍可交换已炼器赠品，读取�
   s.artifacts = TREASURES.map((t) => t.id);
   for (const t of TREASURES) s.forge[t.id] = 1;
   for (const m of MEDICINES) s.medicine.bag[m.id] = 100;
-  beginSectMarketVisit(s);
-  delete s.mortal.auction;
-  const loaded = parseSave(JSON.stringify(s));
   let done = false;
-  for (const npc of marketCultivators(loaded.mortal.population!, loaded.mortal.sectMarket!)) {
-    const deal = sectMarketDeals(loaded, npc.id).find((d) =>
-      d.give.some((i) => i.kind === 'artifact' && freeStarter(i.id)),
-    );
-    if (!deal) continue;
-    const item = deal.give.find((i) => i.kind === 'artifact')!;
-    assert.equal(
-      exchangeSectMedicine(loaded, npc.id, deal.id, loaded.mortal.sectMarket!.visit),
-      true,
-    );
-    assert.ok(loaded.mortal.auction!.releasedArtifacts.includes(item.id));
-    assert.ok(!parseSave(JSON.stringify(loaded)).artifacts.includes(item.id));
-    done = true;
-    break;
+  // 来访者按自身用途选货，不依赖第一批恰好收购某件入门赠品。
+  for (let visit = 0; visit < 20 && !done; visit++) {
+    beginSectMarketVisit(s);
+    delete s.mortal.auction;
+    const loaded = parseSave(JSON.stringify(s));
+    for (const npc of marketCultivators(loaded.mortal.population!, loaded.mortal.sectMarket!)) {
+      const deal = sectMarketDeals(loaded, npc.id).find((d) =>
+        d.give.some((i) => i.kind === 'artifact' && freeStarter(i.id)),
+      );
+      if (!deal) continue;
+      const item = deal.give.find((i) => i.kind === 'artifact')!;
+      assert.equal(
+        exchangeSectMedicine(loaded, npc.id, deal.id, loaded.mortal.sectMarket!.visit),
+        true,
+      );
+      assert.ok(loaded.mortal.auction!.releasedArtifacts.includes(item.id));
+      assert.ok(!parseSave(JSON.stringify(loaded)).artifacts.includes(item.id));
+      done = true;
+      break;
+    }
   }
   assert.equal(done, true);
 });

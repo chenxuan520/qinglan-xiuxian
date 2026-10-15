@@ -1,3 +1,4 @@
+import * as marketEventUi from '../src/market-event-ui.ts';
 import test from 'node:test';
 import { MedicinePanel } from '../src/medicine-panel.ts';
 import assert from 'node:assert/strict';
@@ -61,6 +62,7 @@ function harness(phase: 'first' | 'reunion' | 'choice' | 'read' = 'first', pendi
     locks = 0;
   const logs: string[] = [];
   const context = createContext({
+    marketEventSource: { current: marketEventUi },
     dispatchAction,
     save,
     SAVE_KEY,

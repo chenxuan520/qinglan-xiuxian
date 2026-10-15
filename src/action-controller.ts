@@ -781,6 +781,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       }
       Object.assign(shell.save, next);
       shell.refreshMarketTrade();
+      shell.refreshMarketActivities();
       const status = shell.document.getElementById('town-status');
       if (status) status.innerHTML = shell.townStatus(shell.save);
       shell.toast(

@@ -10,6 +10,7 @@ import {
   MARKET_CULTIVATORS,
   isMarketTraderId,
   marketMedicinePool,
+  marketIdentity,
   type MarketCultivatorId,
 } from './sect-market-data.ts';
 import {
@@ -19,6 +20,7 @@ import {
   exchangeOwned,
 } from './market-exchange.ts';
 import { releaseAuctionItem } from './auction-items.ts';
+import { marketTradeMotive } from './market-trade-motives.ts';
 import {
   marketContact,
   prepareMarketOpportunity,
@@ -67,9 +69,14 @@ export function beginSectMarketVisit(save: SaveData) {
 export function sectMarketOffer(save: SaveData, id: MarketCultivatorId) {
   const state = save.mortal.sectMarket;
   if (!state || !isMarketTraderId(id) || state.absent?.includes(id)) return undefined;
-  const pool = marketMedicinePool(save.mortal.population!, state, id);
-  const index = MARKET_CULTIVATORS.findIndex((npc) => npc.id === id);
-  const seed = (save.medicine.recipeSeed ^ Math.imul(state.visit, 2654435761)) >>> 0;
+  const motive = marketTradeMotive(save, id);
+  if (!motive) return undefined;
+  const all = marketMedicinePool(save.mortal.population!, state, id),
+    spare = all.filter((medicine) => !motive.preferredMedicineIds.includes(medicine.id)),
+    pool = spare.length ? spare : all,
+    identity = marketIdentity(state, id),
+    index = MARKET_CULTIVATORS.findIndex((npc) => npc.id === identity.slot),
+    seed = (save.medicine.recipeSeed ^ Math.imul(identity.birthVisit, 2654435761)) >>> 0;
   return pool[(seed + index) % pool.length];
 }
 export function sectMarketDeals(save: SaveData, id: MarketCultivatorId) {

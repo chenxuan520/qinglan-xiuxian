@@ -147,7 +147,7 @@ import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
 import { TownScene } from './town-scene.ts';
 import { SectMarketScene } from './sect-market-scene.ts';
-import { marketSocialContent } from './market-social-ui.ts';
+import { MarketEventSource } from './market-event-source.ts';
 import { marketFellowCharacter, meetMarketFellow, chooseMarketFellow } from './market-fellow.ts';
 import { marketFellowContent } from './market-fellow-ui.ts';
 import type { MarketAmbushScene } from './market-ambush-scene.ts';
@@ -164,11 +164,7 @@ import {
   sectMarketExchangeReason,
   sectMarketOffer,
 } from './sect-market.ts';
-import {
-  sectMarketPage,
-  sectMarketEventContent,
-  sectMarketTradeContent,
-} from './sect-market-ui.ts';
+import { sectMarketPage } from './sect-market-page.ts';
 import { TOWN_START, HOMETOWN_START, townClockRunning } from './town.ts';
 import {
   departHometown,
@@ -325,6 +321,7 @@ const shownHumanLetters = new Set<string>();
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 const guideSource = new GuideSource();
+const marketEventSource = new MarketEventSource();
 let guideTab = 'basics';
 
 let guideReturn: PanelLocation | null = null;
@@ -598,16 +595,66 @@ function showMarketEvent(npc: MarketCultivator) {
   }
   marketNpc = npc;
   panel = 'sect-market-event';
-  panelFrame(npc.name, '宗门坊市 · 同道往来', sectMarketEventContent(save, npc, !!pendingRun));
-  mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
+  const render = () => {
+    panelFrame(
+      npc.name,
+      '宗门坊市 · 同道往来',
+      marketEventSource.current!.sectMarketEventContent(save, npc, !!pendingRun),
+    );
+    mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
+  };
+  if (marketEventSource.current) {
+    render();
+    return;
+  }
+  panelFrame(
+    npc.name,
+    '宗门坊市 · 同道往来',
+    '<div id="market-event-loading" role="status"><p class="panel-note">正在展开坊间见闻…</p></div>',
+  );
+  const host = modal.querySelector<HTMLElement>('#market-event-loading')!;
+  const visit = save.mortal.sectMarket?.visit;
+  const current = () =>
+    host.isConnected &&
+    !saveLock &&
+    inMarket &&
+    panel === 'sect-market-event' &&
+    marketNpc === npc &&
+    marketScene?.nearbyNpc?.id === npc.id &&
+    save.mortal.sectMarket?.visit === visit;
+  const load = () => {
+    if (!current()) return;
+    host.innerHTML = '<p class="panel-note">正在展开坊间见闻…</p>';
+    void marketEventSource.load().then(
+      () => {
+        if (current()) render();
+      },
+      () => {
+        if (!current()) return;
+        host.innerHTML =
+          '<p class="panel-note">坊间见闻暂时无法载入，请重试。</p><button class="secondary-button">重新展开</button>';
+        host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+      },
+    );
+  };
+  load();
 }
 function refreshMarketTrade(selected?: string) {
-  if (!marketNpc || panel !== 'sect-market-event') return;
+  if (!marketNpc || panel !== 'sect-market-event' || !marketEventSource.current) return;
   const host = modal.querySelector<HTMLElement>('#sect-market-trade');
-  if (host) host.innerHTML = sectMarketTradeContent(save, marketNpc, selected, !!pendingRun);
+  const section = modal.querySelector<HTMLElement>('.panel');
+  const scroll = section?.scrollTop ?? 0;
+  if (host)
+    host.innerHTML = marketEventSource.current.sectMarketTradeContent(
+      save,
+      marketNpc,
+      selected,
+      !!pendingRun,
+    );
+  if (section) section.scrollTop = scroll;
 }
 function refreshMarketActivities() {
-  if (!marketNpc || panel !== 'sect-market-event') return;
+  if (!marketNpc || panel !== 'sect-market-event' || !marketEventSource.current) return;
   const host = modal.querySelector<HTMLElement>('#market-social');
   const section = modal.querySelector<HTMLElement>('.panel');
   const scroll = section?.scrollTop ?? 0;
@@ -615,7 +662,7 @@ function refreshMarketActivities() {
     ? [...host.querySelectorAll<HTMLDetailsElement>('details')].map((d) => d.open)
     : [];
   if (host) {
-    host.innerHTML = marketSocialContent(save, marketNpc, !!pendingRun);
+    host.innerHTML = marketEventSource.current.marketSocialContent(save, marketNpc, !!pendingRun);
     host
       .querySelectorAll<HTMLDetailsElement>('details')
       .forEach((d, index) => (d.open = opened[index] ?? false));

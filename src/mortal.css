@@ -1517,6 +1517,31 @@
 .market-inspection {
   color: var(--jade);
 }
+.market-trade-motive,
+.market-world-echo {
+  font-size: 14px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.market-trade-motive strong {
+  color: var(--gold);
+  font-weight: 400;
+}
+.market-world-echo {
+  padding-left: 14px;
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+}
+.market-world-echo small {
+  display: block;
+  margin-bottom: 5px;
+  letter-spacing: 0.12em;
+}
+.market-friend-lead {
+  font-size: 14px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
 .market-ambush-stats {
   display: flex;
   flex-wrap: wrap;

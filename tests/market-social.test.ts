@@ -16,10 +16,13 @@ import {
   settleMarketAmbush,
 } from '../src/market-social.ts';
 import { marketCultivators, MARKET_CULTIVATORS } from '../src/sect-market-data.ts';
-import { MEDICINES } from '../src/medicine-data.ts';
+import { MEDICINES, medicineInfo } from '../src/medicine-data.ts';
+import { TREASURES } from '../src/data.ts';
 import { auctionValue } from '../src/auction.ts';
 import { validMarketSocial } from '../src/market-social-data.ts';
 import { marketSocialContent } from '../src/market-social-ui.ts';
+import { marketTradeMotive } from '../src/market-trade-motives.ts';
+import { rememberMarketContact } from '../src/market-relations.ts';
 const ids = MARKET_CULTIVATORS.map((n) => n.id);
 function fixture(seed = 12345) {
   const s = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -123,6 +126,10 @@ test('求购单批稳定，物品/数量/品级符合修士，价格低于买入
       artifacts++;
       s.artifacts.push(offer.id);
       s.forge[offer.id] = offer.forgeLevel;
+      if (s.starter === offer.id) {
+        s.starter = 'orbit';
+        s.artifacts.push('orbit');
+      }
     }
     const active = structuredClone(s.medicine.active);
     assert.ok(fulfillMarketRequest(s, id, 1, offer.forgeLevel));
@@ -195,7 +202,7 @@ test('核验能揭露假货、骗款、伏击；婉拒不扣钱，真机缘赠�
   }
   for (const kind of ['goods', 'deposit', 'invitation', 'haggle'] as const) {
     const { s, id, o } = chance(kind, true);
-    s.medicine.bag[o.item.id] = 2;
+    if (o.item.kind === 'medicine') s.medicine.bag[o.item.id] = 2;
     const before = s.stones;
     const r = chooseMarketOpportunity(s, id, 1, 'accept')!;
     assert.ok(r);
@@ -203,7 +210,8 @@ test('核验能揭露假货、骗款、伏击；婉拒不扣钱，真机缘赠�
       assert.equal(s.stones, before + o.price);
       assert.equal(s.medicine.bag[o.item.id], 1);
     } else {
-      assert.equal(s.medicine.bag[o.item.id], 3);
+      if (o.item.kind === 'medicine') assert.equal(s.medicine.bag[o.item.id], 2 + o.item.quantity);
+      else assert.ok(s.artifacts.includes(o.item.id));
       if (kind === 'invitation') assert.equal(s.stones, before);
     }
   }
@@ -340,4 +348,91 @@ test('法宝交货清除炼器后，界面展示已结算，不把零阶库存�
     return;
   }
   assert.fail('缺少法宝求购样本');
+});
+
+test('求购按本人公开的用途挑药与法宝，四类需求确实不同，报价仍低于统一估值', () => {
+  const motives = new Set<string>();
+  let artifacts = 0;
+  for (let seed = 1; seed <= 240; seed++) {
+    const save = fixture(seed);
+    const id = ids.find((npc) => marketRequest(save, npc))!;
+    const offer = marketRequest(save, id)!;
+    const motive = marketTradeMotive(save, id)!;
+    const name =
+      offer.kind === 'medicine'
+        ? medicineInfo(offer.id)!.name
+        : TREASURES.find((t) => t.id === offer.id)!.name;
+    motives.add(motive.kind);
+    assert.equal(offer.motiveTitle, motive.title);
+    assert.equal(offer.motiveText, motive.disclosure);
+    assert.ok(offer.motiveText.includes(name));
+    assert.ok(offer.priceText);
+    assert.ok(offer.price > 0 && offer.price <= Math.floor(auctionValue(offer) * 0.95));
+    if (offer.kind === 'medicine') assert.ok(motive.preferredMedicineIds.includes(offer.id));
+    else {
+      artifacts++;
+      assert.equal(motive.kind, 'journey');
+      assert.ok(motive.preferredWeaponIds.some((weapon) => weapon === offer.id));
+    }
+    const loaded = importSave(exportSave(save, null)).save;
+    assert.deepEqual(marketRequest(loaded, id), offer);
+  }
+  assert.deepEqual([...motives].sort(), ['cultivation', 'journey', 'longevity', 'recovery']);
+  assert.ok(artifacts > 10);
+});
+
+test('故交求购有实际小幅加价，不超过估值98%，读档保留；有旧怨不享照应', () => {
+  let premiums = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const save = fixture(seed);
+    const contact = rememberMarketContact(save, ids[0])!;
+    contact.goodwill = 1;
+    beginSectMarketVisit(save);
+    beginSectMarketVisit(save);
+    const id = ids.find((npc) => marketRequest(save, npc))!;
+    save.mortal.sectMarket!.returning = [
+      {
+        slot: id,
+        birthVisit: contact.birthVisit,
+        birthSlot: contact.slot,
+        realmIndex: contact.realmIndex,
+      },
+    ];
+    const ordinary = marketRequest(save, id)!;
+    contact.goodwill = 2;
+    const friend = marketRequest(save, id)!;
+    assert.equal(friend.id, ordinary.id);
+    assert.equal(friend.quantity, ordinary.quantity);
+    assert.equal(friend.forgeLevel, ordinary.forgeLevel);
+    assert.ok(friend.price >= ordinary.price);
+    assert.ok(friend.price <= Math.floor(auctionValue(friend) * 0.98));
+    if (friend.price > ordinary.price) {
+      premiums++;
+      assert.match(friend.priceText, /故交/);
+    }
+    assert.deepEqual(marketRequest(readSave(JSON.stringify(save)).save, id), friend);
+    contact.grudge = 1;
+    assert.equal(marketRequest(save, id)!.price, ordinary.price);
+  }
+  assert.ok(premiums > 30);
+});
+
+test('求购携资上限确实生效时不夸称加价，高炼器仍按明示金额出售', () => {
+  for (let seed = 1; seed <= 500; seed++) {
+    const save = fixture(seed);
+    const id = ids.find((npc) => marketRequest(save, npc)?.kind === 'artifact');
+    if (!id) continue;
+    const initial = marketRequest(save, id)!;
+    save.forge[initial.id] = 10;
+    const offer = marketRequest(save, id)!;
+    const npc = marketCultivators(save.mortal.population!, save.mortal.sectMarket!).find(
+      (n) => n.id === id,
+    )!;
+    if (offer.price !== 1000 * (npc.realmIndex + 1) ** 2 || !offer.priceText.includes('携带'))
+      continue;
+    assert.doesNotMatch(offer.priceText, /略高|添一点/);
+    assert.ok(offer.price < auctionValue(offer));
+    return;
+  }
+  assert.fail('缺少高炼器受到携资上限的样本');
 });

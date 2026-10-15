@@ -18,6 +18,8 @@ import { hometownParents } from './hometown.ts';
 import { isMarketCultivatorId, isMarketTraderId, marketIdentity } from './sect-market-data.ts';
 import { marketContact } from './market-relations.ts';
 import { marketOpportunity } from './market-social.ts';
+import { marketTradeMotive } from './market-trade-motives.ts';
+import { marketFriendLead } from './market-world.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
@@ -59,8 +61,31 @@ export function marketDialogueContext(
     )
       events.push(entry.kind);
   if (!isMarketTraderId(id)) return { contact, events, risk: null };
+  const motive = marketTradeMotive(save, id);
+  const lead = marketFriendLead(save, id);
+  const trade = motive
+    ? {
+        trade: {
+          motive: motive.kind,
+          friend: motive.friend,
+          wantedMedicineIds: [...motive.preferredMedicineIds],
+          wantedWeaponIds: [...motive.preferredWeaponIds],
+          lead: lead
+            ? {
+                npcId: lead.npcId,
+                kind: lead.kind,
+                id: lead.id,
+                quantity: lead.quantity,
+                forgeLevel: lead.forgeLevel,
+                minimumLevel: lead.minimumLevel,
+                price: lead.price,
+              }
+            : null,
+        },
+      }
+    : {};
   const offer = marketOpportunity(save, id);
-  if (!offer) return { contact, events, risk: null };
+  if (!offer) return { contact, events, risk: null, ...trade };
   const inspection = !social?.inspected.includes(id)
     ? 'unexamined'
     : offer.kind === 'haggle'
@@ -86,6 +111,7 @@ export function marketDialogueContext(
   return {
     contact,
     events,
+    ...trade,
     risk: {
       kind: offer.kind,
       inspection,

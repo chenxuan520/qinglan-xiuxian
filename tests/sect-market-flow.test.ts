@@ -1,3 +1,4 @@
+import * as marketEventUi from '../src/market-event-ui.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -25,7 +26,14 @@ import { dispatchAction } from '../src/action-controller.ts';
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = new Script(
   stripTypeScriptTypes(
-    ['shellBindings', 'handleAction', 'writeSave', 'lockStaleSave', 'refreshMarketTrade']
+    [
+      'shellBindings',
+      'handleAction',
+      'writeSave',
+      'lockStaleSave',
+      'refreshMarketTrade',
+      'refreshMarketActivities',
+    ]
       .map((name) => {
         const match = main.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match, `missing actual ${name}`);
@@ -82,6 +90,7 @@ function harness(pending = false) {
     },
   };
   const context = createContext({
+    marketEventSource: { current: marketEventUi },
     dispatchAction,
     save,
     SAVE_KEY,
