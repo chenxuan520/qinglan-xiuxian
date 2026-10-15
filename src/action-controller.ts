@@ -84,6 +84,7 @@ export interface ActionShell {
   readonly leaveTown: any;
   readonly lifeStats: any;
   readonly lifespanInfo: any;
+  readonly marketEventSource: any;
   marketNpc: any;
   marketScene: any;
   readonly medicinePanel: any;
@@ -192,7 +193,6 @@ export interface ActionShell {
   readonly MAX_REVIVES: any;
   readonly PROLOGUE_IMAGE: any;
   readonly SUPPORT_CODE_IMAGE: any;
-  readonly SectMarketScene: any;
   readonly TownScene: any;
   readonly URL: any;
   adWatched: any;
@@ -646,6 +646,10 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       note.textContent = shell.auctionResult(shell.save, result);
     }
     shell.toast(shell.auctionResult(shell.save, result));
+    return;
+  }
+  if (action.startsWith('market-venue-')) {
+    shell.marketEventSource.current?.marketVenueAction(shell, action, id);
     return;
   }
   if (action.startsWith('sect-market-') && shell.inMortalWorld && !shell.game) {

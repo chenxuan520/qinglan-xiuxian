@@ -1798,3 +1798,85 @@
     margin-inline: auto;
   }
 }
+
+/* 坊中院落沿用原建筑图集，说明与办事内容随面板一起滚动。 */
+.market-venue-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 4px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+.market-venue-art {
+  display: block;
+  width: 150px;
+  height: 140px;
+  flex-shrink: 0;
+  background-repeat: no-repeat;
+}
+.market-venue-hero small,
+.market-venue-card > small {
+  color: var(--gold);
+}
+.market-venue-hero p {
+  margin: 10px 0;
+}
+.market-venue-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+.market-venue-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  background: #0b3029;
+}
+.market-venue-card h3 {
+  margin: 10px 0;
+  color: var(--gold);
+}
+.market-venue-card p {
+  line-height: 1.9;
+}
+.market-venue-card button {
+  width: 100%;
+  margin-top: 10px;
+  white-space: normal;
+}
+.market-venue-card details {
+  margin-top: 16px;
+}
+.market-venue-history {
+  margin: 24px 0;
+}
+#market-venue-result:not(:empty) {
+  margin: 20px 0;
+  padding: 16px;
+  border-left: 2px solid var(--gold);
+  background: #25463c;
+  line-height: 2;
+}
+#market-guide:not(:empty) {
+  display: block;
+  color: #efe0ad;
+  padding: 5px 0;
+  font-size: 13px;
+}
+.market-guided {
+  stroke: #fff4c5;
+  stroke-width: 14;
+  fill: #e8cc73;
+}
+@media (max-width: 640px) {
+  .market-venue-art {
+    width: 100px;
+    height: 100px;
+  }
+  .market-venue-hero {
+    gap: 12px;
+  }
+  .market-venue-card {
+    padding: 16px;
+  }
+}

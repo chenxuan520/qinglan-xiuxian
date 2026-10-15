@@ -4,42 +4,63 @@ import type { TownPopulation } from './town-population.ts';
 import { SECT_MARKET_SETTINGS } from './setting.ts';
 import type { MarketIdentity } from './market-relations-data.ts';
 
-export const MARKET_WIDTH = 1600;
-export const MARKET_HEIGHT = 1100;
-export const MARKET_START = { x: 800, y: 620 };
+export const MARKET_WIDTH = 2000;
+export const MARKET_HEIGHT = 1400;
+export const MARKET_START = { x: 1000, y: 790 };
 export const MARKET_BUILDINGS = [
-  { x: 540, y: 455, art: 0, label: '丹药铺' },
-  { x: 800, y: 300, art: 1, label: '拍卖行' },
-  { x: 1100, y: 455, art: 2, label: '法器阁' },
-  { x: 350, y: 1040, art: 4, label: '散修小院' },
-  { x: 220, y: 490, art: 7, label: '正道行馆' },
-  { x: 1400, y: 390, art: 6, label: '魔道行馆' },
-  { x: 180, y: 760, art: 3, label: '散修摊' },
-  { x: 1400, y: 740, art: 8, label: '游商摊' },
+  { x: 600, y: 590, art: 0, label: '丹药铺' },
+  { x: 1000, y: 400, art: 1, label: '拍卖行' },
+  { x: 1400, y: 590, art: 2, label: '法器阁' },
+  { x: 520, y: 1220, art: 4, label: '论道院' },
+  { x: 220, y: 520, art: 7, label: '执事堂' },
+  { x: 1780, y: 520, art: 6, label: '会客馆' },
+  { x: 240, y: 1000, art: 3, label: '散修摊' },
+  { x: 1760, y: 1000, art: 8, label: '游商摊' },
+] as const;
+export const MARKET_VENUES = [
+  { id: 'medicine', building: 0, x: 600, y: 670, hint: '余丹与换物' },
+  { id: 'artifacts', building: 2, x: 1400, y: 670, hint: '法器与求购' },
+  { id: 'forum', building: 3, x: 520, y: 1300, hint: '听道 · 互证 · 主持' },
+  { id: 'office', building: 4, x: 220, y: 600, hint: '托付与寻物' },
+  { id: 'guests', building: 5, x: 1780, y: 600, hint: '旧识与求助' },
+  { id: 'stalls', building: 6, x: 240, y: 1080, hint: '散修见闻' },
+  { id: 'caravan', building: 7, x: 1760, y: 1080, hint: '来客与货讯' },
+] as const;
+export type MarketVenueId = (typeof MARKET_VENUES)[number]['id'];
+export const MARKET_LANES = [
+  [140, 620, 1720, 170],
+  [850, 480, 300, 850],
+  [380, 1250, 1240, 100],
+  [150, 550, 220, 590],
+  [1650, 550, 220, 590],
+  [660, 750, 140, 580],
+  [1180, 750, 140, 580],
+  [300, 1050, 500, 100],
+  [1300, 1050, 400, 100],
 ] as const;
 export const MARKET_CULTIVATORS = [
   {
     id: 'market-alchemist',
     role: '行脚丹修',
     path: 'dual' as CultivationPath,
-    x: 580,
-    y: 550,
+    x: 660,
+    y: 730,
     greeting: '这一炉药香还没散。道友若有余丹，我们可以各取所需；只想歇脚聊聊，也欢迎。',
   },
   {
     id: 'market-disciple',
     role: '游历剑修',
     path: 'orthodox' as CultivationPath,
-    x: 1010,
-    y: 565,
+    x: 1340,
+    y: 730,
     greeting: '宗门之外，山河自有道理。我刚从山中归来，带了些丹药，也听到几桩修行见闻。',
   },
   {
     id: 'market-wanderer',
     role: '魔道散修',
     path: 'demonic' as CultivationPath,
-    x: 810,
-    y: 890,
+    x: 1060,
+    y: 1250,
     greeting: '出身不同，求道的路却都不好走。这里只论互通有无，不问你拜在哪一门。',
   },
 ] as const;

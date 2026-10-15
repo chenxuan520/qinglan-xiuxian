@@ -6,7 +6,7 @@ import {
   type SectMarketState,
 } from './sect-market-data.ts';
 
-export const AUCTION_SPOT = { x: 800, y: 435 };
+export const AUCTION_SPOT = { x: 1000, y: 535 };
 export const AUCTION_LOTS = 4;
 export type AuctionKind = 'medicine' | 'artifact';
 export type AuctionOutcome = 'won' | 'lost' | 'sold' | 'unsold';

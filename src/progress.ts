@@ -1,3 +1,4 @@
+import { validMarketVenues } from './market-venue-data.ts';
 import { validIronMarket } from './iron-market-data.ts';
 import { defaultAutoplayBuild, validAutoplayBuild, type AutoplayBuild } from './autoplay-build.ts';
 import { syncHumanStories } from './human-stories.ts';
@@ -91,7 +92,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 20;
+export const SAVE_SCHEMA = 21;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -329,6 +330,8 @@ export function readSave(
       delete s.mortal.hometown;
     if (s.mortal?.ironMarket !== undefined && !validIronMarket(s.mortal.ironMarket, base.age))
       delete s.mortal.ironMarket;
+    if (s.mortal?.marketVenues !== undefined && !validMarketVenues(s.mortal.marketVenues, base.age))
+      delete s.mortal.marketVenues;
     if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
     if (base.mortal.hometown?.stage === 'root') base.mortal.hometown.stage = 'farewell';
     base.hometownSeen =

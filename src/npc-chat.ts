@@ -44,6 +44,7 @@ export function marketDialogueContext(
           seenAt: record.seenAt,
           lastVisit: record.lastVisit,
           tradeVisit: record.tradeVisit,
+          ...(record.aidAt === undefined ? {} : { aidAt: record.aidAt }),
           goodwill: record.goodwill,
           grudge: record.grudge,
         }

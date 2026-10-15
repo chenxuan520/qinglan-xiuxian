@@ -63,7 +63,16 @@ export function rememberMarketTrade(save: SaveData, id: MarketCultivatorId) {
   const contact = rememberMarketContact(save, id);
   if (!contact || contact.dead || contact.tradeVisit === save.mortal.sectMarket!.visit) return;
   contact.tradeVisit = save.mortal.sectMarket!.visit;
+  if (contact.aidVisit === contact.tradeVisit) return;
   contact.goodwill = Math.min(3, contact.goodwill + 1);
+}
+export function rememberMarketAid(save: SaveData, id: MarketCultivatorId) {
+  const contact = rememberMarketContact(save, id);
+  const visit = save.mortal.sectMarket!.visit;
+  if (!contact || contact.dead || contact.aidVisit === visit) return;
+  contact.aidAt = save.age;
+  contact.aidVisit = visit;
+  if (contact.tradeVisit !== visit) contact.goodwill = Math.min(3, contact.goodwill + 1);
 }
 export function rememberMarketAmbush(
   save: SaveData,
@@ -107,7 +116,8 @@ export function marketKnownMemory(save: SaveData, id: MarketCultivatorId) {
     c.birthVisit < save.mortal.sectMarket!.visit
       ? '旧识重逢，你认得这张面孔。'
       : '此番相识，彼此已留过名字。',
-    c.goodwill ? '曾经当面公平交易，对方愿意提醒你核对凭据与退路。' : '',
+    c.tradeVisit ? '曾经当面公平交易，对方愿意提醒你核对凭据与退路。' : '',
+    c.aidAt !== undefined ? '你曾在坊中切实相助，这份情谊当事人记在心里。' : '',
     c.grudge ? '你认出先前伏击你的劫修。旧怨尚在，私下赴约尤其危险；可留在坊市，直接作别。' : '',
   ]
     .filter(Boolean)

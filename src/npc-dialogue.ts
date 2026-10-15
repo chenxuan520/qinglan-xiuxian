@@ -99,6 +99,7 @@ export interface MarketDialogueContact {
   seenAt: number;
   lastVisit: number;
   tradeVisit: number;
+  aidAt?: number;
   goodwill: number;
   grudge: number;
 }
@@ -235,6 +236,7 @@ export function validMarketDialogueContext(
         'seenAt',
         'lastVisit',
         'tradeVisit',
+        ...(c.aidAt === undefined ? [] : ['aidAt']),
         'goodwill',
         'grudge',
       ]) ||
@@ -246,6 +248,7 @@ export function validMarketDialogueContext(
       Number(c.seenAt) < Number(c.metAt) ||
       !integer(c.lastVisit, identity.birthVisit, input.marketVisit.visit) ||
       !(c.tradeVisit === 0 || integer(c.tradeVisit, identity.birthVisit, Number(c.lastVisit))) ||
+      (c.aidAt !== undefined && (!age(c.aidAt) || Number(c.aidAt) < Number(c.metAt))) ||
       !integer(c.goodwill, 0, 3) ||
       !integer(c.grudge, 0, 3)
     )
@@ -417,6 +420,11 @@ export function marketDialogueMemory(input: NpcDialogueRequest) {
         ...(c.tradeVisit > 0
           ? ['你们曾实际完成过当面交易，但未提供具体货品，不能编造货品、数量或价钱。']
           : []),
+        ...(c.aidAt !== undefined
+          ? [
+              '玩家曾在坊中实际相助或指点，你记得这份人情；未提供具体事由，不编造送药、修炼进境或第三人的隐情。',
+            ]
+          : []),
         ...(c.goodwill > 0 ? ['你们有过友善往来，不能据此保证今后的交易没有风险。'] : []),
         ...(c.grudge > 0
           ? [
@@ -488,6 +496,11 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
     /认得|记得|见过|近来|招呼|你我|上次|恩怨|敌意/.test(input.message)
   )
     return `${address}，你我之间已有嫌隙，这话我记着。买卖还须看当面的凭据，闲聊既不算成交，也不能替谁抹去旧账。`;
+  if (
+    context?.contact?.aidAt !== undefined &&
+    /相助|帮忙|指点|讲法|人情|记得|你我|上次/.test(input.message)
+  )
+    return `${address}，先前在坊中承过你的帮助，这份人情我记得。今日的事仍按眼前凭据说，不拿旧情替谁作保。`;
   if (context?.contact?.tradeVisit && /认得|记得|见过|近来|招呼|你我|上次|交易/.test(input.message))
     return `${address}，你我曾按当面报价做过交易，这段往来我记得。今日货色仍须验明，熟识也不是省去凭据的理由。`;
   if (

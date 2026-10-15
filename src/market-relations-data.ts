@@ -14,6 +14,8 @@ export interface MarketContact extends MarketIdentity {
   grudge: number;
   dead: boolean;
   tradeVisit: number;
+  aidVisit?: number;
+  aidAt?: number;
 }
 export interface MarketRelationsState {
   contacts: MarketContact[];
@@ -61,7 +63,14 @@ export function validMarketRelations(
         integer(c.goodwill, 3) &&
         integer(c.grudge, 3) &&
         typeof c.dead === 'boolean' &&
-        integer(c.tradeVisit, c.lastVisit),
+        integer(c.tradeVisit, c.lastVisit) &&
+        ((c.aidAt === undefined && c.aidVisit === undefined) ||
+          (integer(c.aidVisit, c.lastVisit) &&
+            Number(c.aidVisit) >= c.birthVisit &&
+            typeof c.aidAt === 'number' &&
+            Number.isFinite(c.aidAt) &&
+            c.aidAt >= c.metAt &&
+            c.aidAt <= age)),
     )
   );
 }

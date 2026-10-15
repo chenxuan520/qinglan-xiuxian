@@ -54,14 +54,34 @@ export function leaveTown(shell: ActionShell) {
 export function mountTownScene(shell: ActionShell) {
   if (shell.inMarket) {
     const marketHost = shell.document.getElementById('sect-market-view');
-    if (marketHost)
-      shell.marketScene = new shell.SectMarketScene(
-        marketHost,
-        { ...shell.marketPosition },
-        shell.save,
-        shell.showMarketEvent,
-        shell.showAuction,
+    if (marketHost) {
+      const visit = shell.save.mortal.sectMarket?.visit;
+      const current = () =>
+        marketHost.isConnected &&
+        shell.inMarket &&
+        !shell.saveLock &&
+        shell.save.mortal.sectMarket?.visit === visit;
+      marketHost.innerHTML =
+        '<div class="town-loading" role="status"><div>宗门坊市 · 正在迎候来客…</div></div>';
+      void shell.marketEventSource.load().then(
+        (module: any) => {
+          if (!current()) return;
+          shell.marketScene = new module.SectMarketScene(
+            marketHost,
+            { ...shell.marketPosition },
+            shell.save,
+            shell.showMarketEvent,
+            shell.showAuction,
+            (id: string) => showMarketVenue(shell, id),
+          );
+        },
+        () => {
+          if (current())
+            marketHost.innerHTML =
+              '<div class="town-loading" role="status"><div>坊市场景暂时无法载入，当前不计龄。<br><button class="secondary-button" data-action="sect-market-retry">重新加载</button></div></div>';
+        },
       );
+    }
     return;
   }
   const host = shell.document.getElementById('town-view');
@@ -182,6 +202,43 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   if (changed || read) shell.persist();
   shell.panelFrame(npc.name, `${npc.place} · ${npc.role}`, shell.townEventContent(shell.save, npc));
   shell.mountNpcChat(shell.modal.querySelector<HTMLElement>('.npc-dialogue')!, shell.save, npc);
+}
+
+export function showMarketVenue(shell: ActionShell, id: string) {
+  const place = shell.marketScene?.nearVenue;
+  if (!shell.inMarket || shell.saveLock || !place || place.id !== id || shell.panel) return;
+  shell.marketNpc = null;
+  shell.panel = 'market-venue';
+  shell.panelFrame(
+    place.name,
+    '宗门坊市 · 坊中诸事',
+    '<div id="venue-loading" role="status">正在展开坊中诸事…</div>',
+  );
+  const host = shell.modal.querySelector<HTMLElement>('#venue-loading')!;
+  const visit = shell.save.mortal.sectMarket?.visit;
+  const current = () =>
+    host.isConnected &&
+    !shell.saveLock &&
+    shell.inMarket &&
+    shell.panel === 'market-venue' &&
+    shell.marketScene?.nearVenue?.id === id &&
+    shell.save.mortal.sectMarket?.visit === visit;
+  const load = () => {
+    if (!current()) return;
+    host.textContent = '正在展开坊中诸事…';
+    void shell.marketEventSource.load().then(
+      (module: any) => {
+        if (current()) module.renderVenue(shell, id);
+      },
+      () => {
+        if (!current()) return;
+        host.innerHTML =
+          '<p>坊中诸事暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
+        host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+      },
+    );
+  };
+  load();
 }
 
 export function showAuction(shell: ActionShell) {

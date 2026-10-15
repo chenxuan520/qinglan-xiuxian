@@ -1,5 +1,7 @@
 import {
   isMarketTraderId,
+  MARKET_WIDTH,
+  MARKET_HEIGHT,
   type MarketCultivatorId,
   type SectMarketState,
 } from './sect-market-data.ts';
@@ -155,9 +157,9 @@ export function validMarketAmbush(
     Number.isFinite(n.x) &&
     Number.isFinite(n.y) &&
     n.x >= 0 &&
-    n.x <= 1600 &&
+    n.x <= MARKET_WIDTH &&
     n.y >= 0 &&
-    n.y <= 1100 &&
+    n.y <= MARKET_HEIGHT &&
     Number.isSafeInteger(a.revivesUsed) &&
     a.revivesUsed >= 0 &&
     a.revivesUsed <= MAX_REVIVES &&

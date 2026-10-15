@@ -146,10 +146,9 @@ import { FrameRate } from './frame-rate.ts';
 import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
 import { TownScene } from './town-scene.ts';
-import { SectMarketScene } from './sect-market-scene.ts';
+import type { SectMarketScene } from './sect-market-scene.ts';
 import { MarketEventSource } from './market-event-source.ts';
 import { marketFellowCharacter, meetMarketFellow, chooseMarketFellow } from './market-fellow.ts';
-import { marketFellowContent } from './market-fellow-ui.ts';
 import type { MarketAmbushScene } from './market-ambush-scene.ts';
 import type { AmbushOutcome } from './market-ambush.ts';
 import { marketCultivators } from './sect-market-data.ts';
@@ -598,20 +597,20 @@ function showMarketEvent(npc: MarketCultivator) {
     }
     const fellow = marketFellowCharacter(save);
     if (!fellow) return;
-    marketNpc = fellow;
-    panel = 'sect-market-event';
-    panelFrame(fellow.name, '宗门坊市 · 炉边故人', marketFellowContent(save));
-    return;
+    npc = fellow;
   }
   marketNpc = npc;
   panel = 'sect-market-event';
   const render = () => {
     panelFrame(
       npc.name,
-      '宗门坊市 · 同道往来',
-      marketEventSource.current!.sectMarketEventContent(save, npc, !!pendingRun),
+      npc.id === 'market-fellow' ? '宗门坊市 · 炉边故人' : '宗门坊市 · 同道往来',
+      npc.id === 'market-fellow'
+        ? marketEventSource.current!.marketFellowContent(save)
+        : marketEventSource.current!.sectMarketEventContent(save, npc, !!pendingRun),
     );
-    mountNpcChat(modal.querySelector<HTMLElement>('.npc-dialogue')!, save, npc);
+    const chat = modal.querySelector<HTMLElement>('.npc-dialogue');
+    if (npc.id !== 'market-fellow' && chat) mountNpcChat(chat, save, npc);
   };
   if (marketEventSource.current) {
     render();
@@ -1328,6 +1327,7 @@ function shellBindings(): ActionShell {
     get leaveTown() { return leaveTown; },
     get lifeStats() { return lifeStats; },
     get lifespanInfo() { return lifespanInfo; },
+    get marketEventSource() { return marketEventSource; },
     get marketNpc() { return marketNpc; },
     set marketNpc(next) { marketNpc = next; },
     get marketScene() { return marketScene; },
@@ -1458,7 +1458,6 @@ function shellBindings(): ActionShell {
     get MAX_REVIVES() { return MAX_REVIVES; },
     get PROLOGUE_IMAGE() { return PROLOGUE_IMAGE; },
     get SUPPORT_CODE_IMAGE() { return SUPPORT_CODE_IMAGE; },
-    get SectMarketScene() { return SectMarketScene; },
     get TownScene() { return TownScene; },
     get URL() { return URL; },
     get adWatched() { return adWatched; },

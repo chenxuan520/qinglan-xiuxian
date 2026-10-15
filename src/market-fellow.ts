@@ -89,8 +89,8 @@ export function marketFellowCharacter(save: SaveData): MarketCultivator | null {
         : 1;
   return {
     id: 'market-fellow',
-    x: 700,
-    y: 760,
+    x: 930,
+    y: 1030,
     name: alive ? '温照川' : '温氏后人',
     role: alive ? '守炉丹修' : '药册传人',
     path: 'dual',
