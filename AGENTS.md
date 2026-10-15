@@ -73,7 +73,7 @@ npm run build
 npm run format:check
 ```
 
-声音与战斗界面重构后运行 `npm ci --prefix scripts/browser-tools`、`npm run ui:check`（需要正常 5173 首页已启动）。回归只经 Chrome DevTools MCP 操作独立浏览器上下文，覆盖电脑、手机窄屏、竖屏及横屏的设置、声音、自动历练、暂停/帮助/伤害返回、刷新续局、升级选择与后期长数字/药效；`UI_BASE_URL` 可指定本机子路径，`CHROME_PATH` 可指定 Chrome。GitHub Pages 在正式构建后、上传前执行同一检查，失败阻止此次发布。工具依赖单独锁定在 `scripts/browser-tools`，不进入游戏依赖或平衡作业。报告与失败截图只写 `artifacts/ui-regression/`；本机需逐张视检时使用 `UI_SCREENSHOTS=1 npm run ui:check`，截图不提交 Git。布局重构同时保留改动前后截图/计算样式基线，自动检查不代替实际视觉审查。
+声音与战斗界面重构后运行 `npm ci --prefix scripts/browser-tools`、`npm run ui:check`（需要正常 5173 首页已启动）。回归只经 Chrome DevTools MCP 操作独立浏览器上下文，覆盖电脑、手机窄屏、竖屏及横屏的设置、声音、自动历练、暂停/帮助/伤害返回、刷新续局、升级选择与后期长数字/药效；`UI_BASE_URL` 可指定本机子路径，`CHROME_PATH` 可指定 Chrome。GitHub 的 `checks.yml` 独立运行同一浏览器回归门禁；单元测试、格式/Worker类型、界面回归分成独立job，失败让相应门禁标红，不放回Pages部署流程，也不以needs或轮询变相等待。提交前的本地验证与独立审查仍必须完成。工具依赖单独锁定在 `scripts/browser-tools`，不进入游戏依赖或平衡作业。报告与失败截图只写 `artifacts/ui-regression/`；本机需逐张视检时使用 `UI_SCREENSHOTS=1 npm run ui:check`，截图不提交 Git。布局重构同时保留改动前后截图/计算样式基线，自动检查不代替实际视觉审查。
 
 有人正在使用 5173 时，不启动第二个服务，不自动换成 5174。先检查现有进程，并按下一节更新生产预览。`npm run preview -- --port 5173 --strictPort` 用于尚无服务时预览 `dist`。
 
@@ -81,7 +81,7 @@ npm run format:check
 - 修改战斗或成长后，运行相关测试；涉及整体难度时再运行 `npm run balance`、`npm run balance:trial` 或 `npm run balance:tribulation`。音频和文档改动无需重跑全部平衡模拟。
 - 永久修为、境界门槛、法宝/功法、妖王或自动策略的数值改动，必须运行 `npm run balance:gate:full`；不得以普通单测或一个天灵根样本代替。门禁用真实 `Game` 和正式结算，对七种灵根、正/魔/兼修、全部十种五行本命、手机/电脑场地和三个难度分别记录逐关进入率、连通率、成功/失败耗时、90 秒修为与境界、每只妖王实际出场与击杀时间，以及未击杀观测下界。裸开荒连续七关、一试即停；收益养成、仅广告复活/借寿、广告满根基/炼器三类另算，不能混成默认胜率。
 - 用户最新确认的验收范围仅为**前六关**初入仙途无辅助连通率：天灵根目标 90%、允许 70–100%；异灵根 70%、允许 50–90%；双灵根 40%、允许 20–65%；三灵根 30%、允许 10–50%；四灵根 10%、允许 0–30%；五灵根 5%、允许 0–25%；无灵根允许 0–10%。容差是绝对百分点。这组要求覆盖旧的七关成仙目标；用户已确认终关节奏，无明确新授权不得改动终关配置。默认样本无广告、训练、炼器、药物、宗门与重试，各根 120 个固定本命/路线/场地样本，不等于真人胜率。路线、本命和设备分组必须打印，分组差异单独诊断，不用旧的更严门槛否决用户已允许的整体区间。
-- GitHub 每次 push 和 PR 跑 `npm run balance:ci`，只实际运行 840 条前六关无辅助样本；超出上述范围、异常、漏样本、重复样本非零退出。固定快检不扩成长矩阵。同一快检与 Pages 部署链路还执行两个宽松性能门禁：`npm run perf:sim`（固定种子后期高压场景逐帧模拟耗时，只拦灾难性复杂度回归）与 `npm run size:check`（独立构建后入口 JS/CSS 原始及 gzip 字节预算）；每天北京时间中午 12:00（UTC `0 4 * * *`）与手动 full 另跑 `npm run perf:render`（无头 Chrome 恢复高压续局实测 60 秒帧率与长任务），只生成报告不卡关，产物不过仓库。每天北京时间中午 12:00（UTC `0 4 * * *`）与手动 full 跑 `npm run balance:gate:full`，实测 10,080 条当前七关全矩阵及重复首关；成长形状、首关 90 秒与技术完整性独立验收，第七关只报告。历史双向对照保留为 `npm run balance:gate -- --full` 的调研入口；不能把默认日测未执行的历史对照写成已经比较。跨大境界成本至少为上一小突破五倍、天灵根首局 90 秒九成达到炼气中期；当前收益提高属于用户授权改动，不以旧版低收益作为发布目标。
+- GitHub 每次 push 和 PR 跑 `npm run balance:ci`，只实际运行 840 条前六关无辅助样本；超出上述范围、异常、漏样本、重复样本非零退出。固定快检不扩成长矩阵。独立 Balance 快检链路还执行两个宽松性能门禁：`npm run perf:sim`（固定种子后期高压场景逐帧模拟耗时，只拦灾难性复杂度回归）与 `npm run size:check`（独立构建后入口 JS/CSS 原始及 gzip 字节预算）；每天北京时间中午 12:00（UTC `0 4 * * *`）与手动 full 另跑 `npm run perf:render`（无头 Chrome 恢复高压续局实测 60 秒帧率与长任务），只生成报告不卡关，产物不过仓库。每天北京时间中午 12:00（UTC `0 4 * * *`）与手动 full 跑 `npm run balance:gate:full`，实测 10,080 条当前七关全矩阵及重复首关；成长形状、首关 90 秒与技术完整性独立验收，第七关只报告。历史双向对照保留为 `npm run balance:gate -- --full` 的调研入口；不能把默认日测未执行的历史对照写成已经比较。跨大境界成本至少为上一小突破五倍、天灵根首局 90 秒九成达到炼气中期；当前收益提高属于用户授权改动，不以旧版低收益作为发布目标。
 - 经验 / 数值相关文件变更须由 `scripts/balance-change-trigger.ts` 的清单自动触发独立全量作业与渲染采样；纯界面和文档不扩充快检。同一来源仓库/分支的 push、PR、定时或手动全量任务共用并发组，新全量任务取消旧任务；不同分支和外仓隔离，快检保持独立。取消任务不生成或发布不完整日报，后续恢复也排除已取消的工作流。正常全量失败仍生成、上传并发布 master 报告，上传后的诊断验收遇到 Error、未通过或报告缺损必须让 CI 失败；Warning 不失败、不擅自改用户容差。后续发布恢复报告 / 性能时须接受可信 master push 来源，排除 PR 与外仓，不回退最新失败。失败邮件由 GitHub 个人 Actions 通知设置控制。
 - 每日完整报告地址：<https://chenxuan520.github.io/qinglan-xiuxian/balance-report/>。报告包含源提交、时间、失败、七关实测与投入/路线/本命/场地分组，可组合筛选，汇总维度可多选或全部取消合计，分组分页与图片导出须标明规则和当前页；可生成/保存统计图；图表只在明确点击生成或翻页时重画，筛选、汇总维度和图表类型变化后保留旧图并标记过期，重新生成前禁止导出。失败与诊断放在统计前面，明细默认折叠、点击展开，计数与通过状态保留可见；Error 红色、Warning 黄色；同目录 `diagnostics.json` 提供给本地 AI 的结构化 GET 接口，详情见开发文档。失败日报也更新且工作流仍失败。生成的 HTML、JSON、CSV、截图、整批存档和研究日志只放已忽略 `artifacts/` 或 `/tmp`，**不提交 Git，也不建立 gh-pages 分支保存报告**。报告通过 Actions artifact 组成 Pages 部署；日报发布保留最近成功游戏部署，游戏发布保留最近正式日报。页面更新有排队延迟，失败邮件沿用 GitHub Actions 个人通知设置。
 - 培养倾向独立小测试：`npm run balance:autoplay`（`--plan`预览），固定双灵根/兼修/手机/初入/无辅助、十种入门本命各四个开局；五模式各40条连续前六关，共200条，不向840/10,080矩阵乘入模式维度。独立`autoplay-balance.yml`每天北京时间12:00与手动运行；两站监控在「每日测试与诊断」之后显示对照，公开JSON为 <https://chenxuan520.github.io/qinglan-xiuxian/autoplay-report/summary.json>。同开局种子配对但决策后随机进程可能分叉；指定法宝固定玄冰镜＋白骨髅，小样本不代表真人胜率。技术异常/漏重样本/混合版本CI失败并展示失败摘要，低通过率不自动改游戏或门禁；报告只进入Actions artifact和Pages，四条发布链相互保留报告，取消任务不发布。
@@ -127,7 +127,7 @@ PY
 
 - 仓库：<https://github.com/chenxuan520/qinglan-xiuxian>。
 - 平台部署地址：<https://chenxuan520.github.io/qinglan-xiuxian/>，仅供部署检查。README 和仓库网站栏只放唯一官网 <https://xiuxian.011203.xyz/>。
-- `.github/workflows/pages.yml` 在 push `master` 后自动检查格式、测试、按仓库子路径构建并发布；也支持手动触发。仓库 Pages 来源为 GitHub Actions。
+- `.github/workflows/pages.yml` 在 push `master` 后只按仓库子路径构建、校验18MB产物上限、恢复已有报告并发布，不运行单元/浏览器/平衡测试，不等待其他测试门禁；也支持手动触发。单元测试、格式/Worker类型、界面回归在独立 `checks.yml`，平衡在 `balance.yml`，二进制在 `binaries.yml`，发布和全量平衡不重复运行单测。仓库 Pages 来源为 GitHub Actions。
 - 经用户授权提交后，`git push origin master`，再用 `gh run list` / `gh run view <run-id>` 检查这次提交的部署结果。发布后用 MCP 确认新入口、资源与关键交互，不能只以 push 成功作为发布完成。
 
 ## Cloudflare Pages 发布（主站）

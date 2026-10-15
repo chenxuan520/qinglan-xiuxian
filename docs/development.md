@@ -35,7 +35,7 @@ npm run format:check
 npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 ```
 
-永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。对局规则与存档结构共用当前版本：`SAVE_SCHEMA` 当前为 18；旧版存档在 `readSave` 单点归一，保留永久进度、补齐可选默认字段，放弃旧格式的未完成对局，不维护逐版本运行时分支；更高版本只读不写。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
+永久修为的关卡系数、妖王奖励和固定敌人定标位于 `src/data.ts` 的 `STAGE_CULTIVATION_RATES`、`STAGE_BOSS_CULTIVATION`、`FIRST_STAGE_CLEAR_CULTIVATION` 与 `STAGE_REALM_STEPS`；击杀累加在 `src/game.ts`，境界门槛与结算在 `src/progress.ts`。对局规则与存档结构共用当前版本：当前结构版本以 `src/progress.ts` 的 `SAVE_SCHEMA` 为准；旧版存档在 `readSave` 单点归一，保留永久进度、补齐可选默认字段，放弃旧格式的未完成对局，不维护逐版本运行时分支；更高版本只读不写。调整数值时同步 [永久修为说明](gameplay.md#永久修为与秘境推进)、游戏内指南和 [验证记录](verification.md)。
 
 第三至六境精英节奏配置集中在 `src/data.ts` 的 `ELITE_PACING`，波次调度与出生气血在 `src/game.ts`。精英节奏与后半程波次为固定规则，恢复时不重新放大在场敌人气血。`lateEliteWaves` 记录是否已接上后半程波次，与 `nextElite` 一起保存，恢复时不重新放大在场敌人气血。变更覆盖波次边界、精英上限、暂停恢复与快照校验时，运行 `tests/elite-pacing.test.ts`；完整难度和分灵根对照见 [验证记录](verification.md)。
 
@@ -69,7 +69,7 @@ curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnos
 
 性能回归防护分两层，源码在 `scripts/perf-sim.ts`、`scripts/size-check.ts` 与 `scripts/perf-render.ts`，产物均写入已忽略的 `artifacts/` 不提交仓库。
 
-- `perf:sim` 每次 push / PR 在 Balance gate 快检与 Pages 部署链路中执行：固定种子在 Node 里驱动真实 `Game`，场景为第六境后期满配自动历练 90 秒、第七境满配逢妖王 90 秒、第六境妖王弹幕 75 秒，逐帧计 `g.update` 耗时统计均值 / p50 / p95 / 最差帧与敌人、弹丸峰值。预算为宽松兜底（p95 ≤ 4ms，最差帧 ≤ 60ms；2026-10 本机基线约 p95 0.12–0.62ms），只拦战斗模拟的灾难性复杂度回归，不随机器快慢抖动；超出预算或场景持续推进不足 30 秒非零退出。
+- `perf:sim` 每次 push / PR 在独立 Balance gate 快检中执行，不放入 Pages 部署链路：固定种子在 Node 里驱动真实 `Game`，场景为第六境后期满配自动历练 90 秒、第七境满配逢妖王 90 秒、第六境妖王弹幕 75 秒，逐帧计 `g.update` 耗时统计均值 / p50 / p95 / 最差帧与敌人、弹丸峰值。预算为宽松兜底（p95 ≤ 4ms，最差帧 ≤ 60ms；2026-10 本机基线约 p95 0.12–0.62ms），只拦战斗模拟的灾难性复杂度回归，不随机器快慢抖动；超出预算或场景持续推进不足 30 秒非零退出。
 - `size:check` 同源链路执行：独立目录 `artifacts/size-check` 以根路径构建后按 `index.html` 引用定位入口 JS/CSS，校验原始与 gzip 字节（JS ≤ 560,000 / gzip ≤ 210,000，CSS ≤ 150,000 / gzip ≤ 35,000；2026-10 基线 451,039 / 169,642 / 125,815 / 27,266）。防止依赖或素材误打进产物。入口 JS 预算在 2026-10-14 由 550,000 调到 560,000，用来容纳主界面控制器拆分后的函数边界。
 - `perf:render` 每天与手动 full 一起跑（`perf-render` job，不卡门禁）：无头 Chrome（CI 的 ubuntu-latest 自带 google-chrome，本地用 `CHROME_PATH` 指定）加载根路径独立构建，写入一份自动生成的「第六境后期满配」可恢复存档（`perfSaveFixture()` 用真实 `Game` 模拟 10 秒后快照），恢复历练后采样 60 秒 rAF 帧间隔与长任务，输出 `artifacts/perf-render/report.json`、`summary.md`，仅保留数值报告，不生成或保存截图。无头软渲染远低于真机帧率，数据仅作日报观测，不设门槛，不与真实设备比较；浏览器或页面流程出错才非零退出。不引入任何新依赖：直接用 Node 22 内置 WebSocket 走 Chrome DevTools Protocol 驱动浏览器（`scripts/perf-render.ts` 自带极简 CDP 客户端），避免浏览器驱动库拖入安装链。使用独立临时浏览器目录并在退出后清理，采样视口固定为 1365×900，保持每日基线一致。
 
@@ -79,7 +79,7 @@ curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnos
 
 「清除所有缓存资源」始终显示在离线资源小节；检查、缓存或清除过程中暂不可点击。清除只删除 `qinglan-offline:<当前作用域路径>:` 前缀的资源缓存，即使 Service Worker 已注销，也能清理残留完整缓存和未完成缓存，不删除其他作用域或网站数据。操作锁覆盖整个清除过程；状态检查按请求序号丢弃迟到响应，避免关闭重开面板、声音切换或并行检查把旧状态写回。其他页面重新完成缓存后，状态检查会撤掉旧清除提示。
 
-Vite 的 `scripts/offline-build.ts` 为每次生产构建生成 `offline-manifest.json` 与带构建号的固定清单；收录整个构建输出，包括后台计时 Worker、留影懒加载代码、字体、音乐和未访问关卡素材。清单包含文件长度与 SHA-256，缓存逐项校验，全部成功后才写完成标记。网络、空间不足、取消或部署中途资源变化均不能标为完整。保持根路径与 GitHub Pages 子路径的独立作用域。
+Vite 的 `scripts/offline-build.ts` 为每次生产构建生成 `offline-manifest.json` 与带构建号的固定清单；收录整个构建输出，包括后台计时 Worker、指南与留影懒加载代码、音乐和未访问关卡素材。远程公共字体不纳入清单，离线使用系统字体。清单包含文件长度与 SHA-256，缓存逐项校验，全部成功后才写完成标记。网络、空间不足、取消或部署中途资源变化均不能标为完整。保持根路径与 GitHub Pages 子路径的独立作用域。
 
 导航先请求网络，失败或三秒无响应时使用最新完整离线入口；静态资源优先使用完整缓存，公共素材和 CSS 中的图片带构建号，避免两版图集混用。音乐缓存完整文件并支持 `Range` 的 206 响应。仅缓存清单内静态资源，AI 与统计 API 不入缓存，广告机制不改。成功更新后保留最近两套完整资源；更早的旧页面需刷新后使用新版。发布必须携带生成的固定清单与 `offline-worker.js`，不能只上传 JS/CSS；本机正常入口更新时也须先追加这些公共文件，再原子替换 `index.html`，保留旧 hash 文件与固定清单。
 
@@ -191,14 +191,26 @@ npm run stats -- --days=30
 - `autoplay-balance.yml`独立于长矩阵，每天北京时间12:00及手动运行，异常/漏样本/重复/混合源版本会失败，仍上传安全失败摘要；取消任务不发布。原始记录在临时目录，公开摘要在忽略目录`artifacts/autoplay-balance/`，Actions artifact `autoplay-daily-report`保留90天，全部不入Git。接口 <https://chenxuan520.github.io/qinglan-xiuxian/autoplay-report/summary.json>：schemaVersion 1，含state、generatedAt、commit/sourceHash、dirty、runId、耗时、200条计划/返回数及五模式配对/逐关计数；失败rows为空，不能冒充完整比较。
 - 四条Pages发布链（游戏、完整平衡、法宝、培养倾向）相互恢复最新正式报告；新日报只重建最近成功部署的游戏，再用当前校验工具恢复报告。恢复只接受本仓库master、对应工作流、已完成且非取消的定时/手动产物，并核对commit/runId与固定200计划，拒绝脏版本和坏摘要，不因最新失败悄悄回退旧成功。监控单独刷新/20秒超时，失败不阻塞其他统计，超过36小时提示陈旧。
 - 性能公开接口：<https://chenxuan520.github.io/qinglan-xiuxian/monitor/performance.json>。`schemaVersion: 1`，`publishedAt` 和 `sources.render / simulation / size` 各带 `state`（ready / failed / unavailable）、源提交、Actions run ID、采样时间及精简指标。两站监控都从这个接口动态读取，不在 Cloudflare 页面冻结数值；GitHub Pages 允许跨域 GET，无需浏览器 GitHub 凭证。
-- `scripts/restore-monitor-performance.ts` 只读取本仓库 master 的可信 `balance.yml` artifact。Pages 发布优先采用当前 job 已完成的模拟 / 体积结果，避免并行快检尚未结束时误用旧数据；每日发布使用最新正式 artifact。`perf-checks` 保存模拟 / 体积，`perf-render` 只保存渲染数值摘要，均保留 90 天。数值报告、JSON 只进入 Actions artifact 和 Pages 部署目录，**不提交 Git**。每次游戏发布和每日完整报告发布都恢复这些摘要；渲染失败也发布安全失败记录，页面不会显示绿色成功。
+- `scripts/restore-monitor-performance.ts` 只读取本仓库 master 的可信 `balance.yml` artifact。Pages 发布从独立Balance工作流恢复最新已上传完成的可信模拟/体积artifact，不在部署job重跑性能门禁。若本次快检仍在运行，保留最近可用摘要并标明源提交和采样时间，不把旧数据标成本次结果；每日发布同样使用最新正式artifact。`perf-checks` 保存模拟 / 体积，`perf-render` 只保存渲染数值摘要，均保留 90 天。数值报告、JSON 只进入 Actions artifact 和 Pages 部署目录，**不提交 Git**。每次游戏发布和每日完整报告发布都恢复这些摘要；渲染失败也发布安全失败记录，页面不会显示绿色成功。
 - 每日北京时间 12:00 调度保持不变。需要只更新渲染时，可手动运行 Balance gate 并选择 `render_only=true`：不重跑 10,080 矩阵，保留最近成功部署的游戏和正式平衡日报，只更新渲染及监控摘要。无头 Chrome 的平均 / 5%低分位帧率、最差帧间隔和长任务只是 CI 环境观测，不代表手机真机表现。
 
 ## GitHub Pages · 平台部署
 
 平台部署地址：`https://chenxuan520.github.io/qinglan-xiuxian/`，不作为对外游玩入口。
 
-`.github/workflows/pages.yml` 在推送到 `master` 时执行格式检查、测试与生产构建，再部署到 GitHub Pages，也支持在 Actions 页面手动运行。仓库 Settings → Pages 的发布来源需设为 **GitHub Actions**；私有仓库需要支持 Pages 的 GitHub 套餐。
+`.github/workflows/pages.yml` 在推送到 `master` 时只安装构建依赖、按Pages子路径编译、校验18MB产物上限、恢复正式监控/日报并部署，不运行测试或等待测试门禁，也支持在Actions页面手动运行。仓库 Settings → Pages 的发布来源需设为 **GitHub Actions**；私有仓库需要支持 Pages 的 GitHub 套餐。
+
+各工作流按职责独立触发，测试失败由对应Actions门禁标红和通知，不阻塞部署，也不因部署成功把测试标为成功：
+
+| 工作流         | 职责                                                               | 触发                            |
+| -------------- | ------------------------------------------------------------------ | ------------------------------- |
+| `pages.yml`    | 编译、产物上限、恢复报告、部署                                     | master推送、手动                |
+| `checks.yml`   | 独立job：单元测试；格式与Worker类型；生产子路径下手机/电脑界面回归 | 所有分支推送、v\*标签、PR、手动 |
+| `binaries.yml` | 禁止未授权二进制与字体                                             | 所有分支/标签推送、PR、手动     |
+| `balance.yml`  | 840快检、模拟/体积；按规则触发万条全量与每日渲染                   | 原推送/PR/定时/手动规则         |
+| `release.yml`  | 编译、产物上限、离线包与校验和、Release                            | v\*标签                         |
+
+Quality gates的手机/电脑回归仍用Chrome DevTools MCP及独立浏览器工具，报告/失败截图保存为7天artifact，不提交仓库。当前游戏与构建规则未改。
 
 构建会使用 Pages 提供的子目录路径，地图、人物、法宝图标和后台计时 Worker 均支持仓库地址下访问。本地 `npm run dev` 与默认构建继续使用根路径。
 
@@ -206,7 +218,7 @@ GitHub Pages 和 localhost 是不同来源，浏览器存档各自独立，不�
 
 ## GitHub Release · 离线版
 
-推送 `v*` 标签会触发 `.github/workflows/release.yml`。流水线依次执行格式检查、全量测试、Worker 类型检查和生产构建，然后创建 GitHub Release，并附带离线包及 SHA-256 校验文件。
+推送 `v*` 标签会触发 `.github/workflows/release.yml`。发布流水线只编译、校验18MB产物上限、打包并创建GitHub Release；`v*`标签同时独立触发Quality gates与二进制门禁，不在发布job内重复单测。发布流程创建GitHub Release，并附带离线包及 SHA-256 校验文件。
 
 ```bash
 git tag v0.0.1

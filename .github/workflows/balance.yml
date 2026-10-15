@@ -108,7 +108,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm test
       - run: npm run balance:gate:full
       - name: Generate daily web report even on failure
         if: always() && !cancelled()
@@ -185,7 +184,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}balance-report/
     steps:
-      # 使用最近成功游戏部署的版本，报告更新不发布未经游戏 CI 的新代码。
+      # 复用最近成功部署的游戏版本，报告更新不切换游戏源代码。
       - name: Select latest deployed game
         id: game
         env:
