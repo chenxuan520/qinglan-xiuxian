@@ -1,4 +1,5 @@
 import { trainingEffect } from './training.ts';
+import { debateQuote } from './market-debate.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, spiritRootInfo, pathInfo } from './data.ts';
 import { MEDICINES, medicineInfo } from './medicine-data.ts';
 import {
@@ -114,37 +115,38 @@ function log(save: SaveData, id: MarketCultivatorId, kind: MarketSocialLog['kind
   );
   return record;
 }
-export function debateReason(save: SaveData, id: MarketCultivatorId, visit: number) {
+export function debateReason(
+  save: SaveData,
+  id: MarketCultivatorId,
+  visit: number,
+  choice?: string,
+) {
   const r = marketSocialReason(save, id, visit, MARKET_SOCIAL_SETTINGS.debateYears);
   if (r) return r;
   const last = save.mortal.marketSocial!.lastDebateAt;
   if (last !== null && save.age < last + MARKET_SOCIAL_SETTINGS.debateInterval - 1e-9)
     return `再历 ${Math.ceil((last + MARKET_SOCIAL_SETTINGS.debateInterval - save.age - 1e-9) * 10) / 10} 年可论道有所获`;
+  if (choice !== undefined) {
+    const quote = debateQuote(save, id, choice);
+    if (!quote) return '丹方或互授条件已变化，请重新查看';
+    if (save.stones < quote.price + auctionDues(save, MARKET_SOCIAL_SETTINGS.debateYears))
+      return '灵石不足，请备足抄录费与到期供奉';
+    if (quote.kind === 'medicine' && !Number.isSafeInteger((save.medicine.bag[quote.id] || 0) + 1))
+      return '丹囊数量已达上限';
+  }
   return '';
 }
 export function debateReward(save: SaveData, id: MarketCultivatorId) {
-  const n = npc(save, id);
-  const pool = MEDICINES.filter(
-    (m) =>
-      m.years > 0 &&
-      m.tier !== '凡品' &&
-      m.stage <= save.unlocked &&
-      marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id).some(
-        (p) => p.id === m.id,
-      ) &&
-      !save.medicine.recipes.includes(m.id),
-  );
-  const player = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
-  if (pool.length && n.realmIndex >= player)
-    return { kind: 'recipe' as const, id: pool[roll(save, `debate:${id}`) % pool.length].id };
-  const common = MEDICINES.filter((m) => m.tier === '凡品');
-  return { kind: 'medicine' as const, id: common[roll(save, `debate:${id}`) % common.length].id };
+  return debateQuote(save, id)!;
 }
-export function debateMarket(save: SaveData, id: MarketCultivatorId, visit: number) {
-  if (debateReason(save, id, visit)) return undefined;
-  const reward = debateReward(save, id);
-  if (reward.kind === 'medicine' && !Number.isSafeInteger((save.medicine.bag[reward.id] || 0) + 1))
-    return undefined;
+export function debateMarket(
+  save: SaveData,
+  id: MarketCultivatorId,
+  visit: number,
+  choice = 'talk',
+) {
+  if (debateReason(save, id, visit, choice)) return undefined;
+  const reward = debateQuote(save, id, choice)!;
   const n = npc(save, id);
   const player = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
   const root = spiritRootInfo(save.spiritRoot);
@@ -168,10 +170,20 @@ export function debateMarket(save: SaveData, id: MarketCultivatorId, visit: numb
         ? '凡躯问道，护住气血与退路，再靠淬体与备药补足根基。'
         : '灵根各有长短，顺着所长立本命，备药与淬体也能补其不足。';
   advanceMortal(save, MARKET_SOCIAL_SETTINGS.debateYears * 60);
-  if (reward.kind === 'recipe') save.medicine.recipes.push(reward.id);
-  else save.medicine.bag[reward.id] = (save.medicine.bag[reward.id] || 0) + 1;
+  save.stones -= reward.price;
+  if (reward.kind === 'recipe') {
+    save.medicine.recipes.push(reward.id);
+    rememberMarketTrade(save, id);
+    if (reward.exchange) {
+      const contact = rememberMarketContact(save, id)!;
+      (contact.taughtRecipes ??= []).push(reward.exchange);
+    }
+  } else if (reward.kind === 'medicine') {
+    save.medicine.bag[reward.id] = (save.medicine.bag[reward.id] || 0) + 1;
+    rememberMarketContact(save, id)!.debateGiftAt = save.age;
+  }
   save.mortal.marketSocial!.lastDebateAt = save.age;
-  const text = `与${n.name}论道一年，${opening}。${root.name} · ${pathInfo(save.path).name} · 本命${item.name}。${rootLine}${advice}${reward.kind === 'recipe' ? `习得${medicineInfo(reward.id)!.name}丹方，本世材料组合沿用已有配方。` : `获赠${medicineInfo(reward.id)!.name}一份，已收入丹囊，出发前自行服用。`}`;
+  const text = `与${n.name}论道一年，${opening}。${root.name} · ${pathInfo(save.path).name} · 本命${item.name}。${rootLine}${advice}${reward.kind === 'recipe' ? `${reward.exchange ? `向对方讲授${medicineInfo(reward.exchange)!.name}丹方，互授` : `支付${reward.price}灵石抄录`}所得为${medicineInfo(reward.id)!.name}丹方，本世材料组合不变，未领取成品丹药。` : reward.kind === 'medicine' ? `旧识以${medicineInfo(reward.id)!.name}一份答谢当年相助，已收入丹囊；本人本世不再重复赠送。` : '此番交流修行取舍，未获赠丹药或丹方，修为与属性不变。'}`;
   return log(save, id, 'debate', text);
 }
 export function marketRequest(save: SaveData, id: MarketCultivatorId) {

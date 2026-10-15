@@ -8,10 +8,10 @@ import {
 } from './sect-market-data.ts';
 import { marketBuildingArt } from './market-art.ts';
 import { assetUrl } from './asset-url.ts';
-import { medicineInfo } from './medicine-data.ts';
 import { auctionItemName } from './auction-items.ts';
 import { sectMarketOffer } from './sect-market.ts';
-import { debateReward, marketRequest } from './market-social.ts';
+import { marketRequest } from './market-social.ts';
+import { debateContent } from './market-debate-ui.ts';
 import { marketContact } from './market-relations.ts';
 import { marketFellowCharacter } from './market-fellow.ts';
 import {
@@ -47,12 +47,10 @@ export function marketVenueContent(save: SaveData, id: MarketVenueId, unfinished
   if (id === 'forum') {
     content = `<p>${rank < 2 ? '院中留着听道的席位。可向眼下在坊中的前辈请教，先从自己的本命与根基说起。' : rank < 4 ? '修行渐深，已能与同道互证所得。选一位在坊中的修士，谈谈各自遇到的难处。' : '你已有开席讲法的修为。可以继续向同道请教，也可以把自己确实掌握的御器心得或丹方，讲给较低境界的来客。'}</p><div class="market-venue-grid">${people
       .map((npc) => {
-        const reward = debateReward(save, npc.id);
-        const gain = medicineInfo(reward.id)!.name;
         const topics = venueHostTopics(save, npc.id as MarketTraderId);
         return person(
           npc,
-          `<p>一席论道：${reward.kind === 'recipe' ? `可习得${esc(gain)}丹方` : `获赠${esc(gain)}一份`}。</p>${button(`debate@${npc.id}`, rank < npc.realmIndex ? '向前辈请教 · 一年' : '坐而互证 · 一年')}${topics.length ? `<details><summary>开席讲法</summary><p class="panel-note">一年，30灵石茶水与场地费。指点实际在坊中的后学，增加一次有来由的交情，不发修为或战力。</p>${topics.map((t) => button(`host@${npc.id}@${t.id}`, `讲${t.name}`)).join('')}</details>` : ''}`,
+          `${debateContent(save, npc.id, venueStamp(save))}${topics.length ? `<details><summary>开席讲法</summary><p class="panel-note">一年，30灵石茶水与场地费。指点实际在坊中的后学，增加一次有来由的交情，不发修为或战力。</p>${topics.map((t) => button(`host@${npc.id}@${t.id}`, `讲${t.name}`)).join('')}</details>` : ''}`,
         );
       })
       .join(

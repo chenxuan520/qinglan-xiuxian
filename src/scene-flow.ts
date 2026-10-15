@@ -341,6 +341,8 @@ export function renderPanel(shell: ActionShell) {
   } else if (shell.panel === 'market-venue') {
     const id = shell.marketScene?.nearVenue?.id;
     if (id) shell.marketEventSource.current?.renderVenue(shell, id);
+  } else if (shell.panel === 'sect-market-event' && shell.marketNpc) {
+    shell.showMarketEvent(shell.marketNpc);
   } else if (shell.panel === 'settings') {
     shell.panelFrame('设置', '游戏选项', shell.settingsContent(shell.save));
     void shell.openOfflinePanel();
@@ -580,7 +582,11 @@ export function closeRewardAd(shell: ActionShell) {
   shell.rewardAd = null;
   shell.panel = '';
   shell.modal.innerHTML = '';
-  if (shell.inMortalWorld) shell.renderMortal();
+  if (shell.inMarket && shell.marketScene) {
+    // 补给不推进年岁或换批；保留现场，避免异步重建期间丢失院落与眼前修士。
+    const status = shell.document.getElementById('town-status');
+    if (status) status.innerHTML = shell.townStatus(shell.save);
+  } else if (shell.inMortalWorld) shell.renderMortal();
   else shell.renderLobby();
   if (shell.rewardReturn) {
     if (shell.rewardReturn.name === 'sect-dues') shell.renderSectDues();

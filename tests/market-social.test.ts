@@ -47,7 +47,7 @@ function chance(kind: 'goods' | 'deposit' | 'haggle' | 'invitation', honest: boo
   }
   throw Error('missing fixture');
 }
-test('论道奖励与灵根、路线和本命文案相符，未知可用丹方或凡品入囊；不改药效配方和永久数值', () => {
+test('普通论道仅交流灵根、路线和本命，不再保底赠丹或免费传方', () => {
   for (let seed = 1; seed < 20; seed++) {
     const s = fixture(seed);
     const id = ids[seed % 3];
@@ -63,18 +63,15 @@ test('论道奖励与灵根、路线和本命文案相符，未知可用丹方�
     assert.deepEqual(s.medicine.used, before.medicine.used);
     assert.equal(s.medicine.recipeSeed, before.medicine.recipeSeed);
     assert.equal(s.cultivation, before.cultivation);
-    if (reward.kind === 'recipe') {
-      assert.ok(s.medicine.recipes.includes(reward.id));
-      const m = MEDICINES.find((m) => m.id === reward.id)!;
-      assert.ok(m.years > 0 && m.tier !== '凡品' && m.stage <= s.unlocked);
-    } else assert.equal(s.medicine.bag[reward.id], 1);
+    assert.equal(reward.kind, 'insight');
+    assert.deepEqual(s.medicine, before.medicine);
   }
 });
-test('论道十年冷却跨NPC/访次/刷新/导入保持，全部丹方已知时只赠凡品，首关不提前送高阶方', () => {
+test('论道十年间隔跨NPC/访次/刷新/导入保持，首关和已知全部丹方都不白送药', () => {
   const s = fixture();
   s.unlocked = 0;
   const id = ids[0];
-  assert.equal(debateReward(s, id).kind, 'medicine');
+  assert.equal(debateReward(s, id).kind, 'insight');
   debateMarket(s, id, 1);
   const at = s.age;
   beginSectMarketVisit(s);
@@ -84,7 +81,7 @@ test('论道十年冷却跨NPC/访次/刷新/导入保持，全部丹方已知�
   assert.equal(loaded.mortal.marketSocial!.lastDebateAt, at);
   loaded.age += 10;
   loaded.medicine.recipes = MEDICINES.filter((m) => m.years && m.tier !== '凡品').map((m) => m.id);
-  assert.equal(debateReward(loaded, ids[1]).kind, 'medicine');
+  assert.equal(debateReward(loaded, ids[1]).kind, 'insight');
   assert.ok(debateMarket(loaded, ids[1], 2));
 });
 test('论道一年的寿元、天劫、供奉预检；不能使用未来报酬，半年旧拍卖规则不变', () => {
@@ -267,12 +264,6 @@ test('不允许未完成历练赴约，冷却及物资上限不溢出，原快�
   assert.deepEqual(game.snapshot(), snapshot);
   assert.ok(Game.restore(normal, snapshot));
   assert.equal(normal.schema, SAVE_SCHEMA);
-  const full = fixture();
-  const reward = debateReward(full, ids[0]);
-  if (reward.kind === 'medicine') {
-    full.medicine.bag[reward.id] = Number.MAX_SAFE_INTEGER;
-    assert.equal(debateMarket(full, ids[0], 1), undefined);
-  }
 });
 test('损坏社交字段正常读档保留其余进度，导入拒绝；日志HTML被转义，细节默认折叠', () => {
   const s = fixture();

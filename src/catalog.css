@@ -176,12 +176,19 @@
   margin-top: 7px;
 }
 .forge-dots {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
   position: absolute;
   bottom: 8px;
   left: 62px;
   font: 9px sans-serif;
-  letter-spacing: 3px;
+  letter-spacing: 1px;
   color: #bcbc8899;
+}
+.forge-bonus {
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 .equipped-label {
   position: absolute;
@@ -226,6 +233,9 @@
   margin-top: 6px;
 }
 .detail-copy h3 small {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 10px;
   color: #b6bd9b;
   margin-left: 14px;

@@ -102,24 +102,32 @@ export function executeMarketSocial(
   visit: number,
   level: number,
   hasPendingRun: boolean,
+  debateChoice = 'talk',
 ) {
   if (!prepareMarketSocial(next)) return { ok: false as const, stale: false };
-  const result =
-    action === 'sect-market-debate'
-      ? debateMarket(next, id, visit)
-      : action === 'sect-market-request'
-        ? fulfillMarketRequest(next, id, visit, level, hasPendingRun)
-        : chooseMarketOpportunity(
-            next,
-            id,
-            visit,
-            action === 'sect-market-inspect'
-              ? 'inspect'
-              : action === 'sect-market-decline'
-                ? 'decline'
-                : 'accept',
-            hasPendingRun,
-          );
+  const result = [
+    'sect-market-debate',
+    'sect-market-debate-pay',
+    'sect-market-debate-swap',
+  ].includes(action)
+    ? (action === 'sect-market-debate' && debateChoice === 'talk') ||
+      (action === 'sect-market-debate-pay' && debateChoice.startsWith('pay:')) ||
+      (action === 'sect-market-debate-swap' && debateChoice.startsWith('swap:'))
+      ? debateMarket(next, id, visit, debateChoice)
+      : undefined
+    : action === 'sect-market-request'
+      ? fulfillMarketRequest(next, id, visit, level, hasPendingRun)
+      : chooseMarketOpportunity(
+          next,
+          id,
+          visit,
+          action === 'sect-market-inspect'
+            ? 'inspect'
+            : action === 'sect-market-decline'
+              ? 'decline'
+              : 'accept',
+          hasPendingRun,
+        );
   if (!result) return { ok: false as const, stale: true };
   const message =
     result.kind === 'debate'

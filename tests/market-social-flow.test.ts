@@ -21,6 +21,8 @@ import {
   isMarketCultivatorId,
   MARKET_CULTIVATORS,
 } from '../src/sect-market-data.ts';
+import { debateRecipeOffer } from '../src/market-debate.ts';
+import { MEDICINES } from '../src/medicine-data.ts';
 import { marketSocialContent } from '../src/market-social-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
 import {
@@ -68,7 +70,15 @@ const script = new Script(
   ),
 );
 function harness(
-  kind: 'debate' | 'request' | 'fraud' | 'ambush' | 'gift-medicine' | 'gift-artifact' = 'debate',
+  kind:
+    | 'debate'
+    | 'debate-pay'
+    | 'debate-swap'
+    | 'request'
+    | 'fraud'
+    | 'ambush'
+    | 'gift-medicine'
+    | 'gift-artifact' = 'debate',
   pending = false,
 ) {
   let save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -87,7 +97,22 @@ function harness(
     save.mortal.auction = undefined;
     beginSectMarketVisit(save);
     const ids = MARKET_CULTIVATORS.map((n) => n.id);
-    if (kind === 'request') {
+    if (kind === 'debate-pay' || kind === 'debate-swap') {
+      save.medicine.recipes =
+        kind === 'debate-swap'
+          ? MEDICINES.filter((m) => m.years > 0 && m.tier !== '凡品')
+              .filter((_, i) => i % 2 === 0)
+              .map((m) => m.id)
+          : [];
+      const id = ids.find((id) => {
+        const q = debateRecipeOffer(save, id);
+        return q && (kind !== 'debate-swap' || q.exchange);
+      });
+      if (id) {
+        chosen = id;
+        break;
+      }
+    } else if (kind === 'request') {
       const id = ids.find((id) => marketRequest(save, id)?.kind === 'medicine');
       if (id) {
         chosen = id;
@@ -223,6 +248,7 @@ function harness(
                 dataset: {
                   visit: attrs.match(/data-visit="(\d+)"/)?.[1],
                   level: attrs.match(/data-level="(\d+)"/)?.[1],
+                  debateChoice: attrs.match(/data-debate-choice="([^"]+)"/)?.[1],
                 },
                 disabled: attrs.includes('disabled'),
               }
@@ -389,4 +415,34 @@ test('真实未完历练论道后保留原快照，可以恢复；赴约按钮�
   trap.action('sect-market-opportunity');
   assert.equal(trap.entered(), 0);
   assert.equal(trap.save.age, 30);
+});
+
+test('真实付费抄录与互授按钮写档成功才扣款/学方/记忆，写入失败或旧窗口完全回滚', () => {
+  for (const mode of ['pay', 'swap'] as const)
+    for (const state of ['success', 'failure', 'stale'] as const) {
+      const h = harness(`debate-${mode}`);
+      const q = debateRecipeOffer(h.save, h.npc.id)!;
+      const before = structuredClone(h.save);
+      if (state === 'failure') h.fail();
+      if (state === 'stale') h.stale();
+      h.action(`sect-market-debate-${mode}`);
+      if (state !== 'success') {
+        assert.deepEqual(h.save, before);
+        continue;
+      }
+      assert.equal(h.save.stones, before.stones - (mode === 'pay' ? q.price : 0));
+      assert.equal(h.save.age, before.age + 1);
+      assert.ok(h.save.medicine.recipes.includes(q.id));
+      assert.deepEqual(h.save.medicine.bag, before.medicine.bag);
+      assert.deepEqual(h.stored().medicine, h.save.medicine);
+      if (mode === 'swap')
+        assert.ok(
+          h.save.mortal.marketRelations!.contacts.some((c) =>
+            c.taughtRecipes?.includes(q.exchange!),
+          ),
+        );
+      const completed = JSON.stringify(h.save);
+      h.action(`sect-market-debate-${mode}`);
+      assert.equal(JSON.stringify(h.save), completed);
+    }
 });

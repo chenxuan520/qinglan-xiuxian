@@ -117,12 +117,16 @@ export function venueActionReason(
   if (venueStamp(save) !== stamp) return '这桩事项已变化，请重新查看';
   const parts = choice.split('@');
   const [kind, id, topic] = parts;
-  if (parts.length !== ({ work: 1, seek: 2, host: 3, favor: 2, debate: 2 }[kind] ?? 0))
+  if (
+    kind === 'debate'
+      ? ![2, 3].includes(parts.length)
+      : parts.length !== ({ work: 1, seek: 2, host: 3, favor: 2 }[kind] ?? 0)
+  )
     return '事项无法识别';
   const people = venuePeople(save);
   if (kind === 'debate')
     return people.some((n) => n.id === id)
-      ? debateReason(save, id as MarketTraderId, save.mortal.sectMarket!.visit)
+      ? debateReason(save, id as MarketTraderId, save.mortal.sectMarket!.visit, topic ?? 'talk')
       : '这位修士已经离场';
   const seek = kind === 'seek' ? venueSeekOffers(save).find((o) => o.npc.id === id) : undefined;
   const host = kind === 'host' ? people.find((n) => n.id === id) : undefined;
@@ -182,7 +186,8 @@ export function executeVenue(save: SaveData, choice: string, stamp: string, unfi
   if (venueActionReason(save, choice, stamp, unfinished)) return undefined;
   const [kind, id, topic] = choice.split('@');
   if (kind === 'debate')
-    return debateMarket(save, id as MarketTraderId, save.mortal.sectMarket!.visit)?.text;
+    return debateMarket(save, id as MarketTraderId, save.mortal.sectMarket!.visit, topic ?? 'talk')
+      ?.text;
   const state = (save.mortal.marketVenues ??= { workAt: null, favorAt: null, receipts: [] });
   let text: string;
   if (kind === 'work') {

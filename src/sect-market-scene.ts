@@ -4,7 +4,6 @@ import {
   MARKET_WIDTH,
   MARKET_HEIGHT,
   MARKET_BUILDINGS,
-  MARKET_LANES,
   MARKET_VENUES,
   type MarketVenueId,
   marketCharacters,
@@ -85,7 +84,7 @@ export class SectMarketScene {
       ...Array.from({ length: 4 }, (_, i) => [150, 650 + i * 370]),
       ...Array.from({ length: 4 }, (_, i) => [MARKET_SCENE_WIDTH - 160, 650 + i * 370]),
     ];
-    host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_SCENE_WIDTH}px;height:${MARKET_SCENE_HEIGHT}px">${trees.map(([x, y]) => `<div class="town-prop market-tree market-border-tree" style="left:${x}px;top:${y}px;width:210px;height:210px;background-position:0 0"></div>`).join('')}<div class="market-world" style="left:${MARKET_SCENE_PADDING}px;top:${MARKET_SCENE_PADDING}px;width:${MARKET_WIDTH}px;height:${MARKET_HEIGHT}px">${MARKET_LANES.map(([x, y, w, h]) => `<div class="market-lane" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"></div>`).join('')}${MARKET_BUILDINGS.map((b) => `<div class="town-building market-shop" style="left:${b.x}px;top:${b.y}px;z-index:${b.y};width:260px;height:260px;${marketBuildingArt(b.art)}"><span class="town-building-caption">${b.label}</span></div>`).join('')}${[
+    host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_SCENE_WIDTH}px;height:${MARKET_SCENE_HEIGHT}px">${trees.map(([x, y]) => `<div class="town-prop market-tree market-border-tree" style="left:${x}px;top:${y}px;width:210px;height:210px;background-position:0 0"></div>`).join('')}<div class="market-world" style="left:${MARKET_SCENE_PADDING}px;top:${MARKET_SCENE_PADDING}px;width:${MARKET_WIDTH}px;height:${MARKET_HEIGHT}px">${MARKET_BUILDINGS.map((b) => `<div class="town-building market-shop" style="left:${b.x}px;top:${b.y}px;z-index:${b.y};width:260px;height:260px;${marketBuildingArt(b.art)}"><span class="town-building-caption">${b.label}</span></div>`).join('')}${[
       [420, 360, 160],
       [1590, 360, 160],
       [130, 1320, 150],

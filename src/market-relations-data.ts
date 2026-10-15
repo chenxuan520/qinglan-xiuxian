@@ -1,3 +1,4 @@
+import { medicineInfo } from './medicine-data.ts';
 import { isMarketTraderId, type MarketTraderId, type SectMarketState } from './sect-market-data.ts';
 
 export const MAX_MARKET_CONTACTS = 8;
@@ -16,6 +17,8 @@ export interface MarketContact extends MarketIdentity {
   tradeVisit: number;
   aidVisit?: number;
   aidAt?: number;
+  debateGiftAt?: number;
+  taughtRecipes?: string[];
 }
 export interface MarketRelationsState {
   contacts: MarketContact[];
@@ -64,6 +67,20 @@ export function validMarketRelations(
         integer(c.grudge, 3) &&
         typeof c.dead === 'boolean' &&
         integer(c.tradeVisit, c.lastVisit) &&
+        (c.debateGiftAt === undefined ||
+          (c.aidAt !== undefined &&
+            typeof c.debateGiftAt === 'number' &&
+            Number.isFinite(c.debateGiftAt) &&
+            c.debateGiftAt >= c.metAt &&
+            c.debateGiftAt <= age)) &&
+        (c.taughtRecipes === undefined ||
+          (Array.isArray(c.taughtRecipes) &&
+            c.taughtRecipes.length <= 16 &&
+            new Set(c.taughtRecipes).size === c.taughtRecipes.length &&
+            c.taughtRecipes.every((id) => {
+              const m = typeof id === 'string' ? medicineInfo(id) : undefined;
+              return !!m && m.years > 0 && m.tier !== '凡品';
+            }))) &&
         ((c.aidAt === undefined && c.aidVisit === undefined) ||
           (integer(c.aidVisit, c.lastVisit) &&
             Number(c.aidVisit) >= c.birthVisit &&

@@ -41,6 +41,7 @@ export function rememberMarketContact(save: SaveData, id: MarketCultivatorId) {
     contacts.push(contact);
     if (contacts.length > MAX_MARKET_CONTACTS) {
       const protectedIdentities = [
+        ...MARKET_CULTIVATORS.map((n) => marketIdentity(state, n.id)),
         ...(state.returning ?? []).map((r) => ({ birthVisit: r.birthVisit, slot: r.birthSlot })),
         ...(save.mortal.marketSocial?.ambush ? [save.mortal.marketSocial.ambush.identity] : []),
       ];
@@ -118,6 +119,7 @@ export function marketKnownMemory(save: SaveData, id: MarketCultivatorId) {
       : '此番相识，彼此已留过名字。',
     c.tradeVisit ? '曾经当面公平交易，对方愿意提醒你核对凭据与退路。' : '',
     c.aidAt !== undefined ? '你曾在坊中切实相助，这份情谊当事人记在心里。' : '',
+    c.debateGiftAt !== undefined ? '这位旧识已赠过一份凡品丹药答谢相助，本世不再重复回礼。' : '',
     c.grudge ? '你认出先前伏击你的劫修。旧怨尚在，私下赴约尤其危险；可留在坊市，直接作别。' : '',
   ]
     .filter(Boolean)

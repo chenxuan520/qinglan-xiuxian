@@ -721,6 +721,8 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     } else if (
       [
         'sect-market-debate',
+        'sect-market-debate-pay',
+        'sect-market-debate-swap',
         'sect-market-request',
         'sect-market-inspect',
         'sect-market-opportunity',
@@ -743,6 +745,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         visit,
         Number(button.dataset.level),
         !!shell.pendingRun,
+        button.dataset.debateChoice ?? 'talk',
       );
       if (!social.ok) {
         if (social.stale) shell.toast('这桩互动已变化，请重新查看；当前物资未改动');

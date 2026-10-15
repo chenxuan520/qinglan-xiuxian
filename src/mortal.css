@@ -1624,22 +1624,6 @@
 }
 
 /* 修士坊市使用独立建筑图集，地景、人物沿用已有素材。 */
-.sect-market-map {
-  background:
-    radial-gradient(ellipse at 50% 48%, #646d4e44, #263f2b55),
-    url('/assets/town-ground.webp') repeat;
-  background-size: auto, 600px;
-}
-.market-lane {
-  position: absolute;
-  z-index: 0;
-  background:
-    linear-gradient(#a8a17b24, #aaa38024),
-    url('/assets/town-ground.webp') repeat;
-  background-size: auto, 440px;
-  border: 2px solid #c1b28c30;
-  box-shadow: 0 0 20px #102c2222;
-}
 .market-shop {
   background-image: url('/assets/sect-market-buildings.webp');
   filter: saturate(0.9);
