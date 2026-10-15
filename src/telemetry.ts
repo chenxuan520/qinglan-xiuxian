@@ -16,13 +16,14 @@ export const TELEMETRY_EVENTS = [
   'epilogue',
   'error',
 ] as const;
-// 历练结果，或轮回原因（寿尽、天劫、叩门后、主动）。
+// 历练结果，或轮回原因（寿尽、天劫、劫杀身陨、叩门后、主动）。
 export const TELEMETRY_RESULTS = [
   'won',
   'lost',
   'abandon',
   'lifespan',
   'tribulation',
+  'ambush',
   'epilogue',
   'manual',
 ] as const;

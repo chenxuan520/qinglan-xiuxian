@@ -12,7 +12,7 @@ import {
 } from './data.ts';
 import { realmInfo, type SaveData } from './progress.ts';
 
-export type JourneyCardEnding = 'ongoing' | 'lifespan' | 'tribulation' | 'immortal';
+export type JourneyCardEnding = 'ongoing' | 'lifespan' | 'tribulation' | 'ambush' | 'immortal';
 export interface JourneyAppraisal {
   title: string;
   detail: string;
@@ -136,7 +136,7 @@ export function validJourneyAppraisalFacts(value: unknown): value is JourneyAppr
     !keys.every((key) => FACT_KEYS.includes(key) || key === 'mortal') ||
     (f.mortal !== undefined &&
       (typeof f.mortal !== 'boolean' || (f.mortal && f.realmIndex !== 0))) ||
-    !['ongoing', 'lifespan', 'tribulation', 'immortal'].includes(f.ending) ||
+    !['ongoing', 'lifespan', 'tribulation', 'ambush', 'immortal'].includes(f.ending) ||
     !Number.isInteger(f.realmIndex) ||
     f.realmIndex < 0 ||
     f.realmIndex >= REALMS.length ||
@@ -189,6 +189,7 @@ function appraisalTitle(f: JourneyAppraisalFacts) {
   const home = tie('home-letter-read') || tie('home-reunion');
   const bond = tie('companion-bond');
   const allStages = STAGES.every((_, index) => f.stages.includes(index));
+  if (f.ending === 'ambush') return '仙途止于风雪';
   if (f.ending === 'tribulation') return '一念问天';
   if (feat('rootless-immortal')) return '凡骨登仙';
   if (feat('hard-immortal')) return '逆境问道';
@@ -234,6 +235,16 @@ function factsSeed(f: JourneyAppraisalFacts) {
 }
 
 function endingWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) => string) {
+  if (f.ending === 'ambush')
+    return {
+      full: pick([
+        '坊外刀光为此世收笔，曾经走过的山海仍有回响。',
+        '此身殒于劫修，问道途中留下的脚步并未随风散尽。',
+        '修行止于一场劫杀，来时的路仍留在青岚山水之间。',
+      ]),
+      compact: '此身殒于劫修，走过的山海仍有回响。',
+      brief: '劫杀身陨，问道留痕。',
+    };
   if (f.ending === 'tribulation')
     return {
       full: pick([
@@ -370,6 +381,17 @@ function cultivationWords(f: JourneyAppraisalFacts, pick: (words: readonly strin
     return {
       full: `${root}，${evidence.slice(0, 2).join('、')}，修行已有实迹。`,
       compact: `${root}，${compactEvidence.slice(0, 2).join('、')}。`,
+    };
+  }
+  if (f.ending === 'ambush') {
+    const reachedRealm = f.ascending ? '渡劫' : realm;
+    return {
+      full: pick([
+        `${root}，此世曾修至${reachedRealm}，也是亲身走出的一程。`,
+        `${root}，修行止于${reachedRealm}，这一程所至皆为实迹。`,
+        `${root}，曾以此身修至${reachedRealm}，问道的脚步已留下。`,
+      ]),
+      compact: `${root}，此世修至${reachedRealm}。`,
     };
   }
   return {

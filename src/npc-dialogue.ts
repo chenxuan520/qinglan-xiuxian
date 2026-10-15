@@ -7,7 +7,13 @@ import {
   isMarketCultivatorId,
   type MarketCultivatorId,
   type SectMarketState,
+  type MarketTraderId,
+  isMarketTraderId,
+  marketCharacters,
+  marketIdentity,
+  marketLocalReply,
 } from './sect-market-data.ts';
+import { REALMS } from './data.ts';
 
 export const NPC_DEFAULT_LINES = {
   herbs: '山中草药正当时，可愿帮我采来一篓？',
@@ -42,16 +48,320 @@ export interface NpcMessage {
   role: 'user' | 'assistant';
   content: string;
 }
+export const MARKET_DIALOGUE_EVENTS = [
+  'exchange',
+  'debate',
+  'request',
+  'declined',
+  'exposed',
+  'fraud',
+  'gift',
+  'ambush',
+  'victory',
+  'escaped',
+  'defeat',
+] as const;
+export const MARKET_DIALOGUE_CLUES = [
+  'higher-realm',
+  'sect-backing',
+  'old-grudge',
+  'known-trader',
+  'suspicious-seal',
+  'upfront-fee',
+  'marked-up-price',
+  'secluded-road',
+  'bloodstain',
+  'pressed-departure',
+  'claimed-sect',
+] as const;
+export interface MarketDialogueContact {
+  birthVisit: number;
+  slot: MarketTraderId;
+  metAt: number;
+  seenAt: number;
+  lastVisit: number;
+  tradeVisit: number;
+  goodwill: number;
+  grudge: number;
+}
+export interface MarketDialogueContext {
+  contact: MarketDialogueContact | null;
+  events: Array<(typeof MARKET_DIALOGUE_EVENTS)[number]>;
+  risk: {
+    kind: 'goods' | 'deposit' | 'haggle' | 'invitation';
+    inspection: 'unexamined' | 'no-flaw-found' | 'fraud-exposed' | 'overpriced';
+    resolved: boolean;
+    realmDelta: number;
+    sectProtection: boolean;
+    level: '谨慎' | '危险' | '凶险';
+    clues: Array<(typeof MARKET_DIALOGUE_CLUES)[number]>;
+  } | null;
+}
+export type MarketDialogueVisit = Pick<SectMarketState, 'visit' | 'realmIndex'> & {
+  absent?: MarketTraderId[];
+  returning?: Array<{
+    slot: MarketTraderId;
+    birthVisit: number;
+    birthSlot: MarketTraderId;
+    realmIndex: number;
+  }>;
+};
 export interface NpcDialogueRequest {
   mode?: 'tea-story';
   population: TownPopulation;
   age: number;
   npcId: TownNpc['id'] | ParentId | MarketCultivatorId;
-  marketVisit?: Pick<SectMarketState, 'visit' | 'realmIndex'>;
+  marketVisit?: MarketDialogueVisit;
+  marketContext?: MarketDialogueContext;
   realm: string;
   message: string;
   history: NpcMessage[];
   townRevision?: number;
   smithStory?: SmithStory;
   hometown?: HometownState;
+}
+
+const record = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
+  Object.keys(value).length === keys.length &&
+  Object.keys(value).every((key) => keys.includes(key));
+const integer = (value: unknown, min: number, max = Number.MAX_SAFE_INTEGER) =>
+  Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max;
+
+export function validMarketDialogueVisit(value: unknown): value is MarketDialogueVisit {
+  if (!record(value)) return false;
+  if (
+    !Object.keys(value).every((key) =>
+      ['visit', 'realmIndex', 'returning', 'absent', 'openedAt', 'exchanged'].includes(key),
+    ) ||
+    !integer(value.visit, 1) ||
+    !integer(value.realmIndex, 0, 8)
+  )
+    return false;
+  if (
+    value.absent !== undefined &&
+    !(
+      Array.isArray(value.absent) &&
+      value.absent.length <= 1 &&
+      value.absent.every(isMarketTraderId)
+    )
+  )
+    return false;
+  if (
+    value.openedAt !== undefined &&
+    !(typeof value.openedAt === 'number' && Number.isFinite(value.openedAt) && value.openedAt >= 0)
+  )
+    return false;
+  if (
+    value.exchanged !== undefined &&
+    !(
+      Array.isArray(value.exchanged) &&
+      value.exchanged.length <= 3 &&
+      new Set(value.exchanged).size === value.exchanged.length &&
+      value.exchanged.every(isMarketTraderId)
+    )
+  )
+    return false;
+  if (value.returning === undefined) return true;
+  return (
+    Array.isArray(value.returning) &&
+    value.returning.length <= 1 &&
+    value.returning.every(
+      (entry) =>
+        record(entry) &&
+        exactKeys(entry, ['slot', 'birthVisit', 'birthSlot', 'realmIndex']) &&
+        isMarketTraderId(entry.slot) &&
+        isMarketTraderId(entry.birthSlot) &&
+        integer(entry.birthVisit, 1, Number(value.visit) - 1) &&
+        integer(entry.realmIndex, 0, 7),
+    )
+  );
+}
+export function npcPlayerRealm(realm: string) {
+  return realm === '渡劫' ? 7 : REALMS.findIndex((name) => realm.startsWith(name));
+}
+
+/** 每次只传当前真人的一份封闭摘要；不接受姓名、日志正文、背包或隐藏真假字段。 */
+export function validMarketDialogueContext(
+  value: unknown,
+  input: Pick<NpcDialogueRequest, 'population' | 'age' | 'npcId' | 'marketVisit' | 'realm'>,
+): value is MarketDialogueContext {
+  if (
+    typeof input.realm !== 'string' ||
+    !isMarketCultivatorId(input.npcId) ||
+    input.npcId === 'market-fellow' ||
+    !validMarketDialogueVisit(input.marketVisit) ||
+    !marketCharacters(input.population, input.marketVisit).some((npc) => npc.id === input.npcId) ||
+    !record(value) ||
+    !exactKeys(value, ['contact', 'events', 'risk'])
+  )
+    return false;
+  const c = value.contact;
+  if (c !== null) {
+    if (!record(c) || !isMarketTraderId(input.npcId)) return false;
+    const identity = marketIdentity(input.marketVisit, input.npcId);
+    const age = (n: unknown) =>
+      typeof n === 'number' && Number.isFinite(n) && n >= input.population.since && n <= input.age;
+    if (
+      !exactKeys(c, [
+        'birthVisit',
+        'slot',
+        'metAt',
+        'seenAt',
+        'lastVisit',
+        'tradeVisit',
+        'goodwill',
+        'grudge',
+      ]) ||
+      !isMarketTraderId(c.slot) ||
+      c.birthVisit !== identity.birthVisit ||
+      c.slot !== identity.slot ||
+      !age(c.metAt) ||
+      !age(c.seenAt) ||
+      Number(c.seenAt) < Number(c.metAt) ||
+      !integer(c.lastVisit, identity.birthVisit, input.marketVisit.visit) ||
+      !(c.tradeVisit === 0 || integer(c.tradeVisit, identity.birthVisit, Number(c.lastVisit))) ||
+      !integer(c.goodwill, 0, 3) ||
+      !integer(c.grudge, 0, 3)
+    )
+      return false;
+  }
+  const list = (items: unknown, allowed: readonly string[]) =>
+    Array.isArray(items) &&
+    items.length <= allowed.length &&
+    new Set(items).size === items.length &&
+    items.every((item) => typeof item === 'string' && allowed.includes(item));
+  if (!list(value.events, MARKET_DIALOGUE_EVENTS)) return false;
+  const risk = value.risk;
+  if (risk === null) return true;
+  if (!record(risk) || !isMarketTraderId(input.npcId)) return false;
+  const npc = marketCharacters(input.population, input.marketVisit).find(
+    (n) => n.id === input.npcId,
+  )!;
+  const playerRealm = npcPlayerRealm(input.realm);
+  return (
+    exactKeys(risk, [
+      'kind',
+      'inspection',
+      'resolved',
+      'realmDelta',
+      'sectProtection',
+      'level',
+      'clues',
+    ]) &&
+    ['goods', 'deposit', 'haggle', 'invitation'].includes(String(risk.kind)) &&
+    ['unexamined', 'no-flaw-found', 'fraud-exposed', 'overpriced'].includes(
+      String(risk.inspection),
+    ) &&
+    (risk.inspection !== 'overpriced' || risk.kind === 'haggle') &&
+    (risk.kind !== 'haggle' ||
+      !['no-flaw-found', 'fraud-exposed'].includes(String(risk.inspection))) &&
+    typeof risk.resolved === 'boolean' &&
+    playerRealm >= 0 &&
+    integer(risk.realmDelta, -8, 7) &&
+    risk.realmDelta === npc.realmIndex - playerRealm &&
+    typeof risk.sectProtection === 'boolean' &&
+    ['谨慎', '危险', '凶险'].includes(String(risk.level)) &&
+    list(risk.clues, MARKET_DIALOGUE_CLUES)
+  );
+}
+
+const EVENT_MEMORY: Record<(typeof MARKET_DIALOGUE_EVENTS)[number], string> = {
+  exchange: '本批按界面完成过互换',
+  debate: '本批坐而论道已经结算',
+  request: '本批当面交货已经结清',
+  declined: '本批私下邀约已被婉拒',
+  exposed: '本批玩家已亲自核验过机缘',
+  fraud: '本批已经实际受骗',
+  gift: '本批私下机缘已经交付所得',
+  ambush: '本批已经实际遭遇劫修伏击',
+  victory: '本批劫修遭遇已经取胜',
+  escaped: '本批已经从劫修遭遇撤离',
+  defeat: '本批劫修遭遇已经落败',
+};
+const CLUE_MEMORY: Record<(typeof MARKET_DIALOGUE_CLUES)[number], string> = {
+  'higher-realm': '邀约修士已在明面表现出较高境界',
+  'sect-backing': '玩家目前有在籍宗门的照应，但这不等于坊外没有致命风险',
+  'old-grudge': '双方已有实际嫌隙',
+  'known-trader': '双方此前确有当面交易，不据此保证下一次私约安全',
+  'suspicious-seal': '封签叠有新旧两层纸，隔瓶难辨药香',
+  'upfront-fee': '先垫路费的要求已明示，收货凭据尚未拿出',
+  'marked-up-price': '凡品丹药的卖价高于药铺明示参考价',
+  'secluded-road': '邀约处偏僻，玩家可以拒绝赴约',
+  bloodstain: '邀约修士袖口可见旧血迹',
+  'pressed-departure': '邀约修士当面催促尽快动身',
+  'claimed-sect':
+    '邀约修士自称与宗门相熟、坊外有人照应；只是当面说法，尚未核实，不能当作真实身份或安全保证',
+};
+export function marketDialogueMemory(input: NpcDialogueRequest) {
+  const context = input.marketContext;
+  if (!context) return '未提供真人往来记录；不能把上一批同位置修士的故事当成自己的记忆。';
+  const c = context.contact;
+  const memory = c
+    ? [
+        c.birthVisit < input.marketVisit!.visit
+          ? '你与玩家确曾在此前来访时相识，此次是同一个人的重逢；只记得下列已证实往来。'
+          : '你与玩家的相识只记录在当前来访中；不能说成久别重逢。',
+        ...(c.tradeVisit > 0
+          ? ['你们曾实际完成过当面交易，但未提供具体货品，不能编造货品、数量或价钱。']
+          : []),
+        ...(c.goodwill > 0 ? ['你们有过友善往来，不能据此保证今后的交易没有风险。'] : []),
+        ...(c.grudge > 0
+          ? [
+              '你们之间已有嫌隙，可以戒备或言语试探；没有明确事件时不编造谁先动手，也不在闲谈中扣物资或开战。',
+            ]
+          : []),
+      ].join('')
+    : '没有与你这个真人有关的旧识记录；即便位置或名字相似，也不能继承其他人的记忆。';
+  const events =
+    context.events.map((kind) => EVENT_MEMORY[kind]).join('；') || '没有当批已完成事件。';
+  const r = context.risk;
+  const risk = r
+    ? `当面可见的私下机缘为${{ goods: '低价转丹', deposit: '先垫路费的求购', haggle: '卖方加价卖药', invitation: '坊外取药邀约' }[r.kind]}，${r.resolved ? '此事已经结束' : '玩家尚可自行取舍'}，界面风险为${r.level}。${r.clues.map((clue) => CLUE_MEMORY[clue]).join('；')}。${{ unexamined: '尚未核验，不能断言这次是真是假。', 'no-flaw-found': '玩家已核验，暂未见破绽；不能把未见破绽说成绝对安全。', 'fraud-exposed': '玩家已核验并查明骗局，可以承认已公开的破绽。', overpriced: '玩家已核对药铺价格，此次加价已经明示。' }[r.inspection]}`
+    : '目前没有当面私下机缘线索，不编造邀约、埋伏或交易结果。';
+  return `${memory}\n已发生事件：${events}\n当面风险：${risk}\n往来记录没有玩家此前境界、精进速度或修炼方法；重逢不等于看得出前辈精进。`;
+}
+
+/** 离线与模型失实回退共用；风险与往来只引用同一份当前真人事实。 */
+export function marketDialogueLocalReply(input: NpcDialogueRequest) {
+  const npc = marketCharacters(input.population, input.marketVisit!).find(
+    (n) => n.id === input.npcId,
+  );
+  if (!npc) return '此处已无人应声。';
+  const playerRealm = npcPlayerRealm(input.realm);
+  const context = input.marketContext;
+  if (/精进|进境|进展|突破|境界|修为/.test(input.message))
+    return marketLocalReply(npc, input.message, playerRealm);
+  const address =
+    npc.realmIndex < playerRealm ? '前辈' : npc.realmIndex === playerRealm ? '道友' : '小友';
+  const riskQuestion = /骗|险|劫|机缘|邀|赴约|真假|核验|凭据|可信|信任/.test(input.message);
+  if (context?.risk?.inspection === 'fraud-exposed' && riskQuestion)
+    return `${address}，你已当面查出这桩机缘的破绽，别再为好听话垫款。普通拍卖、互换照各自明示规则，不与这桩私下邀约混为一谈。`;
+  if (context?.risk?.kind === 'invitation' && !context.risk.resolved && riskQuestion)
+    return `${address}，私下赴约可能遇劫修，战败会身陨。撤离须实际走到左侧退路并拉开距离，稳住两息；胜负、复活与所得都由历练界面结算，闲聊不能保命。`;
+  if (context?.risk && riskQuestion) {
+    if (context.risk.inspection === 'no-flaw-found')
+      return `${address}，你已当面核验，眼下未见破绽。凭据仍须与实际交付对上，没查出问题也不是替往后的交易作保。`;
+    if (context.risk.kind === 'goods')
+      return `${address}，封签叠着新旧两层纸，隔瓶难辨药香。尚未核验，不能断言真假；可先验丹、核对来路，也可直接作别。`;
+    if (context.risk.kind === 'deposit')
+      return `${address}，收货凭据尚未拿出，却先要你垫路费。尚未核验便先付钱，风险要自己担；可核实接应者与凭据，也可婉拒。`;
+    if (context.risk.kind === 'haggle')
+      return `${address}，这份凡品的卖价高于药铺明示参考价，价差摆在眼前。是否成交由你自己取舍，闲聊不扣灵石，也不替你买药。`;
+  }
+  if (
+    context?.contact?.grudge &&
+    /认得|记得|见过|近来|招呼|你我|上次|恩怨|敌意/.test(input.message)
+  )
+    return `${address}，你我之间已有嫌隙，这话我记着。买卖还须看当面的凭据，闲聊既不算成交，也不能替谁抹去旧账。`;
+  if (context?.contact?.tradeVisit && /认得|记得|见过|近来|招呼|你我|上次|交易/.test(input.message))
+    return `${address}，你我曾按当面报价做过交易，这段往来我记得。今日货色仍须验明，熟识也不是省去凭据的理由。`;
+  if (
+    context?.contact &&
+    context.contact.birthVisit < input.marketVisit!.visit &&
+    /认得|记得|见过|近来|招呼|你我|上次/.test(input.message)
+  )
+    return `${address}，先前在坊市确曾相识，今日又碰面了。说说当下的见闻便好，你这一程的修行，我不凭重逢妄下断语。`;
+  return marketLocalReply(npc, input.message, playerRealm);
 }

@@ -442,6 +442,7 @@ export async function createJourneyCard(
     immortal: ['圆满', '已叩入仙门'],
     lifespan: ['寿终', '此世寿终'],
     tribulation: ['劫殒', '止于天劫'],
+    ambush: ['身陨', '殒于劫修'],
     ongoing: ['未竟', '仙途未尽'],
   }[card.ending];
   text('叩仙门 · 青岚纪', 80, 106, 27, '#d8c998');
@@ -456,7 +457,7 @@ export async function createJourneyCard(
   c.textAlign = 'center';
   text(card.realm, 540, 248, 50, '#eee8cf', 720);
   text(
-    `${card.ending === 'lifespan' || card.ending === 'tribulation' ? '此世行年' : '行年'} ${card.age} 载 · ${card.lifespan}`,
+    `${['lifespan', 'tribulation', 'ambush'].includes(card.ending) ? '此世行年' : '行年'} ${card.age} 载 · ${card.lifespan}`,
     540,
     290,
     28,

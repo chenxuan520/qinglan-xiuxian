@@ -97,10 +97,11 @@ export function journeyFarewellPanel(
   reason: NonNullable<SaveData['pendingReincarnation']>,
 ): PanelParts {
   const tribulation = reason === 'tribulation';
+  const ambush = reason === 'ambush';
   return [
-    tribulation ? '止于天劫' : '此世寿终',
-    tribulation ? '劫雷未息 · 一生落笔' : '寿数已尽 · 一生落笔',
-    `<div class="lifespan-story"><p>${tribulation ? '劫雷落尽，这一世的问道路止于仙关之前。' : '这一世已行至尽头。'}山河仍在，旧事、故人与求道路上的每一步，也都留在身后。</p><p>可将此世修行留作一幅纪念；无论是否留存，确认轮回后都将从十五岁重新启程。</p></div><div class="save-actions"><button class="secondary-button" data-action="journey-card">留存此世</button><button class="primary-button" data-action="confirm-journey-reincarnate">轮回转世 ${smallIcon('arrow')}</button></div>`,
+    ambush ? '身陨坊外' : tribulation ? '止于天劫' : '此世寿终',
+    ambush ? '刀光已寂 · 一生落笔' : tribulation ? '劫雷未息 · 一生落笔' : '寿数已尽 · 一生落笔',
+    `<div class="lifespan-story"><p>${ambush ? '坊外的风仍穿过荒草，刀光却已远去。这一世的问道路，止在了归途之前。' : tribulation ? '劫雷落尽，这一世的问道路止于仙关之前。' : '这一世已行至尽头。'}山河仍在，旧事、故人与求道路上的每一步，也都留在身后。</p><p>可将此世修行留作一幅纪念；无论是否留存，确认轮回后都将从十五岁重新启程。</p></div><div class="save-actions"><button class="secondary-button" data-action="journey-card">留存此世</button><button class="primary-button" data-action="confirm-journey-reincarnate">轮回转世 ${smallIcon('arrow')}</button></div>`,
   ];
 }
 

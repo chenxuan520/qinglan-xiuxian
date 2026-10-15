@@ -184,25 +184,6 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   shell.mountNpcChat(shell.modal.querySelector<HTMLElement>('.npc-dialogue')!, shell.save, npc);
 }
 
-export function showMarketAmbush(shell: ActionShell) {
-  const a = shell.save.mortal.marketSocial?.ambush;
-  if (!a) return;
-  shell.closeNpcChat();
-  shell.panel = 'market-ambush';
-  const ambush = shell.marketAmbushPanel(a.held);
-  shell.panelFrame(...ambush);
-  const npc = shell
-    .marketCultivators(shell.save.mortal.population!, shell.save.mortal.sectMarket!)
-    .find((n: { id: string }) => n.id === a.npcId)!;
-  shell.ambushScene?.destroy();
-  shell.ambushScene = new shell.MarketAmbushScene(
-    shell.modal.querySelector<HTMLElement>('#market-ambush')!,
-    shell.save,
-    npc,
-    shell.finishMarketAmbush,
-  );
-}
-
 export function showAuction(shell: ActionShell) {
   if (!shell.inMarket || !shell.marketScene?.nearAuction) return;
   const next = shell.structuredClone(shell.save);
@@ -388,6 +369,7 @@ export function startAdWatch(
   placement: AdPlacement,
 ) {
   shell.adWatched = false;
+  const epoch = (shell.adWatchEpoch = (shell.adWatchEpoch || 0) + 1);
   const provider = shell.getAdProvider();
   if (provider.name === 'placeholder') {
     shell.startAdCountdown(action, label);
@@ -405,7 +387,7 @@ export function startAdWatch(
   shell.watchAdPlacement({
     provider,
     placement,
-    alive: () => shell.panel === watchPanel,
+    alive: () => shell.panel === watchPanel && shell.adWatchEpoch === epoch,
     onWatched: () => shell.markAdWatched(action, label),
     onFallback: () => shell.startAdCountdown(action, label),
   });

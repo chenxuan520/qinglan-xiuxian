@@ -34,10 +34,14 @@ export function auctionResult(save: SaveData, r: AuctionReceipt) {
     r.bidder === 'player'
       ? '你'
       : r.bidder
-        ? marketCultivators(save.mortal.population!, {
+        ? (r.bidderName?.replace(
+            /[&<>"']/g,
+            (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
+          ) ??
+          marketCultivators(save.mortal.population!, {
             visit: r.visit,
             realmIndex: r.realmIndex,
-          }).find((n) => n.id === r.bidder)!.name
+          }).find((n) => n.id === r.bidder)!.name)
         : '';
   return r.outcome === 'won'
     ? `竞得${name} ×${r.quantity} · 花费 ${num(r.price + r.fee)} 灵石（含手续费 ${num(r.fee)}）`

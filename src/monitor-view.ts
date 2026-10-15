@@ -43,9 +43,13 @@ export function monitorRealm(value: unknown) {
     : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`;
 }
 export const monitorReason = (value: unknown) =>
-  ({ lifespan: '寿尽', tribulation: '天劫', epilogue: '离界传承', manual: '主动轮回' })[
-    String(value)
-  ] ?? '未记录';
+  ({
+    lifespan: '寿尽',
+    tribulation: '天劫',
+    ambush: '劫杀身陨',
+    epilogue: '离界传承',
+    manual: '主动轮回',
+  })[String(value)] ?? '未记录';
 export function monitorTable(headers: string[], rows: unknown[][]) {
   if (!rows.length) return '<p class="note">当前范围暂无记录。</p>';
   return `<div class="table-wrap" tabindex="0" role="region" aria-label="${monitorEscape(headers[0])}统计表，可横向滚动"><table><thead><tr>${headers.map((c) => `<th scope="col">${monitorEscape(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${monitorEscape(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;

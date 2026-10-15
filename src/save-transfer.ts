@@ -17,7 +17,6 @@ import {
 } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
-import { settleMarketAmbush } from './market-social.ts';
 
 export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 export const UNREADABLE_SAVE_PREFIX = `${SAVE_KEY}-unreadable-`;
@@ -99,6 +98,9 @@ export function importSave(text: string) {
   if (file?.format !== undefined && (file.format !== 'qinglan-save' || file.version !== 1))
     throw new Error('不支持此存档格式或版本');
   const data = file?.format === 'qinglan-save' ? file.save : file;
+  // 与本机读档共用旧版遭遇升级规则；无快照的旧记录不伪造战果。
+  if (data && (data.schema ?? 0) < 19 && data.mortal?.marketSocial?.ambush)
+    data.mortal.marketSocial.ambush = null;
   const record = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === 'object' && !Array.isArray(value);
   const integer = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
@@ -145,7 +147,8 @@ export function importSave(text: string) {
     (data.pendingReincarnation !== undefined &&
       data.pendingReincarnation !== null &&
       data.pendingReincarnation !== 'lifespan' &&
-      data.pendingReincarnation !== 'tribulation') ||
+      data.pendingReincarnation !== 'tribulation' &&
+      data.pendingReincarnation !== 'ambush') ||
     (data.volume !== undefined &&
       (typeof data.volume !== 'number' || !Number.isFinite(data.volume)))
   )
@@ -175,6 +178,5 @@ export function importSave(text: string) {
   // 老版本档的进行中对局格式不保证兼容，升级时直接放弃历练、保留永久进度。
   const legacyRun = data.schema !== SAVE_SCHEMA;
   const run = restoreSavedRun(save, legacyRun ? null : data.activeRun);
-  if (save.mortal.marketSocial?.ambush) settleMarketAmbush(save, 'escaped');
   return { save, run };
 }

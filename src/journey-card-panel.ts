@@ -16,7 +16,7 @@ export class JourneyCardPanel {
     this.request?.abort();
     this.request = null;
   }
-  async show(save: SaveData, reason?: 'lifespan' | 'tribulation') {
+  async show(save: SaveData, reason?: NonNullable<SaveData['pendingReincarnation']>) {
     const { modal, panelFrame } = this;
     panelFrame(
       '此世留影',

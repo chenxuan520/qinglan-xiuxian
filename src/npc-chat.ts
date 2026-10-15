@@ -1,4 +1,12 @@
-import { npcDefaultLine, type NpcDialogueRequest, type NpcMessage } from './npc-dialogue.ts';
+import {
+  MARKET_DIALOGUE_CLUES,
+  MARKET_DIALOGUE_EVENTS,
+  marketDialogueLocalReply,
+  npcDefaultLine,
+  type MarketDialogueContext,
+  type NpcDialogueRequest,
+  type NpcMessage,
+} from './npc-dialogue.ts';
 import { type TownResident } from './town-population.ts';
 import { realmInfo, type SaveData } from './progress.ts';
 import { NPC_AI_SETTINGS, TEA_STORY_IMAGE_SETTINGS, TEA_STORY_SETTINGS } from './setting.ts';
@@ -7,12 +15,97 @@ import { smithStoryLine } from './town-story.ts';
 import { humanStoryGreeting } from './human-stories.ts';
 import { StorySpeech } from './story-speech.ts';
 import { hometownParents } from './hometown.ts';
-import { isMarketCultivatorId, marketCharacters, marketLocalReply } from './sect-market-data.ts';
+import { isMarketCultivatorId, isMarketTraderId, marketIdentity } from './sect-market-data.ts';
+import { marketContact } from './market-relations.ts';
+import { marketOpportunity } from './market-social.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
   '',
 );
+
+export function marketDialogueContext(
+  save: SaveData,
+  id: NpcDialogueRequest['npcId'],
+): MarketDialogueContext {
+  const market = save.mortal.sectMarket;
+  if (!market || !isMarketCultivatorId(id)) return { contact: null, events: [], risk: null };
+  if (isMarketTraderId(id) && market.absent?.includes(id))
+    return { contact: null, events: [], risk: null };
+  const record = marketContact(save, id);
+  const contact =
+    record && !record.dead
+      ? {
+          birthVisit: record.birthVisit,
+          slot: record.slot,
+          metAt: record.metAt,
+          seenAt: record.seenAt,
+          lastVisit: record.lastVisit,
+          tradeVisit: record.tradeVisit,
+          goodwill: record.goodwill,
+          grudge: record.grudge,
+        }
+      : null;
+  const social =
+    save.mortal.marketSocial?.visit === market.visit ? save.mortal.marketSocial : undefined;
+  const events: MarketDialogueContext['events'] = [];
+  if (market.exchanged.includes(id)) events.push('exchange');
+  for (const entry of social?.logs ?? [])
+    if (
+      entry.visit === market.visit &&
+      entry.npcId === id &&
+      (MARKET_DIALOGUE_EVENTS as readonly string[]).includes(entry.kind) &&
+      !events.includes(entry.kind)
+    )
+      events.push(entry.kind);
+  if (!isMarketTraderId(id)) return { contact, events, risk: null };
+  const offer = marketOpportunity(save, id);
+  if (!offer) return { contact, events, risk: null };
+  const inspection = !social?.inspected.includes(id)
+    ? 'unexamined'
+    : offer.kind === 'haggle'
+      ? 'overpriced'
+      : offer.honest
+        ? 'no-flaw-found'
+        : 'fraud-exposed';
+  // 只在玩家真正核验后才公开相应结果；offer.honest、库存与随机种子均不发送。
+  const risk = offer.risk;
+  const clues: NonNullable<MarketDialogueContext['risk']>['clues'] = [];
+  if (risk)
+    for (const code of risk.clueCodes)
+      if (
+        (MARKET_DIALOGUE_CLUES as readonly string[]).includes(code) &&
+        (offer.kind === 'invitation' ||
+          !['secluded-road', 'bloodstain', 'pressed-departure'].includes(code))
+      )
+        clues.push(code);
+  if (offer.kind === 'goods') clues.push('suspicious-seal');
+  else if (offer.kind === 'deposit') clues.push('upfront-fee');
+  else if (offer.kind === 'haggle') clues.push('marked-up-price');
+  const player = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
+  return {
+    contact,
+    events,
+    risk: {
+      kind: offer.kind,
+      inspection,
+      resolved: !!social?.used.includes(id),
+      realmDelta: risk?.realmDelta ?? offer.n.realmIndex - player,
+      sectProtection: risk?.sectProtection ?? !!save.mortal.member,
+      level: risk?.level ?? (offer.kind === 'invitation' ? '危险' : '谨慎'),
+      clues: [...new Set(clues)],
+    },
+  };
+}
+
+export function marketConversationIdentity(save: SaveData, id: NpcDialogueRequest['npcId']) {
+  const market = save.mortal.sectMarket;
+  if (!market || !isMarketCultivatorId(id)) return '';
+  const identity = isMarketTraderId(id)
+    ? marketIdentity(market, id)
+    : { birthVisit: market.visit, slot: id };
+  return `${save.mortal.population!.seed}:${save.mortal.population!.since}:${identity.birthVisit}:${identity.slot}`;
+}
 
 type NpcDialogueResponse = { reply: string; imageToken?: string };
 type NpcDialogueFailure = { error: string; retryable: boolean };
@@ -298,6 +391,9 @@ export function mountNpcChat(
   closeNpcChat();
   const population = save.mortal.population!;
   const market = isMarketCultivatorId(npc.id);
+  if (npc.id === 'market-fellow') return;
+  if (market && isMarketTraderId(npc.id) && save.mortal.sectMarket?.absent?.includes(npc.id))
+    return;
   const townId = npc.id === 'father' || npc.id === 'mother' ? null : npc.id;
   const home = save.mortal.hometown;
   if (
@@ -307,15 +403,52 @@ export function mountNpcChat(
       !hometownParents(home, save.age).some((p) => p.id === npc.id && p.alive))
   )
     return;
+  const makeRequest = (message: string, history: NpcMessage[]): NpcDialogueRequest => ({
+    population,
+    age: save.age,
+    npcId: npc.id,
+    realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
+    message,
+    history,
+    ...(market
+      ? {
+          marketVisit: {
+            visit: save.mortal.sectMarket!.visit,
+            realmIndex: save.mortal.sectMarket!.realmIndex,
+            ...(save.mortal.sectMarket!.absent
+              ? { absent: [...save.mortal.sectMarket!.absent!] }
+              : {}),
+            ...(save.mortal.sectMarket!.returning
+              ? {
+                  returning: save.mortal.sectMarket!.returning!.map((entry) => ({
+                    slot: entry.slot,
+                    birthVisit: entry.birthVisit,
+                    birthSlot: entry.birthSlot,
+                    realmIndex: entry.realmIndex,
+                  })),
+                }
+              : {}),
+          },
+          marketContext: marketDialogueContext(save, npc.id),
+        }
+      : townId
+        ? { smithStory: save.mortal.smithStory }
+        : { hometown: home }),
+  });
   const memory = townId ? humanStoryGreeting(save, townId) : '';
-  const identity = `${population.seed}:${population.since}:${npc.id}:${npc.generation}:${JSON.stringify(townId ? (save.mortal.smithStory ?? null) : null)}:${memory}${
-    !townId
-      ? `:${JSON.stringify(home!.parents)}:${hometownParents(home!, save.age)
-          .map((p) => p.alive)
-          .join(':')}`
-      : ''
-  }`;
+  const identity = market
+    ? marketConversationIdentity(save, npc.id)
+    : `${population.seed}:${population.since}:${npc.id}:${npc.generation}:${JSON.stringify(townId ? (save.mortal.smithStory ?? null) : null)}:${memory}${
+        !townId
+          ? `:${JSON.stringify(home!.parents)}:${hometownParents(home!, save.age)
+              .map((p) => p.alive)
+              .join(':')}`
+          : ''
+      }`;
   const fallback =
+    (market
+      ? marketDialogueLocalReply(makeRequest('有位修士来到你跟前，请以自己的身份打个招呼。', []))
+      : '') ||
     memory ||
     (townId ? smithStoryLine(population, save.age, save.mortal.smithStory, townId) : '') ||
     npcDefaultLine(npc.id);
@@ -353,36 +486,11 @@ export function mountNpcChat(
     button.disabled = input.disabled = true;
     status.textContent = `${npc.name}正想说些什么…`;
     log.setAttribute('aria-busy', 'true');
-    const reply = await requestNpcDialogue(
-      {
-        population,
-        age: save.age,
-        npcId: npc.id,
-        realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
-        message,
-        history,
-        ...(market
-          ? {
-              marketVisit: {
-                visit: save.mortal.sectMarket!.visit,
-                realmIndex: save.mortal.sectMarket!.realmIndex,
-              },
-            }
-          : townId
-            ? { smithStory: save.mortal.smithStory }
-            : { hometown: home }),
-      },
-      controller.signal,
-    );
+    const request = makeRequest(message, history);
+    const reply = await requestNpcDialogue(request, controller.signal);
     if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
     activeRequest = null;
-    const localReply = market
-      ? marketLocalReply(
-          marketCharacters(population, save.mortal.sectMarket!).find((n) => n.id === npc.id)!,
-          message,
-          realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
-        )
-      : fallback;
+    const localReply = market ? marketDialogueLocalReply(request) : fallback;
     messages.push({ role: 'assistant', content: reply ?? localReply });
     messages.splice(0, Math.max(0, messages.length - NPC_AI_SETTINGS.maxHistoryMessages));
     render();

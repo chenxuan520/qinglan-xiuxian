@@ -19,6 +19,12 @@ import {
   exchangeOwned,
 } from './market-exchange.ts';
 import { releaseAuctionItem } from './auction-items.ts';
+import {
+  marketContact,
+  prepareMarketOpportunity,
+  rememberMarketTrade,
+  returningMarketContact,
+} from './market-relations.ts';
 
 export function sectMarketOpen(save: SaveData) {
   return save.cultivation > 0 && !save.journeyEnded && !save.pendingReincarnation;
@@ -28,12 +34,15 @@ export function beginSectMarketVisit(save: SaveData) {
   if (save.mortal.marketSocial?.ambush) return false;
   const visit = (save.mortal.sectMarket?.visit ?? 0) + 1;
   if (!Number.isSafeInteger(visit)) return false;
+  const returning = returningMarketContact(save, visit);
   save.mortal.sectMarket = {
     openedAt: save.age,
     visit,
     realmIndex: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
     exchanged: [],
+    ...(returning ? { returning } : {}),
   };
+  prepareMarketOpportunity(save);
   if (save.mortal.auction) {
     save.mortal.auction.visit = visit;
     save.mortal.auction.closed = [];
@@ -57,7 +66,7 @@ export function beginSectMarketVisit(save: SaveData) {
 }
 export function sectMarketOffer(save: SaveData, id: MarketCultivatorId) {
   const state = save.mortal.sectMarket;
-  if (!state || !isMarketTraderId(id)) return undefined;
+  if (!state || !isMarketTraderId(id) || state.absent?.includes(id)) return undefined;
   const pool = marketMedicinePool(save.mortal.population!, state, id);
   const index = MARKET_CULTIVATORS.findIndex((npc) => npc.id === id);
   const seed = (save.medicine.recipeSeed ^ Math.imul(state.visit, 2654435761)) >>> 0;
@@ -78,7 +87,10 @@ export function sectMarketExchangeReason(
   if (!sectMarketOpen(save) || !state || !isMarketTraderId(id)) return '暂时无法互换';
   if (lifespanInfo(save).remaining <= 0 || tribulationDue(save) || sectDuesPending(save))
     return '请先处理寿元、天劫或供奉';
+  if (save.mortal.marketSocial?.ambush) return '请先处理尚未结束的劫修遭遇';
   if (state.visit !== visit) return '来访修士已更换，请重新交谈';
+  if (state.absent?.includes(id) || marketContact(save, id)?.dead)
+    return '这名劫修已经身死，无法再交易';
   if (state.exchanged.includes(id)) return '本批已互换';
   const deal = sectMarketDeals(save, id).find((d) => d.id === dealId);
   if (!deal) return '报价已变化，请重新选择';
@@ -108,6 +120,7 @@ export function exchangeSectMedicine(
   save.medicine.bag[deal.receive.id] =
     (save.medicine.bag[deal.receive.id] || 0) + deal.receive.quantity;
   save.mortal.sectMarket!.exchanged.push(id);
+  rememberMarketTrade(save, id);
   const text = `宗门坊市：以${exchangeGiveText(deal)}换得${exchangeItemText(deal.receive)}，已收入丹囊。`;
   save.mortal.events.unshift(`${save.age.toFixed(1)} 岁 · ${text}`);
   save.mortal.events.splice(6);

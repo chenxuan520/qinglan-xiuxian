@@ -1,0 +1,67 @@
+import { isMarketTraderId, type MarketTraderId, type SectMarketState } from './sect-market-data.ts';
+
+export const MAX_MARKET_CONTACTS = 8;
+export interface MarketIdentity {
+  birthVisit: number;
+  slot: MarketTraderId;
+}
+export interface MarketContact extends MarketIdentity {
+  realmIndex: number;
+  metAt: number;
+  seenAt: number;
+  lastVisit: number;
+  goodwill: number;
+  grudge: number;
+  dead: boolean;
+  tradeVisit: number;
+}
+export interface MarketRelationsState {
+  contacts: MarketContact[];
+}
+export function validMarketRelations(
+  value: unknown,
+  age: number,
+  market: SectMarketState | undefined,
+): value is MarketRelationsState {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || !market) return false;
+  const contacts = (value as MarketRelationsState).contacts;
+  const integer = (n: unknown, max: number) =>
+    Number.isSafeInteger(n) && Number(n) >= 0 && Number(n) <= max;
+  return (
+    Array.isArray(contacts) &&
+    contacts.length <= MAX_MARKET_CONTACTS &&
+    new Set(contacts.map((c) => `${c?.birthVisit}:${c?.slot}`)).size === contacts.length &&
+    (market.returning ?? []).every((r) =>
+      contacts.some(
+        (c) =>
+          !!c &&
+          c.birthVisit === r.birthVisit &&
+          c.slot === r.birthSlot &&
+          (!c.dead || market.absent?.includes(r.slot)) &&
+          c.realmIndex === r.realmIndex,
+      ),
+    ) &&
+    contacts.every(
+      (c) =>
+        !!c &&
+        integer(c.birthVisit, market.visit) &&
+        c.birthVisit > 0 &&
+        isMarketTraderId(c.slot) &&
+        integer(c.realmIndex, 7) &&
+        typeof c.metAt === 'number' &&
+        Number.isFinite(c.metAt) &&
+        c.metAt >= 15 &&
+        c.metAt <= age &&
+        typeof c.seenAt === 'number' &&
+        Number.isFinite(c.seenAt) &&
+        c.seenAt >= c.metAt &&
+        c.seenAt <= age &&
+        integer(c.lastVisit, market.visit) &&
+        c.lastVisit >= c.birthVisit &&
+        integer(c.goodwill, 3) &&
+        integer(c.grudge, 3) &&
+        typeof c.dead === 'boolean' &&
+        integer(c.tradeVisit, c.lastVisit),
+    )
+  );
+}

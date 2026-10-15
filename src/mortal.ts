@@ -83,7 +83,14 @@ function log(save: SaveData, text: string) {
   save.mortal.events.length = Math.min(6, save.mortal.events.length);
 }
 function canAct(save: SaveData) {
-  return lifespanInfo(save).remaining > 0 && !tribulationDue(save) && !sectDuesPending(save);
+  return (
+    !save.journeyEnded &&
+    !save.pendingReincarnation &&
+    !save.mortal.marketSocial?.ambush &&
+    lifespanInfo(save).remaining > 0 &&
+    !tribulationDue(save) &&
+    !sectDuesPending(save)
+  );
 }
 export function joinSect(save: SaveData, id: string, unfinishedPath?: CultivationPath) {
   const sect = SECTS.find((s) => s.id === id);

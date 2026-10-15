@@ -25,7 +25,15 @@ import { ROOT_STARTERS, TREASURES, MAX_FORGE_LEVEL } from '../src/data.ts';
 import { MEDICINES, medicineMarketValue } from '../src/medicine-data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { Game } from '../src/game.ts';
-import { auctionContent } from '../src/auction-ui.ts';
+import { auctionContent, auctionResult } from '../src/auction-ui.ts';
+import { rememberMarketTrade } from '../src/market-relations.ts';
+import { marketCultivators } from '../src/sect-market-data.ts';
+import {
+  marketOpportunity,
+  chooseMarketOpportunity,
+  settleMarketAmbush,
+} from '../src/market-social.ts';
+import { MarketAmbushDuel } from '../src/market-ambush.ts';
 
 function fixture(seed = 12345) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -309,4 +317,76 @@ test('高阶修士可收低阶余丹，携药仍按境界，炼气修士不能�
   assert.equal(permanent.outcome, 'unsold');
   assert.equal(low.medicine.bag.peiying, 1);
   assert.equal(low.age, 30.5);
+});
+
+test('重逢买家成交录保存当时姓名，离场换批及读档后仍显示真实旧识而非新槽位修士', () => {
+  const s = fixture(1);
+  rememberMarketTrade(s, 'market-alchemist');
+  beginSectMarketVisit(s);
+  beginSectMarketVisit(s);
+  const npc = marketCultivators(s.mortal.population!, s.mortal.sectMarket!).find(
+    (n) => n.id === 'market-disciple',
+  )!;
+  assert.equal(npc.name, '谢知秋');
+  s.medicine.bag.huxin = 3;
+  const result = sellAuction(
+    s,
+    { kind: 'medicine', id: 'huxin', quantity: 1, forgeLevel: 0 },
+    1,
+    3,
+  )!;
+  assert.equal(result.bidder, 'market-disciple');
+  assert.equal(result.bidderName, npc.name);
+  assert.match(auctionResult(s, result), /谢知秋买下/);
+  beginSectMarketVisit(s);
+  const loaded = importSave(exportSave(s, null)).save;
+  assert.match(auctionResult(loaded, loaded.mortal.auction!.history[0]), /谢知秋买下/);
+  assert.ok(validAuction(loaded.mortal.auction, loaded.age, loaded.mortal.sectMarket));
+  result.bidderName = '<img src=x onerror=1>';
+  assert.equal(
+    validAuction({ ...s.mortal.auction!, history: [result] }, s.age, s.mortal.sectMarket),
+    false,
+  );
+  assert.doesNotMatch(auctionResult(s, result), /<img/);
+});
+
+test('本批劫修死亡不重排寄售拍品，结拍索引和读档保持，死者不再参与竞价', () => {
+  const s = fixture(22),
+    before = structuredClone(auctionLots(s));
+  const bought = buyAuction(s, 0, s.stones, 1)!;
+  assert.equal(bought.outcome, 'won');
+  assert.ok(s.mortal.auction!.closed.includes(0));
+  const id = 'market-wanderer',
+    offer = marketOpportunity(s, id)!;
+  assert.equal(offer.kind, 'invitation');
+  assert.equal(offer.honest, false);
+  assert.ok(chooseMarketOpportunity(s, id, 1, 'accept'));
+  const encounter = s.mortal.marketSocial!.ambush!;
+  const duel = new MarketAmbushDuel(encounter.stats, encounter.snapshot);
+  for (let i = 0; i < 12000 && !duel.outcome; i++) duel.update(1 / 60, { x: 0, y: 0 });
+  assert.equal(duel.outcome, 'defeat');
+  assert.ok(duel.revive());
+  encounter.revivesUsed++;
+  for (let i = 0; i < 12000 && !duel.outcome; i++) duel.update(1 / 60, { x: 0, y: 0 });
+  assert.equal(duel.outcome, 'victory');
+  encounter.snapshot = duel.snapshot();
+  assert.ok(settleMarketAmbush(s, 'victory'));
+  assert.deepEqual(s.mortal.sectMarket!.absent, [id]);
+  assert.deepEqual(auctionLots(s), before);
+  const loaded = readSave(JSON.stringify(s)).save;
+  assert.deepEqual(auctionLots(loaded), before);
+  assert.ok(loaded.mortal.auction!.closed.includes(0));
+  const stored = structuredClone(loaded);
+  assert.match(auctionBuyReason(loaded, 0, 1), /已结拍/);
+  assert.equal(buyAuction(loaded, 0, loaded.stones, 1), undefined);
+  assert.deepEqual(loaded, stored);
+  loaded.medicine.bag.huxin = 2;
+  const sold = sellAuction(
+    loaded,
+    { kind: 'medicine', id: 'huxin', quantity: 1, forgeLevel: 0 },
+    1,
+    1,
+  )!;
+  assert.equal(sold.outcome, 'sold');
+  assert.notEqual(sold.bidder, id);
 });

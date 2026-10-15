@@ -48,7 +48,6 @@ import {
   executeMortalAction,
   immortalEncounterPanel,
   marketAmbushPanel,
-  marketAmbushRecoveryPanel,
   teaStoryPanel,
 } from './town-host.ts';
 import { computeManualInput, trapModalTab } from './input-controller.ts';
@@ -148,11 +147,10 @@ import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
 import { TownScene } from './town-scene.ts';
 import { SectMarketScene } from './sect-market-scene.ts';
-import { settleMarketAmbush } from './market-social.ts';
 import { marketSocialContent } from './market-social-ui.ts';
 import { marketFellowCharacter, meetMarketFellow, chooseMarketFellow } from './market-fellow.ts';
 import { marketFellowContent } from './market-fellow-ui.ts';
-import { MarketAmbushScene } from './market-ambush-scene.ts';
+import type { MarketAmbushScene } from './market-ambush-scene.ts';
 import type { AmbushOutcome } from './market-ambush.ts';
 import { marketCultivators } from './sect-market-data.ts';
 import { prepareAuction } from './auction.ts';
@@ -181,7 +179,7 @@ import {
   type ParentId,
 } from './hometown.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
-import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-chat.ts';
+import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-chat-source.ts';
 import { openOfflinePanel, offlineAction, initOffline } from './offline.ts';
 import { settingsContent, settingsSoundNote } from './settings-ui.ts';
 import { townVisit } from './town-history.ts';
@@ -234,7 +232,8 @@ let lastSaveText = raw;
 const save = saveRead.status === 'unreadable' ? parseSave(null) : saveRead.save;
 // 每次进入先静音，保留音量，只有明确开启声音后才播放。
 save.sound = false;
-if (!save.journeyEnded && !save.pendingReincarnation) resolveActivity(save);
+if (!save.journeyEnded && !save.pendingReincarnation && !save.mortal.marketSocial?.ambush)
+  resolveActivity(save);
 const telemetry = createTelemetry({
   origin: location.origin,
   endpoint: `${NPC_AI_BASE}${TELEMETRY_SETTINGS.path}`,
@@ -301,8 +300,12 @@ let panel = '',
   bookTab = 'treasures',
   selectedTreasure = save.starter,
   settled = false;
-let journeyCardReturn: 'chronicle' | 'lifespan-farewell' | 'tribulation-farewell' | 'epilogue' =
-  'chronicle';
+let journeyCardReturn:
+  | 'chronicle'
+  | 'lifespan-farewell'
+  | 'tribulation-farewell'
+  | 'ambush-farewell'
+  | 'epilogue' = 'chronicle';
 
 let inMortalWorld = false;
 let mortalFilter = 'all';
@@ -343,6 +346,7 @@ const soundSettings = new SoundSettings(save, gameAudio, persist);
 let volumeOpen = false;
 let resumeAfterDamage = false;
 let adReadyAt = 0;
+let adWatchEpoch = 0;
 let adTimer: number | undefined;
 // 真实广告 SDK 看完回调置位；占位路径（倒计时走完）仍按 adReadyAt 判定。
 let adWatched = false;
@@ -436,21 +440,13 @@ const medicinePanel = new MedicinePanel(save, modal, {
 });
 
 function renderLobby(returnYears?: number) {
-  if (ambushScene) return;
-  if (save.mortal.marketSocial?.ambush && !ambushScene && !saveLock) {
-    const next = structuredClone(save);
-    settleMarketAmbush(next, 'escaped');
-    try {
-      writeSave(next, pendingRun);
-    } catch {
-      if (!saveLock) {
-        panel = 'market-ambush-recovery';
-
-        panelFrame(...marketAmbushRecoveryPanel());
-      }
-      return;
-    }
-    Object.assign(save, next);
+  if (save.pendingReincarnation) {
+    renderJourneyFarewell(save.pendingReincarnation);
+    return;
+  }
+  if (save.mortal.marketSocial?.ambush && !saveLock) {
+    if (!ambushScene && !panel.startsWith('market-ambush')) showMarketAmbush();
+    return;
   }
   if (save.journeyEnded) {
     renderEpilogue();
@@ -626,40 +622,53 @@ function refreshMarketActivities() {
   }
   if (section) section.scrollTop = scroll;
 }
-function showMarketAmbush() {
-  return sceneFlow.showMarketAmbush(shellBindings());
+let ambushFlow: Promise<typeof import('./market-ambush-flow.ts')> | undefined;
+function loadAmbushFlow() {
+  return (ambushFlow ??= import('./market-ambush-flow.ts').catch((error) => {
+    ambushFlow = undefined;
+    throw error;
+  }));
 }
-function finishMarketAmbush(outcome: AmbushOutcome) {
-  ambushScene?.lockOutcome(outcome);
-  const next = structuredClone(save);
-  const result = settleMarketAmbush(next, outcome);
-  if (!result) return;
-  try {
-    writeSave(next, pendingRun);
-  } catch {
-    if (!saveLock) {
-      const note = modal.querySelector<HTMLElement>('.ambush-result');
-      if (note) {
-        note.hidden = false;
-        note.textContent = '结算暂时无法保存，暂扣记录保留；请重试保存后返回。';
-      }
-      const button = modal.querySelector<HTMLButtonElement>('[data-action="market-ambush-exit"]');
-      if (button) button.textContent = '重试保存结果';
-    }
+function showMarketAmbush() {
+  if (!save.mortal.marketSocial?.ambush || saveLock) return;
+  panel = 'market-ambush-loading';
+  closeNpcChat();
+  panelFrame('山路逢劫', '坊市之外 · 退路未断', '<p>辨清来路，护住行囊…</p>');
+  modal.querySelector('[data-action="close"]')?.remove();
+  void loadAmbushFlow()
+    .then((flow) => {
+      if (!saveLock && save.mortal.marketSocial?.ambush && panel === 'market-ambush-loading')
+        flow.mountAmbush(shellBindings());
+    })
+    .catch(() => {
+      if (saveLock || panel !== 'market-ambush-loading') return;
+      panel = 'market-ambush-recovery';
+      panelFrame(
+        '山路逢劫',
+        '遭遇已保存',
+        '<p>遭遇暂时无法载入，战斗保持暂停。</p><button class="primary-button" data-action="market-ambush-recover">重试载入</button>',
+      );
+      modal.querySelector('[data-action="close"]')?.remove();
+    });
+}
+function handleMarketAmbushAction(action: string) {
+  if (saveLock || !save.mortal.marketSocial?.ambush) return;
+  if (action === 'market-ambush-recover') {
+    showMarketAmbush();
     return;
   }
-  Object.assign(save, next);
-  ambushScene?.destroy();
-  ambushScene = null;
-  if (marketNpc) showMarketEvent(marketNpc);
-  else {
-    panel = '';
-    modal.innerHTML = '';
-    renderLobby();
-  }
-  const status = document.getElementById('town-status');
-  if (status) status.innerHTML = townStatus(save);
-  toast(result.text);
+  void loadAmbushFlow()
+    .then((flow) => {
+      if (!saveLock && save.mortal.marketSocial?.ambush && !save.pendingReincarnation)
+        flow.ambushAction(shellBindings(), action);
+    })
+    .catch(() => toast('遭遇暂时无法载入，请重试；战况仍然保留'));
+}
+function finishMarketAmbush(outcome: AmbushOutcome) {
+  void loadAmbushFlow().then((flow) => {
+    if (!saveLock && save.mortal.marketSocial?.ambush && !save.pendingReincarnation)
+      flow.finishAmbush(shellBindings(), outcome);
+  });
 }
 function showAuction() {
   return sceneFlow.showAuction(shellBindings());
@@ -792,6 +801,7 @@ async function renderJourneyCard() {
     panel === 'chronicle' ||
     panel === 'lifespan-farewell' ||
     panel === 'tribulation-farewell' ||
+    panel === 'ambush-farewell' ||
     panel === 'epilogue'
   )
     journeyCardReturn = panel;
@@ -802,7 +812,9 @@ async function renderJourneyCard() {
       ? 'lifespan'
       : journeyCardReturn === 'tribulation-farewell'
         ? 'tribulation'
-        : undefined,
+        : journeyCardReturn === 'ambush-farewell'
+          ? 'ambush'
+          : undefined,
   );
 }
 function renderPanel() {
@@ -994,8 +1006,11 @@ function lifeStats() {
     path: save.path,
   } satisfies Partial<TelemetryEvent>;
 }
-function trackReincarnation(result: 'lifespan' | 'tribulation' | 'epilogue' | 'manual') {
-  telemetry.track({ type: 'reincarnate', result, ...lifeStats() });
+function trackReincarnation(
+  result: 'lifespan' | 'tribulation' | 'ambush' | 'epilogue' | 'manual',
+  previous = lifeStats(),
+) {
+  telemetry.track({ type: 'reincarnate', result, ...previous });
   telemetry.flush();
 }
 function resetLifetime(
@@ -1005,56 +1020,65 @@ function resetLifetime(
   successor = false,
 ) {
   const rerolling = panel === 'root-reveal' && !revisitHometown;
-  shownHumanLetters.clear();
   const root = rollSpiritRoot();
-  clearInterval(adTimer);
-  window.clearTimeout(victoryTimer);
-  adReadyAt = 0;
-  rewardAd = null;
-  pendingImport = null;
-  clearInput();
-  game = null;
-  pendingRun = null;
-  rewards = null;
   const { sound: soundEnabled, volume, prologueSeen, hometownSeen } = save;
-  Object.assign(save, freshSave(root, rootElementsFor(root), 'orthodox'), {
+  const next = Object.assign(freshSave(root, rootElementsFor(root), 'orthodox'), {
     sound: soundEnabled,
     volume,
     prologueSeen,
     hometownSeen,
   });
-  applyBirthInheritance(save, inheritance);
+  applyBirthInheritance(next, inheritance);
   if (successor)
     recordChronicle(
-      save,
+      next,
       '承缘启程',
       '渡口的修士已证长生，离界而去。十五岁的少年循着他的指引，接续问道之路。',
       'immortal-successor',
     );
   if (successor && revisitHometown === true) {
-    save.prologueSeen = true;
-    save.hometownSeen = true;
+    next.prologueSeen = true;
+    next.hometownSeen = true;
   } else if (revisitHometown === 'full') {
-    save.prologueSeen = false;
-    save.hometownSeen = false;
+    next.prologueSeen = false;
+    next.hometownSeen = false;
   } else if (!revisitHometown) {
-    save.prologueSeen = true;
-    departHometown(save);
+    next.prologueSeen = true;
+    departHometown(next);
   }
+  try {
+    writeSave(next, null);
+  } catch {
+    if (!saveLock) toast('轮回尚未保存，旧世进度保留，请重试');
+    return false;
+  }
+  Object.assign(save, next);
+  shownHumanLetters.clear();
+  clearInterval(adTimer);
+  window.clearTimeout(victoryTimer);
+  adReadyAt = 0;
+  adWatchEpoch++;
+  rewardAd = null;
+  pendingImport = null;
+  clearInput();
+  ambushScene?.destroy();
+  ambushScene = null;
+  game = pendingRun = null;
+  rewards = null;
   gameAudio.sync();
   selectedStage = difficulty = treasurePage = 0;
   selectedTreasure = save.starter;
   schoolFilter = 'all';
   bookTab = 'treasures';
-  persist();
-  if (saveLock) return;
-  if (rerolling && refreshRootReveal()) return;
+  if (saveLock) return true;
+  if (rerolling && refreshRootReveal()) return true;
   panel = '';
   modal.innerHTML = '';
   ui.inert = false;
   renderLobby();
   if (!save.prologueSeen) renderPrologue();
   if (previousLife && !successor) toast(previousLife);
+  return true;
 }
 function renderTribulationPending() {
   if (game) {
@@ -1087,18 +1111,20 @@ function finishTribulation() {
 function endLifetime() {
   const life = lifespanInfo(save);
   const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name;
-  resetLifetime(
+  return resetLifetime(
     `前世止于${realm}，享年 ${life.age.toFixed(1)} 年。尘缘已了，今世从十五岁再启仙途。`,
   );
 }
 function renderJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation']>) {
   clearInput();
-  panel = reason === 'tribulation' ? 'tribulation-farewell' : 'lifespan-farewell';
+  panel = `${reason}-farewell`;
 
   panelFrame(...journeyFarewellPanel(reason));
   modal.querySelector('[data-action="close"]')?.remove();
 }
 function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation']>) {
+  if (reason === 'ambush' && save.mortal.marketSocial?.ambush?.snapshot.outcome !== 'defeat')
+    return;
   const ended = structuredClone(save);
   ended.pendingReincarnation = reason;
   ended.autoplay = false;
@@ -1111,8 +1137,11 @@ function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation
   }
   Object.assign(save, ended);
   game = pendingRun = null;
+  ambushScene?.destroy();
+  ambushScene = null;
+  leaveTown();
+  inMortalWorld = false;
   settled = false;
-  renderLobby();
   renderJourneyFarewell(reason);
 }
 function renderLifespanEnd() {
@@ -1150,6 +1179,8 @@ function shellBindings(): ActionShell {
     get adCompleted() { return adCompleted; },
     get adElements() { return adElements; },
     set adElements(next) { adElements = next; },
+    get adWatchEpoch() { return adWatchEpoch; },
+    set adWatchEpoch(next) { adWatchEpoch = next; },
     get adReadyAt() { return adReadyAt; },
     set adReadyAt(next) { adReadyAt = next; },
     get adRoot() { return adRoot; },
@@ -1215,6 +1246,7 @@ function shellBindings(): ActionShell {
     get guideTab() { return guideTab; },
     set guideTab(next) { guideTab = next; },
     get handleAction() { return handleAction; },
+    get handleMarketAmbushAction() { return handleMarketAmbushAction; },
     get hometownLetterContent() { return hometownLetterContent; },
     get humanStoryContent() { return humanStoryContent; },
     get immortalGatePanel() { return immortalGatePanel; },
@@ -1366,7 +1398,6 @@ function shellBindings(): ActionShell {
     get JOURNEY_MAP_IMAGE() { return JOURNEY_MAP_IMAGE; },
     get JOURNEY_MAP_MOBILE_IMAGE() { return JOURNEY_MAP_MOBILE_IMAGE; },
     get MAX_REVIVES() { return MAX_REVIVES; },
-    get MarketAmbushScene() { return MarketAmbushScene; },
     get PROLOGUE_IMAGE() { return PROLOGUE_IMAGE; },
     get SUPPORT_CODE_IMAGE() { return SUPPORT_CODE_IMAGE; },
     get SectMarketScene() { return SectMarketScene; },
@@ -1828,8 +1859,9 @@ backgroundClock.onmessage = () => {
 initOffline();
 renderLobby();
 if (save.pendingReincarnation) renderJourneyFarewell(save.pendingReincarnation);
-else if (lifespanInfo(save).remaining === 0) renderLifespanEnd();
-else if (tribulationDue(save)) renderTribulationPending();
+else if (!save.mortal.marketSocial?.ambush && lifespanInfo(save).remaining === 0)
+  renderLifespanEnd();
+else if (!save.mortal.marketSocial?.ambush && tribulationDue(save)) renderTribulationPending();
 if (saveLock) renderSaveLock();
 persist();
 ensureScene(selectedStage, () => {

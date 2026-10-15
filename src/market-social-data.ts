@@ -3,6 +3,17 @@ import {
   type MarketCultivatorId,
   type SectMarketState,
 } from './sect-market-data.ts';
+import { MAX_REVIVES, REALMS, TREASURES, MAX_FORGE_LEVEL, isCultivationPath } from './data.ts';
+import { medicineInfo } from './medicine-data.ts';
+import type { AuctionItem } from './auction-data.ts';
+import type { MarketIdentity } from './market-relations-data.ts';
+import {
+  validAmbushStats,
+  validAmbushSnapshot,
+  type AmbushStats,
+  type AmbushSnapshot,
+} from './market-ambush-data.ts';
+import type { MarketCultivator } from './sect-market-data.ts';
 import type { TownPopulation } from './town-population.ts';
 
 export const MARKET_LOG_KINDS = [
@@ -29,6 +40,12 @@ export interface MarketAmbush {
   npcId: MarketCultivatorId;
   at: number;
   held: number;
+  identity: MarketIdentity;
+  npc: MarketCultivator;
+  stats: AmbushStats;
+  loot: AuctionItem[];
+  snapshot: AmbushSnapshot;
+  revivesUsed: number;
 }
 export interface MarketSocialState {
   visit: number;
@@ -59,16 +76,7 @@ export function validMarketSocial(
     ids(s.inspected) &&
     (s.lastDebateAt === null || at(s.lastDebateAt)) &&
     (s.lastOpportunityAt === null || at(s.lastOpportunityAt)) &&
-    (s.ambush === null ||
-      (!!s.ambush &&
-        visit(s.ambush.visit) &&
-        s.ambush.visit === s.visit &&
-        isMarketTraderId(s.ambush.npcId) &&
-        s.used.includes(s.ambush.npcId) &&
-        at(s.ambush.at) &&
-        Number.isSafeInteger(s.ambush.held) &&
-        s.ambush.held >= 0 &&
-        s.ambush.held <= 80)) &&
+    (s.ambush === null || validMarketAmbush(s.ambush, age, market, s)) &&
     Array.isArray(s.logs) &&
     s.logs.length <= 12 &&
     s.logs.every(
@@ -99,4 +107,92 @@ export function marketDisposition(
 ) {
   const n = marketSocialRoll(population, visit, `disposition:${id}`) % 10;
   return n < 6 ? '平和' : n < 8 ? '精明' : n === 8 ? '虚浮' : '强横';
+}
+
+export function validMarketAmbush(
+  value: unknown,
+  age: number,
+  market: SectMarketState,
+  social: Pick<MarketSocialState, 'visit' | 'used'>,
+): value is MarketAmbush {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const a = value as MarketAmbush;
+  const n = a.npc,
+    i = a.identity;
+  return (
+    Number.isSafeInteger(a.visit) &&
+    a.visit === market.visit &&
+    a.visit === social.visit &&
+    isMarketTraderId(a.npcId) &&
+    social.used.includes(a.npcId) &&
+    typeof a.at === 'number' &&
+    Number.isFinite(a.at) &&
+    a.at >= 15 &&
+    a.at <= age &&
+    Number.isSafeInteger(a.held) &&
+    a.held >= 0 &&
+    a.held <= 80 &&
+    !!i &&
+    Number.isSafeInteger(i.birthVisit) &&
+    i.birthVisit > 0 &&
+    i.birthVisit <= a.visit &&
+    isMarketTraderId(i.slot) &&
+    !!n &&
+    n.id === a.npcId &&
+    typeof n.name === 'string' &&
+    n.name.length > 0 &&
+    n.name.length <= 30 &&
+    Number.isInteger(n.realmIndex) &&
+    n.realmIndex >= 0 &&
+    n.realmIndex <= 7 &&
+    n.realm === REALMS[n.realmIndex] &&
+    n.generation === i.birthVisit - 1 &&
+    isCultivationPath(n.path) &&
+    typeof n.role === 'string' &&
+    n.role.length <= 30 &&
+    typeof n.greeting === 'string' &&
+    n.greeting.length <= 200 &&
+    Number.isFinite(n.x) &&
+    Number.isFinite(n.y) &&
+    n.x >= 0 &&
+    n.x <= 1600 &&
+    n.y >= 0 &&
+    n.y <= 1100 &&
+    Number.isSafeInteger(a.revivesUsed) &&
+    a.revivesUsed >= 0 &&
+    a.revivesUsed <= MAX_REVIVES &&
+    validAmbushStats(a.stats) &&
+    validAmbushSnapshot(a.snapshot, a.stats) &&
+    Array.isArray(a.loot) &&
+    a.loot.length >= 1 &&
+    a.loot.length <= 2 &&
+    new Set(a.loot.map((l) => `${l?.kind}:${l?.id}`)).size === a.loot.length &&
+    a.loot.every((l) => {
+      if (
+        !l ||
+        !Number.isSafeInteger(l.quantity) ||
+        l.quantity < 1 ||
+        l.quantity > 2 ||
+        !Number.isInteger(l.forgeLevel)
+      )
+        return false;
+      if (l.kind === 'artifact')
+        return (
+          l.quantity === 1 &&
+          l.forgeLevel >= 0 &&
+          l.forgeLevel <= Math.min(4, MAX_FORGE_LEVEL, Math.max(1, Math.floor(n.realmIndex / 2))) &&
+          TREASURES.some(
+            (t) => t.id === l.id && t.school === (n.path === 'demonic' ? 'demonic' : 'orthodox'),
+          )
+        );
+      const m = l.kind === 'medicine' ? medicineInfo(l.id) : undefined;
+      return (
+        !!m &&
+        l.forgeLevel === 0 &&
+        m.stage <= (n.realmIndex === 0 ? 0 : Math.min(6, Math.max(1, n.realmIndex - 1))) &&
+        m.tier === (n.realmIndex === 0 ? '凡品' : n.realmIndex < 3 ? '灵品' : '珍品') &&
+        (m.years > 0 || n.realmIndex >= 6)
+      );
+    })
+  );
 }

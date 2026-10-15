@@ -46,7 +46,7 @@ export function marketAmbushPanel(held: number): PanelParts {
   return [
     '话中藏刃',
     '坊外 · 劫修伏击',
-    `<p class="panel-note">${held} 灵石已暂扣，击退后全数取回；败退、离开或刷新仅损失此额，行囊中的法宝和丹药保留。</p><div id="market-ambush"></div>`,
+    `<div id="market-ambush"></div><details class="market-ambush-rules"><summary>遭遇规则与战利品</summary><p class="panel-note">${held} 灵石已暂扣。击败劫修后自动取回，并一次结算其携带的战利品：一份丹药，可能另有一件法宝，品级与炼器符合对方境界。同一场物品固定，无需另点领取。</p><p class="panel-note">点「尝试撤离」后会自动向左退，也可手动走位；到达左侧退路、与追兵拉开距离并连续守住两秒才算脱身，成功后损失本次暂扣灵石。气血耗尽会身死，可选择广告复活；放弃复活或机会用尽时，点「查看此世落幕」进入身陨落幕页。切后台暂停；刷新或导入仍保留未结遭遇。</p></details>`,
   ];
 }
 
@@ -54,7 +54,7 @@ export function marketAmbushRecoveryPanel(): PanelParts {
   return [
     '尚有一场劫修遭遇未结',
     '坊外险路',
-    '<p>重新载入按脱身结算，暂扣限额不会重复扣除；浏览器暂时无法保存，请重试后继续。</p><button class="secondary-button" data-action="market-ambush-recover">重试保存脱身结果</button>',
+    '<p>这场遭遇的进度仍在，重新载入或导入不会让你直接脱身。浏览器暂时无法恢复，请重试后继续应战；暂扣灵石不会重复扣除。</p><button class="secondary-button" data-action="market-ambush-recover">重试恢复遭遇</button>',
   ];
 }
 

@@ -2,6 +2,7 @@ import { MEDICINES } from './medicine-data.ts';
 import { REALMS, type CultivationPath } from './data.ts';
 import type { TownPopulation } from './town-population.ts';
 import { SECT_MARKET_SETTINGS } from './setting.ts';
+import type { MarketIdentity } from './market-relations-data.ts';
 
 export const MARKET_WIDTH = 1600;
 export const MARKET_HEIGHT = 1100;
@@ -72,6 +73,14 @@ export interface SectMarketState {
   openedAt: number;
   visit: number;
   realmIndex: number;
+  returning?: {
+    slot: MarketTraderId;
+    birthVisit: number;
+    birthSlot: MarketTraderId;
+    realmIndex: number;
+  }[];
+  absent?: MarketTraderId[];
+  opportunityHonest?: boolean;
   exchanged: MarketCultivatorId[];
 }
 export function validSectMarket(value: unknown, age: number): value is SectMarketState {
@@ -86,32 +95,67 @@ export function validSectMarket(value: unknown, age: number): value is SectMarke
     Number.isInteger(s.realmIndex) &&
     s.realmIndex >= 0 &&
     s.realmIndex < REALMS.length &&
+    (s.returning === undefined ||
+      (Array.isArray(s.returning) &&
+        s.returning.length <= 1 &&
+        s.returning.every(
+          (r) =>
+            !!r &&
+            isMarketTraderId(r.slot) &&
+            isMarketTraderId(r.birthSlot) &&
+            Number.isSafeInteger(r.birthVisit) &&
+            r.birthVisit > 0 &&
+            r.birthVisit < s.visit &&
+            Number.isInteger(r.realmIndex) &&
+            r.realmIndex >= 0 &&
+            r.realmIndex <= 7,
+        ))) &&
+    (s.opportunityHonest === undefined || typeof s.opportunityHonest === 'boolean') &&
+    (s.absent === undefined ||
+      (Array.isArray(s.absent) && s.absent.length <= 1 && s.absent.every(isMarketTraderId))) &&
     Array.isArray(s.exchanged) &&
     s.exchanged.length <= MARKET_CULTIVATORS.length &&
     new Set(s.exchanged).size === s.exchanged.length &&
     s.exchanged.every(isMarketTraderId)
   );
 }
+export function marketIdentity(
+  state: Pick<SectMarketState, 'visit' | 'returning'>,
+  id: MarketTraderId,
+): MarketIdentity {
+  const returning = state.returning?.find((r) => r.slot === id);
+  return returning
+    ? { birthVisit: returning.birthVisit, slot: returning.birthSlot }
+    : { birthVisit: state.visit, slot: id };
+}
 export function marketCultivators(
   population: TownPopulation,
-  visit: Pick<SectMarketState, 'visit' | 'realmIndex'>,
+  visit: Pick<SectMarketState, 'visit' | 'realmIndex' | 'returning' | 'absent'>,
 ): MarketCultivator[] {
-  const generation = visit.visit - 1;
   const surnames = '沈陆谢林顾江柳宋';
   const names = ['清和', '行舟', '望舒', '知秋', '怀瑾', '听澜', '远山', '云归'];
-  return MARKET_CULTIVATORS.map((npc, index) => {
-    const offset = (population.seed + Math.imul(generation + 1, 2654435761)) >>> 0;
-    const realmIndex = marketCultivatorRealm(population, visit, npc.id);
-    return {
-      ...npc,
-      generation,
-      realmIndex,
-      realm: REALMS[realmIndex],
-      name:
-        surnames[(offset + index * 3) % surnames.length] +
-        names[((offset >>> 4) + index * 5) % names.length],
-    };
-  });
+  return MARKET_CULTIVATORS.filter((position) => !visit.absent?.includes(position.id)).map(
+    (position) => {
+      const identity = marketIdentity(visit, position.id);
+      const index = MARKET_CULTIVATORS.findIndex((n) => n.id === identity.slot);
+      const npc = MARKET_CULTIVATORS[index];
+      const generation = identity.birthVisit - 1;
+      const offset = (population.seed + Math.imul(generation + 1, 2654435761)) >>> 0;
+      const realmIndex = marketCultivatorRealm(population, visit, position.id);
+      return {
+        ...npc,
+        id: position.id,
+        x: position.x,
+        y: position.y,
+        generation,
+        realmIndex,
+        realm: REALMS[realmIndex],
+        name:
+          surnames[(offset + index * 3) % surnames.length] +
+          names[((offset >>> 4) + index * 5) % names.length],
+      };
+    },
+  );
 }
 const VISITOR_ROLES = [
   '采药散修',
@@ -129,7 +173,7 @@ const VISITOR_ROLES = [
 ] as const;
 export function marketVisitors(
   population: TownPopulation,
-  visit: Pick<SectMarketState, 'visit' | 'realmIndex'>,
+  visit: Pick<SectMarketState, 'visit' | 'realmIndex' | 'returning' | 'absent'>,
 ): MarketCultivator[] {
   const traders = marketCultivators(population, visit);
   const used = new Set(traders.map((n) => n.name));
@@ -183,7 +227,7 @@ export function marketVisitors(
 }
 export function marketCharacters(
   population: TownPopulation,
-  visit: Pick<SectMarketState, 'visit' | 'realmIndex'>,
+  visit: Pick<SectMarketState, 'visit' | 'realmIndex' | 'returning' | 'absent'>,
 ) {
   return [...marketCultivators(population, visit), ...marketVisitors(population, visit)];
 }
@@ -201,9 +245,11 @@ export function marketMedicinePool(
 }
 export function marketCultivatorRealm(
   population: TownPopulation,
-  visit: Pick<SectMarketState, 'visit' | 'realmIndex'>,
+  visit: Pick<SectMarketState, 'visit' | 'realmIndex' | 'returning' | 'absent'>,
   id: MarketCultivatorId,
 ) {
+  const returning = visit.returning?.find((r) => r.slot === id);
+  if (returning) return returning.realmIndex;
   // 每位来访者独立抽取；人口种子与访次使界面、携药、读档及 Worker 身份一致。
   // 远低于玩家的境界降权，但不固定为玩家±一阶，不在交谈或重绘时重抽。
   let hash = population.seed;

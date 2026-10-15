@@ -51,10 +51,19 @@ function findOffer(
   honest: boolean,
 ) {
   for (let seed = 1; seed < 1000; seed++) {
-    save.mortal.population!.seed = seed;
-    for (const npc of marketCultivators(save.mortal.population!, save.mortal.sectMarket!)) {
-      const offer = marketOpportunity(save, npc.id);
-      if (offer?.kind === kind && offer.honest === honest) return { npc, offer };
+    const candidate = structuredClone(save);
+    candidate.mortal.population!.seed = seed;
+    assert.ok(beginSectMarketVisit(candidate));
+    for (const npc of marketCultivators(
+      candidate.mortal.population!,
+      candidate.mortal.sectMarket!,
+    )) {
+      const offer = marketOpportunity(candidate, npc.id);
+      if (offer?.kind === kind && offer.honest === honest) {
+        Object.assign(save, candidate);
+        assert.equal(marketOpportunity(save, npc.id)!.honest, honest);
+        return { npc, offer };
+      }
     }
   }
   assert.fail(`没有找到 ${kind}/${honest} 的真实坊间机缘样本`);

@@ -13,6 +13,7 @@ export interface ActionShell {
   readonly adCompleted: any;
   adElements: ElementId[];
   adReadyAt: any;
+  adWatchEpoch: number;
   adRoot: SpiritRootId;
   readonly adSupplies: any;
   adTimer: any;
@@ -63,6 +64,7 @@ export interface ActionShell {
   guideReturn: any;
   guideTab: any;
   readonly handleAction: any;
+  readonly handleMarketAmbushAction: any;
   readonly hometownLetterContent: any;
   readonly humanStoryContent: any;
   readonly immortalGatePanel: any;
@@ -187,7 +189,6 @@ export interface ActionShell {
   readonly JOURNEY_MAP_IMAGE: any;
   readonly JOURNEY_MAP_MOBILE_IMAGE: any;
   readonly MAX_REVIVES: any;
-  readonly MarketAmbushScene: any;
   readonly PROLOGUE_IMAGE: any;
   readonly SUPPORT_CODE_IMAGE: any;
   readonly SectMarketScene: any;
@@ -255,17 +256,9 @@ export interface ActionShell {
 }
 
 export function dispatchAction(shell: ActionShell, action: string, id?: string) {
-  if (shell.panel === 'market-ambush-recovery') {
-    if (action === 'market-ambush-recover') {
-      shell.panel = '';
-      shell.modal.innerHTML = '';
-      shell.renderLobby();
-    }
-    return;
-  }
-  if (shell.panel === 'market-ambush') {
-    if (action === 'market-ambush-exit' || action === 'close' || action === 'home')
-      shell.finishMarketAmbush(shell.ambushScene?.duel.outcome ?? 'escaped');
+  // 以持久遭遇为准，不能通过改面板、返回首页或导入存档绕过生死。
+  if (shell.save.mortal.marketSocial?.ambush && !shell.save.pendingReincarnation) {
+    shell.handleMarketAmbushAction(action);
     return;
   }
   if (action === 'close' && shell.panel === 'journey-card') {
@@ -284,9 +277,8 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
 
       shell.panelFrame(...shell.epilogueReincarnatePanel(shell.save));
     } else if (action === 'confirm-reincarnate' && shell.panel === 'epilogue-reincarnate') {
-      shell.ui.inert = false;
-      shell.trackReincarnation('epilogue');
-      shell.resetLifetime(
+      const previous = shell.lifeStats();
+      const reset = shell.resetLifetime(
         '修士离界，少年启程。一段指路的话，一场未尽的仙缘。',
         true,
         shell.resolveInheritance(
@@ -295,6 +287,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         ),
         true,
       );
+      if (reset) shell.trackReincarnation('epilogue', previous);
     } else if (action === 'close' && shell.panel === 'epilogue-reincarnate') shell.renderEpilogue();
     else if (action === 'epilogue-sound' && shell.panel === 'epilogue') {
       shell.soundSettings.toggle();
@@ -312,11 +305,21 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.renderJourneyFarewell(shell.save.pendingReincarnation);
     else if (
       action === 'confirm-journey-reincarnate' &&
-      (shell.panel === 'lifespan-farewell' || shell.panel === 'tribulation-farewell')
+      (shell.panel === 'lifespan-farewell' ||
+        shell.panel === 'tribulation-farewell' ||
+        shell.panel === 'ambush-farewell')
     ) {
-      shell.trackReincarnation(shell.panel === 'lifespan-farewell' ? 'lifespan' : 'tribulation');
-      if (shell.panel === 'lifespan-farewell') shell.endLifetime();
-      else shell.resetLifetime('前世止于天劫，旧缘已散。今世从十五岁，再问长生。');
+      const reason = shell.save.pendingReincarnation;
+      const previous = shell.lifeStats();
+      const reset =
+        reason === 'lifespan'
+          ? shell.endLifetime()
+          : shell.resetLifetime(
+              reason === 'ambush'
+                ? '前世殒身于山路，未竟之志留待来生。今世从十五岁，再问长生。'
+                : '前世止于天劫，旧缘已散。今世从十五岁，再问长生。',
+            );
+      if (reset) shell.trackReincarnation(reason, previous);
     }
     return;
   }
@@ -985,7 +988,11 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       return;
     }
     Object.assign(shell.save, candidate.save, { sound: shell.save.sound });
-    if (!shell.save.journeyEnded && !shell.save.pendingReincarnation)
+    if (
+      !shell.save.journeyEnded &&
+      !shell.save.pendingReincarnation &&
+      !shell.save.mortal.marketSocial?.ambush
+    )
       shell.resolveActivity(shell.save);
     shell.pendingRun = candidate.run
       ? shell.Game.restore(shell.save, candidate.run.snapshot())
@@ -1156,8 +1163,8 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     return;
   }
   if (action === 'confirm-reincarnate' && shell.panel === 'reincarnate' && !shell.game) {
-    shell.trackReincarnation('manual');
-    shell.resetLifetime(
+    const previous = shell.lifeStats();
+    const reset = shell.resetLifetime(
       undefined,
       shell.modal.querySelector<HTMLInputElement>('#reincarnate-full-opening')?.checked
         ? 'full'
@@ -1167,6 +1174,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? '',
       ),
     );
+    if (reset) shell.trackReincarnation('manual', previous);
     return;
   }
   if (action === 'autoplay') {
@@ -1207,7 +1215,9 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       return;
     }
     if (shell.panel === 'journey-card') {
-      if (shell.journeyCardReturn === 'lifespan-farewell') shell.renderJourneyFarewell('lifespan');
+      if (shell.journeyCardReturn === 'ambush-farewell') shell.renderJourneyFarewell('ambush');
+      else if (shell.journeyCardReturn === 'lifespan-farewell')
+        shell.renderJourneyFarewell('lifespan');
       else if (shell.journeyCardReturn === 'tribulation-farewell')
         shell.renderJourneyFarewell('tribulation');
       else shell.showPanel('chronicle');

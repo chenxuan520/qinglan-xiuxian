@@ -24,6 +24,7 @@ export interface AuctionReceipt extends AuctionItem {
   price: number;
   fee: number;
   bidder: MarketCultivatorId | 'player' | null;
+  bidderName?: string;
 }
 export interface AuctionState {
   visit: number;
@@ -83,6 +84,10 @@ export function validAuction(
         (r.kind === 'artifact'
           ? r.quantity === 1 && r.forgeLevel <= MAX_FORGE_LEVEL
           : r.forgeLevel === 0) &&
+        (r.bidderName === undefined ||
+          (isMarketTraderId(r.bidder) &&
+            typeof r.bidderName === 'string' &&
+            /^[\p{Script=Han}·]{1,30}$/u.test(r.bidderName))) &&
         amount(r.price) &&
         amount(r.fee) &&
         r.fee <= r.price &&

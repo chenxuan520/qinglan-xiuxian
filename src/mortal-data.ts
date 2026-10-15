@@ -1,3 +1,5 @@
+import { validMarketRelations } from './market-relations-data.ts';
+import type { MarketRelationsState } from './market-relations-data.ts';
 import { validIronMarket, type IronMarketState } from './iron-market-data.ts';
 import { PASSIVES } from './data.ts';
 import { validTownPopulation, type TownPopulation } from './town-population.ts';
@@ -108,6 +110,7 @@ export interface MortalState {
   sectMarket?: SectMarketState;
   auction?: AuctionState;
   marketSocial?: MarketSocialState;
+  marketRelations?: MarketRelationsState;
   marketFellow?: MarketFellowState;
   hometown?: HometownState;
   population?: TownPopulation;
@@ -140,6 +143,8 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
     (s.auction === undefined || validAuction(s.auction, age, s.sectMarket)) &&
     (s.marketSocial === undefined || validMarketSocial(s.marketSocial, age, s.sectMarket)) &&
     (s.marketFellow === undefined || validMarketFellow(s.marketFellow, age, s.population)) &&
+    (s.marketRelations === undefined ||
+      validMarketRelations(s.marketRelations, age, s.sectMarket)) &&
     (s.hometown === undefined || validHometown(s.hometown, age)) &&
     (s.immortal == null || validTownImmortal(s.immortal, age)) &&
     (s.population === undefined || validTownPopulation(s.population)) &&

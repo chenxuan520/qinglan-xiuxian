@@ -190,6 +190,7 @@ function harness(save: SaveData) {
     adTimer: undefined,
     victoryTimer: undefined,
     adReadyAt: 0,
+    adWatchEpoch: 0,
     panel: '',
     journeyCardReturn: 'chronicle',
     settled: false,

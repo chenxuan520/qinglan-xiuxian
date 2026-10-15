@@ -28,7 +28,8 @@ export function medicineUseReason(save: SaveData, id: string, unfinished = false
   const m = medicineInfo(id);
   if (!m) return '丹药不存在';
   if (unfinished) return '请先结束当前历练，再在战前服用';
-  if (save.journeyEnded) return '此世仙途已结束';
+  if (save.journeyEnded || save.pendingReincarnation) return '此世仙途已结束';
+  if (save.mortal.marketSocial?.ambush) return '请先处理尚未结束的劫修遭遇';
   if (lifespanInfo(save).remaining <= 0 || tribulationDue(save) || sectDuesPending(save))
     return '请先处理寿元、天劫或宗门供奉';
   if (!(save.medicine.bag[id] > 0)) return '尚未获得';
@@ -124,6 +125,8 @@ export function buyMedicine(save: SaveData, id: string) {
     (save.medicine.shop!.bought?.[id] || 0) >= 3 ||
     m.tier !== '凡品' ||
     save.journeyEnded ||
+    save.pendingReincarnation ||
+    save.mortal.marketSocial?.ambush ||
     save.stones < m.price ||
     lifespanInfo(save).remaining <= 0 ||
     tribulationDue(save) ||
@@ -144,7 +147,8 @@ export function medicineCraftReason(save: SaveData, id: string, unfinished = fal
   if (m.tier === '凡品') return '凡品无需炼制，可向药铺购买';
   if (!save.medicine.recipes.includes(id)) return '尚未习得药方';
   if (unfinished) return '请先结束当前历练';
-  if (save.journeyEnded) return '此世仙途已结束';
+  if (save.journeyEnded || save.pendingReincarnation) return '此世仙途已结束';
+  if (save.mortal.marketSocial?.ambush) return '请先处理尚未结束的劫修遭遇';
   if (save.unlocked < m.stage) return `探索第 ${m.stage + 1} 境后解锁配方`;
   if (tribulationDue(save) || sectDuesPending(save) || save.mortal.activity)
     return '请先处理人间待办、供奉或天劫';
@@ -195,6 +199,8 @@ export function buyMedicineRecipe(save: SaveData, id: string) {
     save.medicine.recipes.includes(id) ||
     save.stones < medicineRecipePrice(id) ||
     save.journeyEnded ||
+    save.pendingReincarnation ||
+    save.mortal.marketSocial?.ambush ||
     lifespanInfo(save).remaining <= 0 ||
     tribulationDue(save) ||
     sectDuesPending(save)

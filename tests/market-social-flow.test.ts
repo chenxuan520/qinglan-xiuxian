@@ -22,28 +22,48 @@ import {
 } from '../src/sect-market-data.ts';
 import { marketSocialContent } from '../src/market-social-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
-import { executeMarketSocial, marketAmbushRecoveryPanel } from '../src/town-host.ts';
+import {
+  executeMarketSocial,
+  marketAmbushRecoveryPanel,
+  marketAmbushPanel,
+} from '../src/town-host.ts';
 import { dispatchAction } from '../src/action-controller.ts';
 import { Game } from '../src/game.ts';
-import { FINAL_TRIAL_STAGE } from '../src/data.ts';
+import { FINAL_TRIAL_STAGE, MAX_REVIVES } from '../src/data.ts';
+import { MarketAmbushDuel } from '../src/market-ambush.ts';
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+const ambushSource = readFileSync(new URL('../src/market-ambush-flow.ts', import.meta.url), 'utf8');
 const script = new Script(
   stripTypeScriptTypes(
     [
-      'shellBindings',
-      'handleAction',
-      'writeSave',
-      'lockStaleSave',
-      'refreshMarketActivities',
-      'finishMarketAmbush',
-      'renderLobby',
-    ]
-      .map((name) => {
+      ...[
+        'shellBindings',
+        'handleAction',
+        'writeSave',
+        'lockStaleSave',
+        'refreshMarketActivities',
+        'renderLobby',
+      ].map((name) => {
         const match = source.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match);
         return match[0];
-      })
-      .join('\n'),
+      }),
+      ...[
+        'commit',
+        'checkpoint',
+        'hideClose',
+        'showDefeat',
+        'mountAmbush',
+        'finishAmbush',
+        'ambushAction',
+      ].map((name) => {
+        const match = ambushSource.match(
+          new RegExp(`^(?:export )?function ${name}\\([^]*?^\\}`, 'm'),
+        );
+        assert.ok(match);
+        return match[0].replace(/^export /, '');
+      }),
+    ].join('\n'),
   ),
 );
 function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pending = false) {
@@ -94,15 +114,28 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
   const logs: string[] = [];
   let entered = 0,
     destroyed = 0;
-  const scene = {
-    duel: { outcome: null as 'victory' | 'defeat' | 'escaped' | null },
-    lockOutcome(o: 'victory' | 'defeat' | 'escaped') {
-      this.duel.outcome ??= o;
-    },
+  let scene: any;
+  class TestScene {
+    duel: MarketAmbushDuel;
+    finish: any;
+    saveCheckpoint: any;
+    constructor(_host, data, _npc, finish, saveCheckpoint) {
+      this.finish = finish;
+      this.saveCheckpoint = saveCheckpoint;
+      this.duel = new MarketAmbushDuel(
+        data.mortal.marketSocial.ambush.stats,
+        data.mortal.marketSocial.ambush.snapshot,
+      );
+      scene = this;
+    }
+    requestRetreat() {
+      this.duel.requestRetreat();
+      return this.saveCheckpoint(this.duel.snapshot());
+    }
     destroy() {
       destroyed++;
-    },
-  };
+    }
+  }
   const context = createContext({
     dispatchAction,
     homeTownEntrance,
@@ -111,6 +144,9 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     structuredClone,
     performance,
     FINAL_TRIAL_STAGE,
+    MAX_REVIVES,
+    MarketAmbushDuel,
+    MarketAmbushScene: TestScene,
     lifespanInfo,
     tribulationDue,
     inMortalWorld: true,
@@ -134,17 +170,21 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     townStatus,
     executeMarketSocial,
     marketAmbushRecoveryPanel,
+    marketAmbushPanel,
+    closeNpcChat: () => {},
     clearInput: () => {},
     renderSaveLock: () => {},
     refreshMarketTrade: () => {},
     resumeHometown: () => true,
-    panelFrame: () => {},
+    panelFrame: (_title, _subtitle, content) => {
+      context.modal.innerHTML = content;
+    },
     renderEpilogue: () => {},
     showMarketAmbush: () => {
       entered++;
-      context.panel = 'market-ambush';
-      context.ambushScene = scene;
+      context.mountAmbush(context.shellBindings());
     },
+    handleMarketAmbushAction: (action) => context.ambushAction(context.shellBindings(), action),
     showMarketEvent: () => {
       context.panel = 'sect-market-event';
     },
@@ -164,6 +204,8 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
             },
           };
         if (selector === '.panel') return section;
+        if (selector === '#market-ambush') return {};
+        if (selector === '[data-action="close"]') return { remove() {} };
         if (selector === '.ambush-result') return { hidden: true, textContent: '' };
         if (selector === '[data-action="market-ambush-exit"]') return { textContent: '' };
         if (selector.startsWith('[data-action=')) {
@@ -196,7 +238,9 @@ function harness(kind: 'debate' | 'request' | 'fraud' | 'ambush' = 'debate', pen
     context,
     npc,
     run,
-    scene,
+    get scene() {
+      return scene;
+    },
     logs,
     section,
     entered: () => entered,
@@ -242,7 +286,7 @@ test('真实求购和诈骗路由同存物资/时间/额度，保存失败不显
     assert.deepEqual(h.stored().mortal.marketSocial, h.save.mortal.marketSocial);
   }
 });
-test('伏击写成功才挂战斗；胜利结算失败锁定胜负并保留ongoing，重试一次退款', () => {
+test('伏击写成功才挂战斗；胜利快照持久化后结算失败可重试，退款与战利品仅一次', () => {
   const h = harness('ambush');
   const before = h.save.stones;
   h.fail();
@@ -255,44 +299,44 @@ test('伏击写成功才挂战斗；胜利结算失败锁定胜负并保留ongoi
   const held = h.save.mortal.marketSocial!.ambush!.held;
   assert.equal(h.save.stones, before - held);
   assert.ok(h.stored().mortal.marketSocial.ambush);
+  const won = h.scene.duel.snapshot();
+  won.enemy.hp = 0;
+  won.outcome = 'victory';
+  assert.equal(h.context.checkpoint(h.context.shellBindings(), won), true);
+  const inventory = JSON.stringify(h.save.medicine.bag);
   h.fail();
-  h.context.finishMarketAmbush('victory');
-  assert.equal(h.scene.duel.outcome, 'victory');
-  assert.equal(h.destroyed(), 0);
+  h.context.finishAmbush(h.context.shellBindings(), 'victory');
+  assert.equal(h.context.panel, 'market-ambush-recovery');
   assert.ok(h.save.mortal.marketSocial!.ambush);
   assert.equal(h.save.stones, before - held);
+  assert.equal(JSON.stringify(h.save.medicine.bag), inventory);
   h.fail(false);
-  h.action('market-ambush-exit');
+  h.action('market-ambush-recover');
   assert.equal(h.save.stones, before);
   assert.equal(h.save.mortal.marketSocial!.ambush, null);
-  assert.equal(h.destroyed(), 1);
-  h.context.finishMarketAmbush('victory');
-  assert.equal(h.save.stones, before);
+  const settled = JSON.stringify(h.save);
+  h.context.finishAmbush(h.context.shellBindings(), 'victory');
+  assert.equal(JSON.stringify(h.save), settled);
 });
-test('主动关闭伏击按脱身；冷启动恢复失败保留原始记录，成功不重复扣款', () => {
+test('关闭只请求真实撤离；冷启动恢复同战况、不自动逃生或重复扣款', () => {
   const h = harness('ambush');
   h.action('sect-market-opportunity');
-  const old = h.save.stones;
+  const paid = h.save.stones;
   h.action('close');
-  assert.equal(h.save.stones, old);
-  assert.equal(h.save.mortal.marketSocial!.ambush, null);
-  const cold = harness('ambush');
-  cold.action('sect-market-opportunity');
-  cold.context.ambushScene = null;
-  cold.context.panel = '';
-  const paid = cold.save.stones;
-  const record = JSON.stringify(cold.save);
-  cold.fail();
-  cold.context.renderLobby();
-  assert.equal(cold.context.panel, 'market-ambush-recovery');
-  assert.equal(JSON.stringify(cold.save), record);
-  cold.fail(false);
-  cold.action('market-ambush-recover');
-  assert.equal(cold.save.stones, paid);
-  assert.equal(cold.save.mortal.marketSocial!.ambush, null);
-  assert.equal(cold.stored().mortal.marketSocial.ambush, null);
-  cold.context.renderLobby();
-  assert.equal(cold.save.stones, paid);
+  assert.equal(h.save.stones, paid);
+  assert.ok(h.save.mortal.marketSocial!.ambush);
+  assert.equal(h.save.mortal.marketSocial!.ambush!.snapshot.retreatRequested, true);
+  assert.equal(h.save.mortal.marketSocial!.ambush!.snapshot.outcome, null);
+  const snapshot = structuredClone(h.save.mortal.marketSocial!.ambush!.snapshot);
+  h.context.ambushScene = null;
+  h.context.panel = '';
+  h.context.renderLobby();
+  assert.equal(h.context.panel, 'market-ambush');
+  assert.equal(h.save.stones, paid);
+  assert.deepEqual(h.scene.duel.snapshot(), snapshot);
+  assert.ok(h.stored().mortal.marketSocial.ambush);
+  h.context.finishAmbush(h.context.shellBindings(), 'escaped');
+  assert.ok(h.save.mortal.marketSocial!.ambush, '无真实脱身快照不能伪造结算');
 });
 test('真实未完历练论道后保留原快照，可以恢复；赴约按钮禁用', () => {
   const h = harness('debate', true);

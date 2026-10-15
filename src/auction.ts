@@ -44,7 +44,8 @@ export function auctionLots(
 ): (AuctionItem & { index: number; seller: string; sellerId: string; start: number })[] {
   const state = save.mortal.sectMarket;
   if (!state || !save.mortal.population) return [];
-  const npcs = marketCultivators(save.mortal.population, state);
+  // 本批拍品已由来访者事先寄售；之后有人离场，不重排拍品或关闭记录。
+  const npcs = marketCultivators(save.mortal.population, { ...state, absent: undefined });
   return Array.from({ length: AUCTION_LOTS }, (_, index) => {
     const seed = roll(save, `lot:${index}`);
     const npc = npcs[seed % npcs.length];
@@ -195,6 +196,13 @@ function receipt(
     price,
     fee,
     bidder,
+    ...(bidder && bidder !== 'player'
+      ? {
+          bidderName: marketCultivators(save.mortal.population!, state).find(
+            (n) => n.id === bidder,
+          )!.name,
+        }
+      : {}),
   };
   save.mortal.auction!.history.unshift(result);
   save.mortal.auction!.history.splice(12);

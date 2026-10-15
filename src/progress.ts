@@ -4,6 +4,7 @@ import { freshHometown, validHometown } from './hometown.ts';
 import { validSectMarket } from './sect-market-data.ts';
 import { validAuction } from './auction-data.ts';
 import { validMarketSocial } from './market-social-data.ts';
+import { validMarketRelations } from './market-relations-data.ts';
 import { validMarketFellow } from './market-fellow-data.ts';
 import {
   freshMedicine,
@@ -74,7 +75,7 @@ export interface SaveData {
   prologueSeen: boolean;
   hometownSeen: boolean;
   journeyEnded: boolean;
-  pendingReincarnation: 'lifespan' | 'tribulation' | null;
+  pendingReincarnation: 'lifespan' | 'tribulation' | 'ambush' | null;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
   rootElements: ElementId[];
@@ -88,7 +89,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 18;
+export const SAVE_SCHEMA = 19;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -277,6 +278,25 @@ export function readSave(
     const upgrading = !newer && s.schema !== SAVE_SCHEMA;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
+    // 旧版遭遇没有战况，升级只解除旧记录，不伪造胜负或补发奖励。
+    if (upgrading && (s.schema ?? 0) < 19 && s.mortal?.marketSocial?.ambush) {
+      s.mortal.marketSocial.ambush = null;
+    }
+    // 新版生死状态损坏必须停止写入；不能静默丢弃字段让角色复活。
+    if (s.mortal?.marketSocial?.ambush || s.pendingReincarnation === 'ambush') {
+      if (
+        !validMortal(s.mortal, base.age) ||
+        (s.pendingReincarnation === 'ambush' &&
+          s.mortal.marketSocial?.ambush?.snapshot?.outcome !== 'defeat')
+      )
+        return { save: base, status: newer ? 'newer' : 'unreadable' };
+    }
+    if (
+      s.mortal?.marketRelations !== undefined &&
+      !validMarketRelations(s.mortal.marketRelations, base.age, s.mortal.sectMarket)
+    )
+      delete s.mortal.marketRelations;
+
     // 旧档本世不补父母；损坏的故乡字段不连带丢弃其余人间进度。
     delete base.mortal.hometown;
     if (s.mortal?.sectMarket !== undefined && !validSectMarket(s.mortal.sectMarket, base.age))
@@ -410,7 +430,9 @@ export function readSave(
       ((s.pendingReincarnation === 'lifespan' &&
         Number.isFinite(lifespanInfo(base).limit) &&
         lifespanInfo(base).remaining === 0) ||
-        (s.pendingReincarnation === 'tribulation' && tribulationDue(base)))
+        (s.pendingReincarnation === 'tribulation' && tribulationDue(base)) ||
+        (s.pendingReincarnation === 'ambush' &&
+          base.mortal.marketSocial?.ambush?.snapshot.outcome === 'defeat'))
     )
       base.pendingReincarnation = s.pendingReincarnation;
     if (validBirthInheritance(base, s.birthInheritance))

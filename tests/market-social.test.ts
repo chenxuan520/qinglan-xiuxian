@@ -208,30 +208,43 @@ test('核验能揭露假货、骗款、伏击；婉拒不扣钱，真机缘赠�
     }
   }
 });
-test('伏击开始预扣+一年+ongoing+限次同存；胜利退款仅一次，败退损失封顶；import按脱身', () => {
+test('伏击固定身份数值战利品同存，刷新及文件往返不脱身；胜利退款仅一次，败亡保留遭遇', () => {
   for (const outcome of ['victory', 'defeat', 'escaped'] as const) {
     const { s, id, o } = chance('invitation', false);
     const before = s.stones;
     chooseMarketOpportunity(s, id, 1, 'accept');
     assert.equal(s.age, 31);
     assert.equal(s.stones, before - o.cost);
-    assert.ok(s.mortal.marketSocial!.ambush);
+    const encounter = s.mortal.marketSocial!.ambush!;
+    assert.ok(encounter);
     assert.equal(beginSectMarketVisit(s), false);
     assert.equal(debateMarket(s, id, 1), undefined);
+    assert.equal(settleMarketAmbush(s, outcome), undefined);
+    encounter.snapshot.outcome = outcome;
+    if (outcome === 'victory') encounter.snapshot.enemy.hp = 0;
+    if (outcome === 'defeat') encounter.snapshot.player.hp = 0;
+    if (outcome === 'escaped') {
+      encounter.snapshot.time = 3;
+      encounter.snapshot.player.x = 28;
+      encounter.snapshot.retreatRequested = true;
+      encounter.snapshot.retreatProgress = 2;
+    }
+    assert.ok(validMarketSocial(s.mortal.marketSocial, s.age, s.mortal.sectMarket));
     const r = settleMarketAmbush(s, outcome)!;
     assert.equal(r.kind, outcome);
     assert.equal(s.stones, outcome === 'victory' ? before : before - o.cost);
     assert.equal(settleMarketAmbush(s, 'victory'), undefined);
-    assert.equal(s.mortal.marketSocial!.ambush, null);
+    assert.equal(s.mortal.marketSocial!.ambush === null, outcome !== 'defeat');
   }
   const { s, id, o } = chance('invitation', false);
   chooseMarketOpportunity(s, id, 1, 'accept');
+  const encounter = structuredClone(s.mortal.marketSocial!.ambush);
   const raw = JSON.stringify(s);
-  assert.ok(readSave(raw).save.mortal.marketSocial!.ambush);
+  assert.deepEqual(readSave(raw).save.mortal.marketSocial!.ambush, encounter);
   const imported = importSave(exportSave(s, null)).save;
-  assert.equal(imported.mortal.marketSocial!.ambush, null);
+  assert.deepEqual(imported.mortal.marketSocial!.ambush, encounter);
   assert.equal(imported.stones, 10000 - o.cost);
-  assert.equal(imported.mortal.marketSocial!.logs[0].kind, 'escaped');
+  assert.equal(imported.mortal.marketSocial!.logs[0].kind, 'ambush');
 });
 test('不允许未完成历练赴约，冷却及物资上限不溢出，原快照/其他永久进度保持', () => {
   const { s, id } = chance('invitation', false);

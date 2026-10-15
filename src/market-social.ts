@@ -1,6 +1,11 @@
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, spiritRootInfo, pathInfo } from './data.ts';
 import { MEDICINES, medicineInfo } from './medicine-data.ts';
-import { realmInfo, type SaveData } from './progress.ts';
+import {
+  forgeDamageBonus,
+  recordCollectionAchievement,
+  realmInfo,
+  type SaveData,
+} from './progress.ts';
 import { advanceMortal } from './mortal.ts';
 import { recordChronicle } from './chronicle.ts';
 import {
@@ -8,9 +13,15 @@ import {
   marketMedicinePool,
   MARKET_CULTIVATORS,
   isMarketTraderId,
+  marketIdentity,
   type MarketCultivatorId,
 } from './sect-market-data.ts';
-import { marketSocialRoll, marketDisposition, type MarketSocialLog } from './market-social-data.ts';
+import {
+  marketSocialRoll,
+  marketDisposition,
+  validMarketAmbush,
+  type MarketSocialLog,
+} from './market-social-data.ts';
 import {
   auctionReason,
   auctionValue,
@@ -20,6 +31,14 @@ import {
   releaseAuctionItem,
 } from './auction.ts';
 import type { AuctionItem } from './auction-data.ts';
+import {
+  marketContact,
+  prepareMarketOpportunity,
+  rememberMarketContact,
+  rememberMarketTrade,
+  rememberMarketAmbush,
+} from './market-relations.ts';
+import { initialAmbushSnapshot } from './market-ambush-data.ts';
 import { MARKET_SOCIAL_SETTINGS } from './setting.ts';
 
 export function prepareMarketSocial(save: SaveData) {
@@ -43,6 +62,7 @@ export function prepareMarketSocial(save: SaveData) {
     s.used = [];
     s.inspected = [];
   }
+  prepareMarketOpportunity(save);
   prepareAuction(save);
   return true;
 }
@@ -69,9 +89,15 @@ export function marketSocialReason(
   )
     return '来访修士已更换，请重新交谈';
   if (save.mortal.marketSocial.ambush) return '请先处理尚未结束的劫修遭遇';
+  if (
+    save.mortal.sectMarket?.absent?.includes(id as (typeof MARKET_CULTIVATORS)[number]['id']) ||
+    marketContact(save, id)?.dead
+  )
+    return '这名劫修已经身死，无法再交谈';
   return auctionReason(save, visit, artifact, unfinished, years);
 }
 function log(save: SaveData, id: MarketCultivatorId, kind: MarketSocialLog['kind'], text: string) {
+  rememberMarketContact(save, id);
   const record = { visit: save.mortal.sectMarket!.visit, npcId: id, at: save.age, kind, text };
   save.mortal.marketSocial!.logs.unshift(record);
   save.mortal.marketSocial!.logs.splice(12);
@@ -145,7 +171,12 @@ export function debateMarket(save: SaveData, id: MarketCultivatorId, visit: numb
   return log(save, id, 'debate', text);
 }
 export function marketRequest(save: SaveData, id: MarketCultivatorId) {
-  if (!save.mortal.sectMarket || !save.mortal.population) return undefined;
+  if (
+    !save.mortal.sectMarket ||
+    !save.mortal.population ||
+    save.mortal.sectMarket.absent?.includes(id as (typeof MARKET_CULTIVATORS)[number]['id'])
+  )
+    return undefined;
   const seed = roll(save, 'request-owner');
   if (MARKET_CULTIVATORS[seed % 3].id !== id) return undefined;
   const n = npc(save, id);
@@ -178,7 +209,15 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
   }
   const minimumLevel = item.forgeLevel;
   if (item.kind === 'artifact') item.forgeLevel = Math.max(minimumLevel, save.forge[item.id] || 0);
-  const disposition = marketDisposition(save.mortal.population!, save.mortal.sectMarket!.visit, id);
+  const identity = marketIdentity(
+    save.mortal.sectMarket!,
+    id as (typeof MARKET_CULTIVATORS)[number]['id'],
+  );
+  const disposition = marketDisposition(
+    save.mortal.population!,
+    identity.birthVisit,
+    identity.slot,
+  );
   const playerRealm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
   const ratio =
     disposition === '强横' && n.realmIndex > playerRealm
@@ -195,7 +234,11 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
 export function marketWorldScene(save: SaveData, id: MarketCultivatorId) {
   const n = npc(save, id);
   const player = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
-  const mood = marketDisposition(save.mortal.population!, save.mortal.sectMarket!.visit, id);
+  const identity = marketIdentity(
+    save.mortal.sectMarket!,
+    id as (typeof MARKET_CULTIVATORS)[number]['id'],
+  );
+  const mood = marketDisposition(save.mortal.population!, identity.birthVisit, identity.slot);
   const scenes =
     n.realmIndex > player
       ? [
@@ -266,6 +309,7 @@ export function fulfillMarketRequest(
   advanceMortal(save, MARKET_SOCIAL_SETTINGS.requestYears * 60);
   save.stones += offer.price;
   save.mortal.marketSocial!.fulfilled.push(id);
+  rememberMarketTrade(save, id);
   return log(
     save,
     id,
@@ -274,12 +318,19 @@ export function fulfillMarketRequest(
   );
 }
 export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
-  if (!save.mortal.sectMarket || !save.mortal.population) return undefined;
+  if (
+    !save.mortal.sectMarket ||
+    !save.mortal.population ||
+    save.mortal.sectMarket.absent?.includes(id as (typeof MARKET_CULTIVATORS)[number]['id'])
+  )
+    return undefined;
   if (MARKET_CULTIVATORS[roll(save, 'opportunity-owner') % 3].id !== id) return undefined;
   const kind = (['goods', 'deposit', 'haggle', 'invitation'] as const)[
     roll(save, `opportunity-kind:${id}`) % 4
   ];
-  const honest = roll(save, `opportunity-truth:${id}`) % 100 >= 40;
+  const risk = marketOpportunityRisk(save, id);
+  const honest =
+    save.mortal.sectMarket.opportunityHonest ?? roll(save, `opportunity-truth:${id}`) % 100 >= 40;
   const pool = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id).filter(
     (m) => m.years > 0,
   );
@@ -300,6 +351,7 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
   return {
     kind,
     honest,
+    risk,
     item,
     cost,
     deposit: Math.min(MARKET_SOCIAL_SETTINGS.maxLoss, cost),
@@ -392,12 +444,39 @@ export function chooseMarketOpportunity(
   s.used.push(id);
   s.lastOpportunityAt = save.age;
   if (o.kind === 'invitation' && !o.honest) {
-    s.ambush = { visit, npcId: id, at: save.age, held: o.cost };
+    const root = spiritRootInfo(save.spiritRoot);
+    const playerRealm = realmInfo(
+      save.cultivation,
+      save.completed.includes(FINAL_TRIAL_STAGE),
+    ).index;
+    const ratio = Math.max(0.5, Math.min(2.7, 1.28 ** (o.n.realmIndex - playerRealm)));
+    const stats = {
+      hp: root.baseHp + save.training.vitality * 5,
+      damage: (7 + root.rate * 8) * (1 + forgeDamageBonus(save.forge[save.starter] || 0)),
+      enemyHp: 90 * ratio,
+      enemyDamage: 16 * ratio,
+      speed: root.baseSpeed,
+    };
+    s.ambush = {
+      visit,
+      npcId: id,
+      at: save.age,
+      held: o.cost,
+      identity: marketIdentity(
+        save.mortal.sectMarket!,
+        id as (typeof MARKET_CULTIVATORS)[number]['id'],
+      ),
+      npc: { ...o.n },
+      stats,
+      loot: marketAmbushLoot(save, id),
+      snapshot: initialAmbushSnapshot(stats),
+      revivesUsed: 0,
+    };
     return log(
       save,
       id,
       'ambush',
-      `${o.n.name}将你引到僻处，忽然拔刃相向。最多${o.cost}灵石已暂扣；击退可取回，败退或离开则损失此额。`,
+      `${o.n.name}将你引到僻处，忽然拔刃相向。${o.cost}灵石已暂扣。击杀可夺回并取得其随身物，欲撤离须走到左侧退路；气血耗尽便是身死。`,
     );
   }
   if (o.kind === 'deposit' && o.honest) {
@@ -429,18 +508,124 @@ export function chooseMarketOpportunity(
       : `${o.n.name}收了${o.cost}灵石便推诿不再收货。所谓路费，是一笔骗取的垫款；你的丹药仍在丹囊。`,
   );
 }
+export const MARKET_RISK_CLUES = {
+  'secluded-road': '约定处在坊外僻路，离开了坊市的公开照应。',
+  bloodstain: '对方袖口有旧血迹，却不肯多谈来路。',
+  'claimed-sect': '他自称与附近宗门相熟，称坊外自有人照应；口头名号不是凭据，仍须核验。',
+  'pressed-departure': '对方催你独行赴约，迟迟不说接应者是谁。',
+  'higher-realm': '对方境界更高，若翻脸，正面应战凶险。',
+  'sect-backing': '你佩着在籍宗门信物，对方有所顾忌；离坊后仍不能指望宗门立刻救援。',
+  'old-grudge': '这正是曾伏击你的劫修，旧怨未消，私下邀约尤须提防。',
+  'known-trader': '你们曾公平交割，但一次好交易并不能替这次邀约作保。',
+} as const;
+export type MarketRiskClue = keyof typeof MARKET_RISK_CLUES;
+export function marketOpportunityRisk(save: SaveData, id: MarketCultivatorId) {
+  const n = npc(save, id);
+  const realmDelta =
+    n.realmIndex - realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
+  const contact = marketContact(save, id),
+    sectProtection = !!save.mortal.member;
+  const clueCodes: MarketRiskClue[] = ['secluded-road', 'bloodstain'];
+  if (roll(save, `opportunity-sect-claim:${id}`) % 3 === 0) clueCodes.push('claimed-sect');
+  if (roll(save, `opportunity-clue:${id}`) % 2) clueCodes.push('pressed-departure');
+  if (realmDelta > 0) clueCodes.push('higher-realm');
+  if (sectProtection) clueCodes.push('sect-backing');
+  if (contact?.grudge) clueCodes.push('old-grudge');
+  if (contact?.goodwill) clueCodes.push('known-trader');
+  const level: '谨慎' | '危险' | '凶险' =
+    realmDelta >= 2 || contact?.grudge ? '凶险' : realmDelta > 0 ? '危险' : '谨慎';
+  return {
+    realmDelta,
+    sectProtection,
+    level,
+    clueCodes,
+    clues: clueCodes.map((c) => MARKET_RISK_CLUES[c]),
+  };
+}
+export function marketAmbushLoot(save: SaveData, id: MarketCultivatorId): AuctionItem[] {
+  const n = npc(save, id);
+  const medicines = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id);
+  const medicine = medicines[roll(save, `ambush-carried-medicine:${id}`) % medicines.length];
+  const loot: AuctionItem[] = [{ kind: 'medicine', id: medicine.id, quantity: 1, forgeLevel: 0 }];
+  if (roll(save, `ambush-carried-artifact:${id}`) % 4 === 0) {
+    const pool = TREASURES.filter(
+      (t) => t.school === (n.path === 'demonic' ? 'demonic' : 'orthodox'),
+    );
+    const t = pool[roll(save, `ambush-artifact:${id}`) % pool.length];
+    const cap = Math.min(4, Math.max(1, Math.floor(n.realmIndex / 2)));
+    loot.push({
+      kind: 'artifact',
+      id: t.id,
+      quantity: 1,
+      forgeLevel: roll(save, `ambush-forge:${id}`) % (cap + 1),
+    });
+  }
+  return loot;
+}
 export function settleMarketAmbush(save: SaveData, outcome: 'victory' | 'escaped' | 'defeat') {
   const a = save.mortal.marketSocial?.ambush;
-  if (!a) return undefined;
-  if (outcome === 'victory' && !Number.isSafeInteger(save.stones + a.held)) return undefined;
-  if (outcome === 'victory') save.stones += a.held;
+  if (
+    !a ||
+    a.snapshot.outcome !== outcome ||
+    !validMarketAmbush(a, save.age, save.mortal.sectMarket!, save.mortal.marketSocial!)
+  )
+    return undefined;
+  if (outcome === 'defeat') {
+    const previous = save.mortal.marketSocial!.logs.find(
+      (l) => l.visit === a.visit && l.npcId === a.npcId && l.kind === 'defeat',
+    );
+    if (previous) return previous;
+    rememberMarketAmbush(save, a.npcId, outcome);
+    return log(
+      save,
+      a.npcId,
+      'defeat',
+      `你倒在${a.npc.name}的刃下，坊外的归路沉入夜色。此世的行迹与旧物，仍可留作一纸记载。`,
+    );
+  }
+  if (outcome === 'victory') {
+    if (
+      !Number.isSafeInteger(save.stones + a.held) ||
+      a.loot.some(
+        (l) =>
+          l.kind === 'medicine' &&
+          !Number.isSafeInteger((save.medicine.bag[l.id] || 0) + l.quantity),
+      )
+    )
+      return undefined;
+    save.stones += a.held;
+    for (const item of a.loot) {
+      if (item.kind === 'medicine')
+        save.medicine.bag[item.id] = (save.medicine.bag[item.id] || 0) + item.quantity;
+      else {
+        if (!save.artifacts.includes(item.id)) save.artifacts.push(item.id);
+        save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);
+        save.forge[item.id] = Math.max(save.forge[item.id] || 0, item.forgeLevel);
+        if (save.mortal.auction)
+          save.mortal.auction.releasedArtifacts = save.mortal.auction.releasedArtifacts.filter(
+            (id) => id !== item.id,
+          );
+      }
+    }
+    recordCollectionAchievement(save);
+  }
+  rememberMarketAmbush(save, a.npcId, outcome);
   save.mortal.marketSocial!.ambush = null;
-  return log(
+  const lootText = a.loot
+    .map(
+      (l) =>
+        `${l.kind === 'medicine' ? medicineInfo(l.id)!.name : treasure(l.id).name}${l.kind === 'artifact' ? `（炼器${l.forgeLevel}阶）` : ''} ×${l.quantity}`,
+    )
+    .join('、');
+  const result = log(
     save,
     a.npcId,
     outcome,
     outcome === 'victory'
-      ? `你击退劫修，取回暂扣的${a.held}灵石，平安回到坊市。`
-      : `你${outcome === 'defeat' ? '力有不逮，护住要害退出' : '及时脱身'}，损失暂扣的${a.held}灵石，法宝与丹药仍在行囊。`,
+      ? `你击杀劫修${a.npc.name}，取回暂扣的${a.held}灵石，并从其随身行囊取得${lootText}，已收入收藏与丹囊。此人不会再出现在坊市。`
+      : `你甩开${a.npc.name}的追击，从退路回到坊市。损失暂扣的${a.held}灵石，法宝与丹药仍在行囊；对方记下这段旧怨。`,
   );
+  if (outcome === 'victory')
+    save.mortal.sectMarket!.absent = [a.npcId as (typeof MARKET_CULTIVATORS)[number]['id']];
+  return result;
 }

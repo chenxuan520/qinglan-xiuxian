@@ -104,7 +104,10 @@ test('十五位具名修士稳定不重名，访客可正常聊境界但没有�
       realm: '炼气初期',
       message: '聊聊修行',
       history: [],
-      marketVisit: save.mortal.sectMarket!,
+      marketVisit: {
+        visit: save.mortal.sectMarket!.visit,
+        realmIndex: save.mortal.sectMarket!.realmIndex,
+      },
     };
     assert.equal(validDialogue(request), true);
     const prompt = dialogueMessages(request)[0].content;
