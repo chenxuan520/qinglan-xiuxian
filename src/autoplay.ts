@@ -1,6 +1,7 @@
 import { MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
 import { hazardDistance, regionalExposure, regionalHazard } from './regional-hazards.ts';
+import { buildChoiceScore } from './autoplay-build.ts';
 
 const favored = [
   'sword',
@@ -218,7 +219,10 @@ export function autoplayInput(g: Game) {
 }
 export function autoplayChoice(game: Game) {
   const ranked = game.choices
-    .map((choice, index) => ({ index, score: choiceScore(choice, game) }))
+    .map((choice, index) => ({
+      index,
+      score: buildChoiceScore(choice, game, choiceScore(choice, game)),
+    }))
     .sort((a, b) => b.score - a.score);
   if (!ranked.length) return null;
   return { index: ranked[0].index, reroll: ranked[0].score < 15 && game.rerolls > 0 };

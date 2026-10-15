@@ -17,6 +17,7 @@ import {
 } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
+import { validAutoplayBuild } from './autoplay-build.ts';
 
 export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 export const UNREADABLE_SAVE_PREFIX = `${SAVE_KEY}-unreadable-`;
@@ -141,6 +142,7 @@ export function importSave(text: string) {
     (data.spiritRoot !== undefined && !SPIRIT_ROOTS.some((r) => r.id === data.spiritRoot)) ||
     (data.artifacts !== undefined && !artifactIds(data.artifacts)) ||
     (data.artifactDrops !== undefined && !artifactIds(data.artifactDrops)) ||
+    (data.autoplayBuild !== undefined && !validAutoplayBuild(data.autoplayBuild)) ||
     ['sound', 'autoplay', 'prologueSeen', 'hometownSeen', 'journeyEnded'].some(
       (key) => data[key] !== undefined && typeof data[key] !== 'boolean',
     ) ||

@@ -1,4 +1,5 @@
 import { validIronMarket } from './iron-market-data.ts';
+import { defaultAutoplayBuild, validAutoplayBuild, type AutoplayBuild } from './autoplay-build.ts';
 import { syncHumanStories } from './human-stories.ts';
 import { freshHometown, validHometown } from './hometown.ts';
 import { validSectMarket } from './sect-market-data.ts';
@@ -72,6 +73,7 @@ export interface SaveData {
   sound: boolean;
   volume: number;
   autoplay: boolean;
+  autoplayBuild: AutoplayBuild;
   prologueSeen: boolean;
   hometownSeen: boolean;
   journeyEnded: boolean;
@@ -89,7 +91,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 19;
+export const SAVE_SCHEMA = 20;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -166,6 +168,7 @@ export function freshSave(
     sound: false,
     volume: 0.6,
     autoplay: false,
+    autoplayBuild: defaultAutoplayBuild(),
     prologueSeen: false,
     hometownSeen: false,
     journeyEnded: false,
@@ -386,6 +389,11 @@ export function readSave(
     if (typeof s.volume === 'number' && Number.isFinite(s.volume))
       base.volume = Math.min(1, Math.max(0, s.volume));
     base.autoplay = s.autoplay === true;
+    if (validAutoplayBuild(s.autoplayBuild))
+      base.autoplayBuild = {
+        mode: s.autoplayBuild.mode,
+        targets: [s.autoplayBuild.targets[0], s.autoplayBuild.targets[1]],
+      };
     base.prologueSeen = s.prologueSeen === true;
     base.path = isCultivationPath(s.path) ? s.path : 'dual';
     const sect = SECTS.find((sect) => sect.id === base.mortal.member?.id);

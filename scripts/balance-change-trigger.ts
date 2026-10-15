@@ -14,6 +14,7 @@ export const BALANCE_FILES = new Set([
   'src/regional-hazards.ts',
   'src/boss-followup.ts',
   'src/autoplay.ts',
+  'src/autoplay-build.ts',
   'src/spirit-power.ts',
   'src/ads.ts',
   'src/medicine.ts',

@@ -1,4 +1,5 @@
 import type { ElementId, SpiritRootId, Treasure } from './data.ts';
+import { changeAutoplayBuild } from './autoplay-build.ts';
 
 export interface ActionShell {
   readonly ELEMENTS: readonly { id: string }[];
@@ -238,6 +239,7 @@ export interface ActionShell {
   readonly rootPickerView: any;
   sceneLoading: any;
   readonly settingsContent: any;
+  readonly refreshAutoplaySettings: any;
   readonly settlementModal: any;
   readonly showAuction: any;
   readonly startAdCountdown: any;
@@ -1279,6 +1281,28 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     shell.soundSettings.toggle();
     shell.renderLobby();
     shell.renderPanel();
+    return;
+  }
+  if (action === 'autoplay-build' || action === 'autoplay-target') {
+    if (shell.panel !== 'settings' || shell.game) return;
+    const [field, value] = action === 'autoplay-build' ? ['mode', id ?? ''] : (id ?? '').split(':');
+    const build = changeAutoplayBuild(shell.save.autoplayBuild, field, value ?? '');
+    if (!build) return;
+    const next = shell.structuredClone(shell.save);
+    next.autoplayBuild = build;
+    try {
+      shell.writeSave(next, shell.pendingRun);
+    } catch {
+      if (!shell.saveLock) {
+        shell.refreshAutoplaySettings();
+        shell.toast('培养倾向尚未保存，请重试');
+      }
+      return;
+    }
+    shell.save.autoplayBuild = build;
+    shell.refreshAutoplaySettings(
+      action === 'autoplay-build' ? 'autoplay-build-mode' : `autoplay-build-target-${field}`,
+    );
     return;
   }
   if (action.startsWith('offline-') && shell.panel === 'settings') {

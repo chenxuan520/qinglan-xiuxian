@@ -177,7 +177,7 @@ import {
 import { freshTownPopulation, type TownResident } from './town-population.ts';
 import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-chat-source.ts';
 import { openOfflinePanel, offlineAction, initOffline } from './offline.ts';
-import { settingsContent, settingsSoundNote } from './settings-ui.ts';
+import { settingsContent, settingsSoundNote, autoplayBuildContent } from './settings-ui.ts';
 import { townVisit } from './town-history.ts';
 import { meetTownImmortal } from './town-immortal.ts';
 import { chooseSmithStory } from './town-story.ts';
@@ -376,6 +376,16 @@ function persist() {
     if (storageAvailable) toast('浏览器暂时无法保存进度，请勿关闭当前页面');
     storageAvailable = false;
   }
+}
+function refreshAutoplaySettings(focusId?: string) {
+  if (panel !== 'settings') return;
+  const host = modal.querySelector<HTMLElement>('#settings-autoplay-build');
+  if (!host) return;
+  const section = modal.querySelector<HTMLElement>('.panel');
+  const scroll = section?.scrollTop ?? 0;
+  host.innerHTML = autoplayBuildContent(save);
+  if (section) section.scrollTop = scroll;
+  if (focusId) modal.querySelector<HTMLElement>(`#${focusId}`)?.focus({ preventScroll: true });
 }
 function lockStaleSave() {
   saveLock = 'stale';
@@ -1068,12 +1078,13 @@ function resetLifetime(
 ) {
   const rerolling = panel === 'root-reveal' && !revisitHometown;
   const root = rollSpiritRoot();
-  const { sound: soundEnabled, volume, prologueSeen, hometownSeen } = save;
+  const { sound: soundEnabled, volume, prologueSeen, hometownSeen, autoplayBuild } = save;
   const next = Object.assign(freshSave(root, rootElementsFor(root), 'orthodox'), {
     sound: soundEnabled,
     volume,
     prologueSeen,
     hometownSeen,
+    autoplayBuild: structuredClone(autoplayBuild),
   });
   applyBirthInheritance(next, inheritance);
   if (successor)
@@ -1500,6 +1511,7 @@ function shellBindings(): ActionShell {
     get sceneLoading() { return sceneLoading; },
     set sceneLoading(next) { sceneLoading = next; },
     get settingsContent() { return settingsContent; },
+    get refreshAutoplaySettings() { return refreshAutoplaySettings; },
     get settlementModal() { return settlementModal; },
     get showAuction() { return showAuction; },
     get startAdCountdown() { return startAdCountdown; },
@@ -1580,6 +1592,14 @@ document.addEventListener('input', (event) => {
 });
 document.addEventListener('change', async (event) => {
   const input = event.target as HTMLInputElement;
+  if (panel === 'settings' && input.id === 'autoplay-build-mode') {
+    handleAction('autoplay-build', input.value);
+    return;
+  }
+  if (panel === 'settings' && /^autoplay-build-target-[01]$/.test(input.id)) {
+    handleAction('autoplay-target', `${input.id.at(-1)}:${input.value}`);
+    return;
+  }
   if (
     (input.id === 'auction-kind' || input.id === 'auction-item') &&
     panel === 'sect-auction' &&
