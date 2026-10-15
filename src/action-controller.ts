@@ -1,3 +1,4 @@
+import { showSectService } from './scene-flow.ts';
 import type { ElementId, SpiritRootId, Treasure } from './data.ts';
 import { changeAutoplayBuild } from './autoplay-build.ts';
 
@@ -120,6 +121,7 @@ export interface ActionShell {
   readonly renderLifespanEnd: any;
   readonly renderLobby: any;
   readonly renderMortal: any;
+  readonly mortalStatus: any;
   readonly renderPanel: any;
   readonly renderPause: any;
   readonly renderPrologue: any;
@@ -646,6 +648,14 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       note.textContent = shell.auctionResult(shell.save, result);
     }
     shell.toast(shell.auctionResult(shell.save, result));
+    return;
+  }
+  if (action === 'sect-service-open') {
+    showSectService(shell);
+    return;
+  }
+  if (action.startsWith('sect-service-')) {
+    shell.marketEventSource.current?.sectServiceAction(shell, action, id);
     return;
   }
   if (action.startsWith('market-venue-')) {
@@ -1231,7 +1241,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       return;
     }
     shell.closeNpcChat();
-    const wasHumanMemory = shell.panel === 'human-memory';
+    const wasHumanMemory = shell.panel === 'human-memory' || shell.panel === 'sect-service';
     const returnToAbout = shell.panel === 'about';
     const returnToSettings = shell.panel === 'settings';
     if (shell.game?.state === 'lost' && !shell.settled) return;

@@ -1,3 +1,4 @@
+import { trainingEffect } from '../src/training.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -80,7 +81,7 @@ test('各灵根满根基满功法仍保留大境倍数差距，小境在原加�
       }
 });
 
-test('淬体每阶加5%至二十阶翻倍，金刚五重加50%，各境界灵根路线保持独立乘区', () => {
+test('淬体后期边际收益增加至二十阶103.75%，金刚五重加50%，各境界灵根路线保持独立乘区', () => {
   for (const root of SPIRIT_ROOTS)
     for (const path of ['orthodox', 'demonic', 'dual'] as const)
       for (let step = 0; step <= 24; step++)
@@ -90,7 +91,7 @@ test('淬体每阶加5%至二十阶翻倍，金刚五重加50%，各境界灵根
           const g = new Game(save, 0, 0);
           const base = root.baseHp + realmBonuses(step).hp;
           const pathHealth = path === 'orthodox' ? 1.12 : 1;
-          const expected = base * (1 + vitality * 0.05);
+          const expected = base * (1 + trainingEffect(vitality) * 0.05);
           const label = `${root.id} ${path} 境界 ${step} 淬体 ${vitality}`;
           assert.equal(
             g.player.maxHp,
@@ -130,7 +131,7 @@ test('增伤功法与魔道共用原加法池，但不再被境界稀释，悟�
         const label = `${root.id} ${path} 境界 ${step}`;
         const independent =
           (1 + realmBonuses(step).damage) *
-          (1 + (20 * root.powerPerLevel) / 100) *
+          (1 + (trainingEffect(20) * root.powerPerLevel) / 100) *
           1.06 *
           1.17 *
           realmDamageMultiplier(step) *
@@ -251,7 +252,7 @@ test('同境界灵根直接命中只保留既有五行与悟道倍率，没有�
         const save = fixture(step, 'dual', root.id);
         save.training.power = power;
         const g = new Game(save, 0, 0);
-        const training = 1 + (power * root.powerPerLevel) / 100;
+        const training = 1 + (trainingEffect(power) * root.powerPerLevel) / 100;
         assert.equal(
           g.stats.damage,
           (1 + realmBonuses(step).damage) * training * realmDamageMultiplier(step),

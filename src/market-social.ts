@@ -1,3 +1,4 @@
+import { trainingEffect } from './training.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, spiritRootInfo, pathInfo } from './data.ts';
 import { MEDICINES, medicineInfo } from './medicine-data.ts';
 import {
@@ -499,7 +500,7 @@ export function chooseMarketOpportunity(
     ).index;
     const ratio = Math.max(0.5, Math.min(2.7, 1.28 ** (o.n.realmIndex - playerRealm)));
     const stats = {
-      hp: root.baseHp + save.training.vitality * 5,
+      hp: root.baseHp + trainingEffect(save.training.vitality) * 5,
       damage: (7 + root.rate * 8) * (1 + forgeDamageBonus(save.forge[save.starter] || 0)),
       enemyHp: 90 * ratio,
       enemyDamage: 16 * ratio,

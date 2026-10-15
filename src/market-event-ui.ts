@@ -5,3 +5,5 @@ export { marketFellowContent } from './market-fellow-ui.ts';
 export { renderVenue, marketVenueAction } from './market-venue-flow.ts';
 
 export { SectMarketScene } from './sect-market-scene.ts';
+
+export { renderSectService, sectServiceAction } from './sect-service-flow.ts';

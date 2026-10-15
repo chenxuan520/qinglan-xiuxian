@@ -43,12 +43,13 @@ export function validAuction(
   age: number,
   market: SectMarketState | undefined,
 ): value is AuctionState {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || !market) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const s = value as AuctionState;
   return (
     amount(s.visit) &&
-    s.visit > 0 &&
-    s.visit <= market.visit &&
+    (market
+      ? s.visit > 0 && s.visit <= market.visit
+      : s.visit === 0 && s.closed?.length === 0 && s.history?.length === 0) &&
     Array.isArray(s.closed) &&
     s.closed.length <= AUCTION_LOTS &&
     new Set(s.closed).size === s.closed.length &&

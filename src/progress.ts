@@ -1,3 +1,6 @@
+import { validSectServices } from './sect-service-data.ts';
+import { trainingCost } from './training.ts';
+export { trainingCost } from './training.ts';
 import { validMarketVenues } from './market-venue-data.ts';
 import { validIronMarket } from './iron-market-data.ts';
 import { defaultAutoplayBuild, validAutoplayBuild, type AutoplayBuild } from './autoplay-build.ts';
@@ -92,7 +95,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 21;
+export const SAVE_SCHEMA = 22;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -330,6 +333,8 @@ export function readSave(
       delete s.mortal.hometown;
     if (s.mortal?.ironMarket !== undefined && !validIronMarket(s.mortal.ironMarket, base.age))
       delete s.mortal.ironMarket;
+    if (s.mortal?.sectServices !== undefined && !validSectServices(s.mortal.sectServices, base.age))
+      delete s.mortal.sectServices;
     if (s.mortal?.marketVenues !== undefined && !validMarketVenues(s.mortal.marketVenues, base.age))
       delete s.mortal.marketVenues;
     if (validMortal(s.mortal, base.age)) base.mortal = s.mortal;
@@ -708,8 +713,6 @@ export function cultivationReward(
       spiritRootInfo(run.spiritRoot ?? 'heaven').rate,
   );
 }
-export const trainingCost = (level: number) =>
-  Math.round(45 * 1.42 ** Math.min(level, 9) * 1.25 ** Math.max(0, level - 9));
 const FORGE_DAMAGE_BONUSES = [0, 8, 16, 24, 32, 40, 52, 68, 88, 114, 200];
 export const forgeDamageBonus = (level: number) =>
   FORGE_DAMAGE_BONUSES[Math.min(MAX_FORGE_LEVEL, Math.max(0, Math.floor(level)))] / 100;
@@ -736,9 +739,12 @@ export function train(save: SaveData, kind: keyof SaveData['training']) {
     '修习根基',
     `${{ vitality: '锻体', power: '悟道', speed: '身法' }[kind]}修至 ${save.training[kind]} 阶，耗时 ${years} 年。`,
   );
+  recordTrainingMastery(save);
+  return true;
+}
+export function recordTrainingMastery(save: SaveData) {
   if (Object.values(save.training).every((level) => level >= 20))
     recordChronicle(save, '三元归一', '淬体、悟道与身法皆修至二十阶。', 'training-master');
-  return true;
 }
 export function forge(save: SaveData, id: string) {
   if (!save.artifacts.includes(id) || !TREASURES.some((t) => t.id === id)) return false;

@@ -2,6 +2,32 @@ import type { ActionShell } from './action-controller.ts';
 import { MARKET_BUILDINGS, MARKET_VENUES, type MarketVenueId } from './sect-market-data.ts';
 import { executeVenue } from './market-venues.ts';
 import { marketVenueContent } from './market-venue-ui.ts';
+import { seekingContent, type SeekingSelection } from './artifact-seeking-ui.ts';
+import { seekArtifact } from './artifact-seeking.ts';
+
+function bindSeeking(shell: ActionShell) {
+  const host = shell.modal.querySelector<HTMLElement>('#artifact-seeking');
+  if (!host) return;
+  host.querySelectorAll<HTMLSelectElement>('select').forEach((select) => {
+    select.onchange = () => {
+      if (
+        !host.isConnected ||
+        shell.panel !== 'market-venue' ||
+        !shell.inMarket ||
+        shell.marketScene?.nearVenue?.id !== 'artifacts'
+      )
+        return;
+      const selection: SeekingSelection = {
+        school: host.querySelector<HTMLSelectElement>('#seeking-school')!.value,
+        element: host.querySelector<HTMLSelectElement>('#seeking-element')!.value,
+        id: host.querySelector<HTMLSelectElement>('#seeking-item')!.value,
+      };
+      host.innerHTML = seekingContent(shell.save, !!shell.pendingRun, selection);
+      bindSeeking(shell);
+      host.querySelector<HTMLElement>(`#${select.id}`)?.focus({ preventScroll: true });
+    };
+  });
+}
 
 export function renderVenue(shell: ActionShell, id: MarketVenueId) {
   const venue = MARKET_VENUES.find((v) => v.id === id);
@@ -14,6 +40,7 @@ export function renderVenue(shell: ActionShell, id: MarketVenueId) {
     '宗门坊市 · 坊中诸事',
     `<div id="market-venue-content" data-venue="${id}">${marketVenueContent(shell.save, id, !!shell.pendingRun)}</div>`,
   );
+  bindSeeking(shell);
 }
 export function marketVenueAction(shell: ActionShell, action: string, choice?: string) {
   const host = shell.modal.querySelector<HTMLElement>('#market-venue-content');
@@ -39,9 +66,16 @@ export function marketVenueAction(shell: ActionShell, action: string, choice?: s
     shell.document.getElementById('sect-market-view')?.focus({ preventScroll: true });
     return;
   }
-  if (action !== 'market-venue-act') return;
+  if (
+    action !== 'market-venue-act' &&
+    !(action === 'market-venue-direct-seek' && venue.id === 'artifacts')
+  )
+    return;
   const next = shell.structuredClone(shell.save);
-  const result = executeVenue(next, choice, button.dataset.stamp ?? '', !!shell.pendingRun);
+  const result =
+    action === 'market-venue-direct-seek'
+      ? seekArtifact(next, choice, button.dataset.stamp ?? '', false, !!shell.pendingRun)
+      : executeVenue(next, choice, button.dataset.stamp ?? '', !!shell.pendingRun);
   if (!result) return;
   try {
     shell.writeSave(next, shell.pendingRun);
@@ -53,6 +87,7 @@ export function marketVenueAction(shell: ActionShell, action: string, choice?: s
   const section = shell.modal.querySelector<HTMLElement>('.panel');
   const scroll = section?.scrollTop ?? 0;
   host.innerHTML = marketVenueContent(shell.save, venue.id, !!shell.pendingRun);
+  bindSeeking(shell);
   host.querySelector<HTMLElement>('#market-venue-result')!.textContent = result;
   if (section) section.scrollTop = scroll;
   const status = shell.document.getElementById('town-status');

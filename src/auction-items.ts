@@ -25,7 +25,7 @@ export function releaseAuctionItem(save: SaveData, item: AuctionItem) {
     save.forge[item.id] = 0;
     if (freeStarter(item.id)) {
       const auction = (save.mortal.auction ??= {
-        visit: save.mortal.sectMarket!.visit,
+        visit: save.mortal.sectMarket?.visit ?? 0,
         closed: [],
         releasedArtifacts: [],
         history: [],

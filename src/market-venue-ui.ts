@@ -1,3 +1,4 @@
+import { seekingContent } from './artifact-seeking-ui.ts';
 import type { SaveData } from './progress.ts';
 import {
   MARKET_BUILDINGS,
@@ -77,6 +78,9 @@ export function marketVenueContent(save: SaveData, id: MarketVenueId, unfinished
       })
       .join('')}</div>`;
   }
+  if (id === 'artifacts')
+    content =
+      `<section id="artifact-seeking">${seekingContent(save, unfinished)}</section>` + content;
   const receipts = save.mortal.marketVenues?.receipts ?? [];
   return `<div class="market-venue-hero"><span class="market-venue-art" aria-hidden="true" style="background-image:url('${assetUrl('/assets/sect-market-buildings.webp')}');${marketBuildingArt(building.art)}"></span><div><small>坊中一席 · ${venue.hint}</small><p>同一条街，你已能参与不同的事情。</p></div></div><div id="market-venue-result" role="status"></div>${content}${receipts.length ? `<details class="market-venue-history"><summary>近来办过的事</summary>${receipts.map((r) => `<p><small>${r.at.toFixed(1)}岁</small><br>${esc(r.text)}</p>`).join('')}</details>` : ''}<button class="secondary-button" data-action="close">回到坊市</button>`;
 }

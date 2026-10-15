@@ -1,3 +1,4 @@
+import { validSectServices, type SectServiceState } from './sect-service-data.ts';
 import { validMarketVenues, type MarketVenueState } from './market-venue-data.ts';
 import { validMarketRelations } from './market-relations-data.ts';
 import type { MarketRelationsState } from './market-relations-data.ts';
@@ -114,6 +115,7 @@ export interface MortalState {
   marketRelations?: MarketRelationsState;
   marketFellow?: MarketFellowState;
   marketVenues?: MarketVenueState;
+  sectServices?: SectServiceState;
   hometown?: HometownState;
   population?: TownPopulation;
   scenery?: TownScenery;
@@ -140,6 +142,7 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
   const sect = (id: unknown) => SECTS.some((s) => s.id === id);
   return (
     number(s.years) &&
+    (s.sectServices === undefined || validSectServices(s.sectServices, age)) &&
     (s.marketVenues === undefined || validMarketVenues(s.marketVenues, age)) &&
     (s.ironMarket === undefined || validIronMarket(s.ironMarket, age)) &&
     (s.sectMarket === undefined || (validSectMarket(s.sectMarket, age) && !!s.population)) &&

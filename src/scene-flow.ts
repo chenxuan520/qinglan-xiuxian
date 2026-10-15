@@ -204,6 +204,52 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   shell.mountNpcChat(shell.modal.querySelector<HTMLElement>('.npc-dialogue')!, shell.save, npc);
 }
 
+export function showSectService(shell: ActionShell) {
+  if (
+    !shell.inMortalWorld ||
+    shell.inTown ||
+    shell.inMarket ||
+    shell.game ||
+    shell.saveLock ||
+    shell.panel ||
+    !shell.save.mortal.member
+  )
+    return;
+  shell.panel = 'sect-service';
+  shell.panelFrame(
+    '本门传习',
+    '宗门 · 专长办事',
+    '<div id="sect-service-loading" role="status">正在展开本门传习…</div>',
+  );
+  const host = shell.modal.querySelector<HTMLElement>('#sect-service-loading')!;
+  const id = shell.save.mortal.member.id;
+  const current = () =>
+    host.isConnected &&
+    !shell.saveLock &&
+    shell.inMortalWorld &&
+    !shell.inTown &&
+    !shell.inMarket &&
+    !shell.game &&
+    shell.panel === 'sect-service' &&
+    shell.save.mortal.member?.id === id;
+  const load = () => {
+    if (!current()) return;
+    host.textContent = '正在展开本门传习…';
+    void shell.marketEventSource.load().then(
+      (module: any) => {
+        if (current()) module.renderSectService(shell);
+      },
+      () => {
+        if (!current()) return;
+        host.innerHTML =
+          '<p>本门传习暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
+        host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+      },
+    );
+  };
+  load();
+}
+
 export function showMarketVenue(shell: ActionShell, id: string) {
   const place = shell.marketScene?.nearVenue;
   if (!shell.inMarket || shell.saveLock || !place || place.id !== id || shell.panel) return;
@@ -290,7 +336,12 @@ export function panelFrame(
 }
 
 export function renderPanel(shell: ActionShell) {
-  if (shell.panel === 'settings') {
+  if (shell.panel === 'sect-service') {
+    shell.marketEventSource.current?.renderSectService(shell);
+  } else if (shell.panel === 'market-venue') {
+    const id = shell.marketScene?.nearVenue?.id;
+    if (id) shell.marketEventSource.current?.renderVenue(shell, id);
+  } else if (shell.panel === 'settings') {
     shell.panelFrame('设置', '游戏选项', shell.settingsContent(shell.save));
     void shell.openOfflinePanel();
   } else if (shell.panel === 'about') {

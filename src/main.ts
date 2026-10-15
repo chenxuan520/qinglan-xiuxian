@@ -1371,6 +1371,7 @@ function shellBindings(): ActionShell {
     get renderJourneyFarewell() { return renderJourneyFarewell; },
     get renderLifespanEnd() { return renderLifespanEnd; },
     get renderLobby() { return renderLobby; },
+    get mortalStatus() { return mortalStatus; },
     get renderMortal() { return renderMortal; },
     get renderPanel() { return renderPanel; },
     get renderPause() { return renderPause; },

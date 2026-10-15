@@ -1,3 +1,4 @@
+import { trainingEffect } from './training.ts';
 import type {
   Point,
   Weapon,
@@ -206,7 +207,7 @@ export class Game {
   private maximumHealth(medicineHp = this.medicine.hp) {
     const base =
       this.baseHp *
-      (1 + this.save.training.vitality * 0.05) *
+      (1 + trainingEffect(this.save.training.vitality) * 0.05) *
       (1 + this.passivePower('guard') * 0.1);
     return Math.round(
       base *
@@ -325,7 +326,10 @@ export class Game {
           this.passivePower('forbidden') * 0.08 +
           (this.path === 'demonic' ? 0.12 : 0)) *
         (1 - (this.passives.abyss || 0) * 0.02 * this.medicine.drawback) *
-        (1 + (this.save.training.power * spiritRootInfo(this.spiritRoot).powerPerLevel) / 100) *
+        (1 +
+          (trainingEffect(this.save.training.power) *
+            spiritRootInfo(this.spiritRoot).powerPerLevel) /
+            100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
         realmDamageMultiplier(this.realm) *
@@ -347,7 +351,7 @@ export class Game {
       speed:
         spiritRootInfo(this.spiritRoot).baseSpeed *
         (1 +
-          this.save.training.speed * 0.02 +
+          trainingEffect(this.save.training.speed) * 0.02 +
           this.passivePower('crit') * 0.03 +
           (this.player.hp < this.player.maxHp / 2 ? this.passivePower('frenzy') * 0.04 : 0)) *
         (1 + this.save.retreatBonus.speed / 100) *

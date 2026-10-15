@@ -1,3 +1,4 @@
+import { trainingEffect } from '../src/training.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -10,7 +11,7 @@ const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} �
 const cultivationAt = (step: number) =>
   Array.from({ length: step }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
 
-test('悟道独立增伤，不被境界与功法稀释，灵根满阶差异适度且逐阶线性累加', () => {
+test('悟道独立增伤，不被境界与功法稀释，灵根满阶差异适度且后期边际收益温和增加', () => {
   const full = [1.4, 1.36, 1.32, 1.32, 1.28, 1.28, 1.24];
   for (const [i, root] of SPIRIT_ROOTS.entries())
     for (const step of [0, 9, 18, 23, 24])
@@ -28,7 +29,7 @@ test('悟道独立增伤，不被境界与功法稀释，灵根满阶差异适�
         const speed = game.stats.speed;
         for (const level of [1, 10, 20]) {
           save.training.power = level;
-          near(game.stats.damage / base, 1 + ((full[i] - 1) * level) / 20);
+          near(game.stats.damage / base, 1 + ((full[i] - 1) * trainingEffect(level)) / 20);
           assert.equal(game.player.maxHp, hp);
           assert.equal(game.stats.speed, speed);
         }
@@ -50,22 +51,22 @@ test('悟道独立加成进入实际法宝伤害统计，觉醒与未觉醒均�
       assert.ok(game.damageBySource.sword > 0);
       return game.damageBySource.sword;
     };
-    near(hit(20) / hit(0), 1.4);
+    near(hit(20) / hit(0), 1.415);
   }
 });
 
-test('根基前十阶费用保留，后十阶递增但修满总价低于五万，寿元和满阶门禁保留', () => {
-  for (let level = 0; level < 10; level++)
+test('根基前五阶费用保留，后期平缓递增且修满总价17857，寿元和满阶门禁保留', () => {
+  for (let level = 0; level < 5; level++)
     assert.equal(trainingCost(level), Math.round(45 * 1.42 ** level));
-  assert.equal(trainingCost(19), 9838);
+  assert.equal(trainingCost(19), 2358);
   assert.equal(
     Array.from({ length: 20 }, (_, level) => trainingCost(level)).reduce((a, b) => a + b, 0),
-    47373,
+    17857,
   );
   for (let level = 1; level < 20; level++) assert.ok(trainingCost(level) > trainingCost(level - 1));
   for (const root of SPIRIT_ROOTS) {
     const save = freshSave(root.id);
-    save.stones = 9838;
+    save.stones = 2358;
     save.training.power = 19;
     const age = save.age;
     assert.equal(train(save, 'power'), true);
@@ -107,4 +108,17 @@ test('已有根基等级和受伤续局保留，灵威与战斗一致，重复�
   near(twice.run!.stats.damage, restored.stats.damage);
   assert.equal(twice.run!.player.hp, restored.player.hp);
   assert.equal(twice.save.stones, 234);
+});
+
+test('训练收益锚点及边际上界：前十阶不变，十一至十五阶1.05倍，最后五阶1.1倍', () => {
+  assert.equal(trainingEffect(0), 0);
+  assert.equal(trainingEffect(10), 10);
+  assert.equal(trainingEffect(15), 15.25);
+  assert.equal(trainingEffect(20), 20.75);
+  near((1 + trainingEffect(20) * 0.05) / 2, 1.01875);
+  assert.equal(trainingCost(5), 258);
+  assert.equal(trainingCost(9), 658);
+  assert.equal(trainingCost(14), 1383);
+  for (let n = 1; n <= 20; n++)
+    near(trainingEffect(n) - trainingEffect(n - 1), n <= 10 ? 1 : n <= 15 ? 1.05 : 1.1);
 });

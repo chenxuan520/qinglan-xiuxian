@@ -7,6 +7,10 @@ import { fileURLToPath } from 'node:url';
 export const BALANCE_FILES = new Set([
   'src/data.ts',
   'src/progress.ts',
+  'src/training.ts',
+  'src/sect-services.ts',
+  'src/artifact-seeking.ts',
+  'src/service-preflight.ts',
   'src/game.ts',
   'src/game-validation.ts',
   'src/game-types.ts',

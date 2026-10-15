@@ -468,7 +468,7 @@ test('金刚与回血功法满重精研按百分比增强，减伤及噬魂回�
         const mastery = 1 + (step === 24 ? 10 : 4) * 0.03;
         const expectedHp = Math.round(
           (root.baseHp + realmBonuses(step).hp) *
-            2 *
+            2.0375 *
             (id === 'guard' ? 1 + 5 * mastery * 0.1 : 1) *
             (id === 'devour' ? 1 : 1.12) *
             realmHealthMultiplier(step),
