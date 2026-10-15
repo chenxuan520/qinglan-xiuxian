@@ -17,6 +17,7 @@ import {
 } from '../src/data.ts';
 import { AD_SECONDS } from '../src/ads.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
+import { validAutoplayBuild, type AutoplayBuild } from '../src/autoplay-build.ts';
 import {
   completeTribulation,
   enterImmortalGate,
@@ -426,9 +427,17 @@ function fight(save: SaveData, stage: number, attempt: number, c: BalanceCase, l
     })),
   } satisfies BattleSample;
 }
-export function simulateCampaign(c: BalanceCase, stageCount = STAGES.length): CampaignSample {
+export function simulateCampaign(
+  c: BalanceCase,
+  stageCount = STAGES.length,
+  autoplayBuild?: AutoplayBuild,
+): CampaignSample {
   assert.ok(Number.isInteger(stageCount) && stageCount >= 1 && stageCount <= STAGES.length);
   const save = initialSave(c);
+  if (autoplayBuild !== undefined) {
+    assert.ok(validAutoplayBuild(autoplayBuild), '培养倾向设置无效');
+    save.autoplayBuild = structuredClone(autoplayBuild);
+  }
   const ledger: Ledger = { supplies: 0, borrow: 0, revive: 0, trials: [] };
   const battles: BattleSample[] = [];
   let stop = 'attempt-cap';
@@ -504,14 +513,15 @@ export function growthShape() {
   });
 }
 if (!isMainThread) {
-  const { cases, farms, stageCount } = workerData as {
+  const { cases, farms, stageCount, autoplayBuild } = workerData as {
     cases: BalanceCase[];
     farms: boolean;
     stageCount?: number;
+    autoplayBuild?: AutoplayBuild;
   };
   for (const c of cases) {
     try {
-      const result = farms ? simulateFarm(c) : simulateCampaign(c, stageCount);
+      const result = farms ? simulateFarm(c) : simulateCampaign(c, stageCount, autoplayBuild);
       parentPort!.postMessage(result);
     } catch (error) {
       parentPort!.postMessage({

@@ -18,6 +18,7 @@
     "stats": "node --experimental-strip-types scripts/telemetry-stats.ts",
     "balance:passives": "node --experimental-strip-types scripts/passive-balance.ts",
     "balance:weapons": "node --experimental-strip-types scripts/weapon-benchmark.ts",
+    "balance:autoplay": "node --experimental-strip-types scripts/autoplay-balance.ts",
     "balance:training": "node --experimental-strip-types scripts/training-balance.ts",
     "balance:realms": "node --experimental-strip-types scripts/realm-balance.ts",
     "balance:gate": "node --experimental-strip-types scripts/balance-gate.ts",

@@ -33,6 +33,7 @@ import {
 } from './balance-metrics.ts';
 import { growthShape, simulateFarm } from './balance-simulation.ts';
 import type { CampaignSample } from './balance-simulation.ts';
+import type { AutoplayBuild } from '../src/autoplay-build.ts';
 interface SimulationError {
   case: BalanceCase;
   key: string;
@@ -63,6 +64,7 @@ export async function runCases(
   jobs: number,
   label: string,
   stageCount = 7,
+  autoplayBuild?: AutoplayBuild,
 ) {
   if (!Number.isInteger(stageCount) || stageCount < 1 || stageCount > 7)
     throw new Error('模拟关卡数必须为 1–7');
@@ -91,7 +93,7 @@ export async function runCases(
               const worker = new Worker(
                 pathToFileURL(join(root, 'scripts/balance-simulation.ts')),
                 {
-                  workerData: { cases: batch, farms: false, stageCount },
+                  workerData: { cases: batch, farms: false, stageCount, autoplayBuild },
                   execArgv: ['--experimental-strip-types'],
                 },
               );

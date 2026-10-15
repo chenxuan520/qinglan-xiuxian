@@ -89,6 +89,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node --experimental-strip-types scripts/restore-weapon-report.ts
+      - name: Keep latest autoplay comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types scripts/restore-autoplay-report.ts
       - name: Upload site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
