@@ -39,6 +39,8 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 第三至六境精英节奏配置集中在 `src/data.ts` 的 `ELITE_PACING`，波次调度与出生气血在 `src/game.ts`。精英节奏与后半程波次为固定规则，恢复时不重新放大在场敌人气血。`lateEliteWaves` 记录是否已接上后半程波次，与 `nextElite` 一起保存，恢复时不重新放大在场敌人气血。变更覆盖波次边界、精英上限、暂停恢复与快照校验时，运行 `tests/elite-pacing.test.ts`；完整难度和分灵根对照见 [验证记录](verification.md)。
 
+灵威概览仍由 `src/spirit-power.ts` 使用真实Game计算；履历详情在 `chronicle-content.ts` 按需加载，`chronicle-source.ts` 按当前构建清单重试，关闭后迟到回调不重开。`power-breakdown.ts` 固定实际入场本命与路线，逐项移除来源重算，不复制战斗伤害公式；`spiritPower` 的可选路线仅用于此项对照，默认行为不变。`power-details-ui.ts` 展示完整数值及正负增幅；所有行是各自与移除状态比较，不能相加。新模块随完整离线资源缓存，不新增存档字段或依赖。
+
 根基收益在 `src/training.ts`：悟道用 `powerTrainingEffect(n) = n + 0.1 × max(0,n−10)^2`，淬体/身法仍用 `trainingEffect`，前十阶与修炼费用、年岁均不变。献物专长用一次固定折价覆盖最少连续阶数，差额补灵石；逐阶年岁向上取整到0.1后相加，供奉单独预留。剩余境界/满阶额度不足以用完整份抵价时零消耗拒绝，不产生可结转余额；精研每阶真实结算，保留五/十阶赐丹。办理仍经 clone→writeSave→apply，写入失败不扣物、修习或记冷却。
 
 `balance:realms` 不会购买永久强化，不能用它代替“正常投入所得资源”的通关测试。两种策略的样本、参数、逐关境界和局限见 [天灵根逐关成长验证](verification.md#天灵根逐关成长复核2026-10-03)。外部辅助模拟与原始结果不随仓库分发，现有命令与外部脚本的复现范围分别说明。

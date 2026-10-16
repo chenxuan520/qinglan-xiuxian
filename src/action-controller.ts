@@ -58,7 +58,7 @@ import type {
   telemetryRow,
   updateStorySoundButton,
 } from './common-ui.ts';
-import type { chronicleContent } from './chronicle-ui.ts';
+import type { ChronicleSource } from './chronicle-source.ts';
 import type {
   alignStarterWithPath,
   attuneSpiritRoot,
@@ -367,7 +367,7 @@ export interface ActionShell {
   readonly battleHud: BattleHud;
   readonly bestiaryPanel: typeof bestiaryPanel;
   readonly catalogPanel: typeof catalogPanel;
-  readonly chronicleContent: typeof chronicleContent;
+  readonly chronicleSource: ChronicleSource;
   readonly completeTribulation: typeof completeTribulation;
   readonly cultivationPanel: typeof cultivationPanel;
   readonly damageReport: typeof damageReport;

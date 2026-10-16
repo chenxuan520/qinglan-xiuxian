@@ -81,7 +81,7 @@ import {
   ERROR_NOTICE_TITLE,
 } from './common-ui.ts';
 import { JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
-import { chronicleContent } from './chronicle-ui.ts';
+import { ChronicleSource } from './chronicle-source.ts';
 import {
   TREASURES,
   isCultivationPath,
@@ -320,6 +320,7 @@ const shownHumanLetters = new Set<string>();
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 const guideSource = new GuideSource();
+const chronicleSource = new ChronicleSource();
 const marketEventSource = new MarketEventSource();
 let guideTab = 'basics';
 
@@ -1469,7 +1470,7 @@ function shellBindings(): ActionShell {
     get battleHud() { return battleHud; },
     get bestiaryPanel() { return bestiaryPanel; },
     get catalogPanel() { return catalogPanel; },
-    get chronicleContent() { return chronicleContent; },
+    get chronicleSource() { return chronicleSource; },
     get completeTribulation() { return completeTribulation; },
     get cultivationPanel() { return cultivationPanel; },
     get damageReport() { return damageReport; },

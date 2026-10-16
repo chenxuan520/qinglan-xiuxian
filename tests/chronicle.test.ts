@@ -10,7 +10,7 @@ import {
 } from '../src/progress.ts';
 import { recordChronicle, chronicleAchievements, CHRONICLE_LIMIT } from '../src/chronicle.ts';
 import { spiritPower } from '../src/spirit-power.ts';
-import { chronicleContent } from '../src/chronicle-ui.ts';
+import { chronicleContent } from '../src/chronicle-content.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { joinSect, leaveSect } from '../src/mortal.ts';
 import { chooseSmithStory } from '../src/town-story.ts';

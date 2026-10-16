@@ -1,10 +1,11 @@
 import { Game } from './game.ts';
 import { treasure, weaponRootBonus } from './data.ts';
+import type { CultivationPath } from './data.ts';
 import { forgeDamageBonus, type SaveData } from './progress.ts';
 
-export function spiritPower(save: SaveData) {
+export function spiritPower(save: SaveData, path?: CultivationPath) {
   // 沿用真实一级入场属性；浅拷贝隔离构造时的天劫时钟同步，不开战、不推进时间。
-  const preview = new Game({ ...save }, 0, 0, () => 0.5);
+  const preview = new Game({ ...save }, 0, 0, () => 0.5, path);
   const stats = preview.stats;
   const weapon = treasure(preview.weapons[0].id);
   const offense =
@@ -21,6 +22,8 @@ export function spiritPower(save: SaveData) {
     hp: preview.player.maxHp,
     ...stats,
     weapon: weapon.name,
+    weaponId: weapon.id,
+    path: preview.path,
     weaponDamage: preview.weaponHitDamage(preview.weapons[0]),
     forge: save.forge[weapon.id] || 0,
   };

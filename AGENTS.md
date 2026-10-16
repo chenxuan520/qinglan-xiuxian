@@ -59,7 +59,7 @@
 
 坊市备物动机以修士自述呈现，物品用途须与真实药效、境界相符。熟人便利沿用真实身份与交易记录，不能靠闲聊增加善意；换物总估值不得凭循环交易增值。邀约预告物品须与结算一致，已有法宝保留较高炼器阶数。旧识指路只指向当前仍有效的公开求购，完成即失效；私下遭遇的回响是玩家自己的记忆，不得让无关修士凭空知晓或让 AI 读取隐藏真假。
 
-前六关地域技能在 `regional-combat.ts`，危险区几何与自动走位共用 `regional-hazards.ts`，绘制在 `regional-render.ts`。条形区域用带圆端的线段判定，漂移仅在预警结束后开始；小怪完整区域及漂移不得越过施法者周围 200 像素。第七关按用户要求保持既定行为，修改共享战斗或自动策略时须同时验证终关不受影响。指南通过 `guide-source.ts` 按需加载，构建出的指南模块必须纳入离线清单；异步回调不得重新打开已关闭的面板。
+前六关地域技能在 `regional-combat.ts`，危险区几何与自动走位共用 `regional-hazards.ts`，绘制在 `regional-render.ts`。条形区域用带圆端的线段判定，漂移仅在预警结束后开始；小怪完整区域及漂移不得越过施法者周围 200 像素。第七关按用户要求保持既定行为，修改共享战斗或自动策略时须同时验证终关不受影响。指南通过 `guide-source.ts` 按需加载，构建出的指南模块必须纳入离线清单；异步回调不得重新打开已关闭的面板。灵威/履历详情由 `chronicle-source.ts` 按需载入 `chronicle-content.ts`，同样遵守当前构建重试、离线缓存和迟到回调约束；增幅来源固定真实本命与路线，逐项移除重算且只读，不另抄战斗公式。
 
 续局结构校验与战斗公共类型在 `game-validation.ts` / `game-types.ts`，连击系数在 `boss-followup.ts`；续局校验与连击系数文件的变更同样触发完整平衡测试。战斗 HUD 在 `battle-hud.ts`，面板框架、返回焦点与滚动在 `panel-host.ts`。序章、轮回与终章模板在 `opening-ui.ts`，首页与战斗结果模板在 `lobby-ui.ts`，入镇、坊市互动与拍卖执行在 `town-host.ts`，弹窗焦点与手动走位在 `input-controller.ts`，点击与按键动作分发在 `action-controller.ts`，城镇挂载、入场与广告面板在 `scene-flow.ts`。异步留影和丹囊交互分别在 `journey-card-panel.ts` / `medicine-panel.ts`；藏器阁、洞府和妖物志纯模板在各自的 `*-ui.ts`。出场、突破与预警绘制在 `render-overlays.ts` / `render-warnings.ts`。`styles.ts` 按原顺序加载十一份连续样式，禁止为了归类移动媒体覆盖顺序；`battle-hud.css` 仍在其后加载。
 

@@ -378,10 +378,31 @@ export function renderPanel(shell: ActionShell) {
     const view = shell.cultivationPanel(shell.save, shell.selectedStage);
     shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
   } else if (shell.panel === 'chronicle') {
+    if (!shell.chronicleSource.current) {
+      shell.panelFrame(
+        '仙途履历',
+        '岁月留痕 · 此世道果',
+        '<p class="panel-note" role="status">正在展开履历与属性…</p>',
+      );
+      void shell.chronicleSource
+        .load()
+        .then(() => {
+          if (shell.panel === 'chronicle') shell.renderPanel();
+        })
+        .catch(() => {
+          if (shell.panel === 'chronicle')
+            shell.panelFrame(
+              '仙途履历',
+              '岁月留痕 · 此世道果',
+              '<p class="panel-note" role="alert">暂未展开，请重试。</p><button class="secondary-button" data-action="chronicle">重新展开</button>',
+            );
+        });
+      return;
+    }
     shell.panelFrame(
       '仙途履历',
       '岁月留痕 · 此世道果',
-      shell.chronicleContent(shell.save) +
+      shell.chronicleSource.current.chronicleContent(shell.save) +
         '<button class="secondary-button journey-card-entry" data-action="journey-card">留存此世</button>',
       true,
     );

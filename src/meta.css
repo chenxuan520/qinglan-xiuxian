@@ -389,6 +389,49 @@
   margin-top: 16px;
   font-size: 13px;
 }
+.power-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px 20px;
+  margin: 18px 0;
+}
+.power-stat-grid dt,
+.power-origin small {
+  display: block;
+  color: #a7bbae;
+  font-size: 12px;
+}
+.power-stat-grid dd,
+.power-origin dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.power-stat-grid dd {
+  color: #e6d69b;
+}
+.power-origin {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+  gap: 12px 20px;
+  border-top: 1px solid #b6bf8e33;
+  padding: 14px 0;
+}
+.power-origin dd span {
+  display: block;
+}
+.power-origin .power-gain {
+  color: #c4dfb7;
+}
+.power-origin .power-loss {
+  color: #e4b69d;
+}
+@media (max-width: 600px) {
+  .power-origin {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+}
 .chronicle-achievements {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

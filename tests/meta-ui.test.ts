@@ -5,7 +5,7 @@ import { guideContent } from '../src/guide.ts';
 import { GAME_SITE_URL, SUPPORT_CODE_IMAGE } from '../src/setting.ts';
 import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
 import { spiritPower } from '../src/spirit-power.ts';
-import { chronicleContent } from '../src/chronicle-ui.ts';
+import { chronicleContent } from '../src/chronicle-content.ts';
 import { autoplayButton, choiceCard, controls } from '../src/common-ui.ts';
 import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
