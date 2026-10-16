@@ -4,10 +4,12 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SPIRIT_ROOTS, CULTIVATION_PATHS, DIFFICULTIES, STAGES, treasure } from '../src/data.ts';
@@ -171,10 +173,13 @@ export function reportHtml(report: DailyReport) {
   (${installReportFilters.toString()})(${embedded(plan)},${embedded(labels)},${embedded({ commit: report.commit, generatedAt: report.generatedAt })},${embedded(rows.map((r) => r.key))});
   </script></body></html>`;
 }
+// macOS 等系统的临时目录不在 /tmp 下，工作目录还会解析为真实路径；本机测试与报告同样写在系统临时目录。
+const temporaryRoots = ['/tmp', resolve(tmpdir()), realpathSync(tmpdir())];
+const temporary = (root: string) => temporaryRoots.some((dir) => root.startsWith(dir + '/'));
 export function renderReport(input: string, output: string) {
   const root = resolve(output);
-  if (!root.startsWith(join(repository, 'artifacts') + '/') && !root.startsWith('/tmp/'))
-    throw new Error('报告只允许写入 artifacts/ 或 /tmp/');
+  if (!root.startsWith(join(repository, 'artifacts') + '/') && !temporary(root))
+    throw new Error('报告只允许写入 artifacts/、/tmp/ 或系统临时目录');
   let report = loadReport(input);
   const claimedPass = report.passed === true;
   report.passed = passedFullReport(report, balanceCases(true));
@@ -218,9 +223,9 @@ export function refreshReport(output = join(repository, 'dist/balance-report')) 
   if (
     root !== join(repository, 'dist/balance-report') &&
     !root.startsWith(join(repository, 'artifacts') + '/') &&
-    !root.startsWith('/tmp/')
+    !temporary(root)
   )
-    throw new Error('报告刷新只允许 dist/balance-report、artifacts/ 或 /tmp/');
+    throw new Error('报告刷新只允许 dist/balance-report、artifacts/、/tmp/ 或系统临时目录');
   mkdirSync(join(repository, 'artifacts'), { recursive: true });
   const staging = mkdtempSync(join(repository, 'artifacts/report-refresh-'));
   try {

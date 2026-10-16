@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, webcrypto } from 'node:crypto';
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import vm from 'node:vm';
@@ -369,6 +369,51 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
       initial.plugin.transform("body{background:url('/assets/map.webp')}", 'src/style.css'),
       new RegExp(`qinglan-build=${initial.manifest.build}`),
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('构建产物与清单不收录 public 复制来的点文件，输出目录原有 .git 保留', () => {
+  const root = mkdtempSync(join(tmpdir(), 'qinglan-dotfiles-'));
+  try {
+    for (const dir of ['src', 'scripts', 'monitor', 'output/.git'])
+      mkdirSync(join(root, dir), { recursive: true });
+    for (const path of [
+      'index.html',
+      'monitor/index.html',
+      'vite.config.ts',
+      'scripts/offline-build.ts',
+      'package-lock.json',
+      'src/main.ts',
+      'output/index.html',
+      'output/.git/HEAD',
+    ])
+      writeFileSync(join(root, path), path);
+    // 模拟 Vite 把 public 原样复制进输出目录。
+    for (const path of ['.DS_Store', 'assets/map.webp', 'assets/.opencode/node_modules/x.js'])
+      for (const dir of ['public', 'output']) {
+        mkdirSync(join(root, dir, path, '..'), { recursive: true });
+        writeFileSync(join(root, dir, path), path);
+      }
+    const plugin = offlineBuild('test-v1');
+    plugin.configResolved({
+      root,
+      base: '/',
+      command: 'build',
+      define: {},
+      publicDir: join(root, 'public'),
+      build: { outDir: 'output' },
+    });
+    plugin.closeBundle();
+    const paths = JSON.parse(
+      readFileSync(join(root, 'output/offline-manifest.json'), 'utf8'),
+    ).resources.map((entry) => entry.path);
+    assert.ok(paths.includes('assets/map.webp'));
+    assert.ok(!paths.some((path) => path.includes('.DS_Store') || path.includes('.opencode')));
+    assert.equal(existsSync(join(root, 'output/.DS_Store')), false);
+    assert.equal(existsSync(join(root, 'output/assets/.opencode')), false);
+    assert.equal(existsSync(join(root, 'output/.git/HEAD')), true);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

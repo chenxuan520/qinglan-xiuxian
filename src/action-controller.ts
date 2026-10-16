@@ -1,269 +1,453 @@
 import { showSectService } from './scene-flow.ts';
-import type { ElementId, SpiritRootId, Treasure } from './data.ts';
+import type {
+  adSupplies,
+  allowsSchool,
+  CultivationPath,
+  ElementId,
+  ENEMIES,
+  isCultivationPath,
+  rootElementsFor,
+  SpiritRootId,
+  spiritRootInfo,
+  STAGES,
+  Treasure,
+  treasure,
+} from './data.ts';
 import { changeAutoplayBuild } from './autoplay-build.ts';
+import type { ironMarketContent } from './iron-market-ui.ts';
+import type { MedicinePanel } from './medicine-panel.ts';
+import type { catalogPanel } from './catalog-ui.ts';
+import type { cultivationPanel } from './cultivation-ui.ts';
+import type { bestiaryPanel } from './bestiary-ui.ts';
+import type { BattleHud } from './battle-hud.ts';
+import type { JourneyCardPanel } from './journey-card-panel.ts';
+import type { PanelHost, PanelLocation } from './panel-host.ts';
+import type {
+  epilogueModal,
+  epilogueReincarnatePanel,
+  hometownFarewellModal,
+  immortalGatePanel,
+  reincarnatePanel,
+  tribulationWonPanel,
+} from './opening-ui.ts';
+import type {
+  damagePanel,
+  guidePanel,
+  pausePanel,
+  restartRunPanel,
+  retreatResultPanel,
+  rootPickerView,
+  settlementModal,
+  upgradeChoicesModal,
+  victoryModal,
+} from './lobby-ui.ts';
+import type {
+  enterTownVisit,
+  executeAuctionTrade,
+  executeMarketSocial,
+  executeMortalAction,
+  immortalEncounterPanel,
+  marketAmbushPanel,
+} from './town-host.ts';
+import type { isImmortalSuccessor } from './inheritance-ui.ts';
+import type { AD_SECONDS, AdPlacement, getAdProvider, watchAdPlacement } from './ads.ts';
+import type { GAME_VERSION } from './version.ts';
+import type {
+  damageReport,
+  fullscreenButton,
+  telemetryRow,
+  updateStorySoundButton,
+} from './common-ui.ts';
+import type { chronicleContent } from './chronicle-ui.ts';
+import type {
+  alignStarterWithPath,
+  attuneSpiritRoot,
+  BirthInheritance,
+  completeTribulation,
+  enterImmortalGate,
+  extendLifespan,
+  forge,
+  lifespanInfo,
+  realmInfo,
+  resolveInheritance,
+  retreat,
+  SaveData,
+  settleRun,
+  train,
+  tribulationDue,
+} from './progress.ts';
+import type { Game } from './game.ts';
+import type { exportSave, importSave } from './save-transfer.ts';
+import type { Renderer } from './render.ts';
+import type { GuideSource } from './guide-source.ts';
+import type { createTelemetry } from './telemetry.ts';
+import type { assetUrl } from './asset-url.ts';
+import type { MobileDisplay } from './mobile-display.ts';
+import type { FrameRate } from './frame-rate.ts';
+import type { GameAudio } from './game-audio.ts';
+import type { SoundSettings } from './sound-settings.ts';
+import type { TownScene } from './town-scene.ts';
+import type { SectMarketScene } from './sect-market-scene.ts';
+import type { MarketEventSource } from './market-event-source.ts';
+import type { chooseMarketFellow } from './market-fellow.ts';
+import type { MarketAmbushScene } from './market-ambush-scene.ts';
+import type { AmbushOutcome } from './market-ambush.ts';
+import type {
+  isMarketCultivatorId,
+  MarketCultivator,
+  marketCultivators,
+} from './sect-market-data.ts';
+import type { prepareAuction } from './auction.ts';
+import type { auctionContent, auctionResult, AuctionView } from './auction-ui.ts';
+import type { AuctionKind } from './auction-data.ts';
+import type {
+  beginSectMarketVisit,
+  exchangeSectMedicine,
+  sectMarketExchangeReason,
+  sectMarketOffer,
+  sectMarketOpen,
+} from './sect-market.ts';
+import type { HOMETOWN_START } from './town.ts';
+import type {
+  acceptHometownRoot,
+  hometownParents,
+  ParentId,
+  readHometownLetter,
+  visitHometown,
+} from './hometown.ts';
+import type { freshTownPopulation, TownResident } from './town-population.ts';
+import type { closeNpcChat, mountNpcChat } from './npc-chat-source.ts';
+import type { offlineAction, openOfflinePanel } from './offline.ts';
+import type { settingsContent } from './settings-ui.ts';
+import type { townVisit } from './town-history.ts';
+import type { meetTownImmortal } from './town-immortal.ts';
+import type { chooseSmithStory } from './town-story.ts';
+import type {
+  chooseHumanStory,
+  HUMAN_STORIES,
+  isHumanStoryId,
+  syncHumanStories,
+} from './human-stories.ts';
+import type { resolveActivity, settleSectDues } from './mortal.ts';
+import type {
+  hometownContent,
+  hometownLetterContent,
+  humanStoryContent,
+  mortalStatus,
+  mortalTabContent,
+  townEventContent,
+  townPage,
+  townStatus,
+} from './mortal-ui.ts';
 
 export interface ActionShell {
   readonly ELEMENTS: readonly { id: string }[];
-  readonly FINAL_TRIAL_STAGE: any;
-  readonly Game: any;
-  readonly HOMETOWN_START: any;
-  readonly HUMAN_STORIES: any;
+  readonly FINAL_TRIAL_STAGE: number;
+  readonly Game: typeof Game;
+  readonly HOMETOWN_START: typeof HOMETOWN_START;
+  readonly HUMAN_STORIES: typeof HUMAN_STORIES;
   readonly SPIRIT_ROOTS: readonly { id: string }[];
-  readonly STAGES: any;
-  abandonConfirm: any;
-  readonly acceptHometownRoot: any;
-  readonly adCompleted: any;
+  readonly STAGES: typeof STAGES;
+  abandonConfirm: boolean;
+  readonly acceptHometownRoot: typeof acceptHometownRoot;
+  readonly adCompleted: () => boolean;
   adElements: ElementId[];
-  adReadyAt: any;
+  adReadyAt: number;
   adWatchEpoch: number;
   adRoot: SpiritRootId;
-  readonly adSupplies: any;
-  adTimer: any;
-  aiChoiceTime: any;
-  readonly alignStarterWithPath: any;
-  readonly allowsSchool: any;
-  ambushScene: any;
-  assetsReady: any;
-  readonly attuneSpiritRoot: any;
-  auctionKind: any;
-  readonly auctionResult: any;
-  auctionView: any;
-  readonly beginJourneyFarewell: any;
-  readonly beginSectMarketVisit: any;
-  readonly beginTribulation: any;
-  bestiaryStage: any;
-  bookTab: any;
+  readonly adSupplies: typeof adSupplies;
+  adTimer: number | undefined;
+  aiChoiceTime: number;
+  readonly alignStarterWithPath: typeof alignStarterWithPath;
+  readonly allowsSchool: typeof allowsSchool;
+  ambushScene: MarketAmbushScene | null;
+  assetsReady: boolean;
+  readonly attuneSpiritRoot: typeof attuneSpiritRoot;
+  auctionKind: AuctionKind;
+  readonly auctionResult: typeof auctionResult;
+  auctionView: AuctionView;
+  readonly beginJourneyFarewell: (reason: NonNullable<SaveData['pendingReincarnation']>) => void;
+  readonly beginSectMarketVisit: typeof beginSectMarketVisit;
+  readonly beginTribulation: () => void;
+  bestiaryStage: number;
+  bookTab: string;
   readonly catalogTreasures: Treasure[];
-  readonly chooseHumanStory: any;
-  readonly chooseMarketFellow: any;
-  readonly chooseSmithStory: any;
-  readonly clearInput: any;
-  readonly clearInterval: any;
-  readonly closeNpcChat: any;
-  readonly closeRewardAd: any;
-  readonly damagePanel: any;
-  difficulty: any;
+  readonly chooseHumanStory: typeof chooseHumanStory;
+  readonly chooseMarketFellow: typeof chooseMarketFellow;
+  readonly chooseSmithStory: typeof chooseSmithStory;
+  readonly clearInput: () => void;
+  readonly clearInterval: typeof clearInterval;
+  readonly closeNpcChat: typeof closeNpcChat;
+  readonly closeRewardAd: () => void;
+  readonly damagePanel: typeof damagePanel;
+  difficulty: number;
   readonly document: Document;
-  readonly downloadJson: any;
-  readonly endLifetime: any;
-  readonly ensureScene: any;
-  readonly enterImmortalGate: any;
-  readonly enterTownVisit: any;
-  readonly epilogueReincarnatePanel: any;
-  readonly exchangeSectMedicine: any;
-  readonly executeAuctionTrade: any;
-  readonly executeMarketSocial: any;
-  readonly executeMortalAction: any;
-  readonly exportSave: any;
-  readonly extendLifespan: any;
-  readonly finishDeparture: any;
-  readonly finishMarketAmbush: any;
-  readonly finishRun: any;
-  readonly forge: any;
-  readonly freshTownPopulation: any;
-  game: any;
-  readonly gameAudio: any;
-  guideReturn: any;
-  guideTab: any;
-  readonly handleAction: any;
-  readonly handleMarketAmbushAction: any;
-  readonly hometownLetterContent: any;
-  readonly humanStoryContent: any;
-  readonly immortalGatePanel: any;
-  inMarket: any;
-  inMortalWorld: any;
-  inTown: any;
-  readonly isCultivationPath: any;
-  readonly isHumanStoryId: any;
-  readonly isImmortalSuccessor: any;
-  readonly ironMarketContent: any;
-  readonly isMarketCultivatorId: any;
-  readonly journeyCardPanel: any;
-  readonly journeyCardReturn: any;
-  lastFrame: any;
-  lastMortalTick: any;
-  readonly leaveTown: any;
-  readonly lifeStats: any;
-  readonly lifespanInfo: any;
-  readonly marketEventSource: any;
-  marketNpc: any;
-  marketScene: any;
-  readonly medicinePanel: any;
-  readonly mobileDisplay: any;
+  readonly downloadJson: (text: string, name: string) => void;
+  readonly endLifetime: () => boolean;
+  readonly ensureScene: (
+    stage: number,
+    next: () => void,
+    run?: Game | null,
+    tribulation?: boolean,
+  ) => boolean;
+  readonly enterImmortalGate: typeof enterImmortalGate;
+  readonly enterTownVisit: typeof enterTownVisit;
+  readonly epilogueReincarnatePanel: typeof epilogueReincarnatePanel;
+  readonly exchangeSectMedicine: typeof exchangeSectMedicine;
+  readonly executeAuctionTrade: typeof executeAuctionTrade;
+  readonly executeMarketSocial: typeof executeMarketSocial;
+  readonly executeMortalAction: typeof executeMortalAction;
+  readonly exportSave: typeof exportSave;
+  readonly extendLifespan: typeof extendLifespan;
+  readonly finishDeparture: (skipOpening?: boolean) => void;
+  readonly finishMarketAmbush: (outcome: AmbushOutcome) => void;
+  readonly finishRun: () => void;
+  readonly forge: typeof forge;
+  readonly freshTownPopulation: typeof freshTownPopulation;
+  game: Game | null;
+  readonly gameAudio: GameAudio;
+  guideReturn: PanelLocation | null;
+  guideTab: string;
+  readonly handleAction: (action: string, id?: string) => void;
+  readonly handleMarketAmbushAction: (action: string) => void;
+  readonly hometownLetterContent: typeof hometownLetterContent;
+  readonly humanStoryContent: typeof humanStoryContent;
+  readonly immortalGatePanel: typeof immortalGatePanel;
+  inMarket: boolean;
+  inMortalWorld: boolean;
+  inTown: boolean;
+  readonly isCultivationPath: typeof isCultivationPath;
+  readonly isHumanStoryId: typeof isHumanStoryId;
+  readonly isImmortalSuccessor: typeof isImmortalSuccessor;
+  readonly ironMarketContent: typeof ironMarketContent;
+  readonly isMarketCultivatorId: typeof isMarketCultivatorId;
+  readonly journeyCardPanel: JourneyCardPanel;
+  readonly journeyCardReturn:
+    | 'chronicle'
+    | 'lifespan-farewell'
+    | 'tribulation-farewell'
+    | 'ambush-farewell'
+    | 'epilogue';
+  lastFrame: number;
+  lastMortalTick: number;
+  readonly leaveTown: () => void;
+  readonly lifeStats: () => {
+    realm: number;
+    stage: number;
+    runs: number;
+    age: number;
+    root: SpiritRootId;
+    path: CultivationPath;
+  };
+  readonly lifespanInfo: typeof lifespanInfo;
+  readonly marketEventSource: MarketEventSource;
+  marketNpc: MarketCultivator | null;
+  marketScene: SectMarketScene | null;
+  readonly medicinePanel: MedicinePanel;
+  readonly mobileDisplay: MobileDisplay;
   readonly modal: HTMLDivElement;
-  mortalFilter: any;
-  mortalTab: any;
-  readonly mortalTabContent: any;
-  nextAiMove: any;
-  readonly offlineAction: any;
-  panel: any;
-  readonly panelFrame: any;
-  pendingImport: any;
-  pendingRun: any;
-  readonly performance: any;
-  readonly persist: any;
-  previousState: any;
-  readonly readHometownLetter: any;
-  readonly realmInfo: any;
-  readonly refreshAdCountdown: any;
-  readonly refreshAuction: any;
-  readonly refreshMarketActivities: any;
-  readonly refreshMarketTrade: any;
-  readonly reincarnatePanel: any;
-  readonly rememberPanel: any;
-  readonly renderChoices: any;
-  readonly renderDeath: any;
-  readonly renderDeparture: any;
-  readonly renderEpilogue: any;
-  readonly renderHud: any;
-  readonly renderJourneyCard: any;
-  readonly renderJourneyFarewell: any;
-  readonly renderLifespanEnd: any;
-  readonly renderLobby: any;
-  readonly renderMortal: any;
-  readonly mortalStatus: any;
-  readonly renderPanel: any;
-  readonly renderPause: any;
-  readonly renderPrologue: any;
-  readonly renderResult: any;
-  readonly renderRootPicker: any;
-  readonly renderTribulationForfeit: any;
-  readonly renderTribulationPending: any;
-  readonly resetLifetime: any;
-  readonly resolveActivity: any;
-  readonly resolveInheritance: any;
-  readonly restorePanel: any;
-  readonly restoreRun: any;
-  resumeAfterDamage: any;
-  readonly retreat: any;
-  readonly retreatResultPanel: any;
-  readonly returnLobby: any;
-  rewardAd: any;
-  readonly rootElementsFor: any;
-  readonly save: any;
-  readonly saveLock: any;
-  schoolFilter: any;
-  readonly sectMarketExchangeReason: any;
-  readonly sectMarketOffer: any;
-  readonly sectMarketOpen: any;
-  selectedStage: any;
-  selectedTreasure: any;
-  readonly settleSectDues: any;
-  settled: any;
-  readonly showHometown: any;
-  readonly showLifespanAd: any;
-  readonly showMarketAmbush: any;
-  readonly showMarketEvent: any;
-  readonly showPanel: any;
-  readonly showReviveAd: any;
-  readonly showRewardAd: any;
-  readonly showTeaStory: any;
-  readonly showTownEvent: any;
-  readonly soundSettings: any;
-  readonly spiritRootInfo: any;
-  readonly startRun: any;
-  storageAvailable: any;
-  readonly structuredClone: any;
-  readonly syncHumanStories: any;
-  readonly syncMortalChange: any;
-  readonly telemetry: any;
-  readonly toast: any;
-  townNpc: any;
-  townPosition: any;
-  townScene: any;
-  readonly townStatus: any;
-  readonly trackReincarnation: any;
-  readonly train: any;
-  readonly treasure: any;
-  treasurePage: any;
-  treasureReturn: any;
-  readonly tribulationDue: any;
+  mortalFilter: string;
+  mortalTab: 'town' | 'sects';
+  readonly mortalTabContent: typeof mortalTabContent;
+  nextAiMove: number;
+  readonly offlineAction: typeof offlineAction;
+  panel: string;
+  readonly panelFrame: (title: string, subtitle: string, body: string, wide?: boolean) => void;
+  pendingImport: ReturnType<typeof importSave> | null;
+  pendingRun: Game | null;
+  readonly performance: Performance;
+  readonly persist: () => void;
+  previousState: string;
+  readonly readHometownLetter: typeof readHometownLetter;
+  readonly realmInfo: typeof realmInfo;
+  readonly refreshAdCountdown: (action: string, label: string) => number;
+  readonly refreshAuction: (selected?: string) => void;
+  readonly refreshMarketActivities: () => void;
+  readonly refreshMarketTrade: (selected?: string) => void;
+  readonly reincarnatePanel: typeof reincarnatePanel;
+  readonly rememberPanel: () => PanelLocation;
+  readonly renderChoices: () => void;
+  readonly renderDeath: () => void;
+  readonly renderDeparture: () => void;
+  readonly renderEpilogue: () => void;
+  readonly renderHud: () => void;
+  readonly renderJourneyCard: () => Promise<void>;
+  readonly renderJourneyFarewell: (reason: NonNullable<SaveData['pendingReincarnation']>) => void;
+  readonly renderLifespanEnd: () => void;
+  readonly renderLobby: (returnYears?: number) => void;
+  readonly renderMortal: (enter?: boolean) => void;
+  readonly mortalStatus: typeof mortalStatus;
+  readonly renderPanel: () => void;
+  readonly renderPause: () => void;
+  readonly renderPrologue: (replay?: boolean) => void;
+  readonly renderResult: () => void;
+  readonly renderRootPicker: () => void;
+  readonly renderTribulationForfeit: () => void;
+  readonly renderTribulationPending: () => void;
+  readonly resetLifetime: (
+    previousLife?: string,
+    revisitHometown?: boolean | 'full',
+    inheritance?: BirthInheritance | null,
+    successor?: boolean,
+  ) => boolean;
+  readonly resolveActivity: typeof resolveActivity;
+  readonly resolveInheritance: typeof resolveInheritance;
+  readonly restorePanel: (location: PanelLocation) => void;
+  readonly restoreRun: () => void;
+  resumeAfterDamage: boolean;
+  readonly retreat: typeof retreat;
+  readonly retreatResultPanel: typeof retreatResultPanel;
+  readonly returnLobby: () => void;
+  rewardAd: 'root' | 'supplies' | null;
+  readonly rootElementsFor: typeof rootElementsFor;
+  readonly save: SaveData;
+  readonly saveLock: 'unreadable' | 'newer' | 'stale' | null;
+  schoolFilter: string;
+  readonly sectMarketExchangeReason: typeof sectMarketExchangeReason;
+  readonly sectMarketOffer: typeof sectMarketOffer;
+  readonly sectMarketOpen: typeof sectMarketOpen;
+  selectedStage: number;
+  selectedTreasure: string;
+  readonly settleSectDues: typeof settleSectDues;
+  settled: boolean;
+  readonly showHometown: (parent?: ParentId) => void;
+  readonly showLifespanAd: () => void;
+  readonly showMarketAmbush: () => void;
+  readonly showMarketEvent: (npc: MarketCultivator) => void;
+  readonly showPanel: (name: string) => void;
+  readonly showReviveAd: () => void;
+  readonly showRewardAd: (kind: 'root' | 'supplies') => void;
+  readonly showTeaStory: () => void;
+  readonly showTownEvent: (npc: TownResident) => void;
+  readonly soundSettings: SoundSettings;
+  readonly spiritRootInfo: typeof spiritRootInfo;
+  readonly startRun: () => void;
+  storageAvailable: boolean;
+  readonly structuredClone: typeof structuredClone;
+  readonly syncHumanStories: typeof syncHumanStories;
+  readonly syncMortalChange: () => void;
+  readonly telemetry: ReturnType<typeof createTelemetry>;
+  readonly toast: (text: string, duration?: number) => void;
+  townNpc: TownResident | null;
+  townPosition: { x: number; y: number };
+  townScene: TownScene | null;
+  readonly townStatus: typeof townStatus;
+  readonly trackReincarnation: (
+    result: 'lifespan' | 'tribulation' | 'ambush' | 'epilogue' | 'manual',
+    previous?: ReturnType<ActionShell['lifeStats']>,
+  ) => void;
+  readonly train: typeof train;
+  readonly treasure: typeof treasure;
+  treasurePage: number;
+  treasureReturn: PanelLocation | null;
+  readonly tribulationDue: typeof tribulationDue;
   readonly ui: HTMLDivElement;
-  readonly updateHud: any;
-  readonly updateStorySoundButton: any;
-  volumeOpen: any;
+  readonly updateHud: () => void;
+  readonly updateStorySoundButton: typeof updateStorySoundButton;
+  volumeOpen: boolean;
   readonly window: Window;
-  readonly writeSave: any;
-  readonly AD_DURATION_MS: any;
-  readonly AD_PLACEHOLDER_HTML: any;
-  readonly AD_SECONDS: any;
-  readonly ENEMIES: any;
-  readonly GAME_SITE_URL: any;
-  readonly GAME_VERSION: any;
-  readonly JOURNEY_MAP_IMAGE: any;
-  readonly JOURNEY_MAP_MOBILE_IMAGE: any;
-  readonly MAX_REVIVES: any;
-  readonly PROLOGUE_IMAGE: any;
-  readonly SUPPORT_CODE_IMAGE: any;
-  readonly TownScene: any;
-  readonly URL: any;
-  adWatched: any;
-  readonly app: any;
-  readonly assetUrl: any;
-  readonly auctionContent: any;
-  readonly battleHud: any;
-  readonly bestiaryPanel: any;
-  readonly catalogPanel: any;
-  readonly chronicleContent: any;
-  readonly completeTribulation: any;
-  readonly cultivationPanel: any;
-  readonly damageReport: any;
-  readonly epilogueModal: any;
-  readonly frameRate: any;
-  readonly fullscreenButton: any;
-  readonly gameEvent: any;
-  readonly getAdProvider: any;
-  readonly guidePanel: any;
-  readonly guideSource: any;
-  readonly hometownContent: any;
-  readonly hometownFarewellModal: any;
-  readonly hometownParents: any;
-  readonly immortalEncounterPanel: any;
-  readonly markAdWatched: any;
-  readonly marketAmbushPanel: any;
-  readonly marketCultivators: any;
-  marketPosition: any;
-  readonly meetTownImmortal: any;
-  readonly mountNpcChat: any;
-  readonly mountTownScene: any;
-  oldRealm: any;
-  readonly openOfflinePanel: any;
-  readonly panelHost: any;
-  readonly pausePanel: any;
-  readonly prepareAuction: any;
-  readonly releaseTownScene: any;
-  readonly rememberRewardReturn: any;
-  readonly renderSectDues: any;
-  readonly renderer: any;
-  readonly restartRunPanel: any;
-  rewardReturn: any;
-  rewards: any;
-  readonly rootPickerView: any;
-  sceneLoading: any;
-  readonly settingsContent: any;
-  readonly refreshAutoplaySettings: any;
-  readonly settlementModal: any;
-  readonly showAuction: any;
-  readonly startAdCountdown: any;
-  readonly startAdWatch: any;
-  readonly telemetryRow: any;
-  readonly touchHintDismissed: any;
-  readonly townEventContent: any;
-  readonly townPage: any;
-  readonly townVisit: any;
-  readonly tribulationWonPanel: any;
-  readonly upgradeChoicesModal: any;
-  readonly victoryModal: any;
-  victoryTimer: any;
-  readonly visitHometown: any;
-  readonly watchAdPlacement: any;
+  readonly writeSave: (data: SaveData, run: Game | null) => void;
+  readonly AD_DURATION_MS: number;
+  readonly AD_PLACEHOLDER_HTML: string;
+  readonly AD_SECONDS: typeof AD_SECONDS;
+  readonly ENEMIES: typeof ENEMIES;
+  readonly GAME_SITE_URL: string;
+  readonly GAME_VERSION: typeof GAME_VERSION;
+  readonly JOURNEY_MAP_IMAGE: string;
+  readonly JOURNEY_MAP_MOBILE_IMAGE: string;
+  readonly MAX_REVIVES: number;
+  readonly PROLOGUE_IMAGE: string;
+  readonly SUPPORT_CODE_IMAGE: string;
+  readonly TownScene: typeof TownScene;
+  readonly URL: typeof URL;
+  adWatched: boolean;
+  readonly app: HTMLDivElement;
+  readonly assetUrl: typeof assetUrl;
+  readonly auctionContent: typeof auctionContent;
+  readonly battleHud: BattleHud;
+  readonly bestiaryPanel: typeof bestiaryPanel;
+  readonly catalogPanel: typeof catalogPanel;
+  readonly chronicleContent: typeof chronicleContent;
+  readonly completeTribulation: typeof completeTribulation;
+  readonly cultivationPanel: typeof cultivationPanel;
+  readonly damageReport: typeof damageReport;
+  readonly epilogueModal: typeof epilogueModal;
+  readonly frameRate: FrameRate;
+  readonly fullscreenButton: typeof fullscreenButton;
+  readonly gameEvent: (name: string) => void;
+  readonly getAdProvider: typeof getAdProvider;
+  readonly guidePanel: typeof guidePanel;
+  readonly guideSource: GuideSource;
+  readonly hometownContent: typeof hometownContent;
+  readonly hometownFarewellModal: typeof hometownFarewellModal;
+  readonly hometownParents: typeof hometownParents;
+  readonly immortalEncounterPanel: typeof immortalEncounterPanel;
+  readonly markAdWatched: (action: string, label: string) => void;
+  readonly marketAmbushPanel: typeof marketAmbushPanel;
+  readonly marketCultivators: typeof marketCultivators;
+  marketPosition: { x: number; y: number };
+  readonly meetTownImmortal: typeof meetTownImmortal;
+  readonly mountNpcChat: typeof mountNpcChat;
+  readonly mountTownScene: () => void;
+  oldRealm: string;
+  readonly openOfflinePanel: typeof openOfflinePanel;
+  readonly panelHost: PanelHost;
+  readonly pausePanel: typeof pausePanel;
+  readonly prepareAuction: typeof prepareAuction;
+  readonly releaseTownScene: () => void;
+  readonly rememberRewardReturn: () => void;
+  readonly renderSectDues: () => void;
+  readonly renderer: Renderer;
+  readonly restartRunPanel: typeof restartRunPanel;
+  rewardReturn: PanelLocation | null;
+  rewards: ReturnType<typeof settleRun> | null;
+  readonly rootPickerView: typeof rootPickerView;
+  sceneLoading: boolean;
+  readonly settingsContent: typeof settingsContent;
+  readonly refreshAutoplaySettings: (focusId?: string) => void;
+  readonly settlementModal: typeof settlementModal;
+  readonly showAuction: () => void;
+  readonly startAdCountdown: (action: string, label: string) => void;
+  readonly startAdWatch: (action: string, label: string, placement: AdPlacement) => void;
+  readonly telemetryRow: typeof telemetryRow;
+  readonly touchHintDismissed: boolean;
+  readonly townEventContent: typeof townEventContent;
+  readonly townPage: typeof townPage;
+  readonly townVisit: typeof townVisit;
+  readonly tribulationWonPanel: typeof tribulationWonPanel;
+  readonly upgradeChoicesModal: typeof upgradeChoicesModal;
+  readonly victoryModal: typeof victoryModal;
+  victoryTimer: number | undefined;
+  readonly visitHometown: typeof visitHometown;
+  readonly watchAdPlacement: typeof watchAdPlacement;
 }
 
 export function dispatchAction(shell: ActionShell, action: string, id?: string) {
+  // 按原顺序逐组处理；分组返回 true 表示本次动作已处理完，不再交给后续分组。
+  if (handleLockedState(shell, action)) return;
+  if (handleOpening(shell, action, id)) return;
+  if (handleImmortalGate(shell, action)) return;
+  if (handleNavigation(shell, action)) return;
+  if (handleLifeLimit(shell, action)) return;
+  if (handleMortalEntry(shell, action)) return;
+  if (handleSectAndMarket(shell, action, id)) return;
+  if (handleTown(shell, action, id)) return;
+  if (handleSaveTransfer(shell, action)) return;
+  if (handleRewardAd(shell, action, id)) return;
+  if (handleRunOutcome(shell, action)) return;
+  if (handleReincarnate(shell, action)) return;
+  if (handleToggles(shell, action)) return;
+  if (handlePanels(shell, action, id)) return;
+  if (handlePreparation(shell, action, id)) return;
+  handleRun(shell, action, id);
+}
+
+// 伏击未了、终章与待轮回时只处理对应动作；关闭留影时先取消生成。
+function handleLockedState(shell: ActionShell, action: string): boolean {
   // 以持久遭遇为准，不能通过改面板、返回首页或导入存档绕过生死。
   if (shell.save.mortal.marketSocial?.ambush && !shell.save.pendingReincarnation) {
     shell.handleMarketAmbushAction(action);
-    return;
+    return true;
   }
   if (action === 'close' && shell.panel === 'journey-card') {
     shell.journeyCardPanel.cancel();
@@ -300,7 +484,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.save.sound,
       );
     }
-    return;
+    return true;
   }
   // 留影只切换面板，不能解除已结束的人生状态。
   if (shell.save.pendingReincarnation) {
@@ -325,8 +509,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
             );
       if (reset) shell.trackReincarnation(reason, previous);
     }
-    return;
+    return true;
   }
+  return false;
+}
+
+// 命盘揭示、序章与离乡，以及故居和家书。
+function handleOpening(shell: ActionShell, action: string, id?: string): boolean {
   if (shell.panel === 'root-reveal') {
     if (action === 'reroll-root')
       shell.resetLifetime(
@@ -347,7 +536,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         .querySelector<HTMLButtonElement>('[data-action="start"]')
         ?.focus({ preventScroll: true });
     }
-    return;
+    return true;
   }
   if (shell.panel === 'prologue') {
     if (action === 'prologue-sound') {
@@ -356,7 +545,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.modal.querySelector<HTMLButtonElement>('[data-action="prologue-sound"]')!,
         shell.save.sound,
       );
-      return;
+      return true;
     }
     if (
       action === 'prologue-skip' &&
@@ -366,7 +555,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       ['farewell', 'walk'].includes(shell.save.mortal.hometown.stage)
     ) {
       shell.finishDeparture(true);
-      return;
+      return true;
     }
     if (action === 'prologue-enter' || action === 'prologue-skip' || action === 'close') {
       const replay = shell.save.prologueSeen;
@@ -389,11 +578,11 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
           preventScroll: true,
         });
     }
-    return;
+    return true;
   }
   if (action === 'prologue-revisit') {
     shell.renderPrologue(true);
-    return;
+    return true;
   }
   if (
     shell.save.mortal.hometown &&
@@ -411,7 +600,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.writeSave(next, null);
       } catch {
         if (!shell.saveLock) shell.toast('暂时无法保存启程选择，请重试');
-        return;
+        return true;
       }
       Object.assign(shell.save, next);
       void shell.mobileDisplay.enter();
@@ -428,11 +617,11 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.townScene?.toggleDockNavigation();
     } else if (action === 'town-retry') shell.renderDeparture();
     else if (action === 'town-talk' && !shell.panel) shell.townScene?.talk();
-    if (action !== 'fullscreen') return;
+    if (action !== 'fullscreen') return true;
   }
   if (action === 'hometown-home' && shell.panel === 'hometown-home') {
     shell.showHometown();
-    return;
+    return true;
   }
   if (
     action === 'hometown-parent' &&
@@ -440,7 +629,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     (id === 'father' || id === 'mother')
   ) {
     shell.showHometown(id);
-    return;
+    return true;
   }
   if (
     action === 'hometown-letter' &&
@@ -451,8 +640,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     if (shell.readHometownLetter(shell.save)) shell.persist();
     shell.panel = 'human-memory';
     shell.panelFrame('故居家书', '人间缘簿 · 家中旧字', shell.hometownLetterContent(shell.save));
-    return;
+    return true;
   }
+  return false;
+}
+
+// 修为圆满后叩入仙门。
+function handleImmortalGate(shell: ActionShell, action: string): boolean {
   if (
     action === 'immortal-gate' &&
     !shell.game &&
@@ -463,27 +657,32 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     shell.panel = 'immortal-gate';
     const gate = shell.immortalGatePanel();
     shell.panelFrame(...gate);
-    return;
+    return true;
   }
   if (action === 'confirm-immortal-gate' && shell.panel === 'immortal-gate' && !shell.game) {
     const ended = shell.structuredClone(shell.save);
-    if (!shell.enterImmortalGate(ended)) return;
+    if (!shell.enterImmortalGate(ended)) return true;
     try {
       shell.writeSave(ended, null);
     } catch {
       if (!shell.saveLock) shell.toast('浏览器无法保存终章，此世尚未结束，请释放存储空间后重试');
-      return;
+      return true;
     }
     Object.assign(shell.save, ended);
     shell.pendingRun = null;
     shell.telemetry.track({ type: 'epilogue', ...shell.lifeStats() });
     shell.telemetry.flush();
     shell.renderEpilogue();
-    return;
+    return true;
   }
+  return false;
+}
+
+// 全屏切换，以及首页山河图与行前准备的定位。
+function handleNavigation(shell: ActionShell, action: string): boolean {
   if (action === 'fullscreen' && (shell.game || shell.inTown || shell.inMarket)) {
     void (shell.mobileDisplay.active ? shell.mobileDisplay.leave() : shell.mobileDisplay.enter());
-    return;
+    return true;
   }
   if (action === 'journey-map' && !shell.game) {
     shell.ui
@@ -495,7 +694,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         ? 'instant'
         : 'smooth',
     });
-    return;
+    return true;
   }
   if ((action === 'revisit' || action === 'journey-prepare') && !shell.game) {
     shell.ui.querySelector<HTMLButtonElement>('.journey-depart [data-action="start"]')?.focus({
@@ -507,8 +706,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         ? 'instant'
         : 'smooth',
     });
-    return;
+    return true;
   }
+  return false;
+}
+
+// 天劫与寿尽：迎劫或放弃、寿尽落幕与借寿。
+function handleLifeLimit(shell: ActionShell, action: string): boolean {
   if (shell.panel === 'tribulation-forfeit') {
     if (action === 'confirm-forfeit') {
       shell.beginJourneyFarewell('tribulation');
@@ -517,42 +721,42 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.game.state === 'lost' ? shell.renderDeath() : shell.renderPause();
       else shell.renderTribulationPending();
     }
-    return;
+    return true;
   }
   if (action === 'tribulation-start' && shell.tribulationDue(shell.save)) {
     if (shell.assetsReady) void shell.mobileDisplay.enter();
     shell.beginTribulation();
-    return;
+    return true;
   }
   if (action === 'tribulation-forfeit' && shell.tribulationDue(shell.save)) {
     shell.renderTribulationForfeit();
-    return;
+    return true;
   }
   if (shell.tribulationDue(shell.save) && !shell.game?.tribulation) {
     shell.renderTribulationPending();
-    return;
+    return true;
   }
 
   if (shell.panel === 'lifespan-ended' && !['watch-lifespan-ad', 'end-lifetime'].includes(action))
-    return;
+    return true;
   if (
     action === 'end-lifetime' &&
     shell.panel === 'lifespan-ended' &&
     shell.lifespanInfo(shell.save).remaining === 0
   ) {
     shell.beginJourneyFarewell('lifespan');
-    return;
+    return true;
   }
   if (action === 'watch-lifespan-ad') {
     shell.showLifespanAd();
-    return;
+    return true;
   }
   if (
     shell.panel === 'lifespan-ad' &&
     ['close', 'cancel-lifespan', 'claim-lifespan'].includes(action)
   ) {
     const claim = action === 'claim-lifespan';
-    if (claim && !shell.adCompleted()) return;
+    if (claim && !shell.adCompleted()) return true;
     const target = shell.game ?? shell.pendingRun;
     const years = claim ? (target ? target.borrowLife() : shell.extendLifespan(shell.save)) : 0;
     if (years) shell.resolveActivity(shell.save);
@@ -571,12 +775,17 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.renderLobby();
     }
     if (years) shell.toast(`向天借寿 · 寿元 +${years} 年`);
-    return;
+    return true;
   }
+  return false;
+}
+
+// 宗门供奉补缴与进入人间。
+function handleMortalEntry(shell: ActionShell, action: string): boolean {
   if (shell.panel === 'sect-dues') {
     if (action === 'dues-ad') shell.showRewardAd('supplies');
     else if (action === 'dues-pay' || action === 'dues-decline') {
-      if (!shell.settleSectDues(shell.save, action === 'dues-decline')) return;
+      if (!shell.settleSectDues(shell.save, action === 'dues-decline')) return true;
       shell.panel = '';
       shell.modal.innerHTML = '';
       shell.persist();
@@ -584,17 +793,22 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       else shell.renderLobby();
       shell.toast(action === 'dues-pay' ? '供奉已补缴，继续游历' : '已离宗，精研成果仍保留');
     }
-    return;
+    return true;
   }
   if (action === 'mortal-enter' && !shell.game) {
     if (shell.lifespanInfo(shell.save).remaining === 0) {
       shell.renderLifespanEnd();
-      return;
+      return true;
     }
     shell.renderMortal(true);
     shell.persist();
-    return;
+    return true;
   }
+  return false;
+}
+
+// 本门传习，以及坊市拍卖、场馆办事与修士往来。
+function handleSectAndMarket(shell: ActionShell, action: string, id?: string): boolean {
   if (
     action.startsWith('auction-') &&
     shell.inMortalWorld &&
@@ -606,14 +820,14 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     if (action === 'auction-view' && (id === 'buy' || id === 'sell' || id === 'history')) {
       shell.auctionView = id;
       shell.refreshAuction();
-      return;
+      return true;
     }
     const button = shell.modal.querySelector<HTMLButtonElement>(
       action === 'auction-buy'
         ? `[data-action="auction-buy"][data-id="${Number(id)}"]`
         : '[data-action="auction-sell"]',
     );
-    if (!button || button.disabled) return;
+    if (!button || button.disabled) return true;
     const visit = Number(button.dataset.visit);
     const next = shell.structuredClone(shell.save);
     const traded = shell.executeAuctionTrade(
@@ -626,17 +840,17 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       !!shell.pendingRun,
       shell.modal,
     );
-    if (!traded) return;
+    if (!traded) return true;
     if (!traded.ok) {
       shell.toast(traded.error);
-      return;
+      return true;
     }
     const result = traded.result;
     try {
       shell.writeSave(next, shell.pendingRun);
     } catch {
       if (!shell.saveLock) shell.toast('拍卖未完成：浏览器暂时无法保存，请重试');
-      return;
+      return true;
     }
     Object.assign(shell.save, next);
     shell.refreshAuction(result.id);
@@ -648,19 +862,19 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       note.textContent = shell.auctionResult(shell.save, result);
     }
     shell.toast(shell.auctionResult(shell.save, result));
-    return;
+    return true;
   }
   if (action === 'sect-service-open') {
     showSectService(shell);
-    return;
+    return true;
   }
   if (action.startsWith('sect-service-')) {
     shell.marketEventSource.current?.sectServiceAction(shell, action, id);
-    return;
+    return true;
   }
   if (action.startsWith('market-venue-')) {
     shell.marketEventSource.current?.marketVenueAction(shell, action, id);
-    return;
+    return true;
   }
   if (action.startsWith('sect-market-') && shell.inMortalWorld && !shell.game) {
     if (
@@ -673,12 +887,12 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     ) {
       const next = shell.structuredClone(shell.save);
       next.mortal.population ??= shell.freshTownPopulation(next.age);
-      if (!shell.beginSectMarketVisit(next)) return;
+      if (!shell.beginSectMarketVisit(next)) return true;
       try {
         shell.writeSave(next, shell.pendingRun);
       } catch {
         if (!shell.saveLock) shell.toast('浏览器暂时无法保存坊市进度，请重试');
-        return;
+        return true;
       }
       Object.assign(shell.save, next);
       shell.inMarket = true;
@@ -707,14 +921,14 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       const button = shell.modal.querySelector<HTMLButtonElement>(
         `[data-action="sect-market-fellow"][data-id="${id}"]`,
       );
-      if (!button || button.disabled) return;
+      if (!button || button.disabled) return true;
       const next = shell.structuredClone(shell.save);
-      if (!shell.chooseMarketFellow(next, id, Number(button.dataset.visit))) return;
+      if (!shell.chooseMarketFellow(next, id, Number(button.dataset.visit))) return true;
       try {
         shell.writeSave(next, shell.pendingRun);
       } catch {
         if (!shell.saveLock) shell.toast('这次交谈未能保存，请重试');
-        return;
+        return true;
       }
       Object.assign(shell.save, next);
       shell.showMarketEvent(shell.marketNpc);
@@ -735,7 +949,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.marketScene?.nearbyNpc?.id === id
     ) {
       const button = shell.modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
-      if (!button || button.disabled) return;
+      if (!button || button.disabled) return true;
       const visit = Number(button.dataset.visit);
       const next = shell.structuredClone(shell.save);
       const social = shell.executeMarketSocial(
@@ -749,13 +963,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       );
       if (!social.ok) {
         if (social.stale) shell.toast('这桩互动已变化，请重新查看；当前物资未改动');
-        return;
+        return true;
       }
       try {
         shell.writeSave(next, shell.pendingRun);
       } catch {
         if (!shell.saveLock) shell.toast('互动未完成：浏览器暂时无法保存，请重试');
-        return;
+        return true;
       }
       Object.assign(shell.save, next);
       if (next.mortal.marketSocial?.ambush) shell.showMarketAmbush();
@@ -788,15 +1002,15 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       );
       if (reason) {
         shell.toast(reason);
-        return;
+        return true;
       }
       const next = shell.structuredClone(shell.save);
-      if (!shell.exchangeSectMedicine(next, id, give, visit, !!shell.pendingRun)) return;
+      if (!shell.exchangeSectMedicine(next, id, give, visit, !!shell.pendingRun)) return true;
       try {
         shell.writeSave(next, shell.pendingRun);
       } catch {
         if (!shell.saveLock) shell.toast('互换未完成：浏览器暂时无法保存，请重试');
-        return;
+        return true;
       }
       Object.assign(shell.save, next);
       shell.refreshMarketTrade();
@@ -807,8 +1021,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         next.mortal.events[0]?.split(' · ').slice(1).join(' · ') || '互换完成，丹药已收入丹囊',
       );
     }
-    return;
+    return true;
   }
+  return false;
+}
+
+// 青岚镇与人间：入镇、镇民旧事、市集买卖、宗门与研习委托。
+function handleTown(shell: ActionShell, action: string, id?: string): boolean {
   if (
     action === 'smith-story' &&
     shell.panel === 'town-event' &&
@@ -824,7 +1043,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.showTownEvent(shell.townNpc);
       shell.toast(shell.save.mortal.events[0]);
     }
-    return;
+    return true;
   }
   if (
     action === 'human-memory' &&
@@ -844,11 +1063,11 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       '人间缘簿 · 此世旧事',
       shell.humanStoryContent(shell.save, id),
     );
-    return;
+    return true;
   }
   if (action === 'human-story' && shell.inMortalWorld && !shell.game) {
     const [storyId, choice] = (id ?? '').split(':');
-    if (!shell.isHumanStoryId(storyId)) return;
+    if (!shell.isHumanStoryId(storyId)) return true;
     const atNpc =
       shell.panel === 'town-event' &&
       shell.inTown &&
@@ -858,7 +1077,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.persist();
       shell.showTownEvent(shell.townNpc!);
     }
-    return;
+    return true;
   }
   if (action.startsWith('town-') && shell.inMortalWorld && !shell.game && !shell.panel) {
     if (action === 'town-enter' && shell.mortalTab === 'town') {
@@ -882,7 +1101,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.renderMortal();
       shell.document.querySelector<HTMLButtonElement>('[data-action="town-enter"]')?.focus();
     } else if (action === 'town-talk') shell.townScene?.talk();
-    return;
+    return true;
   }
   if (
     (action === 'mortal-buy' || action === 'mortal-sell') &&
@@ -896,13 +1115,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     const next = shell.structuredClone(shell.save);
     if (!shell.executeMortalAction(next, action, id, shell.pendingRun?.path)) {
       shell.toast('交易未完成，请检查数量、额度、灵石及当前行情');
-      return;
+      return true;
     }
     try {
       shell.writeSave(next, shell.pendingRun);
     } catch {
       if (!shell.saveLock) shell.toast('交易未完成：浏览器暂时无法保存，请重试');
-      return;
+      return true;
     }
     Object.assign(shell.save, next);
     const host = shell.modal.querySelector<HTMLElement>('#iron-market-trade');
@@ -915,9 +1134,9 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
           : '玄铁已售出，灵石已到账。';
     const town = shell.document.getElementById('town-status');
     if (town) town.innerHTML = shell.townStatus(shell.save);
-    return;
+    return true;
   }
-  if (action === 'mortal-buy' || action === 'mortal-sell') return;
+  if (action === 'mortal-buy' || action === 'mortal-sell') return true;
   if (
     action.startsWith('mortal-') &&
     shell.inMortalWorld &&
@@ -930,7 +1149,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.panel === 'tea-story' &&
       shell.modal.querySelector<HTMLButtonElement>('.tea-story-next')?.disabled !== false
     )
-      return;
+      return true;
     if (action === 'mortal-tab' && (id === 'town' || id === 'sects')) {
       shell.leaveTown();
       shell.mortalTab = id;
@@ -983,16 +1202,21 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       } else if (shell.panel === 'tea-story')
         shell.toast('暂时不能继续听书，请先处理寿元或未完成的事项。');
     }
-    return;
+    return true;
   }
+  return false;
+}
+
+// 存档导出与导入。
+function handleSaveTransfer(shell: ActionShell, action: string): boolean {
   if (action === 'export-save' && !shell.game) {
     shell.downloadJson(shell.exportSave(shell.save, shell.pendingRun), '存档');
     shell.toast('已导出存档，请保留下载的 JSON 文件');
-    return;
+    return true;
   }
   if (action === 'import-save' && !shell.game && shell.panel === 'cultivation') {
     shell.document.querySelector<HTMLInputElement>('#save-import')?.click();
-    return;
+    return true;
   }
   if (
     action === 'confirm-import' &&
@@ -1005,7 +1229,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.writeSave(candidate.save, candidate.run);
     } catch {
       if (!shell.saveLock) shell.toast('浏览器无法写入存档，当前进度未更改');
-      return;
+      return true;
     }
     Object.assign(shell.save, candidate.save, { sound: shell.save.sound });
     if (
@@ -1030,38 +1254,43 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     shell.bookTab = 'treasures';
     shell.gameAudio.sync();
     shell.returnLobby();
-    if (shell.save.journeyEnded) return;
+    if (shell.save.journeyEnded) return true;
     if (shell.save.pendingReincarnation) {
       shell.renderJourneyFarewell(shell.save.pendingReincarnation);
-      return;
+      return true;
     }
     if (shell.lifespanInfo(shell.save).remaining === 0) {
       shell.renderLifespanEnd();
-      return;
+      return true;
     }
     if (shell.tribulationDue(shell.save)) {
       shell.renderTribulationPending();
-      return;
+      return true;
     }
     if (!shell.save.prologueSeen && shell.save.mortal.hometown?.stage !== 'departed')
       shell.renderPrologue();
     shell.toast('存档已导入，修行进度已恢复');
-    return;
+    return true;
   }
   if (shell.panel === 'import-confirm' && ['close', 'cultivation', 'home'].includes(action))
     shell.pendingImport = null;
+  return false;
+}
+
+// 自选灵根与物资补给广告，以及资质说明。
+function handleRewardAd(shell: ActionShell, action: string, id?: string): boolean {
   if (shell.panel === 'reward-ad' && shell.rewardAd === 'root') {
     if (action === 'ad-root-quality' && shell.SPIRIT_ROOTS.some((r) => r.id === id)) {
       shell.adRoot = id as SpiritRootId;
       shell.adElements = shell.rootElementsFor(shell.adRoot, shell.adElements);
       shell.renderRootPicker();
       shell.refreshAdCountdown('claim-ad-reward', '领取奖励');
-      return;
+      return true;
     }
     if (action === 'ad-root-element' && shell.ELEMENTS.some((e) => e.id === id)) {
       const element = id as ElementId;
       const count = shell.spiritRootInfo(shell.adRoot).count;
-      if (!count) return;
+      if (!count) return true;
       if (shell.adElements.includes(element))
         shell.adElements = shell.adElements.filter((e) => e !== element);
       else {
@@ -1070,31 +1299,31 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       }
       shell.renderRootPicker();
       shell.refreshAdCountdown('claim-ad-reward', '领取奖励');
-      return;
+      return true;
     }
   }
   if (shell.panel === 'supplies-shortage' && ['close', 'cancel-supplies'].includes(action)) {
     shell.closeRewardAd();
-    return;
+    return true;
   }
   if (
     action === 'watch-root-ad' ||
     (action === 'watch-supplies-ad' && shell.panel === 'supplies-shortage')
   ) {
     shell.showRewardAd(action === 'watch-root-ad' ? 'root' : 'supplies');
-    return;
+    return true;
   }
   if (shell.panel === 'reward-ad' && (action === 'close' || action === 'cancel-reward-ad')) {
     shell.closeRewardAd();
-    return;
+    return true;
   }
   if (action === 'claim-ad-reward') {
     if (shell.game || shell.panel !== 'reward-ad' || !shell.rewardAd || !shell.adCompleted())
-      return;
+      return true;
     const kind = shell.rewardAd;
     const supplies = shell.adSupplies(shell.save.unlocked);
     if (kind === 'root') {
-      if (!shell.attuneSpiritRoot(shell.save, shell.adRoot, shell.adElements)) return;
+      if (!shell.attuneSpiritRoot(shell.save, shell.adRoot, shell.adElements)) return true;
       shell.selectedTreasure = shell.save.starter;
       shell.treasurePage = Math.floor(
         shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
@@ -1110,16 +1339,21 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         ? `${shell.spiritRootInfo(shell.save.spiritRoot).name}已成 · ${shell.treasure(shell.save.starter).name}为本命 · 下次历练生效`
         : `仙缘补给 · 灵石 +${supplies.stones} · 玄铁 +${supplies.iron}`,
     );
-    return;
+    return true;
   }
   if (action === 'root-guide') {
     shell.guideTab = 'roots';
     shell.handleAction('guide');
-    return;
+    return true;
   }
+  return false;
+}
+
+// 胜负结算、伤害统计与看广告复活。
+function handleRunOutcome(shell: ActionShell, action: string): boolean {
   if (shell.panel === 'victory' && (action === 'victory-result' || action === 'close')) {
     shell.renderResult();
-    return;
+    return true;
   }
   if (
     action === 'damage' &&
@@ -1134,15 +1368,15 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
 
     shell.panelFrame(...shell.damagePanel(shell.game, shell.resumeAfterDamage));
     shell.persist();
-    return;
+    return true;
   }
   if (action === 'watch-ad') {
     shell.showReviveAd();
-    return;
+    return true;
   }
   if (action === 'finish-run' && shell.game?.state === 'lost') {
     shell.finishRun();
-    return;
+    return true;
   }
   if (action === 'ad-revive') {
     if (
@@ -1151,7 +1385,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.settled ||
       !shell.game?.revive()
     )
-      return;
+      return true;
     shell.clearInterval(shell.adTimer);
     shell.adReadyAt = 0;
     shell.clearInput();
@@ -1160,13 +1394,18 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     shell.previousState = 'playing';
     if (shell.game.state === 'won') {
       shell.finishRun();
-      return;
+      return true;
     }
     shell.lastFrame = shell.performance.now();
     shell.updateHud();
     shell.persist();
-    return;
+    return true;
   }
+  return false;
+}
+
+// 主动轮回。
+function handleReincarnate(shell: ActionShell, action: string): boolean {
   if (action === 'reincarnate' && !shell.game) {
     if (
       shell.realmInfo(
@@ -1175,12 +1414,12 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       ).max
     ) {
       shell.handleAction('immortal-gate');
-      return;
+      return true;
     }
     shell.panel = 'reincarnate';
 
     shell.panelFrame(...shell.reincarnatePanel());
-    return;
+    return true;
   }
   if (action === 'confirm-reincarnate' && shell.panel === 'reincarnate' && !shell.game) {
     const previous = shell.lifeStats();
@@ -1195,8 +1434,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       ),
     );
     if (reset) shell.trackReincarnation('manual', previous);
-    return;
+    return true;
   }
+  return false;
+}
+
+// 自动历练与声音开关。
+function handleToggles(shell: ActionShell, action: string): boolean {
   if (action === 'autoplay') {
     shell.save.autoplay = !shell.save.autoplay;
     shell.clearInput();
@@ -1212,27 +1456,32 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       if (shell.panel === 'settings') shell.renderPanel();
     }
     shell.toast(shell.save.autoplay ? '自动历练已开启 · 自动走位与选技' : '已切回手动操作');
-    return;
+    return true;
   }
   if (action === 'sound' || action === 'mute') {
     shell.volumeOpen = action === 'sound' && !shell.volumeOpen;
     shell.soundSettings.setEnabled(action === 'sound', true);
     if (shell.game) shell.renderHud();
     else shell.renderLobby();
-    return;
+    return true;
   }
+  return false;
+}
+
+// 关闭与返回首页，以及设置、关于、指南、丹药和各修行面板。
+function handlePanels(shell: ActionShell, action: string, id?: string): boolean {
   if (action === 'close') {
     if (shell.panel === 'treasure-detail' && shell.treasureReturn) {
       const location = shell.treasureReturn;
       shell.treasureReturn = null;
       shell.restorePanel(location);
-      return;
+      return true;
     }
     if (shell.panel === 'guide' && !shell.game && shell.guideReturn) {
       const location = shell.guideReturn;
       shell.guideReturn = null;
       shell.restorePanel(location);
-      return;
+      return true;
     }
     if (shell.panel === 'journey-card') {
       if (shell.journeyCardReturn === 'ambush-farewell') shell.renderJourneyFarewell('ambush');
@@ -1241,13 +1490,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       else if (shell.journeyCardReturn === 'tribulation-farewell')
         shell.renderJourneyFarewell('tribulation');
       else shell.showPanel('chronicle');
-      return;
+      return true;
     }
     shell.closeNpcChat();
     const wasHumanMemory = shell.panel === 'human-memory' || shell.panel === 'sect-service';
     const returnToAbout = shell.panel === 'about';
     const returnToSettings = shell.panel === 'settings';
-    if (shell.game?.state === 'lost' && !shell.settled) return;
+    if (shell.game?.state === 'lost' && !shell.settled) return true;
     if (shell.game?.state === 'paused' && shell.panel === 'damage') {
       shell.panel = '';
       if (shell.resumeAfterDamage) {
@@ -1276,7 +1525,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
           preventScroll: true,
         });
     }
-    return;
+    return true;
   }
   if (action === 'home') {
     if (!shell.game) {
@@ -1284,27 +1533,27 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       shell.modal.innerHTML = '';
       shell.renderLobby();
     }
-    return;
+    return true;
   }
   if (action === 'about' && !shell.game) {
     shell.showPanel('about');
-    return;
+    return true;
   }
   if (action === 'settings' && !shell.game) {
     shell.showPanel('settings');
-    return;
+    return true;
   }
   if (action === 'settings-sound' && shell.panel === 'settings') {
     shell.soundSettings.toggle();
     shell.renderLobby();
     shell.renderPanel();
-    return;
+    return true;
   }
   if (action === 'autoplay-build' || action === 'autoplay-target') {
-    if (shell.panel !== 'settings' || shell.game) return;
+    if (shell.panel !== 'settings' || shell.game) return true;
     const [field, value] = action === 'autoplay-build' ? ['mode', id ?? ''] : (id ?? '').split(':');
     const build = changeAutoplayBuild(shell.save.autoplayBuild, field, value ?? '');
-    if (!build) return;
+    if (!build) return true;
     const next = shell.structuredClone(shell.save);
     next.autoplayBuild = build;
     try {
@@ -1314,23 +1563,23 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
         shell.refreshAutoplaySettings();
         shell.toast('培养倾向尚未保存，请重试');
       }
-      return;
+      return true;
     }
     shell.save.autoplayBuild = build;
     shell.refreshAutoplaySettings(
       action === 'autoplay-build' ? 'autoplay-build-mode' : `autoplay-build-target-${field}`,
     );
-    return;
+    return true;
   }
   if (action.startsWith('offline-') && shell.panel === 'settings') {
     void shell.offlineAction(action);
-    return;
+    return true;
   }
   if (action === 'telemetry-toggle' && shell.panel === 'about') {
     shell.telemetry.setEnabled(!shell.telemetry.enabled());
     shell.renderPanel();
     shell.modal.querySelector<HTMLButtonElement>('[data-action="telemetry-toggle"]')?.focus();
-    return;
+    return true;
   }
   if (action === 'guide') {
     if (!shell.game || shell.game.state === 'playing' || shell.game.state === 'paused') {
@@ -1343,7 +1592,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       }
       shell.showPanel('guide');
     }
-    return;
+    return true;
   }
   if (action === 'bestiary-stage') {
     shell.bestiaryStage = Number(id);
@@ -1358,20 +1607,20 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
       herbsShop: shell.inTown && shell.townNpc?.id === 'herbs',
     })
   )
-    return;
+    return true;
 
   if (action === 'guide-tab') {
     shell.guideTab = id!;
     shell.renderPanel();
     shell.modal.querySelector('.panel')?.scrollTo(0, 0);
-    return;
+    return true;
   }
   if (
     action === 'journey-card' &&
     (shell.panel === 'chronicle' || shell.panel === 'journey-card')
   ) {
     void shell.renderJourneyCard();
-    return;
+    return true;
   }
   if (
     action === 'cultivation' ||
@@ -1380,8 +1629,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     action === 'chronicle'
   ) {
     if (!shell.game) shell.showPanel(action);
-    return;
+    return true;
   }
+  return false;
+}
+
+// 行前准备：选关、路线与难度，藏器阁与洞府修炼。
+function handlePreparation(shell: ActionShell, action: string, id?: string): boolean {
   if (action === 'stage') {
     if (Number(id) <= shell.save.unlocked) {
       shell.selectedStage = Number(id);
@@ -1472,21 +1726,21 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
   }
   if (action === 'retreat' && !shell.game && shell.panel === 'cultivation') {
     const input = shell.document.querySelector<HTMLInputElement>('#retreat-years');
-    if (!input || !input.reportValidity()) return;
+    if (!input || !input.reportValidity()) return true;
     const result = shell.retreat(shell.save, Number(input.value));
-    if (!result) return;
+    if (!result) return true;
     if (shell.pendingRun)
       shell.pendingRun = shell.Game.restore(shell.save, shell.pendingRun.snapshot());
     shell.persist();
     shell.renderLobby();
     if (shell.tribulationDue(shell.save)) {
       shell.renderTribulationPending();
-      return;
+      return true;
     }
     shell.panel = 'retreat-result';
 
     shell.panelFrame(...shell.retreatResultPanel(shell.save, result));
-    return;
+    return true;
   }
   if (
     action === 'train' &&
@@ -1502,6 +1756,11 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     shell.gameAudio.play('upgrade');
     if (shell.tribulationDue(shell.save)) shell.renderTribulationPending();
   }
+  return false;
+}
+
+// 开局、续局，以及对局中的暂停、放弃与选技。
+function handleRun(shell: ActionShell, action: string, id?: string) {
   if (action === 'start' || action === 'retry') {
     if (
       shell.assetsReady &&
@@ -1553,7 +1812,7 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
   if (action === 'abandon' && shell.game) {
     if (shell.game.tribulation) {
       shell.renderTribulationForfeit();
-      return;
+      return true;
     }
     if (!shell.abandonConfirm) {
       shell.abandonConfirm = true;
@@ -1575,4 +1834,5 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
     shell.renderChoices();
     shell.persist();
   }
+  return false;
 }

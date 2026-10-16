@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { Plugin, ResolvedConfig } from 'vite';
 
@@ -7,6 +7,15 @@ function files(root: string): string[] {
   return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
     const path = join(root, entry.name);
     return entry.isDirectory() ? files(path) : [path];
+  });
+}
+
+// public 中以点开头的文件和目录（如 .DS_Store、本机工具目录）不是游戏资源。
+function dotEntries(root: string): string[] {
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(root, entry.name);
+    if (entry.name.startsWith('.')) return [path];
+    return entry.isDirectory() ? dotEntries(path) : [];
   });
 }
 
@@ -48,6 +57,10 @@ export function offlineBuild(version: string): Plugin {
     closeBundle() {
       if (config.command !== 'build') return;
       const output = resolve(config.root, config.build.outDir);
+      // Vite 原样复制 public；删掉复制出的点文件，部署目录与体积门禁不混入本机文件。
+      if (config.publicDir && existsSync(config.publicDir))
+        for (const path of dotEntries(config.publicDir))
+          rmSync(join(output, relative(config.publicDir, path)), { recursive: true, force: true });
       const resources = files(output)
         .filter((path) => !relative(output, path).startsWith('offline-manifest'))
         .sort()

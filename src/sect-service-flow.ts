@@ -18,7 +18,7 @@ export function renderSectService(shell: ActionShell, selected = '') {
   shell.panelFrame(
     '本门传习',
     '宗门 · 专长办事',
-    `<div id="sect-service-content" data-sect="${shell.save.mortal.member.id}">${sectServiceContent(shell.save, !!shell.pendingRun, selected)}</div>`,
+    `<div id="sect-service-content" data-sect="${shell.save.mortal.member!.id}">${sectServiceContent(shell.save, !!shell.pendingRun, selected)}</div>`,
   );
   bindSectService(shell);
 }

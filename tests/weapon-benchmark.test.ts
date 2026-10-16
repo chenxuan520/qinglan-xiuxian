@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, readFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  symlinkSync,
+  rmSync,
+  readFileSync,
+  realpathSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { TREASURES, STAGE_REALM_STEPS } from '../src/data.ts';
@@ -192,7 +200,8 @@ test('配对保留未解决妖王和自检样本，胜利按窗口成功计，�
 });
 
 test('输出禁止进入仓库正文或通过符号链接绕过；允许忽略产物和仓库外路径', () => {
-  const root = mkdtempSync(join(tmpdir(), 'weapon-path-'));
+  // 输出路径按真实路径返回；macOS 的系统临时目录本身经过符号链接。
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'weapon-path-')));
   try {
     const repo = join(root, 'repo');
     mkdirSync(join(repo, 'src'), { recursive: true });
