@@ -384,7 +384,8 @@ export class Game {
           this.passivePower('forbidden') * 0.18) /
           DIFFICULTIES[this.difficulty].amount) *
         0.9 *
-        spiritRootInfo(this.spiritRoot).rate,
+        spiritRootInfo(this.spiritRoot).rate *
+        this.medicine.xp,
       regen:
         (spiritRootInfo(this.spiritRoot).baseRegen *
           this.medicine.regen *
@@ -2581,8 +2582,10 @@ export class Game {
       this.hitEnemy(e, damage, false, source, attack);
       if (pull && !e.boss) {
         const d = distance(e, from) || 1;
-        e.x += ((from.x - e.x) / d) * 40;
-        e.y += ((from.y - e.y) / d) * 40;
+        // 保留牵引，但在双方碰撞半径之外留出走位余地；近身怪不再向内拉。
+        const pullDistance = Math.min(40, Math.max(0, d - e.radius - 13 - 40));
+        e.x += ((from.x - e.x) / d) * pullDistance;
+        e.y += ((from.y - e.y) / d) * pullDistance;
         e.slow = 1.5;
       }
     }

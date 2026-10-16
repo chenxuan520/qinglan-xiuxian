@@ -2,7 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { freshSave, parseSave } from '../src/progress.ts';
-import { ROOT_STARTERS, treasure, weaponDamageMultiplier, weaponLevelDamage } from '../src/data.ts';
+import {
+  ROOT_STARTERS,
+  TREASURES,
+  treasure,
+  weaponDamageMultiplier,
+  weaponLevelDamage,
+} from '../src/data.ts';
 import { choiceCard } from '../src/common-ui.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { autoplayChoice } from '../src/autoplay.ts';
@@ -90,7 +96,7 @@ test('青莲灯与七宝塔低重补强单独乘算、逐重增伤，其余法�
 });
 
 test('洞府一重预览与升级卡使用实际新旧倍率，三升四不会降低伤害', () => {
-  for (const id of ['orbit', 'pagoda']) {
+  for (const id of ['orbit', 'pagoda', 'flute']) {
     const t = treasure(id);
     const save = freshSave('heaven', [t.element], t.school);
     save.starter = id;
@@ -99,6 +105,21 @@ test('洞府一重预览与升级卡使用实际新旧倍率，三升四不会�
     assert.equal(spiritPower(save).weaponDamage, g.weaponHitDamage(g.weapons[0]));
     assert.match(choiceCard(g, save, { type: 'weapon', id, level: 2 }, 0), /×1.20 → ×1.58/);
     assert.match(choiceCard(g, save, { type: 'weapon', id, level: 4 }, 0), /×1.80 → ×1.96/);
+  }
+});
+
+test('玉清笛仅补低重，全部法宝逐重增伤，四重以上与仙器沿用原上限', () => {
+  const boosted = ['orbit', 'pagoda', 'flute'];
+  for (const t of TREASURES) {
+    let previous = 0;
+    for (let level = 1; level <= 6; level++) {
+      const actual = weaponDamageMultiplier(t.id, level);
+      const opening = boosted.includes(t.id) ? (level <= 2 ? 1.2 : level === 3 ? 1.1 : 1) : 1;
+      assert.equal(actual, weaponLevelDamage(level) * opening);
+      assert.ok(actual > previous, `${t.name} ${level}重不能降伤`);
+      previous = actual;
+    }
+    assert.equal(weaponDamageMultiplier(t.id, 6), 2.6);
   }
 });
 

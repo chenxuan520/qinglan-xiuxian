@@ -18,6 +18,45 @@ function fixture() {
   return s;
 }
 
+test('聚灵丹的灵气与冷却增幅同时进入真实入场属性和只读来源明细', () => {
+  const s = freshSave('five', ['metal', 'wood', 'water', 'fire', 'earth']);
+  s.medicine.active.juyuan = s.age + 1000;
+  const before = JSON.stringify(s);
+  const result = powerBreakdown(s);
+  const row = result.rows.find((r) => r.id === 'medicine:juyuan')!;
+  near(
+    row.changes.find((c) => c.key === 'xp')!.after /
+      row.changes.find((c) => c.key === 'xp')!.before,
+    1.25,
+  );
+  near(
+    row.changes.find((c) => c.key === 'cooldown')!.after /
+      row.changes.find((c) => c.key === 'cooldown')!.before,
+    0.92,
+  );
+  assert.match(powerDetailsContent(s), /聚灵丹/);
+  assert.match(powerDetailsContent(s), /灵气获取/);
+  assert.equal(JSON.stringify(s), before);
+});
+
+test('两种灵气药效取高时，来源显示移除单药的实际差额，不虚加两份经验', () => {
+  const s = freshSave();
+  const plain = powerBreakdown(s).current;
+  s.medicine.active.yingxiang = s.age + 100;
+  let result = powerBreakdown(s);
+  near(result.current.xp / plain.xp, 1.15);
+  s.medicine.active.juyuan = s.age + 1000;
+  result = powerBreakdown(s);
+  near(result.current.xp / plain.xp, 1.25);
+  assert.ok(
+    !result.rows.find((r) => r.id === 'medicine:yingxiang')!.changes.some((c) => c.key === 'xp'),
+  );
+  const change = result.rows
+    .find((r) => r.id === 'medicine:juyuan')!
+    .changes.find((c) => c.key === 'xp')!;
+  near(change.after / change.before, 1.25 / 1.15);
+});
+
 test('入场属性和来源复用真实战斗，满阶悟道、炼器及药效各自贡献准确，读取不改存档', () => {
   const s = fixture();
   s.training = { power: 20, vitality: 11, speed: 20 };

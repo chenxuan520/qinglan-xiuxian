@@ -343,7 +343,7 @@ export const TREASURES: Treasure[] = [
     evolution: '山河社稷',
     passive: 'area',
     damage: 65,
-    cooldown: 4.5,
+    cooldown: 4,
   },
   {
     id: 'chain',
@@ -1589,10 +1589,15 @@ export const EVOLVED_DAMAGE = 1.8;
 export const EVOLVED_COOLDOWN = 0.7;
 export const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05 };
 export const weaponLevelDamage = (level: number) => 1 + (level - 1) * 0.32;
-// 护体与灵塔的低重伤害补强；升阶继续递增，高重与仙器沿用原曲线。
+// 低重补强缓解成型空窗；升阶继续递增，高重与仙器沿用原曲线。
 export function weaponDamageMultiplier(id: string, level: number) {
-  const opening =
-    id === 'orbit' || id === 'pagoda' ? (level <= 2 ? 1.2 : level === 3 ? 1.1 : 1) : 1;
+  const opening = ['orbit', 'pagoda', 'flute'].includes(id)
+    ? level <= 2
+      ? 1.2
+      : level === 3
+        ? 1.1
+        : 1
+    : 1;
   return weaponLevelDamage(level) * opening;
 }
 export const TAU = Math.PI * 2;

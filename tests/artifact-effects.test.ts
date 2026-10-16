@@ -24,6 +24,63 @@ function fixture() {
 }
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 
+test('番天印按四秒基础间隔施放，伤害、落点半径与落印延迟保留', () => {
+  for (const evolved of [false, true]) {
+    const g = fixture();
+    g.weapons = [{ id: 'meteor', level: 6, evolved, timer: 0 }];
+    g.spawnEnemy(0, false, false, { x: 140, y: 0 });
+    g.update(0.01);
+    near(g.weapons[0].timer, 4 * g.stats.cooldown * (evolved ? 0.7 : 1));
+    const z = g.zones.find((z) => z.kind === 'meteor')!;
+    near(z.radius, 75 * g.stats.area * (evolved ? 1.45 : 1));
+    near(z.damage, g.weaponHitDamage(g.weapons[0]));
+    near(z.castDelay!, 0.55);
+    near(treasure('meteor').damage, 65);
+  }
+});
+
+test('赤炼鞭牵引保留近身缓冲，重叠不反推，王不拉，原窄线范围与减速保留', () => {
+  for (const evolved of [false, true]) {
+    const g = fixture();
+    g.weapons = [{ id: 'whip', level: 6, evolved, timer: 999 }];
+    const width = (evolved ? 42 : 27) * g.stats.area;
+    const points = [0, 20, 70, 90, 200, 330, 330 * g.stats.area + width + 10.01].map((x) => ({
+      x,
+      y: 0,
+    }));
+    points.push({ x: 200, y: width + 10 }, { x: 200, y: width + 10.01 });
+    const enemies = points.map((p) => {
+      const e = g.spawnEnemy(0, false, false, p);
+      e.hp = e.maxHp = 1e8;
+      e.radius = 10;
+      return e;
+    });
+    const boss = g.spawnEnemy(0, false, true, { x: 250, y: 0 });
+    boss.hp = boss.maxHp = 1e8;
+    g.cast(g.weapons[0]);
+    const hit = g.weaponHitDamage(g.weapons[0]);
+    for (const [i, e] of enemies.entries()) {
+      const p = points[i],
+        d = Math.hypot(p.x, p.y);
+      const inside = i !== 6 && i !== 8;
+      near(e.maxHp - e.hp, inside ? hit : 0);
+      if (inside) {
+        const remaining = Math.hypot(e.x, e.y);
+        near(remaining, d - Math.min(40, Math.max(0, d - 63)));
+        near(e.slow, 1.5);
+        assert.ok(remaining >= Math.min(d, 63));
+      } else assert.deepEqual({ x: e.x, y: e.y }, p);
+    }
+    near(boss.x, 250);
+    near(boss.y, 0);
+    near(boss.slow, 0);
+    near(boss.maxHp - boss.hp, hit);
+    const effect = g.effects.find((e) => e.kind === 'whip')!;
+    near(effect.radius, width);
+    near(effect.x2!, 330 * g.stats.area);
+  }
+});
+
 function pagodaFixture(level: number, evolved = false) {
   const g = new Game(freshSave('heaven', ['earth'], 'orthodox'), 0, 0, () => 0.99);
   g.weapons = [{ id: 'pagoda', level, evolved, timer: 999 }];

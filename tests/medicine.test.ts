@@ -43,6 +43,123 @@ const quiet = (s = rich(), stage = 0) => {
 };
 const approx = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 
+test('两品阶灵气丹保留原效果并增加局内经验，不改斩妖永久修为，全部灵根难度共用', () => {
+  for (const [id, factor, cooldown] of [
+    ['yingxiang', 1.15, 1],
+    ['juyuan', 1.25, 0.92],
+  ] as const) {
+    for (const root of SPIRIT_ROOTS)
+      for (const difficulty of [0, 1, 2]) {
+        const plainSave = freshSave(
+          root.id,
+          ['metal', 'wood', 'water', 'fire', 'earth'].slice(0, root.count),
+          'dual',
+        );
+        const pillSave = structuredClone(plainSave);
+        pillSave.medicine.bag[id] = 2;
+        assert.equal(useMedicine(pillSave, id, false, 2).ok, true);
+        assert.equal(
+          pillSave.medicine.active[id],
+          pillSave.age + MEDICINES.find((m) => m.id === id)!.years * 2,
+        );
+        const plain = new Game(plainSave, 0, difficulty, () => 0.9);
+        const pill = new Game(pillSave, 0, difficulty, () => 0.9);
+        for (const g of [plain, pill]) {
+          g.passives = { spirit: 3, magnet: 2, soul: 2, forbidden: 1 };
+          g.weapons = [];
+          g.spawnBudget = -10000;
+          g.nextElite = 9999;
+          const e = g.spawnEnemy(0, false, false, { x: 200, y: 0 });
+          g.hitEnemy(e, 1e9);
+          g.pickups.forEach((p) => {
+            p.x = g.player.x;
+            p.y = g.player.y;
+          });
+          g.update(0.01);
+        }
+        approx(pill.stats.cooldown, plain.stats.cooldown * cooldown);
+        approx(pill.stats.xp, plain.stats.xp * factor);
+        approx(pill.xp, plain.xp * factor);
+        assert.equal(pill.level, plain.level);
+        approx(pill.combatCultivation, plain.combatCultivation);
+        assert.equal(pill.save.cultivation, plain.save.cultivation);
+        const transfer = new Game(structuredClone(pillSave), 0, difficulty, () => 0.9);
+        transfer.save.medicine.active[id] = transfer.save.age + 0.001;
+        const imported = importSave(exportSave(transfer.save, transfer));
+        const restored = imported.run!;
+        assert.ok(restored);
+        approx(restored.stats.xp, transfer.stats.xp);
+        approx(restored.xp, transfer.xp);
+        restored.resume();
+        restored.update(0.01);
+        const unmedicated = new Game(plainSave, 0, difficulty, () => 0.9);
+        approx(restored.stats.xp, unmedicated.stats.xp);
+        approx(restored.stats.cooldown, unmedicated.stats.cooldown);
+        const expired = Game.restore(restored.save, restored.snapshot())!;
+        approx(expired.stats.xp, unmedicated.stats.xp);
+      }
+  }
+});
+test('聚灵丹药谱及说明使用原图原配方，额外局内灵气不会叠加强度', () => {
+  const s = rich();
+  const original = medicineFormula(s.medicine, 'juyuan');
+  assert.equal(useMedicine(s, 'juyuan').ok, true);
+  const first = medicineEffects(s.medicine, s.age);
+  assert.equal(useMedicine(s, 'juyuan').ok, true);
+  assert.equal(medicineEffects(s.medicine, s.age).xp, first.xp);
+  assert.equal(medicineEffects(s.medicine, s.age).cultivation, 1);
+  assert.equal(medicineEffects(s.medicine, s.age).bossCultivation, 1);
+  assert.deepEqual(medicineFormula(s.medicine, 'juyuan'), original);
+  assert.match(medicineContent(s, 0, 'bag', false, false, '灵品'), /局内灵气获取 \+25%/);
+});
+
+test('萦香丸与聚灵丹灵气取高，任一种先过期及反复续局都只按剩余药效结算', () => {
+  for (const first of ['yingxiang', 'juyuan']) {
+    const save = freshSave();
+    const other = first === 'yingxiang' ? 'juyuan' : 'yingxiang';
+    save.medicine.active[first] = save.age + 0.001;
+    save.medicine.active[other] = save.age + 0.1;
+    const plain = new Game(freshSave(), 0, 0, () => 0.9);
+    const game = quiet(save);
+    approx(game.stats.xp, plain.stats.xp * 1.25);
+    approx(game.stats.speed, plain.stats.speed * 1.06);
+    approx(game.stats.magnet, plain.stats.magnet * 1.15);
+    approx(game.stats.cooldown, plain.stats.cooldown * 0.92);
+    game.update(0.01);
+    approx(game.stats.xp, plain.stats.xp * (other === 'juyuan' ? 1.25 : 1.15));
+    const restored = Game.restore(save, game.snapshot())!;
+    assert.ok(restored);
+    approx(restored.stats.xp, game.stats.xp);
+    restored.resume();
+    restored.save.age = save.medicine.active[other] - 0.0001;
+    restored.update(0.01);
+    approx(restored.stats.xp, plain.stats.xp);
+    approx(restored.stats.speed, plain.stats.speed);
+    approx(restored.stats.magnet, plain.stats.magnet);
+    approx(restored.stats.cooldown, plain.stats.cooldown);
+    approx(Game.restore(restored.save, restored.snapshot())!.stats.xp, plain.stats.xp);
+  }
+});
+
+test('聚灵丹同时增加直接吸收的妖王灵气，首关终关均不额外乘妖王永久奖励', () => {
+  for (const root of ['heaven', 'none'])
+    for (const stage of [0, 6]) {
+      const games = [false, true].map((medicated) => {
+        const save = freshSave(root);
+        save.unlocked = 6;
+        if (medicated) save.medicine.active.juyuan = save.age + 1000;
+        const g = quiet(save, stage);
+        g.level = 90;
+        const e = g.spawnEnemy(STAGE_ENEMIES[stage][0], false, true, { x: 500, y: 0 }, 0);
+        g.hitEnemy(e, 1e9);
+        return g;
+      });
+      approx(games[1].xp, games[0].xp * 1.25);
+      approx(games[1].combatCultivation, games[0].combatCultivation);
+      approx(games[1].bossCultivation, games[0].bossCultivation);
+    }
+});
+
 test('品级筛选不混入其他品级，未得本世珍品完全隐藏，吃完仍保留药谱', () => {
   const s = freshSave();
   const hidden = MEDICINES.filter((m) => !m.years);
