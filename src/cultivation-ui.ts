@@ -1,4 +1,4 @@
-import { trainingEffect } from './training.ts';
+import { powerTrainingEffect } from './training.ts';
 import { FINAL_TRIAL_STAGE, REALMS, spiritRootInfo } from './data.ts';
 import { realmInfo, lifespanInfo, trainingYears, trainingCost, type SaveData } from './progress.ts';
 import { spiritPower } from './spirit-power.ts';
@@ -15,6 +15,11 @@ import type { PanelDefinition } from './panel-host.ts';
 export function cultivationPanel(save: SaveData, selectedStage: number): PanelDefinition {
   const r = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const current = spiritPower(save);
+  const powerLevel = save.training.power,
+    powerPerLevel = spiritRootInfo(save.spiritRoot).powerPerLevel,
+    powerBonus = powerTrainingEffect(powerLevel) * powerPerLevel,
+    nextPowerGain =
+      ((100 + powerTrainingEffect(powerLevel + 1) * powerPerLevel) / (100 + powerBonus) - 1) * 100;
   const next = r.max
     ? null
     : spiritPower({
@@ -38,8 +43,11 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
           id: 'power',
           name: '悟道',
           icon: 'power',
-          desc: `前十阶每阶独立增伤 +${spiritRootInfo(save.spiritRoot).powerPerLevel}%`,
-          detail: `${spiritRootInfo(save.spiritRoot).name} · 当前增伤 +${Number((trainingEffect(save.training.power) * spiritRootInfo(save.spiritRoot).powerPerLevel).toFixed(2))}%`,
+          desc:
+            powerLevel >= 20
+              ? `当前增伤 +${Number(powerBonus.toFixed(2))}% · 全法宝`
+              : `当前增伤 +${Number(powerBonus.toFixed(2))}% · 下一阶实际增伤 +${Number(nextPowerGain.toFixed(2))}%`,
+          detail: `${spiritRootInfo(save.spiritRoot).name} · 当前增伤 +${Number(powerBonus.toFixed(2))}%`,
         },
         {
           id: 'speed',
@@ -56,7 +64,7 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
       )
       .join(
         '',
-      )}</div><details class="disclosure" data-disclosure="cultivation"><summary>境界属性与根基说明</summary><div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${save.cultivation === 0 ? '凡人' : r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${save.cultivation === 0 ? '尚未入道' : r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${save.cultivation === 0 ? `斩妖积累修为，即可引气入体、踏入炼气初期；炼气中期需累计 ${r.needed} 修为。` : r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，气血与法宝威力大幅提升；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><p><strong>当前入场气血 ${formatNumber(current.hp)}</strong><br>${current.weapon}基础伤害约 ${formatNumber(Math.round(current.weaponDamage))}${next ? `<br>${r.step === 23 ? '通关第七境成仙后' : '下次突破后'}：气血 ${formatNumber(next.hp)}（+${formatNumber(next.hp - current.hp)}），本命基础伤害约 ${formatNumber(Math.round(next.weaponDamage))}（+${formatNumber(Math.round(next.weaponDamage) - Math.round(current.weaponDamage))}）` : ''}</p><small>按当前根基、炼器、宗门与药效估算新历练；本命按一重、未觉醒、非暴击计算，具体招式与敌方减伤另计。灵根主要影响修炼速度，境界越高，气血与伤害越强。</small></div></div><div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index && save.cultivation > 0 ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；前五阶费用保持，之后费用缓升，单项修满共需 17857 灵石；十一至十五阶每阶收益为基础的 1.05 倍，十六至二十阶为 1.1 倍。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p></details>${spiritRootSummary(save)}${lifespanSummary(save, selectedStage)}${retreatSection(save)}<div class="save-record"><div class="save-record-copy"><h3>此世存档</h3><p>把这一世的修为、旧事与未尽历练收进行囊，日后仍可续上仙途。</p><small>本地保存为 JSON，不会上传。</small></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出此世</button><button class="secondary-button" data-action="import-save">导入旧档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
+      )}</div><details class="disclosure" data-disclosure="cultivation"><summary>境界属性与根基说明</summary><div class="cultivation-overview"><div class="realm-circle"><small>当前境界</small><strong>${save.cultivation === 0 ? '凡人' : r.ascending ? '渡劫' : REALMS[r.index]}</strong><span>${save.cultivation === 0 ? '尚未入道' : r.max ? '长生久视' : r.ascending ? '待破七境' : ['初期', '中期', '后期'][r.step % 3]}</span></div><div class="cultivation-progress"><h3>${r.name}<span>累计修为 ${save.cultivation}</span></h3><p class="realm-verse">${realmVerse(r)}</p><div class="thin-bar"><i style="width:${r.max ? 100 : Math.min(100, (r.progress / r.needed) * 100)}%"></i></div><p>${save.cultivation === 0 ? `斩妖积累修为，即可引气入体、踏入炼气初期；炼气中期需累计 ${r.needed} 修为。` : r.max ? '真仙 · 长生久视，仙途无尽。' : r.ascending ? '修为已达标，正待渡劫。通关第七境「万劫归墟」后成就真仙，气血与法宝威力大幅提升；无需再刷一轮修为。' : r.locked ? `成仙瓶颈：须通关第七境「万劫归墟」。已积攒 ${r.progress} / ${r.needed} 修为，超额保留。` : `距下一境界还需 ${Math.max(0, r.needed - r.progress)} 修为，斩妖、升级实时积累，满额立即突破。`}</p><p><strong>当前入场气血 ${formatNumber(current.hp)}</strong><br>${current.weapon}基础伤害约 ${formatNumber(Math.round(current.weaponDamage))}${next ? `<br>${r.step === 23 ? '通关第七境成仙后' : '下次突破后'}：气血 ${formatNumber(next.hp)}（+${formatNumber(next.hp - current.hp)}），本命基础伤害约 ${formatNumber(Math.round(next.weaponDamage))}（+${formatNumber(Math.round(next.weaponDamage) - Math.round(current.weaponDamage))}）` : ''}</p><small>按当前根基、炼器、宗门与药效估算新历练；本命按一重、未觉醒、非暴击计算，具体招式与敌方减伤另计。灵根主要影响修炼速度，境界越高，气血与伤害越强。</small></div></div><div class="realm-road">${REALMS.map((name, i) => `<div class="${i === r.index && save.cultivation > 0 ? 'current' : i < r.index ? 'passed' : ''}"><span>${['一', '二', '三', '四', '五', '六', '七', '八', '九'][i]}</span><strong>${r.ascending && i === r.index ? '渡劫' : name}</strong></div>`).join('')}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；前五阶费用保持，之后费用缓升，单项修满共需 17857 灵石；悟道前十阶保留，后十阶增伤逐阶提高，满阶按三十个基础阶计算；淬体与身法十一至十五阶为基础的 1.05 倍，十六至二十阶为 1.1 倍。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，失败也有收益。</p></details>${spiritRootSummary(save)}${lifespanSummary(save, selectedStage)}${retreatSection(save)}<div class="save-record"><div class="save-record-copy"><h3>此世存档</h3><p>把这一世的修为、旧事与未尽历练收进行囊，日后仍可续上仙途。</p><small>本地保存为 JSON，不会上传。</small></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出此世</button><button class="secondary-button" data-action="import-save">导入旧档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
     wide: true,
   };
 }

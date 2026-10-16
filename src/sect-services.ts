@@ -36,6 +36,8 @@ export interface ServiceQuote {
   recipe?: string;
   train?: Training;
   study?: boolean;
+  levels?: number;
+  studyYears?: number[];
   seek?: string;
   detail: string;
 }
@@ -51,6 +53,18 @@ const gear = (save: SaveData, id: string): AuctionItem => ({
   quantity: 1,
   forgeLevel: save.forge[id] || 0,
 });
+const roundYears = (years: number) => Math.ceil(years * 10 - 1e-9) / 10;
+// 抵价只使用一次，以最少的连续阶数足额抵费；上限容纳不下就保留物品。
+function offeringSteps(credit: number, plans: { stones: number; years: number }[]) {
+  const steps: typeof plans = [];
+  let total = 0;
+  for (const plan of plans) {
+    steps.push({ ...plan, years: roundYears(plan.years) });
+    total += plan.stones;
+    if (total >= credit) break;
+  }
+  return { steps, total, fits: total >= credit };
+}
 export const sectServiceTier = (save: SaveData) =>
   venueRealm(save) >= 5 ? 2 : venueRealm(save) >= 4 ? 1 : 0;
 const exchangeRatio = (id: string, tier: number) =>
@@ -97,7 +111,7 @@ export function sectServiceChoices(save: SaveData): SectChoice[] {
         label: `${treasure(t).name} · 炼器${save.forge[t] || 0}阶，献出后消失`,
       }));
   if (id === 'devour')
-    return ownedPills(save).map((m) => ({ id: m.id, label: `献出${m.name}一份，淬体一阶` }));
+    return ownedPills(save).map((m) => ({ id: m.id, label: `献出${m.name}一份，按抵价连修淬体` }));
   if (['area', 'abyss', 'curse'].includes(id)) {
     const narrow =
       id === 'abyss'
@@ -158,8 +172,20 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     if (id === 'bone') {
       q.give = [gear(save, choice)];
       const credit = Math.floor(auctionValue(q.give[0]) * [0.8, 0.85, 0.9][tier]);
-      q.stones = Math.max(0, q.stones - credit);
-      q.detail = `献出${auctionItemName(q.give[0])}及其炼器阶数，估值${auctionValue(q.give[0])}灵石，可抵${Math.min(credit, study.stones)}灵石；多余抵价不找零、不留存。`;
+      const plans = Array.from({ length: Math.max(0, study.limit - study.level) }, (_, i) => {
+        const plan = studyPlan({
+          ...save,
+          mortal: { ...save.mortal, mastery: { ...save.mortal.mastery, bone: study.level + i } },
+        });
+        return { stones: plan.stones, years: plan.years * 1.2 };
+      });
+      const batch = offeringSteps(credit, plans);
+      q.levels = batch.fits ? batch.steps.length : 0;
+      q.studyYears = batch.steps.map((p) => p.years);
+      q.years = q.studyYears.reduce((a, b) => a + b, 0);
+      q.stones = Math.max(0, batch.total - credit);
+      q.reason ||= batch.fits ? '' : '本境可精研费用不足以用完抵价，请换低价法宝或突破后再来';
+      q.detail = `献出${auctionItemName(q.give[0])}及其炼器阶数，估值${auctionValue(q.give[0])}灵石、折抵${credit}灵石。${batch.fits ? `连续精研${q.levels}阶至${study.level + q.levels}阶，总费${batch.total}灵石，补${q.stones}灵石；抵价全数使用。五阶、十阶赐丹照常领取。` : '当前境界容纳不下全部抵价，本次不交出法宝、不扣费用。'}`;
     } else q.detail = '完成后本门功法精研提升一阶；五阶、十阶赠丹沿用原规则。';
   } else if (id === 'duration') {
     const m = medicineInfo(choice)!;
@@ -206,15 +232,39 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     if (id === 'devour') {
       q.give = [pill(choice)];
       const credit = Math.floor(auctionValue(q.give[0]) * [0.75, 0.8, 0.85][tier]);
-      q.stones = Math.max(0, cost - credit);
-      q.detail = `献出一份${auctionItemName(q.give[0])}，抵${Math.min(cost, credit)}灵石；多余抵价不找零、不留存。药效不自动服用。`;
+      const level = save.training[q.train];
+      const batch = offeringSteps(
+        credit,
+        Array.from({ length: 20 - level }, (_, i) => ({
+          stones: trainingCost(level + i),
+          years: time * 1.5,
+        })),
+      );
+      q.levels = batch.fits ? batch.steps.length : 0;
+      q.stones = Math.max(0, batch.total - credit);
+      q.years = batch.steps.reduce((a, p) => a + p.years, 0);
+      q.reason ||= batch.fits ? '' : '余下淬体费用不足以用完抵价，请换低价余丹';
+      q.detail = `献出一份${auctionItemName(q.give[0])}，估值${auctionValue(q.give[0])}灵石、折抵${credit}灵石。${batch.fits ? `连续淬体${q.levels}阶至${level + q.levels}阶，总费${batch.total}灵石，补${q.stones}灵石；抵价全数使用。` : '余下阶数容纳不下全部抵价，本次不交丹、不扣费用。'}药效不自动服用。`;
     }
     if (save.training[q.train] >= 20) q.reason = `${trainingName[q.train]}已修至二十阶`;
-    q.detail += '只提升一阶，遵守原二十阶上限，不额外叠加宗门战斗属性。';
+    q.detail += `遵守原二十阶上限${id === 'devour' ? '' : '，只提升一阶'}，不额外叠加宗门战斗属性。`;
   }
   // 年岁以十分之一年报价和结算，向上取整避免比明示时间更长。
   q.years = Math.ceil(q.years * 10 - 1e-9) / 10;
   q.reserve = serviceDues(save, q.years);
+  if (q.study) {
+    const rewards = [5, 10].filter((n) => study.level < n && study.level + (q.levels ?? 1) >= n);
+    if (
+      rewards.some((n) =>
+        MEDICINES.some(
+          (m) =>
+            m.tier === (n === 5 ? '凡品' : '灵品') &&
+            !Number.isSafeInteger((save.medicine.bag[m.id] || 0) + 1),
+        ),
+      )
+    )
+      q.reason ||= '丹囊数量已达上限，无法领取精研赐丹';
+  }
   const last = save.mortal.sectServices?.lastAt;
   q.reason ||=
     venueRealm(save) < 1
@@ -258,19 +308,23 @@ export function executeSectService(
     save.stones -= q.stones;
     save.iron -= q.iron;
     q.give.forEach((i) => releaseAuctionItem(save, i));
-    if (q.study)
-      save.mortal.activity = { kind: 'study', remaining: q.years, total: q.years, sect: id };
-    advanceMortal(save, q.years * 60);
+    if (q.study) {
+      for (const years of q.studyYears ?? [q.years]) {
+        save.mortal.activity = { kind: 'study', remaining: years, total: years, sect: id };
+        advanceMortal(save, years * 60);
+        if (save.mortal.activity) return undefined;
+      }
+    } else advanceMortal(save, q.years * 60);
     if (Math.abs(save.age - age - q.years) > 1e-7 || (q.study && save.mortal.activity))
       return undefined;
     if (q.train) {
-      save.training[q.train]++;
+      save.training[q.train] += q.levels ?? 1;
       recordTrainingMastery(save);
     }
     if (q.receive) grantMedicine(save.medicine, q.receive);
     if (q.recipe) save.medicine.recipes.push(q.recipe);
   }
-  const label = sectServiceChoicesLabel(q, choice);
+  const label = sectServiceChoicesLabel(save, q, choice);
   const text = `${SECTS.find((s) => s.id === id)!.name}·${SECT_SPECIALTIES[id].title}：${label}，花费${q.stones}灵石${q.iron ? `、${q.iron}玄铁` : ''}、${q.years}年${q.reserve ? `，另缴供奉${q.reserve}灵石` : ''}。`;
   const state = (save.mortal.sectServices ??= { lastAt: null, receipts: [] });
   state.lastAt = save.age;
@@ -279,13 +333,13 @@ export function executeSectService(
   recordChronicle(save, '宗门专长', text);
   return text;
 }
-function sectServiceChoicesLabel(q: ServiceQuote, choice: string) {
+function sectServiceChoicesLabel(save: SaveData, q: ServiceQuote, choice: string) {
   return q.seek
     ? `寻得${treasure(q.seek).name}，收入收藏，本命不变`
     : q.train
-      ? `${trainingName[q.train]}提升一阶`
+      ? `${trainingName[q.train]}提升${q.levels ?? 1}阶至${save.training[q.train]}阶`
       : q.study
-        ? `本门精研提升一阶${q.give.length ? `，献出${auctionItemName(q.give[0])}` : ''}`
+        ? `本门精研提升${q.levels ?? 1}阶至${save.mortal.mastery[save.mortal.member!.id]}阶${q.give.length ? `，献出${auctionItemName(q.give[0])}` : ''}`
         : q.recipe
           ? `习得${medicineInfo(q.recipe)!.name}丹方`
           : `获得${medicineInfo(q.receive ?? choice)!.name}一份`;

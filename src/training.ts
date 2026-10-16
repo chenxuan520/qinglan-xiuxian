@@ -4,3 +4,6 @@ export const trainingCost = (level: number) =>
 
 export const trainingEffect = (level: number) =>
   level + 0.05 * Math.max(0, level - 10) + 0.05 * Math.max(0, level - 15);
+
+// 悟道后十阶逐步增加边际回报；淬体、身法仍使用原曲线。
+export const powerTrainingEffect = (level: number) => level + 0.1 * Math.max(0, level - 10) ** 2;

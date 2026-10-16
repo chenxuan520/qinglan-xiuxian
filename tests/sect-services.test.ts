@@ -67,8 +67,8 @@ test('十六宗各有可真实结算的专长，原本命、境界与全局掉�
     assert.equal(s.iron, iron - q.iron);
     assert.equal(s.starter, starter);
     assert.equal(s.cultivation, cultivation);
-    if (q.train) assert.equal(s.training[q.train], training[q.train] + 1);
-    if (q.study) assert.equal(s.mortal.mastery[sect.id], mastery + 1);
+    if (q.train) assert.equal(s.training[q.train], training[q.train] + (q.levels ?? 1));
+    if (q.study) assert.equal(s.mortal.mastery[sect.id], mastery + (q.levels ?? 1));
     if (q.seek) {
       assert.ok(s.artifacts.includes(q.seek));
       assert.equal(s.forge[q.seek], 0);
@@ -186,12 +186,12 @@ test('长生代炼预留全部跨期供奉；费用不足、寿尽、天劫、�
 test('精研五阶沿用原赐丹；献器保护本命，非本命入门器的已售记录不依赖进入坊市', () => {
   const s = fixture('bone');
   const other = s.artifacts.find((id) => id !== s.starter)!;
-  s.forge[other] = 3;
+  s.forge[other] = 1;
   s.mortal.mastery.bone = 4;
   assert.ok(!sectServiceChoices(s).some((c) => c.id === s.starter));
   const count = Object.values(s.medicine.bag).reduce((a, b) => a + b, 0);
   const q = sectServiceQuote(s, other);
-  assert.equal(q.stones, 0);
+  assert.equal(q.stones, 47);
   assert.ok(executeSectService(s, other, sectServiceStamp(s)));
   assert.equal(s.mortal.mastery.bone, 5);
   assert.equal(
@@ -309,4 +309,137 @@ test('空状态按本门事项说明所缺条件，不混入其他宗门的功�
   const seek = fixture('power');
   seek.artifacts = TREASURES.map((t) => t.id);
   assert.ok(sectServiceContent(seek).includes('已无符合代寻条件的未藏法宝'));
+});
+
+test('献器将一次抵价完整用于最少连续精研阶数，差额补石，境界容纳不下则原物保留', () => {
+  const s = fixture('bone', 2);
+  s.artifacts.push('orbit');
+  const q = sectServiceQuote(s, 'orbit');
+  assert.equal(q.reason, '');
+  assert.equal(q.levels, 3);
+  assert.equal(q.stones, 6); // 30+50+70 − floor(180×0.8)
+  assert.deepEqual(q.studyYears, [1.2, 1.7, 2.2]);
+  assert.equal(q.years, 5.1);
+  assert.match(sectServiceContent(s, false, 'orbit'), /本门精研 \+3阶 · 至3阶/);
+  assert.match(executeSectService(s, 'orbit', sectServiceStamp(s))!, /提升3阶至3阶/);
+  assert.equal(s.mortal.mastery.bone, 3);
+  assert.ok(!s.artifacts.includes('orbit'));
+  for (const rank of [1, 2]) {
+    const blocked = fixture('bone', rank);
+    blocked.artifacts.push('orbit');
+    if (rank === 2) blocked.mortal.mastery.bone = 2;
+    const before = JSON.stringify(blocked);
+    assert.match(sectServiceQuote(blocked, 'orbit').reason, /不足以用完抵价/);
+    assert.match(sectServiceContent(blocked, false, 'orbit'), /暂不献物 · 物品保留/);
+    assert.equal(executeSectService(blocked, 'orbit', sectServiceStamp(blocked)), undefined);
+    assert.equal(JSON.stringify(blocked), before);
+  }
+});
+
+test('一器连修跨过五阶和十阶各赐丹一次，法宝及炼器只转出一次并可读档', () => {
+  const s = fixture('bone', 8);
+  s.completed = [0, 1, 2, 3, 4, 5, 6];
+  s.mortal.mastery.bone = 4;
+  const item = s.artifacts.find((id) => id !== s.starter)!;
+  s.forge[item] = 4;
+  const q = sectServiceQuote(s, item);
+  assert.equal(q.reason, '');
+  assert.equal(q.levels, 6);
+  assert.equal(q.stones, 154);
+  const count = Object.values(s.medicine.bag).reduce((a, b) => a + b, 0);
+  assert.ok(executeSectService(s, item, sectServiceStamp(s)));
+  assert.equal(s.mortal.mastery.bone, 10);
+  assert.equal(
+    Object.values(s.medicine.bag).reduce((a, b) => a + b, 0),
+    count + 2,
+  );
+  assert.ok(!s.artifacts.includes(item));
+  assert.equal(s.forge[item], 0);
+  assert.deepEqual(importSave(exportSave(s)).save, s);
+  const before = JSON.stringify(s);
+  assert.equal(executeSectService(s, item, sectServiceStamp(s)), undefined);
+  assert.equal(JSON.stringify(s), before);
+});
+
+test('献丹按整份折价连续淬体，不服药、不退现金、不重复抵价或超二十阶', () => {
+  const s = fixture('devour', 2);
+  const id = MEDICINES.find(
+    (m) =>
+      m.years > 0 &&
+      auctionValue({ kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 }) === 1600,
+  )!.id;
+  const q = sectServiceQuote(s, id);
+  assert.equal(q.reason, '');
+  assert.equal(q.levels, 8);
+  assert.equal(q.stones, 351);
+  assert.equal(q.years, 12);
+  const before = structuredClone(s);
+  assert.match(executeSectService(s, id, sectServiceStamp(s))!, /提升8阶至8阶/);
+  assert.equal(s.training.vitality, 8);
+  assert.equal(s.medicine.bag[id], before.medicine.bag[id] - 1);
+  assert.deepEqual(s.medicine.active, before.medicine.active);
+  assert.equal(s.stones, before.stones - q.stones - q.reserve);
+  assert.deepEqual(importSave(exportSave(s)).save, s);
+  const late = fixture('devour');
+  late.training.vitality = 19;
+  const valuable = MEDICINES.find(
+    (m) =>
+      m.years > 0 &&
+      auctionValue({ kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 }) * 0.85 >
+        trainingCost(19),
+  )!.id;
+  const raw = JSON.stringify(late);
+  assert.match(sectServiceQuote(late, valuable).reason, /不足以用完抵价/);
+  assert.equal(executeSectService(late, valuable, sectServiceStamp(late)), undefined);
+  assert.equal(JSON.stringify(late), raw);
+});
+
+test('献物全程预检余额、供奉、寿元、天劫、续局、旧报价与赐丹溢出，拒绝零消耗', () => {
+  for (const id of ['bone', 'devour']) {
+    const base = fixture(id, 2);
+    base.artifacts.push('orbit');
+    const choice = id === 'bone' ? 'orbit' : 'huanglong';
+    for (const kind of [
+      'cash',
+      'dues',
+      'life',
+      'tribulation',
+      'unfinished',
+      'stale',
+      'activity',
+      'ended',
+    ]) {
+      const s = structuredClone(base);
+      if (kind === 'dues') s.mortal.member!.dueAt = 0.1;
+      const q = sectServiceQuote(s, choice);
+      if (kind === 'cash' || kind === 'dues') s.stones = q.stones + q.reserve - 1;
+      if (kind === 'life') s.age = 499.9;
+      if (kind === 'tribulation') s.nextTribulationAge = s.age + 0.1;
+      if (kind === 'activity')
+        s.mortal.activity = { kind: 'herbs', remaining: 1, total: 1, sect: null };
+      if (kind === 'ended') s.journeyEnded = true;
+      const raw = JSON.stringify(s);
+      assert.equal(
+        executeSectService(
+          s,
+          choice,
+          kind === 'stale' ? 'stale' : sectServiceStamp(s),
+          kind === 'unfinished',
+        ),
+        undefined,
+        `${id}/${kind}`,
+      );
+      assert.equal(JSON.stringify(s), raw, `${id}/${kind}`);
+    }
+  }
+  const s = fixture('bone', 8);
+  s.completed = [6];
+  s.mortal.mastery.bone = 4;
+  const item = s.artifacts.find((id) => id !== s.starter)!;
+  s.forge[item] = 4;
+  s.medicine.bag.huanglong = Number.MAX_SAFE_INTEGER;
+  assert.match(sectServiceQuote(s, item).reason, /无法领取精研赐丹/);
+  const raw = JSON.stringify(s);
+  assert.equal(executeSectService(s, item, sectServiceStamp(s)), undefined);
+  assert.equal(JSON.stringify(s), raw);
 });

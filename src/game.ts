@@ -1,4 +1,4 @@
-import { trainingEffect } from './training.ts';
+import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
   Point,
   Weapon,
@@ -327,7 +327,7 @@ export class Game {
           (this.path === 'demonic' ? 0.12 : 0)) *
         (1 - (this.passives.abyss || 0) * 0.02 * this.medicine.drawback) *
         (1 +
-          (trainingEffect(this.save.training.power) *
+          (powerTrainingEffect(this.save.training.power) *
             spiritRootInfo(this.spiritRoot).powerPerLevel) /
             100) *
         (1 + this.save.tribulations * 0.02) *

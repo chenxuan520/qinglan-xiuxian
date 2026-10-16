@@ -1,4 +1,4 @@
-import { trainingEffect } from '../src/training.ts';
+import { powerTrainingEffect, trainingEffect } from '../src/training.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -6,13 +6,14 @@ import { freshSave, realmCost, train, trainingCost, trainingYears } from '../src
 import { SPIRIT_ROOTS } from '../src/data.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
+import { cultivationPanel } from '../src/cultivation-ui.ts';
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} ≠ ${b}`);
 const cultivationAt = (step: number) =>
   Array.from({ length: step }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
 
 test('悟道独立增伤，不被境界与功法稀释，灵根满阶差异适度且后期边际收益温和增加', () => {
-  const full = [1.4, 1.36, 1.32, 1.32, 1.28, 1.28, 1.24];
+  const full = [60, 54, 48, 48, 42, 42, 36];
   for (const [i, root] of SPIRIT_ROOTS.entries())
     for (const step of [0, 9, 18, 23, 24])
       for (const path of ['dual', 'orthodox', 'demonic'] as const) {
@@ -29,7 +30,7 @@ test('悟道独立增伤，不被境界与功法稀释，灵根满阶差异适�
         const speed = game.stats.speed;
         for (const level of [1, 10, 20]) {
           save.training.power = level;
-          near(game.stats.damage / base, 1 + ((full[i] - 1) * trainingEffect(level)) / 20);
+          near(game.stats.damage / base, 1 + (full[i] * powerTrainingEffect(level)) / 3000);
           assert.equal(game.player.maxHp, hp);
           assert.equal(game.stats.speed, speed);
         }
@@ -51,7 +52,7 @@ test('悟道独立加成进入实际法宝伤害统计，觉醒与未觉醒均�
       assert.ok(game.damageBySource.sword > 0);
       return game.damageBySource.sword;
     };
-    near(hit(20) / hit(0), 1.415);
+    near(hit(20) / hit(0), 1.6);
   }
 });
 
@@ -110,7 +111,7 @@ test('已有根基等级和受伤续局保留，灵威与战斗一致，重复�
   assert.equal(twice.save.stones, 234);
 });
 
-test('训练收益锚点及边际上界：前十阶不变，十一至十五阶1.05倍，最后五阶1.1倍', () => {
+test('淬体身法收益锚点及边际上界：前十阶不变，十一至十五阶1.05倍，最后五阶1.1倍', () => {
   assert.equal(trainingEffect(0), 0);
   assert.equal(trainingEffect(10), 10);
   assert.equal(trainingEffect(15), 15.25);
@@ -121,4 +122,22 @@ test('训练收益锚点及边际上界：前十阶不变，十一至十五阶1.
   assert.equal(trainingCost(14), 1383);
   for (let n = 1; n <= 20; n++)
     near(trainingEffect(n) - trainingEffect(n - 1), n <= 10 ? 1 : n <= 15 ? 1.05 : 1.1);
+});
+
+test('悟道后十阶逐步提高收益，前十阶不变，满阶按三十基础阶而非淬体身法曲线', () => {
+  for (let n = 0; n <= 10; n++) assert.equal(powerTrainingEffect(n), n);
+  near(powerTrainingEffect(11), 11.1);
+  near(powerTrainingEffect(15), 17.5);
+  near(powerTrainingEffect(19), 27.1);
+  near(powerTrainingEffect(20), 30);
+  for (let n = 11; n <= 20; n++)
+    near(powerTrainingEffect(n) - powerTrainingEffect(n - 1), 1 + (2 * (n - 10) - 1) / 10);
+  near((1.6 / 1.542 - 1) * 100, 3.761348897535654);
+  const s = freshSave();
+  s.training.power = 19;
+  assert.match(cultivationPanel(s, 0).body, /当前增伤 \+54.2%/);
+  assert.match(cultivationPanel(s, 0).body, /下一阶实际增伤 \+3.76%/);
+  s.training.power = 20;
+  assert.match(cultivationPanel(s, 0).body, /当前增伤 \+60%/);
+  assert.ok(!cultivationPanel(s, 0).body.includes('下一阶实际增伤'));
 });
