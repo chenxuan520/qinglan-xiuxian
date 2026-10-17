@@ -66,6 +66,16 @@ export class PanelHost {
     section.setAttribute('aria-label', title);
     section.dataset.panel = panel;
     section.innerHTML = `<div class="panel-heading"><div><div class="eyebrow">${subtitle}</div><h2>${title}</h2></div></div>${body}`;
+    if (panel === 'guide')
+      section
+        .querySelector<HTMLDetailsElement>('.guide-demo')
+        ?.addEventListener('toggle', (event) => {
+          const demo = event.currentTarget as HTMLDetailsElement;
+          if (demo.open)
+            demo
+              .querySelector('.guide-demo-stage')
+              ?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        });
     section.querySelectorAll<HTMLDetailsElement>('details[data-disclosure]').forEach((detail) => {
       detail.open = openDetails.includes(detail.dataset.disclosure!);
     });

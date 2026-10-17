@@ -34,7 +34,8 @@ test('网络失败可以重新加载，不留下永久失败的promise；成功�
   assert.equal(source.current, null);
   const loaded = await source.load();
   assert.ok(loaded.GUIDE_TABS.length >= 5);
-  assert.match(loaded.guideContent('basics'), /雷路/);
+  assert.match(loaded.guideContent('basics'), /局内灵气与永久修为/);
+  assert.match(loaded.guideContent('combat'), /雷路/);
   assert.equal(calls, 2);
 });
 
