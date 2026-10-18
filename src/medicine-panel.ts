@@ -13,7 +13,7 @@ interface MedicineActions {
   show(): void;
   render(): void;
   refresh(): void;
-  persist(): void;
+  commit(next: SaveData): boolean;
   starterChanged(): void;
   toast(message: string): void;
 }
@@ -30,13 +30,26 @@ export class MedicinePanel {
     this.modal = modal;
     this.actions = actions;
   }
+  private commit(next: SaveData) {
+    try {
+      if (!this.actions.commit(next)) return false;
+    } catch {
+      this.actions.toast('暂时无法保存，本次操作未生效，请重试');
+      return false;
+    }
+    Object.assign(this.save, next);
+    return true;
+  }
+  private refreshShop() {
+    const next = structuredClone(this.save);
+    return !refreshMedicineShop(next.medicine, next.age) || this.commit(next);
+  }
   content(stage: number, blocked: boolean, herbsShop: boolean) {
-    if (this.view === 'shop' && refreshMedicineShop(this.save.medicine, this.save.age))
-      this.actions.persist();
+    if (this.view === 'shop') this.refreshShop();
     return medicineContent(this.save, stage, this.view, blocked, herbsShop, this.tier);
   }
   handle(action: string, id: string | undefined, context: MedicineContext) {
-    const { save, modal, actions } = this;
+    const { modal, actions } = this;
     if (action === 'medicine' && !context.hasGame) {
       this.view = 'bag';
       this.tier = 'all';
@@ -44,8 +57,7 @@ export class MedicinePanel {
       return true;
     }
     if (action === 'medicine-shop' && !context.hasGame && context.herbsShop) {
-      refreshMedicineShop(save.medicine, save.age);
-      actions.persist();
+      if (!this.refreshShop()) return true;
       this.view = 'shop';
       this.tier = 'all';
       actions.show();
@@ -79,12 +91,14 @@ export class MedicinePanel {
       !medicineInfo(id)
     )
       return false;
+    const save = structuredClone(this.save);
     let message = '';
+    let starterChanged = false;
     if (action === 'medicine-use') {
       const input = modal.querySelector<HTMLInputElement>(`#medicine-quantity-${id}`);
       const result = useMedicine(save, id, context.pendingRun, input ? Number(input.value) : 1);
       message = result.message;
-      if (result.ok && id === 'butian') actions.starterChanged();
+      starterChanged = result.ok && id === 'butian';
     } else if (action === 'medicine-discard' && !context.pendingRun) {
       delete save.medicine.active[id];
       message = '药效已散去，丹药不返还';
@@ -97,7 +111,8 @@ export class MedicinePanel {
     else if (action === 'medicine-recipe')
       message = buyMedicineRecipe(save, id) ? '药方已习得，本世保留' : '尚未解锁或灵石不足';
     else return true;
-    actions.persist();
+    if (!this.commit(save)) return true;
+    if (starterChanged) actions.starterChanged();
     actions.refresh();
     actions.toast(message);
     return true;

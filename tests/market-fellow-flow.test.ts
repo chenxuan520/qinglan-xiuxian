@@ -129,7 +129,7 @@ function harness(phase: 'first' | 'reunion' | 'choice' | 'read' = 'first', pendi
     show: () => {},
     render: () => {},
     refresh: () => {},
-    persist: () => {},
+    commit: () => true,
     starterChanged: () => {},
     toast: () => {},
   });

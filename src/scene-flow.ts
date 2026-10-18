@@ -353,16 +353,14 @@ export function renderPanel(shell: ActionShell) {
       `<div class="about-copy"><p class="about-lead">《叩仙门：青岚纪》是一款独立制作的 Web 修仙小游戏。</p><div class="about-maker"><span>制作</span><strong>一个想做点自己喜欢的东西的程序员 chenxuan，和一堆 AI 工具。</strong><p>从幸存者玩法出发，慢慢做成了一场关于修行、岁月与故人的仙途。</p></div><p class="panel-note">程序设计、玩法与内容由作者持续迭代；部分开发、美术生成与辅助工作使用 AI 工具完成。项目持续更新中，源码公开于 GitHub。</p><div class="about-meta"><p><span>GitHub</span><a href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">chenxuan520/qinglan-xiuxian</a></p><p><span>官网</span><a href="${shell.GAME_SITE_URL}" target="_blank" rel="noopener noreferrer" tabindex="0">${new shell.URL(shell.GAME_SITE_URL).host}</a></p><p><span>版本</span>${shell.GAME_VERSION}</p><p><span>运行监控</span><a href="${shell.assetUrl('/monitor/')}" target="_blank" rel="noopener noreferrer">公开统计与每日测试</a></p>${shell.telemetryRow(shell.telemetry.enabled(), shell.telemetry.active)}</div><div class="save-actions about-actions"><a class="primary-button" href="https://github.com/chenxuan520/qinglan-xiuxian" target="_blank" rel="noopener noreferrer" tabindex="0">GitHub 源码</a><a class="secondary-button" href="https://github.com/chenxuan520/qinglan-xiuxian/issues" target="_blank" rel="noopener noreferrer" tabindex="0">反馈问题</a></div><div class="about-support"><img src="${shell.assetUrl(shell.SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="128" height="128" loading="lazy"><div><strong>请道友喝杯茶</strong><p>这一程山水不收分文。若觉得值得，请作者喝杯茶便好——茶钱不换道具，也不换修为，只换作者多写几段山水。</p><small>微信扫码即可；手机上可先截图，再在「扫一扫」里从相册选取。</small></div></div></div>`,
     );
   } else if (shell.panel === 'medicine') {
-    shell.panelFrame(
-      '丹香入道',
-      '炼丹炉',
-      shell.medicinePanel.content(
-        shell.selectedStage,
-        !!(shell.game || shell.pendingRun),
-        shell.inTown && shell.townNpc?.id === 'herbs',
-      ),
-      true,
+    const content = shell.medicinePanel.content(
+      shell.selectedStage,
+      !!(shell.game || shell.pendingRun),
+      shell.inTown && shell.townNpc?.id === 'herbs',
     );
+    // 换货写入可能发现其他窗口的新存档，不覆盖刚打开的存档锁。
+    if (shell.saveLock || shell.panel !== 'medicine') return;
+    shell.panelFrame('丹香入道', '炼丹炉', content, true);
   } else if (shell.panel === 'arsenal' || shell.panel === 'treasure-detail') {
     const view = shell.catalogPanel(shell.save, {
       panel: shell.panel,

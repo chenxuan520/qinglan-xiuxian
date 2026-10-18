@@ -98,7 +98,7 @@ export const MEDICINES: Medicine[] = [
     desc: '法宝伤害 +18%。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'zhenyuan',
@@ -108,7 +108,7 @@ export const MEDICINES: Medicine[] = [
     desc: '气血上限 +18%，基础恢复速度 +20%。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'juyuan',
@@ -118,17 +118,17 @@ export const MEDICINES: Medicine[] = [
     desc: '法宝攻击冷却缩短 8%，局内灵气获取 +25%；与萦香丸的灵气增幅取较高值，不直接增加永久修为。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'jiangchen',
-    name: '降尘丹',
+    name: '昊元丹',
     tier: '灵品',
     years: 1000,
     desc: '暴击率 +4 个百分点。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'fenyuan',
@@ -138,7 +138,7 @@ export const MEDICINES: Medicine[] = [
     desc: '法宝范围 +15%。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'lianqi',
@@ -148,7 +148,7 @@ export const MEDICINES: Medicine[] = [
     desc: '法宝持续效果时间 +20%。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'zengyuan',
@@ -158,7 +158,7 @@ export const MEDICINES: Medicine[] = [
     desc: '普通与精英击杀修为 +10%，不增加妖王修为或局内灵气。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'zhiyuan',
@@ -168,7 +168,7 @@ export const MEDICINES: Medicine[] = [
     desc: '受到伤害降低 8%，基础恢复速度 +30%。',
     stage: 1,
     price: 0,
-    craftYears: 50,
+    craftYears: 10,
   },
   {
     id: 'mingqing',
@@ -178,7 +178,7 @@ export const MEDICINES: Medicine[] = [
     desc: '暴击率 +6 个百分点，对精英与妖王伤害 +15%。',
     stage: 2,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'lingru',
@@ -188,17 +188,17 @@ export const MEDICINES: Medicine[] = [
     desc: '法宝攻击冷却缩短 12%，持续效果时间 +20%。',
     stage: 3,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'dingling',
     name: '定灵丹',
     tier: '珍品',
     years: 5000,
-    desc: '受到的减速强度减半，魔道功法的负面数值减半，正向效果不变。',
+    desc: '气血上限 +30%，基础恢复速度 +60%。',
     stage: 2,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'xuling',
@@ -208,7 +208,7 @@ export const MEDICINES: Medicine[] = [
     desc: '普通与精英击杀修为 +20%，妖王修为 +30%；不增加局内灵气与通关额外修为。',
     stage: 3,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'xuepo',
@@ -218,7 +218,7 @@ export const MEDICINES: Medicine[] = [
     desc: '受到伤害降低 12%，每 8 秒释放寒气，减速周围敌人 2 秒。',
     stage: 3,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'dulong',
@@ -228,17 +228,17 @@ export const MEDICINES: Medicine[] = [
     desc: '最终法宝伤害 +30%，气血上限降低 10%。',
     stage: 4,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'wuchang',
     name: '无常丹',
     tier: '珍品',
     years: 5000,
-    desc: '毒池伤害降低 40%，不减免其他攻击。',
+    desc: '法宝伤害 +20%，局内灵气获取 +30%；与聚灵丹、萦香丸的灵气增幅取较高值，不直接增加永久修为。',
     stage: 2,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'jiangyun',
@@ -248,7 +248,7 @@ export const MEDICINES: Medicine[] = [
     desc: '移速 +12%，拾取范围 +50%。',
     stage: 2,
     price: 0,
-    craftYears: 500,
+    craftYears: 100,
   },
   {
     id: 'butian',
@@ -282,10 +282,10 @@ export const MEDICINES: Medicine[] = [
   },
   {
     id: 'jiuqu',
-    name: '九曲灵参丹',
+    name: '降尘丹',
     tier: '珍品',
     years: 0,
-    desc: '获得当前大境界总修为的 8%，每个大境界限一次；大乘及以上无效，不能跳过成仙关卡。',
+    desc: '获得当前大境界总修为的 25%，每个大境界限一次；大乘及以上无效，不能跳过成仙关卡。',
     stage: 4,
     price: 0,
     craftYears: 0,
@@ -398,11 +398,13 @@ export function medicineEffects(s: MedicineState, age: number) {
       (has('huanglong') ? 1.1 : 1) *
       (has('heqi') ? 1.18 : 1) *
       (has('dulong') ? 1.3 : 1) *
+      (has('wuchang') ? 1.2 : 1) *
       (has('chousui') ? 1.18 : 1),
     hp:
       (1 + (s.used.peiying || 0) * 0.05) *
       (has('jinsui') ? 1.1 : 1) *
       (has('zhenyuan') ? 1.18 : 1) *
+      (has('dingling') ? 1.3 : 1) *
       (has('dulong') ? 0.9 : 1) *
       (has('bigu') ? 1.05 : 1) *
       (has('chousui') ? 0.92 : 1),
@@ -410,10 +412,11 @@ export function medicineEffects(s: MedicineState, age: number) {
       (1 + (s.used.peiying || 0) * 0.05) *
       (has('yangjing') ? 1.3 : 1) *
       (has('zhenyuan') ? 1.2 : 1) *
+      (has('dingling') ? 1.6 : 1) *
       (has('bigu') ? 1.15 : 1) *
       (has('zhiyuan') ? 1.3 : 1),
     cooldown: (has('juyuan') ? 0.92 : 1) * (has('lingru') ? 0.88 : 1),
-    xp: has('juyuan') ? 1.25 : has('yingxiang') ? 1.15 : 1,
+    xp: has('wuchang') ? 1.3 : has('juyuan') ? 1.25 : has('yingxiang') ? 1.15 : 1,
     duration: (has('lingru') ? 1.2 : 1) * (has('lianqi') ? 1.2 : 1),
     area: has('fenyuan') ? 1.15 : 1,
     speed: (has('jiangyun') ? 1.12 : 1) * (has('yingxiang') ? 1.06 : 1),
@@ -422,8 +425,8 @@ export function medicineEffects(s: MedicineState, age: number) {
     eliteDamage: has('mingqing') ? 1.15 : 1,
     armor: (has('xuepo') ? 0.88 : 1) * (has('huxin') ? 0.95 : 1) * (has('zhiyuan') ? 0.92 : 1),
     frost: has('xuepo'),
-    drawback: has('dingling') ? 0.5 : 1,
-    poison: (has('wuchang') ? 0.6 : 1) * (has('qingling') ? 0.8 : 1),
+    drawback: 1,
+    poison: has('qingling') ? 0.8 : 1,
     cultivation: (has('xuling') ? 1.2 : 1) * (has('zengyuan') ? 1.1 : 1),
     bossCultivation: has('xuling') ? 1.3 : 1,
   };

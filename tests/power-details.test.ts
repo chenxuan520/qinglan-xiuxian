@@ -143,7 +143,7 @@ test('暴击按百分点、毒伤含全局减伤，特殊打王药力与永久�
   s.medicine.used.peiying = 2;
   const r = powerBreakdown(s);
   near(r.current.eliteDamage, 1.15);
-  near(r.current.poisonDamage, 0.88 * 0.6);
+  near(r.current.poisonDamage, 0.88);
   near(
     r.rows.find((r) => r.id === 'medicine:mingqing')!.changes.find((c) => c.key === 'crit')!.delta,
     0.06,
@@ -154,7 +154,7 @@ test('暴击按百分点、毒伤含全局减伤，特殊打王药力与永久�
   const html = powerDetailsContent(s);
   assert.match(html, /暴击率 \+6 个百分点/);
   assert.match(html, /明清灵水/);
-  assert.match(html, /52.8%/);
+  assert.match(html, /毒伤承伤比例<\/dt><dd>88%/);
   assert.match(html, /精英与妖王额外增伤/);
   s.age += 100;
   assert.ok(!powerBreakdown(s).rows.some((r) => r.id.startsWith('medicine:')));

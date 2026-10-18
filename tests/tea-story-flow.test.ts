@@ -192,7 +192,7 @@ function harness(t: TestContext) {
     show: noop,
     render: noop,
     refresh: noop,
-    persist: noop,
+    commit: () => true,
     starterChanged: noop,
     toast: noop,
   });

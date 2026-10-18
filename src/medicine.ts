@@ -103,7 +103,7 @@ export function useMedicine(
   } else if (id === 'jiuqu') {
     const major = realmInfo(save.cultivation).index;
     const amount = Math.floor(
-      (realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2)) * 0.08,
+      (realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2)) * 0.25,
     );
     save.medicine.used[`jiuqu-${major}`] = 1;
     gainCultivation(save, amount);

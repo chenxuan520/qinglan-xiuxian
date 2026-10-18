@@ -201,6 +201,9 @@ test('28种丹药为8凡8灵8限时珍品4本世珍品，药方只消耗低一�
     [8, 8, 12],
   );
   assert.equal(MEDICINES.filter((m) => !m.years).length, 4);
+  assert.equal(new Set(MEDICINES.map((m) => m.name)).size, MEDICINES.length);
+  assert.equal(MEDICINES.find((m) => m.id === 'jiangchen')!.name, '昊元丹');
+  assert.equal(MEDICINES.find((m) => m.id === 'jiuqu')!.name, '降尘丹');
   for (const seed of [0, 1, 42, 12345678, 4294967295]) {
     const state = freshMedicine(() => 0);
     state.recipeSeed = seed;
@@ -221,7 +224,7 @@ test('28种丹药为8凡8灵8限时珍品4本世珍品，药方只消耗低一�
               (m.tier === '灵品' ? '凡品' : '灵品'),
           ),
         );
-        assert.equal(m.craftYears, m.tier === '灵品' ? 50 : 500);
+        assert.equal(m.craftYears, m.tier === '灵品' ? 10 : 100);
       }
     }
   }
@@ -291,18 +294,18 @@ test('药铺每批每种限购三份，读档不重置额度，十年换货后�
   legacy.medicine.shop!.bought = { [id]: 4 };
   assert.throws(() => importSave(JSON.stringify(legacy)));
 });
-test('买药方后合成，真实扣除对应成丹、灵石及50/500年；凡品与本世珍品不能合成', () => {
-  for (const id of ['heqi', 'mingqing']) {
+test('买药方后合成，真实扣除全部可炼丹药的材料、灵石及10/100年；凡品与本世珍品不能合成', () => {
+  for (const { id, tier } of MEDICINES.filter((m) => m.years && m.tier !== '凡品')) {
     const s = rich();
     assert.equal(craftMedicine(s, id).ok, false);
     assert.equal(buyMedicineRecipe(s, id), true);
     const before = structuredClone(s);
     const result = craftMedicine(s, id);
     assert.equal(result.ok, true, result.message);
-    const years = id === 'heqi' ? 50 : 500;
+    const years = tier === '灵品' ? 10 : 100;
     assert.equal(s.age - before.age, years);
     assert.equal(s.mortal.years - before.mortal.years, years);
-    assert.equal(before.stones - s.stones, id === 'heqi' ? 40 : 100);
+    assert.equal(before.stones - s.stones, tier === '灵品' ? 40 : 100);
     assert.equal(s.medicine.bag[id], before.medicine.bag[id] + 1);
     for (const item of medicineFormula(s.medicine, id))
       assert.equal(s.medicine.bag[item.id], before.medicine.bag[item.id] - item.count);
@@ -321,11 +324,11 @@ test('材料、钱、寿元不足或有续局时合成原子失败；到期供�
     buyMedicineRecipe(s, 'heqi');
     if (fail === 'life') {
       s.cultivation = 0;
-      s.age = 51;
+      s.age = 91;
     }
     if (fail === 'stones') s.stones = 0;
     if (fail === 'materials') s.medicine.bag = {};
-    if (fail === 'tribulation') s.nextTribulationAge = s.age + 20;
+    if (fail === 'tribulation') s.nextTribulationAge = s.age + 10;
     const before = structuredClone(s);
     assert.equal(craftMedicine(s, 'heqi', fail === 'pending').ok, false);
     assert.deepEqual(s, before);
@@ -333,16 +336,17 @@ test('材料、钱、寿元不足或有续局时合成原子失败；到期供�
   const s = rich();
   s.cultivation = 0;
   joinSect(s, 'power');
+  s.mortal.member!.dueAt = 5;
   buyMedicineRecipe(s, 'heqi');
-  s.stones = 100;
+  s.stones = 89;
   const before = structuredClone(s);
   assert.equal(craftMedicine(s, 'heqi').ok, false);
   assert.deepEqual(s, before);
   s.stones = 1000;
   assert.equal(craftMedicine(s, 'heqi').ok, true);
-  assert.equal(s.stones, 860); // 两期供奉100 + 炼制40
-  assert.equal(s.age, 65);
-  assert.equal(s.mortal.member!.dueAt, 60);
+  assert.equal(s.stones, 910); // 一期供奉50 + 炼制40
+  assert.equal(s.age, 25);
+  assert.equal(s.mortal.member!.dueAt, 25);
 });
 test('补天丹严格提升一个品质档并收束灵根数量，不降级、不提供自选', () => {
   const ranks = { none: 0, quad: 1, five: 1, dual: 2, triple: 2, variant: 3, heaven: 4 };
@@ -377,7 +381,7 @@ test('永久丹药每世次数与境界门槛生效，培婴百分比作用于�
   approx(g.stats.regen, base.stats.regen * 1.15);
   assert.equal(useMedicine(s, 'jiuqu').ok, true);
   assert.equal(useMedicine(s, 'jiuqu').ok, false);
-  assert.equal(s.cultivation, Math.floor((realmCost(0) + realmCost(1) + realmCost(2)) * 0.08));
+  assert.equal(s.cultivation, Math.floor((realmCost(0) + realmCost(1) + realmCost(2)) * 0.25));
   assert.ok(Object.hasOwn(s.chronicle.milestones, 'permanent-medicine'));
   assert.equal(s.chronicle.entries.filter((entry) => entry.title === '丹药入体').length, 6);
   s.cultivation = 1e9;
@@ -492,7 +496,7 @@ test('虚灵丹只增加击杀修为，过期与读档不回溯、不重复记�
   const result = settleRun(p.s, { ...p.g, victory: true });
   assert.equal(p.s.cultivation - earned, result.cultivationRemaining);
 });
-test('定灵丹降低迟滞和魔功负面属性，明清灵水只额外增伤精英与妖王', () => {
+test('定灵丹提升气血和基础恢复，明清灵水只额外增伤精英与妖王', () => {
   const s = rich();
   useMedicine(s, 'dingling');
   const g = quiet(s);
@@ -510,10 +514,11 @@ test('定灵丹降低迟滞和魔功负面属性，明清灵水只额外增伤�
   const plain = quiet(rich());
   plain.passives = { ...g.passives };
   plain.slowed = 0.65;
-  assert.ok(g.stats.damage > plain.stats.damage);
-  assert.ok(g.stats.speed > plain.stats.speed);
-  assert.ok(g.stats.regen > plain.stats.regen);
-  assert.ok(g.stats.armor < plain.stats.armor);
+  approx(g.player.maxHp, Math.round(plain.player.maxHp * 1.3));
+  approx(g.stats.regen, plain.stats.regen * 1.6);
+  approx(g.stats.damage, plain.stats.damage);
+  approx(g.stats.speed, plain.stats.speed);
+  approx(g.stats.armor, plain.stats.armor);
   const h = rich();
   useMedicine(h, 'mingqing');
   const m = quiet(h);
@@ -524,7 +529,7 @@ test('定灵丹降低迟滞和魔功负面属性，明清灵水只额外增伤�
     approx(10000 - e.hp, elite ? 115 : 100);
   }
 });
-test('清灵与无常确实减免毒池，雪魄周期减速；暂停不推进药效', () => {
+test('清灵减免毒池，无常不再解毒；雪魄周期减速，暂停不推进药效', () => {
   for (const id of ['qingling', 'wuchang']) {
     const s = rich();
     useMedicine(s, id);
@@ -544,7 +549,7 @@ test('清灵与无常确实减免毒池，雪魄周期减速；暂停不推进�
       hostile: true,
     });
     g.update(0.01);
-    approx(hp - g.player.hp, 10 * (id === 'qingling' ? 0.8 : 0.6));
+    approx(hp - g.player.hp, 10 * (id === 'qingling' ? 0.8 : 1));
   }
   const s = rich();
   useMedicine(s, 'xuepo');
@@ -630,4 +635,60 @@ test('七关仅小幅增加气血3%伤害2%，密度倍率与收益不变', () =
     approx(d.damage, [0.72, 1, 1.45][i] * 1.02);
     assert.equal(d.amount, [0.9, 1.13, 1.35][i]);
   });
+});
+
+test('无常丹提升真实伤害和局内灵气，三种灵气丹同时服用取最高而不叠乘', () => {
+  for (const stage of [0, 6]) {
+    const base = quiet(rich(), stage);
+    const s = rich();
+    for (const id of ['wuchang', 'juyuan', 'yingxiang']) assert.equal(useMedicine(s, id).ok, true);
+    const g = quiet(s, stage);
+    approx(g.stats.damage, base.stats.damage * 1.2);
+    approx(g.stats.xp, base.stats.xp * 1.3);
+    assert.equal(medicineEffects(s.medicine, s.age).cultivation, 1);
+    assert.equal(medicineEffects(s.medicine, s.age).bossCultivation, 1);
+    for (const elite of [false, true]) {
+      const e = g.spawnEnemy(0, elite, false, { x: 500, y: 0 });
+      e.hp = e.maxHp = 10000;
+      // 正式法宝调用会乘stats.damage；这里确认普通/精英都接受同一增伤后伤害。
+      const b = base.spawnEnemy(0, elite, false, { x: 500, y: 0 });
+      b.hp = b.maxHp = 10000;
+      g.hitEnemy(e, g.stats.damage);
+      base.hitEnemy(b, base.stats.damage);
+      approx(10000 - e.hp, (10000 - b.hp) * 1.2);
+    }
+    s.age = s.medicine.active.wuchang;
+    assert.equal(medicineEffects(s.medicine, s.age).damage, 1);
+    assert.equal(medicineEffects(s.medicine, s.age).xp, 1);
+  }
+});
+
+test('降尘丹按服用前大境界给予25%修为，旧库存和限次标记保留，大乘不开放', () => {
+  for (let rank = 0; rank <= 6; rank++) {
+    const s = rich();
+    s.cultivation = Array.from({ length: rank * 3 }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    const before = s.cultivation;
+    const amount = Math.floor(
+      (realmCost(rank * 3) + realmCost(rank * 3 + 1) + realmCost(rank * 3 + 2)) * 0.25,
+    );
+    const result = useMedicine(s, 'jiuqu');
+    assert.equal(result.ok, true);
+    assert.ok(result.message.includes('降尘丹'));
+    assert.equal(s.cultivation - before, amount);
+    assert.equal(s.medicine.used[`jiuqu-${rank}`], 1);
+    const restored = importSave(exportSave(s)).save;
+    const raw = JSON.stringify(restored);
+    assert.equal(useMedicine(restored, 'jiuqu').ok, false);
+    assert.equal(JSON.stringify(restored), raw);
+  }
+  const s = rich();
+  s.cultivation = Array.from({ length: 21 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0) - 1;
+  assert.equal(useMedicine(s, 'jiuqu').ok, true);
+  const before = JSON.stringify(s);
+  assert.equal(useMedicine(s, 'jiuqu').ok, false);
+  assert.equal(JSON.stringify(s), before);
+  assert.deepEqual(s.completed, []);
 });

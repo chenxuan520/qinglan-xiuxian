@@ -144,8 +144,8 @@ test('长生代炼预留全部跨期供奉；费用不足、寿尽、天劫、�
   assert.ok(s.medicine.recipes.includes(id));
   s.mortal.member!.dueAt = 0.1;
   const q = sectServiceQuote(s, id);
-  assert.equal(q.years, 300);
-  assert.equal(q.reserve, 400);
+  assert.equal(q.years, 60);
+  assert.equal(q.reserve, 200);
   assert.equal(serviceDues(s, 400.1), 600);
   const beforeFormula = medicineFormula(s.medicine, id);
   const before = structuredClone(s);
@@ -456,4 +456,32 @@ test('献物全程预检余额、供奉、寿元、天劫、续局、旧报价�
       assert.equal(capped.mortal.mastery.bone, 10);
     }
   }
+});
+
+test('代炼同步10/100年基准与三档待遇，筑基珍品代炼仍预留并结清多期供奉', () => {
+  for (const [rank, factor] of [
+    [1, 0.6],
+    [4, 0.5],
+    [5, 0.4],
+  ]) {
+    for (const [id, years] of [
+      ['heqi', 10],
+      ['mingqing', 100],
+    ] as const) {
+      const s = fixture('duration', rank);
+      const q = sectServiceQuote(s, id);
+      assert.equal(q.years, years * factor);
+      assert.equal(q.stones, id === 'heqi' ? 60 : 150);
+      assert.ok(executeSectService(s, id, sectServiceStamp(s)));
+      assert.equal(s.age, 15 + years * factor);
+    }
+  }
+  const s = fixture('duration', 1);
+  s.mortal.member!.dueAt = 0.1;
+  const q = sectServiceQuote(s, 'mingqing');
+  assert.equal(q.reserve, 200);
+  const before = structuredClone(s);
+  assert.ok(executeSectService(s, 'mingqing', sectServiceStamp(s)));
+  assert.equal(before.stones - s.stones, q.stones + 200);
+  assert.equal(s.mortal.member!.dueAt, 100.1);
 });

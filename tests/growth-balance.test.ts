@@ -306,11 +306,11 @@ test('自然回复只乘一次境界，功法、法宝与宝匣按最大气血�
           assert.equal(g.choose(0), true);
           g.weapons = [];
           const health = realmHealthMultiplier(step);
-          const medicineRegen = vitality ? 1.15 * 1.3 * 1.2 : 1;
+          const medicineRegen = vitality ? 1.15 * 1.3 * 1.2 * 1.6 : 1;
           const regen =
             (root.baseRegen * medicineRegen * health + duration * g.player.maxHp * 0.001) *
             (path === 'orthodox' ? 1.2 : 1) *
-            (1 - devour * 0.04 * (vitality ? 0.5 : 1));
+            (1 - devour * 0.04);
           const killHeal = devour * g.player.maxHp * 0.0005;
           assert.equal(g.stats.regen, regen);
           assert.equal(g.stats.killHeal, killHeal);

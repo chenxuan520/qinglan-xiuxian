@@ -434,7 +434,20 @@ const battleHud = new BattleHud(ui, save, mobileDisplay);
 const medicinePanel = new MedicinePanel(save, modal, {
   show: () => showPanel('medicine'),
   render: renderPanel,
-  persist,
+  commit: (next) => {
+    try {
+      syncHumanStories(next);
+      writeSave(next, game && !settled ? game : pendingRun);
+      storageAvailable = true;
+      return true;
+    } catch {
+      if (!saveLock) {
+        toast('暂时无法保存，本次操作未生效，请重试');
+        storageAvailable = false;
+      }
+      return false;
+    }
+  },
   refresh: () => {
     if (inMortalWorld) renderMortal();
     else renderLobby();

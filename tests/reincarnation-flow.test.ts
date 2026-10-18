@@ -261,7 +261,7 @@ function harness(save: SaveData) {
     show: noop,
     render: noop,
     refresh: noop,
-    persist: noop,
+    commit: () => true,
     starterChanged: noop,
     toast: noop,
   });
