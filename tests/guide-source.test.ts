@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { GuideSource } from '../src/guide-source.ts';
 import * as guide from '../src/guide.ts';
 
+test('全部帮助分类不出现广告文案；界面导览仅由玩家主动进入', () => {
+  for (const tab of guide.GUIDE_TABS) assert.doesNotMatch(guide.guideContent(tab.id), /广告/);
+  assert.match(guide.guideContent('basics'), /data-action="guide-tour"/);
+  assert.doesNotMatch(guide.guideContent('basics'), /guide-demo|<details[^>]*open/);
+});
+
 test('首次打开指南合并并发加载，成功后重开直接复用模块', async () => {
   let finish!: (value: typeof guide) => void;
   let calls = 0;

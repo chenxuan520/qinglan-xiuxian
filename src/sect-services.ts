@@ -7,7 +7,7 @@ import {
   type SaveData,
 } from './progress.ts';
 import { SECTS, MAX_MASTERY } from './mortal-data.ts';
-import { advanceMortal, studyPlan } from './mortal.ts';
+import { advanceMortal, studyPlan, masteryRewardPool } from './mortal.ts';
 import { MEDICINES, medicineFormula, medicineInfo, grantMedicine } from './medicine-data.ts';
 import { medicineCraftStones, medicineRecipePrice } from './medicine.ts';
 import { auctionItemName, auctionValue, releaseAuctionItem } from './auction-items.ts';
@@ -256,11 +256,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     const rewards = [5, 10].filter((n) => study.level < n && study.level + (q.levels ?? 1) >= n);
     if (
       rewards.some((n) =>
-        MEDICINES.some(
-          (m) =>
-            m.tier === (n === 5 ? '凡品' : '灵品') &&
-            !Number.isSafeInteger((save.medicine.bag[m.id] || 0) + 1),
-        ),
+        masteryRewardPool(n).some((m) => !Number.isSafeInteger((save.medicine.bag[m.id] || 0) + 1)),
       )
     )
       q.reason ||= '丹囊数量已达上限，无法领取精研赐丹';

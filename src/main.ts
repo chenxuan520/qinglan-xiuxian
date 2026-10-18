@@ -1546,6 +1546,15 @@ function handleAction(action: string, id?: string) {
     }
     return;
   }
+  if (action === 'guide-tour' && panel === 'guide') {
+    if (!assetsReady || sceneLoading) {
+      toast('场景仍在准备，请稍后再试');
+      return;
+    }
+    clearInput();
+    guideSource.current?.startInterfaceTour(ui, modal);
+    return;
+  }
   dispatchAction(shellBindings(), action, id);
 }
 document.addEventListener('click', (event) => {
@@ -1859,6 +1868,10 @@ function syncScreenAwake() {
   );
 }
 function tick(now: number, draw: boolean) {
+  if (guideSource.current?.tourActive) {
+    lastFrame = lastMortalTick = now;
+    return;
+  }
   let remaining = Math.max(0, Math.min(2, (now - lastFrame) / 1000));
   lastFrame = now;
   if (save.autoplay) {
@@ -1892,6 +1905,11 @@ function tick(now: number, draw: boolean) {
 function frame(now: number) {
   // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
   requestAnimationFrame(frame);
+  if (saveLock) guideSource.current?.stopInterfaceTour();
+  if (guideSource.current?.tourActive) {
+    lastFrame = lastMortalTick = now;
+    return;
+  }
   frameRate.sample(now, !document.hidden && !inMortalWorld && game?.state === 'playing');
   syncScreenAwake();
   if (saveLock && !modal.querySelector('.save-lock')) renderSaveLock();

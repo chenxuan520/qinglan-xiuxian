@@ -232,6 +232,11 @@ export function advanceMortal(save: SaveData, seconds: number, random = Math.ran
   return changed;
 }
 
+export function masteryRewardPool(level: number) {
+  const tier = level === 5 ? '灵品' : level === MAX_MASTERY ? '珍品' : null;
+  return MEDICINES.filter((m) => m.tier === tier && m.years > 0);
+}
+
 function completeActivity(save: SaveData, random: () => number) {
   const world = save.mortal;
   const activity = world.activity;
@@ -246,8 +251,8 @@ function completeActivity(save: SaveData, random: () => number) {
       world.mastery[id] = Math.min(MAX_MASTERY, (world.mastery[id] || 0) + 1);
       let reward = '';
       if (world.mastery[id] === 5 || world.mastery[id] === 10) {
-        const tier = world.mastery[id] === 5 ? '凡品' : '灵品';
-        const pool = MEDICINES.filter((m) => m.tier === tier);
+        const pool = masteryRewardPool(world.mastery[id]);
+        const tier = pool[0].tier;
         const name = grantMedicine(save.medicine, pool[Math.floor(random() * pool.length)].id);
         reward = `宗门赐下${tier}「${name}」一颗，已收入丹囊。`;
       }

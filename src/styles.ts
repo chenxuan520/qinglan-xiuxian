@@ -10,3 +10,4 @@ import './progression.css';
 import './journey.css';
 import './meta.css';
 import './home-details.css';
+import './interface-tour.css';

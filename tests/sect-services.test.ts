@@ -183,7 +183,7 @@ test('长生代炼预留全部跨期供奉；费用不足、寿尽、天劫、�
   const n = structuredClone(before);
   assert.ok(sectServiceQuote(n, id, true).reason);
 });
-test('精研五阶沿用原赐丹；献器保护本命，非本命入门器的已售记录不依赖进入坊市', () => {
+test('精研五阶赐灵品丹；献器保护本命，非本命入门器的已售记录不依赖进入坊市', () => {
   const s = fixture('bone');
   const other = s.artifacts.find((id) => id !== s.starter)!;
   s.forge[other] = 1;
@@ -346,6 +346,7 @@ test('一器连修跨过五阶和十阶各赐丹一次，法宝及炼器只转�
   assert.equal(q.reason, '');
   assert.equal(q.levels, 6);
   assert.equal(q.stones, 154);
+  const bagBefore = structuredClone(s.medicine.bag);
   const count = Object.values(s.medicine.bag).reduce((a, b) => a + b, 0);
   assert.ok(executeSectService(s, item, sectServiceStamp(s)));
   assert.equal(s.mortal.mastery.bone, 10);
@@ -353,6 +354,9 @@ test('一器连修跨过五阶和十阶各赐丹一次，法宝及炼器只转�
     Object.values(s.medicine.bag).reduce((a, b) => a + b, 0),
     count + 2,
   );
+  const gifts = MEDICINES.filter((m) => (s.medicine.bag[m.id] || 0) > (bagBefore[m.id] || 0));
+  assert.deepEqual(gifts.map((m) => m.tier).sort(), ['灵品', '珍品']);
+  assert.ok(gifts.every((m) => m.years > 0));
   assert.ok(!s.artifacts.includes(item));
   assert.equal(s.forge[item], 0);
   assert.deepEqual(importSave(exportSave(s)).save, s);
@@ -437,9 +441,19 @@ test('献物全程预检余额、供奉、寿元、天劫、续局、旧报价�
   s.mortal.mastery.bone = 4;
   const item = s.artifacts.find((id) => id !== s.starter)!;
   s.forge[item] = 4;
-  s.medicine.bag.huanglong = Number.MAX_SAFE_INTEGER;
-  assert.match(sectServiceQuote(s, item).reason, /无法领取精研赐丹/);
-  const raw = JSON.stringify(s);
-  assert.equal(executeSectService(s, item, sectServiceStamp(s)), undefined);
-  assert.equal(JSON.stringify(s), raw);
+  for (const medicine of MEDICINES) {
+    const capped = structuredClone(s);
+    capped.medicine.bag[medicine.id] = Number.MAX_SAFE_INTEGER;
+    const quote = sectServiceQuote(capped, item);
+    if (medicine.years > 0 && medicine.tier !== '凡品') {
+      assert.match(quote.reason, /无法领取精研赐丹/, medicine.name);
+      const raw = JSON.stringify(capped);
+      assert.equal(executeSectService(capped, item, sectServiceStamp(capped)), undefined);
+      assert.equal(JSON.stringify(capped), raw);
+    } else {
+      assert.equal(quote.reason, '', `${medicine.name}不在赐丹池，不应阻止精研`);
+      assert.ok(executeSectService(capped, item, sectServiceStamp(capped)));
+      assert.equal(capped.mortal.mastery.bone, 10);
+    }
+  }
 });

@@ -209,7 +209,7 @@ test('低资质精研消耗更多年岁，立即完成且读档不重复扣除',
   assert.equal(s.mortal.activity, null);
   assert.deepEqual(parseSave(JSON.stringify(s)).mortal, s.mortal);
 });
-test('十六宗门精研五阶赠凡品、十阶赠灵品，其余阶数不赠药', () => {
+test('十六宗门精研五阶赠灵品、十阶赠限时珍品，其余阶数不赠药', () => {
   for (const sect of SECTS)
     for (const roll of [0, 0.999999]) {
       const s = wealthy(24);
@@ -224,9 +224,13 @@ test('十六宗门精研五阶赠凡品、十阶赠灵品，其余阶数不赠�
           Math.floor(level / 5),
         );
         if (level === 5 || level === 10) {
-          const pool = MEDICINES.filter((m) => m.tier === (level === 5 ? '凡品' : '灵品'));
+          const pool = MEDICINES.filter(
+            (m) => m.tier === (level === 5 ? '灵品' : '珍品') && m.years > 0,
+          );
           const reward = pool[Math.floor(roll * pool.length)];
           assert.equal(s.medicine.bag[reward.id], 1);
+          assert.ok(reward.years > 0, '精研赠丹不含本世永久丹');
+          assert.deepEqual(s.medicine.active, {}, '赐丹收入丹囊，不自动服用');
           assert.ok(s.mortal.events[0].includes(reward.name));
         }
       }
@@ -256,7 +260,7 @@ test('精研赠药等待供奉处理后才发放，放弃研习不领药', () =>
       settleSectDues(s, decline, () => 0),
       true,
     );
-    assert.deepEqual(s.medicine.bag, decline ? {} : { huanglong: 1 });
+    assert.deepEqual(s.medicine.bag, decline ? {} : { heqi: 1 });
     assert.equal(resolveActivity(s), false);
   }
 });
@@ -277,10 +281,10 @@ test('旧档不追补精研丹药，待完成研习只发一次且读档导入�
     resolveActivity(restored, () => 0),
     true,
   );
-  assert.deepEqual(restored.medicine.bag, { heqi: 1 });
+  assert.deepEqual(restored.medicine.bag, { mingqing: 1 });
   const again = parseSave(JSON.stringify(restored));
   assert.equal(resolveActivity(again), false);
-  assert.deepEqual(importSave(exportSave(again, null)).save.medicine.bag, { heqi: 1 });
+  assert.deepEqual(importSave(exportSave(again, null)).save.medicine.bag, { mingqing: 1 });
 });
 test('退宗保留精研，只有当前宗门加成；重新入宗恢复', () => {
   const s = wealthy(24);

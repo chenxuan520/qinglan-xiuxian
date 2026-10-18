@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { freshSave, readSave, IMMORTAL_CULTIVATION, type SaveData } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { formatTime, TRIAL_BOSS_TIMES } from '../src/data.ts';
+import { TOUR_STEPS } from '../src/interface-tour-model.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
@@ -398,6 +399,50 @@ try {
     await click('[data-action=resume]');
     await click('.combat-actions [data-action=guide]');
     await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=save]")');
+    const beforeTour = await evaluate("() => localStorage.getItem('qinglan-immortal-v1')");
+    await click('[data-action=guide-tour]');
+    for (let step = 0; step < TOUR_STEPS.length; step++) {
+      checkpoint = `${name}-tour-${step}`;
+      await wait(`() => document.querySelector('.interface-tour')?.dataset.step === '${step}'`);
+      await evaluate('async () => { await new Promise(requestAnimationFrame); return true; }');
+      const layout = await evaluate(`() => {
+        const target = document.querySelector(${JSON.stringify(TOUR_STEPS[step].target)});
+        const bounds = target.getBoundingClientRect();
+        let clipped = bounds.left < 0 || bounds.top < 0 || bounds.right > innerWidth + 1 || bounds.bottom > innerHeight + 1;
+        for (let parent = target.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+          const r = parent.getBoundingClientRect(), style = getComputedStyle(parent);
+          const top = r.top + parent.clientTop, left = r.left + parent.clientLeft;
+          if (/(auto|scroll|hidden|clip)/.test(style.overflowY)) clipped ||= bounds.top < top - 1 || bounds.bottom > top + parent.clientHeight + 1;
+          if (/(auto|scroll|hidden|clip)/.test(style.overflowX)) clipped ||= bounds.left < left - 1 || bounds.right > left + parent.clientWidth + 1;
+        }
+        const card = document.querySelector('.tour-card').getBoundingClientRect();
+        const hole = document.querySelector('.tour-outline').getBoundingClientRect();
+        return {
+          inside: card.left >= 0 && card.top >= 0 && card.right <= innerWidth + 1 && card.bottom <= innerHeight + 1,
+          overlap: Math.max(0, Math.min(card.right, hole.right) - Math.max(card.left, hole.left)) *
+            Math.max(0, Math.min(card.bottom, hole.bottom) - Math.max(card.top, hole.top)),
+          visible: hole.width > 24 && hole.height > 24 && !clipped,
+          practice: !document.querySelector('.interface-tour[data-step="12"]') || (hole.height >= 80 && hole.top <= innerHeight / 2 - 60 && hole.bottom >= innerHeight / 2 + 50 && hole.left <= innerWidth / 2 - 40 && hole.right >= innerWidth / 2 + 40),
+        };
+      }`);
+      assert.equal(layout.inside, true, `${checkpoint}：说明卡必须完整可见`);
+      assert.equal(layout.visible, true, `${checkpoint}：高亮目标必须可见`);
+      assert.equal(layout.practice, true, `${checkpoint}：走位亮区不能塌缩`);
+      assert.ok(layout.overlap <= 1, `${checkpoint}：说明卡不可遮挡高亮目标`);
+      if (screenshots)
+        await browser.call('take_screenshot', {
+          pageId,
+          filePath: resolve(output, `${checkpoint}.png`),
+        });
+      results.push({ name: checkpoint, layout });
+      await click(step === TOUR_STEPS.length - 2 ? '.choice-card' : '[data-tour=next]');
+    }
+    assert.equal(await evaluate("() => !!document.querySelector('.interface-tour')"), false);
+    assert.equal(
+      await evaluate("() => localStorage.getItem('qinglan-immortal-v1')"),
+      beforeTour,
+      '完整演练不能改变真实存档与暂停中的历练',
+    );
     await click('[data-action=guide-tab][data-id=save]');
     const scroll = await evaluate(`() => {
       const panel=document.querySelector('.panel'), tabs=document.querySelector('.guide-tabs');
