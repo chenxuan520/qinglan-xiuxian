@@ -53,8 +53,9 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-labelledby', 'tour-title');
-  overlay.innerHTML = `<svg class="tour-shade" aria-hidden="true"><defs><mask id="tour-mask"><rect width="100%" height="100%" fill="white"/><rect class="tour-hole" rx="8" fill="black"/></mask></defs><rect width="100%" height="100%" fill="#020e0c" fill-opacity=".8" mask="url(#tour-mask)"/></svg><div class="tour-outline" aria-hidden="true"></div><section class="tour-card" aria-live="polite"><header><span class="tour-progress"></span><button data-tour="exit" aria-label="退出界面导览">退出 ×</button></header><h2 id="tour-title"></h2><p class="tour-copy"></p><small class="tour-tip"></small><div class="tour-steps" aria-hidden="true"></div><footer><button class="secondary-button" data-tour="previous">上一步</button><button class="primary-button" data-tour="next">下一步 →</button></footer></section>`;
+  overlay.innerHTML = `<svg class="tour-shade" aria-hidden="true"><defs><mask id="tour-mask"><rect width="100%" height="100%" fill="white"/><rect class="tour-hole" rx="8" fill="black"/></mask></defs><rect width="100%" height="100%" fill="#020e0c" fill-opacity=".8" mask="url(#tour-mask)"/></svg><div class="tour-outline" aria-hidden="true"></div><section class="tour-card" aria-live="polite"><header><span class="tour-progress"></span></header><h2 id="tour-title"></h2><p class="tour-copy"></p><small class="tour-tip"></small><div class="tour-steps" aria-hidden="true"></div></section><nav class="tour-navigation" aria-label="界面导览操作"><button class="secondary-button" data-tour="previous">上一步</button><button class="primary-button" data-tour="next">下一步 →</button><button class="tour-exit" data-tour="exit" aria-label="退出界面导览">退出</button></nav>`;
   const card = overlay.querySelector<HTMLElement>('.tour-card')!;
+  const navigation = overlay.querySelector<HTMLElement>('.tour-navigation')!;
   const hole = overlay.querySelector<SVGRectElement>('.tour-hole')!;
   const outline = overlay.querySelector<HTMLElement>('.tour-outline')!;
   const abort = new AbortController();
@@ -74,6 +75,7 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
   let preview = new Game(structuredClone(sample), 0, 0, random);
   let move = { x: 0, y: 0 };
   let drag: { x: number; y: number; id: number } | null = null;
+  let dragged = false;
   const held = new Set<string>();
 
   function close() {
@@ -196,7 +198,7 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
     const place = () =>
       tourPlacement(
         target.getBoundingClientRect(),
-        { width: innerWidth, height: innerHeight },
+        { width: innerWidth, height: navigation.getBoundingClientRect().top - 12 },
         { width: card.offsetWidth, height: card.offsetHeight },
       );
     let box = place();
@@ -244,10 +246,10 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
           ? '场景未载入，可退出后重试。'
           : !ready
             ? '场景载入中…'
-            : '演练可以放心尝试，真实进度不变。'
-        : '演练不计年岁、不花物资；退出后回到原来的指南。';
-    card.querySelector<HTMLButtonElement>('[data-tour="previous"]')!.disabled = index === 0;
-    card.querySelector('[data-tour="next"]')!.textContent =
+            : '轻点任意位置继续；拖动走位不会跳步。'
+        : '轻点任意位置继续；演练不改变真实进度。';
+    navigation.querySelector<HTMLButtonElement>('[data-tour="previous"]')!.disabled = index === 0;
+    navigation.querySelector('[data-tour="next"]')!.textContent =
       index === TOUR_STEPS.length - 1 ? '完成导览 ✓' : '下一步 →';
     card.querySelector('.tour-steps')!.innerHTML = TOUR_STEPS.map(
       (_, i) => `<i${i <= index ? ' class="visited"' : ''}></i>`,
@@ -255,26 +257,23 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
     position(true);
     cancelAnimationFrame(layoutFrame);
     layoutFrame = requestAnimationFrame(() => position());
-    card.querySelector<HTMLButtonElement>('[data-tour="next"]')!.focus({ preventScroll: true });
+    navigation
+      .querySelector<HTMLButtonElement>('[data-tour="next"]')!
+      .focus({ preventScroll: true });
   }
   function input(event: Event) {
     const target = event.target as Element;
     const control = target.closest<HTMLElement>('[data-tour]');
-    const choice = target.closest<HTMLElement>('.choice-card');
-    if (event.type === 'click' && scene === 'upgrade' && choice) {
-      preview.choose(Number(choice.dataset.id));
-      show(index + 1);
-    }
-    if (event.type === 'click' && control) {
-      if (
-        control.dataset.tour === 'exit' ||
-        (control.dataset.tour === 'next' && index === TOUR_STEPS.length - 1)
-      )
-        close();
-      else show(index + (control.dataset.tour === 'previous' ? -1 : 1));
+    if (event.type === 'click') {
+      if (dragged && event instanceof MouseEvent && event.detail > 0) {
+        dragged = false;
+      } else if (control?.dataset.tour === 'exit') close();
+      else if (control?.dataset.tour === 'previous') show(index - 1);
+      else if (index === TOUR_STEPS.length - 1) close();
+      else show(index + 1);
     }
     // Let the tour buttons receive native focus / keyboard clicks; prevent every game action.
-    if (!card.contains(target)) event.preventDefault();
+    if (!navigation.contains(target)) event.preventDefault();
     event.stopImmediatePropagation();
   }
   for (const name of ['click', 'input', 'change', 'submit', 'dblclick', 'contextmenu'])
@@ -287,8 +286,7 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
         close();
       } else if (event.key === 'Tab') {
         const buttons = [
-          ...card.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'),
-          ...(scene === 'upgrade' ? modal.querySelectorAll<HTMLButtonElement>('.choice-card') : []),
+          ...navigation.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'),
         ];
         const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
         event.preventDefault();
@@ -329,12 +327,9 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
   window.addEventListener(
     'pointerdown',
     (event) => {
-      if (card.contains(event.target as Node)) return;
-      if (scene === 'upgrade' && (event.target as Element).closest('.choice-card')) {
-        event.stopImmediatePropagation();
-        return;
-      }
-      event.preventDefault();
+      dragged = false;
+      if (card.contains(event.target as Node) || navigation.contains(event.target as Node)) return;
+      // Preserve the browser's tap/click synthesis so tapping the scene advances on phones too.
       event.stopImmediatePropagation();
       if (TOUR_STEPS[index].scene === 'battle')
         drag = { x: event.clientX, y: event.clientY, id: event.pointerId };
@@ -345,6 +340,7 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
     'pointermove',
     (event) => {
       if (!drag || drag.id !== event.pointerId) return;
+      dragged ||= Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 8;
       move = { x: (event.clientX - drag.x) / 40, y: (event.clientY - drag.y) / 40 };
       event.preventDefault();
       event.stopImmediatePropagation();

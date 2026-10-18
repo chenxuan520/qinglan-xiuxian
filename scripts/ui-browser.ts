@@ -93,6 +93,7 @@ export async function openUiBrowser(options: UiBrowserOptions = {}) {
     `--executablePath=${chromePath()}`,
     '--no-usage-statistics',
     '--no-performance-crux',
+    '--experimentalVision=true',
     `--workspace=${workspace}`,
   ];
   if (process.env.CI || process.getuid?.() === 0) args.push('--chromeArg=--no-sandbox');

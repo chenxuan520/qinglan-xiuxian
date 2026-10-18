@@ -401,6 +401,7 @@ try {
     await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=save]")');
     const beforeTour = await evaluate("() => localStorage.getItem('qinglan-immortal-v1')");
     await click('[data-action=guide-tour]');
+    let tourNavigation: { left: number; top: number; width: number; height: number } | undefined;
     for (let step = 0; step < TOUR_STEPS.length; step++) {
       checkpoint = `${name}-tour-${step}`;
       await wait(`() => document.querySelector('.interface-tour')?.dataset.step === '${step}'`);
@@ -417,11 +418,15 @@ try {
         }
         const card = document.querySelector('.tour-card').getBoundingClientRect();
         const hole = document.querySelector('.tour-outline').getBoundingClientRect();
+        const navigation = document.querySelector('.tour-navigation').getBoundingClientRect();
+        const next = document.querySelector('[data-tour="next"]').getBoundingClientRect();
         return {
           inside: card.left >= 0 && card.top >= 0 && card.right <= innerWidth + 1 && card.bottom <= innerHeight + 1,
           overlap: Math.max(0, Math.min(card.right, hole.right) - Math.max(card.left, hole.left)) *
             Math.max(0, Math.min(card.bottom, hole.bottom) - Math.max(card.top, hole.top)),
           visible: hole.width > 24 && hole.height > 24 && !clipped,
+          navigation: {left: next.left, top: next.top, width: next.width, height: next.height},
+          navigationClear: navigation.top >= Math.max(card.bottom, hole.bottom, bounds.bottom) + 11 && navigation.bottom <= innerHeight + 1,
           practice: !document.querySelector('.interface-tour[data-step="12"]') || (hole.height >= 80 && hole.top <= innerHeight / 2 - 60 && hole.bottom >= innerHeight / 2 + 50 && hole.left <= innerWidth / 2 - 40 && hole.right >= innerWidth / 2 + 40),
         };
       }`);
@@ -429,13 +434,33 @@ try {
       assert.equal(layout.visible, true, `${checkpoint}：高亮目标必须可见`);
       assert.equal(layout.practice, true, `${checkpoint}：走位亮区不能塌缩`);
       assert.ok(layout.overlap <= 1, `${checkpoint}：说明卡不可遮挡高亮目标`);
+      assert.equal(layout.navigationClear, true, `${checkpoint}：固定导航不可遮挡说明或高亮区域`);
+      tourNavigation ??= layout.navigation;
+      assert.deepEqual(
+        layout.navigation,
+        tourNavigation,
+        `${checkpoint}：下一步按钮不得随步骤移动`,
+      );
       if (screenshots)
         await browser.call('take_screenshot', {
           pageId,
           filePath: resolve(output, `${checkpoint}.png`),
         });
       results.push({ name: checkpoint, layout });
-      await click(step === TOUR_STEPS.length - 2 ? '.choice-card' : '[data-tour=next]');
+      if (step === 4) {
+        await click('[data-tour=previous]');
+        await wait("() => document.querySelector('.interface-tour')?.dataset.step === '3'");
+        await click('[data-tour=next]');
+        await wait("() => document.querySelector('.interface-tour')?.dataset.step === '4'");
+      }
+      if (step === 0) await browser.call('click_at', { pageId, x: 4, y: 4 });
+      else if (step === TOUR_STEPS.length - 2) await click('.choice-card');
+      else
+        await browser.call('click_at', {
+          pageId,
+          x: tourNavigation!.left + tourNavigation!.width / 2,
+          y: tourNavigation!.top + tourNavigation!.height / 2,
+        });
     }
     assert.equal(await evaluate("() => !!document.querySelector('.interface-tour')"), false);
     assert.equal(
