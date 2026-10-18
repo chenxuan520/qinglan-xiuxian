@@ -38,19 +38,11 @@ test('入口页声明 canonical 与 Open Graph / Twitter 分享卡片', () => {
   expectMeta('property', 'og:locale', 'zh_CN');
   expectMeta('property', 'og:site_name', '叩仙门：青岚纪');
   expectMeta('property', 'og:title', '叩仙门：青岚纪');
-  expectMeta(
-    'property',
-    'og:description',
-    '只需走位的修仙生存游戏。御三十六法宝，历七重秘境，从炼气走向渡劫。',
-  );
+  expectMeta('property', 'og:description', '只需走位的修仙生存游戏。一世修行，叩问仙门。');
   expectMeta('property', 'og:url', 'https://xiuxian.011203.xyz/');
   expectMeta('name', 'twitter:card', 'summary_large_image');
   expectMeta('name', 'twitter:title', '叩仙门：青岚纪');
-  expectMeta(
-    'name',
-    'twitter:description',
-    '只需走位的修仙生存游戏。御三十六法宝，历七重秘境，从炼气走向渡劫。',
-  );
+  expectMeta('name', 'twitter:description', '只需走位的修仙生存游戏。一世修行，叩问仙门。');
 });
 
 test('og:image 指向官网绝对地址，封面文件存在、JPEG、1200x630', () => {
