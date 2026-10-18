@@ -119,7 +119,9 @@ export function marketKnownMemory(save: SaveData, id: MarketCultivatorId) {
       : '此番相识，彼此已留过名字。',
     c.tradeVisit ? '曾经当面公平交易，对方愿意提醒你核对凭据与退路。' : '',
     c.aidAt !== undefined ? '你曾在坊中切实相助，这份情谊当事人记在心里。' : '',
-    c.debateGiftAt !== undefined ? '这位旧识已赠过一份凡品丹药答谢相助，本世不再重复回礼。' : '',
+    c.debateGiftAt !== undefined
+      ? '这位旧识已赠过一份凡品丹药答谢相助，这份答谢本世仅此一次。'
+      : '',
     c.grudge ? '你认出先前伏击你的劫修。旧怨尚在，私下赴约尤其危险；可留在坊市，直接作别。' : '',
   ]
     .filter(Boolean)

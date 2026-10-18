@@ -296,11 +296,18 @@ export function marketCultivatorRealm(
 export function marketRelation(npcRealm: number, playerRealm: number) {
   return npcRealm > playerRealm ? '前辈' : npcRealm === playerRealm ? '道友' : '蝼蚁';
 }
+// 真实境界用于结算；展示时只能辨识同阶及以下的修为。
+export function marketRealmLabel(
+  npc: Pick<MarketCultivator, 'realm' | 'realmIndex'>,
+  playerRealm: number,
+) {
+  return npc.realmIndex > playerRealm ? '修为难测' : npc.realm;
+}
 export function marketLocalReply(npc: MarketCultivator, message: string, playerRealm: number) {
   if (npc.roaming && /论道|丹|药|换|求购/.test(message))
-    return `我如今修至${npc.realm}，随身丹药也是这一境所用。今日只来逛市访友，若要论道或互换，可去丹药铺、法器阁和散修小院找设摊的道友。`;
+    return '今日只来逛市访友，若要论道或互换，可去丹药铺、法器阁和散修小院找设摊的道友。';
   if (/论道|请教|指点/.test(message))
-    return '论道需静心一年，相隔十个游戏年可有所获。你的灵根、路线和本命各有取舍，丹方或余丹以坐而论道的结果为准。';
+    return '论道需静心一年，相隔十个游戏年可有所获。可交流御器心得、抄录或互授丹方；是否赠药，还看故交情分。';
   if (/委托|求购/.test(message))
     return '求购有明示的物品和报酬，当面交货，半年便结清。若有人催你先垫路费，或邀你去僻处，先核验再决定。';
   if (/骗|险|劫|机缘/.test(message))
@@ -314,7 +321,9 @@ export function marketLocalReply(npc: MarketCultivator, message: string, playerR
       ? '前辈的修为，我看不透，也不敢妄评。若愿指点一二，晚辈洗耳恭听。'
       : '只凭一面，难知你这一程如何精进。不妨说说近来修行的难处，我们再慢慢谈。';
   if (/境界|修为|前辈|道友|蝼蚁/.test(message))
-    return `我如今修至${npc.realm}。${npc.realmIndex > playerRealm ? '小友莫急，先走稳眼前这一程。' : npc.realmIndex === playerRealm ? '你我同一大境界，不妨互通见闻。' : '前辈的修为我看不透，晚辈不敢妄评。'}`;
+    return npc.realmIndex > playerRealm
+      ? '小友莫急，修行深浅非一眼可辨，先走稳眼前这一程。'
+      : `我如今修至${npc.realm}。${npc.realmIndex === playerRealm ? '你我同一大境界，不妨互通见闻。' : '前辈的修为我看不透，晚辈不敢妄评。'}`;
   if (/门|正道|魔道|身份|是谁|谁啊/.test(message))
     return `我是${npc.role}，在这里暂歇一程。${npc.path === 'demonic' ? '求道手段虽不同，今日相逢只论互通有无。' : npc.path === 'orthodox' ? '山门教人根基，游历教人取舍。' : '炼丹讲究火候，修行也是如此。'}`;
   const lines = [

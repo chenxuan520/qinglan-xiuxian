@@ -111,7 +111,12 @@ test('十五位具名修士稳定不重名，访客可正常聊境界但没有�
     };
     assert.equal(validDialogue(request), true);
     const prompt = dialogueMessages(request)[0].content;
-    assert.ok(prompt.includes(npc.name) && prompt.includes(npc.realm));
+    assert.ok(prompt.includes(npc.name));
+    assert.ok(
+      prompt.includes(
+        npc.realmIndex > 0 ? '具体境界、小阶段与高出几境都不对外说明' : `你目前修至${npc.realm}。`,
+      ),
+    );
     assert.match(prompt, /没有自己的交易摊位/);
   }
   for (const id of ['market-visitor-12', 'market-visitor--1', 'market-visitor-01'])

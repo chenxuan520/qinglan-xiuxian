@@ -13,6 +13,7 @@ import {
   marketMedicinePool,
   marketCultivatorRealm,
   marketRelation,
+  marketRealmLabel,
   marketLocalReply,
   validSectMarket,
 } from '../src/sect-market-data.ts';
@@ -353,11 +354,17 @@ test('NPC 请求与界面用同一身份/境界；拒绝缺失和越界身份，
     assert.equal(validDialogue(request), true);
     const prompt = dialogueMessages(request)[0].content;
     assert.ok(prompt.includes(npc.name));
-    assert.ok(prompt.includes(npc.realm));
+    assert.ok(
+      prompt.includes(
+        npc.realmIndex > 4 ? '具体境界、小阶段与高出几境都不对外说明' : `你目前修至${npc.realm}。`,
+      ),
+    );
     assert.ok(prompt.includes(`玩家将你归为「${marketRelation(npc.realmIndex, 4)}」`));
     assert.match(prompt, /不能替玩家进行交易/);
     assert.match(prompt, /不承诺免费赠药/);
-    assert.match(marketLocalReply(npc, '你修到什么境界？', 4), new RegExp(npc.realm));
+    const realmReply = marketLocalReply(npc, '你修到什么境界？', 4);
+    if (npc.realmIndex > 4) assert.doesNotMatch(realmReply, new RegExp(npc.realm));
+    else assert.match(realmReply, new RegExp(npc.realm));
     assert.match(marketLocalReply(npc, '换药怎么弄？', 4), /按相近估值互换/);
     assert.equal(validDialogue({ ...request, marketVisit: undefined }), false);
     assert.equal(validDialogue({ ...request, marketVisit: { visit: 0, realmIndex: 4 } }), false);
@@ -438,7 +445,12 @@ test('前辈未自述时，实际境界及小阶段的变化不会给低阶修�
     { role: 'user' as const, content: '我并没有告诉你这些。' },
   ];
   const reported = dialogueMessages({ ...body, history });
-  assert.deepEqual(reported.slice(1), [...history, { role: 'user', content: body.message }]);
+  assert.deepEqual(reported.slice(1), [
+    { role: 'assistant', content: '前辈修为难测，具体境界未曾辨明。' },
+    history[1],
+    { role: 'user', content: body.message },
+  ]);
+  assert.equal(history[0].content, '前辈刚突破化神，精进得真快。');
   assert.match(reported[0].content, /玩家自述只能作为自述转述/);
   assert.match(reported[0].content, /不能接着编造/);
 });
@@ -489,7 +501,7 @@ test('界面列明完整报价与不足状态，成功后隐藏结算按钮', ()
       save.medicine.bag = structuredClone(emptyBag);
       const offer = sectMarketOffer(save, npc.id)!,
         html = sectMarketEventContent(save, npc);
-      assert.ok(html.includes(npc.realm) && html.includes(offer.name));
+      assert.ok(html.includes(marketRealmLabel(npc, rank)) && html.includes(offer.name));
       assert.match(html, /丹囊现有 0/);
       assert.match(html, /所需物品不足/);
       assert.match(html, /disabled/);

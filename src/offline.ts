@@ -140,7 +140,7 @@ export function refreshOfflinePanel() {
   let text = state.ready
     ? '全部离线资源已缓存，可断网重新打开游玩。'
     : state.stored
-      ? '已有旧版离线资源；请缓存当前版本以离线使用本次更新。'
+      ? '离线资源有更新，请在这里重新缓存。'
       : `尚未缓存全部资源${amount ? ` · ${amount}` : ''}。`;
   if (!supported()) text = '此浏览器暂不支持离线缓存，请在支持的浏览器中打开官网。';
   else if (state.busy)

@@ -389,7 +389,7 @@ test('听书失败明确提醒，手动重试不改存档，成功后才能再�
   assert.equal(calls, 2);
   assert.match(
     host.nodes['.tea-story-status'].textContent,
-    /故事生成失败.*AI 生成超时.*不会再次消耗年岁/,
+    /这回故事等得久了.*可再试这一回，不另耗年岁/,
   );
   assert.equal(host.nodes['.tea-story-status'].role, 'alert');
   assert.equal(host.nodes['.tea-story-next'].disabled, true);
@@ -417,14 +417,17 @@ test('自动重试等待期间关闭立即取消，不发第二次请求也不�
   });
   const pending = mountTeaStory(host, save, () => {});
   await new Promise((resolve) => setImmediate(resolve));
-  assert.match(host.nodes['.tea-story-status'].textContent, /正在自动重试（2\/2）/);
+  assert.match(host.nodes['.tea-story-status'].textContent, /说书人稍作停顿，请稍候/);
   closeNpcChat();
   await pending;
   assert.equal(calls, 1);
-  assert.doesNotMatch(host.nodes['.tea-story-status'].textContent, /故事生成失败/);
+  assert.doesNotMatch(
+    host.nodes['.tea-story-status'].textContent,
+    /等得久了|网络连接失败|可再试这一回/,
+  );
 });
 
-test('配图失败明确提示但保留正文、朗读和下一回入口', async (t) => {
+test('配图失败不打断正文、朗读和下一回入口', async (t) => {
   const save = freshSave();
   save.mortal.population = input.population;
   const host = storyHost();
@@ -440,7 +443,9 @@ test('配图失败明确提示但保留正文、朗读和下一回入口', async
   await mountTeaStory(host, save, () => {});
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(host.nodes['.tea-story-text'].textContent, '一段已完整生成的故事。');
-  assert.match(host.nodes['.tea-story-image-status'].textContent, /配图暂未生成，不影响阅读和朗读/);
+  assert.equal(host.nodes['.tea-story-image-status'].textContent, '');
+  assert.equal(host.classList.contains('has-story-image'), false);
+  assert.equal(host.nodes['.tea-story-play'].disabled, false);
   assert.equal(host.nodes['.tea-story-next'].disabled, false);
 });
 
@@ -510,7 +515,10 @@ test('说书正文只写入文本，失败不补固定故事，关闭后丢弃�
   await mountTeaStory(offline, save, () => {});
   assert.equal(offline.nodes['.tea-story-text'].textContent, '');
   assert.equal(offline.nodes['.tea-story-play'].hidden, true);
-  assert.match(offline.nodes['.tea-story-status'].textContent, /故事生成失败.*网络连接失败/);
+  assert.match(
+    offline.nodes['.tea-story-status'].textContent,
+    /网络连接失败.*可再试这一回，不另耗年岁/,
+  );
   assert.equal(offline.nodes['.tea-story-retry'].hidden, false);
   assert.equal(offline.nodes['.tea-story-next'].disabled, true);
   let resolve;

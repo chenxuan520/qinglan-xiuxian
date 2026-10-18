@@ -33,7 +33,7 @@ export function bestiaryPanel(bestiaryStage: number): PanelDefinition {
   return {
     title: '知妖性，方能破万劫',
     subtitle: '妖物志',
-    body: `<p class="panel-note">前六境各有 12 种专属妖物，共 72 种；普通秘境只出现本境妖物。各境依次强调冲开藤枝包围、绕开狐火路径、躲避狼群围猎、避开游瘴、寻找控魂者与观察雷路节拍。第七境汇聚历境精英，使用各自的弹幕与落阵招式。普通与精英妖物的地面攻击在施法者附近生成，远程灵弹可见且有射程；妖王保留锁定主角的预警招式。每关分四批加入强敌：前六境按时长 0%、25%、50%、75% 解锁，终关提前到 0:00、0:45、1:30、2:30，后续以新批次为主。第七境「万劫归墟」汇聚历境精英，六位妖王与九天执劫仙尊依次登场；全部击败才能通关并解除成仙瓶颈。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物池">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
+    body: `<p class="panel-note">不同秘境栖居着不同妖物。各境依次强调冲开藤枝包围、绕开狐火路径、躲避狼群围猎、避开游瘴、寻找控魂者与观察雷路节拍。第七境汇聚历境精英，使用各自的弹幕与落阵招式。普通与精英妖物的地面攻击在施法者附近生成，远程灵弹可见且有射程；妖王保留锁定主角的预警招式。每关分四批加入强敌：前六境按时长 0%、25%、50%、75% 解锁，终关提前到 0:00、0:45、1:30、2:30，后续以新批次为主。第七境「万劫归墟」汇聚历境精英，六位妖王与九天执劫仙尊依次登场；全部击败才能通关并解除成仙瓶颈。</p><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物分类">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
       (_, index) => bestiaryStage < 0 || STAGE_ENEMIES[bestiaryStage].includes(index),
     )
       .map((e) => {

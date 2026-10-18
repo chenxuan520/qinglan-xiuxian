@@ -289,7 +289,7 @@ test('Worker /event 本机只校验不写入，拒收非法、超大、限流与
 
 test('关于面板说明匿名统计内容并提供开关', () => {
   assert.match(telemetryRow(true, true), /已开启[^]*data-action="telemetry-toggle"[^]*关闭/);
-  assert.match(telemetryRow(true, false), /本网址不发送/);
+  assert.match(telemetryRow(true, false), /已开启 · 当前不可用/);
   assert.match(telemetryRow(false, true), /已关闭[^]*开启/);
-  assert.match(telemetryRow(true, true), /不上传存档、闲聊或任何个人信息，数据保留三个月/);
+  assert.match(telemetryRow(true, true), /不上传存档、闲聊或个人信息，记录保留三个月/);
 });

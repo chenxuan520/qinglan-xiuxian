@@ -126,7 +126,7 @@ export function immortalGatePanel(): PanelParts {
   return [
     '叩入仙门',
     '此界修行圆满 · 走向终章',
-    '<p class="pause-description">你已证得长生，此界的修行即将圆满。确认后进入终章，历练、洞府和青岚镇均不可再返回，未完成的历练也会终止；刷新仍停留在终章。</p><p class="panel-note">终章可留存此世，也可在离界时赠青岚少年一件法宝或一枚丹药，让他接续问道之路。你也可以暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 走向终章</button></div>',
+    '<p class="pause-description">你已证得长生，此界的修行即将圆满。确认后进入终章，历练、洞府和青岚镇均不可再返回，未完成的历练也会终止。</p><p class="panel-note">终章可留存此世，也可在离界时赠青岚少年一件法宝或一枚丹药，让他接续问道之路。你也可以暂留人间，待准备好再来。</p><div class="pause-actions"><button class="secondary-button" data-action="close">暂留人间</button><button class="primary-button" data-action="confirm-immortal-gate">叩门而入 · 走向终章</button></div>',
   ];
 }
 

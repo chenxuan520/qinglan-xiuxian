@@ -64,7 +64,7 @@ test('玄铁按十游戏年补货并保存额度，跨期行情稳定，批量�
   assert.equal(JSON.stringify(s), next);
   assert.equal(tradeIron(s, true, 1, ironMarket(s).period), true);
   assert.equal(ironMarket(s).remaining, 99);
-  assert.match(ironMarketContent(s), /35 岁刷新/);
+  assert.match(ironMarketContent(s), /35 岁补货并调整行情/);
 });
 test('玄铁全行情均不能买入后倒卖套利，拒绝非法数量、溢出和不足，不部分扣账', () => {
   const points = [];

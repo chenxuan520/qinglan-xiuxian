@@ -102,11 +102,11 @@ test('洞府使用此世存档文案并保留原导入导出动作', () => {
   assert.match(source, /class="save-record"/);
   assert.match(source, /<h3>此世存档<\/h3>/);
   assert.match(source, /把这一世的修为、旧事与未尽历练收进行囊/);
-  assert.match(source, /本地保存为 JSON，不会上传/);
+  assert.match(source, /导出存档文件，换设备也能接续这一世/);
   assert.match(source, /data-action="export-save">导出此世<\/button>/);
   assert.match(source, /data-action="import-save">导入旧档<\/button>/);
   const guide = guideContent('save');
-  assert.match(guide, /洞府底部「此世存档」可用「导出此世」保存 JSON/);
+  assert.match(guide, /洞府底部「此世存档」可用「导出此世」保存存档文件/);
   assert.match(guide, /点「导入旧档」/);
   assert.doesNotMatch(guide, /「存档备份」|「导入存档」/);
 });

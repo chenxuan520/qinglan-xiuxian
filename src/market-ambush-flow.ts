@@ -86,7 +86,7 @@ export function finishAmbush(shell: ActionShell, outcome: AmbushOutcome) {
     shell.panelFrame(
       '战况已定',
       '结算尚未保存',
-      '<p>战况保持不变，请释放浏览器存储空间后重试。不会再次扣款或重复发放战利品。</p><button class="primary-button" data-action="market-ambush-recover">重试保存结果</button>',
+      '<p>未能保存结果，请释放浏览器存储空间后重试。</p><button class="primary-button" data-action="market-ambush-recover">重试保存结果</button>',
     );
     hideClose(shell);
     return;
@@ -129,7 +129,7 @@ export function ambushAction(shell: ActionShell, action: string) {
     shell.panelFrame(
       '重燃道心',
       '广告复活',
-      `${shell.AD_PLACEHOLDER_HTML}<p class="panel-note">完整观看广告后满血复活，并获得三秒护身。刷新后仍需重新观看未领取的广告。</p><div class="result-actions"><button class="primary-button" data-action="market-ambush-revive" disabled>${shell.AD_SECONDS} 秒后满血复活</button><button class="secondary-button" data-action="market-ambush-ad-back">返回</button></div>`,
+      `${shell.AD_PLACEHOLDER_HTML}<p class="panel-note">完整观看广告后满血复活，并获得三秒护身。</p><div class="result-actions"><button class="primary-button" data-action="market-ambush-revive" disabled>${shell.AD_SECONDS} 秒后满血复活</button><button class="secondary-button" data-action="market-ambush-ad-back">返回</button></div>`,
     );
     hideClose(shell);
     shell.startAdWatch('market-ambush-revive', '满血复活', 'revive');

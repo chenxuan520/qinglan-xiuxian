@@ -319,7 +319,7 @@ test('失败重试只重发本回请求，不带主路由 action，不重扣年�
     assert.equal(modal.querySelector('.tea-story-status')!.getAttribute('role'), 'alert');
     assert.match(
       modal.querySelector('.tea-story-status')!.textContent,
-      /故事生成失败.*重试这一回.*不会再次消耗年岁或判定机缘/,
+      /网络连接失败.*可再试这一回，不另耗年岁/,
     );
     assert.equal(modal.querySelector('.tea-story-next')!.disabled, true);
     assert.equal(retry.hidden, false);

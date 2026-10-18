@@ -94,7 +94,8 @@ test('同道面板沿真实进度显示可用选择，按钮绑定当前来访�
     assert.deepEqual(actions(html), []);
     assert.match(html, /class="market-inspection"/);
     assert.match(html, /data-action="close"/);
-    assert.match(html, /金丹/);
+    assert.match(html, /前辈 · 修为难测/);
+    assert.doesNotMatch(html, /金丹|元婴/);
     assert.doesNotMatch(html, /undefined|NaN/);
   }
 });

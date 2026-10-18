@@ -233,7 +233,12 @@ test('原十五位坊市来客的真实 Worker 请求仍使用各自生成身份
       assert.equal(model, NPC_MODEL);
       assert.ok(options.messages[0].content.includes(`修士${person.name}`), person.id);
       assert.ok(
-        options.messages[0].content.includes(`是${person.realm}的${person.role}`),
+        options.messages[0].content.includes(`是${person.role}。`) &&
+          options.messages[0].content.includes(
+            person.realmIndex > 0
+              ? '具体境界、小阶段与高出几境都不对外说明'
+              : `你目前修至${person.realm}。`,
+          ),
         person.id,
       );
       assert.equal(options.messages.at(-1).content, body.message);

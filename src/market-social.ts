@@ -589,7 +589,7 @@ export const MARKET_RISK_CLUES = {
   bloodstain: '对方袖口有旧血迹，却不肯多谈来路。',
   'claimed-sect': '他自称与附近宗门相熟，称坊外自有人照应；口头名号不是凭据，仍须核验。',
   'pressed-departure': '对方催你独行赴约，迟迟不说接应者是谁。',
-  'higher-realm': '对方境界更高，若翻脸，正面应战凶险。',
+  'higher-realm': '对方修为难测，若翻脸，正面应战凶险。',
   'sect-backing': '你佩着在籍宗门信物，对方有所顾忌；离坊后仍不能指望宗门立刻救援。',
   'old-grudge': '这正是曾伏击你的劫修，旧怨未消，私下邀约尤须提防。',
   'known-trader': '你们曾公平交割，但一次好交易并不能替这次邀约作保。',

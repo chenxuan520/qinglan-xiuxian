@@ -165,7 +165,7 @@ test('另一页完成新旧版本缓存后不继续显示旧清除提示', async
     assert.doesNotMatch(h.nodes['.offline-status'].textContent, /已清除/);
     assert.match(
       h.nodes['.offline-status'].textContent,
-      ready ? /全部离线资源已缓存/ : /已有旧版离线资源/,
+      ready ? /全部离线资源已缓存/ : /离线资源有更新，请在这里重新缓存/,
     );
   }
 });

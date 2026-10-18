@@ -227,7 +227,7 @@ export class TownScene {
       .catch(() => {
         if (this.events.signal.aborted) return;
         host.querySelector('.town-loading')!.innerHTML =
-          '<div>城镇素材加载失败，当前不计龄。<br><button class="secondary-button" data-action="town-retry">重新加载</button></div>';
+          '<div>街巷暂未准备好，游历已暂停。<br><button class="secondary-button" data-action="town-retry">重新加载</button></div>';
       });
   }
   showArrival(text: string) {

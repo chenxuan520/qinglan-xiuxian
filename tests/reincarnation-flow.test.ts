@@ -368,7 +368,7 @@ test('重抽或确认轮回时发现另一窗口更新存档，保留存档锁�
     assert.equal(context.saveLock, 'stale');
     assert.equal(context.panel, 'save-lock');
     assert.equal(context.ui.inert, true);
-    assert.match(context.modal.innerHTML, /同一存档刚在另一个窗口/);
+    assert.match(context.modal.innerHTML, /另一窗口已有更新的进度/);
     assert.equal(context.ui.innerHTML, '原背景');
     assert.equal(context.rootLayout.innerHTML, layout);
     assert.deepEqual(context.routes, ['save-lock']);

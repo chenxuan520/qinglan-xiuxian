@@ -34,5 +34,5 @@ export function powerDetailsContent(save: SaveData) {
           .join('')}</dd></div>`,
     )
     .join('');
-  return `<details class="power-details disclosure" data-disclosure="power-details"><summary>查看详细属性与增幅来源</summary><p class="panel-note">以下为当前满血、一级入场数值，完整显示数字。${root.name}基础：气血${root.baseHp}、移速${root.baseSpeed}、暴击${num(root.baseCrit * 100)}%。</p><dl class="power-stat-grid">${values}</dl><p class="panel-note">${current.weapon}一重未觉醒：本命施法间隔约${num(current.weaponCooldown, 3)}秒。单次伤害是非暴击的招式基础值；多弹、穿透、领域跳伤与敌方减伤另计，不是每秒伤害。施法间隔与承伤比例越低越好，毒伤承伤比例已计入全局减伤。</p><h4>哪些修行正在生效</h4><p class="panel-note">每行保持其他条件不变，与单独移除这一项时比较；各行的增幅不能直接相加。只列出生效且改变入场属性的来源，过期药效不计入。</p><dl class="power-origin-list">${origins || '<p>当前没有额外入场增幅。</p>'}</dl></details>`;
+  return `<details class="power-details disclosure" data-disclosure="power-details"><summary>查看详细属性与增幅来源</summary><p class="panel-note">以下为当前满血、一级入场数值，完整显示数字。${root.name}基础：气血${root.baseHp}、移速${root.baseSpeed}、暴击${num(root.baseCrit * 100)}%。</p><dl class="power-stat-grid">${values}</dl><p class="panel-note">${current.weapon}一重未觉醒：本命施法间隔约${num(current.weaponCooldown, 3)}秒。单次伤害是非暴击的招式基础值；多弹、穿透、领域跳伤与敌方减伤另计，不是每秒伤害。施法间隔与承伤比例越低越好，毒伤承伤比例已计入全局减伤。</p><h4>哪些修行正在生效</h4><p class="panel-note">各项增幅相互影响，不能直接相加。这里只列当前生效的修行与药效。</p><dl class="power-origin-list">${origins || '<p>当前没有额外入场增幅。</p>'}</dl></details>`;
 }

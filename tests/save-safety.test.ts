@@ -193,7 +193,7 @@ test('无法读取的存档在确认前不写入，可下载原文，确认后�
   context.persist();
   assert.equal(writes.length, 0);
   context.renderSaveLock();
-  assert.match(context.modal.innerHTML, /原始数据已另存/);
+  assert.match(context.modal.innerHTML, /原存档已备份/);
   context.handleAction('save-lock-download');
   assert.deepEqual(context.downloads, ['{bad']);
   assert.equal(storage.getItem(SAVE_KEY), '{bad');

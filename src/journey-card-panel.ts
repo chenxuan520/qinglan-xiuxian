@@ -21,7 +21,7 @@ export class JourneyCardPanel {
     panelFrame(
       '此世留影',
       '留存此世 · 山海留痕',
-      '<div class="journey-card-preview"><p class="panel-note" role="status">正在写下此世评语并生成留影，请稍候……可随时关闭。</p></div>',
+      '<div class="journey-card-preview"><p class="panel-note" role="status">此世经历正落笔成卷，请稍候……可随时关闭。</p></div>',
     );
     const request = new AbortController();
     this.request = request;
@@ -35,7 +35,7 @@ export class JourneyCardPanel {
       const url = await createJourneyCard(snapshot, reason, request.signal);
       if (!host.isConnected) return;
       host.innerHTML =
-        '<img alt="此世留影纪念卡预览"><div class="save-actions"><button class="primary-button">分享此世</button><a class="secondary-button" download="叩仙门：青岚纪-此世留影.png" target="_blank" rel="noopener" tabindex="0">保存图片</a></div><p class="panel-note" role="status">保存图片会请求浏览器下载；若未出现下载提示，可长按上方图片保存，或通过「分享此世」选择保存到手机。纪念图不能用于恢复存档，二维码不携带存档数据。</p>';
+        '<img alt="此世留影纪念卡预览"><div class="save-actions"><button class="primary-button">分享此世</button><a class="secondary-button" download="叩仙门：青岚纪-此世留影.png" target="_blank" rel="noopener" tabindex="0">保存图片</a></div><p class="panel-note" role="status">点击保存图片；手机也可长按图片，或通过「分享此世」保存。纪念图不能代替存档。</p>';
       host.querySelector('img')!.src = url;
       const download = host.querySelector('a')!;
       download.href = url;
@@ -49,11 +49,9 @@ export class JourneyCardPanel {
         try {
           // 文件已准备完成；在此次点击内同步创建下载地址，保留用户激活。
           download.href = imageDownloadUrl(file);
-          status.textContent =
-            '已请求下载图片，请查看浏览器下载记录。若未出现下载提示，可长按上方图片保存，或通过「分享此世」选择保存到手机。';
+          status.textContent = '请查看下载记录；若没有图片，可长按图片或通过「分享此世」保存。';
         } catch {
-          status.textContent =
-            '此浏览器无法直接下载图片，请长按上方图片保存，或通过「分享此世」选择保存到手机。';
+          status.textContent = '暂时无法下载，请长按图片或通过「分享此世」保存。';
         }
       };
       const button = host.querySelector('button')!;
@@ -73,7 +71,7 @@ export class JourneyCardPanel {
     } catch {
       if (!host.isConnected) return;
       host.innerHTML =
-        '<p class="panel-note" role="alert">此世留影生成失败，未能生成图片。请重试，或关闭后稍后再来；此世进度不受影响。</p><button class="secondary-button" data-action="journey-card">重新生成</button>';
+        '<p class="panel-note" role="alert">暂时未能留影，请重试或稍后再来。</p><button class="secondary-button" data-action="journey-card">重新生成</button>';
     } finally {
       if (this.request === request) this.request = null;
     }

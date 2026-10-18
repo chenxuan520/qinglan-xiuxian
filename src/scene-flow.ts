@@ -78,7 +78,7 @@ export function mountTownScene(shell: ActionShell) {
         () => {
           if (current())
             marketHost.innerHTML =
-              '<div class="town-loading" role="status"><div>坊市场景暂时无法载入，当前不计龄。<br><button class="secondary-button" data-action="sect-market-retry">重新加载</button></div></div>';
+              '<div class="town-loading" role="status"><div>坊市暂未准备好，游历已暂停。<br><button class="secondary-button" data-action="sect-market-retry">重新加载</button></div></div>';
         },
       );
     }

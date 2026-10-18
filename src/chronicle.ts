@@ -91,7 +91,7 @@ export function restoreChronicle(save: SaveData, value: unknown, step: number, a
       {
         age: null,
         title: '往事补录',
-        detail: `现为${ascending ? '渡劫' : realmTitle(step)}，已通关 ${save.completed.length} 处秘境。旧档未记录的达成年岁留白，此后经历按实际年岁记下。`,
+        detail: `现为${ascending ? '渡劫' : realmTitle(step)}，已通关 ${save.completed.length} 处秘境。`,
       },
     ],
   };

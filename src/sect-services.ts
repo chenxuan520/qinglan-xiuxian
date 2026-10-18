@@ -186,20 +186,20 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
       q.stones = Math.max(0, batch.total - credit);
       q.reason ||= batch.fits ? '' : '本境可精研费用不足以用完抵价，请换低价法宝或突破后再来';
       q.detail = `献出${auctionItemName(q.give[0])}及其炼器阶数，估值${auctionValue(q.give[0])}灵石、折抵${credit}灵石。${batch.fits ? `连续精研${q.levels}阶至${study.level + q.levels}阶，总费${batch.total}灵石，补${q.stones}灵石；抵价全数使用。五阶、十阶赐丹照常领取。` : '当前境界容纳不下全部抵价，本次不交出法宝、不扣费用。'}`;
-    } else q.detail = '完成后本门功法精研提升一阶；五阶、十阶赠丹沿用原规则。';
+    } else q.detail = '完成后本门功法精研提升一阶；五阶赠灵品丹药一颗，十阶赠限时珍品丹药一颗。';
   } else if (id === 'duration') {
     const m = medicineInfo(choice)!;
     q.stones = Math.ceil(medicineCraftStones(choice) * 1.5);
     q.years = m.craftYears * [0.6, 0.5, 0.4][tier];
     q.give = medicineFormula(save.medicine, choice).map((i) => pill(i.id, i.count));
     q.receive = choice;
-    q.detail = '沿用本世已知丹方与全部原料；额外灵石只换取更短年岁，不增加成丹数量。';
+    q.detail = '依本世已知丹方备齐原料；额外灵石只换取更短年岁，不增加成丹数量。';
   } else if (id === 'crit') {
     const m = medicineInfo(choice)!;
     q.stones = Math.ceil(medicineRecipePrice(choice) * 0.5);
     q.years = (m.tier === '灵品' ? 3 : 15) * [1, 5 / 6, 2 / 3][tier];
     q.recipe = choice;
-    q.detail = '样丹保留，习得这颗丹药的本世固定配方；仍需备齐原料、灵石和年岁才能炼丹。';
+    q.detail = '样丹保留，习得这颗丹药的本世丹方；仍需备齐原料、灵石和年岁才能炼丹。';
   } else if (['area', 'abyss', 'curse'].includes(id)) {
     const [from, to] = choice.split('@');
     const ratio = exchangeRatio(id, tier);
@@ -247,7 +247,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
       q.detail = `献出一份${auctionItemName(q.give[0])}，估值${auctionValue(q.give[0])}灵石、折抵${credit}灵石。${batch.fits ? `连续淬体${q.levels}阶至${level + q.levels}阶，总费${batch.total}灵石，补${q.stones}灵石；抵价全数使用。` : '余下阶数容纳不下全部抵价，本次不交丹、不扣费用。'}药效不自动服用。`;
     }
     if (save.training[q.train] >= 20) q.reason = `${trainingName[q.train]}已修至二十阶`;
-    q.detail += `遵守原二十阶上限${id === 'devour' ? '' : '，只提升一阶'}，不额外叠加宗门战斗属性。`;
+    q.detail += `根基至多二十阶${id === 'devour' ? '' : '，只提升一阶'}。`;
   }
   // 年岁以十分之一年报价和结算，向上取整避免比明示时间更长。
   q.years = Math.ceil(q.years * 10 - 1e-9) / 10;

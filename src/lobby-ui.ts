@@ -49,25 +49,25 @@ export function saveLockPanel(
     stale: [
       '此页已停止保存',
       '存档已在其他窗口更新',
-      '同一存档刚在另一个窗口或标签页保存了新的进度。为免覆盖那边的修行，此页不再写入存档。',
+      '另一窗口已有更新的进度，请继续最新的一份修行。',
       '请关闭多余的窗口，或在此页载入最新进度继续。',
       '<button class="primary-button" data-action="save-lock-reload">载入最新进度</button>',
     ],
     newer: [
       '存档来自新版本',
-      '此页为旧版本 · 已停止保存',
-      '本机存档已由更新版本的游戏保存过。继续在旧版本中游玩可能丢失新版本记录的内容，因此此页不会写入存档。',
+      '请先更新游戏',
+      '这份存档需要更新的游戏版本，请先更新游戏后继续。',
       '请刷新页面载入新版本；也可先下载一份存档留底。',
       '<button class="secondary-button" data-action="save-lock-download">下载存档留底</button><button class="primary-button" data-action="save-lock-reload">刷新页面</button>',
     ],
     unreadable: [
       '存档无法读取',
-      unreadableBackedUp ? '原始数据已另存' : '原始数据尚未覆盖',
+      unreadableBackedUp ? '原存档已备份' : '原存档尚未覆盖',
       unreadableBackedUp
-        ? '本机存档已损坏或格式无法识别。原始数据已另存在此浏览器中，开始新的一世也不会删除它。'
-        : '本机存档已损坏或格式无法识别，且浏览器空间不足，未能另存原始数据。开始新的一世会覆盖它。',
-      '建议先下载原始数据留底，便于日后排查或找回。',
-      '<button class="secondary-button" data-action="save-lock-download">下载原始数据</button><button class="primary-button" data-action="save-lock-continue">开始新的一世</button>',
+        ? '暂时读不出这份存档，已为你保留备份。请先下载备份，再开始新的一世。'
+        : '暂时读不出这份存档，也未能备份。开始新的一世会覆盖原存档，请先下载留底。',
+      '建议先下载原存档，留作备份。',
+      '<button class="secondary-button" data-action="save-lock-download">下载原存档</button><button class="primary-button" data-action="save-lock-continue">开始新的一世</button>',
     ],
   }[saveLock];
   return [

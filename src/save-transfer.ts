@@ -94,7 +94,7 @@ export function importSave(text: string) {
   try {
     file = JSON.parse(text.replace(/^\uFEFF/, ''));
   } catch {
-    throw new Error('文件不是有效的 JSON 存档');
+    throw new Error('无法识别这个存档文件，请选择游戏导出的存档');
   }
   if (file?.format !== undefined && (file.format !== 'qinglan-save' || file.version !== 1))
     throw new Error('不支持此存档格式或版本');

@@ -238,7 +238,7 @@ test('导入拒绝错误格式、版本、缺失字段、非法数值、损坏�
     { format: 'qinglan-save', version: 2, save },
   ])
     assert.throws(() => importSave(JSON.stringify(data)));
-  assert.throws(() => importSave('{broken'), /JSON/);
+  assert.throws(() => importSave('{broken'), /无法识别这个存档文件，请选择游戏导出的存档/);
   assert.throws(() => importSave(' '.repeat(MAX_SAVE_FILE_BYTES + 1)), /过大/);
   const legacy = { ...save, spiritRoot: undefined, rootElements: undefined };
   assert.equal(importSave(JSON.stringify(legacy)).save.spiritRoot, 'heaven');

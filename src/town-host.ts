@@ -30,7 +30,7 @@ export function immortalEncounterPanel(
   return [
     '市井逢仙',
     `青岚镇 · 与${npc.name}的一席闲谈`,
-    `<section class="immortal-gift${granted ? '' : ' is-claimed'}" aria-label="仙人赠药">${medicineArt(medicine)}<div><small>仙人赠药 · ${medicine.years ? '珍品' : '本世珍品'}</small><strong>${granted ? '获赠' : '此前获赠'}：${medicine.name} <span>×1</span></strong><p>${granted ? '已收入丹囊' : '此次仙缘已赠药 · 不重复赠送'} · 现持有 ${save.medicine.bag[medicine.id] || 0} 份</p></div></section><div class="town-story immortal-encounter">${story}</div><button class="primary-button" data-action="close">${granted ? '谢过前辈' : '与前辈作别'} · 继续游历</button>`,
+    `<section class="immortal-gift${granted ? '' : ' is-claimed'}" aria-label="仙人赠药">${medicineArt(medicine)}<div><small>仙人赠药 · ${medicine.years ? '珍品' : '本世珍品'}</small><strong>${granted ? '获赠' : '此前获赠'}：${medicine.name} <span>×1</span></strong><p>${granted ? '已收入丹囊' : '此前已赠药'} · 现持有 ${save.medicine.bag[medicine.id] || 0} 份</p></div></section><div class="town-story immortal-encounter">${story}</div><button class="primary-button" data-action="close">${granted ? '谢过前辈' : '与前辈作别'} · 继续游历</button>`,
   ];
 }
 
@@ -38,7 +38,7 @@ export function teaStoryPanel(): PanelParts {
   return [
     '一盏茶，半卷仙途',
     '听雨茶馆 · 仙途旧闻',
-    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">正在生成故事，请稍候…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div><p class="tea-story-image-status panel-note" role="status"></p><p class="panel-note">本次听书已消耗半载并判定机缘（30% 概率获赠 8 灵石）。失败重试不再扣年岁；再听一回会另耗半载并判定机缘。配图不阻塞正文，阅读与朗读不再计龄。</p><div class="save-actions"><button class="primary-button" data-action="close">回到街巷</button><button class="secondary-button tea-story-next" data-action="mortal-activity" data-id="tea" disabled>再听一回 · 半载</button><button class="secondary-button tea-story-retry" hidden disabled>重试这一回</button></div></section>',
+    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">说书人正待开讲…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div><p class="tea-story-image-status panel-note" role="status"></p><p class="panel-note">听书半载，有 30% 机会获赠 8 灵石。阅读与朗读不另耗年岁；再听一回另耗半载。</p><div class="save-actions"><button class="primary-button" data-action="close">回到街巷</button><button class="secondary-button tea-story-next" data-action="mortal-activity" data-id="tea" disabled>再听一回 · 半载</button><button class="secondary-button tea-story-retry" hidden disabled>重试这一回</button></div></section>',
   ];
 }
 
@@ -46,7 +46,7 @@ export function marketAmbushPanel(held: number): PanelParts {
   return [
     '话中藏刃',
     '坊外 · 劫修伏击',
-    `<div id="market-ambush"></div><details class="market-ambush-rules"><summary>遭遇规则与战利品</summary><p class="panel-note">${held} 灵石已暂扣。击败劫修后自动取回，并一次结算其携带的战利品：一份丹药，可能另有一件法宝，品级与炼器符合对方境界。同一场物品固定，无需另点领取。</p><p class="panel-note">点「尝试撤离」后会自动向左退，也可手动走位；到达左侧退路、与追兵拉开距离并连续守住两秒才算脱身，成功后损失本次暂扣灵石。气血耗尽会身死，可选择广告复活；放弃复活或机会用尽时，点「查看此世落幕」进入身陨落幕页。切后台暂停；刷新或导入仍保留未结遭遇。</p></details>`,
+    `<div id="market-ambush"></div><details class="market-ambush-rules"><summary>遭遇规则与战利品</summary><p class="panel-note">${held} 灵石已暂扣。击败劫修后自动取回，并收取其携带的战利品：一份丹药，可能另有一件法宝，品级与炼器符合对方境界。战利品自动收入行囊。</p><p class="panel-note">点「尝试撤离」后会自动向左退，也可手动走位；到达左侧退路、与追兵拉开距离并连续守住两秒才算脱身，成功后损失本次暂扣灵石。气血耗尽会身死，可选择广告复活；放弃复活或机会用尽时，点「查看此世落幕」进入身陨落幕页。离开画面时战斗暂停。</p></details>`,
   ];
 }
 
@@ -54,7 +54,7 @@ export function marketAmbushRecoveryPanel(): PanelParts {
   return [
     '尚有一场劫修遭遇未结',
     '坊外险路',
-    '<p>这场遭遇的进度仍在，重新载入或导入不会让你直接脱身。浏览器暂时无法恢复，请重试后继续应战；暂扣灵石不会重复扣除。</p><button class="secondary-button" data-action="market-ambush-recover">重试恢复遭遇</button>',
+    '<p>这场遭遇尚未结束，暂时无法继续。请重试后应战。</p><button class="secondary-button" data-action="market-ambush-recover">重试恢复遭遇</button>',
   ];
 }
 

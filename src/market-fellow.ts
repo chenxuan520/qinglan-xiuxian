@@ -1,6 +1,6 @@
-import { REALMS } from './data.ts';
+import { FINAL_TRIAL_STAGE, REALMS } from './data.ts';
 import { recordChronicle } from './chronicle.ts';
-import type { SaveData } from './progress.ts';
+import { realmInfo, type SaveData } from './progress.ts';
 import type { MarketCultivator } from './sect-market-data.ts';
 import {
   MARKET_FELLOW_SETTINGS,
@@ -122,7 +122,7 @@ function knownMemory(story: MarketFellowState | undefined, alive: boolean) {
   return parts.join('');
 }
 
-function outcome(story: MarketFellowState, alive: boolean, realm: string) {
+function outcome(story: MarketFellowState, alive: boolean, realm: string, readable: boolean) {
   const chosenAlive = story.chosenAt! < endedAt(story);
   const interrupted = chosenAlive && life(story).goldenAt === null;
   const stay = story.choice === 'stay';
@@ -143,9 +143,11 @@ function outcome(story: MarketFellowState, alive: boolean, realm: string) {
         ? '后人按你重访时的建议，整理旧炉与药册，开了一处当面验药的小摊。旧页里的疏漏用新见闻补齐，温照川未决的心愿，在后来人手里有了归处。'
         : '后人按你重访时的建议，带着旧药册访过几处药山，将新见闻寄回坊市。温照川留下的空白，在后来人的脚步里渐渐有了答案。';
   const progress = alive
-    ? realm === '元婴'
-      ? '多年访药与修持之后，他已修至元婴。再说起初逢时的疑问，仍肯把不懂的地方留白，慢慢去问。'
-      : '十年修持与亲历，终于让他结成金丹。你们各自走过一段路，如今又在炉边相逢。'
+    ? !readable
+      ? '岁月又在药册上添了新页。再说起初逢时的疑问，他仍肯把不懂的地方留白，慢慢去问。'
+      : realm === '元婴'
+        ? '多年访药与修持之后，他已修至元婴。再说起初逢时的疑问，仍肯把不懂的地方留白，慢慢去问。'
+        : '十年修持与亲历，终于让他结成金丹。你们各自走过一段路，如今又在炉边相逢。'
     : '';
   return {
     text: [result, ...(progress ? [progress] : []), experience],
@@ -177,7 +179,7 @@ export function marketFellowView(save: SaveData): MarketFellowView | null {
     return {
       ...base,
       text: [
-        '温照川将一本旧药册从炉边挪开，给你腾了个落座的地方。他是筑基丹修，在坊市替人看药，闲下来也惦记山外的草木。你们说起各自走过的路，记住了彼此的名字。',
+        '温照川将一本旧药册从炉边挪开，给你腾了个落座的地方。他在坊市替人看药，闲下来也惦记山外的草木。你们说起各自走过的路，记住了彼此的名字。',
         '他正攒着几页未辨清的药性，想再看几年，再定往后是留坊安炉，还是外出访药。此后若顺路回来，炉边仍有一处落脚地。',
       ],
     };
@@ -216,7 +218,12 @@ export function marketFellowView(save: SaveData): MarketFellowView | null {
           : '后人已照你的建议接续旧愿。安炉与访药都须亲历年月，待药册添上新页，再向你讲述这一程。',
       ],
     };
-  const result = outcome(story, alive, npc.realm);
+  const result = outcome(
+    story,
+    alive,
+    npc.realm,
+    npc.realmIndex <= realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
+  );
   return {
     ...base,
     phase: base.complete ? '一炉有归' : alive ? '故人回音' : '旧信待展',
@@ -247,7 +254,7 @@ export function meetMarketFellow(save: SaveData) {
       chosenAt: null,
       completedAt: null,
     };
-    remember(save, '在坊市炉边结识筑基丹修温照川，听他谈起还未走过的药路。');
+    remember(save, '在坊市炉边结识丹修温照川，听他谈起还未走过的药路。');
     return true;
   }
   const story = save.mortal.marketFellow;

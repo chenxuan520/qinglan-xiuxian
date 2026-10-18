@@ -50,7 +50,7 @@ export class MarketAmbushScene {
     this.duel = new MarketAmbushDuel(encounter.stats, encounter.snapshot);
     this.lastCheckpoint = this.duel.time;
     this.imageUrls = [...new Set([PLAYER_IMAGES[save.path], PLAYER_IMAGES[npc.path]])];
-    host.innerHTML = `<div class="market-ambush-stats"><span>你 <meter class="ambush-player-hp" min="0" max="${this.duel.player.maxHp}" value="${this.duel.player.hp}"></meter></span><span>劫修 <meter class="ambush-enemy-hp" min="0" max="${this.duel.enemy.maxHp}" value="${this.duel.enemy.hp}"></meter></span><small class="ambush-clock">护住退路</small></div><div class="market-ambush-controls"><button class="secondary-button" data-action="market-ambush-exit">尝试撤离</button></div><div class="market-ambush-field" tabindex="0" role="region" aria-label="劫修遭遇，方向键或触屏拖动移动，自动攻击"><div class="ambush-exit" aria-label="左侧退路"><span>退路</span></div><div class="ambush-figure ambush-player" style="background:${playerSpriteBackground(save.path)}"><small>你</small></div><div class="ambush-figure ambush-enemy" style="background:${playerSpriteBackground(npc.path)}"><small>劫修</small></div><div class="ambush-warning" hidden></div><div class="ambush-shots"></div><div class="ambush-loading">辨清来路，护住行囊…</div></div><p class="panel-note">方向键 / WASD 或拖动走位，靠近自动出手，橙色预警要侧移。撤离时自动退向左侧，手动走位可接管；在退路拉开距离保持两秒即可脱身。切后台暂停并保存。</p><p class="ambush-save-error" role="status" hidden>尚未保存当前战况，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-checkpoint">重试保存并继续</button></p><p class="ambush-result" role="status" hidden></p>`;
+    host.innerHTML = `<div class="market-ambush-stats"><span>你 <meter class="ambush-player-hp" min="0" max="${this.duel.player.maxHp}" value="${this.duel.player.hp}"></meter></span><span>劫修 <meter class="ambush-enemy-hp" min="0" max="${this.duel.enemy.maxHp}" value="${this.duel.enemy.hp}"></meter></span><small class="ambush-clock">护住退路</small></div><div class="market-ambush-controls"><button class="secondary-button" data-action="market-ambush-exit">尝试撤离</button></div><div class="market-ambush-field" tabindex="0" role="region" aria-label="劫修遭遇，方向键或触屏拖动移动，自动攻击"><div class="ambush-exit" aria-label="左侧退路"><span>退路</span></div><div class="ambush-figure ambush-player" style="background:${playerSpriteBackground(save.path)}"><small>你</small></div><div class="ambush-figure ambush-enemy" style="background:${playerSpriteBackground(npc.path)}"><small>劫修</small></div><div class="ambush-warning" hidden></div><div class="ambush-shots"></div><div class="ambush-loading">辨清来路，护住行囊…</div></div><p class="panel-note">方向键 / WASD 或拖动走位，靠近自动出手，橙色预警要侧移。撤离时自动退向左侧，手动走位可接管；在退路拉开距离保持两秒即可脱身。离开画面时战斗暂停。</p><p class="ambush-save-error" role="status" hidden>尚未保存当前战况，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-checkpoint">重试保存并继续</button></p><p class="ambush-result" role="status" hidden></p>`;
     const field = host.querySelector<HTMLElement>('.market-ambush-field')!;
     const options = { signal: this.events.signal };
     document.addEventListener(
@@ -187,7 +187,7 @@ export class MarketAmbushScene {
       this.assetsFailed = true;
       if (loading)
         loading.innerHTML =
-          '人物素材暂时无法载入，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-assets">重试加载</button>';
+          '遭遇画面暂未准备好，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-assets">重试加载</button>';
     }
   }
   checkpoint() {

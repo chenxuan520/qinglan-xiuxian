@@ -1211,7 +1211,7 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
 function handleSaveTransfer(shell: ActionShell, action: string): boolean {
   if (action === 'export-save' && !shell.game) {
     shell.downloadJson(shell.exportSave(shell.save, shell.pendingRun), '存档');
-    shell.toast('已导出存档，请保留下载的 JSON 文件');
+    shell.toast('已导出存档，请妥善保留下载的存档文件');
     return true;
   }
   if (action === 'import-save' && !shell.game && shell.panel === 'cultivation') {

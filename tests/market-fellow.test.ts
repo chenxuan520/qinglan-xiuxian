@@ -181,13 +181,15 @@ test('生前留坊十年结丹，访药八十年结婴，寿数随真实突破�
     assert.equal(marketFellowCharacter(save)!.realm, '筑基');
     save.age = 45;
     assert.equal(marketFellowCharacter(save)!.realm, '金丹');
-    assert.match(marketFellowView(save)!.text.join(''), /结成金丹/);
+    assert.doesNotMatch(marketFellowView(save)!.text.join(''), /金丹|元婴/);
+    assert.match(marketFellowView(save)!.text.join(''), /岁月又在药册上添了新页/);
     chooseMarketFellow(save, 'read', 1);
     save.age = 114.999;
     assert.equal(marketFellowCharacter(save)!.realm, '金丹');
     save.age = 115;
     assert.equal(marketFellowCharacter(save)!.realm, choice === 'stay' ? '金丹' : '元婴');
-    if (choice === 'travel') assert.match(marketFellowView(save)!.text.join(''), /已修至元婴/);
+    if (choice === 'travel')
+      assert.doesNotMatch(marketFellowView(save)!.text.join(''), /金丹|元婴/);
     const deathAge = choice === 'stay' ? 450 : 950;
     save.age = deathAge - 0.001;
     assert.equal(marketFellowCharacter(save)!.name, '温照川');

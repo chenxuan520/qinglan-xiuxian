@@ -202,6 +202,19 @@ export function npcPlayerRealm(realm: string) {
   return realm === '渡劫' ? 7 : REALMS.findIndex((name) => realm.startsWith(name));
 }
 
+// 同时用于服务端和客户端：模型即使忽略提示，也不能补写玩家看不透的境界。
+export function marketReplyRevealsRealm(input: NpcDialogueRequest, reply: string) {
+  if (!isMarketCultivatorId(input.npcId) || !input.marketVisit) return false;
+  const rank = npcPlayerRealm(input.realm);
+  return (
+    rank < REALMS.length - 1 &&
+    (REALMS.slice(rank + 1).some((realm) => reply.includes(realm)) ||
+      /渡劫|[零〇一二两三四五六七八九十百\d]+(?:个)?(?:大)?境(?:界)?/.test(
+        reply.replace(/同一(?:个)?大境界/g, ''),
+      ))
+  );
+}
+
 /** 只传当前真人的一份封闭摘要；公开物品用合法 ID，不接受自由姓名、正文、背包或隐藏真假。 */
 export function validMarketDialogueContext(
   value: unknown,
@@ -395,7 +408,7 @@ const EVENT_MEMORY: Record<(typeof MARKET_DIALOGUE_EVENTS)[number], string> = {
   defeat: '本批劫修遭遇已经落败',
 };
 const CLUE_MEMORY: Record<(typeof MARKET_DIALOGUE_CLUES)[number], string> = {
-  'higher-realm': '邀约修士已在明面表现出较高境界',
+  'higher-realm': '玩家只知邀约修士修为难测，不知具体境界',
   'sect-backing': '玩家目前有在籍宗门的照应，但这不等于坊外没有致命风险',
   'old-grudge': '双方已有实际嫌隙',
   'known-trader': '双方此前确有当面交易，不据此保证下一次私约安全',

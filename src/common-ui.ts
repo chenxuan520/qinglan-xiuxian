@@ -33,16 +33,15 @@ import { formatNumber } from './number-format.ts';
 import { choiceGuidance } from './choice-guidance.ts';
 
 export function telemetryRow(enabled: boolean, active: boolean) {
-  const status = !enabled ? '已关闭' : active ? '已开启' : '已开启 · 本网址不发送';
-  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">为了解玩家常在哪一步卡住，官网与平台站会在开局、结算、入城、轮回和叩门时记录关卡、境界、年岁、时长与胜负，页面出错时另记录错误摘要，附一个随机匿名编号；不上传存档、闲聊或任何个人信息，数据保留三个月。</small>`;
+  const status = !enabled ? '已关闭' : active ? '已开启' : '已开启 · 当前不可用';
+  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">开启后匿名记录历练进度与游戏异常，用于改进体验；不上传存档、闲聊或个人信息，记录保留三个月。</small>`;
 }
 
 // 运行错误兜底提示：上报在 error-report.ts，本模块只管排版。标题含图标与提示语，
 // 按钮组独立，方便需要时单独替换措辞或增删按钮。
 export const ERROR_NOTICE_TITLE =
   '<h2 class="runtime-error-title"><span class="runtime-error-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 22 20 2 20 Z"/><line x1="12" y1="9.5" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="17.2"/></svg></span>出了点状况</h2>';
-export const ERROR_NOTICE_TEXT =
-  '刚刚发生了一个错误，但进度都已保存好。若画面没有反应，刷新页面即可继续。';
+export const ERROR_NOTICE_TEXT = '游戏暂时出了点状况。若画面没有反应，可尝试刷新后继续。';
 export const ERROR_NOTICE_ACTIONS =
   '<div class="runtime-error-actions"><button class="primary-button" data-error-action="refresh">刷新重进</button><button class="secondary-button" data-error-action="dismiss">继续试试</button></div>';
 export function currency(save: SaveData) {
@@ -111,7 +110,7 @@ export function spiritRootEffects(save: SaveData) {
 export function spiritRootSummary(save: SaveData, showAge = false) {
   const life = lifespanInfo(save);
   const immortal = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max;
-  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>刷新保留 · 新角色随机资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">${immortal ? '叩入仙门 · 离界传承' : '轮回转世 · 重启仙途'}</button></div></div>`;
+  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>新一世重定资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">${immortal ? '叩入仙门 · 离界传承' : '轮回转世 · 重启仙途'}</button></div></div>`;
 }
 export function lifespanSummary(save: SaveData, selectedStage: number) {
   const life = lifespanInfo(save);
@@ -236,17 +235,14 @@ export function damageReport(game: Game | null) {
       damage: game.damageBySource.bone,
     });
   const other = Math.max(0, total - rows.reduce((sum, row) => sum + row.damage, 0));
-  if (other > 0.01)
-    rows.push({ id: '', name: '其他 / 旧记录未分类', color: '#a7bbae', damage: other });
+  if (other > 0.01) rows.push({ id: '', name: '其他伤害', color: '#a7bbae', damage: other });
   rows.sort((a, b) => b.damage - a.damage);
   return `<section class="damage-report" aria-label="本局伤害统计"><div class="damage-heading"><h3>法宝伤害占比</h3><span>总伤害 ${formatNumber(Math.round(total))}</span></div>${rows
     .map((row) => {
       const percent = total > 0 ? (row.damage / total) * 100 : 0;
       return `<div class="damage-row" style="--damage-color:${row.color}">${row.id ? icon(row.id, row.color) : '<span class="damage-other">✧</span>'}<div class="damage-detail"><div class="damage-label"><strong>${row.name}</strong><span>${formatNumber(Math.round(row.damage))} <b>${percent.toFixed(1)}%</b></span></div><div class="damage-bar"><i style="width:${percent}%"></i></div></div></div>`;
     })
-    .join(
-      '',
-    )}<p class="panel-note">按实际扣血统计，不含击杀时的溢出伤害；反伤单列。${other > 0.01 ? '旧版对局已造成的伤害无法追溯法宝归属。' : ''}</p></section>`;
+    .join('')}<p class="panel-note">按实际扣血统计，不含击杀时的溢出伤害；反伤单列。</p></section>`;
 }
 export function updateStorySoundButton(button: HTMLButtonElement, sound: boolean) {
   const label = sound ? '关闭声音' : '开启声音';

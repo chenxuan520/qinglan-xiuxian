@@ -20,5 +20,5 @@ export function runLootContent(loot: Game['loot']) {
       };
     }),
   ];
-  return `<section class="result-loot" aria-label="此行收获"><h3>此行收获</h3>${items.length ? `<div class="result-loot-items">${items.map((item) => `<div class="result-loot-item">${item.art}<div class="result-loot-copy"><strong>${item.name}</strong><small>${item.detail}</small></div><b>×${item.count}</b></div>`).join('')}</div>` : ''}<p class="panel-note">${!loot.complete ? '仅记录本次续局后的收获；旧续局之前的物品记录未载。' : items.length ? '法宝收入藏器阁，丹药收入丹囊；此处仅展示，不会重复发放。' : '本局未获新的法宝或丹药。'}</p></section>`;
+  return `<section class="result-loot" aria-label="此行收获"><h3>此行收获</h3>${items.length ? `<div class="result-loot-items">${items.map((item) => `<div class="result-loot-item">${item.art}<div class="result-loot-copy"><strong>${item.name}</strong><small>${item.detail}</small></div><b>×${item.count}</b></div>`).join('')}</div>` : ''}<p class="panel-note">${!loot.complete ? '此行所得已收入行囊。' : items.length ? '法宝已收入藏器阁，丹药已收入丹囊。' : '本局未获新的法宝或丹药。'}</p></section>`;
 }

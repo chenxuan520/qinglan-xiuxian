@@ -2,6 +2,7 @@ import {
   MARKET_DIALOGUE_CLUES,
   MARKET_DIALOGUE_EVENTS,
   marketDialogueLocalReply,
+  marketReplyRevealsRealm,
   npcDefaultLine,
   type MarketDialogueContext,
   type NpcDialogueRequest,
@@ -140,19 +141,19 @@ function dialogueErrorMessage(error: string) {
   return (
     (
       {
-        'request-timeout': '等待服务响应超时',
-        'inference-timeout': 'AI 生成超时',
+        'request-timeout': '这回故事等得久了',
+        'inference-timeout': '这回故事等得久了',
         network: '网络连接失败',
         offline: '当前处于离线状态，请联网后再听新故事',
-        busy: '请求过于频繁，请稍后再试',
-        unavailable: 'AI 服务暂时不可用',
-        'inference-failed': 'AI 服务生成失败',
-        'limiter-unavailable': '服务暂时无法处理请求',
-        'empty-reply': 'AI 未返回完整内容',
-        'invalid-response': '服务返回了无效内容',
-        'invalid-dialogue': '听书请求无效',
+        busy: '茶馆正忙，请稍后再试',
+        unavailable: '这回故事暂未备好',
+        'inference-failed': '这回故事暂未备好',
+        'limiter-unavailable': '茶馆正忙，请稍后再试',
+        'empty-reply': '这回故事还未讲成',
+        'invalid-response': '这回故事还未讲成',
+        'invalid-dialogue': '请再试一次听书',
       } as Record<string, string>
-    )[error] ?? '服务暂时无法完成这次请求'
+    )[error] ?? '这回故事暂未备好'
   );
 }
 async function requestNpcDialogueResponse(
@@ -209,7 +210,10 @@ async function requestNpcDialogueResponse(
             /^\d{10}\.[a-f0-9]{64}$/.test(data.imageToken)
               ? data.imageToken
               : undefined;
-          return { reply, imageToken };
+          return {
+            reply: marketReplyRevealsRealm(input, reply) ? marketDialogueLocalReply(input) : reply,
+            imageToken,
+          };
         }
         failure = { error: data ? 'empty-reply' : 'invalid-response', retryable: true };
       }
@@ -326,7 +330,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   const next = host.querySelector<HTMLButtonElement>('.tea-story-next')!;
   const imageStatus = host.querySelector<HTMLElement>('.tea-story-image-status')!;
   text.textContent = '';
-  status.textContent = '正在生成故事，请稍候…';
+  status.textContent = '说书人正待开讲…';
   status.setAttribute('role', 'status');
   imageStatus.textContent = '';
   host.classList.remove('has-story-image');
@@ -351,9 +355,9 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
     controller.signal,
     undefined,
     undefined,
-    (attempt, error) => {
+    () => {
       if (host.isConnected && activeRequest === controller && !controller.signal.aborted)
-        status.textContent = `${dialogueErrorMessage(error)}，正在自动重试（${attempt}/${TEA_STORY_SETTINGS.maxAttempts}）…`;
+        status.textContent = '说书人稍作停顿，请稍候…';
     },
   );
   if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
@@ -361,7 +365,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   host.setAttribute('aria-busy', 'false');
   if ('error' in story) {
     status.setAttribute('role', 'alert');
-    status.textContent = `故事生成失败：${dialogueErrorMessage(story.error)}。可重试这一回，不会再次消耗年岁或判定机缘。`;
+    status.textContent = `${dialogueErrorMessage(story.error)}。可再试这一回，不另耗年岁。`;
     retry.hidden = retry.disabled = false;
     return;
   }
@@ -394,13 +398,13 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   if (!imageToken) return;
   const imageController = new AbortController();
   activeRequest = imageController;
-  imageStatus.textContent = '配图生成中，不影响阅读。';
+  imageStatus.textContent = '画卷正慢慢铺开…';
   void requestTeaStoryImage(reply, imageToken, imageController.signal).then((image) => {
     const current = activeRequest === imageController;
     if (current) activeRequest = null;
     if (!current || imageController.signal.aborted || !host.isConnected) return;
     if (!image) {
-      imageStatus.textContent = '配图暂未生成，不影响阅读和朗读。';
+      imageStatus.textContent = '';
       return;
     }
     clearStoryImage();
@@ -526,14 +530,14 @@ export function mountNpcChat(
     status.textContent = market
       ? reply
         ? '坊间闲谈 · 同道往来'
-        : '坊间闲谈 · 暂用本地对白'
+        : '坊间闲谈 · 随口聊聊'
       : townId
         ? reply
           ? '街巷闲谈 · 随口聊聊'
           : '闲谈暂歇 · 仍可照常买卖、接取委托'
         : reply
           ? '家中叙话 · 随口聊聊'
-          : '家常依旧 · 暂用本地对白';
+          : '家常依旧 · 随口聊聊';
     if (!greeting) input.focus({ preventScroll: true });
   };
   form.addEventListener('submit', (event) => {

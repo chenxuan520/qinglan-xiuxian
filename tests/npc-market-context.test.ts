@@ -116,7 +116,13 @@ test('真实联系人跨槽位重逢保留本人身份和交易记忆，新来�
   assert.equal(validDialogue(newcomer), true);
   const prompt = dialogueMessages(returning)[0].content;
   assert.ok(prompt.includes(`修士${original.name}`));
-  assert.ok(prompt.includes(`是${original.realm}的${original.role}`));
+  assert.ok(prompt.includes(`是${original.role}。`));
+  if (original.realmIndex > realmInfo(save.cultivation).index) {
+    assert.match(prompt, /具体境界、小阶段与高出几境都不对外说明/);
+    assert.ok(!prompt.includes(`你目前修至${original.realm}。`));
+  } else {
+    assert.ok(prompt.includes(`你目前修至${original.realm}。`));
+  }
   assert.match(prompt, /同一个人再次来访/);
   assert.match(prompt, /曾实际完成过当面交易/);
   assert.match(marketDialogueLocalReply(returning), /曾按当面报价做过交易/);

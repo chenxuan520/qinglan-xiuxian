@@ -702,7 +702,7 @@ function showMarketAmbush() {
       panel = 'market-ambush-recovery';
       panelFrame(
         '山路逢劫',
-        '遭遇已保存',
+        '战斗暂歇',
         '<p>遭遇暂时无法载入，战斗保持暂停。</p><button class="primary-button" data-action="market-ambush-recover">重试载入</button>',
       );
       modal.querySelector('[data-action="close"]')?.remove();

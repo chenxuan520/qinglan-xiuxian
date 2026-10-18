@@ -1,4 +1,4 @@
-import type { NpcDialogueRequest } from '../../src/npc-dialogue.ts';
+import { marketReplyRevealsRealm, type NpcDialogueRequest } from '../../src/npc-dialogue.ts';
 import { REALMS } from '../../src/data.ts';
 import {
   isMarketCultivatorId,
@@ -100,6 +100,7 @@ export function guardDialogueReply(input: NpcDialogueRequest, reply: string) {
         ? REALMS.indexOf('大乘')
         : REALMS.findIndex((realm) => input.realm.startsWith(realm));
     const senior = npc.realmIndex < playerRealm;
+    if (marketReplyRevealsRealm(input, reply)) return marketLocalReply(npc, '境界', playerRealm);
     // 观察能力由游戏设定决定，明确问能否看透时不让模型自行猜答案。
     if (perceptionQuestion) return marketLocalReply(npc, '你看得出我的精进吗？', playerRealm);
     if (!input.history.length && input.message === '有位修士来到你跟前，请以自己的身份打个招呼。') {

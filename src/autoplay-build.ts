@@ -12,7 +12,7 @@ export const AUTOPLAY_BUILDS = [
   {
     id: 'default',
     name: '默认路线',
-    description: '沿用原有选技策略。',
+    description: '兼顾输出与生存，按当前搭配选择升级。',
   },
   { id: 'native', name: '本命优先', description: '培养入场法宝及觉醒功法。' },
   { id: 'survival', name: '保命稳进', description: '偏重护体、恢复，兼顾输出。' },
