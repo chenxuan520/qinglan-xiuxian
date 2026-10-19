@@ -426,15 +426,6 @@ export function renderPanel(shell: ActionShell) {
       load();
       return;
     }
-    if (shell.panel === 'arsenal' && shell.bookTab === 'curios') {
-      shell.panelFrame(
-        '随身奇物',
-        '藏器阁 · 机缘珍藏',
-        shell.marketEventSource.current.curioCollection(shell.save),
-        true,
-      );
-      return;
-    }
     const view = shell.catalogPanel(shell.save, {
       panel: shell.panel,
       catalogTreasures: shell.catalogTreasures,

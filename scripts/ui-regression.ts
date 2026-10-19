@@ -211,6 +211,18 @@ async function finishPage() {
   pageId = 0;
 }
 
+async function catalogHeader() {
+  return evaluate(`() => ({
+    title: document.querySelector('.panel-heading').textContent,
+    summary: document.querySelector('.panel-heading + .panel-note').textContent,
+    labels: [...document.querySelectorAll('.book-tabs button')].map(e => e.textContent),
+    boxes: ['.panel-shell', '.panel-heading', '.collection-toolbar', '.collection-toolbar .header-right', ...['treasures', 'passives', 'curios'].map(id => '[data-action="book-tab"][data-id="' + id + '"]')].map(selector => {
+      const r = document.querySelector(selector).getBoundingClientRect();
+      return [r.x, r.y, r.width, r.height];
+    })
+  })`);
+}
+
 async function checkHomePanels(name: string) {
   for (const panel of ['cultivation', 'arsenal', 'medicine', 'bestiary', 'chronicle', 'about']) {
     checkpoint = `${name}-${panel}`;
@@ -262,6 +274,50 @@ async function checkHomePanels(name: string) {
         { selected: 'true', passives: true, treasures: false },
       );
       await check(`${name}-passives`);
+      const header = await catalogHeader();
+      for (const tab of ['curios', 'treasures', 'passives', 'curios']) {
+        checkpoint = `${name}-catalog-${tab}`;
+        await click(`[data-action="book-tab"][data-id="${tab}"]`);
+        const current = await catalogHeader();
+        assert.equal(current.title, header.title, '切换藏器分类保留统一标题');
+        assert.equal(current.summary, header.summary, '切换藏器分类保留顶部摘要');
+        assert.deepEqual(current.labels, header.labels, '分类文字和计数不随切换改变');
+        assert.equal(
+          await evaluate(`() => document.querySelectorAll('.book-tabs').length`),
+          1,
+          '藏器阁始终只有一套分类导航',
+        );
+        assert.equal(
+          await evaluate(`() => document.querySelector('.book-tabs .active')?.dataset.id`),
+          tab,
+        );
+        current.boxes.forEach((box: number[], index: number) =>
+          box.forEach((value, axis) =>
+            assert.ok(Math.abs(value - header.boxes[index][axis]) <= 1, '分类切换不挪动顶部布局'),
+          ),
+        );
+        if (tab === 'curios') {
+          assert.equal(await evaluate(`() => document.querySelectorAll('.curio-card').length`), 9);
+          const scroll = await evaluate(`() => {
+            const p = document.querySelector('.panel');
+            const tabs = p.querySelector('.book-tabs');
+            const before = tabs.getBoundingClientRect().top;
+            p.scrollTop = 400;
+            const result = {distance: p.scrollTop, movement: before - tabs.getBoundingClientRect().top};
+            p.scrollTop = 0;
+            return result;
+          }`);
+          assert.ok(scroll.distance > 0, '奇物列表可滚动');
+          assert.ok(Math.abs(scroll.distance - scroll.movement) <= 1, '分类导航随内容滚动');
+        } else if (tab === 'treasures') {
+          assert.equal(
+            await evaluate(`() => document.querySelectorAll('.collection-card').length`),
+            6,
+            '跨分类切换保留魔道筛选与第二页',
+          );
+        }
+        await check(checkpoint);
+      }
     } else if (panel === 'medicine') {
       for (const view of ['recipes', 'craft', 'bag']) {
         await click('[data-action="medicine-tier"][data-id="灵品"]');
