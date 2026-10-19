@@ -28,8 +28,18 @@ import {
   type AuctionReceipt,
 } from './auction-data.ts';
 
-export { auctionValue, auctionItemName, releaseAuctionItem } from './auction-items.ts';
-import { auctionValue, auctionItemName, releaseAuctionItem } from './auction-items.ts';
+export {
+  auctionValue,
+  auctionSaleRates,
+  auctionItemName,
+  releaseAuctionItem,
+} from './auction-items.ts';
+import {
+  auctionValue,
+  auctionSaleRates,
+  auctionItemName,
+  releaseAuctionItem,
+} from './auction-items.ts';
 import { AUCTION_SETTINGS } from './setting.ts';
 
 export function prepareAuction(save: SaveData) {
@@ -118,10 +128,11 @@ function bids(
 ): { id: MarketCultivatorId | 'commission'; price: number }[] {
   const value = auctionValue(item);
   if (item.kind === 'curio') {
+    const [low, high] = auctionSaleRates(item);
     const ratio =
-      (selling ? 60 : 90) +
+      (selling ? low : 90) +
       (curioRoll(save.curios.seed, `curio-bid:${curioCycle(save.age)}:${item.id}:${selling}`) %
-        (selling ? 21 : 36));
+        (selling ? high - low + 1 : 36));
     return [{ id: 'commission', price: Math.floor((value * ratio) / 100) }];
   }
   return marketCultivators(save.mortal.population!, save.mortal.sectMarket!)

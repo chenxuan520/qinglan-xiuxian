@@ -11,6 +11,7 @@ import type { AuctionItem, AuctionKind, AuctionReceipt } from './auction-data.ts
 import {
   auctionLots,
   auctionValue,
+  auctionSaleRates,
   auctionItemName,
   auctionFee,
   auctionBuyReason,
@@ -100,7 +101,16 @@ export function auctionContent(
       ? { kind, id, quantity: 1, forgeLevel: kind === 'artifact' ? save.forge[id] || 0 : 0 }
       : undefined;
     const reason = item ? auctionSellReason(save, item, visit, unfinished) : '行囊中暂无可委托物品';
-    content = `<p class="panel-note">可出售行囊中的丹药、收藏法宝和奇物。奇物售出最后一件后，其助益随之消失。每次委托消耗半年，流拍也计龄。修士按估值的 60%–80% 出价，丹药与法宝也受来客财力限制；奇物由代客席按估值收购。达到保留价才成交，卖方佣金为成交价的 10%。当前本命不可出售；入门赠品只按炼器投入估值。丹药出售不影响已服用药效、服用次数与药方。</p><div class="auction-seller"><label>委托类别<select id="auction-kind" aria-label="委托类别"><option value="medicine" ${kind === 'medicine' ? 'selected' : ''}>丹药</option><option value="artifact" ${kind === 'artifact' ? 'selected' : ''}>法宝</option><option value="curio" ${kind === 'curio' ? 'selected' : ''}>奇物</option></select></label>${item ? `<label>委托物品<select id="auction-item" aria-label="委托物品">${choices.map((i) => `<option value="${i.id}" ${id === i.id ? 'selected' : ''}>${i.name}${kind === 'medicine' ? `（持有 ${save.medicine.bag[i.id]}）` : kind === 'curio' ? `（持有 ${save.curios.bag[i.id as keyof typeof save.curios.bag] ?? 0} 件）` : `（炼器 ${save.forge[i.id] || 0} 阶${i.id === save.starter ? ' · 当前本命' : ''}）`}</option>`).join('')}</select></label><section class="sect-market-offer">${art(item)}<div><strong>${auctionItemName(item)}</strong><p>${detail(item)}</p><small>单件估值 ${num(auctionValue(item))} 灵石</small></div></section>${kind === 'medicine' ? `<label>委托数量<input id="auction-quantity" type="number" inputmode="numeric" min="1" max="${Math.min(99, save.medicine.bag[item.id])}" step="1" value="1" aria-label="委托数量"></label>` : ''}<label>总保留价（不含佣金）<input id="auction-reserve" type="number" inputmode="numeric" min="1" step="1" value="${Math.max(1, Math.floor(auctionValue(item) * 0.6))}" aria-label="总保留价"></label><small class="panel-note">批量丹药请按总数量填写保留价；未达到此价不扣物品、不收佣金。</small><button class="secondary-button" data-action="auction-sell" data-visit="${visit}" ${reason ? 'disabled' : ''}>${reason || '委托出售'}</button>` : `<p class="panel-note">${reason}</p>`}</div>`;
+    const [low, high] = item ? auctionSaleRates(item) : [60, 80];
+    const value = item ? auctionValue(item) : 0;
+    const minimum = Math.max(1, Math.floor((value * low) / 100));
+    const maximum = Math.floor((value * high) / 100);
+    const resale =
+      item?.kind === 'curio'
+        ? `<br><small>代客席收购报价 ${num(minimum)}–${num(maximum)} 灵石；扣佣后实收 ${num(minimum - auctionFee(minimum, true))}–${num(maximum - auctionFee(maximum, true))} 灵石。</small>`
+        : '';
+
+    content = `<p class="panel-note">可出售行囊中的丹药、收藏法宝和奇物。奇物售出最后一件后，其助益随之消失。每次委托消耗半年，流拍也计龄。丹药与法宝按估值的 60%–80% 出价，受来客财力限制。奇物珍藏估值计入长久使用的助益，急售由代客席按估值的 10%–15% 收购。达到保留价才成交，卖方佣金为成交价的 10%。当前本命不可出售；入门赠品只按炼器投入估值。丹药出售不影响已服用药效、服用次数与药方。</p><div class="auction-seller"><label>委托类别<select id="auction-kind" aria-label="委托类别"><option value="medicine" ${kind === 'medicine' ? 'selected' : ''}>丹药</option><option value="artifact" ${kind === 'artifact' ? 'selected' : ''}>法宝</option><option value="curio" ${kind === 'curio' ? 'selected' : ''}>奇物</option></select></label>${item ? `<label>委托物品<select id="auction-item" aria-label="委托物品">${choices.map((i) => `<option value="${i.id}" ${id === i.id ? 'selected' : ''}>${i.name}${kind === 'medicine' ? `（持有 ${save.medicine.bag[i.id]}）` : kind === 'curio' ? `（持有 ${save.curios.bag[i.id as keyof typeof save.curios.bag] ?? 0} 件）` : `（炼器 ${save.forge[i.id] || 0} 阶${i.id === save.starter ? ' · 当前本命' : ''}）`}</option>`).join('')}</select></label><section class="sect-market-offer">${art(item)}<div><strong>${auctionItemName(item)}</strong><p>${detail(item)}</p><small>${kind === 'curio' ? '珍藏估值' : '单件估值'} ${num(value)} 灵石</small>${resale}</div></section>${kind === 'medicine' ? `<label>委托数量<input id="auction-quantity" type="number" inputmode="numeric" min="1" max="${Math.min(99, save.medicine.bag[item.id])}" step="1" value="1" aria-label="委托数量"></label>` : ''}<label>总保留价（不含佣金）<input id="auction-reserve" type="number" inputmode="numeric" min="1" step="1" value="${minimum}" aria-label="总保留价"></label><small class="panel-note">批量丹药请按总数量填写保留价；未达到此价不扣物品、不收佣金。</small><button class="secondary-button" data-action="auction-sell" data-visit="${visit}" ${reason ? 'disabled' : ''}>${reason || '委托出售'}</button>` : `<p class="panel-note">${reason}</p>`}</div>`;
   } else {
     content = `<p class="panel-note">近来的结拍往来。</p>${state.history.length ? state.history.map((r) => `<article class="auction-receipt">${art(r)}<div><small>${r.age.toFixed(1)} 岁 · 第 ${r.visit} 场</small><p>${auctionResult(save, r)}</p></div></article>`).join('') : '<p class="panel-note">尚未参与竞拍或委托出售。</p>'}`;
   }

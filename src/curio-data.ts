@@ -22,7 +22,7 @@ export const CURIO_NAMES = [
   '天机屋',
   '玉如意',
 ];
-export const CURIO_VALUES = [12000, 3600, 3000, 2800, 2600, 3200, 2400, 3000, 3200];
+export const CURIO_VALUES = [120000, 30000, 18000, 18000, 20000, 24000, 12000, 24000, 24000];
 export const curioValue = (id: string) => CURIO_VALUES[CURIO_IDS.indexOf(id as CurioId)] ?? 0;
 export const isCurio = (id: unknown): id is CurioId =>
   typeof id === 'string' && CURIO_IDS.includes(id as CurioId);

@@ -11,7 +11,7 @@ export function curioSeekingContent(save: SaveData, sect = false, unfinished = f
   )
     .map((c) => {
       const q = curioSeekingQuote(save, c.id, sect, unfinished);
-      return `<article class="curio-card"><header>${curioArt(c.id)}<div><h3>${c.name}</h3><small>${ownsCurio(save, c.id) ? '已持有' : `寻访 ${q.progress} / 3`}</small></div></header><p>${c.effect}</p><small>本次${q.price}灵石 · 三年${q.reserve ? ` · 另预留供奉${q.reserve}灵石` : ''}</small><button class="secondary-button" data-action="${sect ? 'sect-service-curio' : 'market-venue-curio'}" data-id="${c.id}" data-stamp="${venueStamp(save)}" data-cost-stones="${q.price + q.reserve}" ${q.reason ? 'disabled' : ''}>${q.reason || `托付寻访 · ${q.progress + 1}/3`}</button></article>`;
+      return `<article class="curio-card"><header>${curioArt(c.id)}<div><h3>${c.name}</h3><small>${ownsCurio(save, c.id) ? '已持有' : `寻访 ${q.progress} / 3`}</small></div></header><p>${c.effect}</p><small>本次${q.price.toLocaleString('zh-CN')}灵石 · 剩余${(q.price * (3 - q.progress)).toLocaleString('zh-CN')}灵石 · 三年${q.reserve ? ` · 另预留供奉${q.reserve}灵石` : ''}</small><button class="secondary-button" data-action="${sect ? 'sect-service-curio' : 'market-venue-curio'}" data-id="${c.id}" data-stamp="${venueStamp(save)}" data-cost-stones="${q.price + q.reserve}" ${q.reason ? 'disabled' : ''}>${q.reason || `托付寻访 · ${q.progress + 1}/3`}</button></article>`;
     })
     .join('')}</div></details>`;
 }
