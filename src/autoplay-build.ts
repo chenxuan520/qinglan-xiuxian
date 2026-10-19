@@ -105,7 +105,7 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
     return original;
   }
   if (c.type === 'weapon' && targets.includes(c.id as (typeof targets)[number]))
-    return 76 + c.level;
+    return Math.max(76 + c.level, Math.min(85, original + 8));
   const recipes: string[] = [];
   for (const id of targets) {
     const owned = g.weapons.find((w) => w.id === id);
@@ -131,7 +131,8 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
   // 培养目标尚未成型时留出末格；后半程允许补入其他法宝，避免空等。
   if (c.type === 'weapon' && c.level === 1 && g.time < Math.min(120, g.stageDuration * 0.6)) {
     const missing = targets.filter((id) => !g.weapons.some((w) => w.id === id)).length;
-    if (missing > 0 && MAX_WEAPONS - g.weapons.length <= missing) return original - 20;
+    if (missing > 0 && MAX_WEAPONS - g.weapons.length <= missing)
+      return original - (original >= 77 ? 100 : 20);
   }
   if (
     c.type === 'passive' &&

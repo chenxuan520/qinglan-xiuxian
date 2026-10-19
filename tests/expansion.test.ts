@@ -254,8 +254,9 @@ test('AI 识别魔道配套功法并优先仙器进化', () => {
   const g = fixture('poison', 'demonic');
   g.weapons[0].level = 6;
   g.passives.devour = 4;
+  g.weapons.push({ id: 'sand', level: 1, timer: 0, evolved: false });
   g.choices = [
-    { type: 'weapon', id: 'sand', level: 1 },
+    { type: 'weapon', id: 'sand', level: 2 },
     { type: 'passive', id: 'devour', level: 5 },
     { type: 'passive', id: 'curse', level: 1 },
   ];

@@ -54,10 +54,9 @@ test('寿终与弃劫先落幕可留影，确认轮回才清空', () => {
 test('配套功法优先级以默认培养倾向为前提', () => {
   assert.match(guide.guideContent('builds'), /自动历练采用默认培养倾向时/);
   assert.match(guide.guideContent('builds'), /其他培养倾向按设置取舍/);
-  assert.match(
-    guide.guideContent('combat'),
-    /默认培养倾向优先配套功法和仙器觉醒，其他倾向按设置取舍/,
-  );
+  assert.match(guide.guideContent('combat'), /默认路线优先觉醒与修习已学功法/);
+  assert.match(guide.guideContent('combat'), /已有法宝全满且还有空位时，优先补入新法宝/);
+  assert.match(guide.guideContent('combat'), /略偏向已有配套功法的搭配。其他倾向按设置取舍/);
 });
 
 test('首次打开指南合并并发加载，成功后重开直接复用模块', async () => {

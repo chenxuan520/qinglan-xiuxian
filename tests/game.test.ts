@@ -680,25 +680,30 @@ test('AI 拾取灵气并避开近身妖物、弹道与法阵，移动向量不�
 test('AI 优先进化与配套功法，低血量选恢复，劣质选项使用有限重悟', () => {
   const game = createGame();
   game.weapons[0].level = 6;
+  game.passives.power = 2;
+  game.weapons.push({ id: 'lightning', level: 1, timer: 0, evolved: false });
   game.choices = [
-    { type: 'weapon', id: 'poison', level: 1 },
+    { type: 'weapon', id: 'fan', level: 1 },
     { type: 'passive', id: 'power', level: 3 },
     { type: 'passive', id: 'spirit', level: 1 },
   ];
   assert.deepEqual(autoplayChoice(game), { index: 1, reroll: false });
-  game.choices[2] = { type: 'evolve', id: 'sword', level: 6 };
+  game.choices[2] = { type: 'evolve', id: 'sword', level: 7 };
   assert.deepEqual(autoplayChoice(game), { index: 2, reroll: false });
+  game.weapons.pop();
   game.player.hp = 20;
   game.choices = [{ type: 'heal', id: 'heal', level: 1 }, game.choices[0]];
   assert.deepEqual(autoplayChoice(game), { index: 0, reroll: false });
   game.player.hp = 100;
+  assert.deepEqual(autoplayChoice(game), { index: 1, reroll: false }, '全满时补新法宝');
+  game.weapons[0].level = 5;
   assert.deepEqual(autoplayChoice(game), { index: 1, reroll: true });
   game.rerolls = 0;
   assert.deepEqual(autoplayChoice(game), { index: 1, reroll: false });
   game.choices = [];
   assert.equal(autoplayChoice(game), null);
 });
-test('AI 为六重法宝优先补满一至五重配套功法，其他选技保持原样', () => {
+test('AI 为六重法宝优先补满配套功法，已学功法也先于普通法宝升重', () => {
   for (const path of ['orthodox', 'demonic', 'dual'] as const) {
     const save = freshSave();
     save.path = path;
@@ -718,7 +723,7 @@ test('AI 为六重法宝优先补满一至五重配套功法，其他选技保�
     assert.equal(autoplayChoice(g)?.index, 2);
     g.choices.pop();
     g.weapons[0].level = 5;
-    assert.equal(autoplayChoice(g)?.index, 0);
+    assert.equal(autoplayChoice(g)?.index, 1, '已学功法仍优先');
     g.weapons[0].level = 6;
     for (const level of [1, 2, 3, 4, 5]) {
       g.choices[1].level = level;
@@ -734,11 +739,11 @@ test('AI 为六重法宝优先补满一至五重配套功法，其他选技保�
     g.choices[1].level = 5;
     g.passives[id] = 4;
     g.weapons[0].evolved = true;
-    assert.equal(autoplayChoice(g)?.index, 0);
+    assert.equal(autoplayChoice(g)?.index, 1, '法宝觉醒后仍可补满已学功法');
     if (path === 'dual') {
       g.weapons[0].evolved = false;
       g.passives.blood = 5;
-      assert.equal(autoplayChoice(g)?.index, 0);
+      assert.equal(autoplayChoice(g)?.index, 1, '另一配方已满也不放弃修习已学功法');
     }
   }
 });

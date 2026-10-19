@@ -1,4 +1,4 @@
-import { MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
+import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
 import { hazardDistance, regionalExposure, regionalHazard } from './regional-hazards.ts';
 import { buildChoiceScore } from './autoplay-build.ts';
@@ -18,18 +18,23 @@ const favored = [
 ];
 function choiceScore(c: Choice, g: Game) {
   if (c.type === 'evolve') return 100;
-  if (c.type === 'heal') return g.player.hp / g.player.maxHp < 0.5 ? 30 : -10;
+  if (c.type === 'heal') {
+    const hp = g.player.hp / g.player.maxHp;
+    return hp < 0.3 ? 120 : hp < 0.5 ? 30 : -10;
+  }
   if (c.type === 'weapon')
     return (
-      (c.id === 'orbit'
-        ? g.save.starter === 'orbit' || c.level > 1
-          ? 15
-          : 14.5
-        : favored.includes(c.id)
-          ? 15
-          : 10) +
+      (c.id === 'orbit' || favored.includes(c.id)
+        ? 15 - (c.id === 'orbit' && g.save.starter !== 'orbit' && c.level === 1 ? 0.5 : 0)
+        : 10) +
       (c.level > 1 ? 8 : 2) +
-      c.level
+      c.level +
+      (c.level === 1 &&
+      g.weapons.length < MAX_WEAPONS &&
+      g.weapons.every((w) => w.level === MAX_WEAPON_LEVEL)
+        ? 64
+        : 0) +
+      (c.level === 1 && g.evolutionRequirements(c.id).some((id) => g.passives[id]) ? 2 : 0)
     );
   // 六重法宝优先从领悟起补满配套功法；实际觉醒仍是最高优先级。
   if (
@@ -48,7 +53,7 @@ function choiceScore(c: Choice, g: Game) {
   )
     return 50 + c.level * 5;
   const needed = g.weapons.some((w) => g.evolutionRequirements(w.id).includes(c.id) && !w.evolved);
-  return (
+  const score =
     (needed ? 16 : 0) +
     (g.player.hp < g.player.maxHp * 0.5 && ['guard', 'bone', 'duration', 'devour'].includes(c.id)
       ? 10
@@ -56,8 +61,9 @@ function choiceScore(c: Choice, g: Game) {
     (['power', 'haste', 'guard', 'area', 'blood', 'devour', 'bone', 'abyss'].includes(c.id)
       ? 4
       : 0) +
-    (c.level <= 3 ? 5 : 0)
-  );
+    (c.level <= 3 ? 5 : 0);
+  // 功法只能靠升级修习；已学功法优先升重，法宝仍可由宝匣提升。
+  return g.passives[c.id] ? Math.max(32, score + 12) : score;
 }
 export function autoplayInput(g: Game) {
   const p = g.player;
