@@ -120,6 +120,7 @@ function harness(options: {
     save: freshSave(),
     game: null as null | { paused: number; pause(): void; snapshot(): unknown },
     settled: false,
+    settlementRetryAt: 0,
     pendingRun: null,
     syncHumanStories: () => {},
     localStorage: storage,

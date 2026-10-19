@@ -425,6 +425,14 @@ export interface ActionShell {
 export function dispatchAction(shell: ActionShell, action: string, id?: string) {
   // 按原顺序逐组处理；分组返回 true 表示本次动作已处理完，不再交给后续分组。
   if (handleLockedState(shell, action)) return;
+  if (
+    shell.panel === 'settlement-retry' &&
+    !shell.settled &&
+    (shell.game?.state === 'won' || shell.game?.state === 'lost')
+  ) {
+    if (action === 'finish-run') shell.finishRun();
+    return;
+  }
   if (handleOpening(shell, action, id)) return;
   if (handleImmortalGate(shell, action)) return;
   if (handleNavigation(shell, action)) return;
@@ -1374,7 +1382,11 @@ function handleRunOutcome(shell: ActionShell, action: string): boolean {
     shell.showReviveAd();
     return true;
   }
-  if (action === 'finish-run' && shell.game?.state === 'lost') {
+  if (
+    action === 'finish-run' &&
+    (shell.game?.state === 'lost' ||
+      (shell.game?.state === 'won' && shell.panel === 'settlement-retry'))
+  ) {
     shell.finishRun();
     return true;
   }

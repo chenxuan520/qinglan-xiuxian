@@ -1,3 +1,4 @@
+import { CURIO_IDS, curioName, ownsCurio } from './curio-data.ts';
 import {
   FINAL_TRIAL_STAGE,
   passive,
@@ -36,7 +37,7 @@ function snapshot(save: SaveData, path?: CultivationPath) {
   return {
     ...power,
     weaponCooldown: weapon.cooldown * power.cooldown,
-    eliteDamage: medicine.eliteDamage,
+    eliteDamage: power.eliteDamage,
     poisonDamage: medicine.poison * power.armor,
   };
 }
@@ -113,6 +114,11 @@ export function powerBreakdown(save: SaveData) {
         delete s.medicine.active[medicine.id];
       },
     );
+  for (const id of CURIO_IDS)
+    if (ownsCurio(save, id))
+      add(`curio:${id}`, curioName(id), '随身奇物', (s) => {
+        delete s.curios.bag[id];
+      });
   const rows = sources
     .map(({ id, name, detail, without }) => {
       const base = snapshot(without, id === 'path' ? 'dual' : current.path);

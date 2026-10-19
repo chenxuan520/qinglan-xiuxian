@@ -1,3 +1,5 @@
+import { curioArt } from './curio-art.ts';
+import { curioInfo } from './curio-info.ts';
 import { debateContent } from './market-debate-ui.ts';
 import type { SaveData } from './progress.ts';
 import type { MarketCultivator } from './sect-market-data.ts';
@@ -55,16 +57,24 @@ function opportunityContent(
   const item = offer.item,
     medicine = item.kind === 'medicine' ? medicineInfo(item.id)! : undefined;
   const art = item.kind === 'artifact' ? itemArt(item.id)! : undefined;
-  const icon = medicine
-    ? medicineArt(medicine)
-    : `<span class="auction-art" aria-hidden="true" style="background-image:url('${assetUrl(art!.src)}');background-position:${(art!.column / 3) * 100}% ${(art!.row / (art!.rows - 1)) * 100}%"></span>`;
-  const detail = medicine
-    ? `${medicine.tier} · ${medicine.desc}`
-    : `炼器 ${item.forgeLevel} 阶 · ${treasure(item.id).school === 'orthodox' ? '正道' : '魔道'}法宝`;
+  const icon =
+    item.kind === 'curio'
+      ? curioArt(item.id)
+      : medicine
+        ? medicineArt(medicine)
+        : `<span class="auction-art" aria-hidden="true" style="background-image:url('${assetUrl(art!.src)}');background-position:${(art!.column / 3) * 100}% ${(art!.row / (art!.rows - 1)) * 100}%"></span>`;
+  const detail =
+    item.kind === 'curio'
+      ? curioInfo(item.id)!.effect
+      : medicine
+        ? `${medicine.tier} · ${medicine.desc}`
+        : `炼器 ${item.forgeLevel} 阶 · ${treasure(item.id).school === 'orthodox' ? '正道' : '魔道'}法宝`;
   const rewardNote =
     item.kind === 'artifact'
       ? `${save.artifacts.includes(item.id) ? `收藏中已有此物，炼器保留较高的 ${Math.max(save.forge[item.id] || 0, item.forgeLevel)} 阶，不额外增加一件。` : '所得法宝收入收藏，保留标示炼器阶数。'} 本命由你自行选择。`
-      : '所得丹药收入丹囊，不自动服用。';
+      : item.kind === 'curio'
+        ? '奇物收入行囊，持有即获其助益；同名效果不叠加。'
+        : '所得丹药收入丹囊，不自动服用。';
   const clue = marketFellowClue(save, offer),
     friendClue = marketFriendClue(save, offer.kind);
   const inspect = opportunityReason(save, npc.id, visit, 'inspect', unfinished);

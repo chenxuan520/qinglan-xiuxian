@@ -582,3 +582,70 @@
   color: #becdb6;
   text-decoration: underline;
 }
+
+/* 奇物图集与收藏：随内容滚动，不占战斗操作区。 */
+.curio-art {
+  display: inline-block;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  background-size: 300% 300%;
+  background-repeat: no-repeat;
+}
+.curio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 20px 0;
+}
+.curio-card {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #b8bf9466;
+  background: #31524533;
+}
+.curio-card header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.curio-card h3 {
+  margin: 0 0 6px;
+  color: #d8ce94;
+}
+.curio-card p {
+  line-height: 1.85;
+  margin: 16px 0;
+}
+.curio-card small {
+  display: block;
+  line-height: 1.7;
+  color: #adc0aa;
+}
+.curio-card.is-unowned .curio-art {
+  opacity: 0.5;
+}
+.curio-card.is-owned {
+  border-color: #d8ce9499;
+}
+.curio-card .curio-source {
+  margin-top: 12px;
+}
+.curio-card button {
+  width: 100%;
+  margin-top: 14px;
+  padding-inline: 8px;
+}
+@media (max-width: 800px) {
+  .curio-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .curio-card {
+    padding: 14px;
+  }
+}
+@media (max-width: 480px) {
+  .curio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

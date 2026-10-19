@@ -1,3 +1,4 @@
+import { seekCurio } from './curio-market.ts';
 import type { ActionShell } from './action-controller.ts';
 import { sectServiceContent } from './sect-service-ui.ts';
 import { executeSectService } from './sect-services.ts';
@@ -39,7 +40,7 @@ export function sectServiceAction(shell: ActionShell, action: string, choice?: s
     !active(shell) ||
     !host ||
     host.dataset.sect !== shell.save.mortal.member?.id ||
-    action !== 'sect-service-act' ||
+    !['sect-service-act', 'sect-service-curio'].includes(action) ||
     !choice
   )
     return;
@@ -48,7 +49,10 @@ export function sectServiceAction(shell: ActionShell, action: string, choice?: s
   );
   if (!button || button.disabled) return;
   const next = shell.structuredClone(shell.save);
-  const text = executeSectService(next, choice, button.dataset.stamp ?? '', !!shell.pendingRun);
+  const text =
+    action === 'sect-service-curio'
+      ? seekCurio(next, choice, button.dataset.stamp ?? '', true, !!shell.pendingRun)
+      : executeSectService(next, choice, button.dataset.stamp ?? '', !!shell.pendingRun);
   if (!text) return;
   try {
     shell.writeSave(next, shell.pendingRun);

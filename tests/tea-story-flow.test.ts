@@ -165,6 +165,7 @@ function harness(t: TestContext) {
         writes.push(value);
       },
     },
+    settlementRetryAt: 0,
     saveLock: null,
     lastSaveText: null,
     toast: (message: string) => messages.push(message),

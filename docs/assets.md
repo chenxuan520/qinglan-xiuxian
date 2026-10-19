@@ -337,3 +337,7 @@ Use case: stylized-concept. Asset type: one square seamless terrain texture for 
 `public/assets/sect-market-buildings.webp` 为独立九宫格建筑，采用青玉瓦、白石台基与青铜器具，区别于青岚镇民居。包括丹阁、拍卖楼、法器阁、符箓摊、小院、门楼、两类行馆与游商摊；现有功能入口仍由场内修士及拍卖行提供，装饰建筑不新增玩法。仅生成建筑，地板、树木、灯笼和三类修士继续复用已有素材。
 
 按用户要求缩至 768 × 768，再经 `scripts/compress-assets.py` 以 WebP quality=65、method=6 压缩，保留输入 alpha；整张 225512 字节，约 220.2 KiB，低于 250000 字节。`src/market-art.ts` 按完整屋檐取景，避免拍卖楼宽屋檐被等宽切片裁掉。原始 PNG 与验证截图仅保留在工作区临时目录，不提交 Git。
+
+## 奇物九宫格
+
+用户批准新增 `public/assets/curios.webp`：透明三行三列，960×960，208,998字节（约204.1 KiB），低于260,000字节限制。按掌天瓶、养魂木、金雷竹／灵眼之泉、金阙玉书、梵圣真片／风雷翅、天机屋、玉如意排列，每格320×320。使用内置imagegen生成并压为WebP，保留alpha；只提交这一张已批准的图集，原图、合成预览与截图留在仓库外。映射在 `curio-art.ts`，路径经 `assetUrl()`，构建后的完整离线清单包含此图集。

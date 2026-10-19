@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -265,6 +265,29 @@ test('普通文本修改、批准素材原样恢复和删除素材均允许', ()
     r.write('approved.bin', original);
     r.commit();
     assert.deepEqual(r.check(), []);
+  } finally {
+    rmSync(r.cwd, { recursive: true, force: true });
+  }
+});
+
+test('仅用户明确批准的奇物图集可新增，错路径、大小或任何字节变化仍拒绝', () => {
+  const path = 'public/assets/curios.webp',
+    data = readFileSync(new URL('../public/assets/curios.webp', import.meta.url));
+  assert.deepEqual(binaryBreaches([{ path, data }], {}), []);
+  assert.ok(binaryBreaches([{ path: 'public/assets/other.webp', data }], {}).length);
+  const damaged = Buffer.from(data);
+  damaged[damaged.length - 1] ^= 1;
+  assert.ok(binaryBreaches([{ path, data: damaged }], {}).some((b) => b.includes('被替换')));
+  assert.ok(binaryBreaches([{ path, data: data.subarray(0, data.length - 1) }], {}).length);
+  const r = repository();
+  try {
+    mkdirSync(join(r.cwd, 'public/assets'), { recursive: true });
+    r.write(path, data);
+    r.commit();
+    assert.deepEqual(r.check(), []);
+    r.write(path, damaged);
+    r.commit();
+    assert.ok(r.check().some((b) => b.includes('替换')));
   } finally {
     rmSync(r.cwd, { recursive: true, force: true });
   }

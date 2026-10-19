@@ -29,7 +29,7 @@ export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition
   const pageCount = Math.ceil(visibleTreasures.length / 12);
   const t = treasure(selectedTreasure),
     level = save.forge[t.id] || 0,
-    cost = forgeCost(level),
+    cost = forgeCost(level, save),
     owned = save.artifacts.includes(t.id);
   const detail =
     bookTab === 'treasures'
@@ -46,7 +46,7 @@ export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition
   return {
     title: '万般法宝，皆可入道',
     subtitle: '藏器阁',
-    body: `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar collection-toolbar"><div class="book-tabs" role="group" aria-label="藏器分类"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}" aria-pressed="${bookTab === 'treasures'}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}" aria-pressed="${bookTab === 'passives'}">功法 <b>${PASSIVES.length}</b></button></div><div class="header-right">${currency(save)}</div></div><div class="collection-navigation"><div class="collection-filters" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
+    body: `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar collection-toolbar"><div class="book-tabs" role="group" aria-label="藏器分类"><button data-action="book-tab" data-id="treasures" class="${bookTab === 'treasures' ? 'active' : ''}" aria-pressed="${bookTab === 'treasures'}">法宝 <b>${TREASURES.length}</b></button><button data-action="book-tab" data-id="passives" class="${bookTab === 'passives' ? 'active' : ''}" aria-pressed="${bookTab === 'passives'}">功法 <b>${PASSIVES.length}</b></button><button data-action="book-tab" data-id="curios" aria-pressed="false">奇物</button></div><div class="header-right">${currency(save)}</div></div><div class="collection-navigation"><div class="collection-filters" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
       bookTab === 'treasures' && pageCount > 1
         ? `<nav class="collection-pages" aria-label="法宝分页"><button class="collection-previous" data-action="treasure-page" data-id="previous" aria-label="上一页法宝" ${treasurePage === 0 ? 'disabled' : ''}>${smallIcon('arrow')}</button><span aria-live="polite" aria-atomic="true" title="第 ${treasurePage * 12 + 1}–${Math.min(visibleTreasures.length, (treasurePage + 1) * 12)} 件，共 ${visibleTreasures.length} 件"><span class="sr-only">第 </span>${treasurePage + 1}<span aria-hidden="true"> / </span><span class="sr-only"> 页，共 </span>${pageCount}<span class="sr-only"> 页</span></span><button data-action="treasure-page" data-id="next" aria-label="下一页法宝" ${treasurePage === pageCount - 1 ? 'disabled' : ''}>${smallIcon('arrow')}</button></nav>`
         : ''

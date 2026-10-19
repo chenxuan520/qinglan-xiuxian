@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 // 按文件保守判断：这些文件中的纯重构也会重算；界面、素材和普通文档不会触发。
 export const BALANCE_FILES = new Set([
   'src/data.ts',
+  'src/curio-data.ts',
+  'src/curio-market.ts',
   'src/progress.ts',
   'src/training.ts',
   'src/sect-services.ts',

@@ -1,8 +1,10 @@
+import { isCurio, curioValue, curioName } from './curio-data.ts';
 import { TREASURES, treasure } from './data.ts';
 import { medicineInfo, medicineMarketValue } from './medicine-data.ts';
 import { forgeCost, type SaveData } from './progress.ts';
 import { freeStarter, type AuctionItem } from './auction-data.ts';
 export function auctionValue(item: AuctionItem) {
+  if (item.kind === 'curio') return curioValue(item.id) * item.quantity;
   if (item.kind === 'medicine') {
     return medicineMarketValue(item.id) * item.quantity;
   }
@@ -15,10 +17,16 @@ export function auctionValue(item: AuctionItem) {
   return value;
 }
 export function auctionItemName(item: AuctionItem) {
-  return item.kind === 'medicine' ? medicineInfo(item.id)!.name : treasure(item.id).name;
+  return item.kind === 'medicine'
+    ? medicineInfo(item.id)!.name
+    : item.kind === 'curio'
+      ? curioName(item.id)
+      : treasure(item.id).name;
 }
 export function releaseAuctionItem(save: SaveData, item: AuctionItem) {
   if (item.kind === 'medicine') save.medicine.bag[item.id] -= item.quantity;
+  else if (item.kind === 'curio' && isCurio(item.id))
+    save.curios.bag[item.id] = (save.curios.bag[item.id] ?? 0) - item.quantity;
   else {
     save.artifacts = save.artifacts.filter((id) => id !== item.id);
     save.artifactDrops = save.artifactDrops.filter((id) => id !== item.id);

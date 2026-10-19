@@ -1,3 +1,4 @@
+import { isCurio } from './curio-data.ts';
 import { MAX_FORGE_LEVEL, ROOT_STARTERS, TREASURES } from './data.ts';
 import { medicineInfo } from './medicine-data.ts';
 import {
@@ -8,7 +9,7 @@ import {
 
 export const AUCTION_SPOT = { x: 1000, y: 535 };
 export const AUCTION_LOTS = 8;
-export type AuctionKind = 'medicine' | 'artifact';
+export type AuctionKind = 'medicine' | 'artifact' | 'curio';
 export type AuctionOutcome = 'won' | 'lost' | 'sold' | 'unsold';
 export interface AuctionItem {
   kind: AuctionKind;
@@ -23,7 +24,7 @@ export interface AuctionReceipt extends AuctionItem {
   outcome: AuctionOutcome;
   price: number;
   fee: number;
-  bidder: MarketCultivatorId | 'player' | null;
+  bidder: MarketCultivatorId | 'player' | 'commission' | null;
   bidderName?: string;
 }
 export interface AuctionState {
@@ -67,7 +68,7 @@ export function validAuction(
           ? medicineInfo(r.id)
           : r.kind === 'artifact'
             ? TREASURES.find((t) => t.id === r.id)
-            : undefined;
+            : r.kind === 'curio' && isCurio(r.id);
       return (
         !!item &&
         amount(r.visit) &&
@@ -84,7 +85,7 @@ export function validAuction(
         amount(r.forgeLevel) &&
         (r.kind === 'artifact'
           ? r.quantity === 1 && r.forgeLevel <= MAX_FORGE_LEVEL
-          : r.forgeLevel === 0) &&
+          : r.forgeLevel === 0 && (r.kind !== 'curio' || r.quantity === 1)) &&
         (r.bidderName === undefined ||
           (isMarketTraderId(r.bidder) &&
             typeof r.bidderName === 'string' &&
@@ -95,7 +96,8 @@ export function validAuction(
         (r.outcome === 'won'
           ? r.price > 0 && r.bidder === 'player'
           : r.outcome === 'sold' || r.outcome === 'lost'
-            ? r.price > 0 && isMarketTraderId(r.bidder)
+            ? r.price > 0 &&
+              (isMarketTraderId(r.bidder) || (r.kind === 'curio' && r.bidder === 'commission'))
             : r.outcome === 'unsold' && r.price === 0 && r.fee === 0 && r.bidder === null)
       );
     })

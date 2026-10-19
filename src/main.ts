@@ -1,6 +1,5 @@
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
-import { catalogPanel } from './catalog-ui.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
 import { bestiaryPanel } from './bestiary-ui.ts';
 import { BattleHud } from './battle-hud.ts';
@@ -153,7 +152,7 @@ import type { MarketAmbushScene } from './market-ambush-scene.ts';
 import type { AmbushOutcome } from './market-ambush.ts';
 import { marketCultivators } from './sect-market-data.ts';
 import { prepareAuction } from './auction.ts';
-import { auctionContent, auctionResult, type AuctionView } from './auction-ui.ts';
+import type { AuctionView } from './auction-ui.ts';
 import type { AuctionKind } from './auction-data.ts';
 import { MARKET_START, isMarketCultivatorId, type MarketCultivator } from './sect-market-data.ts';
 import {
@@ -354,6 +353,7 @@ let rewardReturn: PanelLocation | null = null;
 let adRoot: SpiritRootId = 'heaven';
 let adElements: ElementId[] = [];
 let pendingImport: ReturnType<typeof importSave> | null = null;
+let settlementRetryAt = 0;
 // 只在存档仍是本页上次读写的内容时写入，其他窗口写过后本页停止保存。
 function writeSave(data: SaveData, run: Game | null) {
   if (saveLock) throw new Error('存档已停止写入');
@@ -366,7 +366,7 @@ function writeSave(data: SaveData, run: Game | null) {
   lastSaveText = text;
 }
 function persist() {
-  if (saveLock) return;
+  if (saveLock || settlementRetryAt || (game?.state === 'won' && !settled)) return;
   syncHumanStories(save);
   const active = game && !settled ? game : pendingRun;
   try {
@@ -748,7 +748,13 @@ function refreshAuction(selected = '') {
   if (!host || panel !== 'sect-auction') return;
   const section = modal.querySelector<HTMLElement>('.panel');
   const scroll = section?.scrollTop ?? 0;
-  host.innerHTML = auctionContent(save, auctionView, !!pendingRun, auctionKind, selected);
+  host.innerHTML = marketEventSource.current!.auctionContent(
+    save,
+    auctionView,
+    !!pendingRun,
+    auctionKind,
+    selected,
+  );
   if (section) section.scrollTop = scroll;
 }
 function showTeaStory() {
@@ -922,9 +928,8 @@ function finishRun() {
   clearInterval(adTimer);
   adReadyAt = 0;
   adWatched = false;
-  panel = '';
-  settled = true;
-  rewards = settleRun(save, {
+  const next = structuredClone(save);
+  const result = settleRun(next, {
     stage: game.stage,
     difficulty: game.difficulty,
     kills: game.kills,
@@ -937,8 +942,29 @@ function finishRun() {
     spiritRoot: game.spiritRoot,
     path: game.path,
     startedImmortal: game.startedImmortal,
+    loot: game.loot,
   });
-  persist();
+  syncHumanStories(next);
+  try {
+    writeSave(next, null);
+  } catch {
+    if (!saveLock) {
+      settlementRetryAt = performance.now() + 1500;
+      panel = 'settlement-retry';
+      panelFrame(
+        '此行未结',
+        '收拢行囊',
+        '<p>此行收获暂时未能保存，正在重试。请暂留此页。</p><button class="primary-button" data-action="finish-run">重试保存收获</button>',
+      );
+      modal.querySelector('.panel-close')?.remove();
+    }
+    return;
+  }
+  settlementRetryAt = 0;
+  panel = '';
+  Object.assign(save, next);
+  settled = true;
+  rewards = result;
   telemetry.track({
     type: 'run-end',
     ...lifeStats(),
@@ -1270,7 +1296,7 @@ function shellBindings(): ActionShell {
     get attuneSpiritRoot() { return attuneSpiritRoot; },
     get auctionKind() { return auctionKind; },
     set auctionKind(next) { auctionKind = next; },
-    get auctionResult() { return auctionResult; },
+    get auctionResult() { return marketEventSource.current!.auctionResult; },
     get auctionView() { return auctionView; },
     set auctionView(next) { auctionView = next; },
     get beginJourneyFarewell() { return beginJourneyFarewell; },
@@ -1479,10 +1505,10 @@ function shellBindings(): ActionShell {
     set adWatched(next) { adWatched = next; },
     get app() { return app; },
     get assetUrl() { return assetUrl; },
-    get auctionContent() { return auctionContent; },
+    get auctionContent() { return marketEventSource.current!.auctionContent; },
     get battleHud() { return battleHud; },
     get bestiaryPanel() { return bestiaryPanel; },
-    get catalogPanel() { return catalogPanel; },
+    get catalogPanel() { return marketEventSource.current!.catalogPanel; },
     get chronicleSource() { return chronicleSource; },
     get completeTribulation() { return completeTribulation; },
     get cultivationPanel() { return cultivationPanel; },
@@ -1629,7 +1655,8 @@ document.addEventListener('change', async (event) => {
     inMarket
   ) {
     if (input.id === 'auction-kind')
-      auctionKind = input.value === 'artifact' ? 'artifact' : 'medicine';
+      auctionKind =
+        input.value === 'curio' ? 'curio' : input.value === 'artifact' ? 'artifact' : 'medicine';
     refreshAuction(input.id === 'auction-item' ? input.value : '');
     modal.querySelector<HTMLElement>(`#${input.id}`)?.focus({ preventScroll: true });
     return;
@@ -1856,6 +1883,7 @@ function simulate(dt: number, now: number) {
         }
       }
     }
+    if (settlementRetryAt && now >= settlementRetryAt && !saveLock && !settled) finishRun();
     if (
       !settled &&
       realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).step !== realmBefore

@@ -1,3 +1,4 @@
+import { isCurio, grantCurio, ownsCurio } from './curio-data.ts';
 import { trainingEffect } from './training.ts';
 import { debateQuote } from './market-debate.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, spiritRootInfo, pathInfo } from './data.ts';
@@ -258,6 +259,7 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
           : '此物正合他眼下所需，按眼前明示的收货价结算；是否交货由你取舍。';
   return {
     ...item,
+    kind: item.kind as 'medicine' | 'artifact',
     minimumLevel,
     price,
     motiveTitle: motive.title,
@@ -375,7 +377,7 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
       : pool[roll(save, `opportunity-item:${id}`) % pool.length];
   const invitation =
     kind === 'invitation'
-      ? marketInvitationReward(save.mortal.population, save.mortal.sectMarket, id)
+      ? marketInvitationReward(save.mortal.population, save.mortal.sectMarket, id, true)
       : undefined;
   const item: AuctionItem = invitation?.item ?? {
     kind: 'medicine',
@@ -458,6 +460,12 @@ export function opportunityReason(
       !Number.isSafeInteger((save.medicine.bag[o.item.id] || 0) + o.item.quantity)
     )
       return '丹囊数量已达上限';
+    if (
+      o.item.kind === 'curio' &&
+      isCurio(o.item.id) &&
+      !Number.isSafeInteger((save.curios.bag[o.item.id] ?? 0) + 1)
+    )
+      return '奇物数量已达上限';
     if (o.kind === 'deposit' && o.honest && !Number.isSafeInteger(save.stones + o.price))
       return '灵石余额已达上限';
   }
@@ -512,10 +520,14 @@ export function chooseMarketOpportunity(
     ).index;
     const ratio = Math.max(0.5, Math.min(2.7, 1.28 ** (o.n.realmIndex - playerRealm)));
     const stats = {
-      hp: root.baseHp + trainingEffect(save.training.vitality) * 5,
+      hp: Math.round(
+        (root.baseHp +
+          trainingEffect(save.training.vitality) * 5 * (ownsCurio(save, 'soul-wood') ? 1.15 : 1)) *
+          (ownsCurio(save, 'sacred-fragment') ? 1.2 : 1),
+      ),
       damage: (7 + root.rate * 8) * (1 + forgeDamageBonus(save.forge[save.starter] || 0)),
       enemyHp: 90 * ratio,
-      enemyDamage: 16 * ratio,
+      enemyDamage: 16 * ratio * (ownsCurio(save, 'jade-ruyi') ? 0.9 : 1),
       speed: root.baseSpeed,
     };
     s.ambush = {
@@ -559,7 +571,7 @@ export function chooseMarketOpportunity(
       save,
       id,
       'gift',
-      `${o.kind === 'invitation' ? '赴约一年，对方如约交付，暂扣灵石全数返还。' : `花费${o.cost}灵石。`}${auctionItemName(o.item)}${o.item.kind === 'artifact' ? `（炼器${o.item.forgeLevel}阶）已收入藏器阁${ownedLevel >= o.item.forgeLevel ? `；同名法宝不重复收录，保留原有炼器${ownedLevel}阶` : '，本命未改变'}` : ` ×${o.item.quantity} 已收入丹囊`}${o.kind === 'haggle' ? '；这笔要价比药铺更高，吃了些价差。' : ''}。`,
+      `${o.kind === 'invitation' ? '赴约一年，对方如约交付，暂扣灵石全数返还。' : `花费${o.cost}灵石。`}${auctionItemName(o.item)}${o.item.kind === 'artifact' ? `（炼器${o.item.forgeLevel}阶）已收入藏器阁${ownedLevel >= o.item.forgeLevel ? `；同名法宝不重复收录，保留原有炼器${ownedLevel}阶` : '，本命未改变'}` : o.item.kind === 'curio' ? '已收入行囊，持有即获其助益' : ` ×${o.item.quantity} 已收入丹囊`}${o.kind === 'haggle' ? '；这笔要价比药铺更高，吃了些价差。' : ''}。`,
     );
   }
   return log(
@@ -572,6 +584,10 @@ export function chooseMarketOpportunity(
   );
 }
 function receiveMarketItem(save: SaveData, item: AuctionItem) {
+  if (item.kind === 'curio') {
+    grantCurio(save, item.id);
+    return;
+  }
   if (item.kind === 'medicine')
     save.medicine.bag[item.id] = (save.medicine.bag[item.id] || 0) + item.quantity;
   else {

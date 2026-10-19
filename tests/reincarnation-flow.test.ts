@@ -138,6 +138,7 @@ function harness(save: SaveData) {
         writes.push(value);
       },
     },
+    settlementRetryAt: 0,
     saveLock: null,
     unreadableBackedUp: false,
     lastSaveText: null,

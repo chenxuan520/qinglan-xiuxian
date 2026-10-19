@@ -1,3 +1,4 @@
+import { curioAlchemy } from './curio-data.ts';
 import {
   rootElementsFor,
   spiritRootInfo,
@@ -143,17 +144,20 @@ export const medicineCraftStones = (id: string) =>
   ({ 凡品: 10, 灵品: 40, 珍品: 100 })[medicineInfo(id)!.tier];
 export function medicineCraftReason(save: SaveData, id: string, unfinished = false) {
   const m = medicineInfo(id);
+  const brew = curioAlchemy(save, m?.craftYears ?? 0);
   if (!m || !m.years) return '此药无方可炼，只待机缘';
   if (m.tier === '凡品') return '凡品无需炼制，可向药铺购买';
   if (!save.medicine.recipes.includes(id)) return '尚未习得药方';
+  if (!Number.isSafeInteger((save.medicine.bag[id] ?? 0) + brew.quantity))
+    return '丹囊数量已达上限';
   if (unfinished) return '请先结束当前历练';
   if (save.journeyEnded || save.pendingReincarnation) return '此世仙途已结束';
   if (save.mortal.marketSocial?.ambush) return '请先处理尚未结束的劫修遭遇';
   if (save.unlocked < m.stage) return `探索第 ${m.stage + 1} 境后解锁配方`;
   if (tribulationDue(save) || sectDuesPending(save) || save.mortal.activity)
     return '请先处理人间待办、供奉或天劫';
-  if (lifespanInfo(save).remaining <= m.craftYears + 1e-9) return '余下寿元不足，不能开炉';
-  if (save.nextTribulationAge && save.nextTribulationAge <= save.age + m.craftYears + 1e-9)
+  if (lifespanInfo(save).remaining <= brew.years + 1e-9) return '余下寿元不足，不能开炉';
+  if (save.nextTribulationAge && save.nextTribulationAge <= save.age + brew.years + 1e-9)
     return '天劫将至，不能开炉';
   if (
     medicineFormula(save.medicine, id).some(
@@ -164,12 +168,12 @@ export function medicineCraftReason(save: SaveData, id: string, unfinished = fal
   const dues = save.mortal.member?.dues ? save.mortal.member : null;
   // 开炉前预留其间到期的供奉，保证炼制一次结清，不产生现实等待。
   let reserve = 0;
-  if (dues && dues.dueAt <= save.mortal.years + m.craftYears) {
+  if (dues && dues.dueAt <= save.mortal.years + brew.years) {
     const next = sectDues(save);
     if (next.stones > 0)
       reserve =
         Math.min(dues.dues, next.stones) +
-        Math.floor((save.mortal.years + m.craftYears - dues.dueAt) / next.years) * next.stones;
+        Math.floor((save.mortal.years + brew.years - dues.dueAt) / next.years) * next.stones;
   }
   if (save.stones < medicineCraftStones(id) + reserve)
     return reserve ? '灵石不足以支付炼制和期间供奉' : '炼制灵石不足';
@@ -179,12 +183,13 @@ export function craftMedicine(save: SaveData, id: string, unfinished = false) {
   const reason = medicineCraftReason(save, id, unfinished);
   if (reason) return { ok: false, message: reason };
   const m = medicineInfo(id)!;
+  const brew = curioAlchemy(save, m.craftYears);
   syncTribulationClock(save);
   save.stones -= medicineCraftStones(id);
   for (const item of medicineFormula(save.medicine, id)) save.medicine.bag[item.id] -= item.count;
-  advanceMortal(save, m.craftYears * 60);
-  grantMedicine(save.medicine, id);
-  const message = `炼成${m.name}，消耗 ${m.craftYears} 年`;
+  advanceMortal(save, brew.years * 60);
+  for (let n = 0; n < brew.quantity; n++) grantMedicine(save.medicine, id);
+  const message = `炼成${m.name} ×${brew.quantity}，消耗 ${brew.years} 年`;
   recordChronicle(save, '开炉得丹', `${message}。`);
   return { ok: true, message };
 }

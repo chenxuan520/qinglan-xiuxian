@@ -1,3 +1,5 @@
+import { curioName } from './curio-data.ts';
+import { curioArt } from './curio-art.ts';
 import { treasure } from './data.ts';
 import { medicineInfo } from './medicine-data.ts';
 import { medicineArt } from './medicine-ui.ts';
@@ -10,7 +12,11 @@ import {
 } from './progress.ts';
 
 const name = (gift: BirthInheritance) =>
-  gift.kind === 'artifact' ? treasure(gift.id).name : medicineInfo(gift.id)!.name;
+  gift.kind === 'artifact'
+    ? treasure(gift.id).name
+    : gift.kind === 'curio'
+      ? curioName(gift.id)
+      : medicineInfo(gift.id)!.name;
 const rank = (level: number) => (level ? `${'一二三四五六七八九十'[level - 1]}阶` : '未炼器');
 
 export function isImmortalSuccessor(save: SaveData) {
@@ -24,12 +30,19 @@ export function inheritancePreview(save: SaveData, key = '') {
   return giftPreview(gift);
 }
 function giftPreview(gift: BirthInheritance) {
-  const art = gift.kind === 'artifact' ? icon(gift.id) : medicineArt(medicineInfo(gift.id)!);
+  const art =
+    gift.kind === 'artifact'
+      ? icon(gift.id)
+      : gift.kind === 'curio'
+        ? curioArt(gift.id)
+        : medicineArt(medicineInfo(gift.id)!);
   const detail =
     gift.kind === 'artifact'
       ? `炼器阶数保留（${rank(gift.level)}）· 法宝只入少年的藏器阁。局内等级与觉醒重新开始，本命由你自行选择。`
-      : '赠予一枚，收入少年的丹囊，由你自行服用。原修士的药效与已服用的提升不会带入。';
-  return `${art}<div><strong>${name(gift)}<small>${gift.kind === 'artifact' ? rank(gift.level) : '一枚'}</small></strong><p>${detail}</p></div>`;
+      : gift.kind === 'curio'
+        ? '赠予一件，收入少年的行囊，持有即获其助益；同名奇物的效果不叠加。'
+        : '赠予一枚，收入少年的丹囊，由你自行服用。原修士的药效与已服用的提升不会带入。';
+  return `${art}<div><strong>${name(gift)}<small>${gift.kind === 'artifact' ? rank(gift.level) : gift.kind === 'curio' ? '一件奇物' : '一枚'}</small></strong><p>${detail}</p></div>`;
 }
 export function inheritanceContent(save: SaveData) {
   const gifts = inheritanceChoices(save);
@@ -37,10 +50,10 @@ export function inheritanceContent(save: SaveData) {
   const group = (kind: BirthInheritance['kind'], label: string) => {
     const options = gifts.filter((gift) => gift.kind === kind);
     return options.length
-      ? `<optgroup label="${label}">${options.map((gift) => `<option value="${gift.kind}:${gift.id}">${name(gift)} · ${gift.kind === 'artifact' ? rank(gift.level) : `现有 ${save.medicine.bag[gift.id]} 枚，传一枚`}</option>`).join('')}</optgroup>`
+      ? `<optgroup label="${label}">${options.map((gift) => `<option value="${gift.kind}:${gift.id}">${name(gift)} · ${gift.kind === 'artifact' ? rank(gift.level) : gift.kind === 'curio' ? '传一件' : `现有 ${save.medicine.bag[gift.id]} 枚，传一枚`}</option>`).join('')}</optgroup>`
       : '';
   };
-  return `<section class="inheritance-section" aria-labelledby="inheritance-title"><div class="inheritance-heading"><span class="eyebrow">真仙传承 · 临别机缘</span><h3 id="inheritance-title">留一物，续一程</h3><p>可将一件已收藏法宝，或一枚现有丹药赠给青岚渡口的少年。少年的灵根仍随机，本命由你自行选择。</p></div><label class="inheritance-label" for="reincarnate-inheritance">临行赠物 <span>任选其一，也可只留指引</span></label><select id="reincarnate-inheritance"><option value="">不赠物 · 只留指引</option>${group('artifact', '法宝 · 保留炼器阶数')}${group('medicine', '丹药 · 仅传一枚')}</select><div class="inheritance-preview" aria-live="polite">${inheritancePreview(save)}</div></section>`;
+  return `<section class="inheritance-section" aria-labelledby="inheritance-title"><div class="inheritance-heading"><span class="eyebrow">真仙传承 · 临别机缘</span><h3 id="inheritance-title">留一物，续一程</h3><p>可将一件已收藏法宝、一枚现有丹药，或一件随身奇物赠给青岚渡口的少年。少年的灵根仍随机，本命由你自行选择。</p></div><label class="inheritance-label" for="reincarnate-inheritance">临行赠物 <span>任选其一，也可只留指引</span></label><select id="reincarnate-inheritance"><option value="">不赠物 · 只留指引</option>${group('artifact', '法宝 · 保留炼器阶数')}${group('medicine', '丹药 · 仅传一枚')}${group('curio', '奇物 · 仅传一件')}</select><div class="inheritance-preview" aria-live="polite">${inheritancePreview(save)}</div></section>`;
 }
 export function birthInheritanceNotice(gift: BirthInheritance | null) {
   return gift

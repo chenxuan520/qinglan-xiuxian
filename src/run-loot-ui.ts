@@ -1,3 +1,5 @@
+import { curioName } from './curio-data.ts';
+import { curioArt } from './curio-art.ts';
 import type { Game } from './game.ts';
 import { treasure } from './data.ts';
 import { icon } from './icons.ts';
@@ -6,6 +8,12 @@ import { medicineArt } from './medicine-ui.ts';
 
 export function runLootContent(loot: Game['loot']) {
   const items = [
+    ...Object.entries(loot.curios ?? {}).map(([id, count]) => ({
+      name: curioName(id),
+      detail: '随身奇物',
+      art: curioArt(id),
+      count,
+    })),
     ...loot.artifacts.map((id) => {
       const item = treasure(id);
       return { name: item.name, detail: '新获法宝', art: icon(id, item.color), count: 1 };

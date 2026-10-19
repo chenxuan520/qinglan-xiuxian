@@ -11,6 +11,14 @@ export interface BinaryApproval {
   sha256: string;
 }
 export type ApprovedBinaries = Record<string, BinaryApproval>;
+// 2026-10-19 用户明确批准的新增奇物九宫格（上限260,000字节）。
+// 原始素材基线仍不可改；仅此路径、长度和散列获准，不允许扩展名或目录豁免。
+export const EXPLICITLY_APPROVED_ART: ApprovedBinaries = {
+  'public/assets/curios.webp': {
+    bytes: 208998,
+    sha256: 'c44e16695c2fb792a2e19c09f2a663007685579bd5fc96c84788174c35ee185a',
+  },
+};
 export interface RepositoryFile {
   path: string;
   data: Uint8Array;
@@ -38,7 +46,7 @@ export function binaryBreaches(files: RepositoryFile[], approved: ApprovedBinari
   const breaches: string[] = [];
   const present = new Set(files.map((file) => file.path));
   for (const { path, data } of files) {
-    const approval = approved[path];
+    const approval = approved[path] ?? EXPLICITLY_APPROVED_ART[path];
     if (!approval && isBinary(data, path)) breaches.push(`禁止新增二进制文件：${path}`);
     if (
       approval &&
@@ -166,7 +174,7 @@ export function commitBinaryBreaches(
       .filter(Boolean);
     for (const path of new Set(added)) {
       const data = git(['show', `${commit}:${path}`]);
-      const approval = canonical[path];
+      const approval = canonical[path] ?? EXPLICITLY_APPROVED_ART[path];
       if (!approval && isBinary(data, path))
         breaches.push(`提交 ${commit.slice(0, 7)} 禁止新增二进制文件：${path}`);
       if (
@@ -205,5 +213,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   if (breaches.length) {
     for (const breach of breaches) console.error(breach);
     process.exitCode = 1;
-  } else console.log(`二进制门禁通过：仅保留已批准素材，字体文件为 0，新增二进制为 0。`);
+  } else console.log(`二进制门禁通过：仅保留已批准素材，字体文件为 0，未批准新增二进制为 0。`);
 }

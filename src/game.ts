@@ -1,3 +1,4 @@
+import { ownsCurio, bossCurio } from './curio-data.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
   Point,
@@ -115,7 +116,12 @@ export class Game {
   state: GameState = 'playing';
   time = 0;
   elapsedYears: number | undefined = 0;
-  loot = { artifacts: [] as string[], medicines: {} as Record<string, number>, complete: true };
+  loot = {
+    artifacts: [] as string[],
+    medicines: {} as Record<string, number>,
+    curios: {} as Record<string, number>,
+    complete: true,
+  };
   level = 1;
   xp = 0;
   kills = 0;
@@ -207,7 +213,10 @@ export class Game {
   private maximumHealth(medicineHp = this.medicine.hp) {
     const base =
       this.baseHp *
-      (1 + trainingEffect(this.save.training.vitality) * 0.05) *
+      (1 +
+        trainingEffect(this.save.training.vitality) *
+          0.05 *
+          (ownsCurio(this.save, 'soul-wood') ? 1.15 : 1)) *
       (1 + this.passivePower('guard') * 0.1);
     return Math.round(
       base *
@@ -217,7 +226,8 @@ export class Game {
         (1 + this.save.tribulations * 0.03) *
         (1 + this.save.retreatBonus.vitality / 100) *
         realmHealthMultiplier(this.realm) *
-        medicineHp,
+        medicineHp *
+        (ownsCurio(this.save, 'sacred-fragment') ? 1.2 : 1),
     );
   }
   get boss() {
@@ -315,6 +325,9 @@ export class Game {
     const ratio = this.player.hp / this.player.maxHp;
     return this.player.hp > 0 && ratio < 0.3 ? 1 - ratio / 0.3 : 0;
   }
+  private get eliteDamage() {
+    return this.medicine.eliteDamage * (ownsCurio(this.save, 'thunder-bamboo') ? 1.1 : 1);
+  }
   get stats() {
     return {
       damage:
@@ -328,7 +341,8 @@ export class Game {
         (1 - (this.passives.abyss || 0) * 0.02 * this.medicine.drawback) *
         (1 +
           (powerTrainingEffect(this.save.training.power) *
-            spiritRootInfo(this.spiritRoot).powerPerLevel) /
+            spiritRootInfo(this.spiritRoot).powerPerLevel *
+            (ownsCurio(this.save, 'soul-wood') ? 1.15 : 1)) /
             100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
@@ -357,7 +371,8 @@ export class Game {
         (1 + this.save.retreatBonus.speed / 100) *
         (1 - (this.passives.bone || 0) * 0.01 * this.medicine.drawback) *
         (this.slowed > 0 ? 1 - 0.25 * this.medicine.drawback : 1) *
-        this.medicine.speed,
+        this.medicine.speed *
+        (ownsCurio(this.save, 'wind-wings') ? 1.1 : 1),
       crit: Math.min(
         0.85,
         spiritRootInfo(this.spiritRoot).baseCrit +
@@ -374,8 +389,14 @@ export class Game {
             (this.passives.blood || 0) * 0.03 * this.medicine.drawback +
             (this.passives.curse || 0) * 0.015 * this.medicine.drawback +
             (this.passives.forbidden || 0) * 0.015 * this.medicine.drawback,
-        ) * this.medicine.armor,
-      magnet: 85 * (1 + this.passivePower('magnet') * 0.28) * this.medicine.magnet,
+        ) *
+        this.medicine.armor *
+        (ownsCurio(this.save, 'jade-ruyi') ? 0.9 : 1),
+      magnet:
+        85 *
+        (1 + this.passivePower('magnet') * 0.28) *
+        this.medicine.magnet *
+        (ownsCurio(this.save, 'spirit-spring') ? 1.25 : 1),
       xp:
         ((1 +
           this.passivePower('spirit') * 0.15 +
@@ -385,14 +406,17 @@ export class Game {
           DIFFICULTIES[this.difficulty].amount) *
         0.9 *
         spiritRootInfo(this.spiritRoot).rate *
-        this.medicine.xp,
+        this.medicine.xp *
+        (ownsCurio(this.save, 'spirit-spring') ? 1.15 : 1),
       regen:
         (spiritRootInfo(this.spiritRoot).baseRegen *
+          (ownsCurio(this.save, 'sacred-fragment') ? 1.3 : 1) *
           this.medicine.regen *
           realmHealthMultiplier(this.realm) +
           this.passivePower('duration') * this.player.maxHp * 0.001) *
         (this.path === 'orthodox' ? 1.2 : 1) *
         (1 - (this.passives.devour || 0) * 0.04 * this.medicine.drawback),
+      eliteDamage: this.eliteDamage,
       killHeal: this.passivePower('devour') * this.player.maxHp * 0.0005,
     };
   }
@@ -471,6 +495,7 @@ export class Game {
       loot: {
         artifacts: [...this.loot.artifacts],
         medicines: { ...this.loot.medicines },
+        curios: { ...this.loot.curios },
         complete: this.loot.complete,
       },
       level: this.level,
@@ -540,9 +565,10 @@ export class Game {
         ? {
             artifacts: [...s.loot.artifacts],
             medicines: { ...s.loot.medicines },
+            curios: { ...s.loot.curios },
             complete: s.loot.complete,
           }
-        : { artifacts: [], medicines: {}, complete: false };
+        : { artifacts: [], medicines: {}, curios: {}, complete: false };
       g.startedImmortal = s.startedImmortal ?? false;
       g.tribulation = s.tribulation ?? 0;
       g.tribulationStep = s.tribulationStep ?? 0;
@@ -1717,7 +1743,7 @@ export class Game {
     const damage = this.weaponHitDamage(w) * AWAKENING_BURST.hits;
     for (const e of this.enemies) {
       if (e.dead || distance(e, p) > AWAKENING_BURST.radius + e.radius) continue;
-      const bossCap = (e.maxHp * AWAKENING_BURST.bossShare) / this.medicine.eliteDamage;
+      const bossCap = (e.maxHp * AWAKENING_BURST.bossShare) / this.eliteDamage;
       this.hitEnemy(e, e.boss ? Math.min(damage, bossCap) : damage, false, w.id);
     }
   }
@@ -2608,7 +2634,7 @@ export class Game {
       // 同一火球的直击与爆炸共用系数，不改弹丸本身伤害，以免削弱周围小怪群伤。
       damage *= multiplier;
     }
-    if (e.elite || e.boss) damage *= this.medicine.eliteDamage;
+    if (e.elite || e.boss) damage *= this.eliteDamage;
     if (this.tribulation) {
       if (!this.tribulationVulnerable) return;
       damage = Math.min(
@@ -2716,6 +2742,14 @@ export class Game {
         this.creditCultivation();
         collected = dropArtifacts(this.save, this.random);
         this.loot.artifacts.push(...collected);
+        const curio = bossCurio(
+          this.save,
+          this.stage,
+          this.trialBossesDefeated,
+          lastBoss,
+          this.player.hp > 0,
+        );
+        if (curio) this.loot.curios[curio] = (this.loot.curios[curio] ?? 0) + 1;
       } else if (this.level < MAX_RUN_LEVEL)
         this.pickups.push({
           x: e.x,

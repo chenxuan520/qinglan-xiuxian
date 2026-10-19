@@ -67,7 +67,7 @@ test('旧续局标记收获未载，之后新掉落仍记录，不凭整个背�
   const snapshot = game.snapshot();
   delete snapshot.loot;
   const restored = Game.restore(save, snapshot)!;
-  assert.deepEqual(restored.loot, { artifacts: [], medicines: {}, complete: false });
+  assert.deepEqual(restored.loot, { artifacts: [], medicines: {}, curios: {}, complete: false });
   assert.match(runLootContent(restored.loot), /此行所得已收入行囊/);
   restored.random = () => 0.2;
   restored.hitEnemy(restored.spawnEnemy(10, false, true), 1e9);

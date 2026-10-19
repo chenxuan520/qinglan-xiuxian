@@ -1,3 +1,4 @@
+import { curioTrainingYears } from './curio-data.ts';
 import { ironMarket, ironTradeQuote } from './iron-market.ts';
 import { grantMedicine, MEDICINES, townMedicineReward } from './medicine-data.ts';
 import { FINAL_TRIAL_STAGE, spiritRootInfo, passive, type CultivationPath } from './data.ts';
@@ -64,17 +65,18 @@ export function masteryBonus(save: SaveData, id: string) {
   if (save.mortal.member?.id !== id || !level) return 0;
   return Math.min(level, masteryLimit(save)) * MASTERY_PER_LEVEL;
 }
-export function studyPlan(save: SaveData) {
+export function studyPlan(save: SaveData, withCurio = true) {
   const id = save.mortal.member?.id;
   const level = id ? save.mortal.mastery[id] || 0 : 0;
   const limit = masteryLimit(save);
+  const years = Math.round(((1 + level * 0.4) / spiritRootInfo(save.spiritRoot).rate) * 10) / 10;
   return {
     level,
     limit,
     eligible: level < limit,
     requiredRealm: MASTERY_REALMS[level]?.name ?? '',
     stones: 30 + level * 20,
-    years: Math.round(((1 + level * 0.4) / spiritRootInfo(save.spiritRoot).rate) * 10) / 10,
+    years: withCurio ? curioTrainingYears(save, years) : years,
   };
 }
 function log(save: SaveData, text: string) {

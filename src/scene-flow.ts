@@ -288,7 +288,41 @@ export function showMarketVenue(shell: ActionShell, id: string) {
 }
 
 export function showAuction(shell: ActionShell) {
-  if (!shell.inMarket || !shell.marketScene?.nearAuction) return;
+  if (!shell.inMarket || !shell.marketScene?.nearAuction || shell.saveLock) return;
+  if (!shell.marketEventSource.current) {
+    shell.panel = 'sect-auction';
+    shell.panelFrame(
+      '坊间竞宝',
+      '宗门坊市 · 拍卖行',
+      '<div id="auction-loading" role="status">正在展开拍卖行…</div>',
+    );
+    const host = shell.modal.querySelector<HTMLElement>('#auction-loading')!;
+    const visit = shell.save.mortal.sectMarket?.visit;
+    const current = () =>
+      host.isConnected &&
+      !shell.saveLock &&
+      shell.panel === 'sect-auction' &&
+      shell.inMarket &&
+      !!shell.marketScene?.nearAuction &&
+      shell.save.mortal.sectMarket?.visit === visit;
+    const load = () => {
+      if (!current()) return;
+      host.textContent = '正在展开拍卖行…';
+      void shell.marketEventSource.load().then(
+        () => {
+          if (current()) showAuction(shell);
+        },
+        () => {
+          if (!current()) return;
+          host.innerHTML =
+            '<p>拍卖行暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
+          host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+        },
+      );
+    };
+    load();
+    return;
+  }
   const next = shell.structuredClone(shell.save);
   if (!shell.prepareAuction(next)) return;
   try {
@@ -362,6 +396,45 @@ export function renderPanel(shell: ActionShell) {
     if (shell.saveLock || shell.panel !== 'medicine') return;
     shell.panelFrame('丹香入道', '炼丹炉', content, true);
   } else if (shell.panel === 'arsenal' || shell.panel === 'treasure-detail') {
+    if (!shell.marketEventSource.current) {
+      shell.panelFrame(
+        '藏器阁',
+        '随身珍藏',
+        '<div id="catalog-loading" role="status">正在展开藏器阁…</div>',
+        true,
+      );
+      const host = shell.modal.querySelector<HTMLElement>('#catalog-loading')!;
+      const current = () =>
+        host.isConnected &&
+        !shell.saveLock &&
+        (shell.panel === 'arsenal' || shell.panel === 'treasure-detail');
+      const load = () => {
+        if (!current()) return;
+        host.textContent = '正在展开藏器阁…';
+        void shell.marketEventSource.load().then(
+          () => {
+            if (current()) renderPanel(shell);
+          },
+          () => {
+            if (!current()) return;
+            host.innerHTML =
+              '<p>藏器阁暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
+            host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+          },
+        );
+      };
+      load();
+      return;
+    }
+    if (shell.panel === 'arsenal' && shell.bookTab === 'curios') {
+      shell.panelFrame(
+        '随身奇物',
+        '藏器阁 · 机缘珍藏',
+        shell.marketEventSource.current.curioCollection(shell.save),
+        true,
+      );
+      return;
+    }
     const view = shell.catalogPanel(shell.save, {
       panel: shell.panel,
       catalogTreasures: shell.catalogTreasures,

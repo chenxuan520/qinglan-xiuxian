@@ -208,6 +208,8 @@ test('核验能揭露假货、骗款、伏击；婉拒不扣钱，真机缘赠�
       assert.equal(s.medicine.bag[o.item.id], 1);
     } else {
       if (o.item.kind === 'medicine') assert.equal(s.medicine.bag[o.item.id], 2 + o.item.quantity);
+      else if (o.item.kind === 'curio')
+        assert.equal(s.curios.bag[o.item.id as keyof typeof s.curios.bag], 1);
       else assert.ok(s.artifacts.includes(o.item.id));
       if (kind === 'invitation') assert.equal(s.stones, before);
     }

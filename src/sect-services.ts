@@ -1,3 +1,4 @@
+import { curioAlchemy, curioTrainingYears } from './curio-data.ts';
 import { treasure } from './data.ts';
 import {
   trainingCost,
@@ -33,6 +34,7 @@ export interface ServiceQuote {
   reason: string;
   give: AuctionItem[];
   receive?: string;
+  receiveCount?: number;
   recipe?: string;
   train?: Training;
   study?: boolean;
@@ -154,8 +156,8 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     q.reason = '暂无符合条件的事项，请先选择';
     return q;
   }
-  const study = studyPlan(save);
-  const time = trainingYears(save);
+  const study = studyPlan(save, false);
+  const time = trainingYears(save, false);
   if (id === 'power' || id === 'frenzy') {
     const seek = seekingQuote(save, choice, true, unfinished);
     Object.assign(q, { stones: seek.price, years: seek.years, reason: seek.reason, seek: choice });
@@ -166,18 +168,24 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     q.stones = Math.ceil(
       study.stones * (id === 'haste' ? 1.5 : id === 'spirit' ? [0.8, 0.75, 0.7][tier] : 1),
     );
-    q.years = study.years * (id === 'haste' ? [0.6, 0.5, 0.4][tier] : id === 'spirit' ? 2 : 1.2);
+    q.years = curioTrainingYears(
+      save,
+      study.years * (id === 'haste' ? [0.6, 0.5, 0.4][tier] : id === 'spirit' ? 2 : 1.2),
+    );
     if (!study.eligible)
       q.reason = study.level >= MAX_MASTERY ? '本门精研已满' : `精研需${study.requiredRealm}`;
     if (id === 'bone') {
       q.give = [gear(save, choice)];
       const credit = Math.floor(auctionValue(q.give[0]) * [0.8, 0.85, 0.9][tier]);
       const plans = Array.from({ length: Math.max(0, study.limit - study.level) }, (_, i) => {
-        const plan = studyPlan({
-          ...save,
-          mortal: { ...save.mortal, mastery: { ...save.mortal.mastery, bone: study.level + i } },
-        });
-        return { stones: plan.stones, years: plan.years * 1.2 };
+        const plan = studyPlan(
+          {
+            ...save,
+            mortal: { ...save.mortal, mastery: { ...save.mortal.mastery, bone: study.level + i } },
+          },
+          false,
+        );
+        return { stones: plan.stones, years: curioTrainingYears(save, plan.years * 1.2) };
       });
       const batch = offeringSteps(credit, plans);
       q.levels = batch.fits ? batch.steps.length : 0;
@@ -190,10 +198,12 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
   } else if (id === 'duration') {
     const m = medicineInfo(choice)!;
     q.stones = Math.ceil(medicineCraftStones(choice) * 1.5);
-    q.years = m.craftYears * [0.6, 0.5, 0.4][tier];
+    const brew = curioAlchemy(save, m.craftYears * [0.6, 0.5, 0.4][tier]);
+    q.years = brew.years;
+    q.receiveCount = brew.quantity;
     q.give = medicineFormula(save.medicine, choice).map((i) => pill(i.id, i.count));
     q.receive = choice;
-    q.detail = '依本世已知丹方备齐原料；额外灵石只换取更短年岁，不增加成丹数量。';
+    q.detail = `依本世已知丹方备齐一份原料；本次成丹${q.receiveCount}枚。额外灵石只换取更短年岁。`;
   } else if (id === 'crit') {
     const m = medicineInfo(choice)!;
     q.stones = Math.ceil(medicineRecipePrice(choice) * 0.5);
@@ -221,6 +231,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     q.years =
       time *
       (id === 'guard' || id === 'soul' ? 2 : id === 'blood' ? 3 : id === 'forbidden' ? 4 : 1.5);
+    q.years = curioTrainingYears(save, q.years);
     if (id === 'guard') q.stones = Math.ceil(cost * [0.8, 0.75, 0.7][tier]);
     if (id === 'blood' || id === 'forbidden') q.stones = Math.ceil(cost * [0.65, 0.6, 0.55][tier]);
     if (id === 'magnet' || id === 'soul') {
@@ -237,7 +248,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
         credit,
         Array.from({ length: 20 - level }, (_, i) => ({
           stones: trainingCost(level + i),
-          years: time * 1.5,
+          years: curioTrainingYears(save, time * 1.5),
         })),
       );
       q.levels = batch.fits ? batch.steps.length : 0;
@@ -272,7 +283,8 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
         (q.give.some((i) => i.kind === 'medicine' && (save.medicine.bag[i.id] || 0) < i.quantity)
           ? '所需丹药数量不足'
           : '') ||
-        (q.receive && !Number.isSafeInteger((save.medicine.bag[q.receive] || 0) + 1)
+        (q.receive &&
+        !Number.isSafeInteger((save.medicine.bag[q.receive] || 0) + (q.receiveCount ?? 1))
           ? '丹囊数量已达上限'
           : '');
   return q;
@@ -317,7 +329,8 @@ export function executeSectService(
       save.training[q.train] += q.levels ?? 1;
       recordTrainingMastery(save);
     }
-    if (q.receive) grantMedicine(save.medicine, q.receive);
+    if (q.receive)
+      for (let n = 0; n < (q.receiveCount ?? 1); n++) grantMedicine(save.medicine, q.receive);
     if (q.recipe) save.medicine.recipes.push(q.recipe);
   }
   const label = sectServiceChoicesLabel(save, q, choice);
@@ -338,5 +351,5 @@ function sectServiceChoicesLabel(save: SaveData, q: ServiceQuote, choice: string
         ? `本门精研提升${q.levels ?? 1}阶至${save.mortal.mastery[save.mortal.member!.id]}阶${q.give.length ? `，献出${auctionItemName(q.give[0])}` : ''}`
         : q.recipe
           ? `习得${medicineInfo(q.recipe)!.name}丹方`
-          : `获得${medicineInfo(q.receive ?? choice)!.name}一份`;
+          : `获得${medicineInfo(q.receive ?? choice)!.name}${q.receiveCount ?? 1}份`;
 }

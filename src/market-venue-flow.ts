@@ -1,3 +1,4 @@
+import { seekCurio } from './curio-market.ts';
 import type { ActionShell } from './action-controller.ts';
 import { MARKET_BUILDINGS, MARKET_VENUES, type MarketVenueId } from './sect-market-data.ts';
 import { executeVenue } from './market-venues.ts';
@@ -68,14 +69,19 @@ export function marketVenueAction(shell: ActionShell, action: string, choice?: s
   }
   if (
     action !== 'market-venue-act' &&
-    !(action === 'market-venue-direct-seek' && venue.id === 'artifacts')
+    !(
+      ['market-venue-direct-seek', 'market-venue-curio'].includes(action) &&
+      venue.id === 'artifacts'
+    )
   )
     return;
   const next = shell.structuredClone(shell.save);
   const result =
-    action === 'market-venue-direct-seek'
-      ? seekArtifact(next, choice, button.dataset.stamp ?? '', false, !!shell.pendingRun)
-      : executeVenue(next, choice, button.dataset.stamp ?? '', !!shell.pendingRun);
+    action === 'market-venue-curio'
+      ? seekCurio(next, choice, button.dataset.stamp ?? '', false, !!shell.pendingRun)
+      : action === 'market-venue-direct-seek'
+        ? seekArtifact(next, choice, button.dataset.stamp ?? '', false, !!shell.pendingRun)
+        : executeVenue(next, choice, button.dataset.stamp ?? '', !!shell.pendingRun);
   if (!result) return;
   try {
     shell.writeSave(next, shell.pendingRun);

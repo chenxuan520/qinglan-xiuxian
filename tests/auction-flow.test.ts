@@ -119,6 +119,7 @@ function harness(pending = false) {
     auctionSellReason,
     auctionContent,
     auctionResult,
+    marketEventSource: { current: { auctionContent, auctionResult } },
     townStatus,
     executeAuctionTrade,
     clearInput: () => {},

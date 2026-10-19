@@ -1,3 +1,4 @@
+import { CURIO_IDS } from './curio-data.ts';
 import { TREASURES } from './data.ts';
 import type { AuctionItem } from './auction-data.ts';
 import { marketSocialRoll } from './market-social-data.ts';
@@ -16,6 +17,7 @@ export function marketInvitationReward(
   population: TownPopulation,
   market: SectMarketState,
   id: MarketCultivatorId,
+  allowCurio = false,
 ) {
   if (!isMarketTraderId(id)) return undefined;
   const npc = marketCultivators(population, market).find((n) => n.id === id);
@@ -29,7 +31,16 @@ export function marketInvitationReward(
     );
   const artifact = roll('kind') % (identity.slot === 'market-alchemist' ? 4 : 2) === 0;
   let item: AuctionItem;
-  if (artifact) {
+  const curio = allowCurio && roll('curio') % 10 === 0;
+  if (curio) {
+    const pick = roll('curio-id');
+    item = {
+      kind: 'curio',
+      id: CURIO_IDS[pick % 80 === 0 ? 0 : 1 + ((pick >>> 8) % 8)],
+      quantity: 1,
+      forgeLevel: 0,
+    };
+  } else if (artifact) {
     const pool = TREASURES.filter(
       (t) => t.school === (npc.path === 'demonic' ? 'demonic' : 'orthodox'),
     );
@@ -55,9 +66,11 @@ export function marketInvitationReward(
   }
   return {
     item,
-    title: artifact ? '坊外取宝之邀' : '坊外取丹之邀',
-    purpose: artifact
-      ? '他称有一件法宝寄存在坊外旧居，愿以此物酬谢同行照应。此行若顺利，便按眼前说定的炼器阶数交付。'
-      : '他称山中还留着一批封存的余丹，请你同行照应，愿按眼前说定的品种与数量分给你；丹药收入丹囊，由你自行取用。',
+    title: curio ? '坊外寻古之邀' : artifact ? '坊外取宝之邀' : '坊外取丹之邀',
+    purpose: curio
+      ? '他称旧居中封存着一件古修奇物，愿将此物赠予同行照应之人。所言是否属实，仍须核验凭据，留心退路。'
+      : artifact
+        ? '他称有一件法宝寄存在坊外旧居，愿以此物酬谢同行照应。此行若顺利，便按眼前说定的炼器阶数交付。'
+        : '他称山中还留着一批封存的余丹，请你同行照应，愿按眼前说定的品种与数量分给你；丹药收入丹囊，由你自行取用。',
   };
 }

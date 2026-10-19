@@ -155,7 +155,17 @@ export function executeAuctionTrade(
     const reason = auctionBuyReason(save, index, visit, hasPendingRun);
     if (reason) return { ok: false as const, error: reason };
     const budget = Number(modal.querySelector<HTMLInputElement>(`#auction-budget-${index}`)?.value);
-    const result = buyAuction(next, index, budget, visit, hasPendingRun);
+    const result = buyAuction(
+      next,
+      index,
+      budget,
+      visit,
+      hasPendingRun,
+      Number(
+        modal.querySelector<HTMLButtonElement>(`[data-action="auction-buy"][data-id="${index}"]`)
+          ?.dataset.cycle,
+      ),
+    );
     if (!result)
       return {
         ok: false as const,
@@ -169,7 +179,7 @@ export function executeAuctionTrade(
       kind: auctionKind,
       id: selected,
       quantity:
-        auctionKind === 'artifact'
+        auctionKind !== 'medicine'
           ? 1
           : Number(modal.querySelector<HTMLInputElement>('#auction-quantity')?.value),
       forgeLevel: auctionKind === 'artifact' ? save.forge[selected] || 0 : 0,

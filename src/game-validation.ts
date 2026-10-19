@@ -1,3 +1,4 @@
+import { isCurio } from './curio-data.ts';
 import type { Game } from './game.ts';
 import type { SaveData } from './progress.ts';
 import { cultivationReward, tribulationDue } from './progress.ts';
@@ -421,6 +422,14 @@ export function validateRunSnapshot(
         s.loot.artifacts.length > TREASURES.length ||
         new Set(s.loot.artifacts).size !== s.loot.artifacts.length ||
         !s.loot.artifacts.every((id) => TREASURES.some((t) => t.id === id)) ||
+        (s.loot.curios !== undefined &&
+          (!s.loot.curios ||
+            typeof s.loot.curios !== 'object' ||
+            Array.isArray(s.loot.curios) ||
+            !Object.entries(s.loot.curios).every(
+              ([id, count]) =>
+                isCurio(id) && Number.isSafeInteger(count) && count > 0 && count <= 7,
+            ))) ||
         !s.loot.medicines ||
         typeof s.loot.medicines !== 'object' ||
         Array.isArray(s.loot.medicines) ||

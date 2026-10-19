@@ -493,6 +493,7 @@ test('损坏和越界存档不会破坏游戏初始化', () => {
   for (const raw of ['{broken', 'null']) {
     const parsed = parseSave(raw),
       expected = freshSave();
+    expected.curios.seed = parsed.curios.seed;
     expected.medicine.recipeSeed = parsed.medicine.recipeSeed;
     expected.mortal.hometown = parsed.mortal.hometown;
     assert.deepEqual(parsed, expected);

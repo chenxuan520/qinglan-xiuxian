@@ -1,3 +1,10 @@
+import {
+  isCurio,
+  grantCurio,
+  curioRoll,
+  curioCycle,
+  prepareCurioConsignment,
+} from './curio-data.ts';
 import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
 import { medicineInfo } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
@@ -9,7 +16,11 @@ import {
 } from './progress.ts';
 import { advanceMortal, sectDues, sectDuesPending } from './mortal.ts';
 import { sectMarketOpen } from './sect-market.ts';
-import { marketCultivators, marketMedicinePool } from './sect-market-data.ts';
+import {
+  marketCultivators,
+  marketMedicinePool,
+  type MarketCultivatorId,
+} from './sect-market-data.ts';
 import {
   AUCTION_LOTS,
   freeStarter,
@@ -24,6 +35,7 @@ import { AUCTION_SETTINGS } from './setting.ts';
 export function prepareAuction(save: SaveData) {
   const market = save.mortal.sectMarket;
   if (!market) return false;
+  prepareCurioConsignment(save);
   save.mortal.auction ??= { visit: market.visit, closed: [], releasedArtifacts: [], history: [] };
   if (save.mortal.auction.visit !== market.visit) {
     save.mortal.auction.visit = market.visit;
@@ -46,7 +58,7 @@ export function auctionLots(
   if (!state || !save.mortal.population) return [];
   // 本批拍品已由来访者事先寄售；之后有人离场，不重排拍品或关闭记录。
   const npcs = marketCultivators(save.mortal.population, { ...state, absent: undefined });
-  return Array.from({ length: AUCTION_LOTS }, (_, index) => {
+  const lots: ReturnType<typeof auctionLots> = Array.from({ length: AUCTION_LOTS }, (_, index) => {
     const seed = roll(save, `lot:${index}`);
     const npc = npcs[seed % npcs.length];
     let item: AuctionItem;
@@ -72,6 +84,18 @@ export function auctionLots(
     }
     return { ...item, index, seller: npc.name, sellerId: npc.id, start: auctionValue(item) };
   });
+  const special = save.curios.consignment;
+  if (special?.id && special.cycle === curioCycle(save.age)) {
+    const item: AuctionItem = { kind: 'curio', id: special.id, quantity: 1, forgeLevel: 0 };
+    lots.push({
+      ...item,
+      index: AUCTION_LOTS,
+      seller: '行脚修士',
+      sellerId: '',
+      start: auctionValue(item),
+    });
+  }
+  return lots;
 }
 export function auctionFee(price: number, selling = false) {
   return Math.ceil(
@@ -86,8 +110,20 @@ export function auctionDues(save: SaveData, years = AUCTION_SETTINGS.years) {
     ? Math.min(member.dues, sectDues(save).stones)
     : 0;
 }
-function bids(save: SaveData, item: AuctionItem, selling: boolean, sellerId = '') {
+function bids(
+  save: SaveData,
+  item: AuctionItem,
+  selling: boolean,
+  sellerId = '',
+): { id: MarketCultivatorId | 'commission'; price: number }[] {
   const value = auctionValue(item);
+  if (item.kind === 'curio') {
+    const ratio =
+      (selling ? 60 : 90) +
+      (curioRoll(save.curios.seed, `curio-bid:${curioCycle(save.age)}:${item.id}:${selling}`) %
+        (selling ? 21 : 36));
+    return [{ id: 'commission', price: Math.floor((value * ratio) / 100) }];
+  }
   return marketCultivators(save.mortal.population!, save.mortal.sectMarket!)
     .filter((npc) => npc.id !== sellerId)
     .map((npc) => {
@@ -159,9 +195,14 @@ export function auctionReason(
 export function auctionBuyReason(save: SaveData, index: number, visit: number, unfinished = false) {
   const lot = auctionLots(save).find((l) => l.index === index);
   if (!lot) return '拍品不存在';
-  const reason = auctionReason(save, visit, lot.kind === 'artifact', unfinished);
+  const reason = auctionReason(save, visit, lot.kind !== 'medicine', unfinished);
   if (reason) return reason;
-  if (save.mortal.auction!.closed.includes(index)) return '本拍品已结拍';
+  if (
+    index === AUCTION_LOTS
+      ? save.curios.consignment?.closed
+      : save.mortal.auction!.closed.includes(index)
+  )
+    return '本拍品已结拍';
   if (
     lot.kind === 'artifact' &&
     save.artifacts.includes(lot.id) &&
@@ -173,6 +214,12 @@ export function auctionBuyReason(save: SaveData, index: number, visit: number, u
     !Number.isSafeInteger((save.medicine.bag[lot.id] || 0) + lot.quantity)
   )
     return '丹囊数量已达上限';
+  if (
+    lot.kind === 'curio' &&
+    isCurio(lot.id) &&
+    !Number.isSafeInteger((save.curios.bag[lot.id] ?? 0) + 1)
+  )
+    return '奇物数量已达上限';
   return '';
 }
 function receipt(
@@ -197,7 +244,7 @@ function receipt(
     price,
     fee,
     bidder,
-    ...(bidder && bidder !== 'player'
+    ...(bidder && bidder !== 'player' && bidder !== 'commission'
       ? {
           bidderName: marketCultivators(save.mortal.population!, state).find(
             (n) => n.id === bidder,
@@ -222,7 +269,15 @@ export function buyAuction(
   budget: number,
   visit: number,
   unfinished = false,
+  cycle?: number,
 ) {
+  if (
+    index === AUCTION_LOTS &&
+    (cycle === undefined ||
+      cycle !== curioCycle(save.age) ||
+      cycle !== save.curios.consignment?.cycle)
+  )
+    return undefined;
   if (auctionBuyReason(save, index, visit, unfinished)) return undefined;
   const lot = auctionLots(save).find((l) => l.index === index)!;
   if (
@@ -236,11 +291,13 @@ export function buyAuction(
     rival.price >= lot.start ? rival.price + Math.max(1, Math.ceil(lot.start * 0.05)) : lot.start;
   const fee = auctionFee(price);
   const won = price + fee <= budget;
-  save.mortal.auction!.closed.push(index);
+  if (index === AUCTION_LOTS) save.curios.consignment!.closed = true;
+  else save.mortal.auction!.closed.push(index);
   if (!won) return receipt(save, lot, 'lost', rival.price, 0, rival.id);
   save.stones -= price + fee;
   if (lot.kind === 'medicine')
     save.medicine.bag[lot.id] = (save.medicine.bag[lot.id] || 0) + lot.quantity;
+  else if (lot.kind === 'curio') grantCurio(save, lot.id);
   else {
     if (!save.artifacts.includes(lot.id)) save.artifacts.push(lot.id);
     save.forge[lot.id] = lot.forgeLevel;
@@ -259,7 +316,7 @@ export function auctionSellReason(
   unfinished = false,
   years = AUCTION_SETTINGS.years,
 ) {
-  const reason = auctionReason(save, visit, item.kind === 'artifact', unfinished, years);
+  const reason = auctionReason(save, visit, item.kind !== 'medicine', unfinished, years);
   if (reason) return reason;
   if (!Number.isSafeInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)
     return '每次可委托一至九十九份';
@@ -279,6 +336,14 @@ export function auctionSellReason(
     )
       return '法宝已变化，请重新选择';
     if (item.id === save.starter) return '当前本命不可出售';
+  } else if (item.kind === 'curio') {
+    if (
+      !isCurio(item.id) ||
+      item.quantity !== 1 ||
+      item.forgeLevel !== 0 ||
+      (save.curios.bag[item.id] ?? 0) < 1
+    )
+      return '奇物已变化，请重新选择';
   } else return '拍品不存在';
   if (auctionValue(item) <= 0) return '入门赠品未炼器，无人出价';
   return '';

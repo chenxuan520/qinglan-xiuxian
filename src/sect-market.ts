@@ -1,3 +1,4 @@
+import { prepareCurioConsignment } from './curio-data.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 import { lifespanInfo, realmInfo, tribulationDue, type SaveData } from './progress.ts';
 import { sectDuesPending } from './mortal.ts';
@@ -45,6 +46,7 @@ export function beginSectMarketVisit(save: SaveData) {
     ...(returning ? { returning } : {}),
   };
   prepareMarketOpportunity(save);
+  prepareCurioConsignment(save);
   if (save.mortal.auction) {
     save.mortal.auction.visit = visit;
     save.mortal.auction.closed = [];

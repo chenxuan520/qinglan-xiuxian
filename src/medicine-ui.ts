@@ -1,3 +1,4 @@
+import { curioAlchemy } from './curio-data.ts';
 import {
   MEDICINES,
   activeMedicines,
@@ -55,6 +56,7 @@ export function medicineContent(
   <div class="medicine-active" aria-label="当前药效"><strong>药效 ${active.length} / 3</strong>${active.length ? active.map((m) => `<div>${art(m)}<span>${m.name}<small>${medicineTime(save.medicine.active[m.id] - save.age, stage)}</small></span><button data-action="medicine-discard" data-id="${m.id}" ${unfinished ? 'disabled' : ''}>散去药效</button></div>`).join('') : '<p>尚未服用限时丹药</p>'}</div>
   <div class="medicine-grid">${list
     .map((m) => {
+      const brew = curioAlchemy(save, m.craftYears);
       const owned = save.medicine.bag[m.id] || 0;
       const useReason = medicineUseReason(save, m.id, unfinished);
       const craftReason = medicineCraftReason(save, m.id, unfinished);
@@ -76,9 +78,9 @@ export function medicineContent(
         view === 'shop'
           ? `<small class="medicine-source">本批已购 ${save.medicine.shop?.bought?.[m.id] || 0} / 3 份</small><button class="secondary-button" data-action="medicine-buy" data-id="${m.id}" data-cost-stones="${m.price}" ${(save.medicine.shop?.bought?.[m.id] || 0) >= 3 ? 'disabled' : ''}>${(save.medicine.shop?.bought?.[m.id] || 0) >= 3 ? '本批售罄 · 待换新货' : `${m.price} 灵石 · 购入一份`}</button>`
           : view === 'recipes'
-            ? `<small class="medicine-recipe">本世配方：${formula}<br>合成另需 ${medicineCraftStones(m.id)} 灵石 · ${m.craftYears} 年</small><button class="secondary-button" data-action="medicine-recipe" data-id="${m.id}" data-cost-stones="${medicineRecipePrice(m.id)}" ${known || save.unlocked < m.stage ? 'disabled' : ''}>${known ? '本世已习得' : save.unlocked < m.stage ? `探索第 ${m.stage + 1} 境后解锁` : `${medicineRecipePrice(m.id)} 灵石 · 购得药方`}</button>`
+            ? `<small class="medicine-recipe">本世配方：${formula}<br>合成另需 ${medicineCraftStones(m.id)} 灵石 · ${brew.years} 年 · 成丹${brew.quantity}枚</small><button class="secondary-button" data-action="medicine-recipe" data-id="${m.id}" data-cost-stones="${medicineRecipePrice(m.id)}" ${known || save.unlocked < m.stage ? 'disabled' : ''}>${known ? '本世已习得' : save.unlocked < m.stage ? `探索第 ${m.stage + 1} 境后解锁` : `${medicineRecipePrice(m.id)} 灵石 · 购得药方`}</button>`
             : view === 'craft'
-              ? `<small class="medicine-recipe">${formula}<br>${medicineCraftStones(m.id)} 灵石 · ${m.craftYears} 年</small><button class="secondary-button" data-action="medicine-craft" data-id="${m.id}" ${craftReason ? 'disabled' : ''}>${craftReason || '合成 · 即时结算年岁'}</button>`
+              ? `<small class="medicine-recipe">${formula}<br>${medicineCraftStones(m.id)} 灵石 · ${brew.years} 年 · 成丹${brew.quantity}枚</small><button class="secondary-button" data-action="medicine-craft" data-id="${m.id}" ${craftReason ? 'disabled' : ''}>${craftReason || '合成 · 即时结算年岁'}</button>`
               : `${m.years ? `<label class="medicine-quantity" for="medicine-quantity-${m.id}">服用数量<input id="medicine-quantity-${m.id}" type="number" inputmode="numeric" min="1" max="${Math.max(1, owned)}" step="1" value="1" ${useReason ? 'disabled' : ''} aria-label="${m.name}服用数量"></label>` : ''}<button class="secondary-button" data-action="medicine-use" data-id="${m.id}" ${useReason ? 'disabled' : ''}>${useReason || ((save.medicine.active[m.id] || 0) > save.age ? '服用 · 延续药效' : '战前服用')}</button>`;
       return `<article class="medicine-card ${!m.years ? 'medicine-permanent' : ''}"><header>${art(m)}<div><small>${m.years ? m.tier : '本世珍品'}</small><h3>${m.name}</h3><span>持有 ${owned} 份</span></div></header><p>${m.desc}</p><small class="medicine-duration">${m.years ? `每份 ${medicineTime(m.years, stage)}` : '即时生效 · 随此世保留'}${m.id === 'peiying' || m.id === 'huiyang' ? `<br>本世已用 ${save.medicine.used[m.id] || 0} / ${m.id === 'peiying' ? 3 : 2} 次` : ''}</small><small class="medicine-source">${source}</small>${action}</article>`;
     })

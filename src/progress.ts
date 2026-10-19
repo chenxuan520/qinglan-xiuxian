@@ -1,3 +1,13 @@
+import {
+  CURIO_IDS,
+  isCurio,
+  curioName,
+  freshCurios,
+  validCurios,
+  ownsCurio,
+  curioTrainingYears,
+  type CurioState,
+} from './curio-data.ts';
 import { validSectServices } from './sect-service-data.ts';
 import { trainingCost } from './training.ts';
 export { trainingCost } from './training.ts';
@@ -54,9 +64,11 @@ import {
 
 export type BirthInheritance =
   | { kind: 'artifact'; id: string; level: number }
-  | { kind: 'medicine'; id: string };
+  | { kind: 'medicine'; id: string }
+  | { kind: 'curio'; id: string };
 
 export interface SaveData {
+  curios: CurioState;
   birthInheritance: BirthInheritance | null;
   medicine: MedicineState;
   version: 1;
@@ -95,7 +107,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 23;
+export const SAVE_SCHEMA = 24;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -145,6 +157,7 @@ export function freshSave(
 ): SaveData {
   const starter = initialStarter(rootElements, path, random);
   return {
+    curios: freshCurios(Math.floor(random() * 0x100000000)),
     birthInheritance: null,
     version: 1,
     schema: SAVE_SCHEMA,
@@ -188,6 +201,7 @@ const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
 export function validInheritance(value: unknown): value is BirthInheritance {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const gift = value as BirthInheritance;
+  if (gift.kind === 'curio') return isCurio(gift.id);
   if (gift.kind === 'medicine') return !!medicineInfo(gift.id);
   return (
     gift.kind === 'artifact' &&
@@ -200,6 +214,9 @@ export function validInheritance(value: unknown): value is BirthInheritance {
 export function inheritanceChoices(save: SaveData): BirthInheritance[] {
   if (!realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max) return [];
   return [
+    ...CURIO_IDS.filter((id) => ownsCurio(save, id)).map(
+      (id): BirthInheritance => ({ kind: 'curio', id }),
+    ),
     ...TREASURES.filter((t) => save.artifacts.includes(t.id)).map(
       (t): BirthInheritance => ({
         kind: 'artifact',
@@ -229,6 +246,7 @@ export function validBirthInheritance(save: SaveData, value: unknown): value is 
     save.mortal.hometown.stage === 'departed'
   )
     return false;
+  if (value.kind === 'curio') return isCurio(value.id) && save.curios.bag[value.id] === 1;
   return value.kind === 'artifact'
     ? save.artifacts.includes(value.id) && (save.forge[value.id] || 0) === value.level
     : (save.medicine.bag[value.id] || 0) === 1;
@@ -248,14 +266,17 @@ export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | n
   if (gift.kind === 'artifact') {
     save.artifacts = [...new Set([...save.artifacts, gift.id])];
     save.forge[gift.id] = gift.level;
-  } else save.medicine.bag[gift.id] = 1;
+  } else if (gift.kind === 'curio' && isCurio(gift.id)) save.curios.bag[gift.id] = 1;
+  else save.medicine.bag[gift.id] = 1;
   save.birthInheritance = { ...gift };
   recordChronicle(
     save,
     '薪火相传',
     gift.kind === 'artifact'
       ? `前人留下${treasure(gift.id).name}，炼器${gift.level}阶，已收入藏器阁。`
-      : `前人留下一枚${medicineInfo(gift.id)!.name}，已收入丹囊。`,
+      : gift.kind === 'curio'
+        ? `前人留下${curioName(gift.id)}，随身相伴，奇物之力已生效。`
+        : `前人留下一枚${medicineInfo(gift.id)!.name}，已收入丹囊。`,
     'birth-inheritance',
   );
   return true;
@@ -284,6 +305,11 @@ export function readSave(
     newer = Number.isSafeInteger(s.schema) && s.schema > SAVE_SCHEMA;
     const upgrading = !newer && s.schema !== SAVE_SCHEMA;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
+    if (s.curios !== undefined) {
+      if (!validCurios(s.curios, base.age))
+        return { save: base, status: newer ? 'newer' : 'unreadable' };
+      base.curios = s.curios;
+    }
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
     // 旧版遭遇没有战况，升级只解除旧记录，不伪造胜负或补发奖励。
     if (upgrading && (s.schema ?? 0) < 19 && s.mortal?.marketSocial?.ambush) {
@@ -581,8 +607,10 @@ export function completeTribulation(save: SaveData, round: number) {
     recordChronicle(save, '五劫不灭', '五度踏破天劫，雷霆不能损其道心。', 'five-tribulations');
   return true;
 }
-export const trainingYears = (save: SaveData) =>
-  Math.round(10 / spiritRootInfo(save.spiritRoot).rate) / 10;
+export const trainingYears = (save: SaveData, withCurio = true) => {
+  const years = Math.round(10 / spiritRootInfo(save.spiritRoot).rate) / 10;
+  return withCurio ? curioTrainingYears(save, years) : years;
+};
 export function retreatPlan(save: SaveData, requested: number) {
   if (
     !Number.isFinite(requested) ||
@@ -603,7 +631,8 @@ export function retreatPlan(save: SaveData, requested: number) {
   const major = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
   const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
   // 天灵根投入整段寿元，也至多获得当前大境界总修为的 32%；历练仍是突破的主要来源。
-  const minPercent = chance * 16 * spiritRootInfo(save.spiritRoot).rate;
+  const minPercent =
+    chance * 16 * spiritRootInfo(save.spiritRoot).rate * (ownsCurio(save, 'soul-wood') ? 1.3 : 1);
   const maxPercent = minPercent * 2;
   return {
     years,
@@ -716,9 +745,14 @@ export function cultivationReward(
 const FORGE_DAMAGE_BONUSES = [0, 8, 16, 24, 32, 40, 52, 68, 88, 114, 200];
 export const forgeDamageBonus = (level: number) =>
   FORGE_DAMAGE_BONUSES[Math.min(MAX_FORGE_LEVEL, Math.max(0, Math.floor(level)))] / 100;
-export const forgeCost = (level: number) => {
+export const forgeCost = (level: number, save?: SaveData) => {
   const advanced = Math.max(0, level - 4) ** 2;
-  return { iron: 3 + level * 6 + advanced * 18, stones: 35 + level * 30 + advanced * 90 };
+  return {
+    iron: 3 + level * 6 + advanced * 18,
+    stones: Math.ceil(
+      (35 + level * 30 + advanced * 90) * (save && ownsCurio(save, 'jade-book') ? 0.85 : 1),
+    ),
+  };
 };
 export function train(save: SaveData, kind: keyof SaveData['training']) {
   const cost = trainingCost(save.training[kind]);
@@ -749,7 +783,7 @@ export function recordTrainingMastery(save: SaveData) {
 export function forge(save: SaveData, id: string) {
   if (!save.artifacts.includes(id) || !TREASURES.some((t) => t.id === id)) return false;
   const level = save.forge[id] || 0;
-  const cost = forgeCost(level);
+  const cost = forgeCost(level, save);
   if (level >= MAX_FORGE_LEVEL || save.stones < cost.stones || save.iron < cost.iron) return false;
   save.stones -= cost.stones;
   save.iron -= cost.iron;
@@ -800,6 +834,7 @@ export function settleRun(
     spiritRoot?: SpiritRootId;
     path?: CultivationPath;
     startedImmortal?: boolean;
+    loot?: { curios?: Record<string, number> };
   },
 ) {
   const multiplier = DIFFICULTIES[run.difficulty].reward;
@@ -837,6 +872,22 @@ export function settleRun(
     cultivationRemaining: cultivationRemaining + ascensionCultivation,
     iron: run.iron + (run.victory ? 3 + run.stage * 2 : 0),
   };
+  for (const [id, count] of Object.entries(run.loot?.curios ?? {})) {
+    if (
+      isCurio(id) &&
+      Number.isSafeInteger(count) &&
+      count > 0 &&
+      count <= 7 &&
+      Number.isSafeInteger((save.curios.bag[id] ?? 0) + count)
+    ) {
+      save.curios.bag[id] = (save.curios.bag[id] ?? 0) + count;
+      recordChronicle(
+        save,
+        '妖王奇缘',
+        `于${STAGES[run.stage].name}寻得${curioName(id)}${count > 1 ? ` ×${count}` : ''}，已收入行囊。`,
+      );
+    }
+  }
   save.stones += rewards.stones;
   save.iron += rewards.iron;
   gainCultivation(save, rewards.cultivationRemaining, run.spiritRoot ?? save.spiritRoot);
