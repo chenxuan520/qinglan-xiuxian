@@ -98,7 +98,7 @@ test('玄铁全行情均不能买入后倒卖套利，拒绝非法数量、溢�
   assert.equal(loaded.save.stones, old.stones);
   assert.equal(ironMarket(loaded.save).remaining, 100);
 });
-test('互换提供跨品级余丹、丹药组合和法宝组合，全部估值相差不超过15%且不向玩家低价送货', () => {
+test('互换提供跨品级余丹、丹药组合和法宝组合，普通报价差不超过15%，少数急需让利至多8%', () => {
   const categories = new Set<string>();
   let cross = false;
   for (let visit = 0; visit < 25; visit++) {
@@ -118,7 +118,11 @@ test('互换提供跨品级余丹、丹药组合和法宝组合，全部估值�
           d.giveValue,
           d.give.reduce((n, i) => n + auctionValue(i), 0),
         );
-        assert.ok(d.giveValue >= d.receiveValue && d.giveValue * 100 <= d.receiveValue * 115);
+        if (d.receiveValue > d.giveValue) {
+          assert.ok(d.motiveMatched);
+          assert.ok(d.receiveValue * 100 <= d.giveValue * 108);
+          assert.match(d.benefitText, /急需让利/);
+        } else assert.ok(d.giveValue * 100 <= d.receiveValue * 115);
         assert.ok(!d.give.some((i) => i.kind === 'artifact' && i.id === s.starter));
         const received = MEDICINES.find((m) => m.id === d.receive.id)!;
         if (

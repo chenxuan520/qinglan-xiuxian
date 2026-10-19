@@ -218,3 +218,8 @@
 #medicine-hud:empty {
   display: none;
 }
+#medicine-hud > span {
+  display: inline-block;
+  white-space: nowrap;
+  margin-right: 0.5em;
+}

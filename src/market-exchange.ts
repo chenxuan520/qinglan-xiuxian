@@ -1,7 +1,12 @@
 import { TREASURES, type WeaponKind } from './data.ts';
 import { MEDICINES, medicineMarketValue, type Medicine } from './medicine-data.ts';
 import type { SaveData } from './progress.ts';
-import { marketCultivatorRealm, type MarketCultivatorId } from './sect-market-data.ts';
+import {
+  MARKET_CULTIVATORS,
+  marketCultivatorRealm,
+  type MarketCultivatorId,
+} from './sect-market-data.ts';
+import { marketSocialRoll } from './market-social-data.ts';
 import { auctionValue, auctionItemName } from './auction-items.ts';
 import type { AuctionItem } from './auction-data.ts';
 import { marketTradeMotive, type MarketTradeMotiveKind } from './market-trade-motives.ts';
@@ -60,6 +65,10 @@ export function marketExchangeDeals(
   );
   const unit = medicineMarketValue(medicine.id);
   if (unit <= 0) return [];
+  // 每批只有一个可能的让利席位，另外十二个结果不让利；库存、交情或离场不重抽。
+  const bargain =
+    marketSocialRoll(population, state.visit, 'bargain') % 15 ===
+    MARKET_CULTIVATORS.findIndex((npc) => npc.id === id);
   const candidates: MarketExchangeDeal[] = [];
   const keys = new Set<string>();
   const add = (give: AuctionItem[], quantity: number, category: MarketExchangeDeal['category']) => {
@@ -80,10 +89,12 @@ export function marketExchangeDeals(
     );
     const motiveMatched = wantedValue * 2 >= giveValue,
       premiumCap = motiveMatched ? (motive.friend ? 105 : 108) : 115;
+    const gain = receiveValue > giveValue;
     if (
       !Number.isSafeInteger(giveValue) ||
-      giveValue < receiveValue ||
-      giveValue * 100 > receiveValue * premiumCap
+      (gain
+        ? !bargain || !motiveMatched || receiveValue * 100 > giveValue * 108
+        : giveValue * 100 > receiveValue * premiumCap)
     )
       return;
     const key =
@@ -99,23 +110,26 @@ export function marketExchangeDeals(
         category,
         motive: motive.kind,
         motiveMatched,
-        benefitText: motiveMatched
-          ? motive.friend
-            ? give.length > 1
-              ? '故交照应：合用之物搭配余丹，估值补差不超过5%。'
-              : '故交照应：按合用之物相换，估值补差不超过5%。'
-            : `正合「${motive.title}」之需，估值补差不超过8%。`
-          : '',
+        benefitText: gain
+          ? `急需让利：此单多换得${receiveValue - giveValue}灵石参考价值。`
+          : motiveMatched
+            ? motive.friend
+              ? give.length > 1
+                ? '故交照应：合用之物搭配余丹，估值补差不超过5%。'
+                : '故交照应：按合用之物相换，估值补差不超过5%。'
+              : `正合「${motive.title}」之需，估值补差不超过8%。`
+            : '',
       });
     }
   };
   for (const m of pool)
     for (let quantity = 1; quantity <= 6; quantity++)
-      add(
-        [pill(m.id, Math.ceil((unit * quantity) / medicineMarketValue(m.id)))],
-        quantity,
-        'medicine',
-      );
+      for (const round of bargain ? [Math.ceil, Math.floor] : [Math.ceil])
+        add(
+          [pill(m.id, round((unit * quantity) / medicineMarketValue(m.id)))],
+          quantity,
+          'medicine',
+        );
   for (let a = 0; a < pool.length; a++)
     for (let b = a + 1; b < pool.length; b++) {
       const first = pool[a],

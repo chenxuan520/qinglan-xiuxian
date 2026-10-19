@@ -5,6 +5,7 @@ import { freshSave, readSave } from '../src/progress.ts';
 import { MEDICINES, medicineInfo } from '../src/medicine-data.ts';
 import { TREASURES } from '../src/data.ts';
 import {
+  beginSectMarketVisit,
   sectMarketOffer,
   sectMarketDeals,
   exchangeSectMedicine,
@@ -123,7 +124,7 @@ test('动机和所留丹药绑定实际旧识，换摊位及再次来访不换�
   assert.equal(sectMarketOffer(loaded.save, currentId), oldMedicine);
 });
 
-test('合用之物与故交报价实际减少补差且允许低阶添头，所有组合零名义增值、不碰当前本命', () => {
+test('合用之物与故交报价实际减少补差且允许低阶添头，普通组合不增值、少量急需让利受限且不碰当前本命', () => {
   let ordinaryMatches = 0,
     friendMatches = 0,
     extraCombination = 0;
@@ -147,7 +148,11 @@ test('合用之物与故交报价实际减少补差且允许低阶添头，所�
             deal.giveValue,
             deal.give.reduce((n, item) => n + auctionValue(item), 0),
           );
-          assert.ok(deal.giveValue >= deal.receiveValue, '反复换批也不能凭报价循环增值');
+          if (deal.receiveValue > deal.giveValue) {
+            assert.ok(deal.receiveValue * 100 <= deal.giveValue * 108);
+            assert.ok(deal.motiveMatched);
+            assert.match(deal.benefitText, /急需让利/);
+          }
           assert.ok(deal.giveValue * 100 <= deal.receiveValue * 115);
           assert.ok(
             deal.give.every((item) => item.id !== save.starter || item.kind !== 'artifact'),
@@ -156,7 +161,8 @@ test('合用之物与故交报价实际减少补差且允许低阶添头，所�
           assert.ok(deal.receive.quantity >= 1 && deal.receive.quantity <= 6);
           if (deal.motiveMatched) {
             assert.ok(deal.giveValue * 100 <= deal.receiveValue * limit);
-            assert.match(deal.benefitText, limit === 105 ? /5%/ : /8%/);
+            if (deal.receiveValue <= deal.giveValue)
+              assert.match(deal.benefitText, limit === 105 ? /5%/ : /8%/);
             if (limit === 105) friendMatches++;
             else ordinaryMatches++;
           }
@@ -246,4 +252,97 @@ test('持续与新来客交易十二批，已培养故交仍能自然重逢使�
     assert.deepEqual(restored.save.mortal.marketRelations, save.mortal.marketRelations);
   }
   assert.ok(establishedReturns >= 1, '不能只在交换完成后短暂达成交情，再在下一次重逢前遗忘');
+});
+
+test('少量急需互换真正让利，同批最多一席且价值提升封顶，不能重进或读档连换', () => {
+  let profitableBatches = 0;
+  for (let seed = 1; seed <= 120; seed++) {
+    const save = fixture(seed);
+    const quotes = MARKET_CULTIVATORS.map((npc) => ({
+      id: npc.id,
+      deals: sectMarketDeals(save, npc.id),
+    }));
+    const favorable = quotes.filter((q) => q.deals.some((d) => d.receiveValue > d.giveValue));
+    assert.ok(favorable.length <= 1, '同批不能串起多个让利摊位');
+    for (const q of quotes)
+      for (const d of q.deals) {
+        if (d.receiveValue > d.giveValue) {
+          assert.ok(d.motiveMatched);
+          assert.ok(d.receiveValue * 100 <= d.giveValue * 108);
+          assert.match(
+            d.benefitText,
+            new RegExp(`多换得${d.receiveValue - d.giveValue}灵石参考价值`),
+          );
+          // 单次最多多8%价值，按新拍卖最高九成净回收也低于交出的原估值。
+          assert.ok(Math.floor(d.receiveValue * 0.9) < d.giveValue);
+        } else assert.ok(d.giveValue * 100 <= d.receiveValue * 115);
+      }
+    if (!favorable.length) continue;
+    profitableBatches++;
+    const { id, deals } = favorable[0];
+    const deal = deals.find((d) => d.receiveValue > d.giveValue)!;
+    const before = structuredClone(save.medicine.bag);
+    const age = save.age,
+      stones = save.stones;
+    const rawQuotes = sectMarketDeals(save, id);
+    const empty = structuredClone(save);
+    empty.medicine.bag = {};
+    // 展示顺序可优先已持有物品，但库存不能改变哪位修士提供让利。
+    assert.deepEqual(
+      MARKET_CULTIVATORS.filter((npc) =>
+        sectMarketDeals(empty, npc.id).some((d) => d.receiveValue > d.giveValue),
+      ).map((npc) => npc.id),
+      [id],
+    );
+    assert.deepEqual(sectMarketDeals(readSave(JSON.stringify(save)).save, id), rawQuotes);
+    assert.equal(exchangeSectMedicine(save, id, deal.id, save.mortal.sectMarket!.visit), true);
+    assert.equal(save.age, age, '让利互换本身不消耗年岁');
+    assert.equal(save.stones, stones, '参考估值差不直接发灵石');
+    for (const item of deal.give)
+      assert.equal(save.medicine.bag[item.id], before[item.id] - item.quantity);
+    assert.equal(
+      save.medicine.bag[deal.receive.id],
+      before[deal.receive.id] + deal.receive.quantity,
+    );
+    const visit = save.mortal.sectMarket!.visit;
+    assert.equal(beginSectMarketVisit(save), true);
+    assert.equal(save.mortal.sectMarket!.visit, visit);
+    for (const restored of [save, readSave(JSON.stringify(save)).save]) {
+      const old = JSON.stringify(restored);
+      assert.match(
+        sectMarketExchangeReason(restored, id, deal.id, restored.mortal.sectMarket!.visit),
+        /本批已互换/,
+      );
+      assert.equal(
+        exchangeSectMedicine(restored, id, deal.id, restored.mortal.sectMarket!.visit),
+        false,
+      );
+      assert.equal(JSON.stringify(restored), old);
+    }
+  }
+  assert.ok(profitableBatches > 0, '必须实际存在玩家小赚的报价');
+  assert.ok(profitableBatches < 40, '不能把少数急需做成普遍让利');
+});
+
+test('旧识换摊与好感改变不能多出第二位让利者，贫富与死亡也不转移席位', () => {
+  for (let seed = 1; seed <= 60; seed++) {
+    const save = fixture(seed);
+    const contact = bringBack(save, 'market-alchemist', 'market-disciple');
+    const favorableIds = (s: typeof save) =>
+      MARKET_CULTIVATORS.filter((npc) =>
+        sectMarketDeals(s, npc.id).some((d) => d.receiveValue > d.giveValue),
+      ).map((npc) => npc.id);
+    const ids = favorableIds(save);
+    assert.ok(ids.length <= 1);
+    contact.goodwill = 3;
+    assert.deepEqual(favorableIds(save), ids);
+    const empty = structuredClone(save);
+    empty.stones = 0;
+    empty.medicine.bag = {};
+    assert.deepEqual(favorableIds(empty), ids);
+    if (ids.length) {
+      save.mortal.sectMarket!.absent = [ids[0]];
+      assert.deepEqual(favorableIds(save), [], '让利者离场后不能转给另一位修士');
+    }
+  }
 });

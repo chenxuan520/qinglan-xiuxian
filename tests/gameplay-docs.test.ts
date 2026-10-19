@@ -36,7 +36,7 @@ import { AUCTION_HALLS, AUCTION_IRON_MIN } from '../src/auction-data.ts';
 import { AUCTION_SETTINGS } from '../src/setting.ts';
 import { auctionSaleRates } from '../src/auction-items.ts';
 import { auctionContent } from '../src/auction-ui.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
+import { beginSectMarketVisit, sectMarketDeals } from '../src/sect-market.ts';
 import { prepareAuction } from '../src/auction.ts';
 
 const gameplay = readFileSync(new URL('../docs/gameplay.md', import.meta.url), 'utf8');
@@ -287,4 +287,23 @@ test('每一帮助分类都进入一致性检查，CI独立运行且不混入部
     'utf8',
   );
   assert.doesNotMatch(deployment, /npm run docs:check/);
+});
+
+test('急需互换的让利说明保持8%设计上限，并能找到实际小赚报价', () => {
+  const guide = guideContent('mortal').match(/最多可多换得(\d+)%/);
+  const play = gameplay.match(/所得参考价值最多比交出高(\d+)%/);
+  const pills = medicine.match(/所得参考价值最多高(\d+)%/);
+  for (const match of [guide, play, pills]) {
+    assert.ok(match);
+    assert.equal(Number(match[1]), 8);
+  }
+  const save = freshSave('heaven', ['metal']);
+  save.cultivation = Array.from({ length: 18 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
+  save.mortal.population = { seed: 5, since: 15 };
+  save.medicine.recipeSeed = 5;
+  for (const m of MEDICINES) save.medicine.bag[m.id] = 100;
+  beginSectMarketVisit(save);
+  const deal = sectMarketDeals(save, 'market-wanderer').find((d) => d.receiveValue > d.giveValue);
+  assert.ok(deal, '不能只有让利文案而没有真实盈利报价');
+  assert.ok(deal.receiveValue * 100 <= deal.giveValue * (100 + Number(guide![1])));
 });

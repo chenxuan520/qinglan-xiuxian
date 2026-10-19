@@ -45,9 +45,10 @@ export class BattleHud {
   update(game: Game) {
     const { ui, save } = this;
 
-    const set = (id: string, text: string) => {
+    const set = (id: string, text: string, html = false) => {
       const el = document.getElementById(id);
-      if (el && el.textContent !== text) el.textContent = text;
+      const content = html ? 'innerHTML' : 'textContent';
+      if (el && el[content] !== text) el[content] = text;
     };
     const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
     set('realm-name', realm.name);
@@ -86,8 +87,12 @@ export class BattleHud {
     set(
       'medicine-hud',
       activeMedicines(save.medicine, save.age)
-        .map((m) => `${m.name} ${Math.max(0, save.medicine.active[m.id] - save.age).toFixed(0)}年`)
-        .join(' · '),
+        .map(
+          (m) =>
+            `<span>${m.name} ${Math.max(0, save.medicine.active[m.id] - save.age).toFixed(0)}年</span>`,
+        )
+        .join(' '),
+      true,
     );
     const life = lifespanInfo(save);
     set(
