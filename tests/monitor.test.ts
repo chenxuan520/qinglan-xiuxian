@@ -50,7 +50,17 @@ const request = (query = '', origin = official, method = 'GET') =>
     headers: origin ? { Origin: origin, 'CF-Connecting-IP': '192.0.2.8' } : {},
   });
 const headers = (origin = official) => new Headers({ 'Access-Control-Allow-Origin': origin });
-const strings = new Set(['site', 'root', 'path', 'day', 'reason', 'version', 'summary', 'last']);
+const strings = new Set([
+  'site',
+  'root',
+  'path',
+  'day',
+  'reason',
+  'version',
+  'summary',
+  'last',
+  'action',
+]);
 const row = (key: MonitorSection) =>
   Object.fromEntries(
     MONITOR_COLUMNS[key].map((c) => [
@@ -264,20 +274,20 @@ test('分批查询、投影及缓存正确，跨站命中重设 CORS，缓存过
       !raw.includes('private-test-token') &&
       !raw.includes('analytics_engine/sql'),
   );
-  assert.equal(h.calls.length, 12);
+  assert.equal(h.calls.length, Object.keys(MONITOR_COLUMNS).length);
   assert.ok(h.peak() <= 4);
   const b = await monitorResponse(request('', pages), env, headers(pages), h.deps);
   assert.equal(b.headers.get('Access-Control-Allow-Origin'), pages);
-  assert.equal(h.calls.length, 12);
+  assert.equal(h.calls.length, Object.keys(MONITOR_COLUMNS).length);
   h.advance(300_001);
   await monitorResponse(request(), env, headers(), h.deps);
-  assert.equal(h.calls.length, 24);
+  assert.equal(h.calls.length, Object.keys(MONITOR_COLUMNS).length * 2);
   assert.equal(
     (await monitorResponse(request(), { ...env, MONITOR_PUBLIC: 'false' }, headers(), h.deps))
       .status,
     403,
   );
-  assert.equal(h.calls.length, 24);
+  assert.equal(h.calls.length, Object.keys(MONITOR_COLUMNS).length * 2);
 });
 
 test('个别查询失败如实标记并不缓存；全失败返回 502，不冒充零统计', async () => {
@@ -366,7 +376,7 @@ test('Worker 正常 GET 使用原生 fetch 的全局接收对象而非依赖对�
     const response = await worker.fetch(request(), { ...env, ALLOWED_ORIGINS: official } as never);
     assert.equal(response.status, 200);
     const data = (await response.json()) as MonitorData;
-    assert.equal(calls, 12);
+    assert.equal(calls, Object.keys(MONITOR_COLUMNS).length);
     assert.ok(Object.values(data.sections).every((s) => !s.error));
   } finally {
     globalThis.fetch = original;

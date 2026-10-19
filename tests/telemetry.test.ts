@@ -241,6 +241,40 @@ const eventRequest = (body: unknown, origin = official, method = 'POST') =>
     body: method === 'POST' ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
   });
 
+test('两站分享动作经真实Worker白名单写入固定列，非法动作整批拒收', async () => {
+  const actions = [
+    'preview',
+    'save-request',
+    'save-failed',
+    'share-request',
+    'shared',
+    'cancelled',
+    'fallback',
+    'qr-arrival',
+  ];
+  const sharing = { ...batch, events: actions.map((detail) => ({ type: 'sharing', detail })) };
+  for (const origin of [official, pages]) {
+    const { env, points } = workerEnv();
+    const response = await worker.fetch(eventRequest(sharing, origin), env as never);
+    assert.equal(response.status, 204);
+    assert.deepEqual(
+      points.map((point) => point.blobs[6]),
+      actions,
+    );
+    assert.ok(points.every((point) => point.blobs[0] === 'sharing'));
+    assert.equal(
+      (
+        await worker.fetch(
+          eventRequest({ ...sharing, events: [{ type: 'sharing', detail: '私人留言' }] }, origin),
+          env as never,
+        )
+      ).status,
+      400,
+    );
+    assert.equal(points.length, actions.length);
+  }
+});
+
 test('Worker /event 接收两个正式站的纯文本统计并逐条写入 Analytics Engine', async () => {
   assert.ok(deployedOrigins.includes(official) && deployedOrigins.includes(pages));
   assert.match(workerConfig, /"binding": "EVENTS", "dataset": "qinglan_events"/);
@@ -291,5 +325,6 @@ test('关于面板说明匿名统计内容并提供开关', () => {
   assert.match(telemetryRow(true, true), /已开启[^]*data-action="telemetry-toggle"[^]*关闭/);
   assert.match(telemetryRow(true, false), /已开启 · 当前不可用/);
   assert.match(telemetryRow(false, true), /已关闭[^]*开启/);
-  assert.match(telemetryRow(true, true), /不上传存档、闲聊或个人信息，记录保留三个月/);
+  assert.match(telemetryRow(true, true), /留影分享与二维码来源/);
+  assert.match(telemetryRow(true, true), /不上传图片、存档、闲聊或个人信息，记录保留三个月/);
 });

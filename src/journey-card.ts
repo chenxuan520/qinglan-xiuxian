@@ -29,8 +29,10 @@ import { drawPlayerFormation } from './player-formation.ts';
 import { playerSpriteFrame } from './player-appearance.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import { GAME_SITE_URL } from './setting.ts';
+import { JOURNEY_SHARE_URL } from './sharing.ts';
+export { mountJourneyCardActions } from './journey-card-actions.ts';
 
-export const JOURNEY_CARD_QR = encode(GAME_SITE_URL, { ecc: 'M', border: 4 });
+export const JOURNEY_CARD_QR = encode(JOURNEY_SHARE_URL, { ecc: 'M', border: 4 });
 export const JOURNEY_CARD_QR_COLORS = { light: '#e1d3a4', dark: '#102b28' } as const;
 export type { JourneyCardEnding } from './journey-appraisal.ts';
 const ROOT_SEALS: Record<SpiritRootId, string> = {
@@ -526,7 +528,7 @@ export async function createJourneyCard(
   text(state[1], 80, 1658, 22, '#d8c998', 610);
   text(new URL(GAME_SITE_URL).host, 80, 1683, 18, '#aabda8', 610);
 
-  // 整数像素绘制并保留四格浅色静区，二维码只编码官网，不携带存档。
+  // 四格浅色静区；官网链接只带固定来源标记，不携带玩家或存档数据。
   const moduleSize = 7;
   const qrSize = JOURNEY_CARD_QR.size * moduleSize;
   const qrX = 1000 - qrSize;

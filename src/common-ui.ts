@@ -34,7 +34,7 @@ import { choiceGuidance } from './choice-guidance.ts';
 
 export function telemetryRow(enabled: boolean, active: boolean) {
   const status = !enabled ? '已关闭' : active ? '已开启' : '已开启 · 当前不可用';
-  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">开启后匿名记录历练进度与游戏异常，用于改进体验；不上传存档、闲聊或个人信息，记录保留三个月。</small>`;
+  return `<p class="about-telemetry"><span>匿名统计</span>${status}<button class="about-toggle" data-action="telemetry-toggle" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></p><small class="about-telemetry-note">开启后匿名记录历练进度、留影分享与二维码来源、游戏异常，用于改进体验；不上传图片、存档、闲聊或个人信息，记录保留三个月。</small>`;
 }
 
 // 运行错误兜底提示：上报在 error-report.ts，本模块只管排版。标题含图标与提示语，

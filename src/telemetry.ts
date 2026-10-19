@@ -6,6 +6,7 @@ import {
   type SpiritRootId,
 } from './data.ts';
 import { TELEMETRY_SETTINGS } from './setting.ts';
+import { SHARING_ACTIONS } from './sharing.ts';
 
 export const TELEMETRY_EVENTS = [
   'session',
@@ -15,6 +16,7 @@ export const TELEMETRY_EVENTS = [
   'reincarnate',
   'epilogue',
   'error',
+  'sharing',
 ] as const;
 // 历练结果，或轮回原因（寿尽、天劫、劫杀身陨、叩门后、主动）。
 export const TELEMETRY_RESULTS = [
@@ -85,6 +87,11 @@ const record = (value: unknown): value is Record<string, unknown> =>
 
 function validEvent(value: unknown): value is TelemetryEvent {
   if (!record(value) || !TELEMETRY_EVENTS.includes(value.type as TelemetryEvent['type']))
+    return false;
+  if (
+    value.type === 'sharing' &&
+    (typeof value.detail !== 'string' || !Object.hasOwn(SHARING_ACTIONS, value.detail))
+  )
     return false;
   return Object.entries(value).every(([key, field]) => {
     if (!EVENT_KEYS.has(key)) return false;

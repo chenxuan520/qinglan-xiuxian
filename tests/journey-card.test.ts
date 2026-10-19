@@ -8,6 +8,7 @@ import {
   journeyAppraisalLines,
 } from '../src/journey-card.ts';
 import { GAME_SITE_URL } from '../src/setting.ts';
+import { JOURNEY_SHARE_URL } from '../src/sharing.ts';
 import { freshSave, enterImmortalGate, readSave } from '../src/progress.ts';
 import { chooseHumanStory, humanStoryView } from '../src/human-stories.ts';
 import { joinSect } from '../src/mortal.ts';
@@ -190,8 +191,10 @@ test('纪念卡米金墨绿二维码保留浅色静区并能解码为官网，�
     assert.ok(data[size - 1 - i].every((cell) => !cell));
     assert.ok(data.every((row) => !row[i] && !row[size - 1 - i]));
   }
-  assert.equal(jsQR(pixels, width, width)?.data, GAME_SITE_URL);
-  assert.equal(new URL(GAME_SITE_URL).protocol, 'https:');
+  assert.equal(jsQR(pixels, width, width)?.data, JOURNEY_SHARE_URL);
+  const target = new URL(JOURNEY_SHARE_URL);
+  assert.equal(target.origin + target.pathname, GAME_SITE_URL);
+  assert.deepEqual([...target.searchParams], [['from', 'journey-card']]);
 });
 
 test('评语区分未竟、寿尽、天劫、成仙未叩门与终章，不虚构交往或觉醒', () => {

@@ -33,6 +33,7 @@ import './monitor.css';
 import { mountAutoplayMonitor } from './monitor-autoplay.ts';
 import { mountWeaponMonitor } from './monitor-weapons.ts';
 import { monitorDeadline } from './monitor-request.ts';
+import { SHARING_ACTIONS, type SharingAction } from './sharing.ts';
 import {
   validPerformanceSnapshot,
   type PerformanceKind,
@@ -56,6 +57,7 @@ root.innerHTML = `<main>
     )}</select></label><button id="live-refresh">刷新线上统计</button><a id="live-api" href="${MONITOR_ENDPOINT}" target="_blank" rel="noopener noreferrer">聚合 JSON 接口 ↗</a></div><p id="live-status" class="note" role="status">正在读取…</p><div id="cards" class="cards"></div><details><summary>统计口径与保存时间</summary><ul><li>数据来自游戏的匿名事件，不含存档或闲聊；开启匿名统计的浏览器才会发送。打开次数指游戏 session，不包含监控页访问。</li><li>匿名浏览器编号不能代表真实人数；换设备、清理缓存或关闭统计会影响记录。跨站概览按编号去重，分站数量不能直接相加。</li><li>事件量按 Analytics Engine 采样权重估算，编号分布仍为实际观测去重，少量数据也会有波动。排除版本 verification 的上线验证记录。</li><li>历练通关率＝通关结算／全部结算，主动结束也在分母中；不是从第一关到第六关的整条路线通过率。开局和结算可能跨时间窗，灵根与路线是事件发生时的状态，不能严格配对。</li><li>普通历练和天劫分开统计。最高境界及最远通关只表示当前窗口内观测到的记录。版本数据最多 100 组，默认展示前 20 组，其余可展开；错误明细最多 100 组。</li><li>原始数据约保留三个月；统计接口缓存最多五分钟。日趋势按北京时间划分；「最近 N 天」为滚动 N×24 小时，首尾日期可能是不完整的一天。</li></ul></details></section>
   <section aria-labelledby="performance-title"><div class="section-heading"><h2 id="performance-title">性能与每日渲染</h2><button id="performance-refresh">刷新性能摘要</button></div><p class="note">独立于线上筛选。每日无头 Chrome 在第六境后期满配场景采样 60 秒；CI 机器的帧率仅用于观察，不能代表手机真机帧率。模拟成本、构建体积取最近已完成的 master 快检。</p><div id="performance-content" aria-live="polite">正在读取性能摘要…</div></section>
   <section aria-labelledby="errors-title"><h2 id="errors-title">运行错误</h2><p class="note">按站点、版本、摘要合并，最近出现优先；前端会去重限频。这是浏览器上报记录，不代表所有运行故障。摘要可能含浏览器原始错误文本。</p><div id="errors"></div></section>
+  <section><h2>留影分享与二维码</h2><p class="note">保存统计为发起下载，不能确认相册落盘；系统分享完成不代表对方已收到。长按保存无法观测。二维码进入指带留影来源的链接打开，不等同真实扫码人数，复制该链接打开也会计入；新存档不能代表新玩家。历史无来源二维码无法追溯。</p><div id="sharing"></div></section>
   <section><h2>访问与开局趋势</h2><div id="trend"></div></section>
   <section><h2>关卡历练</h2><p class="note">不含天劫，按关卡及难度区分。均值仅使用结算记录；通关率包含主动结束。</p><div id="stages"></div></section>
   <section><div class="two-column"><div><h2>灵根</h2><div id="roots"></div></div><div><h2>路线</h2><div id="paths"></div></div></div></section>
@@ -86,6 +88,7 @@ const sections: [MonitorSection, string][] = [
   ['sites', 'sites'],
   ['versions', 'versions'],
   ['errors', 'errors'],
+  ['sharing', 'sharing'],
 ];
 
 function chart(
@@ -182,6 +185,19 @@ function render(data: MonitorData) {
       continue;
     }
     switch (key) {
+      case 'sharing':
+        $(id).innerHTML = table(
+          ['操作', '次数', '匿名浏览器', '新存档'],
+          rows.map((r) => [
+            Object.hasOwn(SHARING_ACTIONS, String(r.action))
+              ? SHARING_ACTIONS[r.action as SharingAction]
+              : '其他分享操作',
+            count(r.count),
+            count(r.browsers),
+            r.action === 'qr-arrival' ? count(r.fresh) : '—',
+          ]),
+        );
+        break;
       case 'days':
         $(id).innerHTML = table(
           ['日期（北京）', '打开', '开局（含天劫）', '普通历练通关', '错误'],
@@ -326,7 +342,7 @@ function render(data: MonitorData) {
 async function loadLive() {
   liveController?.abort();
   const controller = new AbortController();
-  const deadline = monitorDeadline(controller, 30_000);
+  const deadline = monitorDeadline(controller, 40_000);
   liveController = controller;
   const params = new URLSearchParams({
     days: $<HTMLSelectElement>('days').value,

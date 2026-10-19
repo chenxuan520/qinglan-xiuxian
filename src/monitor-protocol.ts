@@ -49,6 +49,7 @@ export const MONITOR_COLUMNS = {
   reasons: ['reason', 'count', 'realm', 'age'],
   versions: ['version', 'sessions', 'starts', 'errors'],
   errors: ['site', 'version', 'summary', 'count', 'last'],
+  sharing: ['action', 'count', 'browsers', 'fresh'],
   tribulations: ['tribulation', 'starts', 'won', 'lost', 'abandoned', 'ends', 'seconds'],
 } as const;
 export type MonitorSection = keyof typeof MONITOR_COLUMNS;
@@ -123,6 +124,7 @@ export function monitorQueries(filter: MonitorFilter): Record<MonitorSection, st
     reasons: `SELECT ${result} AS reason, SUM(${w}) AS count, SUM(${w} * ${realm}) / SUM(${w}) AS realm, SUM(${w} * ${age}) / SUM(${w}) AS age FROM ${table} WHERE ${recent} AND ${type} = 'reincarnate' GROUP BY reason ORDER BY count DESC`,
     versions: `SELECT ${version} AS version, ${count('session', 'sessions')}, ${count('run-start', 'starts')}, ${count('error', 'errors')} FROM ${table} WHERE ${recent} GROUP BY version ORDER BY sessions DESC LIMIT 100`,
     errors: `SELECT ${site} AS site, ${version} AS version, ${detail} AS summary, SUM(${w}) AS count, max(timestamp) AS last FROM ${table} WHERE ${recent} AND ${type} = 'error' GROUP BY site, version, summary ORDER BY last DESC LIMIT 100`,
+    sharing: `SELECT ${detail} AS action, SUM(${w}) AS count, count(DISTINCT index1) AS browsers, sumIf(${w}, ${detail} = 'qr-arrival' AND ${fresh} = 1) AS fresh FROM ${table} WHERE ${recent} AND ${type} = 'sharing' GROUP BY action ORDER BY count DESC LIMIT 20`,
     tribulations: `SELECT ${tribulation} AS tribulation, ${outcomes} FROM ${table} WHERE ${recent} AND ${tribulation} >= 0 AND (${type} = 'run-start' OR ${type} = 'run-end') GROUP BY tribulation ORDER BY tribulation`,
   };
 }
@@ -136,6 +138,7 @@ const stringColumns = new Set([
   'version',
   'summary',
   'last',
+  'action',
 ]);
 export function monitorRows(section: MonitorSection, input: unknown): MonitorRow[] {
   if (!Array.isArray(input) || input.length > 200) throw new Error('invalid-data');

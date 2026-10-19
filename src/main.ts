@@ -137,6 +137,7 @@ import { Renderer } from './render.ts';
 import { GuideSource } from './guide-source.ts';
 import { GAME_SITE_URL, SUPPORT_CODE_IMAGE, TELEMETRY_SETTINGS } from './setting.ts';
 import { createTelemetry, type TelemetryEvent } from './telemetry.ts';
+import { recordSharingArrival } from './sharing.ts';
 import { createErrorWatch } from './error-report.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
@@ -244,6 +245,12 @@ const telemetry = createTelemetry({
     }).catch(() => {}),
 });
 telemetry.track({ type: 'session', fresh: saveRead.status === 'empty', ...lifeStats() });
+if (
+  recordSharingArrival(telemetry, location.href, saveRead.status === 'empty', (url) =>
+    history.replaceState(history.state, '', url),
+  )
+)
+  telemetry.flush();
 addEventListener('pagehide', () => telemetry.flush());
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') telemetry.flush();
@@ -450,7 +457,10 @@ function toast(text: string, duration = 3200) {
 }
 let toastTimer = 0;
 const panelHost = new PanelHost(modal, ui);
-const journeyCardPanel = new JourneyCardPanel(modal, panelFrame);
+const journeyCardPanel = new JourneyCardPanel(modal, panelFrame, (detail) => {
+  telemetry.track({ type: 'sharing', detail, ...lifeStats() });
+  telemetry.flush();
+});
 const mobileDisplay = new MobileDisplay(() => {
   const button = document.querySelector<HTMLButtonElement>('[data-action="fullscreen"]');
   if (!button) return;
