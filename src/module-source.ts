@@ -21,7 +21,7 @@ export class ModuleSource<T> {
         },
         (error) => {
           this.pending = null;
-          resourceFailed();
+          resourceFailed(true);
           throw error;
         },
       );

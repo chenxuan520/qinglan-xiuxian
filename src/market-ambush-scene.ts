@@ -1,3 +1,4 @@
+import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import { MarketAmbushDuel, type AmbushOutcome } from './market-ambush.ts';
 import {
@@ -171,7 +172,7 @@ export class MarketAmbushScene {
               const img = new Image();
               img.onload = () => resolve();
               img.onerror = (error) => {
-                resourceFailed();
+                resourceFailed(true);
                 reject(error);
               };
               img.src = assetUrl(url);
@@ -190,8 +191,11 @@ export class MarketAmbushScene {
       if (this.events.signal.aborted || attempt !== this.assetAttempt) return;
       this.assetsFailed = true;
       if (loading)
-        loading.innerHTML =
-          '遭遇画面暂未准备好，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-assets">重试加载</button>';
+        loading.innerHTML = resourceFailureContent(
+          'market-ambush-retry-assets',
+          '遭遇画面暂未准备好，战斗已暂停。',
+          '重试加载',
+        );
     }
   }
   checkpoint() {

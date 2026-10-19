@@ -59,6 +59,7 @@ import {
   freshChronicle,
   restoreChronicle,
   recordChronicle,
+  recordCurioAchievement,
   realmTitle,
   type Chronicle,
 } from './chronicle.ts';
@@ -267,8 +268,9 @@ export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | n
   if (gift.kind === 'artifact') {
     save.artifacts = [...new Set([...save.artifacts, gift.id])];
     save.forge[gift.id] = gift.level;
-  } else if (gift.kind === 'curio' && isCurio(gift.id)) grantCurio(save, gift.id);
-  else save.medicine.bag[gift.id] = 1;
+  } else if (gift.kind === 'curio' && isCurio(gift.id)) {
+    if (grantCurio(save, gift.id)) recordCurioAchievement(save);
+  } else save.medicine.bag[gift.id] = 1;
   save.birthInheritance = { ...gift };
   recordChronicle(
     save,
@@ -911,6 +913,7 @@ export function settleRun(
   };
   for (const [id, count] of Object.entries(run.loot?.curios ?? {})) {
     if (isCurio(id) && count === 1 && grantCurio(save, id)) {
+      recordCurioAchievement(save);
       recordChronicle(
         save,
         '妖王奇缘',

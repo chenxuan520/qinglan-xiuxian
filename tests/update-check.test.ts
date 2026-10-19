@@ -122,7 +122,11 @@ test('已处理的指南、履历、坊市和闲谈加载失败也发送信号�
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'dispatchEvent');
   const target = new EventTarget();
   let signals = 0;
-  target.addEventListener('vite:preloadError', () => signals++);
+  const handled: boolean[] = [];
+  target.addEventListener('vite:preloadError', (event) => {
+    signals++;
+    handled.push((event as Event & { handledResourceFailure: boolean }).handledResourceFailure);
+  });
   Object.defineProperty(globalThis, 'dispatchEvent', {
     configurable: true,
     value: target.dispatchEvent.bind(target),
@@ -148,6 +152,7 @@ test('已处理的指南、履历、坊市和闲谈加载失败也发送信号�
     );
     assert.equal(fallback, 1);
     assert.equal(signals, 8);
+    assert.deepEqual(handled, [false, true, true, true, true, true, true, true]);
   } finally {
     if (descriptor) Object.defineProperty(globalThis, 'dispatchEvent', descriptor);
     else Reflect.deleteProperty(globalThis, 'dispatchEvent');

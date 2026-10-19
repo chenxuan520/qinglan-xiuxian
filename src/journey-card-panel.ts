@@ -1,3 +1,5 @@
+import { resourceFailureContent } from './resource-panel.ts';
+import { resourceFailed } from './update-check.ts';
 import type { SaveData } from './progress.ts';
 import { imageDownloadUrl, shareImage } from './image-share.ts';
 
@@ -69,9 +71,13 @@ export class JourneyCardPanel {
           result === 'shared' ? '已交给系统分享面板。' : '已取消分享，图片仍在，可再次分享或保存。';
       };
     } catch {
+      resourceFailed(true);
       if (!host.isConnected) return;
-      host.innerHTML =
-        '<p class="panel-note" role="alert">暂时未能留影，请重试或稍后再来。</p><button class="secondary-button" data-action="journey-card">重新生成</button>';
+      host.innerHTML = resourceFailureContent(
+        'journey-card',
+        '暂时未能留影，请重试或稍后再来。',
+        '重新生成',
+      );
     } finally {
       if (this.request === request) this.request = null;
     }

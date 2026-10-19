@@ -21,6 +21,9 @@
 .guide-tour-entry button {
   flex-shrink: 0;
 }
+.guide-tour-entry > [data-resource-failure] {
+  width: 100%;
+}
 .tour-canvas {
   position: fixed;
   inset: 0;

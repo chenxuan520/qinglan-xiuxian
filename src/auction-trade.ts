@@ -1,7 +1,7 @@
 import { isCurio, grantCurio, acquiredCurio, curioRoll, curioCycle } from './curio-data.ts';
 import { TREASURES } from './data.ts';
 import { MEDICINES, medicineInfo } from './medicine-data.ts';
-import { recordChronicle } from './chronicle.ts';
+import { recordChronicle, recordCurioAchievement } from './chronicle.ts';
 import { recordCollectionAchievement, type SaveData } from './progress.ts';
 import { advanceMortal } from './mortal.ts';
 import {
@@ -286,6 +286,14 @@ function receipt(
     save.mortal.events.unshift(`${save.age.toFixed(1)} 岁 · ${text}`);
     save.mortal.events.splice(6);
     recordChronicle(save, '坊市拍卖', text);
+    if (outcome === 'won' && item.kind === 'curio') recordCurioAchievement(save);
+    if (outcome === 'won' && item.kind === 'artifact' && item.forgeLevel >= 5)
+      recordChronicle(
+        save,
+        '慧眼识珍',
+        `在拍卖会竞得${auctionItemName(item)}，炼器${item.forgeLevel}阶。`,
+        'auction-treasure',
+      );
   }
   return result;
 }

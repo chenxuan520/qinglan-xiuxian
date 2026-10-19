@@ -76,6 +76,9 @@ test('成就栏只保留非必经目标，并补录可由旧档确认的成就',
       'five-tribulations',
       'hard-immortal',
       'rootless-immortal',
+      'curio-three',
+      'auction-treasure',
+      'mixed-exchange',
     ],
   );
   s.mortal.mastery.power = 10;

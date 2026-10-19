@@ -1,3 +1,4 @@
+import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import { assetUrl } from './asset-url.ts';
 import { PLAYER_IMAGES, playerSpriteBackground } from './player-appearance.ts';
@@ -190,7 +191,7 @@ export class SectMarketScene {
               resolve();
             };
             image.onerror = (error) => {
-              resourceFailed();
+              resourceFailed(true);
               reject(error);
             };
             image.src = assetUrl(url);
@@ -204,8 +205,11 @@ export class SectMarketScene {
       })
       .catch(() => {
         if (this.events.signal.aborted) return;
-        host.querySelector('.town-loading')!.innerHTML =
-          '<div>坊市暂未准备好，游历已暂停。<br><button class="secondary-button" data-action="sect-market-retry">重新加载</button></div>';
+        host.querySelector('.town-loading')!.innerHTML = resourceFailureContent(
+          'sect-market-retry',
+          '坊市暂未准备好，游历已暂停。',
+          '重新加载',
+        );
       });
   }
   get nearbyNpc() {

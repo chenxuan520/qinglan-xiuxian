@@ -1,3 +1,4 @@
+import { resourceFailureContent } from './resource-panel.ts';
 import type { ActionShell } from './action-controller.ts';
 import type { ParentId } from './hometown.ts';
 import type { TownResident } from './town-population.ts';
@@ -77,8 +78,7 @@ export function mountTownScene(shell: ActionShell) {
         },
         () => {
           if (current())
-            marketHost.innerHTML =
-              '<div class="town-loading" role="status"><div>坊市暂未准备好，游历已暂停。<br><button class="secondary-button" data-action="sect-market-retry">重新加载</button></div></div>';
+            marketHost.innerHTML = `<div class="town-loading" role="status">${resourceFailureContent('sect-market-retry', '坊市暂未准备好，游历已暂停。', '重新加载')}</div>`;
         },
       );
     }
@@ -241,9 +241,8 @@ export function showSectService(shell: ActionShell) {
       },
       () => {
         if (!current()) return;
-        host.innerHTML =
-          '<p>本门传习暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
-        host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+        host.innerHTML = resourceFailureContent('', '本门传习暂时无法展开，请重试。');
+        host.querySelector<HTMLButtonElement>('[data-resource-retry]')!.onclick = load;
       },
     );
   };
@@ -278,9 +277,8 @@ export function showMarketVenue(shell: ActionShell, id: string) {
       },
       () => {
         if (!current()) return;
-        host.innerHTML =
-          '<p>坊中诸事暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
-        host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+        host.innerHTML = resourceFailureContent('', '坊中诸事暂时无法展开，请重试。');
+        host.querySelector<HTMLButtonElement>('[data-resource-retry]')!.onclick = load;
       },
     );
   };
@@ -314,9 +312,8 @@ export function showAuction(shell: ActionShell) {
         },
         () => {
           if (!current()) return;
-          host.innerHTML =
-            '<p>拍卖行暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
-          host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+          host.innerHTML = resourceFailureContent('', '拍卖行暂时无法展开，请重试。');
+          host.querySelector<HTMLButtonElement>('[data-resource-retry]')!.onclick = load;
         },
       );
     };
@@ -417,9 +414,8 @@ export function renderPanel(shell: ActionShell) {
           },
           () => {
             if (!current()) return;
-            host.innerHTML =
-              '<p>藏器阁暂时无法展开，请重试。</p><button class="secondary-button">重新展开</button>';
-            host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+            host.innerHTML = resourceFailureContent('', '藏器阁暂时无法展开，请重试。');
+            host.querySelector<HTMLButtonElement>('[data-resource-retry]')!.onclick = load;
           },
         );
       };
@@ -444,19 +440,21 @@ export function renderPanel(shell: ActionShell) {
       shell.panelFrame(
         '仙途履历',
         '岁月留痕 · 此世道果',
-        '<p class="panel-note" role="status">正在展开履历与属性…</p>',
+        '<p class="panel-note" data-chronicle-loading role="status">正在展开履历与属性…</p>',
       );
+      const host = shell.modal.querySelector<HTMLElement>('[data-chronicle-loading]')!;
+      const current = () => host.isConnected && !shell.saveLock && shell.panel === 'chronicle';
       void shell.chronicleSource
         .load()
         .then(() => {
-          if (shell.panel === 'chronicle') shell.renderPanel();
+          if (current()) shell.renderPanel();
         })
         .catch(() => {
-          if (shell.panel === 'chronicle')
+          if (current())
             shell.panelFrame(
               '仙途履历',
               '岁月留痕 · 此世道果',
-              '<p class="panel-note" role="alert">暂未展开，请重试。</p><button class="secondary-button" data-action="chronicle">重新展开</button>',
+              resourceFailureContent('chronicle'),
             );
         });
       return;
@@ -475,16 +473,19 @@ export function renderPanel(shell: ActionShell) {
       const tab = bestiary ? shell.bestiaryStage : shell.guideTab;
       const title = bestiary ? '知妖性，方能破万劫' : '修行指南';
       const subtitle = bestiary ? '妖物志' : '道法有迹';
+      let host: HTMLElement;
       const current = () =>
+        host.isConnected &&
         !shell.saveLock &&
         shell.panel === target &&
         (bestiary ? shell.bestiaryStage : shell.guideTab) === tab;
       shell.panelFrame(
         title,
         subtitle,
-        '<p class="panel-note" role="status">正在展开…</p>',
+        '<p class="panel-note" data-guide-loading role="status">正在展开…</p>',
         bestiary,
       );
+      host = shell.modal.querySelector<HTMLElement>('[data-guide-loading]')!;
       void shell.guideSource
         .load()
         .then(() => {
@@ -492,12 +493,7 @@ export function renderPanel(shell: ActionShell) {
         })
         .catch(() => {
           if (current())
-            shell.panelFrame(
-              title,
-              subtitle,
-              `<p class="panel-note" role="status">暂未展开，请重试。</p><button class="secondary-button" data-action="${target}">重新展开</button>`,
-              bestiary,
-            );
+            shell.panelFrame(title, subtitle, resourceFailureContent(target), bestiary);
         });
       return;
     }
@@ -765,10 +761,8 @@ export function ensureScene(
     })
     .catch(() => {
       failed = true;
-      loading.querySelector('.load-progress')!.textContent =
-        '素材加载失败，请检查网络后重试。尚未进入场景。';
-      const retry = loading.querySelector('button')!;
-      retry.hidden = false;
+      loading.innerHTML = `<section><div class="eyebrow">叩仙门：青岚纪</div><h2>${isTribulation ? '天劫将至' : shell.STAGES[stage].name}</h2>${resourceFailureContent('', '素材加载失败，请检查网络后重试。尚未进入场景。', '重新加载')}</section>`;
+      const retry = loading.querySelector<HTMLButtonElement>('[data-resource-retry]')!;
       retry.onclick = () => {
         loading.remove();
         shell.sceneLoading = false;

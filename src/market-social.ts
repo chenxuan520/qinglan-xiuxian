@@ -10,7 +10,7 @@ import {
   type SaveData,
 } from './progress.ts';
 import { advanceMortal } from './mortal.ts';
-import { recordChronicle } from './chronicle.ts';
+import { recordChronicle, recordCurioAchievement } from './chronicle.ts';
 import {
   marketCultivators,
   marketMedicinePool,
@@ -587,7 +587,7 @@ export function chooseMarketOpportunity(
 }
 function receiveMarketItem(save: SaveData, item: AuctionItem) {
   if (item.kind === 'curio') {
-    grantCurio(save, item.id);
+    if (grantCurio(save, item.id)) recordCurioAchievement(save);
     return;
   }
   if (item.kind === 'medicine')

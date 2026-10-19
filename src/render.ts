@@ -78,7 +78,7 @@ export class Renderer {
               resolve();
             };
             image.onerror = () => {
-              resourceFailed();
+              resourceFailed(true);
               this.imageRequests.delete(url);
               reject(new Error(url));
             };

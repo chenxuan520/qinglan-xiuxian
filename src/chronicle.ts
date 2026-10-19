@@ -1,5 +1,6 @@
 import { REALMS, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
 import { MAX_MASTERY } from './mortal-data.ts';
+import { MEDICINES } from './medicine-data.ts';
 import type { SaveData } from './progress.ts';
 
 export interface Chronicle {
@@ -51,6 +52,29 @@ export function realmTitle(step: number) {
     ? REALMS[8]
     : `${REALMS[Math.floor(step / 3)]}${['初期', '中期', '后期'][step % 3]}`;
 }
+export function recordCurioAchievement(save: SaveData) {
+  if (new Set(save.curios.acquired).size >= 3)
+    recordChronicle(save, '奇珍有缘', '本世先后获得三件不同奇物。', 'curio-three');
+}
+// 旧互换记录包含实际交出的物品；只认完整成交句，不从持有物品或交情推断。
+function mixedExchangeEvidence(detail: string) {
+  const trade = detail.match(/^宗门坊市：以(.+)换得(.+)，已收入丹囊。$/);
+  if (!trade) return false;
+  const medicine = (text: string, limit: number) => {
+    const item = text.match(/^(.+) ×([1-9]\d*)$/);
+    return !!item && Number(item[2]) <= limit && MEDICINES.some((m) => m.name === item[1]);
+  };
+  const items = trade[1].split(' ＋ ');
+  const artifact = (text: string) => {
+    const item = text.match(/^(.+)（炼器(0|[1-9]\d*)阶） ×1$/);
+    return (
+      !!item && Number(item[2]) <= MAX_FORGE_LEVEL && TREASURES.some((t) => t.name === item[1])
+    );
+  };
+  return (
+    medicine(trade[2], 6) && items.length === 2 && artifact(items[0]) && medicine(items[1], 12)
+  );
+}
 function restorePersistentAchievements(save: SaveData, milestones: Chronicle['milestones']) {
   if (Object.values(save.mortal.mastery).some((level) => level >= MAX_MASTERY))
     milestones.mastery ??= null;
@@ -67,6 +91,24 @@ function restorePersistentAchievements(save: SaveData, milestones: Chronicle['mi
     )
   )
     milestones['permanent-medicine'] ??= null;
+  // 已得记录可证明本世成果，不能证明第三件的获得时间。
+  if (new Set(save.curios.acquired).size >= 3) milestones['curio-three'] ??= null;
+  if (!Object.hasOwn(milestones, 'auction-treasure')) {
+    const receipts = (save.mortal.auction?.history ?? []).filter(
+      (r) =>
+        r.outcome === 'won' && r.bidder === 'player' && r.kind === 'artifact' && r.forgeLevel >= 5,
+    );
+    if (receipts.length) milestones['auction-treasure'] = Math.min(...receipts.map((r) => r.age));
+  }
+  if (!Object.hasOwn(milestones, 'mixed-exchange')) {
+    const entries = save.chronicle.entries.filter(
+      (entry) => entry.title === '同道互通' && mixedExchangeEvidence(entry.detail),
+    );
+    if (entries.length)
+      milestones['mixed-exchange'] = entries.some((entry) => entry.age === null)
+        ? null
+        : Math.min(...entries.map((entry) => entry.age!));
+  }
 }
 export function restoreChronicle(save: SaveData, value: unknown, step: number, ascending: boolean) {
   if (validChronicle(value, save.age)) {
@@ -114,6 +156,9 @@ export function chronicleAchievements(save: SaveData) {
     { id: 'five-tribulations', title: '五劫不灭', detail: '累计渡过五次天劫' },
     { id: 'hard-immortal', title: '逆境问道', detail: '以天劫降临难度成就真仙' },
     { id: 'rootless-immortal', title: '凡骨登仙', detail: '以无灵根成就真仙' },
+    { id: 'curio-three', title: '奇珍有缘', detail: '本世先后获得三件不同奇物' },
+    { id: 'auction-treasure', title: '慧眼识珍', detail: '在拍卖会竞得一件炼器五阶及以上的法宝' },
+    { id: 'mixed-exchange', title: '以物结缘', detail: '完成一次同时交出法宝和丹药的组合换物' },
   ].map((a) => ({
     ...a,
     achieved: Object.hasOwn(save.chronicle.milestones, a.id),

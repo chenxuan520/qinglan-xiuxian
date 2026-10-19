@@ -618,3 +618,16 @@
 .runtime-error-actions button {
   cursor: pointer;
 }
+
+.resource-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.resource-failure-actions button {
+  flex: 1;
+  min-width: 90px;
+  max-width: 160px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}

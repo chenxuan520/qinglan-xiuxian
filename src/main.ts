@@ -51,7 +51,8 @@ import { computeManualInput, trapModalTab } from './input-controller.ts';
 import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
 import { DebugEntry } from './debug-entry.ts';
-import { createUpdateCheck } from './update-check.ts';
+import { createUpdateCheck, resourceFailed } from './update-check.ts';
+import { resourceFailureContent, resourcesUpdated, panelUpdateNotice } from './resource-panel.ts';
 
 import './styles.ts';
 import './battle-hud.css';
@@ -255,6 +256,7 @@ function showRuntimeErrorNotice(updated = false) {
   const box = document.createElement('div');
   box.className = 'runtime-error';
   box.setAttribute('role', 'alert');
+  if (updated) box.setAttribute('data-resource-update', '');
   box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${updated ? '游戏已更新，请刷新后继续。' : ERROR_NOTICE_TEXT}</p>${ERROR_NOTICE_ACTIONS}`;
   box.querySelector('[data-error-action="refresh"]')?.addEventListener('click', () => {
     if (updated && !persist()) {
@@ -274,12 +276,24 @@ createErrorWatch({
   },
   onError: () => showRuntimeErrorNotice(),
 });
+let handledResourceFailure = false;
 const checkUpdate = createUpdateCheck(
   __QINGLAN_BUILD_ID__,
   new URL('offline-manifest.json', new URL(import.meta.env.BASE_URL, location.href)),
-  () => showRuntimeErrorNotice(true),
+  () => {
+    resourcesUpdated(document);
+    if (!handledResourceFailure && !panelUpdateNotice(modal)) showRuntimeErrorNotice(true);
+  },
 );
-addEventListener('vite:preloadError', checkUpdate);
+addEventListener('vite:preloadError', (event) => {
+  if ((event as Event & { handledResourceFailure?: boolean }).handledResourceFailure) {
+    handledResourceFailure = true;
+    document.querySelector('[data-resource-update]')?.remove();
+  }
+  void checkUpdate().finally(() => {
+    handledResourceFailure = false;
+  });
+});
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
 const catalogTreasures = [...TREASURES];
 catalogTreasures.splice(
@@ -704,9 +718,8 @@ function showMarketEvent(npc: MarketCultivator) {
       },
       () => {
         if (!current()) return;
-        host.innerHTML =
-          '<p class="panel-note">坊间见闻暂时无法载入，请重试。</p><button class="secondary-button">重新展开</button>';
-        host.querySelector<HTMLButtonElement>('button')!.onclick = load;
+        host.innerHTML = resourceFailureContent('', '坊间见闻暂时无法载入，请重试。');
+        host.querySelector<HTMLButtonElement>('[data-resource-retry]')!.onclick = load;
       },
     );
   };
@@ -746,6 +759,7 @@ let ambushFlow: Promise<typeof import('./market-ambush-flow.ts')> | undefined;
 function loadAmbushFlow() {
   return (ambushFlow ??= import('./market-ambush-flow.ts').catch((error) => {
     ambushFlow = undefined;
+    resourceFailed(true);
     throw error;
   }));
 }
@@ -766,7 +780,11 @@ function showMarketAmbush() {
       panelFrame(
         '山路逢劫',
         '战斗暂歇',
-        '<p>遭遇暂时无法载入，战斗保持暂停。</p><button class="primary-button" data-action="market-ambush-recover">重试载入</button>',
+        resourceFailureContent(
+          'market-ambush-recover',
+          '遭遇暂时无法载入，战斗保持暂停。',
+          '重试载入',
+        ),
       );
       modal.querySelector('[data-action="close"]')?.remove();
     });
@@ -1633,6 +1651,15 @@ function handleAction(action: string, id?: string) {
       ui.inert = false;
       persist();
       renderPrologue();
+    }
+    return;
+  }
+  if (action === 'refresh-game') {
+    if (!document.querySelector('[data-action=refresh-game]')) return;
+    if (persist()) location.reload();
+    else {
+      const note = document.querySelector('[data-resource-message]');
+      if (note) note.textContent = '进度尚未保存，请稍后再试。';
     }
     return;
   }

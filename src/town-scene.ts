@@ -1,3 +1,4 @@
+import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import { assetUrl } from './asset-url.ts';
 import type { CultivationPath } from './data.ts';
@@ -213,7 +214,7 @@ export class TownScene {
               resolve();
             };
             img.onerror = (error) => {
-              resourceFailed();
+              resourceFailed(true);
               reject(error);
             };
             img.src = assetUrl(name);
@@ -230,8 +231,11 @@ export class TownScene {
       })
       .catch(() => {
         if (this.events.signal.aborted) return;
-        host.querySelector('.town-loading')!.innerHTML =
-          '<div>街巷暂未准备好，游历已暂停。<br><button class="secondary-button" data-action="town-retry">重新加载</button></div>';
+        host.querySelector('.town-loading')!.innerHTML = resourceFailureContent(
+          'town-retry',
+          '街巷暂未准备好，游历已暂停。',
+          '重新加载',
+        );
       });
   }
   showArrival(text: string) {

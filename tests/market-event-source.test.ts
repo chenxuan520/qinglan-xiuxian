@@ -1,3 +1,4 @@
+import { resourceFailureContent } from '../src/resource-panel.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -75,6 +76,7 @@ function harness() {
     },
   };
   const context = createContext({
+    resourceFailureContent,
     save,
     inMarket: true,
     marketScene: { nearbyNpc: npcs[0] },

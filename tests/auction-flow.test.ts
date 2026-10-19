@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
-import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progress.ts';
+import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue, realmCost } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { prepareAuction, auctionSellReason } from '../src/auction.ts';
@@ -25,7 +25,13 @@ const flow = new Script(
       .join('\n'),
   ),
 );
-function harness(pending = false) {
+function harness(
+  pending = false,
+  options: {
+    setup?: (save: ReturnType<typeof freshSave>) => void;
+    selectLot?: (lot: ReturnType<typeof auctionLots>[number]) => boolean;
+  } = {},
+) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.runs = 1;
   save.cultivation = 1;
@@ -34,10 +40,12 @@ function harness(pending = false) {
   save.age = 30;
   save.stones = 10000;
   save.mortal.population = { seed: 12345, since: 15 };
+  options.setup?.(save);
   beginSectMarketVisit(save);
   prepareAuction(save);
-  const lot = auctionLots(save)[0];
-  save.medicine.bag[lot.id] = 6;
+  const lot = auctionLots(save).find(options.selectLot ?? (() => true));
+  assert.ok(lot, '测试会场必须实际生成所需拍品');
+  if (lot.kind === 'medicine') save.medicine.bag[lot.id] = 6;
   save.forge.nail = 1;
   const run = pending ? new Game(save, 0, 0, () => 0.5) : null;
   run?.pause();
@@ -149,8 +157,8 @@ function harness(pending = false) {
     messages,
     action: (a: string, id?: string) => context.handleAction(a, id),
     stored: () => JSON.parse(stored),
-    fail: () => {
-      fail = true;
+    fail: (value = true) => {
+      fail = value;
     },
     stale: () => {
       stored = JSON.stringify({ ...save, stones: 8000 });
@@ -161,6 +169,21 @@ function harness(pending = false) {
       reserve = v.reserve ?? reserve;
     },
   };
+}
+function treasureHarness() {
+  const h = harness(false, {
+    setup(save) {
+      save.cultivation = Array.from({ length: 18 }, (_, i) => realmCost(i)).reduce(
+        (sum, cost) => sum + cost,
+        0,
+      );
+      save.stones = 1000000;
+    },
+    selectLot: (lot) => lot.kind === 'artifact' && lot.forgeLevel >= 5,
+  });
+  h.inputs({ budget: String(h.save.stones) });
+  assert.equal(auctionBuyReason(h.save, h.lot.index, h.save.mortal.sectMarket!.visit), '');
+  return h;
 }
 test('真实竞拍路由原子写档、半岁一次、闭拍防重入、子区保留滚动位置', () => {
   const h = harness();
@@ -186,6 +209,56 @@ test('真实竞拍保存失败及其他窗口写档不扣钱、扣龄或收入�
     assert.ok(h.messages.length || h.context.saveLock);
     assert.equal(h.note.hidden, true);
   }
+});
+test('高阶法宝真实竞拍同时保存慧眼识珍，使用结拍年龄且重复点击不重复记年表', () => {
+  const h = treasureHarness();
+  const age = h.save.age;
+  h.action('auction-buy', String(h.lot.index));
+  assert.match(h.note.textContent, /竞得/);
+  assert.equal(h.save.chronicle.milestones['auction-treasure'], age + 0.5);
+  assert.equal(h.save.mortal.auction!.history[0].age, age + 0.5);
+  assert.equal(h.save.forge[h.lot.id], h.lot.forgeLevel);
+  assert.ok(h.save.artifacts.includes(h.lot.id));
+  assert.deepEqual(h.stored().chronicle, h.save.chronicle);
+  assert.deepEqual(h.stored().artifacts, h.save.artifacts);
+  assert.deepEqual(h.stored().forge, h.save.forge);
+  assert.equal(h.stored().stones, h.save.stones);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '慧眼识珍').length, 1);
+  const before = JSON.stringify(h.save),
+    stored = h.stored();
+  h.action('auction-buy', String(h.lot.index));
+  assert.equal(JSON.stringify(h.save), before);
+  assert.deepEqual(h.stored(), stored);
+});
+test('高阶竞拍保存失败连同成就回滚，恢复存储后原按钮可成功重试', () => {
+  const h = treasureHarness();
+  const before = structuredClone(h.save),
+    stored = h.stored();
+  h.fail();
+  h.action('auction-buy', String(h.lot.index));
+  assert.deepEqual(h.save, before);
+  assert.deepEqual(h.stored(), stored);
+  assert.equal(Object.hasOwn(h.save.chronicle.milestones, 'auction-treasure'), false);
+  assert.match(h.messages.at(-1)!, /拍卖未完成/);
+  h.fail(false);
+  h.action('auction-buy', String(h.lot.index));
+  assert.equal(h.save.chronicle.milestones['auction-treasure'], before.age + 0.5);
+  assert.deepEqual(h.stored().chronicle, h.save.chronicle);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '慧眼识珍').length, 1);
+});
+test('高阶竞拍跨窗口冲突不产生幽灵成就，也不覆盖另一窗口的存档', () => {
+  const h = treasureHarness();
+  const before = structuredClone(h.save);
+  h.stale();
+  const external = h.stored();
+  h.action('auction-buy', String(h.lot.index));
+  assert.equal(h.context.saveLock, 'stale');
+  assert.deepEqual(h.save, before);
+  assert.deepEqual(h.stored(), external);
+  assert.equal(Object.hasOwn(h.save.chronicle.milestones, 'auction-treasure'), false);
+  h.action('auction-buy', String(h.lot.index));
+  assert.deepEqual(h.save, before);
+  assert.deepEqual(h.stored(), external);
 });
 test('真实出售保存失败保留法宝，成功清炼器并保存标记及半岁', () => {
   for (const fail of [true, false]) {

@@ -1,3 +1,4 @@
+import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import type { SaveData } from './progress.ts';
 import type * as Chat from './npc-chat.ts';
@@ -37,7 +38,7 @@ export class NpcChatSource {
       });
       chat = await this.pending;
     } catch {
-      resourceFailed();
+      resourceFailed(true);
       if (epoch === this.epoch && host.isConnected) failure();
       return;
     }
@@ -60,17 +61,16 @@ export function closeNpcChat() {
 }
 function retry(host: HTMLElement, again: () => void) {
   const original = host.innerHTML;
-  const note = document.createElement('p');
-  note.className = 'panel-note';
-  note.textContent = '闲谈暂时无法载入，交易与其他互动仍可正常使用。';
-  const button = document.createElement('button');
-  button.className = 'secondary-button';
-  button.textContent = '重试闲谈';
+  host.innerHTML = resourceFailureContent(
+    '',
+    '闲谈暂时无法载入，交易与其他互动仍可正常使用。',
+    '重试闲谈',
+  );
+  const button = host.querySelector<HTMLButtonElement>('[data-resource-retry]')!;
   button.onclick = () => {
     host.innerHTML = original;
     again();
   };
-  host.replaceChildren(note, button);
 }
 export function mountNpcChat(...args: Parameters<typeof Chat.mountNpcChat>) {
   const [host] = args;

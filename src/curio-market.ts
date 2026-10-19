@@ -3,7 +3,7 @@ import { syncTribulationClock, type SaveData } from './progress.ts';
 import { advanceMortal } from './mortal.ts';
 import { serviceDues, serviceReason } from './service-preflight.ts';
 import { venueCooldown, venueRealm, venueStamp } from './market-venues.ts';
-import { recordChronicle } from './chronicle.ts';
+import { recordChronicle, recordCurioAchievement } from './chronicle.ts';
 
 export function curioSeekingQuote(save: SaveData, id: string, sect = false, unfinished = false) {
   const progress = isCurio(id) ? (save.curios.seeking[id] ?? 0) : 0;
@@ -46,7 +46,7 @@ export function seekCurio(
   save.stones -= q.price;
   advanceMortal(save, q.years * 60);
   if (Math.abs(save.age - age - q.years) > 1e-7) return undefined;
-  if (q.progress === 2) grantCurio(save, id);
+  if (q.progress === 2 && grantCurio(save, id)) recordCurioAchievement(save);
   save.curios.seeking[id] = q.progress + 1;
   save.curios.soughtAt = save.age;
   const state = (save.mortal.marketVenues ??= { workAt: null, favorAt: null, receipts: [] });

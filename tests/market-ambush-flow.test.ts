@@ -19,6 +19,7 @@ import { marketAmbushPanel } from '../src/town-host.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { FINAL_TRIAL_STAGE, MAX_REVIVES } from '../src/data.ts';
 import { startAdWatch } from '../src/scene-flow.ts';
+import { resourceFailureContent } from '../src/resource-panel.ts';
 
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = readFileSync(new URL('../src/market-ambush-flow.ts', import.meta.url), 'utf8');
@@ -112,6 +113,7 @@ function harness(data = fixture()) {
   }
   const noop = () => {};
   const context = createContext({
+    resourceFailureContent,
     save: data,
     saveLock: null,
     lastSaveText: stored,

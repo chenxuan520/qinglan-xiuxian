@@ -307,6 +307,79 @@ test('更新刷新不绕过结算与存档锁定，原故障刷新仍可使用',
   assert.equal(writes.length, 0);
 });
 
+function inlineRefreshHarness() {
+  const h = harness({ stored: null });
+  const note = { textContent: '' };
+  const button = {};
+  h.context.document = {
+    querySelector: (selector: string) =>
+      selector === '[data-action=refresh-game]'
+        ? button
+        : selector === '[data-resource-message]'
+          ? note
+          : null,
+  };
+  return { ...h, note, refresh: () => h.context.handleAction('refresh-game') };
+}
+
+test('原面板刷新保存真实待续对局，写入失败原地显示，恢复后才离场', () => {
+  const { context, storage, note, refresh } = inlineRefreshHarness();
+  const game = new Game(context.save, 0, 0, () => 0.5);
+  game.time = 42;
+  game.pause();
+  context.pendingRun = game;
+  context.save.stones = 4321;
+  const setItem = storage.setItem;
+  storage.setItem = () => {
+    throw Error('QuotaExceededError');
+  };
+  refresh();
+  assert.equal(context.reloads, 0);
+  assert.equal(storage.getItem(SAVE_KEY), null);
+  assert.match(note.textContent, /尚未保存/);
+  storage.setItem = setItem;
+  refresh();
+  assert.equal(context.reloads, 1);
+  const saved = readSave(storage.getItem(SAVE_KEY));
+  assert.equal(saved.save.stones, 4321);
+  const activeRun = JSON.parse(storage.getItem(SAVE_KEY)!).activeRun;
+  const restored = restoreSavedRun(saved.save, activeRun);
+  assert.ok(restored);
+  assert.equal(restored.time, 42);
+});
+
+test('原面板刷新不能绕过存档锁、结算重试或未结胜局；陈旧页面不覆盖新档', () => {
+  for (const setup of [
+    { saveLock: 'newer' },
+    { saveLock: 'unreadable' },
+    { saveLock: 'stale' },
+    { settlementRetryAt: 10 },
+    { game: { state: 'won' }, settled: false },
+  ]) {
+    const { context, writes, refresh } = inlineRefreshHarness();
+    Object.assign(context, setup);
+    refresh();
+    assert.equal(context.reloads, 0);
+    assert.equal(writes.length, 0);
+  }
+  const { context, storage, writes, refresh } = inlineRefreshHarness();
+  const other = JSON.stringify({ ...freshSave(), stones: 99 });
+  storage.data.set(SAVE_KEY, other);
+  refresh();
+  assert.equal(context.reloads, 0);
+  assert.equal(context.saveLock, 'stale');
+  assert.equal(writes.length, 0);
+  assert.equal(storage.getItem(SAVE_KEY), other);
+});
+
+test('失败面板关闭后残留的刷新动作不能保存或刷新', () => {
+  const { context, writes, refresh } = inlineRefreshHarness();
+  context.document.querySelector = () => null;
+  refresh();
+  assert.equal(context.reloads, 0);
+  assert.equal(writes.length, 0);
+});
+
 test('main.ts 所有存档写入都经过 writeSave，启动与多窗口入口接入锁定', () => {
   assert.equal(source.match(/localStorage\.setItem\(/g)?.length, 1);
   assert.match(

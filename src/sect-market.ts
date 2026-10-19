@@ -149,6 +149,11 @@ export function exchangeSectMedicine(
   save.mortal.events.unshift(`${save.age.toFixed(1)} 岁 · ${text}`);
   save.mortal.events.splice(6);
   recordChronicle(save, '同道互通', text);
+  if (
+    deal.give.some((item) => item.kind === 'artifact') &&
+    deal.give.some((item) => item.kind === 'medicine')
+  )
+    recordChronicle(save, '以物结缘', text, 'mixed-exchange');
   return true;
 }
 export function moveInSectMarket(position: TownPoint, input: TownPoint, seconds: number) {

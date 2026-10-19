@@ -2,6 +2,7 @@ import { MAX_FORGE_LEVEL, TREASURES } from './data.ts';
 import { isCurio, curioName, grantCurio } from './curio-data.ts';
 import { medicineInfo } from './medicine-data.ts';
 import type { SaveData } from './progress.ts';
+import { recordCurioAchievement } from './chronicle.ts';
 
 export type DebugResourceKind = 'stones' | 'iron' | 'artifact' | 'medicine' | 'curio';
 export interface DebugGrant {
@@ -51,6 +52,7 @@ export function debugGrant(save: SaveData, input: DebugGrant) {
     const id = input.id;
     if (!isCurio(id) || input.quantity !== 1 || !grantCurio(next, id))
       return { error: '每件奇物本世仅可获得一次，数量须为一件。' };
+    recordCurioAchievement(next);
     message = `${curioName(id)}已收入行囊 · 持有即生效`;
   } else return { error: '请选择发放类别。' };
   return { next, message };

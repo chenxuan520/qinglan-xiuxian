@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
-import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progress.ts';
+import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue, realmCost } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { freshTownPopulation } from '../src/town-population.ts';
 import { marketCultivators, isMarketCultivatorId } from '../src/sect-market-data.ts';
@@ -43,7 +43,13 @@ const flow = new Script(
       .join('\n'),
   ),
 );
-function harness(pending = false) {
+function harness(
+  pending = false,
+  options: {
+    setup?: (save: ReturnType<typeof freshSave>) => void;
+    category?: 'medicine' | 'mixed';
+  } = {},
+) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.runs = 1;
   save.cultivation = 1;
@@ -51,12 +57,22 @@ function harness(pending = false) {
   save.mortal.hometown!.stage = 'departed';
   save.medicine.recipeSeed = 12345;
   save.mortal.population = { seed: 12345, since: 15 };
+  options.setup?.(save);
   enterNextMarketBatch(save);
   const npc = marketCultivators(save.mortal.population, save.mortal.sectMarket!)[1];
   const offer = sectMarketOffer(save, npc.id)!;
-  const deal = sectMarketDeals(save, npc.id).find((d) => d.category === 'medicine')!;
-  const give = medicineInfo(deal.give[0].id)!;
-  save.medicine.bag[give.id] = deal.give[0].quantity * 2;
+  const deal = sectMarketDeals(save, npc.id).find(
+    (d) => d.category === (options.category ?? 'medicine'),
+  );
+  assert.ok(deal, '测试修士必须实际提供所需互换报价');
+  const give = medicineInfo(deal.give.find((item) => item.kind === 'medicine')!.id)!;
+  for (const item of deal.give) {
+    if (item.kind === 'medicine') save.medicine.bag[item.id] = item.quantity * 2;
+    else {
+      if (!save.artifacts.includes(item.id)) save.artifacts.push(item.id);
+      save.forge[item.id] = item.forgeLevel;
+    }
+  }
   const game = pending ? new Game(save, 0, 0, () => 0.5) : null;
   game?.pause();
   let stored = JSON.stringify({ ...save, activeRun: game?.snapshot() ?? null });
@@ -159,6 +175,27 @@ function harness(pending = false) {
     },
   };
 }
+function mixedHarness() {
+  const h = harness(false, {
+    category: 'mixed',
+    setup(save) {
+      save.age = 30;
+      save.cultivation = Array.from({ length: 18 }, (_, i) => realmCost(i)).reduce(
+        (sum, cost) => sum + cost,
+        0,
+      );
+    },
+  });
+  assert.deepEqual(
+    h.deal.give.map((item) => item.kind),
+    ['artifact', 'medicine'],
+  );
+  assert.equal(
+    sectMarketExchangeReason(h.save, h.npc.id, h.deal.id, h.save.mortal.sectMarket!.visit),
+    '',
+  );
+  return h;
+}
 test('实际按钮 visit 属性经真实路由完成组合互换，额度/物资一次保存且保留原续局', () => {
   for (const pending of [false, true]) {
     const h = harness(pending);
@@ -204,6 +241,61 @@ test('多窗口写档后锁住旧页，保留新存档，旧页不扣药', () =>
   const external = h.stored;
   h.context.handleAction('sect-market-exchange', h.npc.id);
   assert.equal(h.context.saveLock, 'stale');
+  assert.deepEqual(h.save, before);
+  assert.equal(h.stored, external);
+});
+test('真实法宝配丹药互换保存以物结缘与成交年龄，重复点击不重复扣物或记年表', () => {
+  const h = mixedHarness();
+  const before = structuredClone(h.save);
+  h.context.handleAction('sect-market-exchange', h.npc.id);
+  const artifact = h.deal.give.find((item) => item.kind === 'artifact')!;
+  const medicine = h.deal.give.find((item) => item.kind === 'medicine')!;
+  assert.ok(!h.save.artifacts.includes(artifact.id));
+  assert.equal(
+    h.save.medicine.bag[medicine.id],
+    before.medicine.bag[medicine.id] - medicine.quantity,
+  );
+  assert.equal(h.save.medicine.bag[h.offer.id], h.deal.receive.quantity);
+  assert.equal(h.save.age, before.age);
+  assert.equal(h.save.chronicle.milestones['mixed-exchange'], before.age);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '以物结缘').length, 1);
+  assert.deepEqual(JSON.parse(h.stored).chronicle, h.save.chronicle);
+  assert.deepEqual(JSON.parse(h.stored).artifacts, h.save.artifacts);
+  assert.deepEqual(JSON.parse(h.stored).medicine.bag, h.save.medicine.bag);
+  assert.deepEqual(JSON.parse(h.stored).mortal.sectMarket.exchanged, [h.npc.id]);
+  const settled = structuredClone(h.save),
+    stored = h.stored;
+  h.context.handleAction('sect-market-exchange', h.npc.id);
+  assert.deepEqual(h.save, settled);
+  assert.equal(h.stored, stored);
+});
+test('真实混合互换保存失败不发成就、不移走法宝丹药，恢复后原报价可重试', () => {
+  const h = mixedHarness();
+  const before = structuredClone(h.save),
+    stored = h.stored;
+  h.block();
+  h.context.handleAction('sect-market-exchange', h.npc.id);
+  assert.deepEqual(h.save, before);
+  assert.equal(h.stored, stored);
+  assert.equal(Object.hasOwn(h.save.chronicle.milestones, 'mixed-exchange'), false);
+  assert.match(h.messages.at(-1)!, /互换未完成/);
+  h.block(false);
+  h.context.handleAction('sect-market-exchange', h.npc.id);
+  assert.equal(h.save.chronicle.milestones['mixed-exchange'], before.age);
+  assert.deepEqual(JSON.parse(h.stored).chronicle, h.save.chronicle);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '以物结缘').length, 1);
+});
+test('真实混合互换跨窗口冲突连同成就回滚，并保留另一窗口的最新存档', () => {
+  const h = mixedHarness();
+  const before = structuredClone(h.save);
+  h.external();
+  const external = h.stored;
+  h.context.handleAction('sect-market-exchange', h.npc.id);
+  assert.equal(h.context.saveLock, 'stale');
+  assert.deepEqual(h.save, before);
+  assert.equal(h.stored, external);
+  assert.equal(Object.hasOwn(h.save.chronicle.milestones, 'mixed-exchange'), false);
+  h.context.handleAction('sect-market-exchange', h.npc.id);
   assert.deepEqual(h.save, before);
   assert.equal(h.stored, external);
 });

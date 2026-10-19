@@ -1,5 +1,8 @@
 // 各类资源失败共用同一信号；保留原来的异常、重试和离线回退。
-export const resourceFailed = () => globalThis.dispatchEvent?.(new Event('vite:preloadError'));
+export const resourceFailed = (handled = false) =>
+  globalThis.dispatchEvent?.(
+    Object.assign(new Event('vite:preloadError'), { handledResourceFailure: handled }),
+  );
 
 export function createUpdateCheck(
   build: string,
