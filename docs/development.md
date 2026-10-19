@@ -77,6 +77,24 @@ curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnos
 - `size:check` 同源链路执行：独立目录 `artifacts/size-check` 以根路径构建后按 `index.html` 引用定位入口 JS/CSS，校验原始与 gzip 字节（JS ≤ 560,000 / gzip ≤ 210,000，CSS ≤ 150,000 / gzip ≤ 35,000；2026-10 基线 451,039 / 169,642 / 125,815 / 27,266）。防止依赖或素材误打进产物。入口 JS 预算在 2026-10-14 由 550,000 调到 560,000，用来容纳主界面控制器拆分后的函数边界。
 - `perf:render` 每天与手动 full 一起跑（`perf-render` job，不卡门禁）：无头 Chrome（CI 的 ubuntu-latest 自带 google-chrome，本地用 `CHROME_PATH` 指定）加载根路径独立构建，写入一份自动生成的「第六境后期满配」可恢复存档（`perfSaveFixture()` 用真实 `Game` 模拟 10 秒后快照），恢复历练后采样 60 秒 rAF 帧间隔与长任务，输出 `artifacts/perf-render/report.json`、`summary.md`，仅保留数值报告，不生成或保存截图。无头软渲染远低于真机帧率，数据仅作日报观测，不设门槛，不与真实设备比较；浏览器或页面流程出错才非零退出。不引入任何新依赖：直接用 Node 22 内置 WebSocket 走 Chrome DevTools Protocol 驱动浏览器（`scripts/perf-render.ts` 自带极简 CDP 客户端），避免浏览器驱动库拖入安装链。使用独立临时浏览器目录并在退出后清理，采样视口固定为 1365×900，保持每日基线一致。
 
+## 隐藏物资调试
+
+在「关于」面板的版本号上，七秒内连续点击七次，打开物资调试。设置与首页没有调试菜单。可增加灵石、玄铁、指定法宝与炼器阶数、丹药和奇物；直接写入原来的 `qinglan-immortal-v1` 存档，关闭调试仍保留。法宝只进入收藏，不替换本命；丹药不自动服用；重复法宝保留较高炼器阶数。未完成历练、已落幕、待轮回或劫修遭遇期间禁止发放。成功发放后关闭本机匿名统计，避免调试进度混入普通游玩汇总。
+
+NPC Worker 提供 `GET /debug/access`，返回 `{ "enabled": true/false }`，沿用官网、GitHub Pages 与本机的来源校验，响应 `Cache-Control: no-store`。只有 `DEBUG_MODE_ENABLED` 明确为字符串 `true` 时开放；仓库配置默认 `false`，普通部署保持关闭。当前预发布测试需要时，可以显式开启：
+
+```bash
+npm run deploy:npc-ai -- --var DEBUG_MODE_ENABLED:true
+```
+
+关闭时执行：
+
+```bash
+npm run deploy:npc-ai -- --var DEBUG_MODE_ENABLED:false
+```
+
+开关只需发布 Worker，无需重新编译游戏；部署时应核对 `GET /debug/access` 的真实返回。进入面板和每次发放都重新核验，已打开面板不能沿用旧许可；断网、五秒超时、非成功状态或错误响应格式都拒绝。关闭面板或离开「关于」后，迟到响应不得打开面板或发放物资。发放先构造副本，存档写入成功后才应用；不添加独立调试存档或保存结构版本。此开关控制正常客户端的调试入口，不提供账号鉴权，也不改变本地存档可自行编辑的性质。
+
 ## 可选离线资源缓存
 
 首页右上角音量旁的齿轮打开设置，不占用修行菜单；自动历练复用原存档状态与操作，手机首页（窄屏或触屏，含横屏）隐藏快捷开关，电脑首页保留。设置内切换后更新同一面板，保留滚动、展开状态和焦点；手机自动全屏只在明确入场操作的点击调用栈内请求，不从资源加载回调或切回 App 的事件中重试，也不锁屏幕方向；窄屏只调整首页控制区排布，沿用按钮尺寸，不影响战斗栏。`src/settings-ui.ts` 渲染独立设置面板，声音控制复用现有音频实例、存档字段与 `data-volume` 事件；离线资源小节每次打开面板默认折叠，音量调整和缓存进度刷新保留当前展开状态。`src/offline.ts` 管理设置面板的缓存操作；只有点击「缓存所有离线资源」才注册 `public/offline-worker.js` 并获取全部资源。完成过缓存的浏览器重新打开时只检查既有缓存，不自动缓存新版本。缓存与 `qinglan-immortal-v1` 存档独立，清除缓存不读写存档。

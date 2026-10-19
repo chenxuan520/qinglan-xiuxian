@@ -100,3 +100,11 @@ export const MARKET_SOCIAL_SETTINGS = {
   opportunityInterval: 10,
   maxLoss: 80,
 };
+
+// 隐藏物资调试入口，准入与每次发放都以 Worker 的实时答复为准。
+export const DEBUG_SETTINGS = {
+  path: '/debug/access',
+  requestTimeoutMs: 5000,
+  taps: 7,
+  tapWindowMs: 7000,
+} as const;

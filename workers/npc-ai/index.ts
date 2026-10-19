@@ -22,6 +22,7 @@ import { MAX_REVIVES, REALMS } from '../../src/data.ts';
 import { guardDialogueReply as guardPerceptionReply } from './perception.ts';
 import {
   NPC_AI_SETTINGS,
+  DEBUG_SETTINGS,
   TEA_STORY_IMAGE_SETTINGS,
   TEA_STORY_SETTINGS,
   GAME_SITE_URL,
@@ -438,12 +439,21 @@ export default {
     if (!allowed && !(path === '/monitor/stats' && !origin))
       return new Response(null, { status: 403, headers });
     if (allowed) headers.set('Access-Control-Allow-Origin', origin);
-    headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    headers.set(
+      'Access-Control-Allow-Methods',
+      path === DEBUG_SETTINGS.path ? 'GET, OPTIONS' : 'POST, OPTIONS',
+    );
     headers.set('Access-Control-Allow-Headers', 'Content-Type');
     headers.set('Access-Control-Expose-Headers', 'Retry-After');
     headers.set('Access-Control-Max-Age', '86400');
     const json = (body: unknown, status = 200) => Response.json(body, { status, headers });
     if (path === '/monitor/stats') return monitorResponse(request, env, headers);
+    if (path === DEBUG_SETTINGS.path) {
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+      if (request.method !== 'GET') return json({ error: 'method' }, 405);
+      return json({ enabled: String(env.DEBUG_MODE_ENABLED) === 'true' });
+    }
+
     const ray = request.headers.get('CF-Ray') || '';
     const requestId = /^[a-f0-9]{16}(?:-[a-z]{3})?$/i.test(ray) ? ray : crypto.randomUUID();
     let mode =

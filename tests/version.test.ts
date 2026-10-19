@@ -12,5 +12,6 @@ test('构建注入 git describe 版本并展示在关于面板', () => {
   assert.match(config, /git describe --tags --always/);
   assert.match(config, /__QINGLAN_VERSION__/);
   const source = readFileSync(new URL('../src/scene-flow.ts', import.meta.url), 'utf8');
-  assert.match(source, /<span>版本<\/span>\$\{shell\.GAME_VERSION\}/);
+  assert.match(source, /<span>版本<\/span><button[^>]*data-action="debug-version"/);
+  assert.match(source, /\$\{shell\.GAME_VERSION\}<\/button>/);
 });

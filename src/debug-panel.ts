@@ -1,0 +1,154 @@
+import { MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { CURIOS } from './curio-info.ts';
+import { MEDICINES } from './medicine-data.ts';
+import { debugAccess } from './debug-access.ts';
+import { debugGrant, debugQuantityLimit } from './debug-resources.ts';
+import type { DebugResourceKind } from './debug-resources.ts';
+import type { SaveData } from './progress.ts';
+
+export interface DebugHost {
+  modal: HTMLElement;
+  endpoint: string;
+  getSave(): SaveData;
+  canOpen(): boolean;
+  active(): boolean;
+  blocked(): string;
+  show(body: string): void;
+  commit(next: SaveData): boolean;
+  toast(message: string): void;
+}
+const accessMessage = (result: string) =>
+  result === 'disabled' ? '服务端当前未开放调试。' : '暂时无法确认调试权限，请联网后重试。';
+
+export async function openDebugPanel(host: DebugHost, current: () => boolean) {
+  const allowed = await debugAccess(host.endpoint);
+  if (!current()) return;
+  if (allowed !== 'enabled') {
+    host.toast(accessMessage(allowed));
+    return;
+  }
+  host.show(
+    `<div id="debug-tools"><p class="panel-note">物资直接保存到当前存档，退出面板后保留。法宝收入收藏后自行选择本命，丹药收入丹囊后自行服用；奇物持有即生效。发放成功后关闭本机匿名统计。</p><form class="auction-seller"><fieldset style="border:0;padding:0;min-width:0"><label>发放类别<select name="kind" aria-label="发放类别">${[
+      ['stones', '灵石'],
+      ['iron', '玄铁'],
+      ['artifact', '法宝'],
+      ['medicine', '丹药'],
+      ['curio', '奇物'],
+    ]
+      .map(([id, name]) => `<option value="${id}">${name}</option>`)
+      .join(
+        '',
+      )}</select></label><div id="debug-fields"></div><p id="debug-stock" class="panel-note"></p><button class="primary-button" type="submit">发放到当前存档</button></fieldset></form><p id="debug-status" class="panel-note" role="status"></p></div>`,
+  );
+  const root = host.modal.querySelector<HTMLElement>('#debug-tools')!;
+  const form = root.querySelector<HTMLFormElement>('form')!;
+  const fieldset = root.querySelector<HTMLFieldSetElement>('fieldset')!;
+  const kind = form.elements.namedItem('kind') as HTMLSelectElement;
+  const fields = root.querySelector<HTMLElement>('#debug-fields')!;
+  const status = root.querySelector<HTMLElement>('#debug-status')!;
+  const submit = root.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+  let busy = false;
+  const active = () => root.isConnected && host.active();
+  const stock = () => {
+    const s = host.getSave();
+    const id = (form.elements.namedItem('id') as HTMLSelectElement | null)?.value ?? '';
+    const amount =
+      kind.value === 'stones'
+        ? s.stones
+        : kind.value === 'iron'
+          ? s.iron
+          : kind.value === 'medicine'
+            ? s.medicine.bag[id] || 0
+            : kind.value === 'curio'
+              ? s.curios.bag[id as keyof typeof s.curios.bag] || 0
+              : s.artifacts.includes(id)
+                ? s.forge[id] || 0
+                : null;
+    root.querySelector('#debug-stock')!.textContent =
+      kind.value === 'artifact'
+        ? amount === null
+          ? '尚未收藏'
+          : `已收藏 · 当前炼器${amount}阶；发放不会降低已有阶数。`
+        : `当前持有 ${amount?.toLocaleString('zh-CN')}`;
+  };
+  const renderFields = () => {
+    status.textContent = '';
+    const type = kind.value as DebugResourceKind;
+    const items =
+      type === 'artifact'
+        ? TREASURES
+        : type === 'medicine'
+          ? MEDICINES
+          : type === 'curio'
+            ? CURIOS
+            : null;
+    fields.innerHTML = `${items ? `<label>选择物品<select name="id" aria-label="选择物品">${items.map((item) => `<option value="${item.id}">${item.name}</option>`).join('')}</select></label>` : ''}${type === 'artifact' ? `<label>炼器阶数<input type="number" name="forge" aria-label="炼器阶数" min="0" max="${MAX_FORGE_LEVEL}" step="1" value="0"></label>` : `<label>数量<input type="number" name="quantity" aria-label="发放数量" min="1" max="${debugQuantityLimit(type)}" step="1" value="${type === 'stones' || type === 'iron' ? 1000 : 1}"></label>`}`;
+    fields.querySelector('select')?.addEventListener('change', () => {
+      status.textContent = '';
+      stock();
+    });
+    stock();
+  };
+  kind.onchange = renderFields;
+  renderFields();
+  const blocked = host.blocked();
+  if (blocked) {
+    fieldset.disabled = true;
+    status.textContent = blocked;
+  }
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    if (busy || !active()) return;
+    const blocked = host.blocked();
+    if (blocked) {
+      status.textContent = blocked;
+      return;
+    }
+    const input = new FormData(form);
+    const grant = {
+      kind: String(input.get('kind')),
+      id: String(input.get('id') ?? ''),
+      quantity: Number(input.get('quantity')),
+      forge: Number(input.get('forge')),
+    };
+    busy = true;
+    fieldset.disabled = true;
+    submit.textContent = '正在核验…';
+    status.textContent = '';
+    void (async () => {
+      try {
+        const allowed = await debugAccess(host.endpoint);
+        if (!active()) return;
+        if (allowed !== 'enabled') {
+          status.textContent = `${accessMessage(allowed)} 未发放物资。`;
+          return;
+        }
+        const blocked = host.blocked();
+        if (blocked) {
+          status.textContent = blocked;
+          return;
+        }
+        const result = debugGrant(host.getSave(), grant);
+        if ('error' in result) {
+          status.textContent = result.error!;
+          return;
+        }
+        if (!host.commit(result.next)) {
+          if (active()) status.textContent = '保存未成功，本次未发放，请重试。';
+          return;
+        }
+        if (!active()) return;
+        status.textContent = `${result.message} · 已保存`;
+        stock();
+      } catch {
+        if (active()) status.textContent = '本次未能发放，请重试。';
+      } finally {
+        busy = false;
+        if (active()) {
+          fieldset.disabled = !!host.blocked();
+          submit.textContent = '发放到当前存档';
+        }
+      }
+    })();
+  };
+}

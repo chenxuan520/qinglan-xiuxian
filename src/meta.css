@@ -489,3 +489,13 @@
     gap: 7px;
   }
 }
+
+.about-version {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  text-align: left;
+}

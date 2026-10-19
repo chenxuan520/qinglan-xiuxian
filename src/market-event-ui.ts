@@ -11,3 +11,5 @@ export { renderSectService, sectServiceAction } from './sect-service-flow.ts';
 export { catalogPanel } from './catalog-ui.ts';
 
 export { auctionContent, auctionResult } from './auction-ui.ts';
+
+export { openDebugPanel } from './debug-panel.ts';

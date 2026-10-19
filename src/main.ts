@@ -52,6 +52,7 @@ import {
 import { computeManualInput, trapModalTab } from './input-controller.ts';
 import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
+import { DebugEntry } from './debug-entry.ts';
 
 import './styles.ts';
 import './battle-hud.css';
@@ -458,6 +459,41 @@ const medicinePanel = new MedicinePanel(save, modal, {
   },
   toast,
 });
+
+const debugEntry = new DebugEntry(
+  {
+    modal,
+    endpoint: NPC_AI_BASE,
+    getSave: () => save,
+    canOpen: () => panel === 'about' && !game && !saveLock,
+    active: () => panel === 'debug' && !game && !saveLock,
+    blocked: () =>
+      saveLock
+        ? '当前存档已停止写入。'
+        : game || pendingRun
+          ? '请先结束未完成的历练，再发放物资。'
+          : save.journeyEnded || save.pendingReincarnation || save.mortal.marketSocial?.ambush
+            ? '请先处理当前仙途。'
+            : '',
+    show: (body) => {
+      panel = 'debug';
+      panelFrame('调试物资', '开发调试 · 当前存档', body);
+    },
+    commit: (next) => {
+      try {
+        writeSave(next, pendingRun);
+      } catch {
+        return false;
+      }
+      Object.assign(save, next);
+      telemetry.setEnabled(false);
+      renderLobby();
+      return true;
+    },
+    toast,
+  },
+  () => marketEventSource.load(),
+);
 
 function renderLobby(returnYears?: number) {
   if (save.pendingReincarnation) {
@@ -1583,6 +1619,10 @@ function handleAction(action: string, id?: string) {
       persist();
       renderPrologue();
     }
+    return;
+  }
+  if (action === 'debug-version') {
+    void debugEntry.tap(modal.querySelector('[data-action=debug-version]'));
     return;
   }
   if (action === 'guide-tour' && panel === 'guide') {
