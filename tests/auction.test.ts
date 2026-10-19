@@ -3,6 +3,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   freshSave,
+  IMMORTAL_CULTIVATION,
+  forge,
+  forgeCost,
   readSave,
   SAVE_SCHEMA,
   alignStarterWithPath,
@@ -10,6 +13,7 @@ import {
   claimArtifacts,
 } from '../src/progress.ts';
 import { prepareAuction, auctionValue, auctionFee, auctionSellReason } from '../src/auction.ts';
+import { ironMarket, ironTradeQuote } from '../src/iron-market.ts';
 import { auctionLots, buyAuction, sellAuction, auctionBuyReason } from '../src/auction-trade.ts';
 import {
   AUCTION_LOTS,
@@ -260,6 +264,143 @@ test('拍卖购买后立即转卖不会获利', () => {
     }
   }
 });
+
+test('普通寄售实际出价提高到八折至原估值，净回款与保存一致，小额取整不虚报', () => {
+  let overOldMaximum = 0;
+  for (let seed = 1; seed <= 64; seed++) {
+    for (const item of [
+      ...MEDICINES.map(
+        (m): AuctionItem => ({ kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 }),
+      ),
+      ...TREASURES.filter((t) => t.id !== 'sword').map(
+        (t): AuctionItem => ({ kind: 'artifact', id: t.id, quantity: 1, forgeLevel: 2 }),
+      ),
+    ]) {
+      const save = fixture(seed);
+      save.cultivation = IMMORTAL_CULTIVATION;
+      save.completed = [0, 1, 2, 3, 4, 5, 6];
+      enterNextMarketBatch(save);
+      prepareAuction(save);
+      save.mortal.auction!.hall = 2;
+      if (item.kind === 'medicine') save.medicine.bag[item.id] = 1;
+      else {
+        if (!save.artifacts.includes(item.id)) save.artifacts.push(item.id);
+        save.forge[item.id] = 2;
+      }
+      const value = auctionValue(item);
+      const before = save.stones;
+      const r = sellAuction(save, item, 1, save.mortal.sectMarket!.visit)!;
+      assert.equal(r.outcome, 'sold', item.id);
+      assert.ok(r.price >= Math.floor(value * 0.8) && r.price <= value, item.id);
+      assert.equal(r.fee, Math.ceil(r.price * 0.1));
+      assert.equal(save.stones - before, r.price - r.fee);
+      assert.ok(r.price - r.fee <= Math.floor(value * 0.9));
+      if (r.price > value * 0.8) overOldMaximum++;
+      const restored = importSave(exportSave(save, null)).save;
+      assert.equal(restored.stones, save.stones);
+      assert.deepEqual(restored.mortal.auction!.history[0], r);
+    }
+  }
+  assert.ok(overOldMaximum > 100, '必须通过真实报价超过旧八折上限，不能只改估价文案');
+});
+
+test('三会场跨年换批买入再卖仍亏损，包含丹药、炼器法宝及玄铁', () => {
+  const counts = { medicine: 0, artifact: 0, iron: 0 };
+  for (const hall of [0, 1, 2] as const) {
+    for (let seed = 1; seed <= 32; seed++) {
+      const base = fixture(seed);
+      base.cultivation = IMMORTAL_CULTIVATION;
+      base.completed = [0, 1, 2, 3, 4, 5, 6];
+      base.stones = 1000000;
+      enterNextMarketBatch(base);
+      prepareAuction(base);
+      base.mortal.auction!.hall = hall;
+      for (const lot of auctionLots(base)) {
+        if (
+          lot.kind === 'curio' ||
+          lot.id === base.starter ||
+          auctionBuyReason(base, lot.index, base.mortal.sectMarket!.visit)
+        )
+          continue;
+        const boughtSave = structuredClone(base);
+        const b = buyAuction(
+          boughtSave,
+          lot.index,
+          boughtSave.stones,
+          boughtSave.mortal.sectMarket!.visit,
+        )!;
+        assert.equal(b.outcome, 'won');
+        for (const years of [0, 1, 10, 20]) {
+          const s = structuredClone(boughtSave);
+          s.age += years;
+          if (years) {
+            enterNextMarketBatch(s);
+            prepareAuction(s);
+            s.mortal.auction!.hall = hall;
+          }
+          const r = sellAuction(s, lot, 1, s.mortal.sectMarket!.visit)!;
+          assert.equal(r.outcome, 'sold');
+          assert.ok(r.price - r.fee < b.price + b.fee, `${hall}/${lot.kind}/${lot.id}/${years}`);
+          assert.ok(s.stones < base.stones);
+          counts[lot.kind]++;
+        }
+      }
+    }
+  }
+  for (const count of Object.values(counts)) assert.ok(count > 100, '各类别必须真正成交');
+});
+
+test('药铺及九折私下买物不能转售获利，现购玄铁炼器也不能借提高回收价刷钱', () => {
+  for (const m of MEDICINES) {
+    const value = medicineMarketValue(m.id);
+    const maxNet = value - auctionFee(value, true);
+    if (m.tier === '凡品') assert.ok(maxNet < m.price);
+    assert.ok(maxNet <= Math.max(15, Math.floor(value * 0.9)), `${m.id}私下转药价`);
+  }
+  for (let level = 0; level < MAX_FORGE_LEVEL; level++) {
+    for (const jade of [false, true]) {
+      const s = fixture();
+      if (jade) {
+        s.curios.bag['jade-book'] = 1;
+        s.curios.acquired.push('jade-book');
+      }
+      s.artifacts.push('fire');
+      s.forge.fire = level;
+      const beforeValue = auctionValue({
+        kind: 'artifact',
+        id: 'fire',
+        quantity: 1,
+        forgeLevel: level,
+      });
+      const cost = forgeCost(level, s);
+      // 最低玄铁买价25、50枚起九折，按可用最低单价核算，不拿免费掉落当买入成本。
+      s.iron = cost.iron;
+      const balance = s.stones;
+      assert.ok(forge(s, 'fire'));
+      const value = auctionValue({
+        kind: 'artifact',
+        id: 'fire',
+        quantity: 1,
+        forgeLevel: level + 1,
+      });
+      assert.ok(
+        value - beforeValue < balance - s.stones + cost.iron * 22.5,
+        `炼器${level + 1}/${jade}`,
+      );
+      assert.ok(value - auctionFee(value, true) <= Math.floor(value * 0.9));
+    }
+  }
+  for (let seed = 1; seed <= 32; seed++) {
+    const s = fixture(seed);
+    s.medicine.recipeSeed = seed;
+    for (const age of [15, 25, 35, 45, 55, 65]) {
+      s.age = age;
+      const buy = ironTradeQuote(s, true, 50).total / 50;
+      assert.ok(buy >= 22.5);
+      assert.ok(ironMarket(s).sell * 0.9 < 22.5, '任何周期拍卖净回款都低于最低批买价');
+    }
+  }
+});
 test('历史有界，导出导入保留交易与可续局快照；损坏拍卖仅正常读档丢弃字段、导入拒绝', () => {
   const save = fixture();
   const lot = auctionLots(save)[0];
@@ -286,6 +427,9 @@ test('视图预算、手续费、当前本命和续局保护可见，无固定�
   assert.match(auctionContent(save, 'buy', false), /最高预算（含手续费）/);
   assert.match(auctionContent(save, 'sell', false, 'artifact', 'sword'), /当前本命不可出售/);
   assert.match(auctionContent(save, 'buy', true), /请先结束未完成的历练/);
+  const free = auctionContent(save, 'sell', false, 'artifact', 'nail');
+  assert.match(free, /入门赠品未炼器，无人出价/);
+  assert.doesNotMatch(free, /单件收购报价/);
 });
 
 test('半年寿元、天劫与未完成事项阻断；供奉先预留，不能靠出售报酬透支', () => {

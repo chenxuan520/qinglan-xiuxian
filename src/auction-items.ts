@@ -21,7 +21,7 @@ export function auctionValue(item: AuctionItem, save?: SaveData) {
 }
 // 奇物估值计入整世使用收益，急售接盘价单独计算，避免重复掉落放大灵石产出。
 export function auctionSaleRates(item: AuctionItem): readonly [number, number] {
-  return item.kind === 'curio' ? [10, 15] : [60, 80];
+  return item.kind === 'curio' ? [10, 15] : [80, 100];
 }
 export function auctionItemName(item: AuctionItem) {
   return item.kind === 'iron'

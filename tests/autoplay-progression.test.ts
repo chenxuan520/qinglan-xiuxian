@@ -84,7 +84,7 @@ test('新法宝略偏向已有配方，覆盖正道、魔道、兼修全部合�
     for (const t of TREASURES.filter((t) => allowsSchool(path, t.school))) {
       const g = game(path);
       g.rerolls = 0;
-      g.save.starter = 'orbit'; // 消除仅青莲非本命首次选取的半分差距。
+      g.save.starter = 'orbit'; // 消除仅青莲非本命首次选取的排序差距。
       const other = TREASURES.find((candidate) => {
         if (
           candidate.id === t.id ||
@@ -140,6 +140,32 @@ test('配方加分有限，不为配方强选原本低排序法宝，也不奖�
     { type: 'weapon', id: 'lightning', level: 3 },
   ];
   assert.equal(pick(g).id, 'sword', '同分保留候选顺序，不额外加分');
+});
+
+test('青莲灯首次排序再后移，仍可选取且不影响已有升重与指定目标', () => {
+  const g = game();
+  own(g, ['sword'], 2);
+  g.passives = { area: 1 };
+  g.choices = [
+    { type: 'weapon', id: 'orbit', level: 1 },
+    { type: 'weapon', id: 'lightning', level: 1 },
+  ];
+  assert.equal(pick(g).id, 'lightning', '已有青莲配方也先选原优选法宝');
+  g.choices[1].id = 'arrow';
+  assert.equal(pick(g).id, 'orbit', '青莲灯仍可优于其他普通选项');
+  own(g, ['sword', 'orbit', 'fire'], 2);
+  g.choices = [
+    { type: 'weapon', id: 'orbit', level: 3 },
+    { type: 'weapon', id: 'fire', level: 3 },
+  ];
+  assert.equal(pick(g).id, 'orbit', '已有青莲升重不降权');
+  own(g, ['sword'], 2);
+  g.save.autoplayBuild = { mode: 'custom', targets: ['orbit', ''] };
+  g.choices = [
+    { type: 'weapon', id: 'lightning', level: 1 },
+    { type: 'weapon', id: 'orbit', level: 1 },
+  ];
+  assert.equal(pick(g).id, 'orbit', '明确指定青莲时仍优先培养');
 });
 
 test('全满补新仍遵守指定目标与前半程预留末格，后半程不空等', () => {

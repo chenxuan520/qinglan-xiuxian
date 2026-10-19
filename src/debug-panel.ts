@@ -1,6 +1,6 @@
 import { MAX_FORGE_LEVEL, TREASURES } from './data.ts';
 import { CURIOS } from './curio-info.ts';
-import { acquiredCurio } from './curio-data.ts';
+import { acquiredCurio, isCurio } from './curio-data.ts';
 import { MEDICINES } from './medicine-data.ts';
 import { debugAccess } from './debug-access.ts';
 import { debugGrant, debugQuantityLimit } from './debug-resources.ts';
@@ -52,7 +52,8 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
   const active = () => root.isConnected && host.active();
   const stock = () => {
     const s = host.getSave();
-    const id = (form.elements.namedItem('id') as HTMLSelectElement | null)?.value ?? '';
+    const selection = form.elements.namedItem('id') as HTMLSelectElement | null;
+    const id = selection?.value ?? '';
     const amount =
       kind.value === 'stones'
         ? s.stones
@@ -71,6 +72,12 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
           ? '尚未收藏'
           : `已收藏 · 当前炼器${amount}阶；发放不会降低已有阶数。`
         : `当前持有 ${amount?.toLocaleString('zh-CN')}`;
+    const acquired = kind.value === 'curio' && isCurio(id) && acquiredCurio(s, id);
+    submit.disabled = kind.value === 'curio' && (!isCurio(id) || acquired);
+    if (!busy) submit.textContent = acquired ? '本世已获得' : '发放到当前存档';
+    if (kind.value === 'curio' && selection)
+      for (const option of selection.options)
+        option.disabled = isCurio(option.value) && acquiredCurio(s, option.value);
   };
   const renderFields = () => {
     status.textContent = '';
@@ -100,7 +107,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
   }
   form.onsubmit = (event) => {
     event.preventDefault();
-    if (busy || !active()) return;
+    if (busy || submit.disabled || !active()) return;
     const blocked = host.blocked();
     if (blocked) {
       status.textContent = blocked;
@@ -140,7 +147,6 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
           return;
         }
         if (!active()) return;
-        if (grant.kind === 'curio') renderFields();
         status.textContent = `${result.message} · 已保存`;
         stock();
       } catch {
@@ -149,7 +155,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
         busy = false;
         if (active()) {
           fieldset.disabled = !!host.blocked();
-          submit.textContent = '发放到当前存档';
+          stock();
         }
       }
     })();

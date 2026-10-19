@@ -34,6 +34,10 @@ import { MEDICINES } from '../src/medicine-data.ts';
 import { guideContent, GUIDE_TABS } from '../src/guide.ts';
 import { AUCTION_HALLS, AUCTION_IRON_MIN } from '../src/auction-data.ts';
 import { AUCTION_SETTINGS } from '../src/setting.ts';
+import { auctionSaleRates } from '../src/auction-items.ts';
+import { auctionContent } from '../src/auction-ui.ts';
+import { beginSectMarketVisit } from '../src/sect-market.ts';
+import { prepareAuction } from '../src/auction.ts';
 
 const gameplay = readFileSync(new URL('../docs/gameplay.md', import.meta.url), 'utf8');
 const medicine = readFileSync(new URL('../docs/medicine.md', import.meta.url), 'utf8');
@@ -249,6 +253,15 @@ test('拍卖资格与手续费、玄铁门槛对照实际会场配置', () => {
   const iron = gameplay.match(/委托至少(\d+)、至多9999枚/);
   assert.ok(iron);
   assert.equal(Number(iron[1]), AUCTION_IRON_MIN);
+  const rates = auctionSaleRates({ kind: 'medicine', id: 'huanglong', quantity: 1, forgeLevel: 0 });
+  assert.ok(gameplay.includes(`${rates[0]}%–${rates[1]}%`), '玩法说明的普通寄售价必须跟随实际规则');
+  const save = freshSave('heaven', ['metal']);
+  save.cultivation = 1;
+  save.mortal.population = { seed: 12345, since: 15 };
+  beginSectMarketVisit(save);
+  prepareAuction(save);
+  const sale = auctionContent(save, 'sell', false);
+  assert.ok(sale.includes(`${rates[0]}%–${rates[1]}%`), '出售说明必须跟随实际规则');
 });
 
 test('每一帮助分类都进入一致性检查，CI独立运行且不混入部署', () => {

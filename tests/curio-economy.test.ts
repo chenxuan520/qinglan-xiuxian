@@ -153,10 +153,10 @@ test('出售页预告奇物收购与到手范围，默认保留价可成交，�
   assert.deepEqual(auctionSaleRates(item('soul-wood')), [10, 15]);
   assert.deepEqual(
     auctionSaleRates({ kind: 'medicine', id: 'lingru', quantity: 1, forgeLevel: 0 }),
-    [60, 80],
+    [80, 100],
   );
   assert.deepEqual(
     auctionSaleRates({ kind: 'artifact', id: 'fire', quantity: 1, forgeLevel: 0 }),
-    [60, 80],
+    [80, 100],
   );
 });

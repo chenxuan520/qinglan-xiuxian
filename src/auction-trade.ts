@@ -158,6 +158,7 @@ function bids(
   const eligible = marketCultivators(save.mortal.population!, save.mortal.sectMarket!).filter(
     (n) => n.realmIndex >= AUCTION_HALLS[save.mortal.auction!.hall].minRealm,
   );
+  const [low, high] = selling ? auctionSaleRates(item) : [90, 125];
   if (!eligible.some((n) => n.id !== sellerId))
     return [
       {
@@ -165,9 +166,7 @@ function bids(
         price: Math.min(
           64000,
           Math.floor(
-            (value *
-              ((selling ? 60 : 90) + (roll(save, `commission:${item.id}`) % (selling ? 21 : 36)))) /
-              100,
+            (value * (low + (roll(save, `commission:${item.id}`) % (high - low + 1)))) / 100,
           ),
         ),
       },
@@ -176,12 +175,12 @@ function bids(
     .filter((npc) => npc.id !== sellerId)
     .map((npc) => {
       const ratio =
-        (selling ? 60 : 90) +
+        low +
         (roll(
           save,
           `${selling ? 'sell' : 'buy'}:${item.kind}:${item.id}:${item.forgeLevel}:${npc.id}`,
         ) %
-          (selling ? 21 : 36));
+          (high - low + 1));
       const compatible =
         item.kind !== 'medicine' ||
         (() => {

@@ -6,6 +6,7 @@ import { freshSave, readSave, IMMORTAL_CULTIVATION, type SaveData } from '../src
 import { Game } from '../src/game.ts';
 import { formatTime, TRIAL_BOSS_TIMES } from '../src/data.ts';
 import { TOUR_STEPS } from '../src/interface-tour-model.ts';
+import { CURIO_IDS } from '../src/curio-data.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
@@ -209,6 +210,93 @@ async function finishPage() {
   );
   await browser.call('close_page', { pageId });
   pageId = 0;
+}
+
+async function checkDebugCurios(name: string, viewport: string) {
+  await open(viewport, fixture());
+  await evaluate(`() => {
+    const original = window.fetch.bind(window);
+    window.debugAccessCalls = 0;
+    window.fetch = (...args) => {
+      if (String(args[0]).endsWith('/debug/access')) {
+        window.debugAccessCalls++;
+        return Promise.resolve(Response.json({enabled:true}));
+      }
+      return original(...args);
+    };
+    return true;
+  }`);
+  await click('[data-action=about]');
+  await click('[data-action=debug-version]');
+  for (let i = 1; i < 7; i++) await browser.call('press_key', { pageId, key: 'Enter' });
+  await wait('() => !!document.querySelector("#debug-tools")');
+  await evaluate(`() => {
+    const kind = document.querySelector('#debug-tools [name=kind]');
+    kind.value = 'curio';
+    kind.dispatchEvent(new Event('change', {bubbles:true}));
+    return true;
+  }`);
+  for (const id of CURIO_IDS) {
+    checkpoint = `${name}-debug-${id}`;
+    await evaluate(`() => {
+      const selection = document.querySelector('#debug-tools [name=id]');
+      selection.value = ${JSON.stringify(id)};
+      selection.dispatchEvent(new Event('change', {bubbles:true}));
+      return true;
+    }`);
+    assert.equal(
+      await evaluate('() => document.querySelector("#debug-tools button[type=submit]").disabled'),
+      false,
+      '选择尚未获得的奇物可以发放',
+    );
+    await click('#debug-tools button[type=submit]');
+    await wait(
+      `() => document.querySelector('#debug-status')?.textContent.includes('已保存') && !document.querySelector('#debug-tools fieldset').disabled`,
+    );
+    assert.deepEqual(
+      await evaluate(`() => ({
+        id: document.querySelector('#debug-tools [name=id]').value,
+        stock: document.querySelector('#debug-stock').textContent,
+        disabled: document.querySelector('#debug-tools button[type=submit]').disabled,
+        quantity: !!document.querySelector('#debug-tools [name=quantity]'),
+      })`),
+      { id, stock: '当前持有 1', disabled: true, quantity: false },
+      '发放后保留刚发放的奇物，显示一件并禁止再次发放',
+    );
+    const before = await saved();
+    assert.equal(before.curios.bag[id], 1);
+    const calls = await evaluate('() => window.debugAccessCalls');
+    await evaluate(`() => {
+      const form = document.querySelector('#debug-tools form');
+      for (let i=0; i<2; i++) form.dispatchEvent(new Event('submit', {bubbles:true,cancelable:true}));
+      return true;
+    }`);
+    assert.equal(await evaluate('() => window.debugAccessCalls'), calls);
+    assert.deepEqual(await saved(), before, '重复提交不请求权限、不重复发放');
+    await check(checkpoint);
+  }
+  await evaluate(`() => {
+    const kind = document.querySelector('#debug-tools [name=kind]');
+    kind.value = 'stones';
+    kind.dispatchEvent(new Event('change', {bubbles:true}));
+    return true;
+  }`);
+  assert.equal(
+    await evaluate('() => document.querySelector("#debug-tools button[type=submit]").disabled'),
+    false,
+    '切换到可重复领取的灵石后按钮恢复',
+  );
+  const stones = (await saved()).stones;
+  await click('#debug-tools button[type=submit]');
+  await wait(
+    `() => document.querySelector('#debug-status')?.textContent.includes('已保存') && !document.querySelector('#debug-tools fieldset').disabled`,
+  );
+  assert.equal((await saved()).stones, stones + 1000);
+  assert.equal(
+    await evaluate('() => document.querySelector("#debug-stock").textContent'),
+    `当前持有 ${(stones + 1000).toLocaleString('zh-CN')}`,
+  );
+  await finishPage();
 }
 
 async function catalogHeader() {
@@ -586,6 +674,7 @@ try {
       await check('rotate-portrait', true);
     }
     await finishPage();
+    await checkDebugCurios(name, viewport);
   }
   await writeFile(
     resolve(output, 'report.json'),

@@ -25,7 +25,7 @@ function choiceScore(c: Choice, g: Game) {
   if (c.type === 'weapon')
     return (
       (c.id === 'orbit' || favored.includes(c.id)
-        ? 15 - (c.id === 'orbit' && g.save.starter !== 'orbit' && c.level === 1 ? 0.5 : 0)
+        ? 15 - (c.id === 'orbit' && g.save.starter !== 'orbit' && c.level === 1 ? 2.5 : 0)
         : 10) +
       (c.level > 1 ? 8 : 2) +
       c.level +
