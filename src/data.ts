@@ -1491,6 +1491,11 @@ export const ENEMY_SKILLS = {
     hint: '蓄势扑击，短火痕留在行进路径',
     eliteHint: '扑击路径留下三段火痕，绕开回头路',
   },
+  thundercharge: {
+    name: '踏雷突袭',
+    hint: '沿扑击路线留下雷痕，侧移避开，触雷短暂雷麻',
+    eliteHint: '雷痕在扑击后生效，勿沿原路追击',
+  },
   firebolt: {
     name: '熔火飞弹',
     hint: '蓄势发射慢速火弹，横移避开',

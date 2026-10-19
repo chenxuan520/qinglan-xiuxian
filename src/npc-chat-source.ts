@@ -1,3 +1,4 @@
+import { resourceFailed } from './update-check.ts';
 import type { SaveData } from './progress.ts';
 import type * as Chat from './npc-chat.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
@@ -36,6 +37,7 @@ export class NpcChatSource {
       });
       chat = await this.pending;
     } catch {
+      resourceFailed();
       if (epoch === this.epoch && host.isConnected) failure();
       return;
     }

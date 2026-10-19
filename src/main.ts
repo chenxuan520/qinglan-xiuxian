@@ -1,7 +1,6 @@
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
-import { bestiaryPanel } from './bestiary-ui.ts';
 import { BattleHud } from './battle-hud.ts';
 import { JourneyCardPanel } from './journey-card-panel.ts';
 import { PanelHost, type PanelLocation } from './panel-host.ts';
@@ -53,6 +52,7 @@ import { computeManualInput, trapModalTab } from './input-controller.ts';
 import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
 import { DebugEntry } from './debug-entry.ts';
+import { createUpdateCheck } from './update-check.ts';
 
 import './styles.ts';
 import './battle-hud.css';
@@ -249,15 +249,21 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') telemetry.flush();
 });
 // 未捕获错误兜底：摘要去重限频上报，同时提示玩家刷新；提示独立于游戏界面，游戏卡死也能显示。
-function showRuntimeErrorNotice() {
-  if (document.querySelector('.runtime-error')) return;
+function showRuntimeErrorNotice(updated = false) {
+  const previous = document.querySelector('.runtime-error');
+  if (previous && !updated) return;
+  previous?.remove();
   const box = document.createElement('div');
   box.className = 'runtime-error';
   box.setAttribute('role', 'alert');
-  box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${ERROR_NOTICE_TEXT}</p>${ERROR_NOTICE_ACTIONS}`;
-  box
-    .querySelector('[data-error-action="refresh"]')
-    ?.addEventListener('click', () => location.reload());
+  box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${updated ? '游戏已更新，请刷新后继续。' : ERROR_NOTICE_TEXT}</p>${ERROR_NOTICE_ACTIONS}`;
+  box.querySelector('[data-error-action="refresh"]')?.addEventListener('click', () => {
+    if (updated && !persist()) {
+      box.querySelector('p')!.textContent = '进度尚未保存，请稍后再试。';
+      return;
+    }
+    location.reload();
+  });
   box.querySelector('[data-error-action="dismiss"]')?.addEventListener('click', () => box.remove());
   document.body.appendChild(box);
 }
@@ -267,8 +273,14 @@ createErrorWatch({
     telemetry.track(event);
     telemetry.flush();
   },
-  onError: showRuntimeErrorNotice,
+  onError: () => showRuntimeErrorNotice(),
 });
+const checkUpdate = createUpdateCheck(
+  __QINGLAN_BUILD_ID__,
+  new URL('offline-manifest.json', new URL(import.meta.env.BASE_URL, location.href)),
+  () => showRuntimeErrorNotice(true),
+);
+addEventListener('vite:preloadError', checkUpdate);
 // 展示顺序独立于图集顺序，避免移动追魂钉后图标错位。
 const catalogTreasures = [...TREASURES];
 catalogTreasures.splice(
@@ -367,15 +379,17 @@ function writeSave(data: SaveData, run: Game | null) {
   lastSaveText = text;
 }
 function persist() {
-  if (saveLock || settlementRetryAt || (game?.state === 'won' && !settled)) return;
+  if (saveLock || settlementRetryAt || (game?.state === 'won' && !settled)) return false;
   syncHumanStories(save);
   const active = game && !settled ? game : pendingRun;
   try {
     writeSave(save, active);
+    return true;
   } catch {
-    if (saveLock) return;
+    if (saveLock) return false;
     if (storageAvailable) toast('浏览器暂时无法保存进度，请勿关闭当前页面');
     storageAvailable = false;
+    return false;
   }
 }
 function refreshAutoplaySettings(focusId?: string) {
@@ -1543,7 +1557,6 @@ function shellBindings(): ActionShell {
     get assetUrl() { return assetUrl; },
     get auctionContent() { return marketEventSource.current!.auctionContent; },
     get battleHud() { return battleHud; },
-    get bestiaryPanel() { return bestiaryPanel; },
     get catalogPanel() { return marketEventSource.current!.catalogPanel; },
     get chronicleSource() { return chronicleSource; },
     get completeTribulation() { return completeTribulation; },

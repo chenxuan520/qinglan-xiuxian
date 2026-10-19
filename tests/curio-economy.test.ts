@@ -145,11 +145,11 @@ test('出售页预告奇物收购与到手范围，默认保留价可成交，�
     const unsold = sellAuction(s, item(id), high + 1, s.mortal.sectMarket!.visit)!;
     assert.equal(unsold.outcome, 'unsold');
     assert.equal(s.stones, balance);
-    assert.equal(s.curios.bag[id], 2);
+    assert.equal(s.curios.bag[id], 1);
     const sold = sellAuction(s, item(id), low, s.mortal.sectMarket!.visit)!;
     assert.equal(sold.outcome, 'sold');
-    assert.equal(s.curios.bag[id], 1);
-    assert.ok(ownsCurio(s, id));
+    assert.equal(s.curios.bag[id], 0);
+    assert.equal(ownsCurio(s, id), false);
   }
   const s = fixture();
   s.curios.seeking['soul-wood'] = 2;

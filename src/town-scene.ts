@@ -1,3 +1,4 @@
+import { resourceFailed } from './update-check.ts';
 import { assetUrl } from './asset-url.ts';
 import type { CultivationPath } from './data.ts';
 import { PLAYER_IMAGES, playerSpriteBackground } from './player-appearance.ts';
@@ -211,7 +212,10 @@ export class TownScene {
               }
               resolve();
             };
-            img.onerror = reject;
+            img.onerror = (error) => {
+              resourceFailed();
+              reject(error);
+            };
             img.src = assetUrl(name);
           }),
       ),

@@ -1,4 +1,4 @@
-import { isCurio, ownsCurio, grantCurio, curioName, curioValue } from './curio-data.ts';
+import { isCurio, acquiredCurio, grantCurio, curioName, curioValue } from './curio-data.ts';
 import { syncTribulationClock, type SaveData } from './progress.ts';
 import { advanceMortal } from './mortal.ts';
 import { serviceDues, serviceReason } from './service-preflight.ts';
@@ -12,19 +12,17 @@ export function curioSeekingQuote(save: SaveData, id: string, sect = false, unfi
   const reason =
     !isCurio(id) || id === 'heaven-bottle'
       ? '此物不可指名寻得'
-      : ownsCurio(save, id)
-        ? '此物已在行囊'
-        : progress >= 3
-          ? '本世已寻得此物'
-          : venueRealm(save) < 1
-            ? '筑基后可托付寻访'
-            : sect
-              ? !save.mortal.member
-                ? '请先拜入宗门'
-                : ''
-              : !save.mortal.sectMarket
-                ? '请先进入坊市'
-                : '';
+      : acquiredCurio(save, id)
+        ? '本世已寻得此物'
+        : venueRealm(save) < 1
+          ? '筑基后可托付寻访'
+          : sect
+            ? !save.mortal.member
+              ? '请先拜入宗门'
+              : ''
+            : !save.mortal.sectMarket
+              ? '请先进入坊市'
+              : '';
   return {
     progress,
     years,
@@ -43,15 +41,14 @@ export function seekCurio(
   const q = curioSeekingQuote(save, id, sect, unfinished);
   if (!isCurio(id) || q.reason || stamp !== venueStamp(save) || save.stones < q.price + q.reserve)
     return undefined;
-  if (q.progress === 2 && !Number.isSafeInteger((save.curios.bag[id] ?? 0) + 1)) return undefined;
   const age = save.age;
   syncTribulationClock(save);
   save.stones -= q.price;
   advanceMortal(save, q.years * 60);
   if (Math.abs(save.age - age - q.years) > 1e-7) return undefined;
+  if (q.progress === 2) grantCurio(save, id);
   save.curios.seeking[id] = q.progress + 1;
   save.curios.soughtAt = save.age;
-  if (q.progress === 2) grantCurio(save, id);
   const state = (save.mortal.marketVenues ??= { workAt: null, favorAt: null, receipts: [] });
   state.workAt = save.age;
   const text = `寻访${curioName(id)}，花费${q.price}灵石、三年。${q.progress === 2 ? '三次托付已毕，奇物收入行囊。' : `线索已落实${q.progress + 1}/3，再访仍须等满十年。`}`;

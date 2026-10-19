@@ -63,11 +63,11 @@ function ready() {
   s.mortal.population = { seed: 12345, since: 15 };
   return s;
 }
-test('九件奇物按持有生效，重复不叠加；最后一件移走恢复真实战斗属性', () => {
+test('九件奇物按持有生效，重复获取被拒绝；移走恢复真实战斗属性', () => {
   const s = ready();
   s.training = { power: 10, vitality: 10, speed: 10 };
   const baseline = new Game(structuredClone(s), 0, 0, () => 0.5);
-  for (const id of CURIO_IDS) grantCurio(s, id);
+  for (const id of CURIO_IDS) assert.equal(grantCurio(s, id), true);
   const g = new Game(s, 0, 0, () => 0.5);
   near(g.stats.damage / baseline.stats.damage, 1.23 / 1.2);
   assert.equal(g.player.maxHp, Math.round((baseline.player.maxHp / 1.5) * 1.575 * 1.2));
@@ -78,7 +78,7 @@ test('九件奇物按持有生效，重复不叠加；最后一件移走恢复�
   near(g.stats.regen / baseline.stats.regen, 1.3);
   near(g.stats.eliteDamage, 1.1);
   const stats = { ...g.stats };
-  for (const id of CURIO_IDS) grantCurio(s, id);
+  for (const id of CURIO_IDS) assert.equal(grantCurio(s, id), false);
   assert.deepEqual(g.stats, stats);
   for (const id of CURIO_IDS) s.curios.bag[id] = 1;
   assert.deepEqual(g.stats, stats);
@@ -222,7 +222,11 @@ test('奇物寄拍不随进出换货或重开结拍，旧周期报价不能购�
   assert.ok(ownsCurio(s, lot.id as (typeof CURIO_IDS)[number]));
   beginSectMarketVisit(s);
   prepareAuction(s);
-  assert.match(auctionBuyReason(s, 8, 3), /已结拍/);
+  assert.equal(
+    auctionLots(s).some((l) => l.kind === 'curio'),
+    false,
+  );
+  assert.match(auctionBuyReason(s, 8, 3), /不存在/);
   const item = { kind: 'curio' as const, id: lot.id, quantity: 1, forgeLevel: 0 };
   assert.equal(sellAuction(s, item, 1, 3, true), undefined);
   assert.equal(sellAuction(s, item, 1, 3)!.outcome, 'sold');

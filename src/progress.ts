@@ -5,6 +5,7 @@ import {
   freshCurios,
   validCurios,
   ownsCurio,
+  grantCurio,
   curioTrainingYears,
   type CurioState,
 } from './curio-data.ts';
@@ -107,7 +108,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 24;
+export const SAVE_SCHEMA = 25;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -266,7 +267,7 @@ export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | n
   if (gift.kind === 'artifact') {
     save.artifacts = [...new Set([...save.artifacts, gift.id])];
     save.forge[gift.id] = gift.level;
-  } else if (gift.kind === 'curio' && isCurio(gift.id)) save.curios.bag[gift.id] = 1;
+  } else if (gift.kind === 'curio' && isCurio(gift.id)) grantCurio(save, gift.id);
   else save.medicine.bag[gift.id] = 1;
   save.birthInheritance = { ...gift };
   recordChronicle(
@@ -306,9 +307,28 @@ export function readSave(
     const upgrading = !newer && s.schema !== SAVE_SCHEMA;
     if (typeof s.age === 'number' && Number.isFinite(s.age)) base.age = Math.max(0, s.age);
     if (s.curios !== undefined) {
-      if (!validCurios(s.curios, base.age))
+      if (!validCurios(s.curios, base.age, upgrading))
         return { save: base, status: newer ? 'newer' : 'unreadable' };
       base.curios = s.curios;
+      if (upgrading) {
+        base.curios.acquired = CURIO_IDS.filter(
+          (id) =>
+            s.curios.acquired?.includes(id) ||
+            Object.hasOwn(s.curios.bag, id) ||
+            s.curios.seeking[id] === 3 ||
+            (validAuction(s.mortal?.auction, base.age, s.mortal?.sectMarket) &&
+              s.mortal.auction.history.some(
+                (r: { kind?: string; id?: string; outcome?: string }) =>
+                  r?.kind === 'curio' && r.id === id && ['won', 'sold'].includes(r.outcome ?? ''),
+              )),
+        );
+        for (const id of CURIO_IDS) if ((base.curios.bag[id] ?? 0) > 1) base.curios.bag[id] = 1;
+        const special = base.curios.consignment;
+        if (special?.id && base.curios.acquired.includes(special.id)) {
+          special.id = null;
+          special.closed = true;
+        }
+      }
     }
     if (validMedicine(s.medicine)) base.medicine = s.medicine;
     // 旧版遭遇没有战况，升级只解除旧记录，不伪造胜负或补发奖励。
@@ -873,18 +893,11 @@ export function settleRun(
     iron: run.iron + (run.victory ? 3 + run.stage * 2 : 0),
   };
   for (const [id, count] of Object.entries(run.loot?.curios ?? {})) {
-    if (
-      isCurio(id) &&
-      Number.isSafeInteger(count) &&
-      count > 0 &&
-      count <= 7 &&
-      Number.isSafeInteger((save.curios.bag[id] ?? 0) + count)
-    ) {
-      save.curios.bag[id] = (save.curios.bag[id] ?? 0) + count;
+    if (isCurio(id) && count === 1 && grantCurio(save, id)) {
       recordChronicle(
         save,
         '妖王奇缘',
-        `于${STAGES[run.stage].name}寻得${curioName(id)}${count > 1 ? ` ×${count}` : ''}，已收入行囊。`,
+        `于${STAGES[run.stage].name}寻得${curioName(id)}，已收入行囊。`,
       );
     }
   }

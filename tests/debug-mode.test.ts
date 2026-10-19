@@ -191,7 +191,7 @@ test('五类发放只返回副本，可按原存档格式保存读回；本命�
     request('iron', '', 1000),
     ...TREASURES.map((t) => request('artifact', t.id, 1, 10)),
     ...MEDICINES.map((m) => request('medicine', m.id, 7)),
-    ...CURIO_IDS.map((id) => request('curio', id, 2)),
+    ...CURIO_IDS.map((id) => request('curio', id, 1)),
   ];
   for (const input of grants) {
     const before = structuredClone(s);

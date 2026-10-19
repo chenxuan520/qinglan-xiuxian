@@ -1,3 +1,5 @@
+import { resourceFailed } from './update-check.ts';
+import { retryModule } from './module-source.ts';
 type TourModule = typeof import('./interface-tour.ts');
 let current: TourModule | null = null;
 let pending: Promise<TourModule> | null = null;
@@ -7,25 +9,7 @@ export let tourActive = false;
 
 async function fetchTour(): Promise<TourModule> {
   if (!attempts++) return import('./interface-tour.ts');
-  const base = new URL(import.meta.env.BASE_URL, location.href);
-  let path = 'src/interface-tour.ts';
-  if (!import.meta.env.DEV) {
-    const response = await fetch(new URL(`offline-manifest-${__QINGLAN_BUILD_ID__}.json`, base));
-    if (!response.ok) throw Error('tour-manifest-unavailable');
-    const manifest = await response.json();
-    if (manifest.build !== __QINGLAN_BUILD_ID__ || !Array.isArray(manifest.resources))
-      throw Error('tour-manifest-invalid');
-    const entry = manifest.resources.find(
-      (resource: { path?: unknown }) =>
-        typeof resource.path === 'string' &&
-        /^assets\/interface-tour-[\w-]+\.js$/.test(resource.path),
-    );
-    if (!entry) throw Error('tour-module-missing');
-    path = entry.path;
-  }
-  const url = new URL(path, base);
-  url.hash = `tour-retry-${attempts}`;
-  return import(/* @vite-ignore */ url.href);
+  return retryModule<TourModule>('interface-tour', 'tour', attempts);
 }
 export function stopInterfaceTour() {
   generation++;
@@ -52,6 +36,7 @@ export async function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivEleme
       tourActive = false;
     });
   } catch {
+    resourceFailed();
     tourActive = false;
     if (generation === request && button.isConnected) {
       button

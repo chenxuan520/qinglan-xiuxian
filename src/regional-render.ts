@@ -1,3 +1,4 @@
+import type { Game } from './game.ts';
 import type { Zone } from './game-types.ts';
 import { regionalHazard } from './regional-hazards.ts';
 
@@ -110,7 +111,11 @@ export function drawRegionalField(
         c.globalAlpha = z.delay > 0 ? 0.22 : 0.8;
         c.moveTo(x, -z.radius * 0.8);
         c.lineTo(x + 4, z.radius * 0.7);
-      } else if (z.kind.includes('rift') || z.kind.includes('storm')) {
+      } else if (
+        z.kind.includes('rift') ||
+        z.kind.includes('storm') ||
+        z.kind.includes('thunder')
+      ) {
         c.strokeStyle = '#f4e2ac';
         c.lineWidth = z.delay > 0 ? 1.5 : 3;
         c.moveTo(x - 16, pulse);
@@ -144,4 +149,50 @@ export function drawRegionalField(
   }
   c.restore();
   return true;
+}
+
+// 受击状态贴近人物显示，不占用顶部状态栏；减少动态时保留静态辨识。
+export function drawPlayerAilments(
+  c: CanvasRenderingContext2D,
+  game: Game,
+  time: number,
+  reduced: boolean,
+) {
+  const p = game.player;
+  const thunder = game.stage === 5 && !game.tribulation;
+  if (!game.slowed && !game.burning.life) return;
+  c.save();
+  c.font = 'bold 13px serif';
+  c.textAlign = 'center';
+  c.lineWidth = 3;
+  c.strokeStyle = '#173e4e';
+  if (game.slowed > 0) {
+    const label = `${thunder ? '雷麻' : '迟滞'} · 移速 −25%`;
+    c.fillStyle = thunder ? '#e5ddff' : '#d3f1ff';
+    c.strokeText(label, p.x, p.y + 46);
+    c.fillText(label, p.x, p.y + 46);
+    c.strokeStyle = thunder ? '#c7baff' : '#a8e1f4';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.ellipse(p.x, p.y + 12, 25, 10, 0, 0, Math.PI * 2);
+    c.stroke();
+  }
+  if (game.burning.life > 0) {
+    c.fillStyle = '#ffc58b';
+    for (let i = -1; i <= 1; i++) {
+      const x = p.x + i * 15,
+        y = p.y + 10;
+      const sway = reduced ? 0 : Math.sin(time * 10 + i) * 3;
+      c.beginPath();
+      c.moveTo(x - 5, y + 4);
+      c.quadraticCurveTo(x - 8, y - 3, x + sway, y - 20);
+      c.quadraticCurveTo(x + 9, y - 2, x + 5, y + 4);
+      c.fill();
+    }
+    c.strokeStyle = '#543b29';
+    c.lineWidth = 3;
+    c.strokeText('灼烧', p.x, p.y + (game.slowed ? 62 : 46));
+    c.fillText('灼烧', p.x, p.y + (game.slowed ? 62 : 46));
+  }
+  c.restore();
 }

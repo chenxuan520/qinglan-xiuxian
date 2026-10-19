@@ -1,6 +1,7 @@
 import {
   isCurio,
   grantCurio,
+  acquiredCurio,
   curioRoll,
   curioCycle,
   prepareCurioConsignment,
@@ -95,7 +96,7 @@ export function auctionLots(
     return { ...item, index, seller: npc.name, sellerId: npc.id, start: auctionValue(item) };
   });
   const special = save.curios.consignment;
-  if (special?.id && special.cycle === curioCycle(save.age)) {
+  if (special?.id && special.cycle === curioCycle(save.age) && !acquiredCurio(save, special.id)) {
     const item: AuctionItem = { kind: 'curio', id: special.id, quantity: 1, forgeLevel: 0 };
     lots.push({
       ...item,

@@ -45,9 +45,14 @@ export function regionalSkillDetails(
           eliteHint: '游瘴持续漂移，绕开行进路径',
         },
         storm: {
-          name: '引雷横扫',
-          hint: '预警后横向落雷，避开雷路',
-          eliteHint: '两道雷路错时生效，观察先后顺序',
+          name: '错拍雷织',
+          hint: '两道雷路依次落下，命中短暂雷麻；先避亮起的一道',
+          eliteHint: '交错雷路依次生效，趁落雷间隙换位',
+        },
+        firebolt: {
+          ...original,
+          hint: '火球命中后短暂灼烧，侧移避开弹道',
+          eliteHint: '双火球扇射，命中后短暂灼烧',
         },
         firecharge: {
           ...original,
@@ -89,6 +94,10 @@ export function regionalEnemyTactics(
       overrides[stage]?.[type] ??
       (stage === 2 && base.flank && behavior === 'chase' ? 'dash' : base.eliteSkill),
   };
+  if (stage === 5) {
+    if (result.skill === 'dash') result.skill = 'thundercharge';
+    if (result.eliteSkill === 'dash') result.eliteSkill = 'thundercharge';
+  }
   tacticsCache.set(key, result);
   return result;
 }
@@ -96,6 +105,7 @@ export function regionalEnemyTactics(
 function fieldColor(kind: string) {
   if (kind.includes('fire') || kind.includes('flame')) return '#ffad63';
   if (kind.includes('frost')) return '#9ce5ff';
+  if (kind.includes('thunder')) return '#bbc9ff';
   if (kind.includes('storm') || kind.includes('rift')) return '#e9d391';
   return '#b7c992';
 }
@@ -178,6 +188,8 @@ export function regionalEnemyFields(
         ),
       );
     }
+  } else if (skill === 'thundercharge') {
+    fields.push(lane('enemy-thunderpath', e, offset(e, nx, ny, 160), 16, 0.3, 1.3, 0.4, e.id));
   } else if (skill === 'firecharge' || skill === 'firepath') {
     fields.push(lane('enemy-firepath', e, offset(e, nx, ny, 160), 20, 2.4, 0.95, 0.45));
   } else if (skill === 'frost') {
@@ -196,18 +208,15 @@ export function regionalEnemyFields(
   } else if (skill === 'miasma') {
     fields.push(cloud('enemy-miasma', offset(e, nx, ny, 75), nx * 18, ny * 18, 50, 3.2, 1, 0.65));
   } else if (skill === 'storm') {
-    for (const along of e.elite ? [55, 115] : [80])
-      fields.push(
-        lane(
-          'enemy-storm',
-          offset(e, nx, ny, along, -65),
-          offset(e, nx, ny, along, 65),
-          17,
-          0.3,
-          0.95 + (along > 100 ? 0.45 : 0),
-          0.65,
-        ),
-      );
+    for (const [index, side] of [-1, 1].entries()) {
+      const angle = Math.atan2(ny, nx) + side * 0.48;
+      const from = e.type === 69 ? e : offset(e, nx, ny, 65 + index * 60, -60);
+      const to =
+        e.type === 69
+          ? offset(e, Math.cos(angle), Math.sin(angle), 165)
+          : offset(e, nx, ny, 65 + index * 60, 60);
+      fields.push(lane('enemy-thunder', from, to, 16, 0.25, 1.05 + index * 0.6, 0.65, e.id));
+    }
   } else return null;
   return fields;
 }

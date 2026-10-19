@@ -1,3 +1,4 @@
+import { resourceFailed } from './update-check.ts';
 import { assetUrl } from './asset-url.ts';
 import { PLAYER_IMAGES, playerSpriteBackground } from './player-appearance.ts';
 import {
@@ -188,7 +189,10 @@ export class SectMarketScene {
               }
               resolve();
             };
-            image.onerror = reject;
+            image.onerror = (error) => {
+              resourceFailed();
+              reject(error);
+            };
             image.src = assetUrl(url);
           }),
       ),

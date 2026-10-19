@@ -18,7 +18,6 @@ import type { ironMarketContent } from './iron-market-ui.ts';
 import type { MedicinePanel } from './medicine-panel.ts';
 import type { catalogPanel } from './catalog-ui.ts';
 import type { cultivationPanel } from './cultivation-ui.ts';
-import type { bestiaryPanel } from './bestiary-ui.ts';
 import type { BattleHud } from './battle-hud.ts';
 import type { JourneyCardPanel } from './journey-card-panel.ts';
 import type { PanelHost, PanelLocation } from './panel-host.ts';
@@ -365,7 +364,6 @@ export interface ActionShell {
   readonly assetUrl: typeof assetUrl;
   readonly auctionContent: typeof auctionContent;
   readonly battleHud: BattleHud;
-  readonly bestiaryPanel: typeof bestiaryPanel;
   readonly catalogPanel: typeof catalogPanel;
   readonly chronicleSource: ChronicleSource;
   readonly completeTribulation: typeof completeTribulation;

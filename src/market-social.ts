@@ -1,4 +1,4 @@
-import { isCurio, grantCurio, ownsCurio } from './curio-data.ts';
+import { isCurio, grantCurio, ownsCurio, acquiredCurio } from './curio-data.ts';
 import { trainingEffect } from './training.ts';
 import { debateQuote } from './market-debate.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, spiritRootInfo, pathInfo } from './data.ts';
@@ -385,6 +385,7 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
     quantity: 1,
     forgeLevel: 0,
   };
+  if (item.kind === 'curio' && isCurio(item.id) && acquiredCurio(save, item.id)) return undefined;
   const goodsPrice = Math.max(15, Math.floor(auctionValue(item) * 0.9));
   const cost =
     kind === 'invitation'

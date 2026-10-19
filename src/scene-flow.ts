@@ -468,34 +468,46 @@ export function renderPanel(shell: ActionShell) {
         '<button class="secondary-button journey-card-entry" data-action="journey-card">留存此世</button>',
       true,
     );
-  } else if (shell.panel === 'bestiary') {
-    const view = shell.bestiaryPanel(shell.bestiaryStage);
-    shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
-  } else if (shell.panel === 'guide') {
+  } else if (shell.panel === 'guide' || shell.panel === 'bestiary') {
+    const target = shell.panel;
+    const bestiary = target === 'bestiary';
     if (!shell.guideSource.current) {
-      const tab = shell.guideTab;
+      const tab = bestiary ? shell.bestiaryStage : shell.guideTab;
+      const title = bestiary ? '知妖性，方能破万劫' : '修行指南';
+      const subtitle = bestiary ? '妖物志' : '道法有迹';
+      const current = () =>
+        !shell.saveLock &&
+        shell.panel === target &&
+        (bestiary ? shell.bestiaryStage : shell.guideTab) === tab;
       shell.panelFrame(
-        '修行指南',
-        '道法有迹',
-        '<p class="panel-note" role="status">正在展开修行指南…</p>',
+        title,
+        subtitle,
+        '<p class="panel-note" role="status">正在展开…</p>',
+        bestiary,
       );
       void shell.guideSource
         .load()
         .then(() => {
-          if (shell.panel === 'guide' && shell.guideTab === tab) shell.renderPanel();
+          if (current()) shell.renderPanel();
         })
         .catch(() => {
-          if (shell.panel === 'guide' && shell.guideTab === tab)
+          if (current())
             shell.panelFrame(
-              '修行指南',
-              '道法有迹',
-              '<p class="panel-note" role="status">暂未展开指南，请重试。</p><button class="secondary-button" data-action="guide">重新展开</button>',
+              title,
+              subtitle,
+              `<p class="panel-note" role="status">暂未展开，请重试。</p><button class="secondary-button" data-action="${target}">重新展开</button>`,
+              bestiary,
             );
         });
       return;
     }
-    const { GUIDE_TABS, guideContent } = shell.guideSource.current;
-    shell.panelFrame(...shell.guidePanel(shell.guideTab, !!shell.game, GUIDE_TABS, guideContent));
+    if (bestiary) {
+      const view = shell.guideSource.current.bestiaryPanel(shell.bestiaryStage);
+      shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
+    } else {
+      const { GUIDE_TABS, guideContent } = shell.guideSource.current;
+      shell.panelFrame(...shell.guidePanel(shell.guideTab, !!shell.game, GUIDE_TABS, guideContent));
+    }
   }
 }
 

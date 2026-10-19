@@ -111,7 +111,8 @@ export function importSave(text: string) {
   if (
     !record(data) ||
     data.version !== 1 ||
-    (data.curios !== undefined && !validCurios(data.curios, Number(data.age ?? 15))) ||
+    (data.curios !== undefined &&
+      !validCurios(data.curios, Number(data.age ?? 15), Number(data.schema ?? 0) < SAVE_SCHEMA)) ||
     (data.medicine !== undefined && !validMedicine(data.medicine)) ||
     (data.chronicle !== undefined && !validChronicle(data.chronicle, Number(data.age ?? 15))) ||
     (data.mortal !== undefined && !validMortal(data.mortal, Number(data.age ?? 15))) ||

@@ -135,7 +135,8 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
       if (!skill) {
         assert.equal(ENEMIES[type].behavior, 'explode');
         assert.equal(e.charge, 0);
-      } else if (skill === 'dash' || skill === 'firecharge') assert.ok(e.charge > 0.55);
+      } else if (skill === 'dash' || skill === 'firecharge' || skill === 'thundercharge')
+        assert.ok(e.charge > 0.55);
       else if (
         ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(skill)
       ) {
@@ -144,7 +145,14 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
         assert.ok(g.shots.length > 0);
       } else if (skill === 'summon') {
         assert.equal(g.enemies.filter((v) => v.summonedBy === e.id).length, 3);
-      } else assert.ok(g.zones.some((z) => z.kind === `enemy-${skill}` && z.delay > 0));
+      } else
+        assert.ok(
+          g.zones.some(
+            (z) =>
+              z.kind === `enemy-${skill === 'storm' && stage === 5 ? 'thunder' : skill}` &&
+              z.delay > 0,
+          ),
+        );
       count++;
     }
   assert.equal(count, 72);
@@ -209,7 +217,7 @@ test('重甲近身震地保留，地域法师按秘境生成法阵', () => {
   }
   const { g: storm } = encounter(5, 69, false);
   storm.update(0.01);
-  assert.ok(storm.zones.some((zone) => zone.kind === 'enemy-storm'));
+  assert.ok(storm.zones.some((zone) => zone.kind === 'enemy-thunder'));
 });
 
 test('精英冲刺AI侧移避开，续局后仍可辨认锁定路线', () => {

@@ -153,7 +153,9 @@ export function autoplayInput(g: Game) {
       let risk = 0;
       for (const z of zones) {
         if (regionalHazard(z)) {
-          risk += (regionalExposure(z, p, x, y, speed) / 0.5) * (z.damage / Math.max(1, p.hp)) * 4;
+          risk +=
+            (regionalExposure(z, p, x, y, speed) / 0.5) *
+            ((z.damage / Math.max(1, p.hp)) * 4 + (z.kind.includes('thunder') ? 0.12 : 0));
           continue;
         }
         const zx = p.x - z.x,

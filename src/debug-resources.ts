@@ -1,5 +1,5 @@
 import { MAX_FORGE_LEVEL, TREASURES } from './data.ts';
-import { isCurio, curioName } from './curio-data.ts';
+import { isCurio, curioName, grantCurio } from './curio-data.ts';
 import { medicineInfo } from './medicine-data.ts';
 import type { SaveData } from './progress.ts';
 
@@ -11,7 +11,7 @@ export interface DebugGrant {
   forge: number;
 }
 export const debugQuantityLimit = (kind: string) =>
-  kind === 'stones' || kind === 'iron' ? 1000000 : kind === 'medicine' ? 1000 : 99;
+  kind === 'stones' || kind === 'iron' ? 1000000 : kind === 'medicine' ? 1000 : 1;
 
 // 只构造副本，持久化成功前不触碰正在游玩的存档。
 export function debugGrant(save: SaveData, input: DebugGrant) {
@@ -49,10 +49,9 @@ export function debugGrant(save: SaveData, input: DebugGrant) {
     message = `${m.name} +${input.quantity} · 已收入丹囊`;
   } else if (input.kind === 'curio') {
     const id = input.id;
-    if (!isCurio(id) || !add(next.curios.bag[id] || 0, debugQuantityLimit(input.kind)))
-      return { error: '请选择有效奇物和数量，库存不能超出上限。' };
-    next.curios.bag[id] = (next.curios.bag[id] || 0) + input.quantity;
-    message = `${curioName(id)} +${input.quantity} · 持有即生效，同名不叠加`;
+    if (!isCurio(id) || input.quantity !== 1 || !grantCurio(next, id))
+      return { error: '每件奇物本世仅可获得一次，数量须为一件。' };
+    message = `${curioName(id)}已收入行囊 · 持有即生效`;
   } else return { error: '请选择发放类别。' };
   return { next, message };
 }

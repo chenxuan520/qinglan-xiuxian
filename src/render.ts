@@ -1,6 +1,7 @@
+import { resourceFailed } from './update-check.ts';
 import { drawRealmBreakthrough, drawBossEntrance } from './render-overlays.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
-import { drawRegionalField } from './regional-render.ts';
+import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
 import { hazardMargin } from './regional-hazards.ts';
 import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
 import type { CultivationPath, ElementId } from './data.ts';
@@ -77,6 +78,7 @@ export class Renderer {
               resolve();
             };
             image.onerror = () => {
+              resourceFailed();
               this.imageRequests.delete(url);
               reject(new Error(url));
             };
@@ -518,20 +520,7 @@ export class Renderer {
           game.path,
         );
         c.globalAlpha = 1;
-        if (game.slowed > 0) {
-          c.strokeStyle = '#a8e1f4';
-          c.lineWidth = 2;
-          c.beginPath();
-          c.ellipse(p.x, p.y + 12, 25, 10, 0, 0, TAU);
-          c.stroke();
-          c.font = 'bold 13px serif';
-          c.textAlign = 'center';
-          c.fillStyle = '#d3f1ff';
-          c.strokeStyle = '#173e4e';
-          c.lineWidth = 3;
-          c.strokeText('迟滞 · 移速 −25%', p.x, p.y + 46);
-          c.fillText('迟滞 · 移速 −25%', p.x, p.y + 46);
-        }
+        drawPlayerAilments(c, game, time, this.reducedMotion.matches);
       } else {
         if (e.illusionOf !== undefined) {
           c.save();

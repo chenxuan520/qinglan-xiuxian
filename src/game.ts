@@ -35,7 +35,7 @@ import {
   regionalPursuit,
   type RegionalField,
 } from './regional-combat.ts';
-import { hazardDistance } from './regional-hazards.ts';
+import { hazardDistance, slowingHazard } from './regional-hazards.ts';
 import { medicineEffects, medicineLoot } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
@@ -143,6 +143,7 @@ export class Game {
   notice = '';
   noticeTime = 0;
   slowed = 0;
+  burning = { life: 0, damage: 0 };
   bossSpawned = false;
   trialBossesDefeated = 0;
   trialBossesSpawned = 0;
@@ -260,6 +261,7 @@ export class Game {
       this.player.hp = this.player.maxHp;
       this.player.invincible = 3;
       this.slowed = 0;
+      this.burning = { life: 0, damage: 0 };
       this.state = 'paused';
       this.announce(`向天借寿 · 寿元 +${years} 年`);
     }
@@ -545,6 +547,7 @@ export class Game {
       spawnBudget: this.spawnBudget,
       serial: this.serial,
       slowed: this.slowed,
+      burning: { ...this.burning },
       nextEnemySkillAt: this.nextEnemySkillAt,
       nextMedicinePulse: this.nextMedicinePulse,
       medicineHpFactor: this.medicine.hp,
@@ -588,6 +591,7 @@ export class Game {
       g.rerolls = s.rerolls;
       g.player = { ...s.player, moving: false };
       g.slowed = s.slowed ?? 0;
+      g.burning = { ...(s.burning ?? { life: 0, damage: 0 }) };
       if (
         s.nextMedicinePulse !== undefined &&
         (!Number.isFinite(s.nextMedicinePulse) || s.nextMedicinePulse < 0)
@@ -757,6 +761,18 @@ export class Game {
       stats = this.stats;
     p.invincible = Math.max(0, p.invincible - dt);
     this.heal(stats.regen * dt);
+    if (this.burning.life > 0) {
+      const elapsed = Math.min(dt, this.burning.life);
+      const damage = this.burning.damage * (elapsed / this.burning.life);
+      this.burning.damage -= damage;
+      this.burning.life = Math.max(0, this.burning.life - elapsed);
+      p.hp = Math.max(0, p.hp - damage);
+      if (p.hp === 0) {
+        this.state = 'lost';
+        this.onEvent('lose');
+        return;
+      }
+    }
     const length = Math.hypot(this.input.x, this.input.y);
     p.moving = length > 0.05;
     if (p.moving) {
@@ -953,7 +969,9 @@ export class Game {
       first =
         available
           .filter((type) =>
-            ['dash', 'firecharge'].includes(this.enemyTactics(type).eliteSkill ?? ''),
+            ['dash', 'firecharge', 'thundercharge'].includes(
+              this.enemyTactics(type).eliteSkill ?? '',
+            ),
           )
           .at(-1) ?? first;
       second =
@@ -1329,7 +1347,7 @@ export class Game {
       (['roots', 'frost', 'miasma', 'storm', 'firepath'].includes(skill) &&
         distance > ENEMY_FIELD_REACH) ||
       (skill === 'stomp' && distance > 180) ||
-      (skill === 'dash' && distance > 360)
+      (['dash', 'thundercharge'].includes(skill) && distance > 360)
     )
       return;
     const projectile = [
@@ -1341,7 +1359,15 @@ export class Game {
       'frostbolt',
       'gapring',
     ].includes(skill);
-    const circles = ['roots', 'firepath', 'frost', 'miasma', 'storm', 'stomp'].includes(skill);
+    const circles = [
+      'roots',
+      'firepath',
+      'frost',
+      'miasma',
+      'storm',
+      'stomp',
+      'thundercharge',
+    ].includes(skill);
     // 前六境技能共享弹幕与地面区域预算；妖王独立施法，避免小怪挤满画面。
     if (projectile && this.shots.filter((b) => b.kind === 'hostile').length >= 60) return;
     if (circles && this.zones.filter((z) => z.hostile).length > 9) return;
@@ -1354,7 +1380,7 @@ export class Game {
     this.nextEnemySkillAt = this.time + 0.18;
     e.dx = nx;
     e.dy = ny;
-    if (skill === 'dash' || skill === 'firecharge') {
+    if (skill === 'dash' || skill === 'firecharge' || skill === 'thundercharge') {
       e.charge = 1.25 + (!this.isFinalTrial && this.stage === 2 ? (e.id % 2) * 0.3 : 0);
       if (skill === 'firecharge' && !this.isFinalTrial) {
         this.addRegionalFields(e, regionalEnemyFields(e, skill, nx, ny)!);
@@ -1371,6 +1397,8 @@ export class Game {
             'enemy-firepath',
             0.9 + i * 0.18,
           );
+      if (skill === 'thundercharge' && distance <= ENEMY_FIELD_REACH)
+        this.addRegionalFields(e, regionalEnemyFields(e, skill, nx, ny)!);
       return;
     }
     if (projectile) {
@@ -2136,7 +2164,10 @@ export class Game {
       if (b.kind === 'hostile') {
         if (distance(b, this.player) < b.radius + 12) {
           if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
-          this.hurtPlayer(b.damage * (b.bossStage === 3 ? this.medicine.poison : 1));
+          this.hurtPlayer(
+            b.damage * (b.bossStage === 3 ? this.medicine.poison : 1),
+            !this.isFinalTrial && this.stage === 1 && b.enemySkill === 'firebolt',
+          );
           b.life = 0;
         }
         continue;
@@ -2220,7 +2251,7 @@ export class Game {
       if (
         z.hostile &&
         z.life > 0 &&
-        ['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind) &&
+        slowingHazard(z) &&
         this.player.invincible <= 0 &&
         hazardDistance(z, this.player) < z.radius + 8
       )
@@ -2748,8 +2779,9 @@ export class Game {
           this.trialBossesDefeated,
           lastBoss,
           this.player.hp > 0,
+          this.loot.curios,
         );
-        if (curio) this.loot.curios[curio] = (this.loot.curios[curio] ?? 0) + 1;
+        if (curio) this.loot.curios[curio] = 1;
       } else if (this.level < MAX_RUN_LEVEL)
         this.pickups.push({
           x: e.x,
@@ -2799,6 +2831,7 @@ export class Game {
     if (this.state !== 'lost' || this.revivesUsed >= MAX_REVIVES || this.expired) return false;
     this.revivesUsed++;
     this.slowed = 0;
+    this.burning = { life: 0, damage: 0 };
     this.player.hp = this.player.maxHp;
     this.player.invincible = 3;
     const cleared = this.isFinalTrial
@@ -2808,9 +2841,12 @@ export class Game {
     this.announce('重燃道心 · 满血复活 · 三息护体');
     return true;
   }
-  hurtPlayer(damage: number) {
+  hurtPlayer(damage: number, burn = false) {
     if (this.player.invincible > 0 || this.state !== 'playing') return;
-    this.player.hp -= damage * this.stats.armor;
+    const total = damage * this.stats.armor;
+    const delayed = burn && this.burning.life <= 0 ? total * 0.2 : 0;
+    if (delayed > 0) this.burning = { life: 1.5, damage: delayed };
+    this.player.hp -= total - delayed;
     this.player.invincible = 0.8;
     if (this.passives.bone && this.player.hp > 0) {
       this.areaDamage(

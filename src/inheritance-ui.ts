@@ -40,7 +40,7 @@ function giftPreview(gift: BirthInheritance) {
     gift.kind === 'artifact'
       ? `炼器阶数保留（${rank(gift.level)}）· 法宝只入少年的藏器阁。局内等级与觉醒重新开始，本命由你自行选择。`
       : gift.kind === 'curio'
-        ? '赠予一件，收入少年的行囊，持有即获其助益；同名奇物的效果不叠加。'
+        ? '赠予一件，收入少年的行囊，持有即获其助益；此物不会再从少年的其他机缘中出现。'
         : '赠予一枚，收入少年的丹囊，由你自行服用。原修士的药效与已服用的提升不会带入。';
   return `${art}<div><strong>${name(gift)}<small>${gift.kind === 'artifact' ? rank(gift.level) : gift.kind === 'curio' ? '一件奇物' : '一枚'}</small></strong><p>${detail}</p></div>`;
 }

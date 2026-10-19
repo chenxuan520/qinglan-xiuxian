@@ -1,3 +1,4 @@
+import { resourceFailed } from './update-check.ts';
 import { MarketAmbushDuel, type AmbushOutcome } from './market-ambush.ts';
 import {
   AMBUSH_RETREAT_SECONDS,
@@ -169,7 +170,10 @@ export class MarketAmbushScene {
             new Promise<void>((resolve, reject) => {
               const img = new Image();
               img.onload = () => resolve();
-              img.onerror = reject;
+              img.onerror = (error) => {
+                resourceFailed();
+                reject(error);
+              };
               img.src = assetUrl(url);
             }),
         ),

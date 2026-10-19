@@ -94,7 +94,14 @@ test('导出带存档版本；导入拒绝更新版本或迁移失败的存档',
 // 执行 main.ts 中实际的写入、锁定与动作入口，不加载页面初始化。
 const flow = new Script(
   stripTypeScriptTypes(
-    ['writeSave', 'persist', 'lockStaleSave', 'renderSaveLock', 'handleAction']
+    [
+      'writeSave',
+      'persist',
+      'lockStaleSave',
+      'renderSaveLock',
+      'handleAction',
+      'showRuntimeErrorNotice',
+    ]
       .map((name) => {
         const match = source.match(new RegExp(`^function ${name}\\([^]*?^\\}`, 'm'));
         assert.ok(match, `未找到 main.ts 实际函数 ${name}`);
@@ -219,6 +226,85 @@ test('新版本存档只读：不写入、不能跳过锁定，提示刷新并�
   assert.equal(writes.length, 0);
   context.handleAction('save-lock-download');
   assert.deepEqual(context.downloads, [stored]);
+});
+
+function noticeHarness() {
+  const h = harness({ stored: null });
+  const handlers = new Map<string, () => void>();
+  const paragraph = { textContent: '' };
+  const box = {
+    className: '',
+    innerHTML: '',
+    setAttribute: () => {},
+    querySelector: (selector: string) =>
+      selector === 'p'
+        ? paragraph
+        : {
+            addEventListener: (_event: string, listener: () => void) =>
+              handlers.set(selector, listener),
+          },
+    remove: () => {},
+  };
+  Object.assign(h.context, {
+    document: {
+      querySelector: () => null,
+      createElement: () => box,
+      body: { appendChild: () => {} },
+    },
+    ERROR_NOTICE_TITLE: '',
+    ERROR_NOTICE_TEXT: '',
+    ERROR_NOTICE_ACTIONS: '',
+  });
+  h.context.showRuntimeErrorNotice(true);
+  return { ...h, paragraph, refresh: () => handlers.get('[data-error-action="refresh"]')!() };
+}
+
+test('更新提示刷新先保存真实续局，写入失败不离场，重试成功才刷新', () => {
+  const { context, storage, refresh, paragraph } = noticeHarness();
+  const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  const game = new Game(save, 0, 0, () => 0.5);
+  game.time = 45;
+  game.pause();
+  context.game = game;
+  context.save = save;
+  const nativeSet = storage.setItem;
+  storage.setItem = () => {
+    throw new Error('QuotaExceededError');
+  };
+  refresh();
+  assert.equal(context.reloads, 0);
+  assert.equal(storage.getItem(SAVE_KEY), null);
+  assert.match(paragraph.textContent, /尚未保存/);
+  storage.setItem = nativeSet;
+  refresh();
+  assert.equal(context.reloads, 1);
+  const saved = readSave(storage.getItem(SAVE_KEY));
+  assert.equal(saved.status, 'ok');
+  const restored = restoreSavedRun(saved.save, JSON.parse(storage.getItem(SAVE_KEY)!).activeRun);
+  assert.ok(restored);
+  assert.equal(restored.time, 45);
+  assert.equal(restored.state, 'paused');
+});
+
+test('更新刷新不绕过结算与存档锁定，原故障刷新仍可使用', () => {
+  for (const setup of [
+    { settlementRetryAt: 10 },
+    { game: { state: 'won' }, settled: false },
+    { saveLock: 'newer' },
+    { saveLock: 'unreadable' },
+    { saveLock: 'stale' },
+  ]) {
+    const { context, writes, refresh } = noticeHarness();
+    Object.assign(context, setup);
+    refresh();
+    assert.equal(context.reloads, 0);
+    assert.equal(writes.length, 0);
+  }
+  const { context, writes, refresh } = noticeHarness();
+  context.showRuntimeErrorNotice(false);
+  refresh();
+  assert.equal(context.reloads, 1);
+  assert.equal(writes.length, 0);
 });
 
 test('main.ts 所有存档写入都经过 writeSave，启动与多窗口入口接入锁定', () => {

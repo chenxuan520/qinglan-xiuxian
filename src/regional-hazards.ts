@@ -16,6 +16,17 @@ export function regionalHazard(z: Zone) {
   return z.endX !== undefined || z.vx !== undefined;
 }
 
+export function slowingHazard(z: Zone) {
+  return [
+    'enemy-roots',
+    'enemy-frost',
+    'boss-roots',
+    'boss-frost',
+    'enemy-thunder',
+    'enemy-thunderpath',
+  ].includes(z.kind);
+}
+
 export function hazardMargin(z: Zone) {
   return z.radius + 50 + (z.endX === undefined ? 0 : Math.hypot(z.endX - z.x, z.endY! - z.y));
 }
@@ -89,7 +100,7 @@ export function regionalExposure(z: Zone, p: Point, x: number, y: number, speed:
   const [enter, exit] = crossing;
   const tick =
     Math.max(0, z.tick) + Math.max(0, Math.ceil((enter - 0.12 - Math.max(0, z.tick)) / 0.5)) * 0.5;
-  const slows = ['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind);
+  const slows = slowingHazard(z);
   if (!slows && (tick > z.life || tick > exit + 0.12)) return 0;
   return Math.max(0, Math.min(exit + 0.12, z.life, 1.6) - Math.max(0, enter - 0.12));
 }

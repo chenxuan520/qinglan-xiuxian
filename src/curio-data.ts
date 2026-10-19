@@ -1,4 +1,4 @@
-// 顺序与已批准的透明九宫格一致。奇物只按是否持有生效，重复件不叠加。
+// 顺序与已批准的透明九宫格一致。每件奇物本世仅可获得一次。
 export const CURIO_IDS = [
   'heaven-bottle',
   'soul-wood',
@@ -30,6 +30,7 @@ export const curioName = (id: string) => CURIO_NAMES[CURIO_IDS.indexOf(id as Cur
 export interface CurioState {
   seed: number;
   bag: Partial<Record<CurioId, number>>;
+  acquired: CurioId[];
   seeking: Partial<Record<CurioId, number>>;
   soughtAt: number | null;
   consignment: { cycle: number; id: CurioId | null; closed: boolean } | null;
@@ -37,11 +38,12 @@ export interface CurioState {
 export const freshCurios = (seed = 0): CurioState => ({
   seed,
   bag: {},
+  acquired: [],
   seeking: {},
   soughtAt: null,
   consignment: null,
 });
-export function validCurios(value: unknown, age: number): value is CurioState {
+export function validCurios(value: unknown, age: number, legacy = false): value is CurioState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const s = value as CurioState;
   const amounts = (v: unknown, seeking = false) =>
@@ -54,13 +56,18 @@ export function validCurios(value: unknown, age: number): value is CurioState {
         (!seeking || id !== 'heaven-bottle') &&
         Number.isSafeInteger(n) &&
         n >= 0 &&
-        (!seeking || n <= 3),
+        (seeking ? n <= 3 : legacy || n <= 1),
     );
   return (
     Number.isSafeInteger(s.seed) &&
     s.seed >= 0 &&
     s.seed <= 0xffffffff &&
     amounts(s.bag) &&
+    ((legacy && s.acquired === undefined) ||
+      (Array.isArray(s.acquired) &&
+        s.acquired.length <= CURIO_IDS.length &&
+        new Set(s.acquired).size === s.acquired.length &&
+        s.acquired.every(isCurio))) &&
     amounts(s.seeking, true) &&
     (s.soughtAt === null ||
       (Number.isFinite(s.soughtAt) && s.soughtAt >= 15 && s.soughtAt <= age)) &&
@@ -76,11 +83,18 @@ export function validCurios(value: unknown, age: number): value is CurioState {
 }
 export const ownsCurio = (save: { curios: CurioState }, id: CurioId) =>
   (save.curios.bag[id] ?? 0) > 0;
+export const acquiredCurio = (save: { curios: CurioState }, id: CurioId) =>
+  save.curios.acquired.includes(id) ||
+  Object.hasOwn(save.curios.bag, id) ||
+  save.curios.seeking[id] === 3;
 export function grantCurio(save: { curios: CurioState }, id: string) {
-  if (!isCurio(id)) return false;
-  const n = (save.curios.bag[id] ?? 0) + 1;
-  if (!Number.isSafeInteger(n)) return false;
-  save.curios.bag[id] = n;
+  if (!isCurio(id) || acquiredCurio(save, id)) return false;
+  save.curios.bag[id] = 1;
+  save.curios.acquired.push(id);
+  if (save.curios.consignment?.id === id) {
+    save.curios.consignment.id = null;
+    save.curios.consignment.closed = true;
+  }
   return true;
 }
 export function curioRoll(seed: number, key: string) {
@@ -102,6 +116,7 @@ export function bossCurio(
   ordinal: number,
   last: boolean,
   alive = true,
+  pending: Record<string, number> = {},
 ) {
   // 独立于战斗随机流与灵根；首通加成只给本关最后一王，终关旧王不重复享用。
   const key = `boss:${save.runs}:${stage}:${ordinal}`;
@@ -110,17 +125,25 @@ export function bossCurio(
     (last && alive && !save.completed.includes(stage) ? 0.05 : 0);
   if (curioRoll(save.curios.seed, key) / 0x100000000 >= chance) return null;
   const pick = curioRoll(save.curios.seed, `${key}:item`);
-  return pick % 80 === 0 ? CURIO_IDS[0] : CURIO_IDS[1 + ((pick >>> 8) % 8)];
+  const id = pick % 80 === 0 ? CURIO_IDS[0] : CURIO_IDS[1 + ((pick >>> 8) % 8)];
+  return acquiredCurio(save, id) || pending[id] ? null : id;
 }
 
 export const curioCycle = (age: number) => Math.max(0, Math.floor((age - 15 + 1e-9) / 10));
 export function prepareCurioConsignment(save: { age: number; curios: CurioState }) {
   const cycle = curioCycle(save.age);
-  if (save.curios.consignment?.cycle === cycle) return;
+  if (save.curios.consignment?.cycle === cycle) {
+    if (save.curios.consignment.id && acquiredCurio(save, save.curios.consignment.id)) {
+      save.curios.consignment.id = null;
+      save.curios.consignment.closed = true;
+    }
+    return;
+  }
   const n = curioRoll(save.curios.seed, `consignment:${cycle}`);
+  const id = CURIO_IDS[1 + ((n >>> 8) % 8)];
   save.curios.consignment = {
     cycle,
-    id: n % 100 < 35 ? CURIO_IDS[1 + ((n >>> 8) % 8)] : null,
+    id: n % 100 < 35 && !acquiredCurio(save, id) ? id : null,
     closed: false,
   };
 }

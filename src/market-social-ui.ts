@@ -73,7 +73,7 @@ function opportunityContent(
     item.kind === 'artifact'
       ? `${save.artifacts.includes(item.id) ? `收藏中已有此物，炼器保留较高的 ${Math.max(save.forge[item.id] || 0, item.forgeLevel)} 阶，不额外增加一件。` : '所得法宝收入收藏，保留标示炼器阶数。'} 本命由你自行选择。`
       : item.kind === 'curio'
-        ? '奇物收入行囊，持有即获其助益；同名效果不叠加。'
+        ? '奇物收入行囊，持有即获其助益；本世只此一件。'
         : '所得丹药收入丹囊，不自动服用。';
   const clue = marketFellowClue(save, offer),
     friendClue = marketFriendClue(save, offer.kind);

@@ -1,4 +1,4 @@
-import { isCurio } from './curio-data.ts';
+import { isCurio, acquiredCurio } from './curio-data.ts';
 import type { Game } from './game.ts';
 import type { SaveData } from './progress.ts';
 import { cultivationReward, tribulationDue } from './progress.ts';
@@ -133,6 +133,16 @@ export function validateRunSnapshot(
         return null;
     }
     if (typeof s.lateEliteWaves !== 'boolean') return null;
+    if (
+      s.burning !== undefined &&
+      (!numbers(s.burning, ['life', 'damage']) ||
+        s.burning.life < 0 ||
+        s.burning.life > 1.5 ||
+        s.burning.damage < 0 ||
+        (s.burning.life === 0 && s.burning.damage !== 0) ||
+        (s.burning.life > 0 && (s.stage !== 1 || !!s.tribulation)))
+    )
+      return null;
     if (
       s.combatCultivation !== undefined &&
       (!Number.isFinite(s.combatCultivation) || s.combatCultivation < 0)
@@ -427,8 +437,7 @@ export function validateRunSnapshot(
             typeof s.loot.curios !== 'object' ||
             Array.isArray(s.loot.curios) ||
             !Object.entries(s.loot.curios).every(
-              ([id, count]) =>
-                isCurio(id) && Number.isSafeInteger(count) && count > 0 && count <= 7,
+              ([id, count]) => isCurio(id) && count === 1 && !acquiredCurio(save, id),
             ))) ||
         !s.loot.medicines ||
         typeof s.loot.medicines !== 'object' ||

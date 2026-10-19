@@ -1,3 +1,4 @@
+import { resourceFailed } from './update-check.ts';
 import { encode } from 'uqr';
 import { assetUrl } from './asset-url.ts';
 import { chronicleAchievements } from './chronicle.ts';
@@ -69,6 +70,7 @@ function loadImage(path: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     const fail = () => {
+      resourceFailed();
       clearTimeout(timeout);
       image.onload = image.onerror = null;
       reject(new Error('留影素材加载失败，请稍后重试'));
