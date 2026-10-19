@@ -135,7 +135,7 @@ export function mortalTabContent(
     )
     .join(
       '',
-    )}</div></div><p class="mortal-sect-note">${spiritRootInfo(save.spiritRoot).name}入门礼：${entryCost(save)} 灵石。${dues.stones ? `当前境界新账期每 ${dues.years} 年缴 ${dues.stones} 灵石。` : '真仙免供奉。'}不论在哪一门，入门礼与供奉标准相同。城镇游历及人间办事消耗的年岁计入账期；浏览宗门页签、秘境、闭关不计入。${unfinishedPath ? '尚有未结束的历练：只能拜入相同路线的宗门；兼修历练须结束后再入宗。' : ''}</p><div class="sect-grid">${SECTS.filter(
+    )}</div></div><p class="mortal-sect-note">${spiritRootInfo(save.spiritRoot).name}入门礼：${entryCost(save)} 灵石。${dues.stones ? `当前境界新账期每 ${dues.years} 年缴 ${dues.stones} 灵石。` : '真仙免供奉。'}不论在哪一门，入门礼与供奉标准相同。成功拜入后随机赠一枚凡品丹药，收入丹囊，不自动服用；退宗后再次付费拜入仍可获赠。城镇游历及人间办事消耗的年岁计入账期；浏览宗门页签、秘境、闭关不计入。${unfinishedPath ? '尚有未结束的历练：只能拜入相同路线的宗门；兼修历练须结束后再入宗。' : ''}</p><div class="sect-grid">${SECTS.filter(
     (s) => filter === 'all' || s.school === filter,
   )
     .map((s) => {

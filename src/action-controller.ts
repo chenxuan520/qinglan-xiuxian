@@ -15,6 +15,7 @@ import type {
   treasure,
 } from './data.ts';
 import { changeAutoplayBuild } from './autoplay-build.ts';
+import { sectEntryMedicinePool } from './mortal.ts';
 import type { ironMarketContent } from './iron-market-ui.ts';
 import type { MedicinePanel } from './medicine-panel.ts';
 import type { catalogPanel } from './catalog-ui.ts';
@@ -169,6 +170,7 @@ export interface ActionShell {
   readonly beginSectMarketVisit: typeof beginSectMarketVisit;
   readonly beginTribulation: () => void;
   bestiaryStage: number;
+  bestiaryDifficulty: number;
   bookTab: string;
   readonly catalogTreasures: Treasure[];
   readonly chooseHumanStory: typeof chooseHumanStory;
@@ -1179,6 +1181,38 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
     } else if (action === 'mortal-filter' && ['all', 'orthodox', 'demonic'].includes(id ?? '')) {
       shell.mortalFilter = id!;
       shell.renderMortal();
+    } else if (action === 'mortal-join') {
+      const next = shell.structuredClone(shell.save);
+      if (!shell.executeMortalAction(next, action, id, shell.pendingRun?.path)) {
+        shell.toast(
+          !next.mortal.member && !sectEntryMedicinePool(next).length
+            ? '丹囊中的凡品数量已达上限，请先腾出容量再拜入宗门。'
+            : '暂时不能拜入，请检查宗门身份、入门费及未结束历练的路线。',
+        );
+        return true;
+      }
+      const message = next.mortal.events[0];
+      shell.resolveActivity(next);
+      try {
+        shell.writeSave(next, shell.pendingRun);
+      } catch {
+        if (!shell.saveLock) shell.toast('拜入尚未保存，入门费与赠药均未结算，请重试。');
+        return true;
+      }
+      Object.assign(shell.save, next);
+      if (shell.panel === 'town-event') {
+        shell.closeNpcChat();
+        shell.panel = '';
+        shell.modal.innerHTML = '';
+      }
+      if (shell.pendingRun)
+        shell.pendingRun = shell.Game.restore(shell.save, shell.pendingRun.snapshot());
+      shell.selectedTreasure = shell.save.starter;
+      shell.treasurePage = Math.floor(
+        shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
+      );
+      shell.renderMortal();
+      shell.toast(message);
     } else {
       const changed = shell.executeMortalAction(shell.save, action, id, shell.pendingRun?.path);
       if (changed) {
@@ -1187,12 +1221,6 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
           shell.closeNpcChat();
           shell.panel = '';
           shell.modal.innerHTML = '';
-        }
-        if (action === 'mortal-join') {
-          shell.selectedTreasure = shell.save.starter;
-          shell.treasurePage = Math.floor(
-            shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
-          );
         }
         shell.syncMortalChange();
         if (
@@ -1205,8 +1233,7 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
           shell.showTeaStory();
         if (fromTown && (action === 'mortal-buy' || action === 'mortal-sell') && shell.townNpc)
           shell.showTownEvent(shell.townNpc);
-        if (action === 'mortal-join' || action === 'mortal-leave')
-          shell.toast(shell.save.mortal.events[0]);
+        if (action === 'mortal-leave') shell.toast(shell.save.mortal.events[0]);
         if (action === 'mortal-activity' && !shell.save.mortal.activity)
           shell.toast(shell.save.mortal.events[0]);
       } else if (shell.panel === 'tea-story')
@@ -1608,6 +1635,14 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
     }
     return true;
   }
+  if (action === 'bestiary-difficulty' && shell.panel === 'bestiary') {
+    const next = Number(id);
+    if (Number.isInteger(next) && next >= 0 && next < 3) {
+      shell.bestiaryDifficulty = next;
+      shell.renderPanel();
+    }
+    return true;
+  }
   if (action === 'bestiary-stage') {
     shell.bestiaryStage = Number(id);
     shell.renderPanel();
@@ -1642,7 +1677,10 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
     action === 'bestiary' ||
     action === 'chronicle'
   ) {
-    if (!shell.game) shell.showPanel(action);
+    if (!shell.game) {
+      if (action === 'bestiary') shell.bestiaryDifficulty = shell.difficulty;
+      shell.showPanel(action);
+    }
     return true;
   }
   return false;

@@ -10,7 +10,7 @@
 - 游戏帮助所有分类不得出现广告字样，相关条件仅在实际操作界面说明。帮助只说明当前玩法、操作与奖励，不写更新日志、旧版本对照或存档迁移说明；技术兼容信息留在开发文档与验证记录。
 - 当前在 `master` 迭代。只有用户明确授权当前任务时才 commit / push；提交前先读 `git log --oneline -n 10`，沿用仓库英文 `Add ...` 风格，以实际历史为准。
 - 开始多步骤任务时说明假设、简短计划及验证目标。完成前执行检查，报告实际结果及未验证部分。
-- 每次完成代码修改后、提交或推送前，必须启动一个独立 subagent 审查本次代码及相关调用、布局和回归风险；主 agent 自审不能替代独立审查。发现的问题须先修复，再让审查 agent 复审受影响部分；取得明确无未解决问题的结论后才能提交、推送或部署。独立审查通过也不能替代必要的实际验证或用户的提交授权。
+- 每次完成代码修改后、提交或推送前，必须启动一个独立 subagent 审查本次代码及相关调用、布局和回归风险；主 agent 自审不能替代独立审查。 reviewer 必须核对受影响数值与说明：直接对照实际计算、时间与解锁条件、奖励池和费用，而非只看文案、截图或已有测试是否通过；逐项检查游戏帮助及相关玩法文档，并明确记录数值来源、验证结果与未覆盖部分。发现的问题须先修复，再让审查 agent 复审受影响部分；取得明确无未解决问题的结论后才能提交、推送或部署。独立审查通过也不能替代必要的实际验证或用户的提交授权。
 - 二进制资源红线：未经用户明确授权，禁止把任何新增二进制文件提交到 Git，包括图片、字体、音频、视频、压缩包及生成产物，也不得擅自替换已批准的二进制素材。仓库不允许任何字体文件、字库分包或完整字库。界面与 Canvas 可使用已批准的公共字体源 `fonts.loli.net`（样式）/ `gstatic.loli.net`（字形），必须保留系统字体回退；外部请求不能阻塞游戏、留影或离线游玩，不将远程字体复制、打包或纳入本地离线清单。提交前运行 `npm run assets:check`；CI 会按已批准素材基线检查路径、长度和 SHA-256，并逐提交检查新增二进制文件。禁止自行更新 `scripts/approved-binaries.json`、修改检查器或关闭 CI 来放行素材；用户明确要求新增素材时，先说明文件大小与用途，再按实际授权范围处理。所有截图、原图与临时生成结果只放 `/tmp` 或忽略的 `artifacts/`。
 - 依赖与锁文件红线：添加、升级或删除依赖后，推送前必须检查 `package-lock.json` 全部 `resolved` URL 的域名是公网可达的官方源（如 `registry.npmjs.org`），不得残留本机 npm 可能配置的内网镜像地址——这类地址本地安装一切正常，但会让 GitHub Actions 的 `npm ci` 在下载阶段崩溃（2026-10 实际事故，排查记录见 [验证记录](docs/verification.md)）。检查方法：`grep -o '"resolved": "https://[^/"]*' package-lock.json | sort -u` 逐域确认；发现内网域名必须在推送前改回官方源并重装验证。本机 `npm install` 或 `npm prune` 还会顺手改动锁文件的 libc 等字段格式，提交锁文件时以最小 diff 为准，无关的格式变化要还原。
 - 渲染实测（`perf:render`）只用 Node 22 内置 WebSocket 与 fetch 直连 Chrome DevTools Protocol，不引入 puppeteer 等浏览器驱动依赖，避免把额外依赖子树带进每次 push 的 `npm ci`。
@@ -30,6 +30,7 @@
 | ------------------------------------------------------------------- | ----------------------------------------- |
 | `src/data.ts`                                                       | 法宝、功法、灵根、境界、关卡与难度数据    |
 | `src/game.ts`                                                       | 无 DOM 战斗模拟、升级、伤害统计、对局快照 |
+| `src/enemy-stats.ts`、`src/bestiary-stats.ts`                       | 实战出生数值、妖物志解锁时段与同刻对照    |
 | `src/autoplay.ts`                                                   | AI 走位及选技，实战与平衡模拟共用         |
 | `src/progress.ts`                                                   | 永久存档、成长、寿元、闭关、天劫与结算    |
 | `src/mortal-data.ts`、`src/mortal.ts`                               | 人间时间、十六宗门、供奉与精研规则        |
@@ -67,6 +68,8 @@
 
 前六关地域技能在 `regional-combat.ts`，危险区几何与自动走位共用 `regional-hazards.ts`，绘制在 `regional-render.ts`。条形区域用带圆端的线段判定，漂移仅在预警结束后开始；小怪完整区域及漂移不得越过施法者周围 200 像素。第七关按用户要求保持既定行为，修改共享战斗或自动策略时须同时验证终关不受影响。 第二关火球仅将原伤害两成拆为1.5秒灼烧，不额外叠伤、不叠层或刷新时长；护体不施加，暂停冻结，快照保存剩余伤害，复活/借寿清除。第六关错拍双雷路与雷痕使用独立kind，击杀施法者散阵，雷麻沿用0.55秒/2.5秒保护；新的突进技能必须接入精英波兵种筛选，终关同种兵保留原技能。指南通过 `guide-source.ts` 按需加载，构建出的指南模块必须纳入离线清单；异步回调不得重新打开已关闭的面板。灵威/履历详情由 `chronicle-source.ts` 按需载入 `chronicle-content.ts`，同样遵守当前构建重试、离线缓存和迟到回调约束；增幅来源固定真实本命与路线，逐项移除重算且只读，不另抄战斗公式。
 
+妖物志的气血与触碰伤害必须通过 `enemy-stats.ts` 与实战出生共用计算，按所选难度、关卡及出现时段显示，不直接使用敌人模板基础值；普通和精英的同刻对照不表示所有兵种都会自然生成精英，守匣守卫另按七成气血说明。修改敌人数值模块同样触发全量平衡检查。成功付费拜入宗门随机赠一枚凡品丹药，与入门扣费、身份和见闻同次保存成功后应用；失败或重复点击不发药，未结束的历练不补发功法。
+
 续局结构校验与战斗公共类型在 `game-validation.ts` / `game-types.ts`，连击系数在 `boss-followup.ts`；续局校验与连击系数文件的变更同样触发完整平衡测试。战斗 HUD 在 `battle-hud.ts`，面板框架、返回焦点与滚动在 `panel-host.ts`。序章、轮回与终章模板在 `opening-ui.ts`，首页与战斗结果模板在 `lobby-ui.ts`，入镇和坊市互动在 `town-host.ts`，拍卖界面执行在 `auction-ui.ts`、交易结算在 `auction-trade.ts`，弹窗焦点与手动走位在 `input-controller.ts`，点击与按键动作分发在 `action-controller.ts`，城镇挂载、入场与广告面板在 `scene-flow.ts`。异步留影和丹囊交互分别在 `journey-card-panel.ts` / `medicine-panel.ts`；藏器阁、洞府和妖物志纯模板在各自的 `*-ui.ts`。出场、突破与预警绘制在 `render-overlays.ts` / `render-warnings.ts`。`styles.ts` 按原顺序加载十一份连续样式，禁止为了归类移动媒体覆盖顺序；`battle-hud.css` 仍在其后加载。
 
 开发及验证命令：
@@ -77,6 +80,7 @@ npm run dev -- --port 5173 --strictPort
 npm test
 npm run build
 npm run format:check
+npm run docs:check
 ```
 
 声音与战斗界面重构后运行 `npm ci --prefix scripts/browser-tools`、`npm run ui:check`（需要正常 5173 首页已启动）。回归只经 Chrome DevTools MCP 操作独立浏览器上下文，覆盖电脑、手机窄屏、竖屏及横屏的设置、声音、自动历练、暂停/帮助/伤害返回、刷新续局、升级选择与后期长数字/药效；`UI_BASE_URL` 可指定本机子路径，`CHROME_PATH` 可指定 Chrome。GitHub 的 `checks.yml` 独立运行同一浏览器回归门禁；单元测试、格式/Worker类型、界面回归分成独立job，失败让相应门禁标红，不放回Pages部署流程，也不以needs或轮询变相等待。提交前的本地验证与独立审查仍必须完成。工具依赖单独锁定在 `scripts/browser-tools`，不进入游戏依赖或平衡作业。报告与失败截图只写 `artifacts/ui-regression/`；本机需逐张视检时使用 `UI_SCREENSHOTS=1 npm run ui:check`，截图不提交 Git。布局重构同时保留改动前后截图/计算样式基线，自动检查不代替实际视觉审查。
@@ -137,6 +141,7 @@ PY
 
 - 仓库：<https://github.com/chenxuan520/qinglan-xiuxian>。
 - 平台部署地址：<https://chenxuan520.github.io/qinglan-xiuxian/>，仅供部署检查。README 和仓库网站栏只放唯一官网 <https://xiuxian.011203.xyz/>。
+- 文档一致性门禁 `npm run docs:check` 对照真实规则函数核对丹药表、灵根、秘境倍率、妖王时序与修为、累计门槛、本命、低重伤害、宗门费用与赠药、修习年岁和炼器加成，并复查全部帮助分类与妖物志。修改规则或增添表格时须补充对应检查，不以更新手填期望值、快照或删除检查来放行。自然语言条件与叙事含义仍由 reviewer 核对，自动检查不代表覆盖全部文案语义。独立 Quality job 在每次 push / PR 执行，失败标红；部署流程不混入这些测试。
 - `.github/workflows/pages.yml` 在 push `master` 后只按仓库子路径构建、校验18MB产物上限、恢复已有报告并发布，不运行单元/浏览器/平衡测试，不等待其他测试门禁；也支持手动触发。单元测试、格式/Worker类型、界面回归在独立 `checks.yml`，平衡在 `balance.yml`，二进制在 `binaries.yml`，发布和全量平衡不重复运行单测。仓库 Pages 来源为 GitHub Actions。
 - 经用户授权提交后，`git push origin master`，再用 `gh run list` / `gh run view <run-id>` 检查这次提交的部署结果。发布后用 MCP 确认新入口、资源与关键交互，不能只以 push 成功作为发布完成。
 

@@ -18,6 +18,12 @@ import { checkReportDiagnostics } from '../scripts/check-balance-report.ts';
 import { eligibleBalanceReportRun } from '../scripts/ci-artifacts.ts';
 import { renderReport } from '../scripts/balance-report.ts';
 
+test('敌人数值独立模块的改动继续触发全量平衡检查', () => {
+  assert.deepEqual(balanceChangedFiles(['src/enemy-stats.ts', 'src/bestiary-stats.ts']), [
+    'src/enemy-stats.ts',
+  ]);
+});
+
 test('纯界面/文档不触发全量，经验与实际判定文件触发', () => {
   assert.deepEqual(balanceChangedFiles(['src/style.css', 'src/guide.ts', 'docs/gameplay.md']), []);
   assert.deepEqual(

@@ -87,6 +87,107 @@ test('入门费随资质变化，天灵根最低；只能加入一个宗门', ()
   assert.ok(rootless.artifacts.includes('bloodpool'));
 });
 
+test('十六宗门成功拜入随机赠一枚凡品，药名记入见闻且同档保存', () => {
+  const pool = MEDICINES.filter((medicine) => medicine.tier === '凡品');
+  for (const sect of SECTS)
+    for (let i = 0; i < pool.length; i++) {
+      const s = wealthy();
+      const stones = s.stones;
+      let rolls = 0;
+      assert.equal(
+        joinSect(s, sect.id, undefined, () => {
+          rolls++;
+          return (i + 0.5) / pool.length;
+        }),
+        true,
+      );
+      assert.equal(rolls, 1);
+      assert.equal(s.stones, stones - entryCost(s));
+      assert.equal(s.mortal.member?.id, sect.id);
+      assert.deepEqual(s.medicine.bag, { [pool[i].id]: 1 });
+      assert.deepEqual(s.medicine.active, {});
+      assert.ok(s.mortal.events[0].includes(`获赠${pool[i].name}一枚`));
+      assert.ok(s.chronicle.entries.some((entry) => entry.detail.includes(pool[i].name)));
+      const restored = importSave(exportSave(s, null)).save;
+      assert.deepEqual(restored.medicine.bag, s.medicine.bag);
+      assert.deepEqual(restored.mortal.member, s.mortal.member);
+      const before = structuredClone(s);
+      assert.equal(
+        joinSect(s, sect.id, undefined, () => {
+          throw Error('重复入宗不再抽药');
+        }),
+        false,
+      );
+      assert.deepEqual(s, before);
+    }
+});
+
+test('缺钱、路线冲突或不能行动时不扣费不抽药，退宗后重新付费可再领', () => {
+  for (const blocked of ['stones', 'path', 'expired', 'invalid'] as const) {
+    const s = wealthy();
+    if (blocked === 'stones') s.stones = entryCost(s) - 1;
+    if (blocked === 'expired') s.age = 100;
+    const before = structuredClone(s);
+    assert.equal(
+      joinSect(
+        s,
+        blocked === 'invalid' ? 'unknown' : 'power',
+        blocked === 'path' ? 'demonic' : undefined,
+        () => {
+          throw Error('拒绝入宗时不应抽取赠药');
+        },
+      ),
+      false,
+    );
+    assert.deepEqual(s, before);
+  }
+  const s = wealthy();
+  const stones = s.stones;
+  assert.equal(
+    joinSect(s, 'power', undefined, () => 0),
+    true,
+  );
+  assert.equal(leaveSect(s), true);
+  assert.equal(
+    joinSect(s, 'power', undefined, () => 0),
+    true,
+  );
+  assert.equal(s.stones, stones - entryCost(s) * 2);
+  assert.deepEqual(s.medicine.bag, { huanglong: 2 });
+});
+
+test('入门赠药避开数量已满的凡品，全部已满或随机值非法时不产生半套入宗', () => {
+  const pool = MEDICINES.filter((medicine) => medicine.tier === '凡品');
+  const s = wealthy();
+  s.medicine.bag[pool[0].id] = Number.MAX_SAFE_INTEGER;
+  assert.equal(
+    joinSect(s, 'power', undefined, () => 0),
+    true,
+  );
+  assert.equal(s.medicine.bag[pool[0].id], Number.MAX_SAFE_INTEGER);
+  assert.equal(s.medicine.bag[pool[1].id], 1);
+  assert.deepEqual(importSave(exportSave(s, null)).save.medicine.bag, s.medicine.bag);
+  const full = wealthy();
+  for (const medicine of pool) full.medicine.bag[medicine.id] = Number.MAX_SAFE_INTEGER;
+  const before = structuredClone(full);
+  assert.equal(
+    joinSect(full, 'power', undefined, () => {
+      throw Error('全满时不抽药');
+    }),
+    false,
+  );
+  assert.deepEqual(full, before);
+  for (const roll of [-1, 1, NaN, Infinity]) {
+    const invalid = wealthy(),
+      before = structuredClone(invalid);
+    assert.equal(
+      joinSect(invalid, 'power', undefined, () => roll),
+      false,
+    );
+    assert.deepEqual(invalid, before);
+  }
+});
+
 test('任意宗门宝典精研十阶后记录仙门有道', () => {
   const s = wealthy(24);
   assert.equal(joinSect(s, 'power'), true);
@@ -213,7 +314,10 @@ test('十六宗门精研五阶赠灵品、十阶赠限时珍品，其余阶数�
   for (const sect of SECTS)
     for (const roll of [0, 0.999999]) {
       const s = wealthy(24);
-      assert.equal(joinSect(s, sect.id), true);
+      assert.equal(
+        joinSect(s, sect.id, undefined, () => 0),
+        true,
+      );
       for (let level = 1; level <= MAX_MASTERY; level++) {
         assert.equal(
           startActivity(s, 'study', () => roll),
@@ -221,7 +325,7 @@ test('十六宗门精研五阶赠灵品、十阶赠限时珍品，其余阶数�
         );
         assert.equal(
           Object.values(s.medicine.bag).reduce((sum, n) => sum + n, 0),
-          Math.floor(level / 5),
+          1 + Math.floor(level / 5),
         );
         if (level === 5 || level === 10) {
           const pool = MEDICINES.filter(
@@ -237,7 +341,11 @@ test('十六宗门精研五阶赠灵品、十阶赠限时珍品，其余阶数�
       const bag = structuredClone(s.medicine.bag);
       assert.equal(startActivity(s, 'study'), false);
       leaveSect(s);
-      assert.equal(joinSect(s, sect.id), true);
+      assert.equal(
+        joinSect(s, sect.id, undefined, () => 0),
+        true,
+      );
+      bag.huanglong++;
       assert.equal(resolveActivity(s), false);
       assert.deepEqual(importSave(exportSave(s, null)).save.medicine.bag, bag);
     }
@@ -246,6 +354,7 @@ test('精研赠药等待供奉处理后才发放，放弃研习不领药', () =>
   for (const decline of [false, true]) {
     const s = wealthy(12);
     joinSect(s, 'power');
+    const entryBag = structuredClone(s.medicine.bag);
     s.mortal.mastery.power = 4;
     s.mortal.years = s.mortal.member!.dueAt - 0.5;
     s.stones = studyPlan(s).stones;
@@ -254,13 +363,13 @@ test('精研赠药等待供奉处理后才发放，放弃研习不领药', () =>
       true,
     );
     assert.equal(sectDuesPending(s), true);
-    assert.deepEqual(s.medicine.bag, {});
+    assert.deepEqual(s.medicine.bag, entryBag);
     s.stones = s.mortal.member!.dues;
     assert.equal(
       settleSectDues(s, decline, () => 0),
       true,
     );
-    assert.deepEqual(s.medicine.bag, decline ? {} : { heqi: 1 });
+    assert.deepEqual(s.medicine.bag, decline ? entryBag : { ...entryBag, heqi: 1 });
     assert.equal(resolveActivity(s), false);
   }
 });
@@ -269,11 +378,13 @@ test('旧档不追补精研丹药，待完成研习只发一次且读档导入�
     const s = wealthy(24);
     joinSect(s, 'power');
     s.mortal.mastery.power = level;
+    s.medicine.bag = {};
     assert.deepEqual(importSave(exportSave(s, null)).save.medicine.bag, {});
     assert.equal(resolveActivity(s), false);
   }
   const s = wealthy(24);
   joinSect(s, 'power');
+  const entryBag = structuredClone(s.medicine.bag);
   s.mortal.mastery.power = 9;
   s.mortal.activity = { kind: 'study', sect: 'power', total: 1, remaining: 0.25 };
   const restored = importSave(exportSave(s, null)).save;
@@ -281,10 +392,13 @@ test('旧档不追补精研丹药，待完成研习只发一次且读档导入�
     resolveActivity(restored, () => 0),
     true,
   );
-  assert.deepEqual(restored.medicine.bag, { mingqing: 1 });
+  assert.deepEqual(restored.medicine.bag, { ...entryBag, mingqing: 1 });
   const again = parseSave(JSON.stringify(restored));
   assert.equal(resolveActivity(again), false);
-  assert.deepEqual(importSave(exportSave(again, null)).save.medicine.bag, { mingqing: 1 });
+  assert.deepEqual(importSave(exportSave(again, null)).save.medicine.bag, {
+    ...entryBag,
+    mingqing: 1,
+  });
 });
 test('退宗保留精研，只有当前宗门加成；重新入宗恢复', () => {
   const s = wealthy(24);

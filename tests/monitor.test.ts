@@ -17,6 +17,7 @@ import {
   monitorTime,
   monitorRate,
   monitorAverage,
+  monitorVersions,
   validMonitorCI,
 } from '../src/monitor-view.ts';
 
@@ -156,6 +157,67 @@ test('统计口径按结算计算胜率，加权和除以对应观测数，UTC �
   const html = monitorTable(['摘要'], [['<script>private()</script>']]);
   assert.ok(html.includes('&lt;script&gt;'));
   assert.ok(!html.includes('<script>'));
+});
+
+test('版本分布不超过20项时直接展示，不增加展开入口', () => {
+  assert.equal(monitorVersions([]), '<p class="note">当前范围暂无记录。</p>');
+  for (const length of [1, 20]) {
+    const rows = Array.from({ length }, (_, i) => ({
+      version: `v${String(i).padStart(3, '0')}`,
+      sessions: 100 - i,
+      starts: i,
+      errors: 0,
+    }));
+    const html = monitorVersions(rows);
+    assert.equal((html.match(/<tbody>/g) ?? []).length, 1);
+    assert.equal((html.match(/<td>v\d{3}<\/td>/g) ?? []).length, length);
+    assert.doesNotMatch(html, /<details|<summary|展开其余/);
+  }
+});
+
+test('版本分布按原顺序保留前20项，其余完整置于默认折叠区域', () => {
+  for (const length of [21, 100]) {
+    const rows = Array.from({ length }, (_, i) => ({
+      version: `v${String(i).padStart(3, '0')}`,
+      sessions: (i * 37) % length,
+      starts: i,
+      errors: 0,
+    }));
+    const original = structuredClone(rows);
+    rows.forEach(Object.freeze);
+    Object.freeze(rows);
+    const html = monitorVersions(rows);
+    const [preview, remaining] = html.split('<details');
+    const versions = (part: string) =>
+      [...part.matchAll(/<td>(v\d{3})<\/td>/g)].map((match) => match[1]);
+    assert.deepEqual(
+      versions(preview),
+      rows.slice(0, 20).map((r) => r.version),
+    );
+    assert.deepEqual(
+      versions(remaining),
+      rows.slice(20).map((r) => r.version),
+    );
+    assert.match(remaining, /^ class="versions-more"><summary>/);
+    assert.doesNotMatch(html, /<details[^>]*\bopen(?:\s|=|>)/);
+    assert.ok(html.includes(`展开其余 ${length - 20} 个版本`));
+    assert.ok(html.includes(`收起其余 ${length - 20} 个版本`));
+    assert.deepEqual(rows, original);
+  }
+});
+
+test('版本名称在常显和折叠区域都沿用文本转义', () => {
+  const rows = Array.from({ length: 21 }, (_, i) => ({
+    version: i === 19 || i === 20 ? '<img src=x onerror="alert(1)">' : `v${i}`,
+    sessions: 1,
+    starts: 0,
+    errors: 0,
+  }));
+  const [preview, remaining] = monitorVersions(rows).split('<details');
+  for (const part of [preview, remaining]) {
+    assert.match(part, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+    assert.doesNotMatch(part, /<img/);
+  }
 });
 
 test('公开开关、配置、方法、参数及限流失败均在 SQL 之前终止', async () => {

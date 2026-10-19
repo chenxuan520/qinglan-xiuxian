@@ -94,7 +94,23 @@ function canAct(save: SaveData) {
     !sectDuesPending(save)
   );
 }
-export function joinSect(save: SaveData, id: string, unfinishedPath?: CultivationPath) {
+export function sectEntryMedicinePool(save: SaveData) {
+  return MEDICINES.filter((medicine) => {
+    const count = save.medicine.bag[medicine.id] ?? 0;
+    return (
+      medicine.tier === '凡品' &&
+      Number.isSafeInteger(count) &&
+      count >= 0 &&
+      Number.isSafeInteger(count + 1)
+    );
+  });
+}
+export function joinSect(
+  save: SaveData,
+  id: string,
+  unfinishedPath?: CultivationPath,
+  random = Math.random,
+) {
   const sect = SECTS.find((s) => s.id === id);
   if (
     !canAct(save) ||
@@ -104,6 +120,11 @@ export function joinSect(save: SaveData, id: string, unfinishedPath?: Cultivatio
     save.stones < entryCost(save)
   )
     return false;
+  // 赠药与入宗一并结算，数量已满的凡品不进入抽取池。
+  const gifts = sectEntryMedicinePool(save);
+  if (!gifts.length) return false;
+  const gift = gifts[Math.floor(random() * gifts.length)];
+  if (!gift) return false;
   save.stones -= entryCost(save);
   save.path = sect.school;
   alignStarterWithPath(save);
@@ -113,7 +134,8 @@ export function joinSect(save: SaveData, id: string, unfinishedPath?: Cultivatio
     dueAt: dues.stones ? save.mortal.years + dues.years : 0,
     dues: dues.stones,
   };
-  log(save, `拜入${SECTS.find((s) => s.id === id)!.name}，本门精研加成已生效。`);
+  const medicine = grantMedicine(save.medicine, gift.id);
+  log(save, `拜入${sect.name}，获赠${medicine}一枚，已收入丹囊；本门精研加成已生效。`);
   if (!Object.hasOwn(save.chronicle.milestones, 'sect')) save.chronicle.milestones.sect = save.age;
   return true;
 }

@@ -500,6 +500,19 @@
   color: #b7c6ab;
   font-size: inherit;
 }
+.enemy-card > div {
+  min-width: 0;
+}
+.enemy-card .enemy-stats {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--jade);
+  overflow-wrap: anywhere;
+}
+.enemy-stats b {
+  color: var(--gold);
+  font-weight: 400;
+}
 .boss-note {
   border: 1px solid #baac7e3b;
   margin-top: 20px;

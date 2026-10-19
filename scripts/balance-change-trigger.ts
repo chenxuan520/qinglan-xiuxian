@@ -14,6 +14,7 @@ export const BALANCE_FILES = new Set([
   'src/artifact-seeking.ts',
   'src/service-preflight.ts',
   'src/game.ts',
+  'src/enemy-stats.ts',
   'src/game-validation.ts',
   'src/game-types.ts',
   'src/regional-combat.ts',

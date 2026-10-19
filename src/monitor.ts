@@ -26,6 +26,7 @@ import {
   monitorRealm,
   monitorReason,
   monitorTable as table,
+  monitorVersions,
   validMonitorCI,
 } from './monitor-view.ts';
 import './monitor.css';
@@ -52,7 +53,7 @@ root.innerHTML = `<main>
     )
     .join(
       '',
-    )}</select></label><button id="live-refresh">刷新线上统计</button><a id="live-api" href="${MONITOR_ENDPOINT}" target="_blank" rel="noopener noreferrer">聚合 JSON 接口 ↗</a></div><p id="live-status" class="note" role="status">正在读取…</p><div id="cards" class="cards"></div><details><summary>统计口径与保存时间</summary><ul><li>数据来自游戏的匿名事件，不含存档或闲聊；开启匿名统计的浏览器才会发送。打开次数指游戏 session，不包含监控页访问。</li><li>匿名浏览器编号不能代表真实人数；换设备、清理缓存或关闭统计会影响记录。跨站概览按编号去重，分站数量不能直接相加。</li><li>事件量按 Analytics Engine 采样权重估算，编号分布仍为实际观测去重，少量数据也会有波动。排除版本 verification 的上线验证记录。</li><li>历练通关率＝通关结算／全部结算，主动结束也在分母中；不是从第一关到第六关的整条路线通过率。开局和结算可能跨时间窗，灵根与路线是事件发生时的状态，不能严格配对。</li><li>普通历练和天劫分开统计。最高境界及最远通关只表示当前窗口内观测到的记录。版本和错误明细分别最多展示 100 组。</li><li>原始数据约保留三个月；统计接口缓存最多五分钟。日趋势按北京时间划分；「最近 N 天」为滚动 N×24 小时，首尾日期可能是不完整的一天。</li></ul></details></section>
+    )}</select></label><button id="live-refresh">刷新线上统计</button><a id="live-api" href="${MONITOR_ENDPOINT}" target="_blank" rel="noopener noreferrer">聚合 JSON 接口 ↗</a></div><p id="live-status" class="note" role="status">正在读取…</p><div id="cards" class="cards"></div><details><summary>统计口径与保存时间</summary><ul><li>数据来自游戏的匿名事件，不含存档或闲聊；开启匿名统计的浏览器才会发送。打开次数指游戏 session，不包含监控页访问。</li><li>匿名浏览器编号不能代表真实人数；换设备、清理缓存或关闭统计会影响记录。跨站概览按编号去重，分站数量不能直接相加。</li><li>事件量按 Analytics Engine 采样权重估算，编号分布仍为实际观测去重，少量数据也会有波动。排除版本 verification 的上线验证记录。</li><li>历练通关率＝通关结算／全部结算，主动结束也在分母中；不是从第一关到第六关的整条路线通过率。开局和结算可能跨时间窗，灵根与路线是事件发生时的状态，不能严格配对。</li><li>普通历练和天劫分开统计。最高境界及最远通关只表示当前窗口内观测到的记录。版本数据最多 100 组，默认展示前 20 组，其余可展开；错误明细最多 100 组。</li><li>原始数据约保留三个月；统计接口缓存最多五分钟。日趋势按北京时间划分；「最近 N 天」为滚动 N×24 小时，首尾日期可能是不完整的一天。</li></ul></details></section>
   <section aria-labelledby="performance-title"><div class="section-heading"><h2 id="performance-title">性能与每日渲染</h2><button id="performance-refresh">刷新性能摘要</button></div><p class="note">独立于线上筛选。每日无头 Chrome 在第六境后期满配场景采样 60 秒；CI 机器的帧率仅用于观察，不能代表手机真机帧率。模拟成本、构建体积取最近已完成的 master 快检。</p><div id="performance-content" aria-live="polite">正在读取性能摘要…</div></section>
   <section aria-labelledby="errors-title"><h2 id="errors-title">运行错误</h2><p class="note">按站点、版本、摘要合并，最近出现优先；前端会去重限频。这是浏览器上报记录，不代表所有运行故障。摘要可能含浏览器原始错误文本。</p><div id="errors"></div></section>
   <section><h2>访问与开局趋势</h2><div id="trend"></div></section>
@@ -313,10 +314,7 @@ function render(data: MonitorData) {
         );
         break;
       case 'versions':
-        $(id).innerHTML = table(
-          ['版本', '打开', '开局', '错误'],
-          rows.map((r) => [r.version, count(r.sessions), count(r.starts), count(r.errors)]),
-        );
+        $(id).innerHTML = monitorVersions(rows);
         break;
       case 'errors':
         renderErrors(rows);

@@ -12,6 +12,7 @@
     "deploy:npc-ai": "npm run check:npc-ai && wrangler deploy --config workers/npc-ai/wrangler.jsonc",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "docs:check": "node --experimental-strip-types --test tests/gameplay-docs.test.ts tests/guide-source.test.ts tests/bestiary.test.ts",
     "ui:check": "node --experimental-strip-types scripts/ui-regression.ts",
     "assets:check": "node --experimental-strip-types scripts/check-binaries.ts",
     "balance": "node --experimental-strip-types scripts/balance.ts",

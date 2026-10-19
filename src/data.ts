@@ -1493,8 +1493,8 @@ export const ENEMY_SKILLS = {
   },
   thundercharge: {
     name: '踏雷突袭',
-    hint: '沿扑击路线留下雷痕，侧移避开，触雷短暂雷麻',
-    eliteHint: '雷痕在扑击后生效，勿沿原路追击',
+    hint: '近处突袭沿扑击路线留雷痕，侧移避开，触雷短暂雷麻',
+    eliteHint: '近处突袭的雷痕在扑击后生效，勿沿原路追击',
   },
   firebolt: {
     name: '熔火飞弹',

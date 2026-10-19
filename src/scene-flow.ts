@@ -502,7 +502,10 @@ export function renderPanel(shell: ActionShell) {
       return;
     }
     if (bestiary) {
-      const view = shell.guideSource.current.bestiaryPanel(shell.bestiaryStage);
+      const view = shell.guideSource.current.bestiaryPanel(
+        shell.bestiaryStage,
+        shell.bestiaryDifficulty,
+      );
       shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
     } else {
       const { GUIDE_TABS, guideContent } = shell.guideSource.current;

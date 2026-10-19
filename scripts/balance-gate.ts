@@ -211,6 +211,7 @@ export async function main(args: string[]) {
     const coreFiles = [
       'data.ts',
       'game.ts',
+      'enemy-stats.ts',
       'game-validation.ts',
       'boss-followup.ts',
       'progress.ts',

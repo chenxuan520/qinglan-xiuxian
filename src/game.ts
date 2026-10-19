@@ -1,3 +1,4 @@
+import { enemyCombatStats } from './enemy-stats.ts';
 import { ownsCurio, bossCurio } from './curio-data.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
@@ -45,9 +46,7 @@ import {
   PASSIVES,
   STAGES,
   STAGE_COMBAT_SCALING,
-  BOSS_COMBAT,
   ELITE_PACING,
-  STAGE_REALM_STEPS,
   cultivationRate,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,
@@ -1034,41 +1033,25 @@ export class Game {
     }
     const template = ENEMIES[type],
       angle = this.random() * TAU;
-    const difficulty = DIFFICULTIES[this.difficulty];
-    const realmStep = STAGE_REALM_STEPS[this.stage];
-    const scaling = STAGE_COMBAT_SCALING[this.stage];
-    const eliteScaling = elite && !boss ? scaling.elite : undefined;
+    const combat = enemyCombatStats(
+      this.stage,
+      this.difficulty,
+      this.time,
+      type,
+      elite,
+      boss,
+      bossStage,
+      this.tribulation,
+    );
+    const eliteScaling = elite && !boss ? STAGE_COMBAT_SCALING[this.stage].elite : undefined;
     const progress = this.combatProgress;
-    // 妖王排程独立于小怪压力；小怪五分钟达到固定峰值，之后不再增强。
-    const strengthTime = this.isFinalTrial ? progress * 600 : this.time;
-    const strength = (1 + strengthTime / 260) * (1 + this.stage * 0.22);
-    const hp = boss
-      ? (this.isFinalTrial
-          ? bossStage === FINAL_TRIAL_STAGE
-            ? 560000
-            : 120000 + bossStage * 35000
-          : (16000 + this.stage * 11000) *
-            (this.tribulation ? 1 : this.stage === 4 ? 1.3 : this.stage === 5 ? 1.5 : 1)) *
-        difficulty.hp *
-        (this.tribulation
-          ? 1
-          : this.isFinalTrial
-            ? BOSS_COMBAT.trialHp
-            : BOSS_COMBAT.hp[this.stage])
-      : template.hp * strength * difficulty.hp * (elite ? 7 : 1) * (eliteScaling?.hp ?? 1);
-    const lateHealth =
-      this.usesElitePacing && elite && !boss
-        ? 1 +
-          (ELITE_PACING.hpPeaks[this.stage] - 1) *
-            Math.max(0, Math.min(1, (progress - ELITE_PACING.hpStart) / ELITE_PACING.hpRamp)) ** 1.5
-        : 1;
     const enemy: Enemy = {
       id: ++this.serial,
       type,
       x: at?.x ?? this.player.x + Math.cos(angle) * (this.viewport.width / 2 + 70),
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
-      hp: hp * scaling.hp * realmDamageMultiplier(realmStep) * lateHealth,
-      maxHp: hp * scaling.hp * realmDamageMultiplier(realmStep) * lateHealth,
+      hp: combat.hp,
+      maxHp: combat.hp,
       radius: boss
         ? bossStage === FINAL_TRIAL_STAGE
           ? 62
@@ -1083,25 +1066,7 @@ export class Game {
           (1 + progress * 0.3) *
           (elite ? 1.21 : 1) *
           (eliteScaling?.speed ?? 1),
-      damage:
-        (boss
-          ? this.isFinalTrial
-            ? bossStage === FINAL_TRIAL_STAGE
-              ? 220
-              : 85 + bossStage * 10
-            : 52 + this.stage * 16
-          : template.damage * (1 + this.stage * 0.12)) *
-        (boss ? 1 : this.isFinalTrial ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
-        difficulty.damage *
-        (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
-        (this.isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3) *
-        realmHealthMultiplier(realmStep) *
-        (eliteScaling?.damage ?? 1) *
-        (boss && !this.tribulation
-          ? this.isFinalTrial
-            ? BOSS_COMBAT.trialDamage
-            : BOSS_COMBAT.damage[this.stage]
-          : 1),
+      damage: combat.damage,
       elite,
       boss,
       bossStage: boss ? bossStage : undefined,

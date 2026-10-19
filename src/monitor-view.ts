@@ -54,6 +54,19 @@ export function monitorTable(headers: string[], rows: unknown[][]) {
   if (!rows.length) return '<p class="note">当前范围暂无记录。</p>';
   return `<div class="table-wrap" tabindex="0" role="region" aria-label="${monitorEscape(headers[0])}统计表，可横向滚动"><table><thead><tr>${headers.map((c) => `<th scope="col">${monitorEscape(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${monitorEscape(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
+export function monitorVersions(rows: MonitorRow[]) {
+  const headers = ['版本', '打开', '开局', '错误'];
+  const cells = rows.map((r) => [
+    r.version,
+    monitorCount(r.sessions),
+    monitorCount(r.starts),
+    monitorCount(r.errors),
+  ]);
+  const preview = monitorTable(headers, cells.slice(0, 20));
+  if (rows.length <= 20) return preview;
+  const remaining = rows.length - 20;
+  return `${preview}<details class="versions-more"><summary><span class="versions-expand">展开其余 ${remaining} 个版本</span><span class="versions-collapse">收起其余 ${remaining} 个版本</span></summary>${monitorTable(headers, cells.slice(20))}</details>`;
+}
 export type MonitorCI = {
   schemaVersion: 1;
   commit: string | null;

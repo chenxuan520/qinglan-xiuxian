@@ -153,7 +153,7 @@ export function medicineCraftReason(save: SaveData, id: string, unfinished = fal
   if (unfinished) return '请先结束当前历练';
   if (save.journeyEnded || save.pendingReincarnation) return '此世仙途已结束';
   if (save.mortal.marketSocial?.ambush) return '请先处理尚未结束的劫修遭遇';
-  if (save.unlocked < m.stage) return `探索第 ${m.stage + 1} 境后解锁配方`;
+  if (save.unlocked < m.stage) return `解锁第 ${m.stage + 1} 境后可炼制`;
   if (tribulationDue(save) || sectDuesPending(save) || save.mortal.activity)
     return '请先处理人间待办、供奉或天劫';
   if (lifespanInfo(save).remaining <= brew.years + 1e-9) return '余下寿元不足，不能开炉';

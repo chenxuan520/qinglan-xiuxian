@@ -165,6 +165,13 @@ summary {
   cursor: pointer;
   font-weight: 600;
 }
+.versions-more .versions-collapse,
+.versions-more[open] .versions-expand {
+  display: none;
+}
+.versions-more[open] .versions-collapse {
+  display: inline;
+}
 details ul {
   padding-left: 24px;
 }

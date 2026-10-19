@@ -31,13 +31,13 @@ export function regionalSkillDetails(
       {
         roots: {
           name: '青藤横生',
-          hint: '绕开延伸的藤枝，击杀施法者可散阵',
-          eliteHint: '双枝分路生长，绕开藤枝',
+          hint: '藤枝封路并短暂减速，击杀施法者可散阵',
+          eliteHint: '双枝封路，命中移速降低25%',
         },
         frost: {
           name: '凝霜冰棱',
-          hint: '冰棱沿直线长出，侧移避开',
-          eliteHint: '两道冰棱夹击，中间留有空隙',
+          hint: '直线冰棱命中后短暂减速，侧移避开',
+          eliteHint: '双道冰棱夹击，命中移速降低25%，中间留有空隙',
         },
         miasma: {
           name: '游瘴吐息',

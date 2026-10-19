@@ -9,6 +9,57 @@ test('全部帮助分类不出现广告文案；界面导览仅由玩家主动�
   assert.doesNotMatch(guide.guideContent('basics'), /guide-demo|<details[^>]*open/);
 });
 
+test('帮助将三成边界限定为功法合计系数，并说明奇物另算', () => {
+  const builds = guide.guideContent('builds');
+  assert.match(builds, /施法间隔与承伤的功法合计系数各最低取基础的 30%/);
+  assert.match(builds, /之后仍乘丹药及相应奇物效果，最终值可更低/);
+  assert.match(builds, /未持有奇物时的修习效果/);
+  assert.match(builds, /养魂木另使淬体气血与悟道增伤的加成提高 15%/);
+  assert.doesNotMatch(builds, /施法间隔最低为基础的 30%|承伤最低为基础的 30%/);
+});
+
+test('预警帮助区分前六境小怪、秘境妖王与独立天劫', () => {
+  const combat = guide.guideContent('combat');
+  assert.match(combat, /前六境普通与精英妖物的远程攻击出手前会蓄力约 0\.65 秒/);
+  assert.match(combat, /前六境中，第二、六境妖王登场 1 秒后首次出招/);
+  assert.match(combat, /秘境妖王的地面落阵至少预警 1\.2 秒/);
+  assert.match(combat, /小怪和独立天劫按各自节奏，天劫预警逐次缩短/);
+  assert.match(combat, /挑战最多 45 秒，且在妖王预定登场前 12 秒截止/);
+  assert.match(combat, /第七境小怪随时间逐渐增强，5:00 达到/);
+  assert.doesNotMatch(combat, /其余秘境与独立天劫为 2\.5 秒|地面招式至少预警 1\.2 秒/);
+});
+
+test('离界帮助说明法宝、丹药与奇物共用一份传承名额', () => {
+  const builds = guide.guideContent('builds');
+  assert.match(builds, /已收藏法宝、丹囊现有丹药或随身奇物中选择一物/);
+  assert.match(builds, /三类共用一个赠物名额/);
+  assert.match(builds, /奇物在新世持有即生效/);
+  assert.match(guide.guideContent('save'), /法宝、现有丹药或随身奇物中选一物赠给少年/);
+});
+
+test('入宗凡品赠药与精研门槛赠药分开说明', () => {
+  const mortal = guide.guideContent('mortal');
+  assert.match(mortal, /每次成功付费拜入宗门，另获赠 1 枚随机凡品丹药，收入丹囊，不自动服用/);
+  assert.match(mortal, /完成第 5 阶赠 1 颗随机灵品丹药/);
+  assert.match(mortal, /完成第 10 阶赠 1 颗随机限时珍品丹药/);
+});
+
+test('寿终与弃劫先落幕可留影，确认轮回才清空', () => {
+  const save = guide.guideContent('save');
+  assert.match(save, /不再借寿时进入「此世寿终」，可先留存此世；确认轮回后才清空本世进度/);
+  assert.match(save, /确认放弃后进入「止于天劫」落幕页，可先留存此世，再确认轮回/);
+  assert.doesNotMatch(save, /放弃续命则强制轮回|主动放弃并确认后强制轮回/);
+});
+
+test('配套功法优先级以默认培养倾向为前提', () => {
+  assert.match(guide.guideContent('builds'), /自动历练采用默认培养倾向时/);
+  assert.match(guide.guideContent('builds'), /其他培养倾向按设置取舍/);
+  assert.match(
+    guide.guideContent('combat'),
+    /默认培养倾向优先配套功法和仙器觉醒，其他倾向按设置取舍/,
+  );
+});
+
 test('首次打开指南合并并发加载，成功后重开直接复用模块', async () => {
   let finish!: (value: typeof guide) => void;
   let calls = 0;

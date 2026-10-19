@@ -340,6 +340,7 @@ let treasureReturn: PanelLocation | null = null;
 let touchHintDismissed = false;
 let schoolFilter = 'all';
 let bestiaryStage = -1;
+let bestiaryDifficulty = 0;
 let treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
 let rewards: ReturnType<typeof settleRun> | null = null,
   oldRealm = '',
@@ -1351,6 +1352,8 @@ function shellBindings(): ActionShell {
     get beginJourneyFarewell() { return beginJourneyFarewell; },
     get beginSectMarketVisit() { return beginSectMarketVisit; },
     get beginTribulation() { return beginTribulation; },
+    get bestiaryDifficulty() { return bestiaryDifficulty; },
+    set bestiaryDifficulty(next) { bestiaryDifficulty = next; },
     get bestiaryStage() { return bestiaryStage; },
     set bestiaryStage(next) { bestiaryStage = next; },
     get bookTab() { return bookTab; },
