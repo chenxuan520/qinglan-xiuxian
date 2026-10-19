@@ -2085,6 +2085,9 @@ ensureScene(selectedStage, () => {
   renderPrologue();
 });
 requestAnimationFrame(frame);
+void import('./first-run-tour.ts')
+  .then(({ queueFirstRunTour }) => queueFirstRunTour(shellBindings(), saveRead.status === 'empty'))
+  .catch(() => resourceFailed(true));
 
 // Development-only access for deterministic browser verification; omitted from production.
 if (import.meta.env.DEV)

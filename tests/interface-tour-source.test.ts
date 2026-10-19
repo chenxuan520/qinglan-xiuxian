@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { resourceFailureContent } from '../src/resource-panel.ts';
+import { markFirstTourSeen } from '../src/first-run-tour.ts';
 
 const source = readFileSync(new URL('../src/interface-tour-source.ts', import.meta.url), 'utf8');
 // 执行真实入口与关闭逻辑，仅替换网络加载器和浏览器节点。
@@ -77,6 +78,7 @@ function harness(failures: number) {
       return module;
     },
     resourceFailureContent,
+    markFirstTourSeen,
     resourceFailed: (handled: boolean) => flags.push(handled),
   });
   flow.runInContext(context);
@@ -143,4 +145,65 @@ test('等待导览时关闭面板，迟到成功或失败不能修改已断开�
     assert.equal(h.starts, 0);
     assert.equal(h.host.innerHTML, original);
   }
+});
+
+test('自动导览不依赖指南按钮，沿用活动状态且在资源就绪后才消费首次标记', async () => {
+  const h = harness(0);
+  let starts = 0,
+    consumed = 0;
+  Object.assign(h.module, {
+    startInterfaceTour: (_ui: unknown, _modal: unknown, _close: unknown, automatic: boolean) => {
+      assert.equal(automatic, true);
+      starts++;
+    },
+  });
+  const modal = { querySelector: () => null };
+  assert.equal(
+    await h.context.startAutomaticInterfaceTour(
+      {},
+      modal,
+      () => true,
+      () => false,
+    ),
+    false,
+  );
+  assert.equal(starts, 0);
+  assert.equal(
+    await h.context.startAutomaticInterfaceTour(
+      {},
+      modal,
+      () => true,
+      () => {
+        consumed++;
+        return true;
+      },
+    ),
+    true,
+  );
+  assert.equal(consumed, 1);
+  assert.equal(starts, 1);
+  assert.equal(new Script('tourActive').runInContext(h.context), true);
+});
+
+test('自动导览加载期间离开首页，不能展示蒙层或提前消费标记', async () => {
+  const h = harness(0);
+  const pending = Promise.withResolvers();
+  h.context.fetchTour = () => pending.promise;
+  let valid = true,
+    consumed = 0;
+  const request = h.context.startAutomaticInterfaceTour(
+    {},
+    {},
+    () => valid,
+    () => {
+      consumed++;
+      return true;
+    },
+  );
+  valid = false;
+  pending.resolve(h.module);
+  assert.equal(await request, false);
+  assert.equal(consumed, 0);
+  assert.equal(h.starts, 0);
+  assert.equal(new Script('tourActive').runInContext(h.context), false);
 });

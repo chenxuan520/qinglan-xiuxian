@@ -16,7 +16,12 @@ import {
   passive,
 } from './data.ts';
 import { icon, smallIcon } from './icons.ts';
-export { startInterfaceTour, stopInterfaceTour, tourActive } from './interface-tour-source.ts';
+export {
+  startInterfaceTour,
+  startAutomaticInterfaceTour,
+  stopInterfaceTour,
+  tourActive,
+} from './interface-tour-source.ts';
 
 export const GUIDE_TABS = [
   { id: 'basics', title: '怎么玩' },

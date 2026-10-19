@@ -1,6 +1,7 @@
 import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import { retryModule } from './module-source.ts';
+import { markFirstTourSeen } from './first-run-tour.ts';
 type TourModule = typeof import('./interface-tour.ts');
 let current: TourModule | null = null;
 let pending: Promise<TourModule> | null = null;
@@ -17,6 +18,37 @@ export function stopInterfaceTour() {
   generation++;
   current?.stopInterfaceTour();
   tourActive = false;
+}
+export async function startAutomaticInterfaceTour(
+  ui: HTMLDivElement,
+  modal: HTMLDivElement,
+  valid: () => boolean,
+  begin: () => boolean = () => true,
+  roots?: Parameters<TourModule['startInterfaceTour']>[4],
+) {
+  if (tourActive || !valid()) return false;
+  const request = ++generation;
+  try {
+    current ??= await (pending ??= fetchTour().finally(() => {
+      pending = null;
+    }));
+    if (generation !== request || !valid() || !begin()) return false;
+    tourActive = true;
+    current.startInterfaceTour(
+      ui,
+      modal,
+      () => {
+        tourActive = false;
+      },
+      true,
+      roots,
+    );
+    return true;
+  } catch {
+    resourceFailed(true);
+    tourActive = false;
+    return false;
+  }
 }
 export async function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement) {
   if (tourActive) return;
@@ -43,6 +75,7 @@ export async function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivEleme
       preventScroll: true,
     });
     tourActive = true;
+    markFirstTourSeen();
     current.startInterfaceTour(ui, modal, () => {
       tourActive = false;
     });

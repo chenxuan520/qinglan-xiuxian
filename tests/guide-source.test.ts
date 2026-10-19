@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { GuideSource } from '../src/guide-source.ts';
 import * as guide from '../src/guide.ts';
 
-test('全部帮助分类不出现广告文案；界面导览仅由玩家主动进入', () => {
+test('全部帮助分类不出现广告文案；指南保留主动进入导览的入口', () => {
   for (const tab of guide.GUIDE_TABS) assert.doesNotMatch(guide.guideContent(tab.id), /广告/);
   assert.match(guide.guideContent('basics'), /data-action="guide-tour"/);
   assert.doesNotMatch(guide.guideContent('basics'), /guide-demo|<details[^>]*open/);

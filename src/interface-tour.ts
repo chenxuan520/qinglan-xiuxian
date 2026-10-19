@@ -1,4 +1,4 @@
-import { freshSave, settleRun } from './progress.ts';
+import { freshSave, settleRun, type SaveData } from './progress.ts';
 import { Game } from './game.ts';
 import { Renderer } from './render.ts';
 import { BattleHud } from './battle-hud.ts';
@@ -16,7 +16,13 @@ export let tourActive = false;
 export let stopInterfaceTour = () => {};
 
 // Only templates and an isolated Game are used here. No actions, telemetry or persistence.
-export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, onClose: () => void) {
+export function startInterfaceTour(
+  ui: HTMLDivElement,
+  modal: HTMLDivElement,
+  onClose: () => void,
+  automatic = false,
+  roots?: Pick<SaveData, 'spiritRoot' | 'rootElements' | 'path' | 'starter'>,
+) {
   if (tourActive) return;
   const originalUi = document.createDocumentFragment();
   const originalModal = document.createDocumentFragment();
@@ -38,7 +44,16 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  const sample = freshSave('heaven', ['metal'], 'orthodox', random);
+  const sample = freshSave(
+    roots?.spiritRoot ?? 'heaven',
+    roots ? [...roots.rootElements] : ['metal'],
+    roots?.path ?? 'orthodox',
+    random,
+  );
+  if (roots) {
+    sample.starter = roots.starter;
+    sample.artifacts = [...new Set([...sample.artifacts, roots.starter])];
+  }
   sample.cultivation = 1;
   sample.stones = 300;
   sample.iron = 12;
@@ -53,7 +68,7 @@ export function startInterfaceTour(ui: HTMLDivElement, modal: HTMLDivElement, on
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-labelledby', 'tour-title');
-  overlay.innerHTML = `<svg class="tour-shade" aria-hidden="true"><defs><mask id="tour-mask"><rect width="100%" height="100%" fill="white"/><rect class="tour-hole" rx="8" fill="black"/></mask></defs><rect width="100%" height="100%" fill="#020e0c" fill-opacity=".8" mask="url(#tour-mask)"/></svg><div class="tour-outline" aria-hidden="true"></div><section class="tour-card" aria-live="polite"><header><span class="tour-progress"></span></header><h2 id="tour-title"></h2><p class="tour-copy"></p><small class="tour-tip"></small><div class="tour-steps" aria-hidden="true"></div></section><nav class="tour-navigation" aria-label="界面导览操作"><button class="secondary-button" data-tour="previous">上一步</button><button class="primary-button" data-tour="next">下一步 →</button><button class="tour-exit" data-tour="exit" aria-label="退出界面导览">退出</button></nav>`;
+  overlay.innerHTML = `<svg class="tour-shade" aria-hidden="true"><defs><mask id="tour-mask"><rect width="100%" height="100%" fill="white"/><rect class="tour-hole" rx="8" fill="black"/></mask></defs><rect width="100%" height="100%" fill="#020e0c" fill-opacity=".8" mask="url(#tour-mask)"/></svg><div class="tour-outline" aria-hidden="true"></div><section class="tour-card" aria-live="polite"><header><span class="tour-progress"></span></header><h2 id="tour-title"></h2><p class="tour-copy"></p><small class="tour-tip"></small><div class="tour-steps" aria-hidden="true"></div></section><nav class="tour-navigation" aria-label="界面导览操作"><button class="secondary-button" data-tour="previous">上一步</button><button class="primary-button" data-tour="next">下一步 →</button><button class="tour-exit" data-tour="exit" aria-label="${automatic ? '跳过新手引导' : '退出界面导览'}">${automatic ? '跳过' : '退出'}</button></nav>`;
   const card = overlay.querySelector<HTMLElement>('.tour-card')!;
   const navigation = overlay.querySelector<HTMLElement>('.tour-navigation')!;
   const hole = overlay.querySelector<SVGRectElement>('.tour-hole')!;

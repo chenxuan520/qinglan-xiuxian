@@ -24,6 +24,10 @@
 .guide-tour-entry > [data-resource-failure] {
   width: 100%;
 }
+.tour-active #toast {
+  visibility: hidden;
+  transition: none;
+}
 .tour-canvas {
   position: fixed;
   inset: 0;
