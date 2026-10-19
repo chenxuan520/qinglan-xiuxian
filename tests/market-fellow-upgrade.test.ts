@@ -1,9 +1,9 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 import { IMMORTAL_CULTIVATION, SAVE_SCHEMA, freshSave, readSave } from '../src/progress.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { meetMarketFellow } from '../src/market-fellow.ts';
 
 function legacySave() {
@@ -20,7 +20,7 @@ function legacySave() {
   save.mortal.population = { seed: 12345, since: 15 };
   save.mortal.member = { id: 'power', dueAt: 200, dues: 50 };
   save.mortal.mastery.power = 1;
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   return save;
 }
 

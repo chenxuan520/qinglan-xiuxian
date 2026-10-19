@@ -1,3 +1,5 @@
+import { beginSectMarketVisit } from '../src/sect-market.ts';
+import { enterNextMarketBatch } from './market-fixture.ts';
 import * as marketEventUi from '../src/market-event-ui.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,7 +11,6 @@ import { Game } from '../src/game.ts';
 import { freshTownPopulation } from '../src/town-population.ts';
 import { marketCultivators, isMarketCultivatorId } from '../src/sect-market-data.ts';
 import {
-  beginSectMarketVisit,
   sectMarketOpen,
   sectMarketOffer,
   sectMarketDeals,
@@ -50,7 +51,7 @@ function harness(pending = false) {
   save.mortal.hometown!.stage = 'departed';
   save.medicine.recipeSeed = 12345;
   save.mortal.population = { seed: 12345, since: 15 };
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   const npc = marketCultivators(save.mortal.population, save.mortal.sectMarket!)[1];
   const offer = sectMarketOffer(save, npc.id)!;
   const deal = sectMarketDeals(save, npc.id).find((d) => d.category === 'medicine')!;
@@ -208,7 +209,7 @@ test('多窗口写档后锁住旧页，保留新存档，旧页不扣药', () =>
 });
 test('旧按钮不能作用于新来访者；远处修士不能通过路由互换', () => {
   const h = harness();
-  beginSectMarketVisit(h.save);
+  enterNextMarketBatch(h.save);
   const before = structuredClone(h.save),
     text = h.stored;
   h.context.handleAction('sect-market-exchange', h.npc.id);
@@ -224,6 +225,7 @@ test('实际重新入场才换人，保存失败和已在场的重复入口不�
   const h = harness();
   h.context.panel = '';
   h.context.inMarket = false;
+  h.save.age += 1;
   const before = structuredClone(h.save);
   h.block();
   h.context.handleAction('sect-market-enter');

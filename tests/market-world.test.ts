@@ -1,7 +1,7 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave, realmInfo, type SaveData } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { marketContact, rememberMarketTrade } from '../src/market-relations.ts';
 import { marketFriendLead, marketWorldEcho } from '../src/market-world.ts';
 import {
@@ -26,15 +26,15 @@ function saveAt(seed = 12345) {
   save.age = 30;
   save.stones = 10000;
   save.mortal.population = { seed, since: 15 };
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   return save;
 }
 function friendFixture() {
   for (let seed = 1; seed < 500; seed++) {
     const save = saveAt(seed);
     rememberMarketTrade(save, 'market-alchemist');
-    beginSectMarketVisit(save);
-    beginSectMarketVisit(save);
+    enterNextMarketBatch(save);
+    enterNextMarketBatch(save);
     const id = save.mortal.sectMarket!.returning![0].slot;
     rememberMarketTrade(save, id);
     const lead = marketFriendLead(save, id);
@@ -78,7 +78,7 @@ test('坊间回响只由已经保存的本人经历形成，读取与刷新不�
   assert.doesNotMatch(echo.text, /任意旧日志|传闻|人人|听说/);
   assert.equal(JSON.stringify(save), before);
   assert.deepEqual(marketWorldEcho(readSave(before).save), echo);
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   assert.deepEqual(marketWorldEcho(save), echo);
   save.pendingReincarnation = 'ambush';
   assert.equal(marketWorldEcho(save), undefined);
@@ -183,7 +183,7 @@ test('初见、交恶、死者与离场者都不能提供故交指路，换批�
     if (scenario === 'dead') contact.dead = true;
     if (scenario === 'absent') save.mortal.sectMarket!.absent = [id];
     if (scenario === 'target-absent') save.mortal.sectMarket!.absent = [lead.npcId];
-    if (scenario === 'new-visit') beginSectMarketVisit(save);
+    if (scenario === 'new-visit') enterNextMarketBatch(save);
     assert.equal(marketFriendLead(save, id), undefined, scenario);
   }
 });

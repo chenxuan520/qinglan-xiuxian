@@ -1,10 +1,10 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave } from '../src/progress.ts';
 import { MEDICINES, medicineInfo } from '../src/medicine-data.ts';
 import { TREASURES } from '../src/data.ts';
 import {
-  beginSectMarketVisit,
   sectMarketOffer,
   sectMarketDeals,
   exchangeSectMedicine,
@@ -28,7 +28,7 @@ function fixture(seed = 12345) {
   save.artifacts = TREASURES.map((t) => t.id);
   for (const item of TREASURES) save.forge[item.id] = 1;
   for (const medicine of MEDICINES) save.medicine.bag[medicine.id] = 100;
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   return save;
 }
 function bringBack(save: ReturnType<typeof fixture>, id: MarketTraderId, slot: MarketTraderId) {
@@ -226,7 +226,7 @@ test('持续与新来客交易十二批，已培养故交仍能自然重逢使�
   const save = fixture(1);
   let establishedReturns = 0;
   for (let visit = 1; visit <= 12; visit++) {
-    if (visit > 1) assert.equal(beginSectMarketVisit(save), true);
+    if (visit > 1) assert.equal(enterNextMarketBatch(save), true);
     for (const { id } of MARKET_CULTIVATORS) {
       if (marketTradeMotive(save, id)?.friend) {
         establishedReturns++;

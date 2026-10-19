@@ -1,18 +1,11 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CURIO_IDS, curioValue, grantCurio, ownsCurio, curioCycle } from '../src/curio-data.ts';
 import { freshSave, forgeCost, IMMORTAL_CULTIVATION } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { joinSect } from '../src/mortal.ts';
-import {
-  prepareAuction,
-  auctionLots,
-  auctionValue,
-  auctionSaleRates,
-  auctionFee,
-  buyAuction,
-  sellAuction,
-} from '../src/auction.ts';
+import { prepareAuction, auctionValue, auctionSaleRates, auctionFee } from '../src/auction.ts';
+import { auctionLots, buyAuction, sellAuction } from '../src/auction-trade.ts';
 import { auctionContent } from '../src/auction-ui.ts';
 import { curioSeekingQuote, seekCurio } from '../src/curio-market.ts';
 import { curioSeekingContent } from '../src/curio-ui.ts';
@@ -30,7 +23,7 @@ function fixture(seed = 0) {
   s.age = 30;
   s.stones = 1000000;
   s.curios.seed = seed;
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   prepareAuction(s);
   return s;
 }
@@ -78,6 +71,8 @@ test('奇物竞得再出售始终亏损，跨十年行情也不能低买高卖�
     for (let seed = 0; seed < 24; seed++) {
       const s = fixture(seed);
       s.curios.consignment = { cycle: curioCycle(s.age), id, closed: false };
+      delete s.mortal.auction!.curioSlot;
+      prepareAuction(s);
       const lot = auctionLots(s).find((l) => l.kind === 'curio')!;
       const balance = s.stones;
       const r = buyAuction(

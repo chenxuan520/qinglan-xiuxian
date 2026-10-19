@@ -21,6 +21,7 @@ import {
   exchangeOwned,
 } from './market-exchange.ts';
 import { releaseAuctionItem } from './auction-items.ts';
+import { auctionHallForRealm } from './auction-data.ts';
 import { marketTradeMotive } from './market-trade-motives.ts';
 import {
   marketContact,
@@ -35,6 +36,7 @@ export function sectMarketOpen(save: SaveData) {
 export function beginSectMarketVisit(save: SaveData) {
   if (!sectMarketOpen(save)) return false;
   if (save.mortal.marketSocial?.ambush) return false;
+  if (save.mortal.sectMarket && save.age < save.mortal.sectMarket.openedAt + 1 - 1e-9) return true;
   const visit = (save.mortal.sectMarket?.visit ?? 0) + 1;
   if (!Number.isSafeInteger(visit)) return false;
   const returning = returningMarketContact(save, visit);
@@ -50,8 +52,21 @@ export function beginSectMarketVisit(save: SaveData) {
   if (save.mortal.auction) {
     save.mortal.auction.visit = visit;
     save.mortal.auction.closed = [];
+    delete save.mortal.auction.curioSlot;
+    save.mortal.auction.hall = Math.max(
+      auctionHallForRealm(save.mortal.sectMarket.realmIndex),
+      save.mortal.auction.paidHall ?? 0,
+    ) as 0 | 1 | 2;
   }
-  save.mortal.auction ??= { visit, closed: [], releasedArtifacts: [], history: [] };
+  save.mortal.auction ??= {
+    visit,
+    hall: auctionHallForRealm(save.mortal.sectMarket.realmIndex),
+    closed: [],
+    releasedArtifacts: [],
+    history: [],
+  };
+  const special = save.curios.consignment;
+  save.mortal.auction.curioSlot = special?.id ? { id: special.id, cycle: special.cycle } : null;
   save.mortal.marketSocial ??= {
     visit,
     fulfilled: [],

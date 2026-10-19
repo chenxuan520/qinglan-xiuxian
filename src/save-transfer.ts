@@ -115,7 +115,8 @@ export function importSave(text: string) {
       !validCurios(data.curios, Number(data.age ?? 15), Number(data.schema ?? 0) < SAVE_SCHEMA)) ||
     (data.medicine !== undefined && !validMedicine(data.medicine)) ||
     (data.chronicle !== undefined && !validChronicle(data.chronicle, Number(data.age ?? 15))) ||
-    (data.mortal !== undefined && !validMortal(data.mortal, Number(data.age ?? 15))) ||
+    (data.mortal !== undefined &&
+      !validMortal(data.mortal, Number(data.age ?? 15), Number(data.schema ?? 0) < 26)) ||
     (data.lifespanBonus !== undefined && !integer(data.lifespanBonus)) ||
     (data.tribulations !== undefined && !integer(data.tribulations)) ||
     (data.nextTribulationAge !== undefined &&

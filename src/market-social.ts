@@ -327,6 +327,7 @@ export function requestReason(
     visit,
     unfinished,
     MARKET_SOCIAL_SETTINGS.requestYears,
+    false,
   );
   if (sale) return sale;
   if (!Number.isSafeInteger(save.stones + offer.price)) return '灵石余额已达上限';

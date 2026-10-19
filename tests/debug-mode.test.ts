@@ -225,7 +225,13 @@ test('重复法宝不复制、不降低炼器，清除对应待领和已售标�
   s.starter = 'sword';
   s.forge.sword = 9;
   s.artifactDrops = ['sword', 'fire'];
-  s.mortal.auction = { visit: 1, closed: [], releasedArtifacts: ['sword', 'fire'], history: [] };
+  s.mortal.auction = {
+    hall: 0,
+    visit: 1,
+    closed: [],
+    releasedArtifacts: ['sword', 'fire'],
+    history: [],
+  };
   const result = debugGrant(s, request('artifact', 'sword', 1, 1));
   assert.ok('next' in result);
   const next = result.next!;

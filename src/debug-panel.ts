@@ -84,7 +84,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
             ? CURIOS.filter((c) => !acquiredCurio(host.getSave(), c.id))
             : null;
     submit.disabled = items?.length === 0;
-    fields.innerHTML = `${items ? `<label>选择物品<select name="id" aria-label="选择物品">${items.map((item) => `<option value="${item.id}">${item.name}</option>`).join('') || '<option value="">本世奇物均已结缘</option>'}</select></label>` : ''}${type === 'artifact' ? `<label>炼器阶数<input type="number" name="forge" aria-label="炼器阶数" min="0" max="${MAX_FORGE_LEVEL}" step="1" value="0"></label>` : `<label>数量<input type="number" name="quantity" aria-label="发放数量" min="1" max="${debugQuantityLimit(type)}" step="1" value="${type === 'stones' || type === 'iron' ? 1000 : 1}"></label>`}`;
+    fields.innerHTML = `${items ? `<label>选择物品<select name="id" aria-label="选择物品">${items.map((item) => `<option value="${item.id}">${item.name}</option>`).join('') || '<option value="">本世奇物均已结缘</option>'}</select></label>` : ''}${type === 'artifact' ? `<label>炼器阶数<input type="number" name="forge" aria-label="炼器阶数" min="0" max="${MAX_FORGE_LEVEL}" step="1" value="0"></label>` : type === 'curio' ? '<p class="panel-note">每件奇物本世唯一，每次发放一件。</p>' : `<label>数量<input type="number" name="quantity" aria-label="发放数量" min="1" max="${debugQuantityLimit(type)}" step="1" value="${type === 'stones' || type === 'iron' ? 1000 : 1}"></label>`}`;
     fields.querySelector('select')?.addEventListener('change', () => {
       status.textContent = '';
       stock();
@@ -110,7 +110,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
     const grant = {
       kind: String(input.get('kind')),
       id: String(input.get('id') ?? ''),
-      quantity: Number(input.get('quantity')),
+      quantity: kind.value === 'curio' ? 1 : Number(input.get('quantity')),
       forge: Number(input.get('forge')),
     };
     busy = true;

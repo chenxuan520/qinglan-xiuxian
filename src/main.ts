@@ -41,7 +41,6 @@ import {
 } from './lobby-ui.ts';
 import {
   enterTownVisit,
-  executeAuctionTrade,
   executeMarketSocial,
   executeMortalAction,
   immortalEncounterPanel,
@@ -1375,7 +1374,7 @@ function shellBindings(): ActionShell {
     get enterTownVisit() { return enterTownVisit; },
     get epilogueReincarnatePanel() { return epilogueReincarnatePanel; },
     get exchangeSectMedicine() { return exchangeSectMedicine; },
-    get executeAuctionTrade() { return executeAuctionTrade; },
+    get executeAuctionTrade() { return marketEventSource.current!.executeAuctionTrade; },
     get executeMarketSocial() { return executeMarketSocial; },
     get executeMortalAction() { return executeMortalAction; },
     get exportSave() { return exportSave; },
@@ -1709,7 +1708,9 @@ document.addEventListener('change', async (event) => {
   ) {
     if (input.id === 'auction-kind')
       auctionKind =
-        input.value === 'curio' ? 'curio' : input.value === 'artifact' ? 'artifact' : 'medicine';
+        input.value === 'curio' || input.value === 'iron' || input.value === 'artifact'
+          ? input.value
+          : 'medicine';
     refreshAuction(input.id === 'auction-item' ? input.value : '');
     modal.querySelector<HTMLElement>(`#${input.id}`)?.focus({ preventScroll: true });
     return;

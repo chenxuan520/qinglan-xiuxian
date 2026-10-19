@@ -1,9 +1,10 @@
+import { beginSectMarketVisit } from '../src/sect-market.ts';
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FINAL_TRIAL_STAGE, REALMS } from '../src/data.ts';
 import { freshSave, readSave, realmCost, realmInfo, SAVE_SCHEMA } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { marketCharacters, marketRelation } from '../src/sect-market-data.ts';
 import { validMortal } from '../src/mortal-data.ts';
 import { validMarketFellow } from '../src/market-fellow-data.ts';
@@ -21,7 +22,7 @@ function fixture() {
   save.age = 30;
   save.cultivation = 1;
   save.mortal.population = { seed: 12345, since: 15 };
-  assert.ok(beginSectMarketVisit(save));
+  assert.ok(enterNextMarketBatch(save));
   return save;
 }
 
@@ -34,7 +35,7 @@ function choiceFixture(choice: 'stay' | 'travel', age = 35) {
   return save;
 }
 
-test('同道首逢自然记录，反复进出只换原十五位访客，不推进三段经历或重记行迹', () => {
+test('同道首逢自然记录，一年内反复进出保留原十五位访客，不推进三段经历或重记行迹', () => {
   const save = fixture();
   const randomVisitors = marketCharacters(save.mortal.population!, save.mortal.sectMarket!);
   assert.equal(randomVisitors.length, 15);
@@ -51,7 +52,7 @@ test('同道首逢自然记录，反复进出只换原十五位访客，不推�
     assert.deepEqual(marketFellowCharacter(save), fellow);
     assert.deepEqual(marketFellowView(save)!.actions, []);
   }
-  assert.notDeepEqual(
+  assert.deepEqual(
     marketCharacters(save.mortal.population!, save.mortal.sectMarket!),
     randomVisitors,
   );
@@ -117,7 +118,7 @@ test('第一次晚来按真正相识年岁起算，突破或短期重复来访�
   assert.ok(meetMarketFellow(save));
   assert.equal(save.mortal.marketFellow!.metAt, 10000);
   save.cultivation = Array.from({ length: 23 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
-  assert.ok(beginSectMarketVisit(save));
+  assert.ok(enterNextMarketBatch(save));
   assert.equal(meetMarketFellow(save), false);
   assert.match(marketFellowView(save)!.knownMemory, /10000\.0岁/);
   assert.doesNotMatch(marketFellowView(save)!.knownMemory, /30\.0岁|再逢|后人/);
@@ -127,7 +128,7 @@ test('初逢后跨数千年归来由后人接旧愿，选择不会复活温照�
   const save = fixture();
   meetMarketFellow(save);
   save.age = 10030;
-  assert.ok(beginSectMarketVisit(save));
+  assert.ok(enterNextMarketBatch(save));
   assert.ok(meetMarketFellow(save));
   const npc = marketFellowCharacter(save)!;
   assert.equal(npc.name, '温氏后人');
@@ -252,7 +253,7 @@ test('陈旧访次、非法选择、寿尽待轮回和劫修未结均不能写�
   meetMarketFellow(save);
   save.age += 5;
   meetMarketFellow(save);
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   const before = structuredClone(save);
   assert.equal(chooseMarketFellow(save, 'stay', 1), false);
   assert.equal(chooseMarketFellow(save, 'gift', 2), false);

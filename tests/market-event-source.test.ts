@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -6,7 +7,6 @@ import { createContext, Script } from 'node:vm';
 import { MarketEventSource } from '../src/market-event-source.ts';
 import * as marketEventUi from '../src/market-event-ui.ts';
 import { freshSave } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { marketCultivators } from '../src/sect-market-data.ts';
 
 test('坊市事件首次并发载入合并，失败重试递增模块身份，成功后复用', async () => {
@@ -46,7 +46,7 @@ function harness() {
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
   save.mortal.population = { seed: 12345, since: 15 };
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   const npcs = marketCultivators(save.mortal.population, save.mortal.sectMarket!);
   const loads: { resolve: (ui: typeof marketEventUi) => void; reject: (e: Error) => void }[] = [];
   const source = new MarketEventSource(
@@ -163,7 +163,7 @@ test('真实坊市开窗载入期间关闭、离场、换批、旧存档锁定�
     await flush();
     if (state === 'close') h.context.panel = '';
     if (state === 'leave') h.context.inMarket = false;
-    if (state === 'visit') beginSectMarketVisit(h.save);
+    if (state === 'visit') enterNextMarketBatch(h.save);
     if (state === 'locked') h.context.saveLock = 'stale';
     if (state === 'detached') h.host.isConnected = false;
     h.loads[0].resolve(marketEventUi);

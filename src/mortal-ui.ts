@@ -84,7 +84,7 @@ export function townPage(save: SaveData, fullscreenButton: string) {
 }
 export function sectMarketEntrance(save: SaveData) {
   const open = sectMarketOpen(save);
-  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，互换余丹，或到中央拍卖行竞宝、委托出售。</p><small>${open ? '无需入宗 · 闲逛沿用人间计龄，交谈与互换时暂停' : '积累修为、踏入炼气后开放，无需完成整场历练'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '踏入炼气后开放'}</button></section>`;
+  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，互换余丹，或到中央拍卖行竞宝、委托出售。</p><small>${open ? `无需入宗 · 闲逛计龄，交谈暂停 · ${save.mortal.sectMarket && save.age < save.mortal.sectMarket.openedAt + 1 - 1e-9 ? `距换批约 ${Math.max(0.1, save.mortal.sectMarket.openedAt + 1 - save.age).toFixed(1)} 年` : save.mortal.sectMarket ? '再入换新客' : '每批客货至少留一年'}` : '积累修为、踏入炼气后开放，无需完成整场历练'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '踏入炼气后开放'}</button></section>`;
 }
 
 export function mortalPage(

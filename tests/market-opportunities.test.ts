@@ -1,8 +1,8 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { MARKET_CULTIVATORS, marketMedicinePool } from '../src/sect-market-data.ts';
 import {
   chooseMarketOpportunity,
@@ -23,7 +23,7 @@ function fixture(seed: number) {
   save.age = 30;
   save.stones = 10000;
   save.mortal.population = { seed, since: 15 };
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   return save;
 }
 function invitation(kind: 'medicine' | 'artifact', starter = false, honest = true) {
@@ -67,7 +67,7 @@ test('真实邀约明示并交付法宝或丹药：一年归来自动入账，�
     const before = JSON.stringify(loaded);
     assert.equal(chooseMarketOpportunity(loaded, id, 1, 'accept'), undefined);
     assert.equal(JSON.stringify(loaded), before);
-    assert.ok(beginSectMarketVisit(loaded));
+    assert.ok(enterNextMarketBatch(loaded));
     const next = MARKET_CULTIVATORS.map((n) => n.id).find((n) => marketOpportunity(loaded, n))!;
     assert.match(opportunityReason(loaded, next, 2, 'accept'), /相隔十年/);
   }

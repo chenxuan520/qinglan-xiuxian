@@ -1,7 +1,7 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, type SaveData } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { marketCultivators } from '../src/sect-market-data.ts';
 import {
   meetMarketFellow,
@@ -21,7 +21,7 @@ function fixture() {
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
   save.mortal.population = { seed: 12345, since: 15 };
-  assert.ok(beginSectMarketVisit(save));
+  assert.ok(enterNextMarketBatch(save));
   return save;
 }
 
@@ -53,7 +53,7 @@ function findOffer(
   for (let seed = 1; seed < 1000; seed++) {
     const candidate = structuredClone(save);
     candidate.mortal.population!.seed = seed;
-    assert.ok(beginSectMarketVisit(candidate));
+    assert.ok(enterNextMarketBatch(candidate));
     for (const npc of marketCultivators(
       candidate.mortal.population!,
       candidate.mortal.sectMarket!,
@@ -76,7 +76,7 @@ test('同道面板沿真实进度显示可用选择，按钮绑定当前来访�
     assert.deepEqual(actions(marketFellowContent(save)), []);
     save.age = 35;
     assert.ok(meetMarketFellow(save));
-    assert.ok(beginSectMarketVisit(save));
+    assert.ok(enterNextMarketBatch(save));
     let html = marketFellowContent(save);
     assert.deepEqual(actions(html), [
       { id: 'stay', visit: 2 },

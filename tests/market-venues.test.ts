@@ -1,9 +1,10 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost, readSave, SAVE_SCHEMA } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
-import { beginSectMarketVisit, sectMarketDeals, exchangeSectMedicine } from '../src/sect-market.ts';
+import { sectMarketDeals, exchangeSectMedicine } from '../src/sect-market.ts';
 import {
   MARKET_VENUES,
   MARKET_BUILDINGS,
@@ -47,7 +48,7 @@ function fixture(rank = 4, seed = 12345) {
   for (const t of TREASURES) s.forge[t.id] = 0;
   for (const m of MEDICINES) s.medicine.bag[m.id] = 20;
   s.medicine.recipes = MEDICINES.filter((m) => m.years > 0 && m.tier !== '凡品').map((m) => m.id);
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   return s;
 }
 function reunion(rank = 4) {
@@ -56,8 +57,8 @@ function reunion(rank = 4) {
   const deal = sectMarketDeals(s, id).find((d) => d.give.every((i) => i.kind === 'medicine'))!;
   for (const i of deal.give) s.medicine.bag[i.id] = i.quantity + 20;
   assert.ok(exchangeSectMedicine(s, id, deal.id, s.mortal.sectMarket!.visit));
-  beginSectMarketVisit(s);
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
+  enterNextMarketBatch(s);
   assert.ok(venueFavor(s));
   return s;
 }
@@ -110,7 +111,7 @@ test('托付随境界变为护送/压阵/调停，报酬有限、十年共享额
     const settled = JSON.stringify(s);
     assert.equal(executeVenue(s, 'work', venueStamp(s)), undefined);
     assert.equal(JSON.stringify(s), settled);
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     assert.match(venueActionReason(s, 'work', venueStamp(s)), /再过/);
     assert.deepEqual(readSave(JSON.stringify(s)).save.mortal.marketVenues, s.mortal.marketVenues);
   }
@@ -134,6 +135,7 @@ test('寻物只在化神开放，成本与物品同存，本命不变、不会�
         a.artifacts = a.artifacts.filter((id) => id !== offer.item.id);
         a.artifactDrops.push(offer.item.id);
         a.mortal.auction = {
+          hall: 0,
           visit: a.mortal.sectMarket!.visit,
           closed: [],
           releasedArtifacts: [offer.item.id],

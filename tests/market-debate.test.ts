@@ -1,10 +1,10 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost, readSave, retreat, SAVE_SCHEMA } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { TREASURES } from '../src/data.ts';
 import { MEDICINES, medicineInfo } from '../src/medicine-data.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import {
   marketCultivators,
   MARKET_CULTIVATORS,
@@ -38,7 +38,7 @@ function fixture(rank = 4, seed = 12345) {
   s.stones = 10000;
   for (const t of TREASURES) s.forge[t.id] = 0;
   s.mortal.population = { seed, since: 15 };
-  assert.ok(beginSectMarketVisit(s));
+  assert.ok(enterNextMarketBatch(s));
   return s;
 }
 function offered(tier: '灵品' | '珍品', swap = false) {
@@ -61,8 +61,8 @@ function reunion() {
   const id = ids[0];
   rememberMarketAid(s, id);
   assert.equal(debateThanks(s, id), undefined, '当场相助不立即赠药');
-  assert.ok(beginSectMarketVisit(s));
-  assert.ok(beginSectMarketVisit(s));
+  assert.ok(enterNextMarketBatch(s));
+  assert.ok(enterNextMarketBatch(s));
   const current = ids.find((slot) => marketContact(s, slot)?.aidAt !== undefined)!;
   assert.ok(current);
   return { s, id: current };
@@ -80,7 +80,7 @@ test('复现旧闭关刷药路线：100次普通论道零丹药、零新丹方�
     assert.equal(readSave(JSON.stringify(s)).status, 'ok');
     if (i < 99) {
       assert.ok(retreat(s, 10, () => 0.5));
-      assert.ok(beginSectMarketVisit(s));
+      assert.ok(enterNextMarketBatch(s));
     }
   }
   assert.equal(s.stones, 0);
@@ -117,8 +117,8 @@ test('互授只能用实际已知、对方未知且同品级的丹方；讲过�
   const loaded = importSave(exportSave(s, null)).save;
   assert.deepEqual(marketContact(loaded, id), c);
   loaded.age += 10;
-  beginSectMarketVisit(loaded);
-  beginSectMarketVisit(loaded);
+  enterNextMarketBatch(loaded);
+  enterNextMarketBatch(loaded);
   const slot = ids.find(
     (x) =>
       marketContact(loaded, x)?.birthVisit === c.birthVisit &&
@@ -174,8 +174,8 @@ test('普通买卖、聊天、仇怨及非本人不触发回礼；真实相助�
   const a = fixture();
   rememberMarketContact(a, ids[0]);
   rememberMarketTrade(a, ids[0]);
-  beginSectMarketVisit(a);
-  beginSectMarketVisit(a);
+  enterNextMarketBatch(a);
+  enterNextMarketBatch(a);
   assert.ok(ids.every((id) => debateThanks(a, id) === undefined));
   const { s, id } = reunion();
   const gift = debateThanks(s, id)!;

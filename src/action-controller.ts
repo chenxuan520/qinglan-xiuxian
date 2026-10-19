@@ -1,3 +1,4 @@
+import type { executeAuctionTrade } from './auction-ui.ts';
 import { showSectService } from './scene-flow.ts';
 import type {
   adSupplies,
@@ -42,7 +43,6 @@ import type {
 } from './lobby-ui.ts';
 import type {
   enterTownVisit,
-  executeAuctionTrade,
   executeMarketSocial,
   executeMortalAction,
   immortalEncounterPanel,
@@ -823,6 +823,10 @@ function handleSectAndMarket(shell: ActionShell, action: string, id?: string): b
     shell.panel === 'sect-auction' &&
     shell.marketScene?.nearAuction
   ) {
+    if (action === 'auction-hall') {
+      shell.marketEventSource.current?.auctionHallAction(shell, id);
+      return true;
+    }
     if (action === 'auction-view' && (id === 'buy' || id === 'sell' || id === 'history')) {
       shell.auctionView = id;
       shell.refreshAuction();

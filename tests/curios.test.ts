@@ -1,3 +1,5 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
+import { AUCTION_CURIO_LOT } from '../src/auction-data.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -30,14 +32,8 @@ import { importSave, exportSave } from '../src/save-transfer.ts';
 import { studyPlan, joinSect } from '../src/mortal.ts';
 import { medicineFormula, MEDICINES } from '../src/medicine-data.ts';
 import { craftMedicine, medicineCraftReason } from '../src/medicine.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
-import {
-  auctionLots,
-  prepareAuction,
-  buyAuction,
-  sellAuction,
-  auctionBuyReason,
-} from '../src/auction.ts';
+import { prepareAuction } from '../src/auction.ts';
+import { auctionLots, buyAuction, sellAuction, auctionBuyReason } from '../src/auction-trade.ts';
 import { curioSeekingQuote, seekCurio } from '../src/curio-market.ts';
 import { venueStamp } from '../src/market-venues.ts';
 import { sectServiceQuote, executeSectService, sectServiceStamp } from '../src/sect-services.ts';
@@ -207,40 +203,40 @@ test('奇物寄拍不随进出换货或重开结拍，旧周期报价不能购�
     prepareCurioConsignment(s);
     if (s.curios.consignment?.id) break;
   }
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   prepareAuction(s);
   const lot = auctionLots(s).find((l) => l.kind === 'curio')!;
   assert.ok(lot);
-  assert.equal(auctionLots(s).filter((l) => l.kind !== 'curio').length, 8);
+  assert.equal(auctionLots(s).filter((l) => l.kind !== 'curio').length, 7);
   const initial = structuredClone(s),
     cycle = s.curios.consignment!.cycle;
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   prepareAuction(s);
   assert.equal(auctionLots(s).find((l) => l.kind === 'curio')!.id, lot.id);
-  const r = buyAuction(s, 8, 50000, 2, false, cycle)!;
+  const r = buyAuction(s, AUCTION_CURIO_LOT, 50000, 2, false, cycle)!;
   assert.equal(r.outcome, 'won');
   assert.ok(ownsCurio(s, lot.id as (typeof CURIO_IDS)[number]));
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   prepareAuction(s);
   assert.equal(
     auctionLots(s).some((l) => l.kind === 'curio'),
     false,
   );
-  assert.match(auctionBuyReason(s, 8, 3), /不存在/);
+  assert.match(auctionBuyReason(s, AUCTION_CURIO_LOT, 3), /不存在/);
   const item = { kind: 'curio' as const, id: lot.id, quantity: 1, forgeLevel: 0 };
   assert.equal(sellAuction(s, item, 1, 3, true), undefined);
   assert.equal(sellAuction(s, item, 1, 3)!.outcome, 'sold');
   assert.equal(ownsCurio(s, lot.id as (typeof CURIO_IDS)[number]), false);
   initial.age += 10;
-  beginSectMarketVisit(initial);
+  enterNextMarketBatch(initial);
   prepareAuction(initial);
   const unchanged = JSON.stringify(initial);
-  assert.equal(buyAuction(initial, 8, 50000, 2, false, cycle), undefined);
+  assert.equal(buyAuction(initial, AUCTION_CURIO_LOT, 50000, 2, false, cycle), undefined);
   assert.equal(JSON.stringify(initial), unchanged);
 });
 test('寻访三次到账、十年额度共享；卖掉不重置已完成进度、掌天瓶不可定向', () => {
   const s = ready();
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   const id = 'soul-wood';
   let total = 0;
   for (let i = 0; i < 3; i++) {
@@ -268,7 +264,7 @@ test('当前档完整往返、浮点十年边界、旧档迁移和坏奇物状�
   grantCurio(s, 'soul-wood');
   s.curios.seeking['wind-wings'] = 2;
   s.curios.soughtAt = 30;
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   prepareAuction(s);
   const g = new Game(s, 0, 0, () => 0.5);
   g.player.hp -= 11;
@@ -360,7 +356,7 @@ test('修士私邀少量赠奇物且承诺与交割相符，执事堂公开寻�
   for (let seed = 1; seed < 5000; seed++) {
     const s = ready();
     s.mortal.population!.seed = seed;
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     prepareMarketSocial(s);
     for (const id of ['market-alchemist', 'market-disciple', 'market-wanderer'] as const) {
       assert.notEqual(
@@ -387,7 +383,7 @@ test('劫修固定战况按持有奇物计算气血与承伤，刷新沿用该�
   for (let seed = 1; seed < 2000 && !checked; seed++) {
     const base = ready();
     base.mortal.population!.seed = seed;
-    beginSectMarketVisit(base);
+    enterNextMarketBatch(base);
     prepareMarketSocial(base);
     base.training.vitality = 10;
     for (const id of ['market-alchemist', 'market-disciple', 'market-wanderer'] as const) {

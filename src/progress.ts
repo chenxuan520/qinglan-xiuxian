@@ -18,7 +18,7 @@ import { defaultAutoplayBuild, validAutoplayBuild, type AutoplayBuild } from './
 import { syncHumanStories } from './human-stories.ts';
 import { freshHometown, validHometown } from './hometown.ts';
 import { validSectMarket } from './sect-market-data.ts';
-import { validAuction } from './auction-data.ts';
+import { validAuction, auctionHallForRealm } from './auction-data.ts';
 import { validMarketSocial } from './market-social-data.ts';
 import { validMarketRelations } from './market-relations-data.ts';
 import { validMarketFellow } from './market-fellow-data.ts';
@@ -108,7 +108,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 25;
+export const SAVE_SCHEMA = 26;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -316,7 +316,12 @@ export function readSave(
             s.curios.acquired?.includes(id) ||
             Object.hasOwn(s.curios.bag, id) ||
             s.curios.seeking[id] === 3 ||
-            (validAuction(s.mortal?.auction, base.age, s.mortal?.sectMarket) &&
+            (validAuction(
+              s.mortal?.auction,
+              base.age,
+              s.mortal?.sectMarket,
+              (s.schema ?? 0) < 26,
+            ) &&
               s.mortal.auction.history.some(
                 (r: { kind?: string; id?: string; outcome?: string }) =>
                   r?.kind === 'curio' && r.id === id && ['won', 'sold'].includes(r.outcome ?? ''),
@@ -334,6 +339,18 @@ export function readSave(
     // 旧版遭遇没有战况，升级只解除旧记录，不伪造胜负或补发奖励。
     if (upgrading && (s.schema ?? 0) < 19 && s.mortal?.marketSocial?.ambush) {
       s.mortal.marketSocial.ambush = null;
+    }
+    if (
+      upgrading &&
+      (s.schema ?? 0) < 26 &&
+      validAuction(s.mortal?.auction, base.age, s.mortal?.sectMarket, true)
+    ) {
+      const auction = s.mortal.auction;
+      auction.hall = auctionHallForRealm(s.mortal.sectMarket?.realmIndex ?? 0);
+      auction.closed = [0, 1, 2].flatMap((hall) =>
+        auction.closed.map((index: number) => hall * 8 + index),
+      );
+      for (const receipt of auction.history) receipt.hall = auctionHallForRealm(receipt.realmIndex);
     }
     // 新版生死状态损坏必须停止写入；不能静默丢弃字段让角色复活。
     if (s.mortal?.marketSocial?.ambush || s.pendingReincarnation === 'ambush') {

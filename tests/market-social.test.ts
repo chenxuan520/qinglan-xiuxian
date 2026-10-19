@@ -1,9 +1,9 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave, SAVE_SCHEMA } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import {
   debateMarket,
   debateReason,
@@ -34,7 +34,7 @@ function fixture(seed = 12345) {
   s.stones = 10000;
   s.unlocked = 6;
   s.mortal.population = { seed, since: 15 };
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   return s;
 }
 function chance(kind: 'goods' | 'deposit' | 'haggle' | 'invitation', honest: boolean) {
@@ -74,7 +74,7 @@ test('论道十年间隔跨NPC/访次/刷新/导入保持，首关和已知全�
   assert.equal(debateReward(s, id).kind, 'insight');
   debateMarket(s, id, 1);
   const at = s.age;
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   assert.match(debateReason(s, ids[1], 2), /再历/);
   assert.equal(debateMarket(s, ids[1], 2), undefined);
   const loaded = importSave(exportSave(s, null)).save;
@@ -180,7 +180,7 @@ test('假货及垫款骗局损失有上限，不产生伪药/改永久效果，�
     assert.equal(s.age, 30.5);
     assert.equal(chooseMarketOpportunity(s, id, 1, 'accept'), undefined);
     assert.ok(validMarketSocial(s.mortal.marketSocial, s.age, s.mortal.sectMarket));
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     const next = ids.find((id) => marketOpportunity(s, id))!;
     assert.equal(chooseMarketOpportunity(s, next, 2, 'accept'), undefined);
   }
@@ -224,7 +224,7 @@ test('伏击固定身份数值战利品同存，刷新及文件往返不脱身�
     assert.equal(s.stones, before - o.cost);
     const encounter = s.mortal.marketSocial!.ambush!;
     assert.ok(encounter);
-    assert.equal(beginSectMarketVisit(s), false);
+    assert.equal(enterNextMarketBatch(s), false);
     assert.equal(debateMarket(s, id, 1), undefined);
     assert.equal(settleMarketAmbush(s, outcome), undefined);
     encounter.snapshot.outcome = outcome;
@@ -380,8 +380,8 @@ test('故交求购有实际小幅加价，不超过估值98%，读档保留；�
     const save = fixture(seed);
     const contact = rememberMarketContact(save, ids[0])!;
     contact.goodwill = 1;
-    beginSectMarketVisit(save);
-    beginSectMarketVisit(save);
+    enterNextMarketBatch(save);
+    enterNextMarketBatch(save);
     const id = ids.find((npc) => marketRequest(save, npc))!;
     save.mortal.sectMarket!.returning = [
       {

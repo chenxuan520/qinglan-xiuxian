@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import * as marketEventUi from '../src/market-event-ui.ts';
 import { homeTownEntrance } from '../src/home-town.ts';
 import test from 'node:test';
@@ -6,7 +7,6 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import {
   debateMarket,
   marketRequest,
@@ -95,7 +95,7 @@ function harness(
     save.mortal.sectMarket = undefined;
     save.mortal.marketSocial = undefined;
     save.mortal.auction = undefined;
-    beginSectMarketVisit(save);
+    enterNextMarketBatch(save);
     const ids = MARKET_CULTIVATORS.map((n) => n.id);
     if (kind === 'debate-pay' || kind === 'debate-swap') {
       save.medicine.recipes =

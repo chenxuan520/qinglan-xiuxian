@@ -2,8 +2,11 @@ import { isCurio, curioValue, curioName } from './curio-data.ts';
 import { TREASURES, treasure } from './data.ts';
 import { medicineInfo, medicineMarketValue } from './medicine-data.ts';
 import { forgeCost, type SaveData } from './progress.ts';
+import { ironMarket } from './iron-market.ts';
 import { freeStarter, type AuctionItem } from './auction-data.ts';
-export function auctionValue(item: AuctionItem) {
+export function auctionValue(item: AuctionItem, save?: SaveData) {
+  if (item.kind === 'iron')
+    return Math.ceil((save ? ironMarket(save).buy : 30) * 0.9 * item.quantity);
   if (item.kind === 'curio') return curioValue(item.id) * item.quantity;
   if (item.kind === 'medicine') {
     return medicineMarketValue(item.id) * item.quantity;
@@ -21,14 +24,17 @@ export function auctionSaleRates(item: AuctionItem): readonly [number, number] {
   return item.kind === 'curio' ? [10, 15] : [60, 80];
 }
 export function auctionItemName(item: AuctionItem) {
-  return item.kind === 'medicine'
-    ? medicineInfo(item.id)!.name
-    : item.kind === 'curio'
-      ? curioName(item.id)
-      : treasure(item.id).name;
+  return item.kind === 'iron'
+    ? '玄铁'
+    : item.kind === 'medicine'
+      ? medicineInfo(item.id)!.name
+      : item.kind === 'curio'
+        ? curioName(item.id)
+        : treasure(item.id).name;
 }
 export function releaseAuctionItem(save: SaveData, item: AuctionItem) {
-  if (item.kind === 'medicine') save.medicine.bag[item.id] -= item.quantity;
+  if (item.kind === 'iron') save.iron -= item.quantity;
+  else if (item.kind === 'medicine') save.medicine.bag[item.id] -= item.quantity;
   else if (item.kind === 'curio' && isCurio(item.id))
     save.curios.bag[item.id] = (save.curios.bag[item.id] ?? 0) - item.quantity;
   else {
@@ -37,6 +43,7 @@ export function releaseAuctionItem(save: SaveData, item: AuctionItem) {
     save.forge[item.id] = 0;
     if (freeStarter(item.id)) {
       const auction = (save.mortal.auction ??= {
+        hall: 0,
         visit: save.mortal.sectMarket?.visit ?? 0,
         closed: [],
         releasedArtifacts: [],

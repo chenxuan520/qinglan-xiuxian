@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,7 +18,7 @@ import {
   marketLocalReply,
   isMarketCultivatorId,
 } from '../src/sect-market-data.ts';
-import { beginSectMarketVisit, sectMarketOffer } from '../src/sect-market.ts';
+import { sectMarketOffer } from '../src/sect-market.ts';
 import { townWalkable } from '../src/town.ts';
 import { freshSave, realmInfo, lifespanInfo } from '../src/progress.ts';
 import { SPIRIT_ROOTS } from '../src/data.ts';
@@ -85,7 +86,7 @@ test('十五位具名修士稳定不重名，访客可正常聊境界但没有�
   const save = freshSave();
   save.cultivation = 1;
   save.mortal.population = { seed: 12345, since: 15 };
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   const npcs = marketCharacters(save.mortal.population, save.mortal.sectMarket!);
   assert.equal(npcs.length, 15);
   assert.equal(new Set(npcs.map((n) => n.name)).size, 15);

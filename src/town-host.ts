@@ -13,8 +13,6 @@ import {
   fulfillMarketRequest,
   prepareMarketSocial,
 } from './market-social.ts';
-import { auctionBuyReason, auctionSellReason, buyAuction, sellAuction } from './auction.ts';
-import type { AuctionItem, AuctionKind } from './auction-data.ts';
 import type { PanelParts } from './panel-host.ts';
 
 export function immortalEncounterPanel(
@@ -138,59 +136,4 @@ export function executeMarketSocial(
           ? `${result.text.slice(0, 72)}…`
           : result.text;
   return { ok: true as const, stale: false, message };
-}
-
-export function executeAuctionTrade(
-  save: SaveData,
-  next: SaveData,
-  action: string,
-  id: string | undefined,
-  visit: number,
-  auctionKind: AuctionKind,
-  hasPendingRun: boolean,
-  modal: Pick<ParentNode, 'querySelector'>,
-) {
-  if (action === 'auction-buy') {
-    const index = Number(id);
-    const reason = auctionBuyReason(save, index, visit, hasPendingRun);
-    if (reason) return { ok: false as const, error: reason };
-    const budget = Number(modal.querySelector<HTMLInputElement>(`#auction-budget-${index}`)?.value);
-    const result = buyAuction(
-      next,
-      index,
-      budget,
-      visit,
-      hasPendingRun,
-      Number(
-        modal.querySelector<HTMLButtonElement>(`[data-action="auction-buy"][data-id="${index}"]`)
-          ?.dataset.cycle,
-      ),
-    );
-    if (!result)
-      return {
-        ok: false as const,
-        error: '请输入扣除到期供奉后可负担、且足够起拍的整数预算（含手续费）',
-      };
-    return { ok: true as const, result };
-  }
-  if (action === 'auction-sell') {
-    const selected = modal.querySelector<HTMLSelectElement>('#auction-item')?.value ?? '';
-    const item: AuctionItem = {
-      kind: auctionKind,
-      id: selected,
-      quantity:
-        auctionKind !== 'medicine'
-          ? 1
-          : Number(modal.querySelector<HTMLInputElement>('#auction-quantity')?.value),
-      forgeLevel: auctionKind === 'artifact' ? save.forge[selected] || 0 : 0,
-    };
-    const reason = auctionSellReason(save, item, visit, hasPendingRun);
-    if (reason) return { ok: false as const, error: reason };
-    const reserve = Number(modal.querySelector<HTMLInputElement>('#auction-reserve')?.value);
-    const result = sellAuction(next, item, reserve, visit, hasPendingRun);
-    if (!result)
-      return { ok: false as const, error: '请输入有效的整数保留价，灵石余额不能超出上限' };
-    return { ok: true as const, result };
-  }
-  return null;
 }

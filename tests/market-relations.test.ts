@@ -1,8 +1,8 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave } from '../src/progress.ts';
 import {
-  beginSectMarketVisit,
   sectMarketDeals,
   exchangeSectMedicine,
   sectMarketExchangeReason,
@@ -43,7 +43,7 @@ function fixture(seed = 12345) {
   s.stones = 10000;
   s.unlocked = 6;
   s.mortal.population = { seed, since: 15 };
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   return s;
 }
 function ambush() {
@@ -79,10 +79,10 @@ test('真实身份以出生访次及原摊位保存，每三访次只回一名�
       old = marketCultivators(s.mortal.population!, s.mortal.sectMarket!)[0];
     rememberMarketTrade(s, old.id);
     const identity = marketIdentity(s.mortal.sectMarket!, old.id);
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     assert.equal(s.mortal.sectMarket!.returning, undefined);
     for (const id of ids) assert.equal(marketContact(s, id), undefined);
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     assert.equal(s.mortal.sectMarket!.returning!.length, 1);
     const returning = s.mortal.sectMarket!.returning![0];
     const npc = marketCultivators(s.mortal.population!, s.mortal.sectMarket!).find(
@@ -146,7 +146,7 @@ test('联系人只保留八位且真身份不复用，旧敌死亡不再重逢�
   assert.match(sectMarketExchangeReason(s, ids[0], 'unknown', 1), /身死/);
   assert.match(marketSocialContent(s, deadNpc), /不再接待/);
   for (let i = 0; i < 30; i++) {
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     assert.ok(
       !(s.mortal.sectMarket!.returning ?? []).some(
         (r) => r.birthVisit === dead.birthVisit && r.birthSlot === dead.slot,
@@ -160,8 +160,8 @@ test('联系人只保留八位且真身份不复用，旧敌死亡不再重逢�
 test('返回映射、死者和错误境界无法伪装成旧识，损坏关系会拒绝校验', () => {
   const s = fixture();
   rememberMarketTrade(s, ids[0]);
-  beginSectMarketVisit(s);
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
+  enterNextMarketBatch(s);
   assert.ok(validSectMarket(s.mortal.sectMarket, s.age));
   const c = s.mortal.marketRelations!.contacts[0],
     r = s.mortal.sectMarket!.returning![0];
@@ -268,7 +268,7 @@ test('掉落数量溢出保存完整胜利待处理，不先退钱或丢遭遇�
 test('八人淘汰保护本访次重逢者及进行中遭遇，九次换批仍可完整读取', () => {
   const s = fixture(1);
   for (let visit = 1; visit <= 9; visit++) {
-    if (visit > 1) beginSectMarketVisit(s);
+    if (visit > 1) enterNextMarketBatch(s);
     for (const id of ids) {
       rememberMarketTrade(s, id);
       assert.ok(validMarketRelations(s.mortal.marketRelations, s.age, s.mortal.sectMarket));
@@ -311,8 +311,8 @@ test('重逢劫修战死后离开本批摊位，保存可读取且后续不复�
   for (let seed = 1; seed < 500; seed++) {
     const s = fixture(seed);
     for (const id of ids) rememberMarketTrade(s, id);
-    beginSectMarketVisit(s);
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
+    enterNextMarketBatch(s);
     const r = s.mortal.sectMarket!.returning![0],
       offer = marketOpportunity(s, r.slot);
     if (offer?.kind !== 'invitation' || offer.honest) continue;
@@ -338,8 +338,8 @@ test('重逢劫修战死后离开本批摊位，保存可读取且后续不复�
 test('旧识提醒重建历史姓名不受当前死者离场影响，提示只谈具体凭据不泄露真伪', () => {
   const s = fixture(1);
   rememberMarketTrade(s, ids[0]);
-  beginSectMarketVisit(s);
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
+  enterNextMarketBatch(s);
   const returning = s.mortal.sectMarket!.returning![0];
   rememberMarketTrade(s, returning.slot);
   s.mortal.sectMarket!.absent = [ids[0]];

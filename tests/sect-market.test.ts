@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave, realmCost, realmInfo, SAVE_SCHEMA } from '../src/progress.ts';
@@ -19,7 +20,6 @@ import {
 } from '../src/sect-market-data.ts';
 import {
   sectMarketOpen,
-  beginSectMarketVisit,
   sectMarketOffer,
   sectMarketDeals,
   sectMarketExchangeReason,
@@ -51,7 +51,7 @@ function visitor(realm = 0, seed = 12345) {
     realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
     realm,
   );
-  assert.equal(beginSectMarketVisit(save), true);
+  assert.equal(enterNextMarketBatch(save), true);
   return save;
 }
 const count = (bag: Record<string, number>) => Object.values(bag).reduce((a, b) => a + b, 0);
@@ -261,7 +261,7 @@ test('拒绝未知报价、过期访次、库存不足和丹囊溢出，失败�
   }
 });
 
-test('每次实际进场更换来访者，同年重进也换人；旧批次按钮拒绝且只查看不重抽', () => {
+test('满一年后实际进场更换来访者；旧批次按钮拒绝且只查看不重抽', () => {
   const save = visitor(2);
   const original = structuredClone(save.mortal.sectMarket!);
   const npcs = marketCultivators(save.mortal.population!, original);
@@ -271,8 +271,8 @@ test('每次实际进场更换来访者，同年重进也换人；旧批次按�
     sectMarketOffer(save, 'market-alchemist');
   }
   assert.equal(JSON.stringify(save), snapshot);
-  assert.equal(beginSectMarketVisit(save), true);
-  assert.equal(save.age, original.openedAt);
+  assert.equal(enterNextMarketBatch(save), true);
+  assert.equal(save.age, original.openedAt + 1);
   assert.equal(save.mortal.sectMarket!.visit, original.visit + 1);
   assert.deepEqual(save.mortal.sectMarket!.exchanged, []);
   const next = marketCultivators(save.mortal.population!, save.mortal.sectMarket!);
@@ -392,7 +392,7 @@ test('渡劫仍属大乘，AI 与界面的前辈/道友/蝼蚁分类严格一致
       ),
     );
   }
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   const next = marketCultivators(save.mortal.population!, save.mortal.sectMarket!);
   assert.equal(new Set(next.map((n) => n.name)).size, next.length);
   next.forEach((npc, i) => assert.notEqual(npc.name, original[i].name));

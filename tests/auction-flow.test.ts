@@ -6,17 +6,11 @@ import { createContext, Script } from 'node:vm';
 import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { beginSectMarketVisit } from '../src/sect-market.ts';
-import {
-  prepareAuction,
-  buyAuction,
-  sellAuction,
-  auctionBuyReason,
-  auctionSellReason,
-  auctionLots,
-} from '../src/auction.ts';
-import { auctionContent, auctionResult } from '../src/auction-ui.ts';
+import { prepareAuction, auctionSellReason } from '../src/auction.ts';
+import { buyAuction, sellAuction, auctionBuyReason, auctionLots } from '../src/auction-trade.ts';
+import { auctionContent, auctionResult, auctionHallAction } from '../src/auction-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
-import { executeAuctionTrade } from '../src/town-host.ts';
+import { executeAuctionTrade } from '../src/auction-ui.ts';
 import { dispatchAction } from '../src/action-controller.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -74,7 +68,11 @@ function harness(pending = false) {
       if (selector === '#auction-reserve') return { value: reserve };
       if (selector === '#auction-quantity') return { value: '2' };
       if (selector.startsWith('[data-action="auction-')) {
-        const action = selector.includes('auction-buy') ? 'auction-buy' : 'auction-sell';
+        const action = selector.includes('auction-hall')
+          ? 'auction-hall'
+          : selector.includes('auction-buy')
+            ? 'auction-buy'
+            : 'auction-sell';
         const id = selector.match(/data-id="(\d+)"/)?.[1];
         const button = html.match(
           new RegExp(
@@ -83,7 +81,11 @@ function harness(pending = false) {
         )?.[0];
         return button
           ? {
-              dataset: { visit: button.match(/data-visit="(\d+)"/)![1] },
+              dataset: {
+                visit: button.match(/data-visit="(\d+)"/)![1],
+                hall: button.match(/data-hall="(\d+)"/)?.[1],
+                pay: button.match(/data-pay="(\d+)"/)?.[1],
+              },
               disabled: button.includes('disabled'),
             }
           : null;
@@ -119,7 +121,9 @@ function harness(pending = false) {
     auctionSellReason,
     auctionContent,
     auctionResult,
-    marketEventSource: { current: { auctionContent, auctionResult } },
+    marketEventSource: {
+      current: { auctionContent, auctionResult, auctionHallAction, executeAuctionTrade },
+    },
     townStatus,
     executeAuctionTrade,
     clearInput: () => {},
@@ -226,4 +230,42 @@ test('流拍只扣半年，预算错误不扣半年', () => {
   assert.equal(h.save.age, 30.5);
   assert.equal(h.save.medicine.bag[h.lot.id], before);
   assert.match(h.note.textContent, /未达到保留价/);
+});
+
+test('真实会场缴费保存失败或跨窗口冲突零扣费，成功资格跨批保留且重复点不扣', () => {
+  for (const failure of ['fail', 'stale', 'none'] as const) {
+    const h = harness();
+    const before = JSON.stringify(h.save);
+    if (failure !== 'none') h[failure]();
+    h.action('auction-hall', '1');
+    if (failure !== 'none') {
+      assert.equal(JSON.stringify(h.save), before);
+      continue;
+    }
+    assert.equal(h.save.stones, 7000);
+    assert.equal(h.save.age, 30);
+    assert.equal(h.save.mortal.auction!.paidHall, 1);
+    assert.equal(h.stored().mortal.auction.paidHall, 1);
+    assert.equal(h.section.scrollTop, 123);
+    h.action('auction-hall', '1');
+    assert.equal(h.save.stones, 7000);
+    h.action('auction-hall', '0');
+    assert.equal(h.save.mortal.auction!.hall, 0);
+  }
+});
+test('出售页跨会场重置非法种类，界面所见与真实提交一致', () => {
+  const h = harness();
+  h.action('auction-hall', '1');
+  h.action('auction-view', 'sell');
+  h.context.auctionKind = 'curio';
+  h.context.refreshAuction();
+  h.action('auction-hall', '0');
+  assert.equal(h.context.auctionKind, 'medicine');
+  h.inputs({ selected: h.lot.id, reserve: '1' });
+  h.action('auction-sell');
+  assert.equal(h.save.age, 30.5);
+  h.context.auctionKind = 'iron';
+  h.context.refreshAuction();
+  h.action('auction-hall', '1');
+  assert.equal(h.context.auctionKind, 'medicine');
 });

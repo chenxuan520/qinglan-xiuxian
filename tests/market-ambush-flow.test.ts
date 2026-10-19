@@ -1,10 +1,10 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { freshSave, readSave, realmInfo, SAVE_KEY, type SaveData } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { MARKET_CULTIVATORS } from '../src/sect-market-data.ts';
 import {
   chooseMarketOpportunity,
@@ -68,7 +68,7 @@ function fixture(): SaveData {
     save.prologueSeen = save.hometownSeen = true;
     save.mortal.hometown!.stage = 'departed';
     save.mortal.population = { seed, since: 15 };
-    beginSectMarketVisit(save);
+    enterNextMarketBatch(save);
     const npc = MARKET_CULTIVATORS.find(({ id }) => {
       const offer = marketOpportunity(save, id);
       return offer?.kind === 'invitation' && !offer.honest;

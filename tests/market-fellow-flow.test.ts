@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import * as marketEventUi from '../src/market-event-ui.ts';
 import test from 'node:test';
 import { MedicinePanel } from '../src/medicine-panel.ts';
@@ -6,7 +7,6 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { marketCultivators } from '../src/sect-market-data.ts';
 import { marketFellowContent } from '../src/market-fellow-ui.ts';
 import {
@@ -38,7 +38,7 @@ function harness(phase: 'first' | 'reunion' | 'choice' | 'read' = 'first', pendi
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
   save.mortal.population = { seed: 12345, since: 15 };
-  assert.ok(beginSectMarketVisit(save));
+  assert.ok(enterNextMarketBatch(save));
   if (phase !== 'first') {
     assert.ok(meetMarketFellow(save));
     save.age = 35;
@@ -264,7 +264,7 @@ test('实际主路由拒绝过期场次、远离人物、错误面板及缺失�
     const h = harness('choice');
     h.open();
     if (reason === 'visit') {
-      assert.ok(beginSectMarketVisit(h.save));
+      assert.ok(enterNextMarketBatch(h.save));
       h.syncFixture();
     } else if (reason === 'distance') h.context.marketScene.nearbyNpc = null;
     else if (reason === 'otherNpc') h.context.marketNpc = { id: 'market-alchemist' };

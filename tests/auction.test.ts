@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -8,19 +9,14 @@ import {
   attuneSpiritRoot,
   claimArtifacts,
 } from '../src/progress.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
+import { prepareAuction, auctionValue, auctionFee, auctionSellReason } from '../src/auction.ts';
+import { auctionLots, buyAuction, sellAuction, auctionBuyReason } from '../src/auction-trade.ts';
 import {
-  prepareAuction,
-  auctionLots,
-  auctionValue,
-  auctionFee,
-  buyAuction,
-  sellAuction,
-  auctionBuyReason,
-  auctionSellReason,
-} from '../src/auction.ts';
-import { AUCTION_LOTS, validAuction, type AuctionItem } from '../src/auction-data.ts';
-import { marketMedicinePool, MARKET_CULTIVATORS } from '../src/sect-market-data.ts';
+  AUCTION_LOTS,
+  AUCTION_CURIO_LOT,
+  validAuction,
+  type AuctionItem,
+} from '../src/auction-data.ts';
 import { ROOT_STARTERS, TREASURES, MAX_FORGE_LEVEL } from '../src/data.ts';
 import { MEDICINES, medicineMarketValue } from '../src/medicine-data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
@@ -42,7 +38,7 @@ function fixture(seed = 12345) {
   save.age = 30;
   save.stones = 100000;
   save.mortal.population = { seed, since: 15 };
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   prepareAuction(save);
   return save;
 }
@@ -83,25 +79,16 @@ test('拍品本批稳定，不随收藏、预算、卖物、关闭或读档重�
   assert.deepEqual(auctionLots(save), expected);
   assert.deepEqual(auctionLots(readSave(JSON.stringify(save)).save), expected);
   save.mortal.auction!.closed = [0];
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   assert.deepEqual(save.mortal.auction!.closed, []);
   assert.notDeepEqual(auctionLots(save), expected);
 });
-test('每批各四件丹药和法宝，原四件及已结拍索引保持，新增拍品可完整结算和读档', () => {
+test('每批各四件丹药和法宝，低场玄铁占物品位且结拍索引保持，新增拍品可完整结算和读档', () => {
   const save = fixture();
   const lots = auctionLots(save);
   assert.equal(lots.length, 8);
   assert.equal(lots.filter((lot) => lot.kind === 'medicine').length, 4);
-  assert.equal(lots.filter((lot) => lot.kind === 'artifact').length, 4);
-  assert.deepEqual(
-    lots.slice(0, 4).map(({ kind, id, forgeLevel }) => ({ kind, id, forgeLevel })),
-    [
-      { kind: 'medicine', id: 'xuling', forgeLevel: 0 },
-      { kind: 'medicine', id: 'yingxiang', forgeLevel: 0 },
-      { kind: 'artifact', id: 'dragon', forgeLevel: 0 },
-      { kind: 'artifact', id: 'sword', forgeLevel: 1 },
-    ],
-  );
+  assert.equal(lots.filter((lot) => lot.kind !== 'medicine').length, 4);
   save.mortal.auction!.closed = [0, 2];
   const loaded = importSave(exportSave(save, null)).save;
   assert.deepEqual(auctionLots(loaded), lots);
@@ -124,31 +111,25 @@ test('每批各四件丹药和法宝，原四件及已结拍索引保持，新�
   );
   assert.equal(
     validAuction(
-      { ...restored.mortal.auction!, closed: [8] },
+      { ...restored.mortal.auction!, closed: [AUCTION_CURIO_LOT] },
       restored.age,
       restored.mortal.sectMarket,
     ),
     false,
   );
-  beginSectMarketVisit(restored);
+  enterNextMarketBatch(restored);
   assert.deepEqual(restored.mortal.auction!.closed, []);
   assert.equal(auctionLots(restored).length, 8);
   assert.notDeepEqual(auctionLots(restored), lots);
 });
-test('拍品丹药随出售修士境界配置，法宝阶数有上限，免费赠品不零价拍卖', () => {
+test('初级场四份丹药排除珍品，物品含批量玄铁且免费赠品不零价拍卖', () => {
   for (let seed = 1; seed <= 100; seed++) {
     const save = fixture(seed);
     for (const lot of auctionLots(save)) {
       assert.ok(lot.start > 0);
       assert.ok(lot.forgeLevel < MAX_FORGE_LEVEL);
       if (lot.kind === 'medicine')
-        assert.ok(
-          MARKET_CULTIVATORS.some((npc) =>
-            marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, npc.id).some(
-              (m) => m.id === lot.id,
-            ),
-          ),
-        );
+        assert.notEqual(MEDICINES.find((m) => m.id === lot.id)!.tier, '珍品');
     }
   }
 });
@@ -343,7 +324,7 @@ test('高阶修士可收低阶余丹，携药仍按境界，炼气修士不能�
   const save = fixture(5);
   save.cultivation = 1e9;
   save.completed = [6];
-  beginSectMarketVisit(save);
+  enterNextMarketBatch(save);
   prepareAuction(save);
   save.medicine.bag.huanglong = 2;
   const r = sellAuction(
@@ -362,16 +343,20 @@ test('高阶修士可收低阶余丹，携药仍按境界，炼气修士不能�
     1,
     1,
   )!;
-  assert.equal(permanent.outcome, 'unsold');
+  assert.equal(permanent, undefined);
+  assert.match(
+    auctionSellReason(low, { kind: 'medicine', id: 'peiying', quantity: 1, forgeLevel: 0 }, 1),
+    /初级会场/,
+  );
   assert.equal(low.medicine.bag.peiying, 1);
-  assert.equal(low.age, 30.5);
+  assert.equal(low.age, 30);
 });
 
 test('重逢买家成交录保存当时姓名，离场换批及读档后仍显示真实旧识而非新槽位修士', () => {
   const s = fixture(1);
   rememberMarketTrade(s, 'market-alchemist');
-  beginSectMarketVisit(s);
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
+  enterNextMarketBatch(s);
   const npc = marketCultivators(s.mortal.population!, s.mortal.sectMarket!).find(
     (n) => n.id === 'market-disciple',
   )!;
@@ -386,7 +371,7 @@ test('重逢买家成交录保存当时姓名，离场换批及读档后仍显�
   assert.equal(result.bidder, 'market-disciple');
   assert.equal(result.bidderName, npc.name);
   assert.match(auctionResult(s, result), /谢知秋买下/);
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   const loaded = importSave(exportSave(s, null)).save;
   assert.match(auctionResult(loaded, loaded.mortal.auction!.history[0]), /谢知秋买下/);
   assert.ok(validAuction(loaded.mortal.auction, loaded.age, loaded.mortal.sectMarket));

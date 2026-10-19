@@ -1,3 +1,4 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, parseSave, readSave, SAVE_SCHEMA } from '../src/progress.ts';
@@ -7,7 +8,6 @@ import { ironMarket, ironTradeQuote } from '../src/iron-market.ts';
 import { ironMarketContent } from '../src/iron-market-ui.ts';
 import { validIronMarket } from '../src/iron-market-data.ts';
 import {
-  beginSectMarketVisit,
   sectMarketDeals,
   sectMarketExchangeReason,
   exchangeSectMedicine,
@@ -106,7 +106,7 @@ test('互换提供跨品级余丹、丹药组合和法宝组合，全部估值�
     s.artifacts = TREASURES.map((t) => t.id);
     for (const t of TREASURES) s.forge[t.id] = visit % 4;
     for (const m of MEDICINES) s.medicine.bag[m.id] = 100;
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     s.mortal.sectMarket!.visit = visit + 1;
     for (const npc of marketCultivators(s.mortal.population!, s.mortal.sectMarket!)) {
       const deals = sectMarketDeals(s, npc.id);
@@ -140,7 +140,7 @@ test('法宝加余丹交易全量扣账并清炼器，失败/过期/续局不部
   s.artifacts = TREASURES.map((t) => t.id);
   for (const t of TREASURES) s.forge[t.id] = 1;
   for (const m of MEDICINES) s.medicine.bag[m.id] = 100;
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   const npc = marketCultivators(s.mortal.population!, s.mortal.sectMarket!)[0],
     deal = sectMarketDeals(s, npc.id).find((d) => d.category === 'mixed')!;
   assert.ok(deal);
@@ -262,7 +262,7 @@ test('合法坊市档缺少拍卖记录时仍可交换已炼器赠品，读取�
   let done = false;
   // 来访者按自身用途选货，不依赖第一批恰好收购某件入门赠品。
   for (let visit = 0; visit < 20 && !done; visit++) {
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     delete s.mortal.auction;
     const loaded = parseSave(JSON.stringify(s));
     for (const npc of marketCultivators(loaded.mortal.population!, loaded.mortal.sectMarket!)) {

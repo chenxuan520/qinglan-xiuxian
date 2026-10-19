@@ -135,7 +135,7 @@ export interface MortalState {
 export function freshMortal(): MortalState {
   return { years: 0, member: null, mastery: {}, activity: null, events: [] };
 }
-export function validMortal(value: unknown, age = 15): value is MortalState {
+export function validMortal(value: unknown, age = 15, legacyAuction = false): value is MortalState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const s = value as MortalState;
   const number = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
@@ -146,7 +146,7 @@ export function validMortal(value: unknown, age = 15): value is MortalState {
     (s.marketVenues === undefined || validMarketVenues(s.marketVenues, age)) &&
     (s.ironMarket === undefined || validIronMarket(s.ironMarket, age)) &&
     (s.sectMarket === undefined || (validSectMarket(s.sectMarket, age) && !!s.population)) &&
-    (s.auction === undefined || validAuction(s.auction, age, s.sectMarket)) &&
+    (s.auction === undefined || validAuction(s.auction, age, s.sectMarket, legacyAuction)) &&
     (s.marketSocial === undefined || validMarketSocial(s.marketSocial, age, s.sectMarket)) &&
     (s.marketFellow === undefined || validMarketFellow(s.marketFellow, age, s.population)) &&
     (s.marketRelations === undefined ||

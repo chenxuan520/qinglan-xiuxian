@@ -1,3 +1,5 @@
+import { enterNextMarketBatch } from './market-fixture.ts';
+import { AUCTION_CURIO_LOT } from '../src/auction-data.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -18,8 +20,8 @@ import {
   settleRun,
 } from '../src/progress.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
-import { beginSectMarketVisit } from '../src/sect-market.ts';
-import { prepareAuction, auctionLots, buyAuction, releaseAuctionItem } from '../src/auction.ts';
+import { prepareAuction, releaseAuctionItem } from '../src/auction.ts';
+import { auctionLots, buyAuction } from '../src/auction-trade.ts';
 import { curioSeekingQuote, seekCurio } from '../src/curio-market.ts';
 import { curioSeekingContent, curioCollection } from '../src/curio-ui.ts';
 import { venueStamp } from '../src/market-venues.ts';
@@ -42,7 +44,7 @@ function ready() {
   s.age = 30;
   s.unlocked = 6;
   s.stones = 1000000;
-  beginSectMarketVisit(s);
+  enterNextMarketBatch(s);
   prepareAuction(s);
   return s;
 }
@@ -128,6 +130,8 @@ test('取得奇物立即撤掉原寄拍，不收取旧按钮费用；跨十年�
       cycle = curioCycle(s.age),
       visit = s.mortal.sectMarket!.visit;
     s.curios.consignment = { cycle, id, closed: false };
+    delete s.mortal.auction!.curioSlot;
+    prepareAuction(s);
     assert.equal(auctionLots(s).at(-1)!.id, id);
     grantCurio(s, id);
     assert.equal(
@@ -135,7 +139,7 @@ test('取得奇物立即撤掉原寄拍，不收取旧按钮费用；跨十年�
       false,
     );
     const before = structuredClone(s);
-    assert.equal(buyAuction(s, 8, s.stones, visit, false, cycle), undefined);
+    assert.equal(buyAuction(s, AUCTION_CURIO_LOT, s.stones, visit, false, cycle), undefined);
     assert.deepEqual(s, before);
     releaseAuctionItem(s, item(id));
     for (let n = 0; n < 100; n++) {
@@ -171,7 +175,7 @@ test('私邀承诺保持原抽取，取得同物后撤掉整桩邀约，旧操�
   const s = ready();
   let found = false;
   for (let n = 0; n < 2000 && !found; n++) {
-    beginSectMarketVisit(s);
+    enterNextMarketBatch(s);
     prepareMarketSocial(s);
     for (const npc of ['market-swordsman', 'market-alchemist', 'market-wanderer'] as const) {
       const offer = marketOpportunity(s, npc);
