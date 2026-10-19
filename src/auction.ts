@@ -50,7 +50,8 @@ export function auctionLots(
     const seed = roll(save, `lot:${index}`);
     const npc = npcs[seed % npcs.length];
     let item: AuctionItem;
-    if (index < 2) {
+    // 每四件各含两丹两器；新增拍品接在末尾，保留原四件及其结拍索引。
+    if (index % 4 < 2) {
       const pool = marketMedicinePool(save.mortal.population!, state, npc.id);
       item = {
         kind: 'medicine',

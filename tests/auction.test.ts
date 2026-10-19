@@ -19,7 +19,7 @@ import {
   auctionBuyReason,
   auctionSellReason,
 } from '../src/auction.ts';
-import { validAuction, type AuctionItem } from '../src/auction-data.ts';
+import { AUCTION_LOTS, validAuction, type AuctionItem } from '../src/auction-data.ts';
 import { marketMedicinePool, MARKET_CULTIVATORS } from '../src/sect-market-data.ts';
 import { ROOT_STARTERS, TREASURES, MAX_FORGE_LEVEL } from '../src/data.ts';
 import { MEDICINES, medicineMarketValue } from '../src/medicine-data.ts';
@@ -86,6 +86,54 @@ test('拍品本批稳定，不随收藏、预算、卖物、关闭或读档重�
   beginSectMarketVisit(save);
   assert.deepEqual(save.mortal.auction!.closed, []);
   assert.notDeepEqual(auctionLots(save), expected);
+});
+test('每批各四件丹药和法宝，原四件及已结拍索引保持，新增拍品可完整结算和读档', () => {
+  const save = fixture();
+  const lots = auctionLots(save);
+  assert.equal(lots.length, 8);
+  assert.equal(lots.filter((lot) => lot.kind === 'medicine').length, 4);
+  assert.equal(lots.filter((lot) => lot.kind === 'artifact').length, 4);
+  assert.deepEqual(
+    lots.slice(0, 4).map(({ kind, id, forgeLevel }) => ({ kind, id, forgeLevel })),
+    [
+      { kind: 'medicine', id: 'xuling', forgeLevel: 0 },
+      { kind: 'medicine', id: 'yingxiang', forgeLevel: 0 },
+      { kind: 'artifact', id: 'dragon', forgeLevel: 0 },
+      { kind: 'artifact', id: 'sword', forgeLevel: 1 },
+    ],
+  );
+  save.mortal.auction!.closed = [0, 2];
+  const loaded = importSave(exportSave(save, null)).save;
+  assert.deepEqual(auctionLots(loaded), lots);
+  assert.match(auctionBuyReason(loaded, 2, 1), /已结拍/);
+  for (const lot of lots.filter((lot) => lot.index >= 4)) {
+    const before = loaded.age;
+    assert.ok(buyAuction(loaded, lot.index, loaded.stones, 1));
+    assert.equal(loaded.age, before + 0.5);
+    assert.match(auctionBuyReason(loaded, lot.index, 1), /已结拍/);
+    assert.equal(buyAuction(loaded, lot.index, loaded.stones, 1), undefined);
+    assert.ok(validAuction(loaded.mortal.auction, loaded.age, loaded.mortal.sectMarket));
+  }
+  const restored = importSave(exportSave(loaded, null)).save;
+  assert.deepEqual(restored.mortal.auction, loaded.mortal.auction);
+  assert.deepEqual(auctionLots(restored), lots);
+  restored.mortal.auction!.closed = lots.map((lot) => lot.index);
+  assert.deepEqual(
+    importSave(exportSave(restored, null)).save.mortal.auction!.closed,
+    restored.mortal.auction!.closed,
+  );
+  assert.equal(
+    validAuction(
+      { ...restored.mortal.auction!, closed: [8] },
+      restored.age,
+      restored.mortal.sectMarket,
+    ),
+    false,
+  );
+  beginSectMarketVisit(restored);
+  assert.deepEqual(restored.mortal.auction!.closed, []);
+  assert.equal(auctionLots(restored).length, 8);
+  assert.notDeepEqual(auctionLots(restored), lots);
 });
 test('拍品丹药随出售修士境界配置，法宝阶数有上限，免费赠品不零价拍卖', () => {
   for (let seed = 1; seed <= 100; seed++) {
@@ -220,7 +268,7 @@ test('免费赠品出售后读档、改道、换根均不补副本；必要本�
 });
 test('拍卖购买后立即转卖不会获利', () => {
   for (let seed = 1; seed <= 100; seed++) {
-    for (let index = 0; index < 4; index++) {
+    for (let index = 0; index < AUCTION_LOTS; index++) {
       const save = fixture(seed);
       const lot = auctionLots(save)[index];
       if (auctionBuyReason(save, index, 1)) continue;
