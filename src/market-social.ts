@@ -524,7 +524,7 @@ export function chooseMarketOpportunity(
     const stats = {
       hp: Math.round(
         (root.baseHp +
-          trainingEffect(save.training.vitality) * 5 * (ownsCurio(save, 'soul-wood') ? 1.15 : 1)) *
+          trainingEffect(save.training.vitality) * 5 * (ownsCurio(save, 'soul-wood') ? 1.3 : 1)) *
           (ownsCurio(save, 'sacred-fragment') ? 1.2 : 1),
       ),
       damage: (7 + root.rate * 8) * (1 + forgeDamageBonus(save.forge[save.starter] || 0)),

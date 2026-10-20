@@ -816,7 +816,7 @@ export const forgeCost = (level: number, save?: SaveData) => {
   return {
     iron: 3 + level * 6 + advanced * 18,
     stones: Math.ceil(
-      (35 + level * 30 + advanced * 90) * (save && ownsCurio(save, 'jade-book') ? 0.85 : 1),
+      (35 + level * 30 + advanced * 90) * (save && ownsCurio(save, 'jade-book') ? 0.7 : 1),
     ),
   };
 };

@@ -9,12 +9,20 @@ test('全部帮助分类不出现广告文案；指南保留主动进入导览�
   assert.doesNotMatch(guide.guideContent('basics'), /guide-demo|<details[^>]*open/);
 });
 
+test('本世珍品帮助说明强化后的实际增幅、次数与占位，保留未知药谱的丹名', () => {
+  const medicine = guide.guideContent('medicine');
+  assert.match(medicine, /服用时所在境界基础寿元的 30%，每世最多两次，长生后不可服用/);
+  assert.match(medicine, /气血上限、基础恢复速度各提高 15%，每世最多三份，合计提高 45%/);
+  assert.match(medicine, /不占三种限时药效的位置/);
+  assert.doesNotMatch(medicine, /回阳水|培婴丹/);
+});
+
 test('帮助将三成边界限定为功法合计系数，并说明奇物另算', () => {
   const builds = guide.guideContent('builds');
   assert.match(builds, /施法间隔与承伤的功法合计系数各最低取基础的 30%/);
   assert.match(builds, /之后仍乘丹药及相应奇物效果，最终值可更低/);
   assert.match(builds, /未持有奇物时的修习效果/);
-  assert.match(builds, /养魂木另使淬体气血与悟道增伤的加成提高 15%/);
+  assert.match(builds, /养魂木另使淬体气血与悟道增伤的加成提高 30%/);
   assert.doesNotMatch(builds, /施法间隔最低为基础的 30%|承伤最低为基础的 30%/);
 });
 

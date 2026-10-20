@@ -94,13 +94,13 @@ export function useMedicine(
     save.spiritRoot = root;
     message = `补天有成 · ${spiritRootInfo(root).name} · ${save.rootElements.map((e) => elementInfo(e).name).join('、')}灵根`;
   } else if (id === 'huiyang') {
-    const years = Math.round(lifespanInfo(save).base * 0.25);
+    const years = Math.round(lifespanInfo(save).base * 0.3);
     save.lifespanBonus += years;
     save.medicine.used.huiyang = (save.medicine.used.huiyang || 0) + 1;
     message += `，寿元增加 ${years} 年`;
   } else if (id === 'peiying') {
     save.medicine.used.peiying = (save.medicine.used.peiying || 0) + 1;
-    message += '，本世气血与基础恢复各 +5%';
+    message += '，本世气血与基础恢复各 +15%';
   } else if (id === 'jiuqu') {
     const major = realmInfo(save.cultivation).index;
     const amount = Math.floor(

@@ -35,7 +35,9 @@ test('奇物估值体现整世收益，普通奇物回款不能一次覆盖完�
   const strongestTimedMedicine = Math.max(
     ...MEDICINES.filter((m) => m.years > 0).map((m) => medicineMarketValue(m.id)),
   );
-  const fullForge = Array.from({ length: 10 }, (_, i) => forgeCost(i).stones).reduce(
+  const discounted = fixture();
+  grantCurio(discounted, 'jade-book');
+  const fullForge = Array.from({ length: 10 }, (_, i) => forgeCost(i, discounted).stones).reduce(
     (a, b) => a + b,
     0,
   );

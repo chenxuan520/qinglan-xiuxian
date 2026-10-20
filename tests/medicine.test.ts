@@ -371,14 +371,20 @@ test('永久丹药每世次数与境界门槛生效，培婴百分比作用于�
   const s = rich();
   s.cultivation = 0;
   for (let i = 0; i < 2; i++) assert.equal(useMedicine(s, 'huiyang').ok, true);
-  assert.equal(s.lifespanBonus, 50);
+  assert.equal(s.lifespanBonus, 60);
   assert.equal(useMedicine(s, 'huiyang').ok, false);
   const base = new Game(s, 0, 0);
-  for (let i = 0; i < 3; i++) assert.equal(useMedicine(s, 'peiying').ok, true);
+  for (let i = 1; i <= 3; i++) {
+    assert.equal(useMedicine(s, 'peiying').ok, true);
+    const restored = parseSave(JSON.stringify(s));
+    const current = new Game(restored, 0, 0);
+    assert.equal(current.player.maxHp, Math.round(base.player.maxHp * (1 + i * 0.15)));
+    approx(current.stats.regen, base.stats.regen * (1 + i * 0.15));
+  }
   assert.equal(useMedicine(s, 'peiying').ok, false);
   const g = new Game(s, 0, 0);
-  assert.equal(g.player.maxHp, Math.round(base.player.maxHp * 1.15));
-  approx(g.stats.regen, base.stats.regen * 1.15);
+  assert.equal(g.player.maxHp, Math.round(base.player.maxHp * 1.45));
+  approx(g.stats.regen, base.stats.regen * 1.45);
   assert.equal(useMedicine(s, 'jiuqu').ok, true);
   assert.equal(useMedicine(s, 'jiuqu').ok, false);
   assert.equal(s.cultivation, Math.floor((realmCost(0) + realmCost(1) + realmCost(2)) * 0.25));

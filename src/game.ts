@@ -216,7 +216,7 @@ export class Game {
       (1 +
         trainingEffect(this.save.training.vitality) *
           0.05 *
-          (ownsCurio(this.save, 'soul-wood') ? 1.15 : 1)) *
+          (ownsCurio(this.save, 'soul-wood') ? 1.3 : 1)) *
       (1 + this.passivePower('guard') * 0.1);
     return Math.round(
       base *
@@ -327,7 +327,7 @@ export class Game {
     return this.player.hp > 0 && ratio < 0.3 ? 1 - ratio / 0.3 : 0;
   }
   private get eliteDamage() {
-    return this.medicine.eliteDamage * (ownsCurio(this.save, 'thunder-bamboo') ? 1.1 : 1);
+    return this.medicine.eliteDamage * (ownsCurio(this.save, 'thunder-bamboo') ? 1.15 : 1);
   }
   get stats() {
     return {
@@ -343,7 +343,7 @@ export class Game {
         (1 +
           (powerTrainingEffect(this.save.training.power) *
             spiritRootInfo(this.spiritRoot).powerPerLevel *
-            (ownsCurio(this.save, 'soul-wood') ? 1.15 : 1)) /
+            (ownsCurio(this.save, 'soul-wood') ? 1.3 : 1)) /
             100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
@@ -373,7 +373,7 @@ export class Game {
         (1 - (this.passives.bone || 0) * 0.01 * this.medicine.drawback) *
         (this.slowed > 0 ? 1 - 0.25 * this.medicine.drawback : 1) *
         this.medicine.speed *
-        (ownsCurio(this.save, 'wind-wings') ? 1.1 : 1),
+        (ownsCurio(this.save, 'wind-wings') ? 1.15 : 1),
       crit: Math.min(
         0.85,
         spiritRootInfo(this.spiritRoot).baseCrit +

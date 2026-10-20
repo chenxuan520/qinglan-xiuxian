@@ -265,7 +265,7 @@ export const MEDICINES: Medicine[] = [
     name: '回阳水',
     tier: '珍品',
     years: 0,
-    desc: '增加当前境界基础寿元的 25%，每世最多两次；长生境界不可服用。',
+    desc: '增加当前境界基础寿元的 30%，每世最多两次；长生境界不可服用。',
     stage: 4,
     price: 0,
     craftYears: 0,
@@ -275,7 +275,7 @@ export const MEDICINES: Medicine[] = [
     name: '培婴丹',
     tier: '珍品',
     years: 0,
-    desc: '本世气血上限、基础恢复速度各 +5%，每世最多三次。',
+    desc: '本世气血上限、基础恢复速度各 +15%，每世最多三次。',
     stage: 4,
     price: 0,
     craftYears: 0,
@@ -401,7 +401,7 @@ export function medicineEffects(s: MedicineState, age: number) {
       (has('wuchang') ? 1.2 : 1) *
       (has('chousui') ? 1.18 : 1),
     hp:
-      (1 + (s.used.peiying || 0) * 0.05) *
+      (1 + (s.used.peiying || 0) * 0.15) *
       (has('jinsui') ? 1.1 : 1) *
       (has('zhenyuan') ? 1.18 : 1) *
       (has('dingling') ? 1.3 : 1) *
@@ -409,7 +409,7 @@ export function medicineEffects(s: MedicineState, age: number) {
       (has('bigu') ? 1.05 : 1) *
       (has('chousui') ? 0.92 : 1),
     regen:
-      (1 + (s.used.peiying || 0) * 0.05) *
+      (1 + (s.used.peiying || 0) * 0.15) *
       (has('yangjing') ? 1.3 : 1) *
       (has('zhenyuan') ? 1.2 : 1) *
       (has('dingling') ? 1.6 : 1) *
