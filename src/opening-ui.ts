@@ -1,3 +1,4 @@
+import { isExtremeLife, rewardDisabled } from './life-mode.ts';
 import { FINAL_TRIAL_STAGE, MAX_REVIVES, elementInfo, spiritRootInfo, treasure } from './data.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import type { Game } from './game.ts';
@@ -51,12 +52,13 @@ export function rootRevealPanel(
   previousLife = '前尘已散，新一世从十五岁启程。',
   firstLife = false,
   body = rootRevealBody(save),
+  lifeModeChoice = '',
 ): PanelParts {
   const successor = isImmortalSuccessor(save);
   return [
     successor ? '少年承缘，始问长生' : firstLife ? '命盘初现，始问长生' : '一念轮回，再问长生',
     successor ? '前人离界 · 后来者启程' : '命盘初现 · 此世资质',
-    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout">${body}</div>${birthInheritanceNotice(save.birthInheritance)}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">${successor ? '重看命盘' : '轮回转世'}</button></div>`,
+    `<p class="root-reveal-context">${previousLife}</p><div class="root-reveal-layout">${body}</div>${birthInheritanceNotice(save.birthInheritance)}${lifeModeChoice}<div class="root-reveal-actions"><button class="primary-button" data-action="accept-root">道心已明 ${smallIcon('arrow')}</button><button class="secondary-button" data-action="reroll-root">${successor ? '重看命盘' : '轮回转世'}</button></div>`,
     true,
   ];
 }
@@ -69,7 +71,7 @@ export function tribulationPendingPanel(
   return [
     '天劫将至',
     `第 ${save.tribulations + 1} 次天劫 · 两万年一劫`,
-    `<p class="pause-description">当前历练已保存。渡劫场只有一位「天劫」，看清预警、侧移避雷，在核心显露时反击。</p><p class="panel-note">携带当前搭配；无未完成历练时，本命在渡劫场临时觉醒。渡劫期间不计龄、不掉经验或回血宝物。战败可使用本次天劫的 ${MAX_REVIVES} 次广告复活；放弃后可先留存此世，再确认轮回。</p><p class="boss-reward">渡劫成功：永久气血 +3% · 法宝伤害 +2%<small>劫印按次数累加，轮回清空；胜利后返回原历练。</small></p><div class="save-actions"><button class="primary-button" data-action="tribulation-start" ${assetsReady ? '' : 'disabled'}>${pendingTribulation ? '继续迎劫' : '迎战天劫'}</button><button class="secondary-button" data-action="tribulation-forfeit">放弃渡劫 · 此世落幕</button></div>`,
+    `<p class="pause-description">当前历练已保存。渡劫场只有一位「天劫」，看清预警、侧移避雷，在核心显露时反击。</p><p class="panel-note">携带当前搭配；无未完成历练时，本命在渡劫场临时觉醒。渡劫期间不计龄、不掉经验或回血宝物。${isExtremeLife(save) ? '极限修行不可退离或复活，战败即此世落幕；未完战斗刷新或关闭后重开也将身陨。' : `战败可使用本次天劫的 ${MAX_REVIVES} 次广告复活；放弃后可先留存此世，再确认轮回。`}</p><p class="boss-reward">渡劫成功：永久气血 +3% · 法宝伤害 +2%<small>劫印按次数累加，轮回清空；胜利后返回原历练。</small></p><div class="save-actions"><button class="primary-button" data-action="tribulation-start" ${assetsReady ? '' : 'disabled'}>${pendingTribulation ? '继续迎劫' : '迎战天劫'}</button><button class="secondary-button" data-action="tribulation-forfeit" ${isExtremeLife(save) ? 'disabled title="极限模式不可弃劫"' : ''}>放弃渡劫 · 此世落幕</button></div>`,
   ];
 }
 
@@ -77,7 +79,7 @@ export function tribulationForfeitPanel(game: Game | null): PanelParts {
   return [
     '弃劫即轮回',
     '确认放弃这一世修行',
-    `<p class="pause-description">确认轮回后，境界、物资、法宝收藏、炼器、根基、劫印和已保存的原历练都会清空，并重新随机灵根。</p><p class="panel-note">${game?.tribulation && game.revivesUsed >= MAX_REVIVES ? '本次天劫的广告复活次数已用尽。' : '可以继续迎劫；已阵亡时可看广告复活。'}确认放弃后可先留存此世，再决定轮回。</p><div class="save-actions"><button class="secondary-button" data-action="cancel-forfeit">继续迎劫</button><button class="primary-button" data-action="confirm-forfeit">确认弃劫 · 此世落幕</button></div>`,
+    `<p class="pause-description">确认轮回后，境界、物资、法宝收藏、炼器、根基、劫印和已保存的原历练都会清空，并重新随机灵根。</p><p class="panel-note">${game && isExtremeLife(game.save) ? '极限修行不可复活或退离；战败即此世落幕。' : game?.tribulation && game.revivesUsed >= MAX_REVIVES ? '本次天劫的广告复活次数已用尽。' : '可以继续迎劫；已阵亡时可看广告复活。'}确认放弃后可先留存此世，再决定轮回。</p><div class="save-actions"><button class="secondary-button" data-action="cancel-forfeit">继续迎劫</button><button class="primary-button" data-action="confirm-forfeit">确认弃劫 · 此世落幕</button></div>`,
   ];
 }
 
@@ -98,10 +100,17 @@ export function journeyFarewellPanel(
 ): PanelParts {
   const tribulation = reason === 'tribulation';
   const ambush = reason === 'ambush';
+  const extreme = reason === 'extreme';
   return [
-    ambush ? '身陨坊外' : tribulation ? '止于天劫' : '此世寿终',
-    ambush ? '刀光已寂 · 一生落笔' : tribulation ? '劫雷未息 · 一生落笔' : '寿数已尽 · 一生落笔',
-    `<div class="lifespan-story"><p>${ambush ? '坊外的风仍穿过荒草，刀光却已远去。这一世的问道路，止在了归途之前。' : tribulation ? '劫雷落尽，这一世的问道路止于仙关之前。' : '这一世已行至尽头。'}山河仍在，旧事、故人与求道路上的每一步，也都留在身后。</p><p>可将此世修行留作一幅纪念；无论是否留存，确认轮回后都将从十五岁重新启程。</p></div><div class="save-actions"><button class="secondary-button" data-action="journey-card">留存此世</button><button class="primary-button" data-action="confirm-journey-reincarnate">轮回转世 ${smallIcon('arrow')}</button></div>`,
+    extreme ? '大道无情，生死有命' : ambush ? '身陨坊外' : tribulation ? '止于天劫' : '此世寿终',
+    extreme
+      ? '极限修行 · 此世落幕'
+      : ambush
+        ? '刀光已寂 · 一生落笔'
+        : tribulation
+          ? '劫雷未息 · 一生落笔'
+          : '寿数已尽 · 一生落笔',
+    `<div class="lifespan-story"><p>${extreme ? '问道的脚步止于险境，山风仍穿过青岚。此世虽已落幕，来时的心意仍留在山河之间。' : ambush ? '坊外的风仍穿过荒草，刀光却已远去。这一世的问道路，止在了归途之前。' : tribulation ? '劫雷落尽，这一世的问道路止于仙关之前。' : '这一世已行至尽头。'}山河仍在，旧事、故人与求道路上的每一步，也都留在身后。</p><p>可将此世修行留作一幅纪念；无论是否留存，确认轮回后都将从十五岁重新启程。</p></div><div class="save-actions"><button class="secondary-button" data-action="journey-card">留存此世</button><button class="primary-button" data-action="confirm-journey-reincarnate">轮回转世 ${smallIcon('arrow')}</button></div>`,
   ];
 }
 
@@ -110,7 +119,7 @@ export function lifespanEndPanel(save: SaveData): PanelParts {
   return [
     '一生将尽，山河仍远',
     '寿元已尽 · 此世未了',
-    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。山风拂过衣袖，你望着来时的路，久久没有言语。</p></div><p class="pause-description">此世行至${currentRealm(save).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad">向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
+    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。山风拂过衣袖，你望着来时的路，久久没有言语。</p></div><p class="pause-description">此世行至${currentRealm(save).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">${isExtremeLife(save) ? '极限模式不可借寿。此世行至寿尽，可留存此世后轮回。' : `完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。`}</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad" ${rewardDisabled(save)}>向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
   ];
 }
 

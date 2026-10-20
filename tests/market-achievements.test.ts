@@ -185,7 +185,7 @@ test('慧眼识珍仅真实竞得五阶以上法宝触发，四阶、落拍和�
   }
 });
 
-test('以物结缘只在法宝搭配丹药真实换出时取得，失败和其他组合不计', () => {
+test('组合换物保留真实成交和库存回滚，不再颁发以物结缘', () => {
   const seen = new Set<string>();
   for (let seed = 1; seed <= 30 && seen.size < 4; seed++) {
     const source = ready(seed);
@@ -206,15 +206,19 @@ test('以物结缘只在法宝搭配丹药真实换出时取得，失败和其�
           assert.equal(has(save, 'mixed-exchange'), false);
         }
         assert.equal(exchangeSectMedicine(save, npc.id, deal.id, 1), true);
-        assert.equal(has(save, 'mixed-exchange'), deal.category === 'mixed');
+        assert.equal(has(save, 'mixed-exchange'), false);
+        assert.equal(
+          chronicleAchievements(save).some((a) => a.id === 'mixed-exchange'),
+          false,
+        );
         if (deal.category === 'mixed') {
-          assert.equal(save.chronicle.milestones['mixed-exchange'], save.age);
+          assert.equal(save.chronicle.milestones['mixed-exchange'], undefined);
           const before = structuredClone(save);
           assert.equal(exchangeSectMedicine(save, npc.id, deal.id, 1), false);
           assert.deepEqual(save, before);
           assert.equal(
             importSave(exportSave(save)).save.chronicle.milestones['mixed-exchange'],
-            save.age,
+            undefined,
           );
         }
         seen.add(deal.category);
@@ -257,13 +261,14 @@ test('旧档只据已得记录与真实成交证据补录，不从当前库存�
   });
   const loaded = parseSave(JSON.stringify(evidence));
   assert.equal(loaded.chronicle.milestones['auction-treasure'], 28.5);
-  assert.equal(loaded.chronicle.milestones['mixed-exchange'], 25);
+  assert.equal(loaded.chronicle.milestones['mixed-exchange'], undefined);
+  assert.ok(loaded.chronicle.entries.some((e) => e.title === '同道互通'));
   const known = structuredClone(evidence);
   known.chronicle.milestones['auction-treasure'] = 20;
   known.chronicle.milestones['mixed-exchange'] = null;
   const knownLoaded = parseSave(JSON.stringify(known));
   assert.equal(knownLoaded.chronicle.milestones['auction-treasure'], 20);
-  assert.equal(knownLoaded.chronicle.milestones['mixed-exchange'], null);
+  assert.equal(knownLoaded.chronicle.milestones['mixed-exchange'], undefined);
   const noProof = ready();
   noProof.artifacts = TREASURES.map((t) => t.id);
   noProof.forge.nail = 10;

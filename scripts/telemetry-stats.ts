@@ -120,6 +120,7 @@ const reasonNames: Record<string, string> = {
   lifespan: '寿尽',
   tribulation: '天劫',
   ambush: '劫杀身陨',
+  extreme: '极限身陨',
   epilogue: '离界传承',
   manual: '主动',
 };

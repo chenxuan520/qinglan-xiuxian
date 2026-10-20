@@ -1,3 +1,5 @@
+import * as lifeMode from '../src/life-mode.ts';
+import { endExtremeLife } from '../src/progress.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -42,6 +44,8 @@ test('结算保存失败保留原奖励，禁止won坏快照与旁路交互；�
       adWatched: false,
       rewards: null,
       structuredClone,
+      ...lifeMode,
+      endExtremeLife,
       performance: { now: () => 1000 },
       clearInterval: () => {},
       settleRun,

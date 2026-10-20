@@ -244,7 +244,7 @@ test('多窗口写档后锁住旧页，保留新存档，旧页不扣药', () =>
   assert.deepEqual(h.save, before);
   assert.equal(h.stored, external);
 });
-test('真实法宝配丹药互换保存以物结缘与成交年龄，重复点击不重复扣物或记年表', () => {
+test('真实法宝配丹药互换保留成交纪事且不再颁发以物结缘，重复点击不重复扣物或记年表', () => {
   const h = mixedHarness();
   const before = structuredClone(h.save);
   h.context.handleAction('sect-market-exchange', h.npc.id);
@@ -257,8 +257,9 @@ test('真实法宝配丹药互换保存以物结缘与成交年龄，重复点�
   );
   assert.equal(h.save.medicine.bag[h.offer.id], h.deal.receive.quantity);
   assert.equal(h.save.age, before.age);
-  assert.equal(h.save.chronicle.milestones['mixed-exchange'], before.age);
-  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '以物结缘').length, 1);
+  assert.equal(h.save.chronicle.milestones['mixed-exchange'], undefined);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '以物结缘').length, 0);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '同道互通').length, 1);
   assert.deepEqual(JSON.parse(h.stored).chronicle, h.save.chronicle);
   assert.deepEqual(JSON.parse(h.stored).artifacts, h.save.artifacts);
   assert.deepEqual(JSON.parse(h.stored).medicine.bag, h.save.medicine.bag);
@@ -281,9 +282,10 @@ test('真实混合互换保存失败不发成就、不移走法宝丹药，恢�
   assert.match(h.messages.at(-1)!, /互换未完成/);
   h.block(false);
   h.context.handleAction('sect-market-exchange', h.npc.id);
-  assert.equal(h.save.chronicle.milestones['mixed-exchange'], before.age);
+  assert.equal(h.save.chronicle.milestones['mixed-exchange'], undefined);
   assert.deepEqual(JSON.parse(h.stored).chronicle, h.save.chronicle);
-  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '以物结缘').length, 1);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '以物结缘').length, 0);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '同道互通').length, 1);
 });
 test('真实混合互换跨窗口冲突连同成就回滚，并保留另一窗口的最新存档', () => {
   const h = mixedHarness();

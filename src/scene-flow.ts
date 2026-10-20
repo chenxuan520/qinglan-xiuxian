@@ -1,3 +1,4 @@
+import { isExtremeLife, difficultyAllowed, rewardDisabled } from './life-mode.ts';
 import { resourceFailureContent } from './resource-panel.ts';
 import type { ActionShell } from './action-controller.ts';
 import type { ParentId } from './hometown.ts';
@@ -78,7 +79,7 @@ export function mountTownScene(shell: ActionShell) {
         },
         () => {
           if (current())
-            marketHost.innerHTML = `<div class="town-loading" role="status">${resourceFailureContent('sect-market-retry', '坊市暂未准备好，游历已暂停。', '重新加载')}</div>`;
+            marketHost.innerHTML = `<div class="town-loading" role="status">${resourceFailureContent('refresh-game', '坊市暂未准备好，游历已暂停。', '重新加载', false)}</div>`;
         },
       );
     }
@@ -130,7 +131,7 @@ export function mountTownScene(shell: ActionShell) {
     },
     () => {
       if (current())
-        host.innerHTML = `<div class="town-loading" role="status">${resourceFailureContent('town-retry', '街巷暂未准备好，游历已暂停。', '重新加载')}</div>`;
+        host.innerHTML = `<div class="town-loading" role="status">${resourceFailureContent('refresh-game', '街巷暂未准备好，游历已暂停。', '重新加载', false)}</div>`;
     },
   );
 }
@@ -485,8 +486,7 @@ export function renderPanel(shell: ActionShell) {
     shell.panelFrame(
       '仙途履历',
       '岁月留痕 · 此世道果',
-      shell.chronicleSource.current.chronicleContent(shell.save) +
-        '<button class="secondary-button journey-card-entry" data-action="journey-card">留存此世</button>',
+      shell.chronicleSource.current.chronicleContent(shell.save),
       true,
     );
   } else if (shell.panel === 'guide' || shell.panel === 'bestiary') {
@@ -571,6 +571,7 @@ export function renderVictory(shell: ActionShell) {
 }
 
 export function showReviveAd(shell: ActionShell) {
+  if (isExtremeLife(shell.save)) return;
   if (
     !shell.game ||
     shell.game.state !== 'lost' ||
@@ -585,6 +586,7 @@ export function showReviveAd(shell: ActionShell) {
 }
 
 export function markAdWatched(shell: ActionShell, action: string, label: string) {
+  if (isExtremeLife(shell.save)) return;
   shell.adWatched = true;
   shell.refreshAdCountdown(action, label); // 按钮文本切到「广告已结束 · …」并解除禁用
 }
@@ -595,6 +597,7 @@ export function startAdWatch(
   label: string,
   placement: AdPlacement,
 ) {
+  if (isExtremeLife(shell.save)) return;
   shell.adWatched = false;
   const epoch = (shell.adWatchEpoch = (shell.adWatchEpoch || 0) + 1);
   const provider = shell.getAdProvider();
@@ -621,6 +624,7 @@ export function startAdWatch(
 }
 
 export function startAdCountdown(shell: ActionShell, action: string, label: string) {
+  if (isExtremeLife(shell.save)) return;
   shell.adReadyAt = Date.now() + shell.AD_DURATION_MS;
   shell.clearInterval(shell.adTimer);
   shell.adTimer = shell.window.setInterval(() => {
@@ -631,6 +635,10 @@ export function startAdCountdown(shell: ActionShell, action: string, label: stri
 export function refreshAdCountdown(shell: ActionShell, action: string, label: string) {
   const button = shell.modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
   if (!button) return 0;
+  if (isExtremeLife(shell.save)) {
+    button.disabled = true;
+    return 0;
+  }
   const seconds = Math.max(0, Math.ceil((shell.adReadyAt - Date.now()) / 1000));
   const incomplete =
     shell.rewardAd === 'root' &&
@@ -665,12 +673,13 @@ export function showSuppliesShortage(shell: ActionShell, stones: number, iron: n
     .filter(Boolean)
     .join('、');
   shell.panel = 'supplies-shortage';
-  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${shell.save.stones} 灵石、${shell.save.iron} 玄铁。<br>可观看 ${shell.AD_SECONDS} 秒广告，领取 ${shell.adSupplies(shell.save.unlocked).stones} 灵石与 ${shell.adSupplies(shell.save.unlocked).iron} 玄铁。领取后返回原页面，再选择要进行的操作。</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad">看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
+  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${shell.save.stones} 灵石、${shell.save.iron} 玄铁。<br>${isExtremeLife(shell.save) ? '极限模式不可领取补给，请通过历练或交易积累资粮。' : `可观看 ${shell.AD_SECONDS} 秒广告，领取 ${shell.adSupplies(shell.save.unlocked).stones} 灵石与 ${shell.adSupplies(shell.save.unlocked).iron} 玄铁。领取后返回原页面，再选择要进行的操作。`}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad" ${rewardDisabled(shell.save)}>看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
   shell.modal.querySelector<HTMLButtonElement>('[data-action="cancel-supplies"]')?.focus();
   return true;
 }
 
 export function showRewardAd(shell: ActionShell, kind: 'root' | 'supplies') {
+  if (isExtremeLife(shell.save)) return;
   if (shell.game || shell.rewardAd) return;
   if (shell.panel !== 'supplies-shortage') shell.rememberRewardReturn();
   shell.rewardAd = kind;
@@ -784,7 +793,7 @@ export function ensureScene(
     })
     .catch(() => {
       failed = true;
-      loading.innerHTML = `<section><div class="eyebrow">叩仙门：青岚纪</div><h2>${isTribulation ? '天劫将至' : shell.STAGES[stage].name}</h2>${resourceFailureContent('', '素材加载失败，请检查网络后重试。尚未进入场景。', '重新加载')}</section>`;
+      loading.innerHTML = `<section><div class="eyebrow">叩仙门：青岚纪</div><h2>${isTribulation ? '天劫将至' : shell.STAGES[stage].name}</h2>${resourceFailureContent('', '素材加载失败，请检查网络后重试。尚未进入场景。', '重新加载', false)}</section>`;
       const retry = loading.querySelector<HTMLButtonElement>('[data-resource-retry]')!;
       retry.onclick = () => {
         loading.remove();
@@ -797,12 +806,23 @@ export function ensureScene(
 }
 
 export function startRun(shell: ActionShell) {
-  if (!shell.assetsReady || shell.selectedStage > shell.save.unlocked) return;
+  if (
+    !shell.assetsReady ||
+    (shell.game && !shell.settled) ||
+    shell.save.pendingReincarnation ||
+    shell.selectedStage > shell.save.unlocked ||
+    !difficultyAllowed(shell.save, shell.difficulty)
+  )
+    return;
   if (shell.tribulationDue(shell.save)) {
     shell.renderTribulationPending();
     return;
   }
   if (shell.pendingRun) {
+    if (isExtremeLife(shell.save)) {
+      shell.restoreRun();
+      return;
+    }
     shell.panel = 'restart';
 
     shell.panelFrame(...shell.restartRunPanel());
@@ -811,6 +831,19 @@ export function startRun(shell: ActionShell) {
   if (!shell.ensureScene(shell.selectedStage, shell.startRun)) {
     return;
   }
+  let entering: Game | null = null;
+  if (isExtremeLife(shell.save)) {
+    const next = structuredClone(shell.save);
+    entering = new shell.Game(next, shell.selectedStage, shell.difficulty);
+    try {
+      shell.writeSave(next, entering);
+    } catch {
+      if (!shell.saveLock) shell.toast('尚未进入秘境，未能保存入场，请重试');
+      return;
+    }
+    Object.assign(shell.save, next);
+    entering.save = shell.save;
+  }
   shell.clearInput();
   shell.panel = '';
   shell.modal.innerHTML = '';
@@ -818,7 +851,7 @@ export function startRun(shell: ActionShell) {
   shell.settled = false;
   shell.rewards = null;
   shell.abandonConfirm = false;
-  shell.game = new shell.Game(shell.save, shell.selectedStage, shell.difficulty);
+  shell.game = entering ?? new shell.Game(shell.save, shell.selectedStage, shell.difficulty);
   shell.frameRate.reset();
   shell.game.onEvent = shell.gameEvent;
   shell.telemetry.track({
@@ -889,8 +922,23 @@ export function beginTribulation(shell: ActionShell) {
     return;
   }
   const source = shell.game && !shell.settled ? shell.game : shell.pendingRun;
-  shell.save.tribulationReturn = source?.snapshot() ?? null;
-  shell.game = shell.Game.createTribulation(shell.save, source);
+  if (isExtremeLife(shell.save)) {
+    const next = structuredClone(shell.save);
+    next.tribulationReturn = source?.snapshot() ?? null;
+    const entering = shell.Game.createTribulation(next, source);
+    try {
+      shell.writeSave(next, entering);
+    } catch {
+      if (!shell.saveLock) shell.toast('尚未迎劫，未能保存入场，请重试');
+      return;
+    }
+    Object.assign(shell.save, next);
+    entering.save = shell.save;
+    shell.game = entering;
+  } else {
+    shell.save.tribulationReturn = source?.snapshot() ?? null;
+    shell.game = shell.Game.createTribulation(shell.save, source);
+  }
   shell.frameRate.reset();
   shell.pendingRun = null;
   shell.settled = false;
@@ -914,6 +962,45 @@ export function beginTribulation(shell: ActionShell) {
 export function finishTribulation(shell: ActionShell) {
   if (!shell.game?.tribulation || shell.game.state !== 'won') return;
   const report = shell.damageReport(shell.game);
+  if (isExtremeLife(shell.save)) {
+    const next = structuredClone(shell.save);
+    if (!shell.completeTribulation(next, shell.game.tribulation)) return;
+    shell.resolveActivity(next);
+    const original = shell.Game.restore(next, next.tribulationReturn);
+    next.tribulationReturn = null;
+    try {
+      shell.writeSave(next, original);
+    } catch {
+      if (!shell.saveLock) {
+        shell.panel = 'settlement-retry';
+        shell.panelFrame(
+          '此行未结',
+          '劫后收心',
+          '<p>尚未保存渡劫结果，请暂留此页重试。</p><button class="primary-button" data-action="finish-run">重试保存收获</button>',
+        );
+        shell.modal.querySelector('[data-action="close"]')?.remove();
+      }
+      return;
+    }
+    Object.assign(shell.save, next);
+    if (original) original.save = shell.save;
+    shell.telemetry.track({
+      type: 'run-end',
+      ...shell.lifeStats(),
+      result: 'won',
+      tribulation: shell.save.tribulations,
+      seconds: Math.round(shell.game.time),
+    });
+    shell.telemetry.flush();
+    shell.pendingRun = original;
+    shell.game = null;
+    shell.settled = false;
+    shell.clearInput();
+    shell.renderLobby();
+    shell.panel = 'tribulation-won';
+    shell.panelFrame(...shell.tribulationWonPanel(shell.save, report, !!shell.pendingRun));
+    return;
+  }
   if (!shell.completeTribulation(shell.save, shell.game.tribulation)) return;
   shell.telemetry.track({
     type: 'run-end',
@@ -938,6 +1025,7 @@ export function finishTribulation(shell: ActionShell) {
 }
 
 export function showLifespanAd(shell: ActionShell) {
+  if (isExtremeLife(shell.save)) return;
   const life = shell.lifespanInfo(shell.save);
   if (!Number.isFinite(life.base) || life.remaining > 0 || shell.panel !== 'lifespan-ended') return;
   shell.panel = 'lifespan-ad';

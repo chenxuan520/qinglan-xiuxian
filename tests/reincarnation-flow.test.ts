@@ -6,8 +6,12 @@ import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { SoundSettings } from '../src/sound-settings.ts';
 import * as data from '../src/data.ts';
+import * as lifeMode from '../src/life-mode.ts';
+import { lifeModeChoice } from '../src/life-mode-ui.ts';
 import {
   freshSave,
+  readSave,
+  endExtremeLife,
   applyBirthInheritance,
   resolveInheritance,
   parseSave,
@@ -101,6 +105,9 @@ function harness(save: SaveData) {
   let rolls = 0;
   const context = createContext({
     dispatchAction,
+    ...lifeMode,
+    lifeModeChoice,
+    endExtremeLife,
     homeTownEntrance,
     ...data,
     ambushScene: null,
@@ -983,4 +990,68 @@ test('少年已选故乡后，中途刷新和导入只恢复告别，不再次�
     restored.finishDeparture();
     assertNewReveal(restored);
   }
+});
+
+test('极限命盘选择先保存再应用，启程后不能改回普通，轮回恢复普通并可重选', () => {
+  const save = freshSave();
+  save.prologueSeen = true;
+  departHometown(save);
+  const h = harness(save);
+  h.panel = 'root-reveal';
+  h.handleAction('life-mode', 'extreme');
+  assert.equal(save.lifeMode, 'extreme');
+  assert.equal(h.difficulty, 1);
+  h.handleAction('close');
+  assert.equal(h.panel, 'root-reveal');
+  h.handleAction('accept-root');
+  assert.equal(save.mortal.hometown!.stage, 'departed');
+  h.handleAction('life-mode', 'normal');
+  assert.equal(save.lifeMode, 'extreme');
+  assert.equal(readSave(h.writes.at(-1)!).save.lifeMode, 'extreme');
+  h.resetLifetime();
+  assert.equal(save.lifeMode, 'normal');
+  assert.equal(save.mortal.hometown!.stage, 'reveal');
+});
+
+test('极限选择/启程保存失败不假成功，极限战败保存重试不发收益或丢死亡', () => {
+  const save = freshSave();
+  save.prologueSeen = true;
+  departHometown(save);
+  const h = harness(save);
+  h.panel = 'root-reveal';
+  const write = h.localStorage.setItem;
+  h.localStorage.setItem = () => {
+    throw Error('quota');
+  };
+  h.handleAction('life-mode', 'extreme');
+  assert.equal(save.lifeMode, 'normal');
+  assert.equal(h.panel, 'root-reveal');
+  h.localStorage.setItem = write;
+  h.handleAction('life-mode', 'extreme');
+  h.localStorage.setItem = () => {
+    throw Error('quota');
+  };
+  h.handleAction('accept-root');
+  assert.equal(save.mortal.hometown!.stage, 'reveal');
+  assert.equal(h.panel, 'root-reveal');
+  h.localStorage.setItem = write;
+  h.handleAction('accept-root');
+  const before = { stones: save.stones, iron: save.iron, runs: save.runs };
+  h.game = new Game(save, 0, 1);
+  h.game.state = 'lost';
+  h.game.player.hp = 0;
+  h.localStorage.setItem = () => {
+    throw Error('quota');
+  };
+  h.finishRun();
+  assert.equal(h.panel, 'extreme-death-retry');
+  assert.equal(save.pendingReincarnation, null);
+  h.handleAction('home');
+  assert.equal(h.panel, 'extreme-death-retry');
+  h.localStorage.setItem = write;
+  h.handleAction('finish-run');
+  assert.equal(save.pendingReincarnation, 'extreme');
+  assert.equal(h.game, null);
+  assert.deepEqual({ stones: save.stones, iron: save.iron, runs: save.runs }, before);
+  assert.equal(readSave(h.writes.at(-1)!).save.pendingReincarnation, 'extreme');
 });

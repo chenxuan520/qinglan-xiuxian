@@ -1,3 +1,4 @@
+import { isExtremeLife } from './life-mode.ts';
 import type { ActionShell } from './action-controller.ts';
 import type { SaveData } from './progress.ts';
 import { MAX_REVIVES } from './data.ts';
@@ -28,6 +29,10 @@ function hideClose(shell: ActionShell) {
 function showDefeat(shell: ActionShell) {
   const encounter = shell.save.mortal.marketSocial?.ambush;
   if (!encounter || encounter.snapshot.outcome !== 'defeat') return;
+  if (isExtremeLife(shell.save)) {
+    shell.beginJourneyFarewell('extreme');
+    return;
+  }
   shell.ambushScene?.destroy();
   shell.ambushScene = null;
   shell.panel = 'market-ambush-defeat';
@@ -61,7 +66,7 @@ export function mountAmbush(shell: ActionShell) {
   shell.closeNpcChat();
   shell.clearInput();
   shell.panel = 'market-ambush';
-  shell.panelFrame(...shell.marketAmbushPanel(encounter.held));
+  shell.panelFrame(...shell.marketAmbushPanel(encounter.held, isExtremeLife(shell.save)));
   hideClose(shell);
   shell.ambushScene?.destroy();
   shell.ambushScene = new MarketAmbushScene(
@@ -106,6 +111,11 @@ export function finishAmbush(shell: ActionShell, outcome: AmbushOutcome) {
 export function ambushAction(shell: ActionShell, action: string) {
   const encounter = shell.save.mortal.marketSocial?.ambush;
   if (!encounter || shell.saveLock || shell.save.pendingReincarnation) return;
+  if (
+    isExtremeLife(shell.save) &&
+    ['market-ambush-watch-ad', 'market-ambush-revive', 'market-ambush-exit'].includes(action)
+  )
+    return;
   if (action === 'market-ambush-recover') {
     mountAmbush(shell);
     return;

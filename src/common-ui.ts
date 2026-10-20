@@ -1,3 +1,4 @@
+import { rewardDisabled } from './life-mode.ts';
 // 首页、洞府与战斗共用的纯展示小片段：只按参数渲染 HTML，不读写全局游戏状态。
 import {
   ELEMENTS,
@@ -110,7 +111,7 @@ export function spiritRootEffects(save: SaveData) {
 export function spiritRootSummary(save: SaveData, showAge = false) {
   const life = lifespanInfo(save);
   const immortal = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max;
-  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>新一世重定资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad">看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">${immortal ? '叩入仙门 · 离界传承' : '轮回转世 · 重启仙途'}</button></div></div>`;
+  return `<div class="spirit-root-summary"><div class="root-identity">${spiritRootDiagram(save)}${showAge ? `<small class="root-age">年岁 <b>${life.age.toFixed(1)}</b> / ${Number.isFinite(life.limit) ? `${life.limit} 年寿元` : '无限寿元'}</small>` : ''}</div><p>${spiritRootEffects(save)}<small>新一世重定资质与五行</small></p><button class="secondary-button" data-action="root-guide">资质说明 ${smallIcon('arrow')}</button><div class="spirit-root-rewards"><button class="secondary-button" data-action="watch-root-ad" ${rewardDisabled(save)}>看广告 · 自选灵根</button><button class="secondary-button" data-action="reincarnate">${immortal ? '叩入仙门 · 离界传承' : '轮回转世 · 重启仙途'}</button></div></div>`;
 }
 export function lifespanSummary(save: SaveData, selectedStage: number) {
   const life = lifespanInfo(save);

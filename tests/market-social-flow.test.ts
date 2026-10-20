@@ -1,3 +1,5 @@
+import * as lifeMode from '../src/life-mode.ts';
+import { endExtremeLife } from '../src/progress.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
 import * as marketEventUi from '../src/market-event-ui.ts';
 import { homeTownEntrance } from '../src/home-town.ts';
@@ -174,6 +176,8 @@ function harness(
     save,
     SAVE_KEY,
     structuredClone,
+    ...lifeMode,
+    endExtremeLife,
     performance,
     FINAL_TRIAL_STAGE,
     MAX_REVIVES,

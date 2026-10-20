@@ -1,3 +1,10 @@
+import {
+  isExtremeLife,
+  minimumDifficulty,
+  difficultyAllowed,
+  EXTREME_AD_ACTIONS,
+  EXTREME_EXIT_ACTIONS,
+} from './life-mode.ts';
 import type { executeAuctionTrade } from './auction-ui.ts';
 import { showSectService, showTownArrival } from './scene-flow.ts';
 import type {
@@ -229,6 +236,7 @@ export interface ActionShell {
     | 'lifespan-farewell'
     | 'tribulation-farewell'
     | 'ambush-farewell'
+    | 'extreme-farewell'
     | 'epilogue';
   lastFrame: number;
   lastMortalTick: number;
@@ -336,7 +344,7 @@ export interface ActionShell {
   townScene: TownScene | null;
   readonly townStatus: typeof townStatus;
   readonly trackReincarnation: (
-    result: 'lifespan' | 'tribulation' | 'ambush' | 'epilogue' | 'manual',
+    result: 'lifespan' | 'tribulation' | 'ambush' | 'extreme' | 'epilogue' | 'manual',
     previous?: ReturnType<ActionShell['lifeStats']>,
   ) => void;
   readonly train: typeof train;
@@ -424,6 +432,17 @@ export interface ActionShell {
 }
 
 export function dispatchAction(shell: ActionShell, action: string, id?: string) {
+  if (isExtremeLife(shell.save) && EXTREME_AD_ACTIONS.has(action)) return;
+  if (
+    isExtremeLife(shell.save) &&
+    ((shell.game && !shell.settled) ||
+      shell.pendingRun ||
+      shell.save.mortal.marketSocial?.ambush) &&
+    EXTREME_EXIT_ACTIONS.has(action)
+  ) {
+    shell.toast('极限模式入境无退，请继续战斗');
+    return;
+  }
   // 按原顺序逐组处理；分组返回 true 表示本次动作已处理完，不再交给后续分组。
   if (handleLockedState(shell, action)) return;
   if (
@@ -504,7 +523,8 @@ function handleLockedState(shell: ActionShell, action: string): boolean {
       action === 'confirm-journey-reincarnate' &&
       (shell.panel === 'lifespan-farewell' ||
         shell.panel === 'tribulation-farewell' ||
-        shell.panel === 'ambush-farewell')
+        shell.panel === 'ambush-farewell' ||
+        shell.panel === 'extreme-farewell')
     ) {
       const reason = shell.save.pendingReincarnation;
       const previous = shell.lifeStats();
@@ -512,9 +532,11 @@ function handleLockedState(shell: ActionShell, action: string): boolean {
         reason === 'lifespan'
           ? shell.endLifetime()
           : shell.resetLifetime(
-              reason === 'ambush'
-                ? '前世殒身于山路，未竟之志留待来生。今世从十五岁，再问长生。'
-                : '前世止于天劫，旧缘已散。今世从十五岁，再问长生。',
+              reason === 'extreme'
+                ? '前世问道止于险境，今世从十五岁再启仙途。'
+                : reason === 'ambush'
+                  ? '前世殒身于山路，未竟之志留待来生。今世从十五岁，再问长生。'
+                  : '前世止于天劫，旧缘已散。今世从十五岁，再问长生。',
             );
       if (reset) shell.trackReincarnation(reason, previous);
     }
@@ -534,12 +556,22 @@ function handleOpening(shell: ActionShell, action: string, id?: string): boolean
         shell.isImmortalSuccessor(shell.save),
       );
     else if (action === 'accept-root' || action === 'close') {
+      if (action === 'close' && isExtremeLife(shell.save)) return true;
+      const next = structuredClone(shell.save);
+      const hadInheritance = next.birthInheritance !== null;
+      next.birthInheritance = null;
+      if (!shell.acceptHometownRoot(next) && !hadInheritance) return true;
+      try {
+        shell.writeSave(next, null);
+      } catch {
+        if (!shell.saveLock) shell.toast('未能保存启程，请重试');
+        return true;
+      }
+      Object.assign(shell.save, next);
+      shell.difficulty = minimumDifficulty(shell.save);
       shell.ui.inert = false;
       shell.panel = '';
       shell.modal.innerHTML = '';
-      const hadInheritance = shell.save.birthInheritance !== null;
-      shell.save.birthInheritance = null;
-      if (shell.acceptHometownRoot(shell.save) || hadInheritance) shell.persist();
       shell.renderLobby();
       shell.ui
         .querySelector<HTMLButtonElement>('[data-action="start"]')
@@ -1290,7 +1322,7 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
     shell.treasurePage = Math.floor(
       shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
     );
-    shell.difficulty = 0;
+    shell.difficulty = minimumDifficulty(shell.save);
     shell.schoolFilter = 'all';
     shell.bookTab = 'treasures';
     shell.gameAudio.sync();
@@ -1750,6 +1782,7 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
     shell.modal.querySelector('.panel')?.scrollTo(0, 0);
   }
   if (action === 'difficulty') {
+    if (!difficultyAllowed(shell.save, Number(id))) return true;
     shell.difficulty = Number(id);
     shell.renderLobby();
   }

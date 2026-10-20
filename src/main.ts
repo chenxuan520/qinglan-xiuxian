@@ -4,6 +4,8 @@ import { cultivationPanel } from './cultivation-ui.ts';
 import { BattleHud } from './battle-hud.ts';
 import { JourneyCardPanel } from './journey-card-panel.ts';
 import { PanelHost, type PanelLocation } from './panel-host.ts';
+import { lifeModeChoice } from './life-mode-ui.ts';
+import { isExtremeLife, minimumDifficulty } from './life-mode.ts';
 import './medicine.css';
 import {
   PROLOGUE_IMAGE,
@@ -53,7 +55,12 @@ import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
 import { DebugEntry } from './debug-entry.ts';
 import { createUpdateCheck, resourceFailed } from './update-check.ts';
-import { resourceFailureContent, resourcesUpdated, panelUpdateNotice } from './resource-panel.ts';
+import {
+  resourceFailureContent,
+  resourcesUpdated,
+  panelUpdateNotice,
+  setResourceRefreshWarning,
+} from './resource-panel.ts';
 
 import './styles.ts';
 import './battle-hud.css';
@@ -103,6 +110,7 @@ import {
 } from './data.ts';
 import {
   parseSave,
+  endExtremeLife,
   readSave,
   freshSave,
   applyBirthInheritance,
@@ -266,7 +274,11 @@ function showRuntimeErrorNotice(updated = false) {
   box.className = 'runtime-error';
   box.setAttribute('role', 'alert');
   if (updated) box.setAttribute('data-resource-update', '');
-  box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${updated ? '游戏已更新，请刷新后继续。' : ERROR_NOTICE_TEXT}</p>${ERROR_NOTICE_ACTIONS}`;
+  const extremeWarning =
+    isExtremeLife(save) && ((game && !settled) || pendingRun || save.mortal.marketSocial?.ambush)
+      ? ' 极限战斗尚未结束，刷新将结束此世。'
+      : '';
+  box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${updated ? '游戏已更新，请刷新后继续。' : ERROR_NOTICE_TEXT}${extremeWarning}</p>${ERROR_NOTICE_ACTIONS}`;
   box.querySelector('[data-error-action="refresh"]')?.addEventListener('click', () => {
     if (updated && !persist()) {
       box.querySelector('p')!.textContent = '进度尚未保存，请稍后再试。';
@@ -317,13 +329,14 @@ catalogTreasures.splice(
 let pendingRun: Game | null = null;
 try {
   const stored = JSON.parse(raw || '{}');
-  if (saveRead.status !== 'unreadable' && stored.schema === SAVE_SCHEMA)
+  if (saveRead.status !== 'unreadable' && (stored.schema === SAVE_SCHEMA || isExtremeLife(save)))
     pendingRun = restoreSavedRun(save, stored.activeRun);
 } catch {
-  /* 无有效对局时仍保留永久进度。 */
+  if (isExtremeLife(save)) endExtremeLife(save, 'interrupted');
+  /* 普通模式无有效对局时仍保留永久进度。 */
 }
 let selectedStage = save.unlocked,
-  difficulty = 0,
+  difficulty = minimumDifficulty(save),
   game: Game | null = null;
 let panel = '',
   bookTab = 'treasures',
@@ -334,6 +347,7 @@ let journeyCardReturn:
   | 'lifespan-farewell'
   | 'tribulation-farewell'
   | 'ambush-farewell'
+  | 'extreme-farewell'
   | 'epilogue' = 'chronicle';
 
 let inMortalWorld = false;
@@ -392,6 +406,11 @@ let adRoot: SpiritRootId = 'heaven';
 let adElements: ElementId[] = [];
 let pendingImport: ReturnType<typeof importSave> | null = null;
 let settlementRetryAt = 0;
+setResourceRefreshWarning(() =>
+  isExtremeLife(save) && ((game && !settled) || pendingRun || save.mortal.marketSocial?.ambush)
+    ? '极限战斗尚未结束，刷新将结束此世。'
+    : '',
+);
 // 只在存档仍是本页上次读写的内容时写入，其他窗口写过后本页停止保存。
 function writeSave(data: SaveData, run: Game | null) {
   if (saveLock) throw new Error('存档已停止写入');
@@ -404,7 +423,13 @@ function writeSave(data: SaveData, run: Game | null) {
   lastSaveText = text;
 }
 function persist() {
-  if (saveLock || settlementRetryAt || (game?.state === 'won' && !settled)) return false;
+  if (
+    saveLock ||
+    settlementRetryAt ||
+    panel === 'extreme-death-retry' ||
+    (game?.state === 'won' && !settled)
+  )
+    return false;
   syncHumanStories(save);
   const active = game && !settled ? game : pendingRun;
   try {
@@ -960,6 +985,7 @@ async function renderJourneyCard() {
     panel === 'lifespan-farewell' ||
     panel === 'tribulation-farewell' ||
     panel === 'ambush-farewell' ||
+    panel === 'extreme-farewell' ||
     panel === 'epilogue'
   )
     journeyCardReturn = panel;
@@ -972,7 +998,9 @@ async function renderJourneyCard() {
         ? 'tribulation'
         : journeyCardReturn === 'ambush-farewell'
           ? 'ambush'
-          : undefined,
+          : journeyCardReturn === 'extreme-farewell'
+            ? 'extreme'
+            : undefined,
   );
 }
 function renderPanel() {
@@ -997,6 +1025,10 @@ function gameEvent(name: string) {
 }
 
 function finishRun() {
+  if (isExtremeLife(save) && game?.state === 'lost') {
+    beginJourneyFarewell('extreme');
+    return;
+  }
   if (game?.tribulation) {
     if (game.state === 'won') finishTribulation();
     else if (game.state === 'lost') renderTribulationForfeit();
@@ -1078,6 +1110,10 @@ function renderVictory() {
 }
 function renderDeath() {
   if (!game || game.state !== 'lost' || settled) return;
+  if (isExtremeLife(save)) {
+    beginJourneyFarewell('extreme');
+    return;
+  }
   if (game.expired) {
     renderLifespanEnd();
     return;
@@ -1095,7 +1131,7 @@ function showReviveAd() {
 }
 // 广告是否已完整播放：真实 SDK 由观看回调置位，占位模式按倒计时完成判定。
 function adCompleted() {
-  return adWatched || (adReadyAt !== 0 && Date.now() >= adReadyAt);
+  return !isExtremeLife(save) && (adWatched || (adReadyAt !== 0 && Date.now() >= adReadyAt));
 }
 
 // 真实 SDK 看过广告后的统一入口：解锁当前进程中的奖励按钮。
@@ -1166,7 +1202,15 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   panel = 'root-reveal';
   ui.inert = true;
 
-  panelFrame(...rootRevealPanel(save, previousLife, firstLife, rootRevealContent()));
+  panelFrame(
+    ...rootRevealPanel(
+      save,
+      previousLife,
+      firstLife,
+      rootRevealContent(),
+      lifeModeChoice(save.lifeMode),
+    ),
+  );
   modal.querySelector('[data-action="close"]')?.remove();
   const section = modal.querySelector<HTMLElement>('.panel')!;
   section.classList.add('root-reveal-panel');
@@ -1185,7 +1229,7 @@ function lifeStats() {
   } satisfies Partial<TelemetryEvent>;
 }
 function trackReincarnation(
-  result: 'lifespan' | 'tribulation' | 'ambush' | 'epilogue' | 'manual',
+  result: 'lifespan' | 'tribulation' | 'ambush' | 'extreme' | 'epilogue' | 'manual',
   previous = lifeStats(),
 ) {
   telemetry.track({ type: 'reincarnate', result, ...previous });
@@ -1207,6 +1251,7 @@ function resetLifetime(
     hometownSeen,
     autoplayBuild: structuredClone(autoplayBuild),
   });
+  next.lifeMode = rerolling ? save.lifeMode : 'normal';
   applyBirthInheritance(next, inheritance);
   if (successor)
     recordChronicle(
@@ -1245,7 +1290,8 @@ function resetLifetime(
   game = pendingRun = null;
   rewards = null;
   gameAudio.sync();
-  selectedStage = difficulty = treasurePage = 0;
+  selectedStage = treasurePage = 0;
+  difficulty = minimumDifficulty(save);
   selectedTreasure = save.starter;
   schoolFilter = 'all';
   bookTab = 'treasures';
@@ -1305,13 +1351,25 @@ function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation
   if (reason === 'ambush' && save.mortal.marketSocial?.ambush?.snapshot.outcome !== 'defeat')
     return;
   const ended = structuredClone(save);
-  ended.pendingReincarnation = reason;
+  if (reason === 'extreme') {
+    if (!endExtremeLife(ended, 'defeat') && ended.pendingReincarnation !== 'extreme') return;
+  } else ended.pendingReincarnation = reason;
   ended.autoplay = false;
   ended.tribulationReturn = null;
   try {
     writeSave(ended, null);
   } catch {
-    if (!saveLock) toast('浏览器无法保存本世落幕，请释放存储空间后重试');
+    if (!saveLock && reason === 'extreme') {
+      game?.pause();
+      clearInput();
+      panel = 'extreme-death-retry';
+      panelFrame(
+        '此世已止',
+        '正在记下这一程',
+        '<p>未能保存本世落幕，请释放存储空间后重试。</p><button class="primary-button" data-action="finish-run">重试保存</button>',
+      );
+      modal.querySelector('[data-action="close"]')?.remove();
+    } else if (!saveLock) toast('浏览器无法保存本世落幕，请释放存储空间后重试');
     return;
   }
   Object.assign(save, ended);
@@ -1669,6 +1727,33 @@ function handleAction(action: string, id?: string) {
     }
     return;
   }
+  if (
+    action === 'life-mode' &&
+    panel === 'root-reveal' &&
+    save.mortal.hometown?.stage === 'reveal' &&
+    (id === 'normal' || id === 'extreme')
+  ) {
+    const next = structuredClone(save);
+    next.lifeMode = id;
+    try {
+      writeSave(next, null);
+    } catch {
+      if (!saveLock) toast('未能保存修行模式，请重试');
+      return;
+    }
+    Object.assign(save, next);
+    difficulty = minimumDifficulty(save);
+    const choice = modal.querySelector('.life-mode-choice');
+    if (choice) choice.outerHTML = lifeModeChoice(save.lifeMode);
+    modal
+      .querySelector<HTMLButtonElement>(`[data-action="life-mode"][data-id="${id}"]`)
+      ?.focus({ preventScroll: true });
+    return;
+  }
+  if (panel === 'extreme-death-retry') {
+    if (action === 'finish-run') beginJourneyFarewell('extreme');
+    return;
+  }
   if (action === 'refresh-game') {
     if (!document.querySelector('[data-action=refresh-game]')) return;
     if (persist()) location.reload();
@@ -1790,14 +1875,25 @@ document.addEventListener('change', async (event) => {
     if (preview) preview.innerHTML = inheritancePreview(save, input.value);
     return;
   }
-  if (input.id !== 'save-import' || game || panel !== 'cultivation') return;
+  if (
+    input.id !== 'save-import' ||
+    game ||
+    panel !== 'cultivation' ||
+    (isExtremeLife(save) && (pendingRun || save.mortal.marketSocial?.ambush))
+  )
+    return;
   const file = input.files?.[0];
   input.value = '';
   if (!file) return;
   try {
     if (file.size > MAX_SAVE_FILE_BYTES) throw new Error('存档文件过大，请选择 10 MB 以内的文件');
     const candidate = importSave(await file.text());
-    if (game || panel !== 'cultivation') return;
+    if (
+      game ||
+      panel !== 'cultivation' ||
+      (isExtremeLife(save) && (pendingRun || save.mortal.marketSocial?.ambush))
+    )
+      return;
     pendingImport = candidate;
     panel = 'import-confirm';
 
@@ -1865,11 +1961,24 @@ document.addEventListener('visibilitychange', () => {
   frameRate.sample(0, false);
   if (document.hidden) {
     clearInput();
-    if (!save.autoplay && game?.state === 'playing') handleAction('pause');
+    if ((!save.autoplay || isExtremeLife(save)) && game?.state === 'playing') handleAction('pause');
     if ((game && !settled) || inMortalWorld) persist();
   } else renderer.restore();
 });
-window.addEventListener('pageshow', () => renderer.restore());
+window.addEventListener('pageshow', (event) => {
+  renderer.restore();
+  if (
+    event.persisted &&
+    isExtremeLife(save) &&
+    ((game && !settled && game.state !== 'won') ||
+      pendingRun ||
+      (save.mortal.marketSocial?.ambush &&
+        !['victory', 'escaped'].includes(
+          ambushScene?.duel.outcome ?? save.mortal.marketSocial.ambush.snapshot.outcome ?? '',
+        )))
+  )
+    beginJourneyFarewell('extreme');
+});
 const canvas = renderer.canvas;
 canvas.addEventListener('pointerdown', (e) => {
   if (
@@ -1992,7 +2101,8 @@ function simulate(dt: number, now: number) {
     if (game.expired) {
       if (previousState !== 'lost') {
         previousState = 'lost';
-        renderLifespanEnd();
+        if (isExtremeLife(save)) beginJourneyFarewell('extreme');
+        else renderLifespanEnd();
         persist();
       }
       return;

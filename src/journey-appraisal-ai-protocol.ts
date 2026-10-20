@@ -37,6 +37,11 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
   const has = (id: string) => facts.feats.includes(id);
   const tie = (id: string) => facts.ties.includes(id);
   if (
+    !has('one-life-clear') &&
+    /一命(?:通关|证长生|踏破七境|修成真仙)|极限.{0,8}(?:成仙|登仙|通关)/.test(text)
+  )
+    return false;
+  if (
     facts.stages.length !== STAGES.length &&
     /七境(?:皆|尽|全|已)|(?:踏破|尽破|走遍|通关)七境/.test(text)
   )
@@ -103,6 +108,13 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
       ))
   )
     return false;
+  if (
+    facts.ending === 'extreme' &&
+    /此世仍在修行|此世(?:尚未|仍未)(?:结束|落幕|收笔)|此世未竟|仍待亲行|平安(?:归来|返回)|成功脱身|及时脱身|已获新生/.test(
+      text,
+    )
+  )
+    return false;
   if (facts.ending === 'ongoing' && /此世落幕|此生落幕|此世已终|此世终章已落/.test(text))
     return false;
   if (!tie('friend-met') && /渔友|渔夫|船头共饮/.test(text)) return false;
@@ -136,6 +148,8 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
     lifespan: '此世已因寿元耗尽落幕',
     tribulation: '此世已殒于天劫',
     ambush: '此世在坊外遭劫修袭杀而身陨，已经结束；不是寿尽、天劫或成功脱身',
+    extreme:
+      '此世选择一命问道的极限修行，已在险境中落幕；不编造具体死因，不是寿尽，也不能说仍可继续修行',
     immortal: '已证真仙并叩入仙门，此世圆满结束',
   }[facts.ending];
   const messages = [

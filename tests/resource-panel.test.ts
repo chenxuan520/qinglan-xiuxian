@@ -8,6 +8,7 @@ import {
   resourceFailureContent,
   resourcesUpdated,
   panelUpdateNotice,
+  setResourceRefreshWarning,
 } from '../src/resource-panel.ts';
 
 const current = 'a'.repeat(24),
@@ -44,6 +45,7 @@ function harness() {
       document,
       resourcesUpdated,
       panelUpdateNotice,
+      setResourceRefreshWarning,
       showRuntimeErrorNotice: () => state.notices++,
       addEventListener: target.addEventListener.bind(target),
       createUpdateCheck: (build: string, url: URL, updated: () => void) =>
@@ -131,4 +133,29 @@ test('无本地处理器时优先沿用中心面板，仅无面板才显示原�
   outside.signal();
   await outside.finish();
   assert.equal(outside.state.notices, 1);
+});
+
+test('未入场失败只显示一个重新加载，极限新版中心提示同样写明刷新后果', () => {
+  const html = resourceFailureContent('refresh-game', '尚未进入场景', '重新加载', false);
+  assert.equal((html.match(/<button\b/g) ?? []).length, 1);
+  assert.match(html, /data-action="refresh-game">重新加载/);
+  const warning = '极限战斗尚未结束，刷新将结束此世。';
+  setResourceRefreshWarning(() => warning);
+  try {
+    let inserted = '';
+    const panel = {
+      querySelector: () => null,
+      insertAdjacentHTML(_: string, html: string) {
+        inserted = html;
+      },
+    };
+    assert.equal(panelUpdateNotice({ querySelector: () => panel } as unknown as HTMLElement), true);
+    assert.ok(inserted.includes(warning));
+    assert.ok(resourceFailureContent('chronicle').includes(warning));
+    const note = { textContent: '' };
+    resourcesUpdated({ querySelectorAll: () => [note] } as unknown as ParentNode);
+    assert.ok(note.textContent.includes(warning));
+  } finally {
+    setResourceRefreshWarning(() => '');
+  }
 });

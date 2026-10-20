@@ -412,3 +412,53 @@ test('Worker 评语也受推理超时和用户取消控制，binding 不响应�
     assert.equal(signal.aborted, true);
   }
 });
+
+test('普通真仙评语不能编造一命通关，真实成就和极限落幕分别照实表达', () => {
+  const save = freshSave();
+  save.cultivation = 1e9;
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  const input = journeyAppraisalFacts(save, 'ongoing');
+  for (const phrase of ['一命通关', '一命证长生', '一命踏破七境', '一命修成真仙', '极限修行成仙']) {
+    const appraisal = {
+      title: '长生已证',
+      detail: `长生已经证得，此世还待亲手写下新的篇章。${phrase}，亦在山河之间留下修行的来路。`,
+    };
+    assert.equal(validJourneyAppraisal(appraisal, input), false, phrase);
+    assert.equal(
+      validJourneyAppraisal(appraisal, { ...input, feats: ['one-life-clear'] }),
+      true,
+      phrase,
+    );
+  }
+  save.lifeMode = 'extreme';
+  save.pendingReincarnation = 'extreme';
+  const ended = journeyAppraisalFacts(save, 'extreme');
+  assert.equal(validJourneyAppraisal(localJourneyAppraisal(ended), ended), true);
+});
+
+test('极限身陨评语不接纳仍然活着的断言', () => {
+  const save = freshSave();
+  save.lifeMode = 'extreme';
+  save.pendingReincarnation = 'extreme';
+  const input = journeyAppraisalFacts(save, 'extreme');
+  for (const claim of [
+    '此世尚未落幕',
+    '此世仍未结束',
+    '此世尚未收笔',
+    '此世仍在修行',
+    '平安返回',
+  ]) {
+    assert.equal(
+      validJourneyAppraisal(
+        {
+          title: '一命问道',
+          detail: `${claim}，求长生的一程还在山河之间延伸。天灵根在身，来时的心意仍有回响。`,
+        },
+        input,
+      ),
+      false,
+      claim,
+    );
+  }
+  assert.equal(validJourneyAppraisal(localJourneyAppraisal(input), input), true);
+});

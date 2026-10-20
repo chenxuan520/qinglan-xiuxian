@@ -26,6 +26,7 @@ export const TELEMETRY_RESULTS = [
   'lifespan',
   'tribulation',
   'ambush',
+  'extreme',
   'epilogue',
   'manual',
 ] as const;

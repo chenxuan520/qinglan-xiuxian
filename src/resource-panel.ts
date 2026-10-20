@@ -1,3 +1,7 @@
+let refreshWarning = () => '';
+export function setResourceRefreshWarning(warning: () => string) {
+  refreshWarning = warning;
+}
 let updated = false;
 const updateMessage = '游戏已更新，请刷新后继续。';
 
@@ -6,14 +10,15 @@ export function resourceFailureContent(
   action = '',
   message = '暂未展开，请重试。',
   label = '重新展开',
+  showRefresh = true,
 ) {
-  return `<div data-resource-failure><p class="panel-note" data-resource-message role="status">${updated ? updateMessage : message}</p><div class="resource-failure-actions"><button class="secondary-button" data-resource-retry ${action ? `data-action="${action}"` : ''}>${label}</button><button class="secondary-button" data-action="refresh-game">刷新</button></div></div>`;
+  return `<div data-resource-failure><p class="panel-note" data-resource-message role="status">${updated ? updateMessage : message}${refreshWarning() ? ` ${refreshWarning()}` : ''}</p><div class="resource-failure-actions"><button class="secondary-button" data-resource-retry ${action ? `data-action="${action}"` : ''}>${label}</button>${showRefresh ? '<button class="secondary-button" data-action="refresh-game">刷新</button>' : ''}</div></div>`;
 }
 
 export function resourcesUpdated(root: ParentNode) {
   updated = true;
   root.querySelectorAll('[data-resource-message]').forEach((note) => {
-    note.textContent = updateMessage;
+    note.textContent = [updateMessage, refreshWarning()].filter(Boolean).join(' ');
   });
 }
 
@@ -23,7 +28,7 @@ export function panelUpdateNotice(modal: HTMLElement) {
   if (!panel.querySelector('[data-resource-message]'))
     panel.insertAdjacentHTML(
       'beforeend',
-      `<div data-resource-failure><p class="panel-note" data-resource-message role="status">${updateMessage}</p><button class="secondary-button" data-action="refresh-game">刷新</button></div>`,
+      `<div data-resource-failure><p class="panel-note" data-resource-message role="status">${[updateMessage, refreshWarning()].filter(Boolean).join(' ')}</p><button class="secondary-button" data-action="refresh-game">刷新</button></div>`,
     );
   return true;
 }

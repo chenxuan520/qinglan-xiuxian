@@ -12,7 +12,13 @@ import {
 } from './data.ts';
 import { realmInfo, type SaveData } from './progress.ts';
 
-export type JourneyCardEnding = 'ongoing' | 'lifespan' | 'tribulation' | 'ambush' | 'immortal';
+export type JourneyCardEnding =
+  | 'ongoing'
+  | 'lifespan'
+  | 'tribulation'
+  | 'ambush'
+  | 'extreme'
+  | 'immortal';
 export interface JourneyAppraisal {
   title: string;
   detail: string;
@@ -29,6 +35,7 @@ export const JOURNEY_APPRAISAL_FEATS = [
   'six-immortals',
   'five-tribulations',
   'hard-immortal',
+  'one-life-clear',
   'rootless-immortal',
 ] as const;
 export const JOURNEY_APPRAISAL_TIES = [
@@ -136,7 +143,7 @@ export function validJourneyAppraisalFacts(value: unknown): value is JourneyAppr
     !keys.every((key) => FACT_KEYS.includes(key) || key === 'mortal') ||
     (f.mortal !== undefined &&
       (typeof f.mortal !== 'boolean' || (f.mortal && f.realmIndex !== 0))) ||
-    !['ongoing', 'lifespan', 'tribulation', 'ambush', 'immortal'].includes(f.ending) ||
+    !['ongoing', 'lifespan', 'tribulation', 'ambush', 'extreme', 'immortal'].includes(f.ending) ||
     !Number.isInteger(f.realmIndex) ||
     f.realmIndex < 0 ||
     f.realmIndex >= REALMS.length ||
@@ -165,6 +172,8 @@ export function validJourneyAppraisalFacts(value: unknown): value is JourneyAppr
     (f.ascending && (f.realmIndex !== 7 || f.stages.includes(FINAL_TRIAL_STAGE))) ||
     (f.feats.some((feat) => ['rootless-immortal', 'hard-immortal'].includes(feat)) &&
       f.realmIndex !== 8) ||
+    (f.feats.includes('one-life-clear') &&
+      (f.realmIndex !== 8 || !STAGES.every((_, index) => f.stages.includes(index)))) ||
     (f.feats.includes('five-tribulations') && f.tribulations < 5) ||
     (f.ties.includes('home-letter-read') && !f.ties.includes('home-letter-found'))
   )
@@ -189,8 +198,10 @@ function appraisalTitle(f: JourneyAppraisalFacts) {
   const home = tie('home-letter-read') || tie('home-reunion');
   const bond = tie('companion-bond');
   const allStages = STAGES.every((_, index) => f.stages.includes(index));
+  if (f.ending === 'extreme') return '一命问道';
   if (f.ending === 'ambush') return '仙途止于风雪';
   if (f.ending === 'tribulation') return '一念问天';
+  if (feat('one-life-clear')) return '一命证长生';
   if (feat('rootless-immortal')) return '凡骨登仙';
   if (feat('hard-immortal')) return '逆境问道';
   if (f.ending === 'immortal')
@@ -235,6 +246,16 @@ function factsSeed(f: JourneyAppraisalFacts) {
 }
 
 function endingWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) => string) {
+  if (f.ending === 'extreme')
+    return {
+      full: pick([
+        '大道无情，此身止于险境，问道的脚步仍留在山河之间。',
+        '一命问道，这一程虽已收笔，曾经走过的山海仍有回响。',
+        '生死有命，修行止于险途，来时的心意并未随风散去。',
+      ]),
+      compact: '一命问道，此身止于险境，走过的山海仍有回响。',
+      brief: '极限身陨，问道留痕。',
+    };
   if (f.ending === 'ambush')
     return {
       full: pick([
@@ -317,10 +338,12 @@ const FEAT_WORDS: Record<(typeof JOURNEY_APPRAISAL_FEATS)[number], readonly stri
   'training-master': ['三元皆修成', '三元修至二十阶', '淬体悟道身法皆成'],
   'six-immortals': ['六器曾齐鸣', '曾同御六件仙器', '六件仙器曾共鸣'],
   'five-tribulations': ['五劫皆渡过', '五次天劫已亲渡', '五劫留下修行印'],
+  'one-life-clear': ['一命踏破七境', '一命修成真仙', '极限求道已成仙'],
   'hard-immortal': ['最险历练亦证仙', '逆最险历练成仙', '最险仙途已走过'],
   'rootless-immortal': ['无灵根亦证仙', '无灵根也证真仙', '无灵根曾证长生'],
 };
 const FEAT_PRIORITY = [
+  'one-life-clear',
   'rootless-immortal',
   'hard-immortal',
   'six-immortals',
@@ -350,7 +373,12 @@ function cultivationWords(f: JourneyAppraisalFacts, pick: (words: readonly strin
     const selected = feats.slice(0, 3);
     const both = selected.includes('rootless-immortal') && selected.includes('hard-immortal');
     const words = both
-      ? ['无灵根亦于最险历练证仙', ...selected.slice(2).map((id) => pick(FEAT_WORDS[id]))]
+      ? [
+          '无灵根亦于最险历练证仙',
+          ...selected
+            .filter((id) => id !== 'rootless-immortal' && id !== 'hard-immortal')
+            .map((id) => pick(FEAT_WORDS[id])),
+        ]
       : selected.map((id) => pick(FEAT_WORDS[id]));
     return {
       full: `${words.join('、')}，皆为此身亲证。`,
@@ -383,7 +411,7 @@ function cultivationWords(f: JourneyAppraisalFacts, pick: (words: readonly strin
       compact: `${root}，${compactEvidence.slice(0, 2).join('、')}。`,
     };
   }
-  if (f.ending === 'ambush') {
+  if (f.ending === 'ambush' || f.ending === 'extreme') {
     const reachedRealm = f.ascending ? '渡劫' : realm;
     return {
       full: pick([

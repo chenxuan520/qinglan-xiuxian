@@ -221,7 +221,7 @@ test('失焦/隐藏保存并暂停，返回不追算后台时间；加载失败�
     h.scene.update(9000, true);
     assert.equal(h.scene.duel.time, 0);
     assert.equal(h.scene.duel.outcome, null);
-    assert.match(h.nodes.get('.ambush-loading')!.innerHTML, /重试加载/);
+    assert.match(h.nodes.get('.ambush-loading')!.innerHTML, /重新加载/);
     h.setImageFailure(false);
     await h.scene.retryAssets();
     assert.equal(h.scene.ready, true);

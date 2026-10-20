@@ -40,11 +40,11 @@ export function teaStoryPanel(): PanelParts {
   ];
 }
 
-export function marketAmbushPanel(held: number): PanelParts {
+export function marketAmbushPanel(held: number, extreme = false): PanelParts {
   return [
     '话中藏刃',
     '坊外 · 劫修伏击',
-    `<div id="market-ambush"></div><details class="market-ambush-rules"><summary>遭遇规则与战利品</summary><p class="panel-note">${held} 灵石已暂扣。击败劫修后自动取回，并收取其携带的战利品：一份丹药，可能另有一件法宝，品级与炼器符合对方境界。战利品自动收入行囊。</p><p class="panel-note">点「尝试撤离」后会自动向左退，也可手动走位；到达左侧退路、与追兵拉开距离并连续守住两秒才算脱身，成功后损失本次暂扣灵石。气血耗尽会身死，可选择广告复活；放弃复活或机会用尽时，点「查看此世落幕」进入身陨落幕页。离开画面时战斗暂停。</p></details>`,
+    `<div id="market-ambush"></div><details class="market-ambush-rules"><summary>遭遇规则与战利品</summary><p class="panel-note">${held} 灵石已暂扣。击败劫修后自动取回，并收取其携带的战利品：一份丹药，可能另有一件法宝，品级与炼器符合对方境界。战利品自动收入行囊。</p><p class="panel-note">${extreme ? '极限模式无法撤离或复活，战败与未完战斗刷新、关闭页面都将结束此世。离开画面时战斗暂停。' : '点「尝试撤离」后会自动向左退，也可手动走位；到达左侧退路、与追兵拉开距离并连续守住两秒才算脱身，成功后损失本次暂扣灵石。气血耗尽会身死，可选择广告复活；放弃复活或机会用尽时，点「查看此世落幕」进入身陨落幕页。离开画面时战斗暂停。'}</p></details>`,
   ];
 }
 

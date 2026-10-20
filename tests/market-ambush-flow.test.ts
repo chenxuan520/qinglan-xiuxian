@@ -1,3 +1,5 @@
+import * as lifeMode from '../src/life-mode.ts';
+import { endExtremeLife } from '../src/progress.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -130,6 +132,8 @@ function harness(data = fixture()) {
     realmInfo,
     SAVE_KEY,
     structuredClone,
+    ...lifeMode,
+    endExtremeLife,
     settleMarketAmbush,
     marketAmbushPanel,
     journeyFarewellPanel,

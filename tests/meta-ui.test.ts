@@ -101,7 +101,8 @@ test('关于面板与离界传承确认放置微信赞赏码，终章正文不�
 test('洞府使用此世存档文案并保留原导入导出动作', () => {
   assert.match(source, /class="save-record"/);
   assert.match(source, /<h3>此世存档<\/h3>/);
-  assert.match(source, /把这一世的修为、旧事与未尽历练收进行囊/);
+  assert.match(source, /把这一世的修为与旧事收进行囊/);
+  assert.match(source, /普通模式可续未尽历练；极限未完战斗重开将身陨/);
   assert.match(source, /导出存档文件，换设备也能接续这一世/);
   assert.match(source, /data-action="export-save">导出此世<\/button>/);
   assert.match(source, /data-action="import-save">导入旧档<\/button>/);

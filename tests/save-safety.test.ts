@@ -1,3 +1,5 @@
+import * as lifeMode from '../src/life-mode.ts';
+import { endExtremeLife } from '../src/progress.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -124,6 +126,7 @@ function harness(options: {
     setItem(key, value);
   };
   const context = createContext({
+    ...lifeMode,
     save: freshSave(),
     game: null as null | { paused: number; pause(): void; snapshot(): unknown },
     settled: false,
@@ -390,7 +393,7 @@ test('main.ts 所有存档写入都经过 writeSave，启动与多窗口入口�
   assert.match(source, /backupUnreadableSave\(localStorage, raw\)/);
   assert.match(
     source,
-    /if \(saveRead\.status !== 'unreadable' && stored\.schema === SAVE_SCHEMA\)\s+pendingRun = restoreSavedRun/,
+    /saveRead\.status !== 'unreadable' &&[^]*?stored\.schema === SAVE_SCHEMA \|\| isExtremeLife\(save\)[^]*?pendingRun = restoreSavedRun/,
   );
   assert.match(
     source,
@@ -417,7 +420,15 @@ test('实际启动恢复代码只续同结构对局，旧档和高版本保留�
     const saveRead = readSave(raw);
     const save = saveRead.save;
     const restored = new Script(code).runInContext(
-      createContext({ raw, saveRead, save, SAVE_SCHEMA, restoreSavedRun }),
+      createContext({
+        raw,
+        saveRead,
+        save,
+        SAVE_SCHEMA,
+        restoreSavedRun,
+        ...lifeMode,
+        endExtremeLife,
+      }),
     );
     assert.equal(save.stones, 321);
     assert.equal(!!restored, schema === SAVE_SCHEMA, `结构${schema}`);

@@ -230,6 +230,7 @@ export class SectMarketScene {
           'sect-market-retry',
           '坊市暂未准备好，游历已暂停。',
           '重新加载',
+          false,
         );
       });
   }

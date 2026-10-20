@@ -262,6 +262,7 @@ export class TownScene {
           'town-retry',
           '街巷暂未准备好，游历已暂停。',
           '重新加载',
+          false,
         );
       });
   }

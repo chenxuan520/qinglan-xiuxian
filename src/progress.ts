@@ -11,6 +11,7 @@ import {
 } from './curio-data.ts';
 import { validSectServices } from './sect-service-data.ts';
 import { trainingCost } from './training.ts';
+import { isExtremeLife, type LifeMode } from './life-mode.ts';
 export { trainingCost } from './training.ts';
 import { validMarketVenues } from './market-venue-data.ts';
 import { validIronMarket } from './iron-market-data.ts';
@@ -70,6 +71,7 @@ export type BirthInheritance =
   | { kind: 'curio'; id: string };
 
 export interface SaveData {
+  lifeMode: LifeMode;
   curios: CurioState;
   birthInheritance: BirthInheritance | null;
   medicine: MedicineState;
@@ -95,7 +97,7 @@ export interface SaveData {
   prologueSeen: boolean;
   hometownSeen: boolean;
   journeyEnded: boolean;
-  pendingReincarnation: 'lifespan' | 'tribulation' | 'ambush' | null;
+  pendingReincarnation: 'lifespan' | 'tribulation' | 'ambush' | 'extreme' | null;
   path: CultivationPath;
   spiritRoot: SpiritRootId;
   rootElements: ElementId[];
@@ -109,7 +111,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 26;
+export const SAVE_SCHEMA = 27;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -159,6 +161,7 @@ export function freshSave(
 ): SaveData {
   const starter = initialStarter(rootElements, path, random);
   return {
+    lifeMode: 'normal',
     curios: freshCurios(Math.floor(random() * 0x100000000)),
     birthInheritance: null,
     version: 1,
@@ -287,6 +290,21 @@ export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | n
 export function parseSave(raw: string | null, random: () => number = Math.random): SaveData {
   return readSave(raw, random).save;
 }
+export function endExtremeLife(save: SaveData, reason: 'defeat' | 'interrupted') {
+  if (!isExtremeLife(save) || save.journeyEnded || save.pendingReincarnation) return false;
+  save.pendingReincarnation = 'extreme';
+  save.autoplay = false;
+  save.tribulationReturn = null;
+  recordChronicle(
+    save,
+    '大道无情，生死有命',
+    reason === 'defeat'
+      ? '极限修行中战败身陨，这一世的问道之路至此落幕。'
+      : '极限战斗未完便离开，此世问道之路随之落幕。',
+    'extreme-death',
+  );
+  return true;
+}
 export function readSave(
   raw: string | null,
   random: () => number = Math.random,
@@ -303,6 +321,14 @@ export function readSave(
     }
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return { save: base, status: 'unreadable' };
+    if (s.lifeMode !== undefined && s.lifeMode !== 'normal' && s.lifeMode !== 'extreme')
+      return {
+        save: base,
+        status: Number.isSafeInteger(s.schema) && s.schema > SAVE_SCHEMA ? 'newer' : 'unreadable',
+      };
+    if (s.pendingReincarnation === 'extreme' && s.lifeMode !== 'extreme')
+      return { save: base, status: 'unreadable' };
+    base.lifeMode = s.lifeMode ?? 'normal';
     // 兼容老版本档：读取时归一到当前结构（缺失字段用默认值、语义差异就地迁移）；
     // 不保留逐版本运行时兼容。更高版本档只读不写。
     newer = Number.isSafeInteger(s.schema) && s.schema > SAVE_SCHEMA;
@@ -513,7 +539,8 @@ export function readSave(
         lifespanInfo(base).remaining === 0) ||
         (s.pendingReincarnation === 'tribulation' && tribulationDue(base)) ||
         (s.pendingReincarnation === 'ambush' &&
-          base.mortal.marketSocial?.ambush?.snapshot.outcome === 'defeat'))
+          base.mortal.marketSocial?.ambush?.snapshot.outcome === 'defeat') ||
+        (s.pendingReincarnation === 'extreme' && isExtremeLife(base)))
     )
       base.pendingReincarnation = s.pendingReincarnation;
     if (validBirthInheritance(base, s.birthInheritance))
@@ -930,6 +957,13 @@ export function settleRun(
     const before = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
     save.unlocked = Math.max(save.unlocked, Math.min(STAGES.length - 1, run.stage + 1));
     if (!save.completed.includes(run.stage)) save.completed.push(run.stage);
+    if (
+      isExtremeLife(save) &&
+      run.difficulty >= 1 &&
+      run.stage === FINAL_TRIAL_STAGE &&
+      STAGES.every((_, index) => save.completed.includes(index))
+    )
+      recordChronicle(save, '一命通关', '以极限模式一命踏破七境，成就真仙。', 'one-life-clear');
     if (ascensionCultivation > 0)
       recordChronicle(save, '七劫登仙', `尽破七劫，补足成仙修为 ${ascensionCultivation}。`);
     recordChronicle(
