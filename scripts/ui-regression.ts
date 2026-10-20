@@ -671,15 +671,17 @@ try {
       return [...hud.children].map(item => {
         const range = document.createRange(); range.selectNodeContents(item);
         const rect = item.getBoundingClientRect();
-        return {text:item.textContent, lines:range.getClientRects().length,
+        return {text:item.textContent, lines:range.getClientRects().length, top:rect.top, bottom:rect.bottom,
           inside:rect.left >= box.left - 1 && rect.right <= box.right + 1};
       });
     }`);
     assert.equal(medicines.length, 3, '三种药效必须分别完整显示');
-    for (const medicine of medicines) {
+    for (const [index, medicine] of medicines.entries()) {
       assert.match(medicine.text, /^(明清灵水|万年灵乳|无常丹) \d+年$/);
       assert.equal(medicine.lines, 1, '同一种丹药的药名与剩余年数不能拆行');
       assert.equal(medicine.inside, true, '药效不能溢出状态栏');
+      if (index > 0)
+        assert.ok(medicine.top >= medicines[index - 1].bottom - 1, '每种药效必须独占一行');
     }
     if (name === 'phone') {
       await browser.call('emulate', { pageId, viewport: '844x390x1,mobile,touch,landscape' });

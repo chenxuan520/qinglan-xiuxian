@@ -90,34 +90,57 @@ export function mountTownScene(shell: ActionShell) {
     shell.save.mortal.population = shell.freshTownPopulation(shell.save.age);
     shell.persist();
   }
-  shell.townScene = new shell.TownScene(
-    host,
-    { ...shell.townPosition },
-    shell.save.mortal.population,
-    shell.save.age,
-    shell.showTownEvent,
-    () => shell.save.path,
-    shell.save.mortal.scenery,
-    shell.save.mortal.hometown
-      ? {
-          state: shell.save.mortal.hometown,
-          interact: (target: string) =>
-            target === 'dock' ? shell.finishDeparture() : shell.showHometown(),
-          ready: () => {
-            if (shell.panel !== 'hometown-loading') return;
-            if (shell.save.mortal.hometown?.stage === 'farewell') {
-              shell.panel = 'hometown-farewell';
-              shell.ui.inert = true;
-              shell.modal.innerHTML = shell.hometownFarewellModal();
-              shell.modal.querySelector<HTMLButtonElement>('button')?.focus();
-            } else {
-              shell.panel = '';
-              shell.document.getElementById('town-view')?.focus({ preventScroll: true });
+  const current = () => host.isConnected && shell.inTown && !shell.saveLock && !shell.townScene;
+  host.innerHTML = '<div class="town-loading" role="status"><div>青岚镇 · 街巷铺展中…</div></div>';
+  void shell.townSource.load().then(
+    (module) => {
+      if (!current()) return;
+      shell.townScene = new module.TownScene(
+        host,
+        { ...shell.townPosition },
+        shell.save.mortal.population!,
+        shell.save.age,
+        shell.showTownEvent,
+        () => shell.save.path,
+        shell.save.mortal.scenery,
+        shell.save.mortal.hometown
+          ? {
+              state: shell.save.mortal.hometown,
+              interact: (target: string) =>
+                target === 'dock' ? shell.finishDeparture() : shell.showHometown(),
+              ready: () => {
+                if (shell.panel !== 'hometown-loading') return;
+                if (shell.save.mortal.hometown?.stage === 'farewell') {
+                  shell.panel = 'hometown-farewell';
+                  shell.ui.inert = true;
+                  shell.modal.innerHTML = shell.hometownFarewellModal();
+                  shell.modal.querySelector<HTMLButtonElement>('button')?.focus();
+                } else {
+                  shell.panel = '';
+                  shell.document.getElementById('town-view')?.focus({ preventScroll: true });
+                }
+              },
             }
-          },
-        }
-      : undefined,
+          : undefined,
+      );
+      if (host.dataset.arrival) {
+        shell.townScene.showArrival(host.dataset.arrival);
+        delete host.dataset.arrival;
+      }
+    },
+    () => {
+      if (current())
+        host.innerHTML = `<div class="town-loading" role="status">${resourceFailureContent('town-retry', '街巷暂未准备好，游历已暂停。', '重新加载')}</div>`;
+    },
   );
+}
+
+export function showTownArrival(shell: ActionShell, message: string) {
+  if (shell.townScene) shell.townScene.showArrival(message);
+  else {
+    const host = shell.document.getElementById('town-view');
+    if (host) host.dataset.arrival = message;
+  }
 }
 
 export function renderDeparture(shell: ActionShell) {

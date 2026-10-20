@@ -185,6 +185,27 @@ function treasureHarness() {
   assert.equal(auctionBuyReason(h.save, h.lot.index, h.save.mortal.sectMarket!.visit), '');
   return h;
 }
+test('落拍路由保留临时金额说明，保存失败不展示成功结拍且不新增存档字段', () => {
+  const h = harness(false, {
+    setup: (save) => {
+      save.mortal.population = { seed: 1, since: 15 };
+    },
+  });
+  h.inputs({ budget: '50' });
+  const before = h.stored();
+  h.fail();
+  h.action('auction-buy', '0');
+  assert.deepEqual(h.stored(), before);
+  assert.equal(h.note.hidden, true);
+  h.fail(false);
+  h.action('auction-buy', '0');
+  assert.match(h.note.textContent, /含费预算 50.*出价 49 ＋手续费 3 ＝ 52.*超出预算/);
+  assert.equal(h.save.stones, before.stones);
+  assert.equal(h.save.age, before.age + 0.5);
+  const receipt = h.stored().mortal.auction.history[0];
+  assert.equal(receipt.outcome, 'lost');
+  assert.ok(!('budget' in receipt) && !('message' in receipt));
+});
 test('真实竞拍路由原子写档、半岁一次、闭拍防重入、子区保留滚动位置', () => {
   const h = harness();
   const old = h.save.stones;

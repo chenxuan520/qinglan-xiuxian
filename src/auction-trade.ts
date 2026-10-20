@@ -298,6 +298,13 @@ function receipt(
 }
 
 // 调用者克隆存档，保存成功后应用；单次结算不等待现实倒计时。
+export function auctionNextBid(start: number, rival: number) {
+  const step = Math.max(1, Math.ceil(start * 0.05));
+  const price = rival >= start ? rival + step : start;
+  const fee = auctionFee(price);
+  return { step, price, fee, total: price + fee };
+}
+
 export function buyAuction(
   save: SaveData,
   index: number,
@@ -322,9 +329,7 @@ export function buyAuction(
   )
     return undefined;
   const rival = bids(save, lot, false, lot.sellerId)[0];
-  const price =
-    rival.price >= lot.start ? rival.price + Math.max(1, Math.ceil(lot.start * 0.05)) : lot.start;
-  const fee = auctionFee(price);
+  const { price, fee } = auctionNextBid(lot.start, rival.price);
   const won = price + fee <= budget;
   if (index === AUCTION_CURIO_LOT) {
     save.mortal.auction!.curioSlot = {

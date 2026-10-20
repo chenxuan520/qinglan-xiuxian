@@ -27,7 +27,13 @@ import {
   auctionSellReason,
   auctionDues,
 } from './auction.ts';
-import { auctionLots, buyAuction, sellAuction, auctionBuyReason } from './auction-trade.ts';
+import {
+  auctionLots,
+  buyAuction,
+  sellAuction,
+  auctionBuyReason,
+  auctionNextBid,
+} from './auction-trade.ts';
 
 export type AuctionView = 'buy' | 'sell' | 'history';
 const num = (n: number) => n.toLocaleString('zh-CN');
@@ -45,7 +51,11 @@ function detail(item: AuctionItem) {
     ? `${medicineInfo(item.id)!.years ? medicineInfo(item.id)!.tier : '本世珍品'} · ${medicineInfo(item.id)!.desc}`
     : `炼器 ${item.forgeLevel} 阶 · ${treasure(item.id).school === 'orthodox' ? '正道' : '魔道'}法宝`;
 }
-export function auctionResult(save: SaveData, r: AuctionReceipt) {
+export function auctionResult(
+  save: SaveData,
+  r: AuctionReceipt,
+  bid?: { budget: number; start: number },
+) {
   const name = auctionItemName(r);
   const bidder =
     r.bidder === 'player'
@@ -65,7 +75,14 @@ export function auctionResult(save: SaveData, r: AuctionReceipt) {
   return r.outcome === 'won'
     ? `竞得${name} ×${r.quantity} · 花费 ${num(r.price + r.fee)} 灵石（含手续费 ${num(r.fee)}）`
     : r.outcome === 'lost'
-      ? `${bidder}以 ${num(r.price)} 灵石竞得${name} · 你的预算未胜出，未扣款 · 已消耗半年`
+      ? `${bidder}以 ${num(r.price)} 灵石竞得${name} · ${
+          bid
+            ? (() => {
+                const next = auctionNextBid(bid.start, r.price);
+                return `你的含费预算 ${num(bid.budget)}；下一档需出价 ${num(next.price)} ＋手续费 ${num(next.fee)} ＝ ${num(next.total)}，超出预算`;
+              })()
+            : '下一档出价与手续费超出你的预算'
+        } · 未扣款 · 已消耗半年`
       : r.outcome === 'sold'
         ? `${bidder}买下${name} ×${r.quantity} · 实收 ${num(r.price - r.fee)} 灵石（佣金 ${num(r.fee)}）`
         : `${name}未达到保留价 · 物品仍在行囊，未收佣金 · 已消耗半年`;
@@ -102,7 +119,7 @@ export function auctionContent(
     .join('')}</div>`;
   let content: string;
   if (view === 'buy') {
-    content = `<details><summary>竞拍规则与换批</summary><p class="panel-note">填一次最高预算，修士代你逐次竞价。每次竞拍消耗半年，落拍也计龄。预算包含 5% 手续费；成交只扣实际成交价与手续费，落拍不扣钱。每场四份丹药、四件物品。本批每件只拍一次，本批满一年后，再入坊市才更换修士和常规拍品；偶有奇物寄拍，按十年更换，不随重进换货。奇物由代客席统一竞价。本世已获得过的奇物不再寄拍。法宝保留炼器阶数，收入收藏，自行选择本命。</p></details><div class="auction-grid">${auctionLots(
+    content = `<details><summary>竞拍规则与换批</summary><p class="panel-note">填一次最高预算，修士代你逐次竞价。每次竞拍消耗半年，落拍也计龄。每次加价至少为起拍价的5%（向上取整，至少1灵石）。预算包含 5% 手续费；不足下一档出价与手续费时便会落拍，不能只拿总预算与对手成交价比较。成交只扣实际成交价与手续费，落拍不扣钱。每场四份丹药、四件物品。本批每件只拍一次，本批满一年后，再入坊市才更换修士和常规拍品；偶有奇物寄拍，按十年更换，不随重进换货。奇物由代客席统一竞价。本世已获得过的奇物不再寄拍。法宝保留炼器阶数，收入收藏，自行选择本命。</p></details><div class="auction-grid">${auctionLots(
       save,
     )
       .map((lot) => {
@@ -212,6 +229,7 @@ export function executeAuctionTrade(
     const reason = auctionBuyReason(save, index, visit, hasPendingRun);
     if (reason) return { ok: false as const, error: reason };
     const budget = Number(modal.querySelector<HTMLInputElement>(`#auction-budget-${index}`)?.value);
+    const start = auctionLots(save).find((lot) => lot.index === index)!.start;
     const result = buyAuction(
       next,
       index,
@@ -228,7 +246,7 @@ export function executeAuctionTrade(
         ok: false as const,
         error: '请输入扣除到期供奉后可负担、且足够起拍的整数预算（含手续费）',
       };
-    return { ok: true as const, result };
+    return { ok: true as const, result, message: auctionResult(save, result, { budget, start }) };
   }
   if (action === 'auction-sell') {
     const selected = modal.querySelector<HTMLSelectElement>('#auction-item')?.value ?? '';
@@ -247,7 +265,7 @@ export function executeAuctionTrade(
     const result = sellAuction(next, item, reserve, visit, hasPendingRun);
     if (!result)
       return { ok: false as const, error: '请输入有效的整数保留价，灵石余额不能超出上限' };
-    return { ok: true as const, result };
+    return { ok: true as const, result, message: auctionResult(save, result) };
   }
   return null;
 }

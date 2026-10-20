@@ -24,6 +24,7 @@ import { townResidents, type TownPopulation, type TownResident } from './town-po
 import { townSceneryLayout, type TownScenery } from './town-history.ts';
 import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts';
 import { hometownParents, type HometownState } from './hometown.ts';
+import { mapClick, walkRoute } from './walk-navigation.ts';
 
 const TOWN_IMAGES = [
   '/assets/town-ground.webp',
@@ -32,6 +33,11 @@ const TOWN_IMAGES = [
   '/assets/town-npcs.webp',
   ...Object.values(PLAYER_IMAGES),
 ];
+type HometownScene = {
+  state: HometownState;
+  interact: (target: 'home' | 'dock') => void;
+  ready: () => void;
+};
 
 export class TownScene {
   ready = false;
@@ -60,23 +66,32 @@ export class TownScene {
   private homeAppearance = '';
   private buildingSize = 305;
   private route: TownPoint[] = [];
+  private clickRoute: TownPoint[] = [];
   private routeGuide?: SVGPolylineElement;
   private routeShown = false;
+  private host: HTMLElement;
+  public position: TownPoint;
+  private population: TownPopulation;
+  private interact: (npc: TownResident) => void;
+  private playerPath: () => CultivationPath;
+  private hometown?: HometownScene;
 
   constructor(
-    private host: HTMLElement,
-    public position: TownPoint,
-    private population: TownPopulation,
+    host: HTMLElement,
+    position: TownPoint,
+    population: TownPopulation,
     age: number,
-    private interact: (npc: TownResident) => void,
-    private playerPath: () => CultivationPath,
+    interact: (npc: TownResident) => void,
+    playerPath: () => CultivationPath,
     scenery?: TownScenery,
-    private hometown?: {
-      state: HometownState;
-      interact: (target: 'home' | 'dock') => void;
-      ready: () => void;
-    },
+    hometown?: HometownScene,
   ) {
+    this.host = host;
+    this.position = position;
+    this.population = population;
+    this.interact = interact;
+    this.playerPath = playerPath;
+    this.hometown = hometown;
     this.layout = townSceneryLayout(population.seed, scenery, !!hometown);
     this.buildingSize = scenery?.revision ? 270 : 305;
     if (!townWalkable(this.position, this.layout.buildings, this.buildingSize))
@@ -153,6 +168,7 @@ export class TownScene {
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
           e.preventDefault();
           this.stopDockNavigation();
+          this.clickRoute = [];
           this.keys.add(key);
         }
         if (
@@ -171,10 +187,21 @@ export class TownScene {
     host.addEventListener(
       'pointerdown',
       (e) => {
-        if (!this.enabled || this.pointer) return;
+        if (!this.enabled || this.pointer || !e.isPrimary || e.button !== 0) return;
         e.preventDefault();
         this.stopDockNavigation();
         host.focus({ preventScroll: true });
+        if (e.pointerType === 'mouse') {
+          this.clearInput();
+          this.clickRoute = walkRoute(
+            this.position,
+            mapClick(this.map, TOWN_WIDTH, TOWN_HEIGHT, e.clientX, e.clientY),
+            (p) => townWalkable(p, this.layout.buildings, this.buildingSize),
+            TOWN_WIDTH,
+            TOWN_HEIGHT,
+          );
+          return;
+        }
         this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
         host.setPointerCapture(e.pointerId);
       },
@@ -247,6 +274,7 @@ export class TownScene {
     this.host.append(notice);
   }
   private clearInput() {
+    this.clickRoute = [];
     this.keys.clear();
     this.touch = { x: 0, y: 0 };
     this.pointer = null;
@@ -296,11 +324,12 @@ export class TownScene {
     this.last = now;
     this.enabled = enabled && this.ready;
     this.host.classList.toggle('town-paused', !this.enabled);
-    const target = this.route[0];
+    const route = this.clickRoute.length ? this.clickRoute : this.route;
+    const target = route[0];
     const remaining = target
       ? Math.hypot(target.x - this.position.x, target.y - this.position.y)
       : 0;
-    const speed = target ? HOMETOWN_NAV_SPEED : TOWN_WALK_SPEED;
+    const speed = this.route.length ? HOMETOWN_NAV_SPEED : TOWN_WALK_SPEED;
     if (!this.enabled) this.clearInput();
     else
       this.position = moveInTown(
@@ -326,7 +355,7 @@ export class TownScene {
         speed,
       );
     if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
-      this.route.shift();
+      route.shift();
     if (this.enabled && !this.reducedMotion.matches) this.walkingSeconds += Math.min(dt, 0.05);
     for (const { npc, element } of this.villagers) {
       const point = townNpcPosition(npc, this.walkingSeconds);

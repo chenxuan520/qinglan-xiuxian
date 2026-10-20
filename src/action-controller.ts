@@ -1,5 +1,5 @@
 import type { executeAuctionTrade } from './auction-ui.ts';
-import { showSectService } from './scene-flow.ts';
+import { showSectService, showTownArrival } from './scene-flow.ts';
 import type {
   adSupplies,
   allowsSchool,
@@ -87,6 +87,7 @@ import type { FrameRate } from './frame-rate.ts';
 import type { GameAudio } from './game-audio.ts';
 import type { SoundSettings } from './sound-settings.ts';
 import type { TownScene } from './town-scene.ts';
+import type { TownSource } from './town-source.ts';
 import type { SectMarketScene } from './sect-market-scene.ts';
 import type { MarketEventSource } from './market-event-source.ts';
 import type { chooseMarketFellow } from './market-fellow.ts';
@@ -242,6 +243,7 @@ export interface ActionShell {
   };
   readonly lifespanInfo: typeof lifespanInfo;
   readonly marketEventSource: MarketEventSource;
+  readonly townSource: TownSource;
   marketNpc: MarketCultivator | null;
   marketScene: SectMarketScene | null;
   readonly medicinePanel: MedicinePanel;
@@ -359,7 +361,6 @@ export interface ActionShell {
   readonly MAX_REVIVES: number;
   readonly PROLOGUE_IMAGE: string;
   readonly SUPPORT_CODE_IMAGE: string;
-  readonly TownScene: typeof TownScene;
   readonly URL: typeof URL;
   adWatched: boolean;
   readonly app: HTMLDivElement;
@@ -858,6 +859,7 @@ function handleSectAndMarket(shell: ActionShell, action: string, id?: string): b
       return true;
     }
     const result = traded.result;
+    const message = traded.message || shell.auctionResult(shell.save, result);
     try {
       shell.writeSave(next, shell.pendingRun);
     } catch {
@@ -871,9 +873,9 @@ function handleSectAndMarket(shell: ActionShell, action: string, id?: string): b
     const note = shell.modal.querySelector<HTMLElement>('#auction-result');
     if (note) {
       note.hidden = false;
-      note.textContent = shell.auctionResult(shell.save, result);
+      note.textContent = message;
     }
-    shell.toast(shell.auctionResult(shell.save, result));
+    shell.toast(message);
     return true;
   }
   if (action === 'sect-service-open') {
@@ -1102,11 +1104,13 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
       shell.lastMortalTick = shell.performance.now();
       shell.renderMortal();
       shell.document.getElementById('town-view')?.focus({ preventScroll: true });
-      if (memory) shell.townScene?.showArrival(memory);
+      if (memory) showTownArrival(shell, memory);
     } else if (action === 'town-retry' && shell.inTown) {
-      const memory = shell.document.querySelector('.town-return-note')?.textContent;
+      const memory =
+        shell.document.querySelector('.town-return-note')?.textContent ||
+        shell.document.getElementById('town-view')?.dataset.arrival;
       shell.renderMortal();
-      if (memory) shell.townScene?.showArrival(memory);
+      if (memory) showTownArrival(shell, memory);
     } else if (action === 'town-exit') {
       shell.leaveTown();
       shell.persist();

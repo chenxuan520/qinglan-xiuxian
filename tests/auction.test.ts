@@ -14,7 +14,13 @@ import {
 } from '../src/progress.ts';
 import { prepareAuction, auctionValue, auctionFee, auctionSellReason } from '../src/auction.ts';
 import { ironMarket, ironTradeQuote } from '../src/iron-market.ts';
-import { auctionLots, buyAuction, sellAuction, auctionBuyReason } from '../src/auction-trade.ts';
+import {
+  auctionLots,
+  buyAuction,
+  sellAuction,
+  auctionBuyReason,
+  auctionNextBid,
+} from '../src/auction-trade.ts';
 import {
   AUCTION_LOTS,
   AUCTION_CURIO_LOT,
@@ -46,6 +52,34 @@ function fixture(seed = 12345) {
   prepareAuction(save);
   return save;
 }
+test('含费预算高于对手成交价仍可能不足下一档，保留原结果并完整解释金额', () => {
+  const save = fixture(1);
+  const lot = auctionLots(save).find((lot) => lot.id === 'yingxiang')!;
+  assert.equal(lot.start, 45);
+  const before = structuredClone(save);
+  const result = buyAuction(save, lot.index, 50, save.mortal.sectMarket!.visit)!;
+  assert.equal(result.outcome, 'lost');
+  assert.equal(result.price, 46);
+  assert.equal(save.stones, before.stones);
+  assert.deepEqual(save.medicine.bag, before.medicine.bag);
+  assert.equal(save.age, before.age + 0.5);
+  assert.deepEqual(auctionNextBid(lot.start, result.price), {
+    step: 3,
+    price: 49,
+    fee: 3,
+    total: 52,
+  });
+  const note = auctionResult(save, result, { budget: 50, start: lot.start });
+  assert.match(note, /含费预算 50/);
+  assert.match(note, /出价 49 ＋手续费 3 ＝ 52/);
+  assert.match(note, /超出预算.*未扣款/);
+  assert.match(auctionResult(save, result), /下一档出价与手续费超出你的预算/);
+  const enough = structuredClone(before);
+  const won = buyAuction(enough, lot.index, 52, enough.mortal.sectMarket!.visit)!;
+  assert.equal(won.outcome, 'won');
+  assert.equal(won.price + won.fee, 52);
+  assert.equal(enough.stones, before.stones - 52);
+});
 test('坊市药价按品级及价值分档，药铺凡品价格不变', () => {
   for (const m of MEDICINES) {
     const value = medicineMarketValue(m.id);

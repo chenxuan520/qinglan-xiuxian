@@ -219,7 +219,6 @@
   display: none;
 }
 #medicine-hud > span {
-  display: inline-block;
+  display: block;
   white-space: nowrap;
-  margin-right: 0.5em;
 }

@@ -48,6 +48,7 @@ import {
   teaStoryPanel,
 } from './town-host.ts';
 import { computeManualInput, trapModalTab } from './input-controller.ts';
+import { destinationInput } from './walk-navigation.ts';
 import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
 import { DebugEntry } from './debug-entry.ts';
@@ -146,7 +147,8 @@ import { ScreenAwake } from './screen-awake.ts';
 import { FrameRate } from './frame-rate.ts';
 import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
-import { TownScene } from './town-scene.ts';
+import type { TownScene } from './town-scene.ts';
+import { TownSource } from './town-source.ts';
 import type { SectMarketScene } from './sect-market-scene.ts';
 import { MarketEventSource } from './market-event-source.ts';
 import { marketFellowCharacter, meetMarketFellow, chooseMarketFellow } from './market-fellow.ts';
@@ -354,6 +356,7 @@ let nextMortalStatus = 0;
 const guideSource = new GuideSource();
 const chronicleSource = new ChronicleSource();
 const marketEventSource = new MarketEventSource();
+const townSource = new TownSource();
 let guideTab = 'basics';
 
 let guideReturn: PanelLocation | null = null;
@@ -370,6 +373,7 @@ const keys = new Set<string>();
 let touchInput = { x: 0, y: 0 },
   pointer: number | null = null,
   touchOrigin = { x: 0, y: 0 };
+let clickDestination: { x: number; y: number } | null = null;
 let assetsReady = false;
 const gameAudio = new GameAudio(save);
 const soundSettings = new SoundSettings(save, gameAudio, persist);
@@ -1330,6 +1334,7 @@ function showLifespanAd() {
   return sceneFlow.showLifespanAd(shellBindings());
 }
 function clearInput() {
+  clickDestination = null;
   keys.clear();
   touchInput = { x: 0, y: 0 };
   pointer = null;
@@ -1448,6 +1453,7 @@ function shellBindings(): ActionShell {
     get lifeStats() { return lifeStats; },
     get lifespanInfo() { return lifespanInfo; },
     get marketEventSource() { return marketEventSource; },
+    get townSource() { return townSource; },
     get marketNpc() { return marketNpc; },
     set marketNpc(next) { marketNpc = next; },
     get marketScene() { return marketScene; },
@@ -1579,7 +1585,6 @@ function shellBindings(): ActionShell {
     get MAX_REVIVES() { return MAX_REVIVES; },
     get PROLOGUE_IMAGE() { return PROLOGUE_IMAGE; },
     get SUPPORT_CODE_IMAGE() { return SUPPORT_CODE_IMAGE; },
-    get TownScene() { return TownScene; },
     get URL() { return URL; },
     get adWatched() { return adWatched; },
     set adWatched(next) { adWatched = next; },
@@ -1839,6 +1844,7 @@ document.addEventListener('keydown', (event) => {
     game?.state === 'playing'
   ) {
     event.preventDefault();
+    clickDestination = null;
     if (save.autoplay) handleAction('autoplay');
     keys.add(key);
   }
@@ -1866,9 +1872,35 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pageshow', () => renderer.restore());
 const canvas = renderer.canvas;
 canvas.addEventListener('pointerdown', (e) => {
-  if (game?.state !== 'playing' || pointer !== null) return;
+  if (
+    game?.state !== 'playing' ||
+    pointer !== null ||
+    saveLock ||
+    panel ||
+    !e.isPrimary ||
+    e.button !== 0
+  )
+    return;
   e.preventDefault();
   if (save.autoplay) handleAction('autoplay');
+  if (e.pointerType === 'mouse') {
+    clearInput();
+    const box = canvas.getBoundingClientRect();
+    clickDestination = {
+      x: game.player.x + (e.clientX - box.left - box.width / 2) / renderer.scale,
+      y: game.player.y + (e.clientY - box.top - box.height / 2) / renderer.scale,
+    };
+    if (game.tribulation) {
+      const radius = Math.hypot(clickDestination.x, clickDestination.y);
+      const limit = game.tribulationRadius - 16;
+      if (radius > limit) {
+        clickDestination.x *= limit / radius;
+        clickDestination.y *= limit / radius;
+      }
+    }
+    return;
+  }
+  clickDestination = null;
   pointer = e.pointerId;
   touchOrigin = { x: e.clientX, y: e.clientY };
   canvas.setPointerCapture(e.pointerId);
@@ -1938,7 +1970,13 @@ function simulate(dt: number, now: number) {
           aiChoiceTime = 0;
         }
       } else aiChoiceTime = 0;
-    } else game.input = computeManualInput(keys, touchInput);
+    } else {
+      game.input =
+        clickDestination && game.state === 'playing'
+          ? destinationInput(game.player, clickDestination, game.stats.speed * dt)
+          : computeManualInput(keys, touchInput);
+      if (clickDestination && !game.input.x && !game.input.y) clickDestination = null;
+    }
     const realmBefore = realmInfo(
       save.cultivation,
       save.completed.includes(FINAL_TRIAL_STAGE),

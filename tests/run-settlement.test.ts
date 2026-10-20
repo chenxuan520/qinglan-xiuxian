@@ -70,6 +70,7 @@ test('结算保存失败保留原奖励，禁止won坏快照与旁路交互；�
       computeManualInput: () => ({ x: 0, y: 0 }),
       keys: new Set(),
       touchInput: { x: 0, y: 0 },
+      clickDestination: null,
       nextAiMove: 0,
       aiChoiceTime: 0,
       lastHud: 100000,

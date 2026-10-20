@@ -27,6 +27,8 @@ import {
 } from './market-roaming.ts';
 import { marketBuildingArt } from './market-art.ts';
 import { marketFellowCharacter } from './market-fellow.ts';
+import { mapClick, walkRoute } from './walk-navigation.ts';
+import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -43,6 +45,7 @@ export class SectMarketScene {
   private keys = new Set<string>();
   private pointer: { id: number; x: number; y: number } | null = null;
   private touch = { x: 0, y: 0 };
+  private clickRoute: TownPoint[] = [];
   private enabled = false;
   private last = 0;
   private walkingSeconds = 0;
@@ -125,6 +128,7 @@ export class SectMarketScene {
         const key = e.key.toLowerCase();
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
           e.preventDefault();
+          this.clickRoute = [];
           this.keys.add(key);
         }
         if (key === 'e' && !e.repeat) {
@@ -156,9 +160,26 @@ export class SectMarketScene {
     host.addEventListener(
       'pointerdown',
       (e) => {
-        if (!this.enabled || this.pointer) return;
+        if (!this.enabled || this.pointer || !e.isPrimary || e.button !== 0) return;
         e.preventDefault();
         host.focus({ preventScroll: true });
+        if (e.pointerType === 'mouse') {
+          this.clearInput();
+          const world = host.querySelector<HTMLElement>('.market-world')!;
+          this.clickRoute = walkRoute(
+            this.position,
+            mapClick(world, MARKET_WIDTH, MARKET_HEIGHT, e.clientX, e.clientY),
+            (p) =>
+              p.x >= 24 &&
+              p.x <= MARKET_WIDTH - 24 &&
+              p.y >= 24 &&
+              p.y <= MARKET_HEIGHT - 24 &&
+              townWalkable(p, MARKET_BUILDINGS, 260),
+            MARKET_WIDTH,
+            MARKET_HEIGHT,
+          );
+          return;
+        }
         this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
         host.setPointerCapture(e.pointerId);
       },
@@ -239,22 +260,33 @@ export class SectMarketScene {
     this.last = now;
     this.enabled = enabled && this.ready;
     this.host.classList.toggle('town-paused', !this.enabled);
+    const target = this.clickRoute[0];
+    const remaining = target
+      ? Math.hypot(target.x - this.position.x, target.y - this.position.y)
+      : 0;
     if (!this.enabled) this.clearInput();
     else
       this.position = moveInSectMarket(
         this.position,
-        {
-          x:
-            Number(this.keys.has('d') || this.keys.has('arrowright')) -
-            Number(this.keys.has('a') || this.keys.has('arrowleft')) +
-            this.touch.x,
-          y:
-            Number(this.keys.has('s') || this.keys.has('arrowdown')) -
-            Number(this.keys.has('w') || this.keys.has('arrowup')) +
-            this.touch.y,
-        },
-        dt,
+        target
+          ? {
+              x: (target.x - this.position.x) / (remaining || 1),
+              y: (target.y - this.position.y) / (remaining || 1),
+            }
+          : {
+              x:
+                Number(this.keys.has('d') || this.keys.has('arrowright')) -
+                Number(this.keys.has('a') || this.keys.has('arrowleft')) +
+                this.touch.x,
+              y:
+                Number(this.keys.has('s') || this.keys.has('arrowdown')) -
+                Number(this.keys.has('w') || this.keys.has('arrowup')) +
+                this.touch.y,
+            },
+        target ? Math.min(dt, remaining / TOWN_WALK_SPEED) : dt,
       );
+    if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
+      this.clickRoute.shift();
     if (this.enabled) {
       this.walkingSeconds += dt;
       for (const { npc, node, marker } of this.visitorNodes) {
@@ -365,6 +397,7 @@ export class SectMarketScene {
     this.touch = { x: 0, y: 0 };
   }
   private clearInput() {
+    this.clickRoute = [];
     this.keys.clear();
     this.clearPointer();
   }
