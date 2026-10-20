@@ -129,7 +129,19 @@ export function powerBreakdown(save: SaveData) {
           { key: attribute.key, delta, before: base[attribute.key], after: current[attribute.key] },
         ];
       });
-      return { id, name, detail, changes };
+      let amplification: { before: number; after: number; percent: number } | undefined;
+      if (id === 'power' && ownsCurio(save, 'soul-wood')) {
+        const plain = structuredClone(save),
+          untrained = structuredClone(without);
+        delete plain.curios.bag['soul-wood'];
+        delete untrained.curios.bag['soul-wood'];
+        const before =
+          snapshot(plain, current.path).damage / snapshot(untrained, current.path).damage - 1;
+        const after = current.damage / base.damage - 1;
+        if (before > 0) amplification = { before, after, percent: after / before - 1 };
+      }
+      const related = id === 'vitality' && ownsCurio(save, 'soul-wood') ? '养魂木 → 淬体气血' : '';
+      return { id, name, detail, changes, amplification, related };
     })
     .filter((row) => row.changes.length);
   return { current, root: spiritRootInfo(save.spiritRoot), rows };

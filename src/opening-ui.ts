@@ -77,7 +77,7 @@ export function tribulationPendingPanel(
 
 export function tribulationForfeitPanel(game: Game | null): PanelParts {
   return [
-    '弃劫即轮回',
+    '放弃渡劫',
     '确认放弃这一世修行',
     `<p class="pause-description">确认轮回后，境界、物资、法宝收藏、炼器、根基、劫印和已保存的原历练都会清空，并重新随机灵根。</p><p class="panel-note">${game && isExtremeLife(game.save) ? '极限修行不可复活或退离；战败即此世落幕。' : game?.tribulation && game.revivesUsed >= MAX_REVIVES ? '本次天劫的广告复活次数已用尽。' : '可以继续迎劫；已阵亡时可看广告复活。'}确认放弃后可先留存此世，再决定轮回。</p><div class="save-actions"><button class="secondary-button" data-action="cancel-forfeit">继续迎劫</button><button class="primary-button" data-action="confirm-forfeit">确认弃劫 · 此世落幕</button></div>`,
   ];
@@ -127,7 +127,7 @@ export function epilogueReincarnatePanel(save: SaveData): PanelParts {
   return [
     '临行留缘',
     '真仙离界 · 少年接续',
-    `<p class="pause-description">仙门已开，你将离开此界，继续追寻大道。青岚渡口的少年却才刚要启程，临行可赠他一物，也可只留一句指引。</p>${inheritanceContent(save)}<p class="panel-note">确认后将从这名十五岁青年开始新的修行。除所选赠物外，原修士的境界、物资、根基与履历不会带入，当前进度将替换为青年的旅程；确认前可返回终章留存此世。</p><figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">留缘离界</button></div>`,
+    `<p class="pause-description">仙门已开，你将离开此界，继续追寻大道。青岚渡口的少年却才刚要启程，临行可赠他一物，也可只留一句指引。</p>${inheritanceContent(save)}<p class="panel-note">确认后将从这名十五岁青年开始新的修行。除所选赠物外，原修士的境界、物资、根基与履历不会带入，当前进度将替换为青年的旅程；确认前可返回终章留存此世。</p><div class="pause-actions"><button class="secondary-button" data-action="close">留在终章</button><button class="primary-button" data-action="confirm-reincarnate">留缘离界</button></div><figure class="reincarnate-support"><img src="${assetUrl(SUPPORT_CODE_IMAGE)}" alt="微信赞赏码" width="104" height="104" loading="lazy"><figcaption>若这一程让你有所触动，可请作者喝杯茶。<br>微信扫码，或截图后在「扫一扫」里从相册选取。</figcaption></figure>`,
   ];
 }
 

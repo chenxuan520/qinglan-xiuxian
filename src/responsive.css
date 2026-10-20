@@ -989,12 +989,13 @@
     letter-spacing: 1px;
   }
   .pause-build {
+    grid-template-columns: 1fr;
     gap: 7px;
   }
   .pause-build > span {
+    grid-template-columns: 25px minmax(0, 1fr) auto;
     padding: 8px;
     gap: 6px;
-    font-size: 10px;
   }
   .pause-build .icon {
     width: 25px;

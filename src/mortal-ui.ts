@@ -161,10 +161,16 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     .join('')}${npcDialogueContent(npc.id, npc.name)}${actions}`;
 }
 
-export function npcDialogueContent(id: NpcDialogueRequest['npcId'], name: string) {
+export function npcDialogueContent(
+  id: NpcDialogueRequest['npcId'],
+  name: string,
+  storyGreeting = '',
+) {
   const family = id === 'father' || id === 'mother';
   const market = isMarketCultivatorId(id);
-  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"><div class="npc-chat-log" role="log" aria-live="polite"><p>${npcDefaultLine(id)}</p></div><small class="npc-chat-status" role="status">${family ? '家中叙话' : market ? '坊间闲谈' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : market ? '想对修士说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '坐下叙话，不另耗年岁。' : market ? (isMarketTraderId(id) ? '丹药互换请在下方办理。' : '买卖可找设摊的修士。') : '承接委托或续上旧事，请在下方选择。'}</small></section>`;
+  const opening = npcDefaultLine(id);
+  const repeated = family && opening === storyGreeting;
+  return `<section class="npc-dialogue" aria-label="与${escape(name)}闲谈"${family && storyGreeting ? ` data-story-greeting="${escape(storyGreeting)}"` : ''}><div class="npc-chat-log" role="log" aria-live="polite"${repeated ? ' hidden' : ''}>${repeated ? '' : `<p>${opening}</p>`}</div><small class="npc-chat-status" role="status">${family ? '家中叙话' : market ? '坊间闲谈' : '街巷闲谈'} · 随口聊聊</small><form class="npc-chat-form"><input type="text" maxlength="${NPC_AI_SETTINGS.maxMessageLength}" aria-label="${family ? '想对家人说的话' : market ? '想对修士说的话' : '想对镇民说的话'}" placeholder="问问近况，聊聊山外的事…" autocomplete="off"/><button type="submit" class="secondary-button">交谈</button></form><small class="panel-note">${family ? '坐下叙话，不另耗年岁。' : market ? (isMarketTraderId(id) ? '互换请按明示报价办理。' : '买卖可找设摊的修士。') : '承接委托或续上旧事，请在下方选择。'}</small></section>`;
 }
 
 export function humanStoryContent(save: SaveData, id: HumanStoryId, atNpc = false) {
@@ -204,7 +210,7 @@ export function hometownContent(save: SaveData, parent?: ParentId) {
         : parent === 'mother'
           ? '路远，记得添衣。'
           : '山外怎么样？回来就好。';
-    return `<div class="town-story"><p>${person.old ? '鬓边已见白发，熟悉的声音却没有变。' : '门前仍是熟悉的身影。'}</p><blockquote><p>你回来了。</p>${years >= 1 ? `<p>一别 ${years} 年了。</p>` : ''}<p>${quote}</p></blockquote></div>${npcDialogueContent(parent, person.name)}<button class="secondary-button" data-action="hometown-home">回到门前</button>`;
+    return `<div class="town-story"><p>${person.old ? '鬓边已见白发，熟悉的声音却没有变。' : '门前仍是熟悉的身影。'}</p><blockquote><p>你回来了。</p>${years >= 1 ? `<p>一别 ${years} 年了。</p>` : ''}<p>${quote}</p></blockquote></div>${npcDialogueContent(parent, person.name, quote)}<button class="secondary-button" data-action="hometown-home">回到门前</button>`;
   }
   const longGone =
     save.age >=

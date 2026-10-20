@@ -1,4 +1,3 @@
-import { powerTrainingEffect } from './training.ts';
 import { FINAL_TRIAL_STAGE, REALMS, spiritRootInfo } from './data.ts';
 import { realmInfo, lifespanInfo, trainingYears, trainingCost, type SaveData } from './progress.ts';
 import { spiritPower } from './spirit-power.ts';
@@ -16,10 +15,11 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
   const r = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const current = spiritPower(save);
   const powerLevel = save.training.power,
-    powerPerLevel = spiritRootInfo(save.spiritRoot).powerPerLevel,
-    powerBonus = powerTrainingEffect(powerLevel) * powerPerLevel,
+    trainingDamage = (power: number) =>
+      spiritPower({ ...save, training: { ...save.training, power } }).damage,
+    powerBonus = (current.damage / trainingDamage(0) - 1) * 100,
     nextPowerGain =
-      ((100 + powerTrainingEffect(powerLevel + 1) * powerPerLevel) / (100 + powerBonus) - 1) * 100;
+      powerLevel < 20 ? (trainingDamage(powerLevel + 1) / current.damage - 1) * 100 : 0;
   const next = r.max
     ? null
     : spiritPower({
@@ -36,7 +36,7 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
           id: 'vitality',
           name: '淬体',
           icon: 'guard',
-          desc: '前十阶每阶气血 +5%，满阶 +103.75%',
+          desc: '基础：前十阶每阶气血 +5%，满阶 +103.75%',
           detail: '筋骨如玉，百劫不摧',
         },
         {

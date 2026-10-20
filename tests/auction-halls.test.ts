@@ -11,17 +11,19 @@ import {
 } from '../src/auction.ts';
 import { auctionLots, auctionBuyReason, buyAuction, sellAuction } from '../src/auction-trade.ts';
 import {
+  AUCTION_HALLS,
   AUCTION_CURIO_LOT,
   AUCTION_IRON_LOT,
   validAuction,
   type AuctionItem,
 } from '../src/auction-data.ts';
-import { MEDICINES, medicineInfo } from '../src/medicine-data.ts';
+import { MEDICINES, medicineInfo, medicineMarketValue } from '../src/medicine-data.ts';
 import { ironMarket } from '../src/iron-market.ts';
 import { IRON_MARKET_LIMIT } from '../src/iron-market-data.ts';
 import { curioCycle, grantCurio, prepareCurioConsignment } from '../src/curio-data.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
 import { auctionContent } from '../src/auction-ui.ts';
+import { TREASURES, evolutionPassives, passive, pathInfo } from '../src/data.ts';
 
 function fixture(realm = 0, seed = 12345) {
   const s = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -200,16 +202,16 @@ test('低场拒收所有珍品和奇物，中高拒收玄铁，越权交易零�
     s.medicine.bag[m.id] = 5;
     const item: AuctionItem = { kind: 'medicine', id: m.id, quantity: 1, forgeLevel: 0 };
     const before = structuredClone(s);
-    assert.match(auctionSellReason(s, item, 1), /初级会场/);
+    assert.match(auctionSellReason(s, item, 1), /人字场/);
     assert.equal(sellAuction(s, item, 1, 1), undefined);
     assert.deepEqual(s, before);
   }
-  assert.match(auctionSellReason(s, curio, 1), /初级会场/);
+  assert.match(auctionSellReason(s, curio, 1), /人字场/);
   s.iron = 500;
   selectAuctionHall(s, 2, 1, true);
   const before = structuredClone(s);
   assert.equal(buyAuction(s, AUCTION_IRON_LOT, s.stones, 1), undefined);
-  assert.match(auctionSellReason(s, iron(150), 1), /初级会场/);
+  assert.match(auctionSellReason(s, iron(150), 1), /人字场/);
   assert.equal(sellAuction(s, iron(150), 1, 1), undefined);
   assert.deepEqual(s, before);
   assert.doesNotMatch(auctionContent(s, 'sell', false, 'iron'), /value="iron"/);
@@ -339,4 +341,188 @@ test('奇物占位跨十年固定，其他来源获得及售出后不补法宝�
   s.curios.consignment = { cycle: curioCycle(s.age), id: 'soul-wood', closed: false };
   prepareAuction(s);
   assert.deepEqual(auctionLots(s), original);
+});
+
+test('会场新名称贯穿门槛、拒绝原因与历史，编号和入场费用不变', () => {
+  assert.deepEqual(
+    AUCTION_HALLS.map((h) => h.name),
+    ['人字场', '地字场', '天字场'],
+  );
+  assert.deepEqual(
+    AUCTION_HALLS.map((h) => h.admission),
+    [0, 3000, 10000],
+  );
+  const s = fixture();
+  assert.match(selectAuctionHall(s, 1, 1), /地字场/);
+  assert.match(selectAuctionHall(s, 2, 1), /天字场/);
+  const r = buyAuction(s, 0, s.stones, 1)!;
+  const html = auctionContent(s, 'history', false);
+  assert.equal(r.hall, 0);
+  assert.match(html, /人字场/);
+  assert.doesNotMatch(html, /初级会场|中级会场|高级会场/);
+});
+
+test('同批四丹去重，保持各槽品级、本世珍品触发、估值与交易后的稳定性', () => {
+  let permanent = 0;
+  for (let seed = 0; seed < 200; seed++) {
+    const s = fixture(6, seed);
+    for (let hall = 0; hall < 3; hall++) {
+      selectAuctionHall(s, hall, 1);
+      const lots = auctionLots(s);
+      const meds = lots.filter((l) => l.kind === 'medicine');
+      assert.equal(meds.length, 4);
+      assert.equal(new Set(meds.map((m) => m.id)).size, 4);
+      for (const lot of meds) {
+        const slot = lot.index % 8;
+        const m = medicineInfo(lot.id)!;
+        assert.equal(
+          m.tier,
+          hall === 0
+            ? slot % 4 === 0
+              ? '凡品'
+              : '灵品'
+            : hall === 1 && slot !== 5
+              ? '灵品'
+              : '珍品',
+        );
+        assert.equal(lot.quantity, 1);
+        assert.equal(lot.start, medicineMarketValue(lot.id));
+        if (m.years === 0) {
+          assert.equal(hall, 2);
+          assert.equal(slot, 5);
+          permanent++;
+        }
+      }
+      const before = structuredClone(s);
+      const bought = buyAuction(s, meds[1].index, s.stones, 1)!;
+      assert.equal(bought.outcome, 'won');
+      assert.deepEqual(auctionLots(s), lots, '购买不重排其余拍品');
+      assert.deepEqual(auctionLots(importSave(exportSave(s, null)).save), lots);
+      Object.assign(s, before);
+    }
+  }
+  assert.equal(permanent, 55, '200个固定种子的既有本世珍品触发数量不变');
+});
+
+test('旧已结拍药槽保留原成交物品和结拍索引，不按新去重药品改写历史', () => {
+  const s = fixture(6);
+  selectAuctionHall(s, 0, 1);
+  s.age = 30.5;
+  s.medicine.bag.zengyuan = 1;
+  s.mortal.auction!.closed = [5];
+  s.mortal.auction!.history = [
+    {
+      kind: 'medicine',
+      id: 'zengyuan',
+      quantity: 1,
+      forgeLevel: 0,
+      hall: 0,
+      visit: 1,
+      realmIndex: 6,
+      age: 30.5,
+      outcome: 'won',
+      price: 403,
+      fee: 21,
+      bidder: 'player',
+    },
+  ];
+  const old = structuredClone(s);
+  for (const restored of [readSave(JSON.stringify(s)).save, importSave(exportSave(s, null)).save]) {
+    assert.deepEqual(restored.mortal.auction!.closed, [5]);
+    assert.deepEqual(restored.mortal.auction!.history, old.mortal.auction!.history);
+    assert.deepEqual(restored.medicine.bag, old.medicine.bag);
+    assert.notEqual(auctionLots(restored).find((l) => l.index === 5)!.id, 'zengyuan');
+    assert.match(auctionBuyReason(restored, 5, 1), /已结拍/);
+    assert.equal(buyAuction(restored, 5, restored.stones, 1), undefined);
+    assert.match(auctionContent(restored, 'history', false), /增元丹/);
+    const card = auctionContent(restored, 'buy', false)
+      .split('data-closed-index="5">')[1]
+      .split('</article>')[0];
+    assert.match(card, /增元丹 ×1/);
+    assert.match(card, /竞得增元丹/);
+    assert.ok(!card.includes('auction-budget-5'));
+  }
+});
+
+test('去重后的药品仍按原估值竞买和回收，不可通过竞买再出售套利', () => {
+  let checked = 0;
+  for (let seed = 0; seed < 32; seed++) {
+    const initial = fixture(6, seed);
+    for (let hall = 0; hall < 3; hall++) {
+      selectAuctionHall(initial, hall, 1);
+      for (const lot of auctionLots(initial).filter((l) => l.kind === 'medicine')) {
+        const s = structuredClone(initial);
+        const bought = buyAuction(s, lot.index, s.stones, 1)!;
+        assert.equal(bought.outcome, 'won');
+        const sold = sellAuction(s, lot, 1, 1)!;
+        assert.equal(sold.outcome, 'sold');
+        assert.ok(sold.price - sold.fee < bought.price + bought.fee);
+        assert.ok(s.stones < initial.stones);
+        checked++;
+      }
+    }
+  }
+  assert.equal(checked, 384);
+});
+
+test('法宝竞拍卡原地鉴宝列明攻击方式、两种配套及正确的纯修兼修觉醒限制', () => {
+  const checked = new Set<string>();
+  for (let seed = 0; seed < 200 && checked.size < TREASURES.length; seed++) {
+    const s = fixture(6, seed);
+    selectAuctionHall(s, 2, 1);
+    const cards = auctionContent(s, 'buy', false).split('<article class="auction-card">').slice(1);
+    for (const lot of auctionLots(s).filter((lot) => lot.kind === 'artifact')) {
+      if (checked.has(lot.id)) continue;
+      const t = TREASURES.find((t) => t.id === lot.id)!;
+      const card = cards.find((card) => card.includes(`<h3>${t.name} ×1</h3>`))!;
+      assert.match(card, /<details class="auction-inspection"><summary>鉴宝 · 攻击与配套/);
+      assert.ok(card.includes(t.desc));
+      assert.ok(card.includes(t.tag));
+      assert.ok(card.includes(t.evolution));
+      for (const id of evolutionPassives(t)) assert.ok(card.includes(passive(id).name));
+      assert.ok(card.includes(`${pathInfo(t.school).name}或兼修路线可领悟此宝、设为本命`));
+      assert.match(card, /法宝六重与任一配套功法五重/);
+      assert.match(card, /纯修仅可用本流派功法，兼修可任选配套功法/);
+      assert.match(card, /炼器阶数不代替局内重数/);
+      checked.add(t.id);
+    }
+  }
+  assert.equal(checked.size, TREASURES.length);
+});
+
+test('新去重药槽成交后保留真实药名，混合出售和跨场历史截断不串到其他槽位', () => {
+  const s = fixture(6);
+  selectAuctionHall(s, 0, 1);
+  const lot = auctionLots(s).find((l) => l.index === 5)!;
+  assert.notEqual(lot.id, 'zengyuan');
+  const bought = buyAuction(s, 5, s.stones, 1)!;
+  const card = auctionContent(s, 'buy', false)
+    .split('data-closed-index="5">')[1]
+    .split('</article>')[0];
+  assert.ok(card.includes(`${medicineInfo(bought.id)!.name} ×1`));
+  assert.doesNotMatch(card, /<h3>增元丹 ×1/);
+  selectAuctionHall(s, 1, 1);
+  buyAuction(s, 8, s.stones, 1);
+  selectAuctionHall(s, 0, 1);
+  s.medicine.bag.huanglong = 40;
+  for (let i = 0; i < 12; i++)
+    sellAuction(s, { kind: 'medicine', id: 'huanglong', quantity: 1, forgeLevel: 0 }, 1, 1);
+  assert.equal(s.mortal.auction!.history.length, 12);
+  const fallback = auctionContent(s, 'buy', false)
+    .split('data-closed-index="5">')[1]
+    .split('</article>')[0];
+  assert.match(fallback, /本拍品已结拍/);
+  assert.doesNotMatch(fallback, /黄龙丹|增元丹|auction-budget/);
+  const next = auctionLots(s).find((l) => l.index === 4)!;
+  const recent = buyAuction(s, next.index, s.stones, 1)!;
+  const fresh = auctionContent(s, 'buy', false)
+    .split('data-closed-index="4">')[1]
+    .split('</article>')[0];
+  assert.ok(fresh.includes(`${medicineInfo(recent.id)!.name} ×1`));
+  const stillUnknown = auctionContent(s, 'buy', false)
+    .split('data-closed-index="5">')[1]
+    .split('</article>')[0];
+  assert.match(stillUnknown, /本拍品已结拍/);
+  assert.doesNotMatch(stillUnknown, new RegExp(`<h3>${medicineInfo(recent.id)!.name}`));
+  assert.deepEqual(importSave(exportSave(s, null)).save.mortal.auction, s.mortal.auction);
 });

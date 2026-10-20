@@ -38,6 +38,7 @@ import { auctionSaleRates } from '../src/auction-items.ts';
 import { auctionContent } from '../src/auction-ui.ts';
 import { beginSectMarketVisit, sectMarketDeals } from '../src/sect-market.ts';
 import { prepareAuction } from '../src/auction.ts';
+import { JOURNEY_SHARE_URL } from '../src/sharing.ts';
 
 const gameplay = readFileSync(new URL('../docs/gameplay.md', import.meta.url), 'utf8');
 const medicine = readFileSync(new URL('../docs/medicine.md', import.meta.url), 'utf8');
@@ -238,12 +239,12 @@ test('帮助中的根基年岁、炼器增伤与满阶费用对照真实计算',
 });
 
 test('拍卖资格与手续费、玄铁门槛对照实际会场配置', () => {
-  const admission = gameplay.match(/一次交(\d+)灵石取得中级资格、(\d+)取得高级资格/);
-  assert.ok(admission);
-  assert.deepEqual(
-    admission.slice(1).map(Number),
-    AUCTION_HALLS.slice(1).map((hall) => hall.admission),
-  );
+  for (const hall of AUCTION_HALLS) assert.ok(gameplay.includes(hall.name), hall.name);
+  for (const hall of AUCTION_HALLS.slice(1)) {
+    const admission = gameplay.match(new RegExp(`(\\d+)灵石取得${hall.name}资格`));
+    assert.ok(admission, `${hall.name}必须说明入席费用`);
+    assert.equal(Number(admission[1]), hall.admission, `${hall.name}资格费用`);
+  }
   const fees = medicine.match(/买方手续费 (\d+)%，卖方佣金 (\d+)%/);
   assert.ok(fees);
   assert.deepEqual(fees.slice(1).map(Number), [
@@ -262,6 +263,11 @@ test('拍卖资格与手续费、玄铁门槛对照实际会场配置', () => {
   prepareAuction(save);
   const sale = auctionContent(save, 'sell', false);
   assert.ok(sale.includes(`${rates[0]}%–${rates[1]}%`), '出售说明必须跟随实际规则');
+});
+
+test('留影文档链接使用真实二维码地址，固定来源标记与个人标识分开说明', () => {
+  assert.ok(gameplay.includes(`\`${JOURNEY_SHARE_URL}\``), '留影网址必须包含实际固定来源标记');
+  assert.match(gameplay, /固定的留影来源标记，不含存档、身份或个人分享标识/);
 });
 
 test('每一帮助分类都进入一致性检查，CI独立运行且不混入部署', () => {

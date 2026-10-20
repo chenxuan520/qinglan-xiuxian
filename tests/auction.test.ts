@@ -524,7 +524,7 @@ test('高阶修士可收低阶余丹，携药仍按境界，炼气修士不能�
   assert.equal(permanent, undefined);
   assert.match(
     auctionSellReason(low, { kind: 'medicine', id: 'peiying', quantity: 1, forgeLevel: 0 }, 1),
-    /初级会场/,
+    /人字场/,
   );
   assert.equal(low.medicine.bag.peiying, 1);
   assert.equal(low.age, 30);

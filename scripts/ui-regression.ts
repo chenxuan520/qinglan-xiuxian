@@ -7,6 +7,7 @@ import { Game } from '../src/game.ts';
 import { formatTime, TRIAL_BOSS_TIMES } from '../src/data.ts';
 import { TOUR_STEPS } from '../src/interface-tour-model.ts';
 import { CURIO_IDS } from '../src/curio-data.ts';
+import { JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../src/setting.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
@@ -63,6 +64,7 @@ async function elementId(selector: string) {
   const label = await evaluate(`() => {
     const node = document.querySelector(${JSON.stringify(selector)});
     if (!node) throw Error('未找到：' + ${JSON.stringify(selector)});
+    node.scrollIntoView({ block: 'nearest' });
     const label = node.getAttribute('aria-label');
     node.setAttribute('aria-label', ${JSON.stringify(mark)});
     return label;
@@ -131,7 +133,7 @@ function fixture(late = false, upgrade = false) {
   return save;
 }
 
-async function open(viewport: string, save: SaveData) {
+async function open(viewport: string, save: SaveData, testInitScript = '') {
   const text = await browser.call('new_page', {
     url: 'about:blank',
     isolatedContext: `ui-regression-${Date.now()}`,
@@ -142,7 +144,7 @@ async function open(viewport: string, save: SaveData) {
   await browser.call('navigate_page', {
     pageId,
     url: baseUrl,
-    initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(save))});`,
+    initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(save))});${testInitScript}`,
   });
   await wait('() => !!document.querySelector("[data-action=settings]")');
 }
@@ -216,7 +218,22 @@ async function checkJourneyModuleRecovery() {
   checkpoint = 'journey-cold-module';
   const save = fixture();
   save.cultivation = 1234;
-  await open(viewport, save);
+  // 本用例测冷模块断网后的恢复与真实PNG，不依赖在线AI；仅评语请求以503走真实本地兜底。
+  // 在线AI仍由独立测试及发布后实测覆盖，其他请求和浏览器错误检查保持原样。
+  const appraisalFallbackInit = `(() => {
+      const original = window.fetch.bind(window);
+      const appraisalUrl = ${JSON.stringify(new URL(JOURNEY_APPRAISAL_SETTINGS.path, NPC_AI_SETTINGS.baseUrl).href)};
+      window.journeyAppraisalFallbackCalls = 0;
+      window.fetch = (input, init) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (new URL(url, location.href).href === appraisalUrl) {
+          window.journeyAppraisalFallbackCalls++;
+          return Promise.resolve(new Response(null, {status: 503}));
+        }
+        return original(input, init);
+      };
+    })();`;
+  await open(viewport, save, appraisalFallbackInit);
   await click('[data-action=chronicle]');
   await wait('() => !!document.querySelector("[data-action=journey-card]")');
   assert.deepEqual(
@@ -244,6 +261,8 @@ async function checkJourneyModuleRecovery() {
   await wait(
     '() => !document.querySelector(".panel") && !!document.querySelector("[data-action=chronicle]")',
   );
+  // 真实刷新产生新文档，MCP单次initScript已移除；只重新安装相同的评语失败夹具。
+  await evaluate(`() => { ${appraisalFallbackInit} return true; }`);
   assert.equal((await saved()).cultivation, before.cultivation);
   assert.deepEqual((await saved()).completed, before.completed);
   await click('[data-action=chronicle]');
@@ -256,6 +275,9 @@ async function checkJourneyModuleRecovery() {
     ),
     [1080, 1740, true],
   );
+  const appraisalFallbackCalls = await evaluate('() => window.journeyAppraisalFallbackCalls');
+  assert.ok(appraisalFallbackCalls >= 1, '冷模块恢复必须实际拦截评语请求并触发本地兜底');
+  console.log(`冷模块恢复使用本地评语：503回退 ${appraisalFallbackCalls} 次，不测试在线AI。`);
   await check('journey-cold-module-recovered');
   await click('[data-action=close]');
   await wait('() => !!document.querySelector("[data-action=journey-card]")');
@@ -500,6 +522,56 @@ async function checkHomePanels(name: string) {
   }
 }
 
+async function checkTourScrollRestore(name: string) {
+  const cases = [
+    { top: 0, complete: false },
+    { top: 40, complete: false },
+    ...(name === 'desktop' ? [{ top: 0, complete: true }] : []),
+  ];
+  for (const scenario of cases) {
+    checkpoint = `${name}-tour-scroll-${scenario.top}-${scenario.complete ? 'complete' : 'exit'}`;
+    await click('[data-action=guide]');
+    await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=basics]")');
+    await click('[data-action=guide-tab][data-id=basics]');
+    await wait('() => !!document.querySelector("[data-action=guide-tour]")');
+    const beforeSave = await evaluate("() => localStorage.getItem('qinglan-immortal-v1')");
+    const start = await evaluate(`() => {
+      const ui = document.querySelector('#ui');
+      ui.scrollTop = ${scenario.top};
+      return { top: ui.scrollTop, left: ui.scrollLeft };
+    }`);
+    await click('[data-action=guide-tour]');
+    await wait('() => !!document.querySelector(".interface-tour")');
+    if (scenario.complete) {
+      for (let step = 0; step < TOUR_STEPS.length; step++) {
+        await wait(`() => document.querySelector('.interface-tour')?.dataset.step === '${step}'`);
+        await click('[data-tour=next]');
+      }
+    } else await click('[data-tour=exit]');
+    await wait('() => !document.querySelector(".interface-tour")');
+    assert.equal(
+      await evaluate('() => document.activeElement?.dataset.action'),
+      'guide-tour',
+      '退出或完成导览后恢复原入口焦点',
+    );
+    await click('.panel-close[data-action=close]');
+    assert.deepEqual(
+      await evaluate(`() => {
+        const ui = document.querySelector('#ui');
+        return { top: ui.scrollTop, left: ui.scrollLeft };
+      }`),
+      start,
+      `${checkpoint}：首页原位置为零也必须还原`,
+    );
+    assert.equal(
+      await evaluate("() => localStorage.getItem('qinglan-immortal-v1')"),
+      beforeSave,
+      '退出或完成导览不能改变真实存档',
+    );
+    results.push({ name: checkpoint, layout: start });
+  }
+}
+
 try {
   // SPA 的 HTML 回退也会返回 200；先确认实际脚本可加载，避免误报成界面等待超时。
   const entry = await fetch(baseUrl, { signal: AbortSignal.timeout(15000) });
@@ -577,6 +649,7 @@ try {
     );
     await click('[data-action=close]');
     await checkHomePanels(name);
+    await checkTourScrollRestore(name);
     await click('[data-action=sound]');
     await check(`${name}-volume`);
     await click('[data-action=mute]');

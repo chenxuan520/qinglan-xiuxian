@@ -33,7 +33,7 @@ export function auctionHallReason(save: SaveData, hall: number) {
   return !Number.isInteger(hall) || hall < 0 || hall > 2
     ? '会场不存在'
     : hall > auctionHallLimit(save)
-      ? '尚未取得该会场资格'
+      ? `尚未取得${AUCTION_HALLS[hall as AuctionHall].name}资格`
       : '';
 }
 export function selectAuctionHall(save: SaveData, hall: number, visit: number, pay = false) {
@@ -54,9 +54,10 @@ export function selectAuctionHall(save: SaveData, hall: number, visit: number, p
   )
     return '请先处理寿元、天劫、供奉或遭遇';
   if (auctionHallReason(save, hall)) {
-    if (!pay) return '尚未取得该会场资格';
+    if (!pay) return auctionHallReason(save, hall);
     const fee = AUCTION_HALLS[hall as AuctionHall].admission;
-    if (save.stones - auctionDues(save) < fee) return '灵石不足入场费用';
+    if (save.stones - auctionDues(save) < fee)
+      return `灵石不足${AUCTION_HALLS[hall as AuctionHall].name}入场费用`;
     save.stones -= fee;
     save.mortal.auction.paidHall = hall as 1 | 2;
   }
@@ -162,9 +163,12 @@ export function auctionSellReason(
     years,
   );
   if (reason) return reason;
-  if (checkHall && auctionHallReason(save, save.mortal.auction!.hall)) return '尚未取得该会场资格';
+  if (checkHall && auctionHallReason(save, save.mortal.auction!.hall))
+    return auctionHallReason(save, save.mortal.auction!.hall);
   if (checkHall && !auctionItemAllowed(save.mortal.auction!.hall, item))
-    return item.kind === 'iron' ? '玄铁只在初级会场交易' : '初级会场不收珍品丹药与奇物';
+    return item.kind === 'iron'
+      ? `玄铁只在${AUCTION_HALLS[0].name}交易`
+      : `${AUCTION_HALLS[0].name}不收珍品丹药与奇物`;
   if (
     !Number.isSafeInteger(item.quantity) ||
     item.quantity < 1 ||

@@ -1,6 +1,7 @@
 import { CURIOS, curioInfo } from './curio-info.ts';
 import { curioArt } from './curio-art.ts';
-import { TREASURES, treasure } from './data.ts';
+import { TREASURES, treasure, elementInfo, pathInfo } from './data.ts';
+import { catalogEvolutionRecipe } from './common-ui.ts';
 import { MEDICINES, medicineInfo } from './medicine-data.ts';
 import { medicineArt } from './medicine-ui.ts';
 import { itemArt } from './item-art.ts';
@@ -9,6 +10,7 @@ import type { SaveData } from './progress.ts';
 import { marketCultivators } from './sect-market-data.ts';
 import {
   AUCTION_HALLS,
+  AUCTION_LOTS,
   AUCTION_IRON_MIN,
   type AuctionItem,
   type AuctionKind,
@@ -51,6 +53,11 @@ function detail(item: AuctionItem) {
     ? `${medicineInfo(item.id)!.years ? medicineInfo(item.id)!.tier : '本世珍品'} · ${medicineInfo(item.id)!.desc}`
     : `炼器 ${item.forgeLevel} 阶 · ${treasure(item.id).school === 'orthodox' ? '正道' : '魔道'}法宝`;
 }
+function artifactInspection(item: AuctionItem) {
+  if (item.kind !== 'artifact') return '';
+  const t = treasure(item.id);
+  return `<details class="auction-inspection"><summary>鉴宝 · 攻击与配套</summary><p>${elementInfo(t.element).name}系 · ${t.tag}</p><p>${t.desc}</p>${catalogEvolutionRecipe(t)}<p class="panel-note">${pathInfo(t.school).name}或兼修路线可领悟此宝、设为本命。法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。纯修仅可用本流派功法，兼修可任选配套功法；炼器阶数不代替局内重数。</p></details>`;
+}
 export function auctionResult(
   save: SaveData,
   r: AuctionReceipt,
@@ -87,6 +94,32 @@ export function auctionResult(
         ? `${bidder}买下${name} ×${r.quantity} · 实收 ${num(r.price - r.fee)} 灵石（佣金 ${num(r.fee)}）`
         : `${name}未达到保留价 · 物品仍在行囊，未收佣金 · 已消耗半年`;
 }
+// closed按竞拍先后追加，history按时间倒序；出售和奇物竞拍不占常规closed槽。
+// 只还原同批同场、保留在历史尾段中的真实成交，不用新生成的药品猜测旧货。
+function closedReceipt(save: SaveData, index: number) {
+  const state = save.mortal.auction!;
+  const hall = Math.floor(index / AUCTION_LOTS);
+  const closed = state.closed.filter((n) => Math.floor(n / AUCTION_LOTS) === hall);
+  const receipts = state.history.filter(
+    (r) =>
+      r.visit === state.visit &&
+      r.hall === hall &&
+      r.kind !== 'curio' &&
+      (r.outcome === 'won' || r.outcome === 'lost'),
+  );
+  const position = closed.indexOf(index);
+  const r =
+    position < 0 || receipts.length > closed.length
+      ? undefined
+      : receipts[closed.length - 1 - position];
+  const kind =
+    (index % AUCTION_LOTS) % 4 < 2
+      ? 'medicine'
+      : hall === 0 && index % AUCTION_LOTS === 7
+        ? 'iron'
+        : 'artifact';
+  return r?.kind === kind ? r : undefined;
+}
 export function auctionContent(
   save: SaveData,
   view: AuctionView,
@@ -106,7 +139,7 @@ export function auctionContent(
     },
   ).join(
     '',
-  )}</div><p class="panel-note">${['凡品、灵品丹药 · 低阶法宝 · 大批玄铁', '灵品为主，兼有珍品丹药 · 一至三阶法宝 · 偶有奇物', '珍品丹药为主，偶有稀有丹药 · 三至六阶法宝 · 偶有奇物'][state.hall]}。境界不足可缴费取得本世资格，高级包含中级。切场不计龄。</p>`;
+  )}</div><p class="panel-note">${['凡品、灵品丹药 · 低阶法宝 · 大批玄铁', '灵品为主，兼有珍品丹药 · 一至三阶法宝 · 偶有奇物', '珍品丹药为主，偶有稀有丹药 · 三至六阶法宝 · 偶有奇物'][state.hall]}。境界不足可缴费取得本世资格，${AUCTION_HALLS[2].name}资格包含${AUCTION_HALLS[1].name}。切场不计龄。</p>`;
   const toolbar = `${halls}<div class="auction-toolbar"><span>灵石 <strong>${num(save.stones)}</strong></span><small>第 ${visit} 批 · 每场半年 · 即时结算${auctionDues(save) ? ` · 已预留供奉 ${auctionDues(save)} 灵石` : ''}</small></div><div class="medicine-tabs auction-tabs" role="group" aria-label="拍卖用途">${[
     ['buy', '参与竞拍'],
     ['sell', '委托出售'],
@@ -123,9 +156,13 @@ export function auctionContent(
       save,
     )
       .map((lot) => {
+        if (state.closed.includes(lot.index)) {
+          const r = closedReceipt(save, lot.index);
+          return `<article class="auction-card" data-closed-index="${lot.index}">${r ? `<header>${art(r)}<div><small>已结拍 · ${AUCTION_HALLS[r.hall].name}</small><h3>${auctionItemName(r)} ×${r.quantity}</h3></div></header><p>${auctionResult(save, r)}</p>` : '<h3>本拍品已结拍</h3><p class="panel-note">可在「成交录」查看结拍往来，本批不再开拍。</p>'}</article>`;
+        }
         const reason = auctionBuyReason(save, lot.index, visit, unfinished);
         const minimum = lot.start + auctionFee(lot.start);
-        return `<article class="auction-card"><header>${art(lot)}<div><small>${lot.seller}的委托</small><h3>${auctionItemName(lot)} ×${lot.quantity}</h3></div></header><p>${detail(lot)}</p><strong>起拍 ${num(lot.start)} 灵石</strong><label>最高预算（含手续费）<input id="auction-budget-${lot.index}" type="number" inputmode="numeric" min="${minimum}" max="${available}" step="1" value="${minimum}" aria-label="${auctionItemName(lot)}最高预算" ${reason || available < minimum ? 'disabled' : ''}></label><button class="secondary-button" data-action="auction-buy" data-id="${lot.index}" data-visit="${visit}" data-hall="${state.hall}" data-cycle="${save.curios.consignment?.cycle ?? -1}" ${reason || available < minimum ? 'disabled' : ''}>${reason || (available < minimum ? '灵石不足起拍预算' : '委托竞拍')}</button></article>`;
+        return `<article class="auction-card"><header>${art(lot)}<div><small>${lot.seller}的委托</small><h3>${auctionItemName(lot)} ×${lot.quantity}</h3></div></header><p>${detail(lot)}</p>${artifactInspection(lot)}<strong>起拍 ${num(lot.start)} 灵石</strong><label>最高预算（含手续费）<input id="auction-budget-${lot.index}" type="number" inputmode="numeric" min="${minimum}" max="${available}" step="1" value="${minimum}" aria-label="${auctionItemName(lot)}最高预算" ${reason || available < minimum ? 'disabled' : ''}></label><button class="secondary-button" data-action="auction-buy" data-id="${lot.index}" data-visit="${visit}" data-hall="${state.hall}" data-cycle="${save.curios.consignment?.cycle ?? -1}" ${reason || available < minimum ? 'disabled' : ''}>${reason || (available < minimum ? '灵石不足起拍预算' : '委托竞拍')}</button></article>`;
       })
       .join(
         '',
@@ -166,7 +203,7 @@ export function auctionContent(
         ? `<br><small>${item.kind === 'curio' ? '代客席收购报价' : '单件收购报价（未计财力上限）'} ${num(minimum)}–${num(maximum)} 灵石；扣佣后实收 ${num(minimum - auctionFee(minimum, true))}–${num(maximum - auctionFee(maximum, true))} 灵石。</small>`
         : '';
 
-    content = `<details><summary>委托规则与估价</summary><p class="panel-note">按会场类别委托行囊中的丹药、法宝、奇物或玄铁。初级场不收珍品与奇物，玄铁只在初级场交易。玄铁每批至少150枚，以当期回收行情的九至十折出价。奇物售出后助益消失，本世无法再得。每次委托消耗半年，流拍也计龄。丹药与法宝按估值的 ${auctionSaleRates({ kind: 'medicine', id: '', quantity: 1, forgeLevel: 0 }).join('%–')}% 出价，受来客财力限制；扣佣后通常实收估值的七成二至九成，零头向下取整。大批量或高价物品可能超出来客财力，可拆批或前往更高会场。奇物珍藏估值计入长久使用的助益，急售由代客席按估值的 10%–15% 收购。达到保留价才成交，卖方佣金为成交价的 10%。当前本命不可出售；入门赠品只按炼器投入估值。丹药出售不影响已服用药效、服用次数与药方。</p></details><div class="auction-seller"><label>委托类别<select id="auction-kind" aria-label="委托类别"><option value="medicine" ${kind === 'medicine' ? 'selected' : ''}>丹药</option><option value="artifact" ${kind === 'artifact' ? 'selected' : ''}>法宝</option>${state.hall === 0 ? `<option value="iron" ${kind === 'iron' ? 'selected' : ''}>玄铁</option>` : `<option value="curio" ${kind === 'curio' ? 'selected' : ''}>奇物</option>`}</select></label>${item ? `<label>委托物品<select id="auction-item" aria-label="委托物品">${choices.map((i) => `<option value="${i.id}" ${id === i.id ? 'selected' : ''}>${i.name}${kind === 'iron' ? `（持有 ${save.iron} 枚）` : kind === 'medicine' ? `（持有 ${save.medicine.bag[i.id]}）` : kind === 'curio' ? `（持有 ${save.curios.bag[i.id as keyof typeof save.curios.bag] ?? 0} 件）` : `（炼器 ${save.forge[i.id] || 0} 阶${i.id === save.starter ? ' · 当前本命' : ''}）`}</option>`).join('')}</select></label><section class="sect-market-offer">${art(item)}<div><strong>${auctionItemName(item)}</strong><p>${detail(item)}</p><small>${kind === 'curio' ? '珍藏估值' : kind === 'iron' ? `${AUCTION_IRON_MIN} 枚估值` : '单件估值'} ${num(value)} 灵石</small>${resale}</div></section>${kind === 'medicine' || kind === 'iron' ? `<label>委托数量<input id="auction-quantity" type="number" inputmode="numeric" min="${kind === 'iron' ? AUCTION_IRON_MIN : 1}" max="${Math.min(kind === 'iron' ? 9999 : 99, kind === 'iron' ? save.iron : save.medicine.bag[item.id])}" step="1" value="${item.quantity}" aria-label="委托数量"></label>` : ''}<label>总保留价（不含佣金）<input id="auction-reserve" type="number" inputmode="numeric" min="1" step="1" value="${minimum}" aria-label="总保留价"></label><small class="panel-note">批量物品请按总数量填写保留价；未达到此价不扣物品、不收佣金。</small><button class="secondary-button" data-action="auction-sell" data-visit="${visit}" data-hall="${state.hall}" ${reason ? 'disabled' : ''}>${reason || '委托出售'}</button>` : `<p class="panel-note">${reason}</p>`}</div>`;
+    content = `<details><summary>委托规则与估价</summary><p class="panel-note">按会场类别委托行囊中的丹药、法宝、奇物或玄铁。${AUCTION_HALLS[0].name}不收珍品与奇物，玄铁只在${AUCTION_HALLS[0].name}交易。玄铁每批至少150枚，以当期回收行情的九至十折出价。奇物售出后助益消失，本世无法再得。每次委托消耗半年，流拍也计龄。丹药与法宝按估值的 ${auctionSaleRates({ kind: 'medicine', id: '', quantity: 1, forgeLevel: 0 }).join('%–')}% 出价，受来客财力限制；扣佣后通常实收估值的七成二至九成，零头向下取整。大批量或高价物品可能超出来客财力，可拆批或前往更高会场。奇物珍藏估值计入长久使用的助益，急售由代客席按估值的 10%–15% 收购。达到保留价才成交，卖方佣金为成交价的 10%。当前本命不可出售；入门赠品只按炼器投入估值。丹药出售不影响已服用药效、服用次数与药方。</p></details><div class="auction-seller"><label>委托类别<select id="auction-kind" aria-label="委托类别"><option value="medicine" ${kind === 'medicine' ? 'selected' : ''}>丹药</option><option value="artifact" ${kind === 'artifact' ? 'selected' : ''}>法宝</option>${state.hall === 0 ? `<option value="iron" ${kind === 'iron' ? 'selected' : ''}>玄铁</option>` : `<option value="curio" ${kind === 'curio' ? 'selected' : ''}>奇物</option>`}</select></label>${item ? `<label>委托物品<select id="auction-item" aria-label="委托物品">${choices.map((i) => `<option value="${i.id}" ${id === i.id ? 'selected' : ''}>${i.name}${kind === 'iron' ? `（持有 ${save.iron} 枚）` : kind === 'medicine' ? `（持有 ${save.medicine.bag[i.id]}）` : kind === 'curio' ? `（持有 ${save.curios.bag[i.id as keyof typeof save.curios.bag] ?? 0} 件）` : `（炼器 ${save.forge[i.id] || 0} 阶${i.id === save.starter ? ' · 当前本命' : ''}）`}</option>`).join('')}</select></label><section class="sect-market-offer">${art(item)}<div><strong>${auctionItemName(item)}</strong><p>${detail(item)}</p><small>${kind === 'curio' ? '珍藏估值' : kind === 'iron' ? `${AUCTION_IRON_MIN} 枚估值` : '单件估值'} ${num(value)} 灵石</small>${resale}</div></section>${kind === 'medicine' || kind === 'iron' ? `<label>委托数量<input id="auction-quantity" type="number" inputmode="numeric" min="${kind === 'iron' ? AUCTION_IRON_MIN : 1}" max="${Math.min(kind === 'iron' ? 9999 : 99, kind === 'iron' ? save.iron : save.medicine.bag[item.id])}" step="1" value="${item.quantity}" aria-label="委托数量"></label>` : ''}<label>总保留价（不含佣金）<input id="auction-reserve" type="number" inputmode="numeric" min="1" step="1" value="${minimum}" aria-label="总保留价"></label><small class="panel-note">批量物品请按总数量填写保留价；未达到此价不扣物品、不收佣金。</small><button class="secondary-button" data-action="auction-sell" data-visit="${visit}" data-hall="${state.hall}" ${reason ? 'disabled' : ''}>${reason || '委托出售'}</button>` : `<p class="panel-note">${reason}</p>`}</div>`;
   } else {
     content = `<p class="panel-note">近来的结拍往来。</p>${state.history.length ? state.history.map((r) => `<article class="auction-receipt">${art(r)}<div><small>${r.age.toFixed(1)} 岁 · ${AUCTION_HALLS[r.hall].name} · 第 ${r.visit} 批</small><p>${auctionResult(save, r)}</p></div></article>`).join('') : '<p class="panel-note">尚未参与竞拍或委托出售。</p>'}`;
   }

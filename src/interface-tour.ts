@@ -34,7 +34,7 @@ export function startInterfaceTour(
     ...ui.querySelectorAll<HTMLElement>('*'),
     ...modal.querySelectorAll<HTMLElement>('*'),
   ]
-    .filter((node) => node.scrollTop || node.scrollLeft)
+    .filter((node) => node === ui || node === modal || node.scrollTop || node.scrollLeft)
     .map((node) => ({ node, top: node.scrollTop, left: node.scrollLeft }));
   const inert = ui.inert;
   const hiddenUi = ui.getAttribute('aria-hidden');

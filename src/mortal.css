@@ -338,22 +338,12 @@
 }
 .sect-market-auction-sign {
   position: absolute;
-  z-index: 330;
   transform: translate(-50%, -50%);
-  padding: 12px 22px;
-  border: 1px solid #d8c89480;
-  background: #153b33e8;
   color: #e7d7a6;
   text-align: center;
-  box-shadow: 0 4px 18px #091f2360;
 }
-.sect-market-auction-sign strong,
 .sect-market-auction-sign small {
   display: block;
-}
-.sect-market-auction-sign strong {
-  font-size: 21px;
-  letter-spacing: 0.14em;
 }
 .sect-market-auction-sign small {
   margin-top: 5px;
@@ -501,48 +491,47 @@
     padding: 14px;
   }
 }
-.sect-market-building {
-  position: absolute;
-  width: 195px;
-  height: 260px;
-  transform: translate(-50%, -100%);
-  background: url('/assets/sects-orthodox.webp') 0 0 / 400% 200% no-repeat;
-}
-.sect-market-building.demonic {
-  width: 213.28px;
-  background-image: url('/assets/sects-demonic.webp');
-  background-size: 365.7143% 200%;
-}
 .sect-market-npc {
   position: absolute;
-  width: 78px;
-  height: 104px;
   transform: translate(-50%, -100%);
 }
 .sect-market-npc-art {
   display: block;
-  width: 78px;
-  height: 104px;
 }
 .sect-market-npc-name {
   position: absolute;
   top: 108px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 5px 10px;
   color: #e8dfbe;
   background: #15392fed;
   border: 1px solid #b3ad7555;
   text-align: center;
   white-space: nowrap;
-  font-size: 14px;
 }
 .sect-market-npc-name small {
   display: block;
   font-size: 11px;
 }
 .sect-market-npc.nearby .sect-market-npc-name {
+  visibility: hidden;
+}
+.sect-market-npc-name.market-active-label {
+  z-index: 2000;
+  pointer-events: none;
   border-color: var(--gold);
+  font-size: calc(13px / var(--market-scale, 1));
+}
+.sect-market-npc-name.market-active-label small,
+.sect-market-auction-sign.nearby small {
+  font-size: calc(12px / var(--market-scale, 1));
+}
+.sect-market-auction-sign.nearby {
+  margin-top: var(--market-label-offset, 0px);
+  z-index: 2000 !important;
+}
+.market-venue-sign.nearby {
+  margin-top: calc(var(--market-label-offset, 0px) + 60px);
 }
 .sect-market-profile,
 .sect-market-offer {

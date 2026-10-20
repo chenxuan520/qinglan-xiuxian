@@ -141,3 +141,39 @@ test('悟道后十阶逐步提高收益，前十阶不变，满阶按三十基�
   assert.match(cultivationPanel(s, 0).body, /当前增伤 \+60%/);
   assert.ok(!cultivationPanel(s, 0).body.includes('下一阶实际增伤'));
 });
+
+test('洞府悟道当前与下一阶显示真实入场增幅，计入养魂木且读取不改存档', () => {
+  for (const root of SPIRIT_ROOTS)
+    for (const wood of [false, true])
+      for (const level of [0, 10, 11, 20]) {
+        const save = freshSave(root.id);
+        save.cultivation = cultivationAt(18);
+        save.training.power = level;
+        save.retreatBonus.power = 17;
+        save.medicine.active.heqi = save.age + 100;
+        if (wood) {
+          save.curios.bag['soul-wood'] = 1;
+          save.curios.acquired.push('soul-wood');
+        }
+        const before = JSON.stringify(save);
+        const damage = (power: number) => {
+          const copy = structuredClone(save);
+          copy.training.power = power;
+          return new Game(copy, 0, 0, () => 0.5).stats.damage;
+        };
+        const current = damage(level);
+        const html = cultivationPanel(save, 0).body;
+        const bonus = Number(((current / damage(0) - 1) * 100).toFixed(2));
+        assert.ok(html.includes(`当前增伤 +${bonus}%`), `${root.id}/${wood}/${level}`);
+        if (level < 20) {
+          const next = Number(((damage(level + 1) / current - 1) * 100).toFixed(2));
+          assert.ok(html.includes(`下一阶实际增伤 +${next}%`));
+        } else assert.ok(!html.includes('下一阶实际增伤'));
+        assert.equal(JSON.stringify(save), before);
+      }
+  const example = freshSave('heaven', ['metal']);
+  example.training.power = 10;
+  example.curios.bag['soul-wood'] = 1;
+  assert.match(cultivationPanel(example, 0).body, /当前增伤 \+26%/);
+  assert.match(cultivationPanel(example, 0).body, /下一阶实际增伤 \+2\.27%/);
+});

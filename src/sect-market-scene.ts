@@ -54,6 +54,7 @@ export class SectMarketScene {
   private height = 0;
   private map: HTMLElement;
   private player: HTMLElement;
+  private activeLabel: HTMLElement;
   private residents: MarketCultivator[];
   private lastTransform = '';
   private nearbyId = '';
@@ -106,6 +107,10 @@ export class SectMarketScene {
       )}<div class="town-prop market-lanterns" style="left:1000px;top:515px;width:220px;height:220px;z-index:515;background-position:100% 0"></div>${MARKET_VENUES.map((v) => `<div class="sect-market-auction-sign market-venue-sign" data-venue-sign="${v.id}" style="left:${v.x}px;top:${v.y - 30}px;z-index:${v.y - 20}"><small>${v.hint}</small></div>`).join('')}<div class="sect-market-auction-sign" style="left:${AUCTION_SPOT.x}px;top:${AUCTION_SPOT.y + 35}px"><small>门前入席 · 丹药法宝</small></div><div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc ${npc.roaming ? 'market-visitor' : 'market-trader'}" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${marketRealmLabel(npc, realm)}<br>${npc.role}</small></span></div>`).join('')}</div></div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${MARKET_VENUES.map((v) => `<circle cx="${v.x}" cy="${v.y}" r="22" fill="#d3be80"/>`).join('')}${this.residents.map((n) => `<circle data-market-marker="${n.id}" cx="${n.x}" cy="${n.y}" r="${n.roaming ? 18 : 28}" fill="${n.roaming ? '#a5bca0' : '#dbc17a'}"/>`).join('')}<rect x="${AUCTION_SPOT.x - 25}" y="${AUCTION_SPOT.y - 25}" width="50" height="50" fill="#f1db9a"/><circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.sect-market-map')!;
     this.player = host.querySelector('.town-player')!;
+    this.activeLabel = document.createElement('span');
+    this.activeLabel.className = 'sect-market-npc-name market-active-label';
+    this.activeLabel.hidden = true;
+    host.querySelector('.market-world')!.append(this.activeLabel);
     this.visitorNodes = this.residents
       .filter((n) => n.roaming)
       .map((npc) => ({
@@ -307,6 +312,9 @@ export class SectMarketScene {
       place &&
       (!near || place.distance < Math.hypot(this.position.x - near.x, this.position.y - near.y));
     const nearId = this.nearAuction ? 'auction' : usePlace ? place.id : (near?.id ?? '');
+    const labelOffset = `${this.position.y - (nearId === 'auction' ? AUCTION_SPOT.y : usePlace ? place.y : (near?.y ?? this.position.y))}px`;
+    if (this.host.style.getPropertyValue('--market-label-offset') !== labelOffset)
+      this.host.style.setProperty('--market-label-offset', labelOffset);
     if (this.nearbyId !== nearId || !this.host.dataset.initialized) {
       this.nearbyId = nearId;
       this.host.dataset.initialized = 'true';
@@ -323,7 +331,24 @@ export class SectMarketScene {
       }
       this.host
         .querySelectorAll<HTMLElement>('.sect-market-npc')
-        .forEach((node) => node.classList.toggle('nearby', node.dataset.marketNpc === near?.id));
+        .forEach((node) => node.classList.toggle('nearby', node.dataset.marketNpc === nearId));
+      this.host
+        .querySelectorAll<HTMLElement>('.sect-market-auction-sign')
+        .forEach((node) =>
+          node.classList.toggle('nearby', (node.dataset.venueSign ?? 'auction') === nearId),
+        );
+      const label =
+        near?.id === nearId
+          ? this.host.querySelector(`[data-market-npc="${nearId}"] .sect-market-npc-name`)
+          : null;
+      this.activeLabel.hidden = !label;
+      this.activeLabel.replaceChildren(
+        ...Array.from(label?.childNodes ?? [], (node) => node.cloneNode(true)),
+      );
+    }
+    if (!this.activeLabel.hidden && near) {
+      this.activeLabel.style.left = `${near.x}px`;
+      this.activeLabel.style.top = `${this.position.y + 12}px`;
     }
     const guided = this.residents.find((n) => n.id === this.guidedId);
     const note = document.getElementById('market-guide');
@@ -346,6 +371,7 @@ export class SectMarketScene {
     const transform = `translate(${x}px,${y}px) scale(${scale})`;
     if (transform !== this.lastTransform) {
       this.map.style.transform = transform;
+      this.map.style.setProperty('--market-scale', String(scale));
       this.lastTransform = transform;
     }
     this.player.style.left = `${this.position.x}px`;
@@ -391,7 +417,7 @@ export class SectMarketScene {
     ).index;
     if (label)
       label.innerHTML = `${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${marketRealmLabel(npc, realm)}<br>${npc.role}</small>`;
-    this.nearbyId = '';
+    delete this.host.dataset.initialized;
   }
   private clearPointer() {
     this.pointer = null;

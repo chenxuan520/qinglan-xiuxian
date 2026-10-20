@@ -302,7 +302,10 @@ export async function requestTeaStoryImage(
 }
 
 // 仅保留本次页面内每个位置当前人物的最近闲谈，不继承给下一任，也不上传完整存档。
-const conversations = new Map<string, { identity: string; messages: NpcMessage[] }>();
+const conversations = new Map<
+  string,
+  { identity: string; messages: NpcMessage[]; greeting?: NpcMessage }
+>();
 let activeRequest: AbortController | null = null;
 let activeSpeech: StorySpeech | null = null;
 let activeStoryImageUrl = '';
@@ -494,10 +497,16 @@ export function mountNpcChat(
   const input = form.querySelector<HTMLInputElement>('input')!;
   const button = form.querySelector<HTMLButtonElement>('button')!;
   const status = host.querySelector<HTMLElement>('.npc-chat-status')!;
+  const storyGreeting = !townId ? host.dataset?.storyGreeting : undefined;
   const render = () => {
     log.replaceChildren();
     const visible = messages.length ? messages : [{ role: 'assistant', content: fallback }];
     for (const message of visible) {
+      if (
+        storyGreeting === message.content &&
+        (!messages.length || message === conversation.greeting)
+      )
+        continue;
       const row = document.createElement('p');
       const name = document.createElement('strong');
       name.textContent = message.role === 'user' ? '你' : npc.name;
@@ -505,6 +514,7 @@ export function mountNpcChat(
       row.append(name, document.createTextNode(message.content));
       log.append(row);
     }
+    log.hidden = !log.firstChild;
     log.scrollTop = log.scrollHeight;
   };
   const send = async (message: string, greeting = false) => {
@@ -522,7 +532,9 @@ export function mountNpcChat(
     if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
     activeRequest = null;
     const localReply = market ? marketDialogueLocalReply(request) : fallback;
-    messages.push({ role: 'assistant', content: reply ?? localReply });
+    const answer: NpcMessage = { role: 'assistant', content: reply ?? localReply };
+    if (greeting) conversation.greeting = answer;
+    messages.push(answer);
     messages.splice(0, Math.max(0, messages.length - NPC_AI_SETTINGS.maxHistoryMessages));
     render();
     button.disabled = input.disabled = false;

@@ -332,6 +332,60 @@ function assertNewReveal(context: ReturnType<typeof harness>) {
   assert.deepEqual(JSON.parse(context.writes.at(-1)), { ...save, activeRun: null });
 }
 
+test('取消弃劫退出确认状态，继续修行、指南返回、再次弃劫与落败复活入口仍可操作', () => {
+  for (const cancel of ['cancel-forfeit', 'close']) {
+    const save = previousLife();
+    save.cultivation = 1e9;
+    save.age = save.nextTribulationAge;
+    const context = harness(save);
+    const battle = Game.createTribulation(save, null);
+    battle.pause();
+    context.game = battle;
+    context.renderPause = () => context.panelFrame(...lobbyUi.pausePanel(battle, save, 60, false));
+    context.showPanel = (name: string) => {
+      context.panel = name;
+      context.modal.innerHTML = '指南正文';
+    };
+
+    context.handleAction('abandon');
+    assert.equal(context.panel, 'tribulation-forfeit');
+    context.handleAction(cancel);
+    assert.equal(context.panel, '');
+    assert.match(context.modal.innerHTML, /data-action="resume"/);
+    context.handleAction('resume');
+    assert.equal(battle.state, 'playing');
+    assert.equal(context.modal.innerHTML, '');
+    context.handleAction('pause');
+    context.handleAction('guide');
+    assert.equal(context.panel, 'guide');
+    assert.equal(battle.state, 'paused');
+    context.handleAction('close');
+    assert.equal(context.panel, '');
+    assert.match(context.modal.innerHTML, /data-action="resume"/);
+    context.handleAction('abandon');
+    assert.equal(context.panel, 'tribulation-forfeit');
+    context.handleAction(cancel);
+    assert.equal(context.panel, '');
+
+    battle.state = 'lost';
+    battle.player.hp = 0;
+    context.renderDeath();
+    context.handleAction('finish-run');
+    assert.equal(context.panel, 'tribulation-forfeit');
+    context.handleAction(cancel);
+    assert.equal(context.panel, 'death');
+    assert.match(context.modal.innerHTML, /data-action="watch-ad"/);
+    let revives = 0;
+    context.showReviveAd = () => {
+      revives++;
+    };
+    context.handleAction('watch-ad');
+    assert.equal(revives, 1);
+    assert.equal(save.pendingReincarnation, null);
+    assert.equal(context.game, battle);
+  }
+});
+
 test('命盘连续重抽只更新结果，保留弹窗与滚动，不经过故乡或序章', () => {
   const save = freshSave();
   save.prologueSeen = true;

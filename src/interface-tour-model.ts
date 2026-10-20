@@ -74,7 +74,7 @@ export const TOUR_STEPS = [
     chapter: '战斗',
     target: '.stage-timer',
     title: '撑过历练，还要击败妖王',
-    copy: '上方显示当前秘境和时间。普通秘境倒计时结束时妖王登场；击败它才算通关，计时结束不等于已经获胜。',
+    copy: '上方显示当前秘境和时间。普通秘境历练达到指定时长后妖王登场；击败它才算通关，计时到点不等于已经获胜。',
   },
   {
     scene: 'battle',
@@ -88,7 +88,7 @@ export const TOUR_STEPS = [
     chapter: '走位',
     target: '.tour-practice-area',
     title: '走两步试试',
-    copy: '电脑用 WASD 或方向键，手机按住亮起的战场拖动。法宝自动攻击，靠近灵气即可拾取。',
+    copy: '演练中，电脑按 WASD 或方向键，手机拖动亮起的战场。实际历练也可左键点地前往，移动键随时接管；法宝自动攻击。',
   },
   {
     scene: 'battle',

@@ -94,6 +94,33 @@ export function auctionLots(
       start: auctionValue(item),
     };
   });
+  // 保留原槽位、品级与本世珍品触发；只替换本批重复丹药，不挪动原本不同的药。
+  // 不读取库存或结拍状态，成交、关闭、刷新后其余待拍品仍是同一批。
+  const reservedMedicineIds = new Set(
+    lots.filter((lot) => lot.kind === 'medicine').map((lot) => lot.id),
+  );
+  const seen = new Set<string>();
+  for (const lot of lots) {
+    if (lot.kind !== 'medicine') continue;
+    const original = medicineInfo(lot.id)!;
+    if (seen.has(lot.id)) {
+      const alternatives = MEDICINES.filter(
+        (m) =>
+          m.tier === original.tier &&
+          (m.years === 0) === (original.years === 0) &&
+          !reservedMedicineIds.has(m.id),
+      );
+      if (alternatives.length) {
+        lot.id =
+          alternatives[
+            (roll(save, `lot:${lot.index % AUCTION_LOTS}`) >>> 8) % alternatives.length
+          ].id;
+        lot.start = auctionValue(lot);
+        reservedMedicineIds.add(lot.id);
+      }
+    }
+    seen.add(lot.id);
+  }
   if (hall === 0) {
     const item: AuctionItem = {
       kind: 'iron',
@@ -209,7 +236,7 @@ function bids(
 
 export function auctionBuyReason(save: SaveData, index: number, visit: number, unfinished = false) {
   if (save.mortal.auction && auctionHallReason(save, save.mortal.auction.hall))
-    return '尚未取得该会场资格';
+    return auctionHallReason(save, save.mortal.auction.hall);
   const lot = auctionLots(save).find((l) => l.index === index);
   if (!lot) return '拍品不存在';
   const reason = auctionReason(

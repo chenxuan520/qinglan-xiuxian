@@ -307,7 +307,7 @@ export function marketLocalReply(npc: MarketCultivator, message: string, playerR
   if (npc.roaming && /论道|丹|药|换|求购/.test(message))
     return '今日只来逛市访友，若要论道或互换，可去丹药铺、法器阁和散修小院找设摊的道友。';
   if (/论道|请教|指点/.test(message))
-    return '论道需静心一年，相隔十个游戏年可有所获。可交流御器心得、抄录或互授丹方；是否赠药，还看故交情分。';
+    return '论道需静心一年；普通交流、抄录、互授与讲法共用十年一次机会，本次择一。可交流御器心得、抄录或互授丹方；是否赠药，还看故交情分。';
   if (/委托|求购/.test(message))
     return '求购有明示的物品和报酬，当面交货，半年便结清。若有人催你先垫路费，或邀你去僻处，先核验再决定。';
   if (/骗|险|劫|机缘/.test(message))
@@ -315,7 +315,7 @@ export function marketLocalReply(npc: MarketCultivator, message: string, playerR
   if (/拍卖|竞拍|买|卖/.test(message))
     return '坊市中央有拍卖行，可竞拍丹药和法宝，也可委托出售余物。每场花半年，报价、手续费和成交以拍卖行按钮为准；闲聊不会扣钱或换物。';
   if (/丹|药|换/.test(message))
-    return '互通有无，要先看看你我各自带了什么。下方列着我愿换出的丹药，丹药、法宝或搭配余丹的组合都可商量，按相近估值互换，这批只换一次。';
+    return '互通有无，要先看看你我各自带了什么。界面列着我愿换出的丹药，丹药、法宝或搭配余丹的组合都可商量，按相近估值互换，这批只换一次。';
   if (/精进|进境|进展|突破/.test(message) && /我|看(?:得|不)?出|看穿|察觉/.test(message))
     return npc.realmIndex < playerRealm
       ? '前辈的修为，我看不透，也不敢妄评。若愿指点一二，晚辈洗耳恭听。'

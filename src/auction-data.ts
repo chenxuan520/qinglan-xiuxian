@@ -11,7 +11,7 @@ export const AUCTION_SPOT = { x: 1000, y: 535 };
 export const AUCTION_LOTS = 8;
 export const AUCTION_HALLS = [
   {
-    name: '初级会场',
+    name: '人字场',
     realms: '炼气、筑基、金丹',
     minRealm: 0,
     forgeMin: 0,
@@ -19,7 +19,7 @@ export const AUCTION_HALLS = [
     admission: 0,
   },
   {
-    name: '中级会场',
+    name: '地字场',
     realms: '元婴、化神、炼虚',
     minRealm: 3,
     forgeMin: 1,
@@ -27,7 +27,7 @@ export const AUCTION_HALLS = [
     admission: 3000,
   },
   {
-    name: '高级会场',
+    name: '天字场',
     realms: '合体、大乘、渡劫',
     minRealm: 6,
     forgeMin: 3,

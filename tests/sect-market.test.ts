@@ -505,6 +505,8 @@ test('界面列明完整报价与不足状态，成功后隐藏结算按钮', ()
       assert.match(html, /丹囊现有 0/);
       assert.match(html, /所需物品不足/);
       assert.match(html, /disabled/);
+      assert.ok(html.indexOf('id="sect-market-trade"') < html.indexOf('id="market-social"'));
+      assert.ok(html.indexOf('id="sect-market-trade"') < html.indexOf('class="npc-dialogue"'));
       const deal = fundDeal(save, npc.id);
       assert.equal(
         exchangeSectMedicine(save, npc.id, deal.id, save.mortal.sectMarket!.visit),

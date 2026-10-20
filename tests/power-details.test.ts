@@ -8,6 +8,7 @@ import { powerDetailsContent } from '../src/power-details-ui.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { ChronicleSource } from '../src/chronicle-source.ts';
 import * as chronicle from '../src/chronicle-content.ts';
+import { formatNumber } from '../src/number-format.ts';
 
 const near = (actual: number, expected: number) =>
   assert.ok(Math.abs(actual - expected) < 1e-8, `${actual} ≠ ${expected}`);
@@ -185,4 +186,76 @@ test('履历按需合并加载，失败可重试、成功复用，详细数字�
   assert.ok(chronicle.chronicleContent(s).includes('查看详细属性与增幅来源'));
   assert.ok(powerDetailsContent(s).includes(value));
   assert.ok(!/<details[^>]*class="power-details[^>]*\bopen\b/.test(powerDetailsContent(s)));
+});
+
+test('养魂木解释训练本身的20%到26%，独立展开来源给完整比较数值且不改存档', () => {
+  const s = freshSave('heaven', ['metal']);
+  s.training.power = 10;
+  s.curios.bag['soul-wood'] = 1;
+  s.curios.acquired.push('soul-wood');
+  const before = JSON.stringify(s);
+  const row = powerBreakdown(s).rows.find((row) => row.id === 'power')!;
+  near(row.amplification!.before, 0.2);
+  near(row.amplification!.after, 0.26);
+  near(row.amplification!.percent, 0.3);
+  const html = powerDetailsContent(s);
+  assert.match(html, /悟道增伤 20% → 26% · 养魂木 \+30%/);
+  const change = row.changes.find((change) => change.key === 'weaponDamage')!;
+  assert.ok(
+    html.includes(
+      `本命伤害 ${change.before.toLocaleString('zh-CN', { maximumFractionDigits: 2 })} →`,
+    ),
+  );
+  assert.ok(
+    html.includes(
+      `→ ${change.after.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}（+26%）`,
+    ),
+  );
+  assert.match(html, /保留其他加成对比/);
+  assert.doesNotMatch(html, /以未计本项|所以当前|收益：|代价：/);
+  assert.ok(!/<details[^>]*data-disclosure="power-origin-[^"]+"[^>]*\bopen\b/.test(html));
+  assert.equal(JSON.stringify(s), before);
+});
+
+test('功法的减速代价、施法间隔收益和零斩妖回血基数均正确解释', () => {
+  const bone = fixture();
+  assert.ok(joinSect(bone, 'bone'));
+  const boneHtml = powerDetailsContent(bone);
+  assert.match(boneHtml, /class="power-loss">移速 [\d,.]+ 像素\/秒 → [\d,.]+ 像素\/秒（-1%）/);
+  const soul = fixture();
+  assert.ok(joinSect(soul, 'devour'));
+  const html = powerDetailsContent(soul);
+  assert.match(html, /每次斩妖回血 0 → [\d,.]+（\+[\d,.]+）/);
+  assert.doesNotMatch(html, /NaN|Infinity/);
+  const medicine = freshSave();
+  medicine.medicine.active.juyuan = medicine.age + 100;
+  assert.match(powerDetailsContent(medicine), /class="power-gain">施法间隔 1 倍 → 0\.92 倍（-8%）/);
+});
+
+test('淬体短句关联养魂木，只对照真实整数气血而不反推训练规则', () => {
+  const s = freshSave('heaven', ['metal'], 'orthodox');
+  s.training.vitality = 10;
+  s.curios.bag['soul-wood'] = 1;
+  s.curios.acquired.push('soul-wood');
+  const row = powerBreakdown(s).rows.find((row) => row.id === 'vitality')!;
+  assert.equal(row.related, '养魂木 → 淬体气血');
+  assert.equal(row.amplification, undefined);
+  const change = row.changes.find((change) => change.key === 'hp')!;
+  assert.equal(change.before, 112);
+  assert.equal(change.after, 185);
+});
+
+test('履历头部维持简写，完整灵威仅在展开明细中显示', () => {
+  const s = fixture();
+  s.forge[s.starter] = 10;
+  s.training = { power: 20, vitality: 20, speed: 20 };
+  s.retreatBonus.power = 10000;
+  const full = spiritPower(s).score.toLocaleString('zh-CN');
+  assert.ok(
+    chronicle
+      .chronicleContent(s)
+      .includes(`<strong>${formatNumber(spiritPower(s).score)}</strong>`),
+  );
+  assert.ok(powerDetailsContent(s).includes(`灵威 ${full}`));
+  assert.match(powerDetailsContent(s), /百分比不能直接相加/);
 });

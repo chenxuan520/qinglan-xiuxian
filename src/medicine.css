@@ -157,6 +157,9 @@
   padding-top: 10px;
   font-size: 13px;
 }
+.medicine-active > div > span {
+  min-width: 0;
+}
 .medicine-active .medicine-art {
   width: 36px;
   height: 36px;
@@ -168,6 +171,9 @@
   color: #acbda8;
 }
 .medicine-active button {
+  flex-shrink: 0;
+  min-height: 44px;
+  white-space: nowrap;
   margin-left: auto;
   font-size: 12px;
   padding: 8px;

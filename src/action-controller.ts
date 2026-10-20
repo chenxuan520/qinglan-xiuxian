@@ -758,9 +758,10 @@ function handleLifeLimit(shell: ActionShell, action: string): boolean {
     if (action === 'confirm-forfeit') {
       shell.beginJourneyFarewell('tribulation');
     } else if (action === 'cancel-forfeit' || action === 'close') {
-      if (shell.game?.tribulation)
+      if (shell.game?.tribulation) {
+        shell.panel = '';
         shell.game.state === 'lost' ? shell.renderDeath() : shell.renderPause();
-      else shell.renderTribulationPending();
+      } else shell.renderTribulationPending();
     }
     return true;
   }

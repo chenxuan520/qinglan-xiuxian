@@ -420,6 +420,9 @@
 .power-origin dd span {
   display: block;
 }
+.power-origin details span {
+  margin-top: 6px;
+}
 .power-origin .power-gain {
   color: #c4dfb7;
 }

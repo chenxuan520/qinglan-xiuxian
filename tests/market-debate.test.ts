@@ -229,6 +229,7 @@ test('两端界面统一显示收费与互授，普通论道文字不再承诺�
     assert.match(html, /80灵石/);
     assert.match(html, /互授丹方/);
     assert.match(html, /普通论道不发放丹药/);
+    assert.match(html, /普通交流、抄录丹方、互授与讲法共用十年一次机会/);
     assert.doesNotMatch(html, /无合适丹方时赠/);
     assert.ok(html.includes(`pay:${offer.id}`));
     assert.ok(html.includes(`swap:${offer.id}:${offer.exchange}`));
@@ -327,4 +328,11 @@ test('两入口在办理前明确显示额外到期供奉，不把抄录费冒�
   }
   s.mortal.member.dueAt = s.mortal.years + 2;
   assert.doesNotMatch(marketSocialContent(s, npc), /本次一年内到期供奉另计/);
+});
+
+test('纯交流后的冷却只说明可再交流，不再承诺未必存在的奖励', () => {
+  const { s, id } = offered('灵品');
+  assert.ok(debateMarket(s, id, s.mortal.sectMarket!.visit));
+  assert.match(debateReason(s, id, s.mortal.sectMarket!.visit), /10 年可再交流/);
+  assert.doesNotMatch(debateReason(s, id, s.mortal.sectMarket!.visit), /有所获/);
 });

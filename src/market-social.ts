@@ -126,7 +126,7 @@ export function debateReason(
   if (r) return r;
   const last = save.mortal.marketSocial!.lastDebateAt;
   if (last !== null && save.age < last + MARKET_SOCIAL_SETTINGS.debateInterval - 1e-9)
-    return `再历 ${Math.ceil((last + MARKET_SOCIAL_SETTINGS.debateInterval - save.age - 1e-9) * 10) / 10} 年可论道有所获`;
+    return `再历 ${Math.ceil((last + MARKET_SOCIAL_SETTINGS.debateInterval - save.age - 1e-9) * 10) / 10} 年可再交流`;
   if (choice !== undefined) {
     const quote = debateQuote(save, id, choice);
     if (!quote) return '丹方或互授条件已变化，请重新查看';

@@ -11,7 +11,7 @@ import {
 import { freshSave } from '../src/progress.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
-import { TEA_STORY_SETTINGS } from '../src/setting.ts';
+import { NPC_AI_SETTINGS, TEA_STORY_SETTINGS } from '../src/setting.ts';
 
 const input = {
   population: { seed: 12345, since: 15 },
@@ -184,6 +184,109 @@ test('推进铁匠故事不会清空父母闲谈或重复请求自动问候', as
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(requests, 2);
   assert.equal(reopened.log.children.length, 3);
+});
+
+test('故居只隐藏正文同句初始问候，AI与失败兜底保留，后续同句回复与镇民开场仍显示', async (t) => {
+  const originalDocument = globalThis.document;
+  const node = () => ({
+    children: [],
+    append(...children) {
+      this.children.push(...children);
+    },
+  });
+  globalThis.document = { createElement: node, createTextNode: (textContent) => ({ textContent }) };
+  t.after(() => {
+    closeNpcChat();
+    if (originalDocument) globalThis.document = originalDocument;
+    else delete globalThis.document;
+  });
+  const host = (storyGreeting?: string) => {
+    const log = {
+      ...node(),
+      hidden: false,
+      scrollHeight: 0,
+      scrollTop: 0,
+      get firstChild() {
+        return this.children[0] ?? null;
+      },
+      replaceChildren() {
+        this.children = [];
+      },
+      setAttribute() {},
+    };
+    const input = { value: '', disabled: false, focus() {} };
+    const button = { disabled: false };
+    const status = { textContent: '' };
+    const form = {
+      submit: null,
+      querySelector: (selector) => (selector === 'input' ? input : button),
+      addEventListener(_event, handler) {
+        this.submit = handler;
+      },
+    };
+    return {
+      isConnected: true,
+      dataset: { storyGreeting },
+      log,
+      input,
+      form,
+      querySelector: (selector) =>
+        ({ '.npc-chat-log': log, form, '.npc-chat-status': status })[selector],
+    };
+  };
+  const quote = '路远，记得添衣。';
+  const requests = [];
+  let greeting: string | null = quote;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    const request = JSON.parse(options.body);
+    requests.push(request);
+    return request.history.length === 0 && greeting === null
+      ? new Response(null, { status: 503 })
+      : Response.json({ reply: request.history.length === 0 ? greeting : quote });
+  });
+  for (const [index, initial] of [quote, null, '孩子，回来就好。'].entries()) {
+    greeting = initial;
+    const save = freshSave();
+    save.mortal.population = { seed: 700000 + index, since: 15 };
+    departHometown(save);
+    acceptHometownRoot(save);
+    const person = { id: 'mother', name: '母亲', generation: 0 };
+    const first = host(quote);
+    const count = requests.length;
+    mountNpcChat(first, save, person);
+    assert.equal(first.log.children.length, 0);
+    assert.equal(first.log.hidden, true);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(requests.length, count + 1);
+    assert.equal(first.log.children.length, initial && initial !== quote ? 1 : 0);
+    first.input.value = '家里可好？';
+    first.form.submit({ preventDefault() {} });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(first.log.hidden, false);
+    assert.equal(first.log.children.at(-1).children[1].textContent, quote);
+    assert.equal(requests.at(-1).history[0].content, initial ?? quote);
+    const reopened = host(quote);
+    const beforeReopen = requests.length;
+    mountNpcChat(reopened, save, person);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(requests.length, beforeReopen);
+    assert.equal(reopened.log.children.length, first.log.children.length);
+    for (let n = 0; n < NPC_AI_SETTINGS.maxHistoryMessages; n++) {
+      reopened.input.value = '路上平安。';
+      reopened.form.submit({ preventDefault() {} });
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(reopened.log.children.length, NPC_AI_SETTINGS.maxHistoryMessages);
+  }
+  greeting = null;
+  const save = freshSave();
+  save.mortal.population = { seed: 700003, since: 15 };
+  const town = host();
+  mountNpcChat(town, save, { id: 'herbs', name: '药铺先生', generation: 0 });
+  assert.equal(town.log.children.length, 1);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(town.log.children.length, 1);
+  assert.equal(town.log.hidden, false);
 });
 
 test('说书接受较长正文，断网、空值与超限仅返回空结果', async () => {

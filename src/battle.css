@@ -455,13 +455,24 @@
   margin: 24px 0;
 }
 .pause-build > span {
-  display: flex;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
+  min-width: 0;
   gap: 12px;
   background: #c0d6a908;
   padding: 12px;
   font-size: 12px;
   color: #dbdcb5;
+}
+.pause-build > :only-child {
+  grid-column: 1 / -1;
+}
+.pause-weapon-name {
+  min-width: 0;
+}
+.pause-build .element-affinity {
+  white-space: nowrap;
 }
 .pause-build .icon {
   width: 30px;
