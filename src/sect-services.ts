@@ -1,4 +1,4 @@
-import { curioAlchemy, curioTrainingYears } from './curio-data.ts';
+import { curioAlchemy, curioTrainingYears, curioTrainingCost, ownsCurio } from './curio-data.ts';
 import { treasure } from './data.ts';
 import {
   trainingCost,
@@ -8,7 +8,7 @@ import {
   type SaveData,
 } from './progress.ts';
 import { SECTS, MAX_MASTERY } from './mortal-data.ts';
-import { advanceMortal, studyPlan, masteryRewardPool } from './mortal.ts';
+import { advanceMortal, resolveActivity, studyPlan, masteryRewardPool } from './mortal.ts';
 import { MEDICINES, medicineFormula, medicineInfo, grantMedicine } from './medicine-data.ts';
 import { medicineCraftStones, medicineRecipePrice } from './medicine.ts';
 import { auctionItemName, auctionValue, releaseAuctionItem } from './auction-items.ts';
@@ -55,7 +55,7 @@ const gear = (save: SaveData, id: string): AuctionItem => ({
   quantity: 1,
   forgeLevel: save.forge[id] || 0,
 });
-const roundYears = (years: number) => Math.ceil(years * 10 - 1e-9) / 10;
+const roundYears = (years: number) => Math.max(0, Math.ceil(years * 10 - 1e-9) / 10);
 // 抵价只使用一次，以最少的连续阶数足额抵费；上限容纳不下就保留物品。
 function offeringSteps(credit: number, plans: { stones: number; years: number }[]) {
   const steps: typeof plans = [];
@@ -185,7 +185,10 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
           },
           false,
         );
-        return { stones: plan.stones, years: curioTrainingYears(save, plan.years * 1.2) };
+        return {
+          stones: curioTrainingCost(save, plan.stones),
+          years: curioTrainingYears(save, plan.years * 1.2),
+        };
       });
       const batch = offeringSteps(credit, plans);
       q.levels = batch.fits ? batch.steps.length : 0;
@@ -247,7 +250,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
       const batch = offeringSteps(
         credit,
         Array.from({ length: 20 - level }, (_, i) => ({
-          stones: trainingCost(level + i),
+          stones: trainingCost(level + i, save),
           years: curioTrainingYears(save, time * 1.5),
         })),
       );
@@ -260,8 +263,13 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     if (save.training[q.train] >= 20) q.reason = `${trainingName[q.train]}已修至二十阶`;
     q.detail += `根基至多二十阶${id === 'devour' ? '' : '，只提升一阶'}。`;
   }
+  // 献物按已打折的逐阶费用足额抵价；其他专长在自身报价后只减半一次灵石，玄铁不变。
+  if (q.study || q.train) {
+    if (id !== 'bone' && id !== 'devour') q.stones = curioTrainingCost(save, q.stones);
+    if (ownsCurio(save, 'heaven-house')) q.detail += '天机屋：不耗年岁，所需灵石减半。';
+  }
   // 年岁以十分之一年报价和结算，向上取整避免比明示时间更长。
-  q.years = Math.ceil(q.years * 10 - 1e-9) / 10;
+  q.years = roundYears(q.years);
   q.reserve = serviceDues(save, q.years);
   if (q.study) {
     const rewards = [5, 10].filter((n) => study.level < n && study.level + (q.levels ?? 1) >= n);
@@ -319,7 +327,7 @@ export function executeSectService(
     if (q.study) {
       for (const years of q.studyYears ?? [q.years]) {
         save.mortal.activity = { kind: 'study', remaining: years, total: years, sect: id };
-        advanceMortal(save, years * 60);
+        resolveActivity(save);
         if (save.mortal.activity) return undefined;
       }
     } else advanceMortal(save, q.years * 60);

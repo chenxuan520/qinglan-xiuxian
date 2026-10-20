@@ -6,15 +6,15 @@ import { buildChoiceScore } from './autoplay-build.ts';
 const favored = [
   'sword',
   'lightning',
-  'pulse',
+  'dragon',
   'fire',
-  'chain',
+  'skull',
   'pagoda',
   'cauldron',
   'umbrella',
   'scythe',
   'compass',
-  'coffin',
+  'nail',
 ];
 function choiceScore(c: Choice, g: Game) {
   if (c.type === 'evolve') return 100;
@@ -24,9 +24,7 @@ function choiceScore(c: Choice, g: Game) {
   }
   if (c.type === 'weapon')
     return (
-      (c.id === 'orbit' || favored.includes(c.id)
-        ? 15 - (c.id === 'orbit' && g.save.starter !== 'orbit' && c.level === 1 ? 2.5 : 0)
-        : 10) +
+      (favored.includes(c.id) ? 15 : 10) +
       (c.level > 1 ? 8 : 2) +
       c.level +
       (c.level === 1 &&

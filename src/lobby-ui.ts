@@ -111,7 +111,7 @@ export function lobbyView(
       }
       ${spiritRootSummary(save, true)}
       ${pendingRun ? `<div class="resume-banner"><div><span class="status-dot"></span>尚有一段仙缘未了<small>${pendingRun.encounterName} · ${formatTime(pendingRun.time)} · ${pathInfo(pendingRun.path).name} · 局内 ${pendingRun.level} 级</small></div><button class="secondary-button" data-action="restore">继续上次历练 ${smallIcon('arrow')}</button></div>` : ''}
-      ${homeTownEntrance()}
+      ${homeTownEntrance(save)}
       <section class="expedition" aria-label="选择秘境">
         <div class="journey-selection"><div class="journey-destination" aria-live="polite"><small>第${stage.chapter}境 · ${save.completed.includes(selectedStage) ? '故地重游' : '此行将至'}</small><h3>${stage.name}</h3><p>${stage.description}</p><div class="journey-destination-facts"><span>${selectedStage === FINAL_TRIAL_STAGE ? `仙尊最早 ${formatTime(TRIAL_BOSS_TIMES.at(-1)!)}` : `历练 ${stage.minutes} 分钟`}</span><span>每分钟 ${STAGE_YEARS_PER_MINUTE[selectedStage]} 年</span><span>妖王 · ${stage.boss}</span></div></div><div class="journey-depart"><div class="loadout-preview"><span>本命法宝</span><button data-action="arsenal">${icon(save.starter, treasure(save.starter).color)}${treasure(save.starter).name}${smallIcon('arrow')}</button></div><button class="primary-button embark" data-action="start" ${assetsReady ? '' : 'disabled'}><span>${assetsReady ? (completed ? '再入山河' : '踏入秘境') : '秘境凝聚中…'}</span>${smallIcon('arrow')}</button><small>${pathInfo(save.path).name} · ${DIFFICULTIES[difficulty].name}</small></div></div>
         <div class="path-selection"><span class="field-label">修行之道 · 本局法宝与功法路线</span><div class="path-grid" role="group" aria-label="选择修行路线">${CULTIVATION_PATHS.map((p) => `<button data-action="path" data-id="${p.id}" class="path-card ${save.path === p.id ? 'active' : ''}" aria-pressed="${save.path === p.id}" ${save.mortal.member && p.id !== save.path ? 'disabled' : ''} style="--path-color:${p.color}"><strong>${p.name}</strong><span>${p.desc}</span></button>`).join('')}</div><small>正道、魔道各 18 件法宝与 8 种功法，兼修可混搭。${save.mortal.member ? '宗门在籍：仅可修习本门路线，退宗后解锁其他路线。' : '路线仅影响新历练，续局保留原路线。'}</small></div>
@@ -132,7 +132,7 @@ export function guidePanel(
   return [
     '修行指南',
     '道法有迹',
-    `<div class="guide-tabs" role="group" aria-label="说明分类">${tabs.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideTab === 'mortal' ? '<h3 class="guide-subheading">青岚故居</h3><p class="panel-note">初入此世可选「跳过开场」直接看命盘，或选「入此山河」从故居告别、前往渡口，离乡后再看命盘；两种方式不影响灵根和物资，离乡途中不计年岁。之后入镇都从故居门前出发。父母会随年岁老去，与他们交谈没有任务或奖励，家事和家书可在履历与缘簿中重读。轮回默认直接看命盘；想从头再走一遍，可在洞府轮回确认时勾选「重走十五岁那一程」，同样会清空本世进度。真仙终章则由承缘少年接续，可选赠一物，也可选择先走一程故乡。首页「重温序章」只重看序章文字，不影响存档。</p>' : ''}${content(guideTab)}<button class="primary-button guide-close" data-action="close">${inGame ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+    `<div class="guide-tabs" role="group" aria-label="说明分类">${tabs.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${content(guideTab)}<button class="primary-button guide-close" data-action="close">${inGame ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
   ];
 }
 

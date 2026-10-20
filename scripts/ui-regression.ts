@@ -6,7 +6,12 @@ import { freshSave, readSave, IMMORTAL_CULTIVATION, type SaveData } from '../src
 import { Game } from '../src/game.ts';
 import { formatTime, TRIAL_BOSS_TIMES } from '../src/data.ts';
 import { TOUR_STEPS } from '../src/interface-tour-model.ts';
-import { CURIO_IDS } from '../src/curio-data.ts';
+import { CURIO_IDS, CURIO_NAMES } from '../src/curio-data.ts';
+import { MEDICINES } from '../src/medicine-data.ts';
+import { medicineCraftStones } from '../src/medicine.ts';
+import { joinSect } from '../src/mortal.ts';
+import { spiritPower } from '../src/spirit-power.ts';
+import { formatNumber } from '../src/number-format.ts';
 import { JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../src/setting.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 
@@ -221,6 +226,12 @@ async function checkJourneyModuleRecovery() {
   // 本用例测冷模块断网后的恢复与真实PNG，不依赖在线AI；仅评语请求以503走真实本地兜底。
   // 在线AI仍由独立测试及发布后实测覆盖，其他请求和浏览器错误检查保持原样。
   const appraisalFallbackInit = `(() => {
+      window.journeyPowerDraws = [];
+      const originalDraw = CanvasRenderingContext2D.prototype.fillText;
+      CanvasRenderingContext2D.prototype.fillText = function(value,x,y,...args) {
+        if (String(value).startsWith('此世灵威')) window.journeyPowerDraws.push({value,x,y,width:this.measureText(value).width,font:this.font});
+        return originalDraw.call(this,value,x,y,...args);
+      };
       const original = window.fetch.bind(window);
       const appraisalUrl = ${JSON.stringify(new URL(JOURNEY_APPRAISAL_SETTINGS.path, NPC_AI_SETTINGS.baseUrl).href)};
       window.journeyAppraisalFallbackCalls = 0;
@@ -274,6 +285,15 @@ async function checkJourneyModuleRecovery() {
       "() => { const i = document.querySelector('.journey-card-preview img'); return [i.naturalWidth,i.naturalHeight,i.src.startsWith('blob:')]; }",
     ),
     [1080, 1740, true],
+  );
+  const powerDraws = await evaluate('()=>window.journeyPowerDraws');
+  assert.equal(powerDraws.length, 1, '真实Canvas必须绘制一行灵威');
+  assert.equal(powerDraws[0].value, `此世灵威 ${formatNumber(spiritPower(save).score)}`);
+  assert.equal(powerDraws[0].x, 728);
+  assert.equal(powerDraws[0].y, 1014);
+  assert.ok(
+    powerDraws[0].width <= 270 && powerDraws[0].font.includes('24px'),
+    '小号灵威必须完整放在本命炼器信息下方',
   );
   const appraisalFallbackCalls = await evaluate('() => window.journeyAppraisalFallbackCalls');
   assert.ok(appraisalFallbackCalls >= 1, '冷模块恢复必须实际拦截评语请求并触发本地兜底');
@@ -383,12 +403,351 @@ async function catalogHeader() {
   })`);
 }
 
+async function walkScene(selector: string, x: number, y: number) {
+  await evaluate(`async () => {
+    const host = document.querySelector(${JSON.stringify(selector)});
+    host.focus({preventScroll:true});
+    for (let attempt=0; attempt<1100; attempt++) {
+      if (!host.isConnected) throw Error('行走期间场景意外切换');
+      const px=Number(host.dataset.x), py=Number(host.dataset.y);
+      if (Math.abs(px-${x})<8 && Math.abs(py-${y})<8) return true;
+      const key=Math.abs(px-${x})>=8 ? (px<${x}?'d':'a') : (py<${y}?'s':'w');
+      document.body.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true}));
+      await new Promise(resolve=>setTimeout(resolve,30));
+      document.body.dispatchEvent(new KeyboardEvent('keyup',{key,bubbles:true}));
+    }
+    throw Error('道路不可达');
+  }`);
+}
+
+async function clickScene(selector: string, fraction = 0.5) {
+  const point = await evaluate(`() => {
+    const rect=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+    return {x:rect.left+rect.width/2,y:rect.top+rect.height*${fraction},width:innerWidth,height:innerHeight};
+  }`);
+  assert.ok(
+    point.x > 0 && point.x < point.width && point.y > 0 && point.y < point.height,
+    '实际点选目标必须可见',
+  );
+  await browser.call('click_at', { pageId, x: point.x, y: point.y });
+}
+
+async function checkSettlementLinks(name: string, viewport: string) {
+  const save = fixture();
+  save.cultivation = 352;
+  save.age = 30;
+  save.stones = 10000;
+  save.unlocked = 1;
+  save.medicine.shop = { ids: ['huanglong', 'jinsui', 'yangjing'], bought: {}, refreshAt: 40 };
+  save.medicine.recipes = ['heqi'];
+  for (const medicine of MEDICINES.filter((m) => m.tier === '凡品'))
+    save.medicine.bag[medicine.id] = 30;
+  // 本项只核对真实场景交互，闲谈接口明确使用503夹具，不依赖外部AI可用性。
+  const npcUrl = `${NPC_AI_SETTINGS.baseUrl}/chat`;
+  await open(
+    viewport,
+    save,
+    `{
+    // 固定随机抽取，刻意让新批撞回旧三味，验证跨批保底换货。
+    Math.random=()=>0;
+    const original=window.fetch.bind(window);window.__uiNpcMock=0;
+    window.fetch=(input,init)=>{
+      if(new URL(typeof input==='string'?input:input.url,location.href).href===${JSON.stringify(npcUrl)}){
+        window.__uiNpcMock++;return Promise.resolve(new Response('{}',{status:503,headers:{'Content-Type':'application/json'}}));
+      }
+      return original(input,init);
+    };
+  }`,
+  );
+  checkpoint = `${name}-town-links`;
+  await click('[data-action=mortal-enter]');
+  await click('[data-action=town-enter]');
+  await wait(
+    '()=>!!document.querySelector("#town-view[data-x]")&&!document.querySelector(".town-loading")',
+  );
+  await clickScene('[data-parent=father] .town-npc-art');
+  await wait('()=>!!document.querySelector(".npc-dialogue[data-story-greeting]")');
+  await check(`${name}-click-father`);
+  await click('[data-action=close]');
+  await walkScene('#town-view', 850, 600);
+  await walkScene('#town-view', 850, 770);
+  await clickScene('[data-town-place=herbs]', 0.85);
+  await wait('()=>!!document.querySelector("[data-action=medicine-shop]")');
+  assert.ok(
+    await evaluate(
+      '()=>Math.hypot(Number(document.querySelector("#town-view").dataset.x)-1120,Number(document.querySelector("#town-view").dataset.y)-750)<=115',
+    ),
+    '必须走近被点选商铺才交互',
+  );
+  await check(`${name}-click-town-shop`);
+  await click('[data-action=medicine-shop]');
+  for (let i = 0; i < 3; i++) await click('[data-action=medicine-buy][data-id=huanglong]');
+  assert.equal((await saved()).medicine.shop!.bought!.huanglong, 3);
+  assert.ok(
+    await evaluate(
+      '()=>document.querySelector("[data-action=medicine-buy][data-id=huanglong]").disabled',
+    ),
+  );
+  await check(`${name}-shop-sold-out`);
+  await click('[data-action=medicine-view][data-id=craft]');
+  const beforeBrew = await saved();
+  await click('[data-action=medicine-craft][data-id=heqi]');
+  assert.ok(Math.abs((await saved()).age - beforeBrew.age - 10) < 1e-9, '炼丹实际消耗十年');
+  await click('[data-action=medicine-view][data-id=shop]');
+  const freshShop = (await saved()).medicine.shop!;
+  assert.deepEqual(freshShop.bought, {});
+  assert.ok(
+    freshShop.ids.some((id) => !save.medicine.shop!.ids.includes(id)),
+    '撞回旧三味也须至少换一种',
+  );
+  assert.ok(
+    await evaluate(
+      '()=>[...document.querySelectorAll("[data-action=medicine-buy]")].every(e=>!e.disabled)',
+    ),
+  );
+  await check(`${name}-shop-ten-year-refresh`);
+  const travelStones =
+    save.stones -
+    MEDICINES.find((m) => m.id === 'huanglong')!.price * 3 -
+    medicineCraftStones('heqi');
+  await click('[data-action=close]');
+  await walkScene('#town-view', 1740, 770);
+  await walkScene('#town-view', 1740, 440);
+  await clickScene('[data-passage=town]');
+  await wait(
+    '()=>!!document.querySelector("#sect-market-view[data-initialized]")&&!document.querySelector(".town-loading")',
+  );
+  assert.ok(
+    await evaluate(
+      '()=>Math.hypot(Number(document.querySelector("#sect-market-view").dataset.x)-800,Number(document.querySelector("#sect-market-view").dataset.y)-1210)<1',
+    ),
+  );
+  await check(`${name}-walk-to-market`);
+  assert.equal(
+    await evaluate('()=>!!document.querySelector(".market-venue-sign,.sect-market-auction-sign")'),
+    false,
+    '地图只保留建筑名称，不另放说明小牌子',
+  );
+  const batch = (await saved()).mortal.sectMarket!.visit;
+  await walkScene('#sect-market-view', 800, 900);
+  const targetName = await evaluate(
+    '()=>document.querySelector("[data-market-npc=market-alchemist] .sect-market-npc-name").firstChild.textContent',
+  );
+  await clickScene('[data-market-npc=market-alchemist] .sect-market-npc-art');
+  await wait('()=>!!document.querySelector("#sect-market-trade")');
+  assert.ok(
+    await evaluate(
+      `()=>document.querySelector('[role=dialog]').innerText.includes(${JSON.stringify(targetName)})`,
+    ),
+    '只能打开被点选的修士',
+  );
+  await check(`${name}-click-market-npc`);
+  await click('[data-action=close]');
+  await walkScene('#sect-market-view', 1000, 750);
+  await clickScene('[data-market-place=auction] .town-building-caption');
+  await wait('()=>!!document.querySelector(".auction-grid")');
+  const names: string[] = await evaluate(
+    '()=>[...document.querySelectorAll(".auction-card h3")].map(e=>e.innerText)',
+  );
+  assert.equal(names.length, 8);
+  assert.equal(new Set(names).size, 8, '同一会场本批药物与法宝不能重名');
+  await check(`${name}-auction-variety`);
+  await click('[data-action=auction-view][data-id=sell]');
+  assert.ok(
+    await evaluate(`()=>{
+    const a=document.querySelector('.auction-seller > button').getBoundingClientRect();
+    const b=document.querySelector('.auction-return').getBoundingClientRect();
+    return Math.abs(a.width-b.width)<1&&Math.abs(a.height-b.height)<1&&b.height>=44&&b.top-a.bottom>=12;
+  }`),
+    '回到坊市与出售按钮等宽等高，且保留间距',
+  );
+  await check(`${name}-auction-return-button`);
+  await click('[data-action=close]');
+  await walkScene('#sect-market-view', 1000, 750);
+  await walkScene('#sect-market-view', 400, 750);
+  await walkScene('#sect-market-view', 400, 650);
+  await clickScene('[data-market-place=office] .town-building-caption');
+  await wait('()=>!!document.querySelector("#market-venue-content[data-venue=office]")');
+  assert.ok(
+    await evaluate(
+      '()=>{const p=document.querySelector("#market-venue-content > p"),s=getComputedStyle(p);return s.marginTop==="20px"&&s.marginBottom==="20px"&&Number.parseFloat(s.lineHeight)===Number.parseFloat(s.fontSize)*2;}',
+    ),
+    '院落说明须有真实段间距与两倍行高',
+  );
+  await check(`${name}-office-spacing`);
+  await click('[data-action=close]');
+  assert.equal(
+    await evaluate('()=>!!document.querySelector(".market-active-label")'),
+    false,
+    '修士字牌保留在修士节点，不创建跟随玩家的副本',
+  );
+  await walkScene('#sect-market-view', 800, 1210);
+  await clickScene('[data-passage=market]');
+  await wait(
+    '()=>!!document.querySelector("#town-view[data-x]")&&!document.querySelector(".town-loading")',
+  );
+  assert.ok(
+    await evaluate(
+      '()=>Math.hypot(Number(document.querySelector("#town-view").dataset.x)-1740,Number(document.querySelector("#town-view").dataset.y)-245)<1',
+    ),
+  );
+  await check(`${name}-walk-back-town`);
+  await click('[data-action=town-exit]');
+  await click('[data-action=home]');
+  assert.match(
+    await evaluate('()=>document.querySelector(".home-town-entry").innerText'),
+    /距上次进入/,
+  );
+  assert.equal((await saved()).mortal.sectMarket!.visit, batch, '未满一年不能沿路重抽客货');
+  assert.equal((await saved()).stones, travelStones, '走动与查看不再自动交易扣费');
+  assert.ok(await evaluate('()=>window.__uiNpcMock>=1'), '明确覆盖闲谈故障夹具');
+  await finishPage();
+}
+
+async function checkCurioSeeking(name: string, viewport: string) {
+  for (const [kind, seed, attempts, found] of [
+    ['third-miss', 0, 2, false],
+    ['first-find', 5, 0, true],
+    ['capped-miss', 166, 5, false],
+  ] as const) {
+    const save = fixture();
+    save.cultivation = IMMORTAL_CULTIVATION;
+    save.completed = [0, 1, 2, 3, 4, 5, 6];
+    save.unlocked = 6;
+    save.age = 30;
+    save.stones = 1000000;
+    save.curios.seed = seed;
+    save.curios.seeking['soul-wood'] = attempts;
+    assert.ok(joinSect(save, 'power'));
+    await open(viewport, save);
+    checkpoint = `${name}-curio-${kind}`;
+    await click('[data-action=mortal-enter]');
+    await click('[data-action=mortal-tab][data-id=sects]');
+    await click('[data-action=sect-service-open]');
+    await wait('()=>!!document.querySelector(".curio-seeking")');
+    await click('.curio-seeking > summary');
+    await click('[data-action=sect-service-curio][data-id=soul-wood]');
+    const after = await saved();
+    assert.ok(Math.abs(after.age - save.age - 10) < 1e-9, '每次真实消耗十年');
+    assert.equal(save.stones - after.stones, 10800, '失败和成功均收原单次费用');
+    assert.equal(after.curios.seeking['soul-wood'], attempts + 1);
+    assert.equal(after.curios.bag['soul-wood'] ?? 0, found ? 1 : 0);
+    const result = await evaluate('()=>document.querySelector("#sect-service-result").textContent');
+    assert.match(result, found ? /已收入行囊/ : /此行未能寻得/);
+    if (kind === 'capped-miss') assert.match(result, /机会仍为70%/);
+    await click('[data-action=close]');
+    await click('[data-action=home]');
+    await browser.call('navigate_page', { pageId, type: 'reload' });
+    await wait('()=>!!document.querySelector("[data-action=mortal-enter]")');
+    assert.deepEqual((await saved()).curios, after.curios, '三次失败不能在读档时变成已获得');
+    await click('[data-action=mortal-enter]');
+    await click('[data-action=mortal-tab][data-id=sects]');
+    await click('[data-action=sect-service-open]');
+    await wait('()=>!!document.querySelector(".curio-seeking")');
+    await click('.curio-seeking > summary');
+    const state = await evaluate(`()=>{
+      const b=document.querySelector('[data-action=sect-service-curio][data-id=soul-wood]');
+      if(b)b.scrollIntoView({block:'center'});
+      return b?{disabled:b.disabled,text:b.closest('.curio-card').innerText}:null;
+    }`);
+    if (found) assert.equal(state, null, '已获得后撤掉同物委托');
+    else {
+      assert.ok(state?.disabled, '十年办事冷却不可被重开和刷新清除');
+      assert.ok(state.text.includes(`已寻访 ${attempts + 1} 次`));
+      assert.ok(state.text.includes(`本次机会 ${Math.min(70, 30 + attempts * 10)}%`));
+    }
+    await check(checkpoint);
+    await finishPage();
+  }
+}
+
+async function checkHeavenHouse(name: string, viewport: string) {
+  const save = fixture();
+  save.cultivation = IMMORTAL_CULTIVATION;
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  save.unlocked = 6;
+  save.age = 30;
+  save.stones = 1000000;
+  save.training = { vitality: 19, power: 19, speed: 19 };
+  save.curios.bag['heaven-house'] = 1;
+  save.curios.acquired.push('heaven-house');
+  assert.ok(joinSect(save, 'haste'));
+  save.mortal.mastery.haste = 4;
+  await open(viewport, save);
+  checkpoint = `${name}-heaven-house-training`;
+  await click('[data-action=cultivation]');
+  for (const kind of ['vitality', 'power', 'speed']) {
+    const before = await saved();
+    await click(`[data-action=train][data-id=${kind}]`);
+    const after = await saved();
+    assert.equal(after.stones, before.stones - 1179, '二十阶按2358灵石半价结算');
+    assert.equal(after.age, before.age, '天机屋根基修习零年岁');
+    assert.equal(after.training[kind as keyof SaveData['training']], 20);
+    assert.ok(
+      await evaluate(`()=>document.querySelector('[data-action=train][data-id=${kind}]').disabled`),
+    );
+  }
+  await check(checkpoint);
+  await click('[data-action=close]');
+  await click('[data-action=mortal-enter]');
+  await click('[data-action=mortal-tab][data-id=sects]');
+  const direct = await saved();
+  await click('[data-action=mortal-activity][data-id=study]');
+  const studied = await saved();
+  assert.equal(studied.age, direct.age);
+  assert.equal(direct.stones - studied.stones, 55, '直接精研只收110的一半');
+  assert.equal(studied.mortal.mastery.haste, 5);
+  assert.equal(studied.mortal.activity, null);
+  assert.equal(
+    Object.values(studied.medicine.bag).reduce((a, b) => a + b, 0) -
+      Object.values(direct.medicine.bag).reduce((a, b) => a + b, 0),
+    1,
+    '五阶仍赐一颗灵品',
+  );
+  await click('[data-action=sect-service-open]');
+  await wait('()=>!!document.querySelector("[data-action=sect-service-act]")');
+  await click('[data-action=sect-service-act]');
+  const specialized = await saved();
+  assert.equal(specialized.age, studied.age);
+  assert.equal(studied.stones - specialized.stones, 98, '专长195灵石只减半一次，向上取整');
+  assert.equal(specialized.mortal.mastery.haste, 6);
+  assert.equal(specialized.mortal.activity, null);
+  assert.ok(
+    await evaluate('()=>document.querySelector("[data-action=sect-service-act]").disabled'),
+    '零年专长仍占十年额度',
+  );
+  await check(`${name}-heaven-house-study`);
+  await click('[data-action=close]');
+  await click('[data-action=home]');
+  await browser.call('navigate_page', { pageId, type: 'reload' });
+  await wait('()=>!!document.querySelector("[data-action=mortal-enter]")');
+  const reloaded = await saved();
+  assert.deepEqual(reloaded.training, specialized.training);
+  assert.equal(reloaded.mortal.mastery.haste, 6);
+  assert.equal(reloaded.mortal.activity, null);
+  await finishPage();
+}
+
 async function checkHomePanels(name: string) {
   for (const panel of ['cultivation', 'arsenal', 'medicine', 'bestiary', 'chronicle', 'about']) {
     checkpoint = `${name}-${panel}`;
     await click(`[data-action="${panel}"]`);
     await wait(`() => !!document.querySelector('.panel[data-panel="${panel}"]')`);
     await check(checkpoint);
+    if (panel === 'cultivation') {
+      assert.equal(
+        await evaluate(
+          '()=>!!document.querySelector(".cultivation-summary,details[data-disclosure=cultivation]")',
+        ),
+        false,
+      );
+      assert.ok(
+        await evaluate(
+          '()=>{const panel=document.querySelector(".panel"),nodes=[...panel.children];return nodes.indexOf(panel.querySelector(".cultivation-overview"))<nodes.indexOf(panel.querySelector(".spirit-root-summary"))&&nodes.indexOf(panel.querySelector(".realm-road"))<nodes.indexOf(panel.querySelector(".training-grid"));}',
+        ),
+        '洞府沿用完整境界展示、灵根寿元、境界路标、根基修炼顺序',
+      );
+    }
     if (panel === 'arsenal') {
       await click('[data-action="school-filter"][data-id="demonic"]');
       assert.equal(
@@ -522,6 +881,36 @@ async function checkHomePanels(name: string) {
   }
 }
 
+async function checkItemHelp(name: string) {
+  const before = await saved();
+  await click('[data-action=guide]');
+  await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=medicine]")');
+  await click('[data-action=guide-tab][data-id=medicine]');
+  const noteStyle = `e => { const s=getComputedStyle(e);return [s.fontSize,s.color,s.lineHeight,s.margin]; }`;
+  const reference = await evaluate(
+    `() => (${noteStyle})(document.querySelector('.panel p.panel-note'))`,
+  );
+  await click('[data-action=guide-tab][data-id=items]');
+  const help = await evaluate(`() => {
+    const panel=document.querySelector('.panel'), rows=[...panel.querySelectorAll('.item-guide-row')];
+    const section=[...panel.querySelectorAll('.guide-subheading')].find(e=>e.textContent==='随身奇物');
+    const style=e=>{const s=getComputedStyle(e);return [s.fontSize,s.color,s.lineHeight,s.margin];};
+    return { note:style(section.nextElementSibling), names:rows.slice(0,9).map(e=>e.querySelector('h3').textContent),
+      cards:!!panel.querySelector('.curio-grid,.curio-card'), count:rows.length,
+      styles:[rows[0],rows[9]].map(e=>[style(e),style(e.querySelector('h3')),style(e.querySelector('p'))]) };
+  }`);
+  assert.deepEqual(help.note, reference, '奇物正文与其他帮助共用字号、颜色、行高和段距');
+  assert.equal(help.cards, false, '帮助不混入收藏卡片');
+  assert.deepEqual(help.names, CURIO_NAMES);
+  assert.equal(help.count, 15, '九奇物与六类拾取物均有完整说明');
+  assert.deepEqual(help.styles[0], help.styles[1], '奇物与其他道具说明共用排版');
+  await check(`${name}-item-help`);
+  await click('[data-action=guide-tab][data-id=builds]');
+  await click('[data-action=guide-tab][data-id=items]');
+  await click('.guide-close');
+  assert.deepEqual(await saved(), before, '查看与切换说明不改变存档');
+}
+
 async function checkTourScrollRestore(name: string) {
   const cases = [
     { top: 0, complete: false },
@@ -649,6 +1038,7 @@ try {
     );
     await click('[data-action=close]');
     await checkHomePanels(name);
+    await checkItemHelp(name);
     await checkTourScrollRestore(name);
     await click('[data-action=sound]');
     await check(`${name}-volume`);
@@ -816,6 +1206,9 @@ try {
     }
     await finishPage();
     await checkDebugCurios(name, viewport);
+    if (name === 'desktop' || name === 'phone') await checkSettlementLinks(name, viewport);
+    await checkCurioSeeking(name, viewport);
+    await checkHeavenHouse(name, viewport);
   }
   await writeFile(
     resolve(output, 'report.json'),

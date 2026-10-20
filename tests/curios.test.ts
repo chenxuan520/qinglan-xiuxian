@@ -11,6 +11,7 @@ import {
   prepareCurioConsignment,
   curioCycle,
   curioRoll,
+  acquiredCurio,
 } from '../src/curio-data.ts';
 import { Game } from '../src/game.ts';
 import {
@@ -19,6 +20,8 @@ import {
   SAVE_SCHEMA,
   realmCost,
   trainingYears,
+  trainingCost,
+  train,
   retreatPlan,
   forgeCost,
   forge,
@@ -29,7 +32,8 @@ import {
   applyBirthInheritance,
 } from '../src/progress.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
-import { studyPlan, joinSect } from '../src/mortal.ts';
+import { studyPlan, joinSect, leaveSect, startActivity } from '../src/mortal.ts';
+import { SECTS } from '../src/mortal-data.ts';
 import { medicineFormula, MEDICINES } from '../src/medicine-data.ts';
 import { craftMedicine, medicineCraftReason } from '../src/medicine.ts';
 import { prepareAuction } from '../src/auction.ts';
@@ -45,6 +49,7 @@ import {
 } from '../src/market-social.ts';
 import { powerBreakdown } from '../src/power-breakdown.ts';
 import { inheritanceContent } from '../src/inheritance-ui.ts';
+import { SPIRIT_ROOTS } from '../src/data.ts';
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 function ready() {
@@ -143,28 +148,158 @@ test('掌天瓶两种丹炉均一份原料三枚成丹，十年变一年、百�
   near(s.age - age, 0.4);
   assert.equal(s.medicine.bag[m.id], 3);
 });
-test('天机屋逐阶时间减半且至少一年；宗门加速和献物批量不绕过下限', () => {
+test('天机屋三项根基对全部灵根零年岁、逐阶灵石减半；出售即恢复原费用与年岁', () => {
+  for (const root of SPIRIT_ROOTS) {
+    const s = ready();
+    s.spiritRoot = root.id;
+    grantCurio(s, 'heaven-house');
+    for (const kind of ['vitality', 'power', 'speed'] as const) {
+      for (let level = 0; level < 20; level++) {
+        const age = s.age,
+          stones = s.stones;
+        assert.equal(trainingYears(s), 0);
+        assert.equal(trainingCost(level, s), Math.ceil(trainingCost(level) / 2));
+        assert.ok(train(s, kind));
+        assert.equal(s.training[kind], level + 1);
+        assert.equal(s.age, age);
+        assert.equal(stones - s.stones, Math.ceil(trainingCost(level) / 2));
+      }
+      const full = structuredClone(s);
+      assert.equal(train(s, kind), false);
+      assert.deepEqual(s, full);
+    }
+    s.curios.bag['heaven-house'] = 0;
+    assert.ok(trainingYears(s) > 0);
+    assert.equal(trainingCost(0, s), trainingCost(0));
+  }
+});
+test('天机屋直接精研零年岁、灵石减半，五阶十阶赐丹各一次且不残留活动', () => {
   const s = ready();
+  s.cultivation = IMMORTAL_CULTIVATION;
+  s.completed = [6];
   grantCurio(s, 'heaven-house');
-  assert.equal(trainingYears(s), 1);
-  s.spiritRoot = 'none';
-  s.rootElements = [];
-  assert.equal(trainingYears(s), 2.5);
   assert.ok(joinSect(s, 'haste'));
-  const plain = structuredClone(s);
-  plain.curios.bag = {};
-  near(studyPlan(s).years, Math.max(1, Math.ceil(studyPlan(plain).years * 5 - 1e-9) / 10));
-  s.spiritRoot = 'heaven';
-  s.rootElements = ['metal'];
-  assert.ok(sectServiceQuote(s, 'study').years >= 1);
-  const t = ready();
-  assert.ok(joinSect(t, 'devour'));
-  grantCurio(t, 'heaven-house');
-  t.medicine.bag.huanglong = 20;
-  const q = sectServiceQuote(t, 'huanglong');
-  if (!q.reason) {
-    assert.ok(q.years >= (q.levels ?? 1));
-    assert.ok(executeSectService(t, 'huanglong', sectServiceStamp(t)));
+  const initialMedicines = Object.values(s.medicine.bag).reduce((a, b) => a + b, 0);
+  for (let level = 0; level < 10; level++) {
+    const age = s.age,
+      years = s.mortal.years,
+      stones = s.stones;
+    const q = studyPlan(s);
+    assert.equal(q.years, 0);
+    assert.equal(q.stones, Math.ceil(studyPlan(s, false).stones / 2));
+    assert.ok(startActivity(s, 'study', () => 0));
+    assert.equal(s.age, age);
+    assert.equal(s.mortal.years, years);
+    assert.equal(stones - s.stones, q.stones);
+    assert.equal(s.mortal.mastery.haste, level + 1);
+    assert.equal(s.mortal.activity, null);
+    assert.deepEqual(importSave(exportSave(s)).save.mortal, s.mortal);
+  }
+  assert.equal(Object.values(s.medicine.bag).reduce((a, b) => a + b, 0) - initialMedicines, 2);
+  const full = structuredClone(s);
+  assert.equal(startActivity(s, 'study'), false);
+  assert.deepEqual(s, full);
+});
+test('天机屋宗门精研与根基专长零年岁、只折一次灵石，献物按折后逐阶费用抵价', () => {
+  for (const sect of [
+    'haste',
+    'spirit',
+    'bone',
+    'guard',
+    'blood',
+    'forbidden',
+    'magnet',
+    'soul',
+    'devour',
+  ]) {
+    const s = ready();
+    s.cultivation = IMMORTAL_CULTIVATION;
+    s.completed = [6];
+    s.artifacts.push('dragon');
+    s.medicine.bag.huanglong = 20;
+    assert.ok(joinSect(s, sect));
+    const choice =
+      sect === 'bone'
+        ? 'dragon'
+        : sect === 'devour'
+          ? 'huanglong'
+          : ['haste', 'spirit'].includes(sect)
+            ? 'study'
+            : ['magnet', 'forbidden'].includes(sect)
+              ? 'power'
+              : sect === 'soul'
+                ? 'speed'
+                : 'vitality';
+    const plain = sectServiceQuote(s, choice);
+    grantCurio(s, 'heaven-house');
+    const q = sectServiceQuote(s, choice);
+    assert.equal(q.reason, '', sect);
+    assert.equal(q.years, 0, sect);
+    assert.equal(q.iron, plain.iron, sect);
+    if (!['bone', 'devour'].includes(sect))
+      assert.equal(q.stones, Math.ceil(plain.stones / 2), sect);
+    else assert.ok((q.levels ?? 1) >= (plain.levels ?? 1), '折后抵价应足额容纳物品价值');
+    const age = s.age,
+      years = s.mortal.years,
+      stones = s.stones;
+    assert.ok(executeSectService(s, choice, sectServiceStamp(s)), sect);
+    assert.equal(s.age, age);
+    assert.equal(s.mortal.years, years);
+    assert.equal(stones - s.stones, q.stones);
+    assert.equal(s.mortal.activity, null);
+    if (q.study) assert.equal(s.mortal.mastery[sect], q.levels ?? 1);
+    if (q.train) assert.equal(s.training[q.train], q.levels ?? 1);
+    assert.match(
+      sectServiceQuote(s, choice).reason,
+      /十年|暂无/,
+      '零年岁不能跳过专长冷却或找回已献物',
+    );
+    assert.equal(readSave(JSON.stringify(s)).status, 'ok');
+  }
+});
+test('天机屋不允许退宗重领奖励或借零年岁刷新交易；付费入宗赠丹再售不能循环获利', () => {
+  for (const sect of SECTS) {
+    const s = ready();
+    s.cultivation = IMMORTAL_CULTIVATION;
+    s.completed = [6];
+    grantCurio(s, 'heaven-house');
+    enterNextMarketBatch(s);
+    prepareAuction(s);
+    assert.ok(joinSect(s, sect.id, undefined, () => 0));
+    const batch = s.mortal.sectMarket!.visit;
+    const age = s.age;
+    for (let level = 0; level < 10; level++) assert.ok(startActivity(s, 'study', () => 0));
+    assert.equal(s.age, age);
+    assert.equal(s.mortal.sectMarket!.visit, batch);
+    const afterMastery = Object.values(s.medicine.bag).reduce((a, b) => a + b, 0);
+    for (let cycle = 0; cycle < 3; cycle++) {
+      assert.ok(leaveSect(s));
+      const balance = s.stones;
+      assert.ok(joinSect(s, sect.id, undefined, () => 0));
+      const settled = structuredClone(s);
+      assert.equal(
+        startActivity(s, 'study', () => 0),
+        false,
+      );
+      assert.deepEqual(s, settled, '满阶重入不能再扣精研费或再赐五/十阶丹');
+      assert.equal(
+        Object.values(s.medicine.bag).reduce((a, b) => a + b, 0),
+        afterMastery + 1,
+      );
+      const sold = sellAuction(
+        s,
+        {
+          kind: 'medicine',
+          id: MEDICINES.find((m) => m.tier === '凡品')!.id,
+          quantity: 1,
+          forgeLevel: 0,
+        },
+        1,
+        s.mortal.sectMarket!.visit,
+      )!;
+      assert.equal(sold.outcome, 'sold');
+      assert.ok(s.stones < balance, '付入门礼再售赠丹应净亏损');
+    }
   }
 });
 test('养魂木闭关修为增三成，金阙玉书只降炼器灵石；灵威列出奇物的实际贡献', () => {
@@ -236,18 +371,26 @@ test('奇物寄拍不随进出换货或重开结拍，旧周期报价不能购�
   assert.equal(buyAuction(initial, AUCTION_CURIO_LOT, 50000, 2, false, cycle), undefined);
   assert.equal(JSON.stringify(initial), unchanged);
 });
-test('寻访三次到账、十年额度共享；卖掉不重置已完成进度、掌天瓶不可定向', () => {
+test('寻访可连续落空三次，十年逐次付费并积累机会；共享额度与本世唯一性保留', () => {
   const s = ready();
+  s.curios.seed = 0;
   enterNextMarketBatch(s);
   const id = 'soul-wood';
   let total = 0;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const q = curioSeekingQuote(s, id);
     assert.equal(q.reason, '');
+    assert.equal(q.years, 10);
+    assert.equal(q.chance, 20 + 10 * i);
+    const age = s.age;
+    const stones = s.stones;
     total += q.price;
     assert.ok(seekCurio(s, id, venueStamp(s)));
+    near(s.age - age, 10);
+    assert.equal(stones - s.stones, q.price);
     assert.equal(s.curios.seeking[id], i + 1);
-    assert.equal(s.curios.bag[id] ?? 0, i === 2 ? 1 : 0);
+    assert.equal(s.curios.bag[id] ?? 0, i === 3 ? 1 : 0);
+    assert.deepEqual(importSave(exportSave(s)).save.curios, s.curios);
     assert.ok(curioSeekingQuote(s, 'wind-wings').reason);
     s.age += 10;
   }
@@ -259,6 +402,90 @@ test('寻访三次到账、十年额度共享；卖掉不重置已完成进度�
   assert.equal(seekCurio(s, 'wind-wings', 'stale'), undefined);
   assert.equal(seekCurio(s, 'wind-wings', venueStamp(s), false, true), undefined);
   assert.equal(JSON.stringify(s), before);
+});
+test('七次未获后仍无保底，机会封顶70%；三次失败和多次失败均可保存且不冒充已获得', () => {
+  let s = ready();
+  s.curios.seed = 166;
+  enterNextMarketBatch(s);
+  for (let n = 0; n < 8; n++) {
+    const q = curioSeekingQuote(s, 'soul-wood');
+    assert.equal(q.reason, '');
+    assert.equal(q.chance, Math.min(70, 20 + 10 * n));
+    const text = seekCurio(s, 'soul-wood', venueStamp(s))!;
+    assert.match(text, n < 7 ? /此行未能寻得/ : /已收入行囊/);
+    assert.equal(acquiredCurio(s, 'soul-wood'), n === 7);
+    s = importSave(exportSave(s)).save;
+    assert.equal(s.curios.seeking['soul-wood'], n + 1);
+    assert.equal(acquiredCurio(s, 'soul-wood'), n === 7);
+    s.age += 10;
+  }
+  assert.equal(s.curios.bag['soul-wood'], 1);
+});
+test('读档和更换宗门寻访入口不重抽该次机缘；首访可得，各奇物独立积累次数', () => {
+  const s = ready();
+  s.curios.seed = 5;
+  enterNextMarketBatch(s);
+  assert.ok(joinSect(s, 'power'));
+  const market = structuredClone(s);
+  const sect = importSave(exportSave(s)).save;
+  assert.match(seekCurio(market, 'soul-wood', venueStamp(market))!, /已收入行囊/);
+  assert.match(seekCurio(sect, 'soul-wood', venueStamp(sect), true)!, /已收入行囊/);
+  assert.equal(market.curios.bag['soul-wood'], 1);
+  assert.equal(sect.curios.bag['soul-wood'], 1);
+  assert.equal(curioSeekingQuote(market, 'wind-wings').progress, 0);
+  assert.equal(curioSeekingQuote(market, 'wind-wings').chance, 20);
+  assert.equal(s.curios.seeking['soul-wood'], undefined);
+});
+test('八种可寻奇物的多种子实际授予覆盖首访至封顶，成功比例随失败次数提高', () => {
+  const rates: number[] = [];
+  for (const attempts of [0, 1, 2, 3, 4, 5, 20]) {
+    let won = 0;
+    let total = 0;
+    for (const id of CURIO_IDS.slice(1)) {
+      for (let seed = 0; seed < 256; seed++) {
+        const s = ready();
+        s.curios.seed = seed;
+        s.curios.seeking[id] = attempts;
+        enterNextMarketBatch(s);
+        assert.ok(seekCurio(s, id, venueStamp(s)));
+        total++;
+        if (ownsCurio(s, id)) won++;
+      }
+    }
+    const rate = won / total;
+    assert.ok(Math.abs(rate - Math.min(0.7, 0.2 + attempts * 0.1)) < 0.04);
+    rates.push(rate);
+  }
+  for (let i = 1; i < 6; i++) assert.ok(rates[i] > rates[i - 1]);
+  assert.ok(rates[6] < 1, '大量失败后仍可落空');
+});
+test('奇物十年寻访预留全程供奉，寿元和天劫不足十年时不花钱不积累次数', () => {
+  for (const boundary of ['lifespan', 'tribulation'] as const) {
+    const s = ready();
+    enterNextMarketBatch(s);
+    if (boundary === 'lifespan') {
+      s.cultivation = 352;
+      s.age = 240;
+    } else {
+      s.cultivation = IMMORTAL_CULTIVATION;
+      s.nextTribulationAge = s.age + 10;
+    }
+    const before = structuredClone(s);
+    assert.match(curioSeekingQuote(s, 'soul-wood').reason, /寿元不足|天劫将至/);
+    assert.equal(seekCurio(s, 'soul-wood', venueStamp(s)), undefined);
+    assert.deepEqual(s, before);
+  }
+  const s = ready();
+  s.cultivation = 352;
+  enterNextMarketBatch(s);
+  assert.ok(joinSect(s, 'power'));
+  s.mortal.member!.dueAt = s.mortal.years + 1;
+  const q = curioSeekingQuote(s, 'soul-wood', true);
+  assert.ok(q.reserve > 0);
+  s.stones = q.price + q.reserve - 1;
+  const before = structuredClone(s);
+  assert.equal(seekCurio(s, 'soul-wood', venueStamp(s), true), undefined);
+  assert.deepEqual(s, before);
 });
 test('当前档完整往返、浮点十年边界、旧档迁移和坏奇物状态拒绝', () => {
   const s = ready();
@@ -289,7 +516,9 @@ test('当前档完整往返、浮点十年边界、旧档迁移和坏奇物状�
   for (const bad of [
     { ...s.curios, bag: { 'soul-wood': -1 } },
     { ...s.curios, bag: { unknown: 1 } },
-    { ...s.curios, seeking: { 'wind-wings': 4 } },
+    { ...s.curios, seeking: { 'wind-wings': -1 } },
+    { ...s.curios, seeking: { 'wind-wings': 1.5 } },
+    { ...s.curios, seeking: { 'wind-wings': Number.MAX_SAFE_INTEGER + 1 } },
   ]) {
     const data = { ...s, curios: bad };
     assert.equal(readSave(JSON.stringify(data)).status, 'unreadable');

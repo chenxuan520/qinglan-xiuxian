@@ -1127,9 +1127,16 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
     return true;
   }
   if (action.startsWith('town-') && shell.inMortalWorld && !shell.game && !shell.panel) {
-    if (action === 'town-enter' && shell.mortalTab === 'town') {
-      const memory = shell.enterTownVisit(shell.save);
-      shell.persist();
+    if (action === 'town-enter' && !shell.inTown && !shell.inMarket && shell.mortalTab === 'town') {
+      const next = shell.structuredClone(shell.save);
+      const memory = shell.enterTownVisit(next);
+      try {
+        shell.writeSave(next, shell.pendingRun);
+      } catch {
+        if (!shell.saveLock) shell.toast('浏览器暂时无法保存入镇行程，请重试');
+        return true;
+      }
+      Object.assign(shell.save, next);
       shell.telemetry.track({ type: 'town', ...shell.lifeStats() });
       void shell.mobileDisplay.enter();
       shell.inTown = true;

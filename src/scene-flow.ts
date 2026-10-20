@@ -6,7 +6,6 @@ import type { TownResident } from './town-population.ts';
 import type { PanelLocation } from './panel-host.ts';
 import type { AdPlacement } from './ads.ts';
 import type { Game } from './game.ts';
-
 export function renderEpilogue(shell: ActionShell) {
   shell.leaveTown();
   shell.inMortalWorld = false;
@@ -75,6 +74,9 @@ export function mountTownScene(shell: ActionShell) {
             shell.showMarketEvent,
             shell.showAuction,
             (id: string) => showMarketVenue(shell, id),
+            () => {
+              if (marketHost.isConnected) module.travelSettlement(shell, 'town');
+            },
           );
         },
         () => {
@@ -108,7 +110,11 @@ export function mountTownScene(shell: ActionShell) {
           ? {
               state: shell.save.mortal.hometown,
               interact: (target: string) =>
-                target === 'dock' ? shell.finishDeparture() : shell.showHometown(),
+                target === 'dock'
+                  ? shell.finishDeparture()
+                  : shell.showHometown(
+                      target === 'father' || target === 'mother' ? target : undefined,
+                    ),
               ready: () => {
                 if (shell.panel !== 'hometown-loading') return;
                 if (shell.save.mortal.hometown?.stage === 'farewell') {
@@ -123,6 +129,12 @@ export function mountTownScene(shell: ActionShell) {
               },
             }
           : undefined,
+        {
+          open: () => shell.sectMarketOpen(shell.save),
+          enter: () => {
+            if (host.isConnected) module.travelSettlement(shell, 'market');
+          },
+        },
       );
       if (host.dataset.arrival) {
         shell.townScene.showArrival(host.dataset.arrival);

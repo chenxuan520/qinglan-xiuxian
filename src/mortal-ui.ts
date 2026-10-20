@@ -1,3 +1,6 @@
+import { lastVisitText } from './home-town.ts';
+import { marketBuildingArt } from './market-art.ts';
+import { playerSpriteBackground } from './player-appearance.ts';
 import { SECT_SPECIALTIES } from './sect-service-data.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { assetUrl } from './asset-url.ts';
@@ -19,7 +22,7 @@ import {
   MAX_SECT_DUES,
 } from './mortal-data.ts';
 import { entryCost, masteryBonus, sectDues, sectRole, studyPlan } from './mortal.ts';
-import { icon } from './icons.ts';
+import { icon, smallIcon } from './icons.ts';
 import { type TownResident } from './town-population.ts';
 import { npcDefaultLine, type NpcDialogueRequest } from './npc-dialogue.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
@@ -79,12 +82,12 @@ export function townStatus(save: SaveData) {
 }
 export function townPage(save: SaveData, fullscreenButton: string) {
   if (save.mortal.hometown && save.mortal.hometown.stage !== 'departed')
-    return `<main class="town-scene hometown-departure" aria-label="十五岁离乡"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，方向键或触屏拖动移动，也可点击前往渡口自动走动"></div><header class="town-scene-heading"><div class="town-hud"><small>十五岁 · 青岚镇</small><h2>前往渡口</h2><small>沿街向东，循河到渡口</small></div><div class="town-scene-actions">${fullscreenButton}</div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">左键点击前往 · WASD / 方向键接管</span><span class="touch-hint">按住空白处拖动行走</span><br>手动移动可接管自动前往</p><button class="primary-button" data-action="town-talk">前往渡口</button></footer></main>`;
-  return `<main class="town-scene" aria-label="青岚镇游历"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，左键点击前往、触屏拖动或方向键移动，靠近镇民点击交谈或按 E"></div><header class="town-scene-heading"><div class="town-hud"><h2>青岚镇</h2>${save.mortal.scenery?.since !== undefined ? `<small>自记城景 · 已过 ${Math.floor(save.mortal.scenery.lastVisitAge - save.mortal.scenery.since)} 年</small>` : ''}<small>现实 1 分钟 = 1 年</small><div id="town-status">${townStatus(save)}</div></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="town-exit">离开城镇</button></div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">左键点击前往 · WASD / 方向键接管</span><span class="touch-hint">按住空白处拖动行走</span><br>靠近镇民，<span class="keyboard-hint">按 E 或</span>点击交谈</p><button class="primary-button" data-action="town-talk" disabled>走近镇民可交谈</button></footer></main>`;
+    return `<main class="town-scene hometown-departure" aria-label="十五岁离乡"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，方向键或触屏拖动移动，也可点击前往渡口自动走动"></div><header class="town-scene-heading"><div class="town-hud"><small>十五岁 · 青岚镇</small><h2>前往渡口</h2><small>沿街向东，循河到渡口</small></div><div class="town-scene-actions">${fullscreenButton}</div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">点击地面前往 · WASD / 方向键接管</span><span class="touch-hint">点按前往 · 拖动接管</span><br>手动移动可接管自动前往</p><button class="primary-button" data-action="town-talk">前往渡口</button></footer></main>`;
+  return `<main class="town-scene" aria-label="青岚镇游历"><div id="town-view" class="town-view" tabindex="0" role="region" aria-label="青岚镇，点地面前往，点人物或店铺自动走近互动，拖动或方向键接管"></div><header class="town-scene-heading"><div class="town-hud"><h2>青岚镇</h2>${save.mortal.scenery?.since !== undefined ? `<small>自记城景 · 已过 ${Math.floor(save.mortal.scenery.lastVisitAge - save.mortal.scenery.since)} 年</small>` : ''}<small>现实 1 分钟 = 1 年</small><div id="town-status">${townStatus(save)}</div></div><div class="town-scene-actions">${fullscreenButton}<button class="secondary-button" data-action="town-exit">离开城镇</button></div></header><footer class="town-scene-controls"><p><span class="keyboard-hint">点击地面前往 · WASD / 方向键接管</span><span class="touch-hint">点按前往 · 拖动接管</span><br>点人物或店铺，走近自动互动</p><button class="primary-button" data-action="town-talk" disabled>走近镇民可交谈</button></footer></main>`;
 }
 export function sectMarketEntrance(save: SaveData) {
   const open = sectMarketOpen(save);
-  return `<section class="sect-market-entrance"><div><span class="eyebrow">同道往来 · 坊间机缘</span><h2>宗门坊市</h2><p>各宗修士在此歇脚，散修亦可来往。走近同道，聊聊山外见闻，互换余丹，或到中央拍卖行竞宝、委托出售。</p><small>${open ? `无需入宗 · 闲逛计龄，交谈暂停 · ${save.mortal.sectMarket && save.age < save.mortal.sectMarket.openedAt + 1 - 1e-9 ? `距换批约 ${Math.max(0.1, save.mortal.sectMarket.openedAt + 1 - save.age).toFixed(1)} 年` : save.mortal.sectMarket ? '再入换新客' : '每批客货至少留一年'}` : '积累修为、踏入炼气后开放，无需完成整场历练'}</small></div><button class="secondary-button" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? '走进坊市 →' : '踏入炼气后开放'}</button></section>`;
+  return `<section class="home-town-entry sect-market-entrance" aria-label="宗门坊市"><span class="home-town-art" aria-hidden="true">${[0, 1, 2].map((art) => `<span style="background-image:url('${assetUrl('assets/sect-market-buildings.webp')}');${marketBuildingArt(art)}"></span>`).join('')}<i style="background:${playerSpriteBackground('orthodox')}"></i><i style="background:${playerSpriteBackground('dual')}"></i></span><div class="home-town-copy"><small>同道往来 · 坊间机缘</small><strong role="heading" aria-level="2">宗门坊市</strong><span>互通余丹 · 坊中竞宝 · 坐而论道</span><small>${lastVisitText(save.age, save.mortal.sectMarket?.lastVisitAge, !!save.mortal.sectMarket)}</small></div><button class="secondary-button home-town-link" data-action="sect-market-enter" ${open ? '' : 'disabled'}>${open ? `走进坊市 ${smallIcon('arrow')}` : '踏入炼气后开放'}</button><small class="market-entry-note">${open ? '无需入宗 · 闲逛计龄，交谈暂停' : '获得修为后开放 · 无需入宗'}</small></section>`;
 }
 
 export function mortalPage(
@@ -119,7 +122,7 @@ export function mortalTabContent(
 ) {
   const world = save.mortal;
   if (tab === 'town')
-    return `<section class="town-arrival"><div><span class="eyebrow">山下烟火</span><h2>青岚镇</h2><p>商铺沿街，炊烟绕巷。<br>走进城镇，去港口听潮，拜访行当中人，与街巷里的镇民闲谈。</p><p class="panel-note">城门外不消耗寿元。入城后时间流逝，切换到宗门或离开城镇即暂停。</p><button class="primary-button" data-action="town-enter">走进青岚镇 →</button></div><div class="town-arrival-art" aria-hidden="true"><span></span><span></span><span></span></div></section>`;
+    return `<section class="town-arrival"><div><span class="eyebrow">山下烟火</span><h2>青岚镇</h2><p>商铺沿街，炊烟绕巷。<br>走进城镇，去港口听潮，拜访行当中人，与街巷里的镇民闲谈。</p><p class="panel-note">${lastVisitText(save.age, save.mortal.scenery?.lastVisitAge)}<br>街巷闲逛计龄，交谈或退回入口时暂停。</p><button class="primary-button" data-action="town-enter">走进青岚镇 →</button></div><div class="town-arrival-art" aria-hidden="true"><span></span><span></span><span></span></div></section>`;
   const member = SECTS.find((s) => s.id === world.member?.id);
   const plan = studyPlan(save);
   const dues = sectDues(save);

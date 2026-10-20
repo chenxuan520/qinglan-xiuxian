@@ -14,6 +14,7 @@ import {
   AUCTION_HALLS,
   AUCTION_CURIO_LOT,
   AUCTION_IRON_LOT,
+  AUCTION_PREMIUM_MIN_VALUE,
   validAuction,
   type AuctionItem,
 } from '../src/auction-data.ts';
@@ -23,6 +24,7 @@ import { IRON_MARKET_LIMIT } from '../src/iron-market-data.ts';
 import { curioCycle, grantCurio, prepareCurioConsignment } from '../src/curio-data.ts';
 import { importSave, exportSave } from '../src/save-transfer.ts';
 import { auctionContent } from '../src/auction-ui.ts';
+import { auctionValue } from '../src/auction-items.ts';
 import { TREASURES, evolutionPassives, passive, pathInfo } from '../src/data.ts';
 
 function fixture(realm = 0, seed = 12345) {
@@ -136,7 +138,7 @@ test('每场严格四丹四物，百种种子验证品级、法宝阶数、低�
             permanent += Number(m.years === 0);
           }
         } else if (lot.kind === 'artifact') {
-          assert.ok(lot.forgeLevel >= [0, 1, 3][hall] && lot.forgeLevel <= [1, 3, 6][hall]);
+          assert.ok(lot.forgeLevel >= [0, 3, 6][hall] && lot.forgeLevel <= [1, 6, 10][hall]);
         }
       }
       assert.equal(
@@ -295,6 +297,8 @@ test('一年内反复进入、读档保留修士/额度/结拍；满一年才换
   s.age += 0.999;
   const before = structuredClone(s);
   assert.ok(beginSectMarketVisit(s));
+  assert.equal(s.mortal.sectMarket!.lastVisitAge, s.age);
+  before.mortal.sectMarket!.lastVisitAge = s.age;
   assert.deepEqual(s, before);
   s = importSave(exportSave(s, null)).save;
   assert.equal(beginSectMarketVisit(s), true);
@@ -402,6 +406,39 @@ test('同批四丹去重，保持各槽品级、本世珍品触发、估值与�
     }
   }
   assert.equal(permanent, 55, '200个固定种子的既有本世珍品触发数量不变');
+});
+
+test('各会场同批法宝品种不重复，炼器范围和估值准确，竞买读档不重排', () => {
+  for (let seed = 0; seed < 200; seed++) {
+    const s = fixture(6, seed);
+    for (const hall of [0, 1, 2] as const) {
+      selectAuctionHall(s, hall, 1);
+      const lots = auctionLots(s);
+      const artifacts = lots.filter((lot) => lot.kind === 'artifact');
+      if (hall === 2)
+        assert.ok(
+          lots.every((lot) => lot.start >= AUCTION_PREMIUM_MIN_VALUE),
+          '天字场起拍至少1000灵石',
+        );
+      assert.equal(
+        new Set(artifacts.map((lot) => lot.id)).size,
+        artifacts.length,
+        `${seed}/${hall}`,
+      );
+      for (const lot of artifacts) {
+        assert.ok(lot.forgeLevel >= AUCTION_HALLS[hall].forgeMin);
+        assert.ok(lot.forgeLevel <= AUCTION_HALLS[hall].forgeMax);
+        assert.equal(lot.quantity, 1);
+        assert.equal(lot.start, auctionValue(lot));
+      }
+      const original = structuredClone(s);
+      const bought = buyAuction(s, artifacts[0].index, s.stones, 1)!;
+      assert.equal(bought.outcome, 'won');
+      assert.deepEqual(auctionLots(s), lots);
+      assert.deepEqual(auctionLots(importSave(exportSave(s, null)).save), lots);
+      Object.assign(s, original);
+    }
+  }
 });
 
 test('旧已结拍药槽保留原成交物品和结拍索引，不按新去重药品改写历史', () => {

@@ -36,12 +36,16 @@ export function sectMarketOpen(save: SaveData) {
 export function beginSectMarketVisit(save: SaveData) {
   if (!sectMarketOpen(save)) return false;
   if (save.mortal.marketSocial?.ambush) return false;
-  if (save.mortal.sectMarket && save.age < save.mortal.sectMarket.openedAt + 1 - 1e-9) return true;
+  if (save.mortal.sectMarket && save.age < save.mortal.sectMarket.openedAt + 1 - 1e-9) {
+    save.mortal.sectMarket.lastVisitAge = save.age;
+    return true;
+  }
   const visit = (save.mortal.sectMarket?.visit ?? 0) + 1;
   if (!Number.isSafeInteger(visit)) return false;
   const returning = returningMarketContact(save, visit);
   save.mortal.sectMarket = {
     openedAt: save.age,
+    lastVisitAge: save.age,
     visit,
     realmIndex: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index,
     exchanged: [],

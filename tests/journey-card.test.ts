@@ -12,6 +12,8 @@ import { JOURNEY_SHARE_URL } from '../src/sharing.ts';
 import { freshSave, enterImmortalGate, readSave } from '../src/progress.ts';
 import { chooseHumanStory, humanStoryView } from '../src/human-stories.ts';
 import { joinSect } from '../src/mortal.ts';
+import { spiritPower } from '../src/spirit-power.ts';
+import { grantCurio } from '../src/curio-data.ts';
 
 test('评语中文句末不落在下一行开头，正文不截断且不越过二维码边界', () => {
   const detail =
@@ -63,6 +65,31 @@ test('纪念卡只写当前资质与真实成果，不把年岁写成寿终或�
   assert.ok(!JSON.stringify(card).includes('道侣'));
   assert.ok(!JSON.stringify(card).includes('六仙同御'));
   assert.equal(JSON.stringify(save), before);
+});
+
+test('留影灵威取生成时真实入场估值，反映炼器根基与奇物且只读存档', () => {
+  const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  for (const upgraded of [false, true]) {
+    if (upgraded) {
+      save.cultivation = 183239;
+      save.completed = [0, 1, 2, 3, 4, 5, 6];
+      save.training = { power: 20, vitality: 20, speed: 20 };
+      save.forge[save.starter] = 10;
+      grantCurio(save, 'soul-wood');
+      grantCurio(save, 'sacred-fragment');
+    }
+    const before = structuredClone(save);
+    for (const ending of [
+      'ongoing',
+      'lifespan',
+      'tribulation',
+      'ambush',
+      'extreme',
+      'immortal',
+    ] as const)
+      assert.equal(journeyCardData(save, ending).power, spiritPower(save).score);
+    assert.deepEqual(save, before);
+  }
 });
 
 test('真仙与叩门状态分开，历史未知年岁不编造，六仙器只按已记录成就展示', () => {

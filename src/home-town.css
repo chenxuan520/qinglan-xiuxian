@@ -77,8 +77,9 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  min-height: 44px;
-  padding: 10px 0;
+  min-height: 52px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
   color: var(--gold);
   font-size: 13px;
   white-space: nowrap;
@@ -127,8 +128,49 @@
   }
   .home-town-link {
     justify-self: start;
-    padding: 8px 0;
+    padding: 12px 14px;
     font-size: 12px;
     gap: 8px;
+  }
+}
+
+.home-town-entry.sect-market-entrance {
+  grid-template-columns: 240px 280px minmax(0, 1fr);
+  grid-template-areas: 'copy art link' 'note note note';
+  padding: 20px 0;
+  margin-bottom: 28px;
+  cursor: default;
+  border-bottom: 1px solid var(--border);
+}
+.sect-market-entrance .home-town-link {
+  min-height: 56px;
+  min-width: 160px;
+}
+.market-entry-note {
+  grid-area: note;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.8;
+}
+.sect-market-entrance .home-town-art > i {
+  position: absolute;
+  bottom: -4px;
+  left: 15%;
+  width: 20%;
+  height: 45%;
+}
+.sect-market-entrance .home-town-art > i:last-child {
+  left: 74%;
+}
+@media (max-width: 900px) {
+  .home-town-entry.sect-market-entrance {
+    grid-template-columns: minmax(0, 1fr) 170px auto;
+    gap: 18px;
+  }
+}
+@media (max-width: 640px) {
+  .home-town-entry.sect-market-entrance {
+    grid-template-columns: minmax(0, 1fr) 112px;
+    grid-template-areas: 'copy art' 'link art' 'note note';
   }
 }

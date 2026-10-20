@@ -9,6 +9,7 @@ import {
 
 export const AUCTION_SPOT = { x: 1000, y: 535 };
 export const AUCTION_LOTS = 8;
+export const AUCTION_PREMIUM_MIN_VALUE = 1000;
 export const AUCTION_HALLS = [
   {
     name: '人字场',
@@ -22,16 +23,16 @@ export const AUCTION_HALLS = [
     name: '地字场',
     realms: '元婴、化神、炼虚',
     minRealm: 3,
-    forgeMin: 1,
-    forgeMax: 3,
+    forgeMin: 3,
+    forgeMax: 6,
     admission: 3000,
   },
   {
     name: '天字场',
     realms: '合体、大乘、渡劫',
     minRealm: 6,
-    forgeMin: 3,
-    forgeMax: 6,
+    forgeMin: 6,
+    forgeMax: 10,
     admission: 10000,
   },
 ] as const;

@@ -92,6 +92,7 @@ export function isMarketCultivatorId(id: unknown): id is MarketCultivatorId {
 }
 export interface SectMarketState {
   openedAt: number;
+  lastVisitAge?: number;
   visit: number;
   realmIndex: number;
   returning?: {
@@ -111,6 +112,8 @@ export function validSectMarket(value: unknown, age: number): value is SectMarke
     Number.isFinite(s.openedAt) &&
     s.openedAt >= 0 &&
     s.openedAt <= age &&
+    (s.lastVisitAge === undefined ||
+      (Number.isFinite(s.lastVisitAge) && s.lastVisitAge >= s.openedAt && s.lastVisitAge <= age)) &&
     Number.isSafeInteger(s.visit) &&
     s.visit >= 1 &&
     Number.isInteger(s.realmIndex) &&

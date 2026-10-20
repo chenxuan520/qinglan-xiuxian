@@ -94,33 +94,6 @@ export function auctionLots(
       start: auctionValue(item),
     };
   });
-  // 保留原槽位、品级与本世珍品触发；只替换本批重复丹药，不挪动原本不同的药。
-  // 不读取库存或结拍状态，成交、关闭、刷新后其余待拍品仍是同一批。
-  const reservedMedicineIds = new Set(
-    lots.filter((lot) => lot.kind === 'medicine').map((lot) => lot.id),
-  );
-  const seen = new Set<string>();
-  for (const lot of lots) {
-    if (lot.kind !== 'medicine') continue;
-    const original = medicineInfo(lot.id)!;
-    if (seen.has(lot.id)) {
-      const alternatives = MEDICINES.filter(
-        (m) =>
-          m.tier === original.tier &&
-          (m.years === 0) === (original.years === 0) &&
-          !reservedMedicineIds.has(m.id),
-      );
-      if (alternatives.length) {
-        lot.id =
-          alternatives[
-            (roll(save, `lot:${lot.index % AUCTION_LOTS}`) >>> 8) % alternatives.length
-          ].id;
-        lot.start = auctionValue(lot);
-        reservedMedicineIds.add(lot.id);
-      }
-    }
-    seen.add(lot.id);
-  }
   if (hall === 0) {
     const item: AuctionItem = {
       kind: 'iron',
@@ -155,6 +128,35 @@ export function auctionLots(
       start: auctionValue(item),
     };
   } else if (hall > 0 && save.mortal.auction?.curioSlot) lots.pop();
+  // 仅替换同批重名拍品，原槽位、品级、炼器范围与其他原始拍品均保留。
+  // 排除库存与结拍状态，成交、关窗和读档不会重排其余拍品。
+  const key = (lot: AuctionItem) => `${lot.kind}:${lot.id}`;
+  const reservedIds = new Set(lots.map(key));
+  const seen = new Set<string>();
+  for (const lot of lots) {
+    if (lot.kind !== 'medicine' && lot.kind !== 'artifact') continue;
+    if (seen.has(key(lot))) {
+      const original = lot.kind === 'medicine' ? medicineInfo(lot.id)! : null;
+      const alternatives = (
+        original
+          ? MEDICINES.filter(
+              (m) => m.tier === original.tier && (m.years === 0) === (original.years === 0),
+            )
+          : TREASURES
+      ).filter((item) => !reservedIds.has(`${lot.kind}:${item.id}`));
+      if (alternatives.length) {
+        lot.id =
+          alternatives[
+            (roll(save, `lot:${lot.index % AUCTION_LOTS}`) >>> 8) % alternatives.length
+          ].id;
+        if (lot.kind === 'artifact' && freeStarter(lot.id))
+          lot.forgeLevel = Math.max(1, lot.forgeLevel);
+        lot.start = auctionValue(lot);
+        reservedIds.add(key(lot));
+      }
+    }
+    seen.add(key(lot));
+  }
   return lots;
 }
 

@@ -56,7 +56,7 @@ export function validCurios(value: unknown, age: number, legacy = false): value 
         (!seeking || id !== 'heaven-bottle') &&
         Number.isSafeInteger(n) &&
         n >= 0 &&
-        (seeking ? n <= 3 : legacy || n <= 1),
+        (seeking || legacy || n <= 1),
     );
   return (
     Number.isSafeInteger(s.seed) &&
@@ -84,9 +84,7 @@ export function validCurios(value: unknown, age: number, legacy = false): value 
 export const ownsCurio = (save: { curios: CurioState }, id: CurioId) =>
   (save.curios.bag[id] ?? 0) > 0;
 export const acquiredCurio = (save: { curios: CurioState }, id: CurioId) =>
-  save.curios.acquired.includes(id) ||
-  Object.hasOwn(save.curios.bag, id) ||
-  save.curios.seeking[id] === 3;
+  save.curios.acquired.includes(id) || Object.hasOwn(save.curios.bag, id);
 export function grantCurio(save: { curios: CurioState }, id: string) {
   if (!isCurio(id) || acquiredCurio(save, id)) return false;
   save.curios.bag[id] = 1;
@@ -105,7 +103,9 @@ export function curioRoll(seed: number, key: string) {
   return (hash ^ (hash >>> 16)) >>> 0;
 }
 export const curioTrainingYears = (save: { curios: CurioState }, years: number) =>
-  ownsCurio(save, 'heaven-house') ? Math.max(1, Math.ceil(years * 5 - 1e-9) / 10) : years;
+  ownsCurio(save, 'heaven-house') ? 0 : years;
+export const curioTrainingCost = (save: { curios: CurioState } | undefined, stones: number) =>
+  save && ownsCurio(save, 'heaven-house') ? Math.ceil(stones / 2) : stones;
 export const curioAlchemy = (save: { curios: CurioState }, years: number) =>
   ownsCurio(save, 'heaven-bottle')
     ? { years: Math.ceil(years - 1e-9) / 10, quantity: 3 }

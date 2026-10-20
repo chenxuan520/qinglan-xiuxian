@@ -229,6 +229,38 @@ test('28种丹药为8凡8灵8限时珍品4本世珍品，药方只消耗低一�
     }
   }
 });
+test('同阶八种可炼丹药互不撞方，逆序材料视为同方，查询顺序不改变配方', () => {
+  for (const seed of [
+    0,
+    4294967295,
+    ...Array.from({ length: 256 }, (_, i) => Math.imul(i, 2654435761) >>> 0),
+  ]) {
+    const state = freshMedicine(() => 0);
+    state.recipeSeed = seed;
+    const before = structuredClone(state);
+    for (const tier of ['灵品', '珍品']) {
+      const medicines = MEDICINES.filter((m) => m.tier === tier && m.years);
+      assert.equal(medicines.length, 8);
+      const formulas = medicines.map((m) => medicineFormula(state, m.id));
+      const keys = formulas.map((formula) =>
+        formula
+          .map((item) => `${item.id}:${item.count}`)
+          .sort()
+          .join('|'),
+      );
+      assert.equal(new Set(keys).size, 8, `${seed}/${tier}不能出现同方异名`);
+      assert.deepEqual(
+        [...medicines]
+          .reverse()
+          .map((m) => medicineFormula(state, m.id))
+          .reverse(),
+        formulas,
+      );
+    }
+    assert.deepEqual(state, before, '查看丹方不消耗物资或改变种子');
+  }
+});
+
 test('本世配方固定，换关和导入不重抽；轮回种子改变配方且清空丹药', () => {
   const s = rich();
   const before = MEDICINES.map((m) => medicineFormula(s.medicine, m.id));
@@ -274,6 +306,51 @@ test('药铺每十年只轮售三种凡品，刷新不重抽，高阶成丹不�
     s.medicine.shop!.ids.every((id) => MEDICINES.find((m) => m.id === id)!.tier === '凡品'),
   );
 });
+test('药铺十年换货整组撞回旧三种时仍至少换一种，旧额度清空且不靠重进抽货', () => {
+  const pool = MEDICINES.filter((m) => m.tier === '凡品').map((m) => m.id);
+  for (let a = 0; a < pool.length; a++)
+    for (let b = a + 1; b < pool.length; b++)
+      for (let c = b + 1; c < pool.length; c++) {
+        const oldIds = [pool[a], pool[b], pool[c]];
+        for (const order of [oldIds, [...oldIds].reverse()]) {
+          const state = freshMedicine(() => 0);
+          state.shop = {
+            ids: oldIds,
+            bought: Object.fromEntries(oldIds.map((id) => [id, 3])),
+            refreshAt: 25,
+          };
+          const remaining = [...pool];
+          let draw = 0;
+          const random = () => {
+            if (draw >= order.length) return 0.5;
+            const index = remaining.indexOf(order[draw++]);
+            const value = (index + 0.1) / remaining.length;
+            remaining.splice(index, 1);
+            return value;
+          };
+          const before = structuredClone(state);
+          assert.equal(refreshMedicineShop(state, 24.999, random), false);
+          assert.deepEqual(state, before);
+          assert.equal(refreshMedicineShop(state, 25, random), true);
+          assert.equal(new Set(state.shop.ids).size, 3);
+          assert.ok(
+            state.shop.ids.some((id) => !oldIds.includes(id)),
+            oldIds.join('/'),
+          );
+          assert.deepEqual(state.shop.bought, {});
+          assert.equal(state.shop.refreshAt, 35);
+          const batch = structuredClone(state.shop);
+          assert.equal(
+            refreshMedicineShop(state, 25, () => {
+              throw Error('本批不能重新抽货');
+            }),
+            false,
+          );
+          assert.deepEqual(state.shop, batch);
+        }
+      }
+});
+
 test('药铺每批每种限购三份，读档不重置额度，十年换货后恢复', () => {
   const s = rich();
   refreshMedicineShop(s.medicine, s.age, () => 0);

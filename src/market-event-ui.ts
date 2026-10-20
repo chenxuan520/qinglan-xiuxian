@@ -18,3 +18,5 @@ export {
 } from './auction-ui.ts';
 
 export { openDebugPanel } from './debug-panel.ts';
+
+export { travelSettlement } from './settlement-travel.ts';

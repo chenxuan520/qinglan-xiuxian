@@ -1,4 +1,4 @@
-import { curioTrainingYears } from './curio-data.ts';
+import { curioTrainingYears, curioTrainingCost } from './curio-data.ts';
 import { ironMarket, ironTradeQuote } from './iron-market.ts';
 import { grantMedicine, MEDICINES, townMedicineReward } from './medicine-data.ts';
 import { FINAL_TRIAL_STAGE, spiritRootInfo, passive, type CultivationPath } from './data.ts';
@@ -75,7 +75,7 @@ export function studyPlan(save: SaveData, withCurio = true) {
     limit,
     eligible: level < limit,
     requiredRealm: MASTERY_REALMS[level]?.name ?? '',
-    stones: 30 + level * 20,
+    stones: curioTrainingCost(withCurio ? save : undefined, 30 + level * 20),
     years: withCurio ? curioTrainingYears(save, years) : years,
   };
 }

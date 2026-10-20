@@ -28,17 +28,20 @@ import {
   realmHealthMultiplier,
   trainingYears,
 } from '../src/progress.ts';
-import { entryCost, masteryRewardPool, sectDues } from '../src/mortal.ts';
+import { entryCost, masteryRewardPool, sectDues, studyPlan } from '../src/mortal.ts';
 import { trainingCost } from '../src/training.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 import { guideContent, GUIDE_TABS } from '../src/guide.ts';
-import { AUCTION_HALLS, AUCTION_IRON_MIN } from '../src/auction-data.ts';
+import { AUCTION_HALLS, AUCTION_IRON_MIN, AUCTION_PREMIUM_MIN_VALUE } from '../src/auction-data.ts';
 import { AUCTION_SETTINGS } from '../src/setting.ts';
 import { auctionSaleRates } from '../src/auction-items.ts';
 import { auctionContent } from '../src/auction-ui.ts';
 import { beginSectMarketVisit, sectMarketDeals } from '../src/sect-market.ts';
 import { prepareAuction } from '../src/auction.ts';
 import { JOURNEY_SHARE_URL } from '../src/sharing.ts';
+import { curioSeekingQuote } from '../src/curio-market.ts';
+import { curioSeekingContent } from '../src/curio-ui.ts';
+import { curioValue, grantCurio } from '../src/curio-data.ts';
 
 const gameplay = readFileSync(new URL('../docs/gameplay.md', import.meta.url), 'utf8');
 const medicine = readFileSync(new URL('../docs/medicine.md', import.meta.url), 'utf8');
@@ -245,6 +248,17 @@ test('拍卖资格与手续费、玄铁门槛对照实际会场配置', () => {
     assert.ok(admission, `${hall.name}必须说明入席费用`);
     assert.equal(Number(admission[1]), hall.admission, `${hall.name}资格费用`);
   }
+  const ranges = gameplay.match(
+    /地字场以[^；]+和(\d+)～(\d+)阶法宝；天字场以珍品、(\d+)～(\d+)阶法宝/,
+  );
+  assert.ok(ranges, '文档必须列出地字与天字场真实上架阶数');
+  assert.deepEqual(
+    ranges.slice(1).map(Number),
+    AUCTION_HALLS.slice(1).flatMap((h) => [h.forgeMin, h.forgeMax]),
+  );
+  const premium = gameplay.match(/天字场[^\n]+起拍价至少(\d+)灵石/);
+  assert.ok(premium);
+  assert.equal(Number(premium[1]), AUCTION_PREMIUM_MIN_VALUE);
   const fees = medicine.match(/买方手续费 (\d+)%，卖方佣金 (\d+)%/);
   assert.ok(fees);
   assert.deepEqual(fees.slice(1).map(Number), [
@@ -268,6 +282,59 @@ test('拍卖资格与手续费、玄铁门槛对照实际会场配置', () => {
 test('留影文档链接使用真实二维码地址，固定来源标记与个人标识分开说明', () => {
   assert.ok(gameplay.includes(`\`${JOURNEY_SHARE_URL}\``), '留影网址必须包含实际固定来源标记');
   assert.match(gameplay, /固定的留影来源标记，不含存档、身份或个人分享标识/);
+});
+
+test('奇物寻访帮助与实际十年耗时、递增机会、非保底和逐次收费一致', () => {
+  const save = freshSave('heaven', ['metal']);
+  save.cultivation = 352;
+  save.mortal.population = { seed: 12345, since: 15 };
+  beginSectMarketVisit(save);
+  const first = curioSeekingQuote(save, 'soul-wood');
+  save.curios.seeking['soul-wood'] = 1;
+  const second = curioSeekingQuote(save, 'soul-wood');
+  save.curios.seeking['soul-wood'] = 99;
+  const capped = curioSeekingQuote(save, 'soul-wood');
+  for (const source of [guideContent('items'), gameplay, curioSeekingContent(save)]) {
+    assert.match(source, /每次(?:寻访)?(?:耗)?十年/);
+    const chance = source.match(/首访机会(\d+)%.*?每次未获提高(\d+)个百分点.*?最高(\d+)%/);
+    assert.ok(chance);
+    assert.deepEqual(chance.slice(1).map(Number), [
+      first.chance,
+      second.chance - first.chance,
+      capped.chance,
+    ]);
+    assert.match(source, /不设必得次数|没有固定必得次数|不保证第几次得手/);
+    assert.doesNotMatch(source, /分三次寻访|每件需三次托付|剩余\d+灵石|寻访 \d+ \/ 3/);
+  }
+  assert.equal(first.years, 10);
+  assert.ok(capped.chance < 100);
+  assert.equal(capped.reason, '', '累计次数不得被当作已获得');
+  const prices = gameplay.match(/坊市每次收估值的(\d+)%、宗门(\d+)%/);
+  assert.ok(prices);
+  for (const sect of [false, true])
+    assert.equal(
+      curioSeekingQuote(save, 'soul-wood', sect).price,
+      Math.ceil((curioValue('soul-wood') * Number(prices[sect ? 2 : 1])) / 100),
+    );
+});
+
+test('天机屋零年岁、半价灵石的帮助与根基、精研真实报价一致', () => {
+  const save = freshSave('heaven', ['metal']);
+  const before = studyPlan(save);
+  grantCurio(save, 'heaven-house');
+  assert.equal(trainingYears(save), 0);
+  assert.equal(trainingCost(0, save), Math.ceil(trainingCost(0) / 2));
+  assert.equal(studyPlan(save).years, 0);
+  assert.equal(studyPlan(save).stones, Math.ceil(before.stones / 2));
+  for (const source of [
+    guideContent('items'),
+    guideContent('mortal'),
+    guideContent('builds'),
+    gameplay,
+  ]) {
+    assert.match(source, /(?:天机屋[^。]+)?(?:不耗年岁|不消耗年岁)[^。]*灵石减半/);
+    assert.doesNotMatch(source, /天机屋[^。]*(?:耗时减半|年岁减半|至少一年|最少 1 年)/);
+  }
 });
 
 test('每一帮助分类都进入一致性检查，CI独立运行且不混入部署', () => {

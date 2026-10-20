@@ -465,10 +465,7 @@ export function townMedicineReward(s: MedicineState, kind: string, random: () =>
   }
   return '';
 }
-// 一世只存一个种子，配方按丹药 ID 确定；买方、刷新、换关均不会重抽。
-export function medicineFormula(s: MedicineState, id: string) {
-  const target = medicineInfo(id);
-  if (!target?.years || target.tier === '凡品') return [];
+function initialFormula(s: MedicineState, target: Medicine) {
   let seed = (s.recipeSeed ^ Math.imul(MEDICINES.indexOf(target) + 1, 2654435761)) >>> 0;
   const next = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -482,12 +479,51 @@ export function medicineFormula(s: MedicineState, id: string) {
     { id: second.id, count: target.tier === '灵品' ? 1 : 2 },
   ];
 }
+const formulaKey = (formula: Array<{ id: string; count: number }>) =>
+  formula
+    .map((item) => `${item.id}:${item.count}`)
+    .sort()
+    .join('|');
+// 同阶八种丹药各用一方，顺序颠倒不算新方；保留原本没有碰撞的配方。
+export function medicineFormula(s: MedicineState, id: string) {
+  const target = medicineInfo(id);
+  if (!target?.years || target.tier === '凡品') return [];
+  const peers = MEDICINES.filter((m) => m.years && m.tier === target.tier);
+  const formulas = peers.map((m) => initialFormula(s, m));
+  const reserved = new Set(formulas.map(formulaKey));
+  const used = new Set<string>();
+  const pool = MEDICINES.filter((m) => m.tier === (target.tier === '灵品' ? '凡品' : '灵品'));
+  for (let i = 0; i < peers.length; i++) {
+    let formula = formulas[i];
+    if (used.has(formulaKey(formula))) {
+      const alternatives: typeof formulas = [];
+      for (let a = 0; a < pool.length; a++)
+        for (let b = 0; b < pool.length; b++) {
+          if (a === b || (target.tier === '珍品' && a > b)) continue;
+          const candidate = [
+            { id: pool[a].id, count: 2 },
+            { id: pool[b].id, count: target.tier === '灵品' ? 1 : 2 },
+          ];
+          if (!reserved.has(formulaKey(candidate))) alternatives.push(candidate);
+        }
+      const seed = (s.recipeSeed ^ Math.imul(MEDICINES.indexOf(peers[i]) + 1, 2654435761)) >>> 0;
+      formula = alternatives[seed % alternatives.length];
+      reserved.add(formulaKey(formula));
+    }
+    used.add(formulaKey(formula));
+    if (peers[i] === target) return formula;
+  }
+  return [];
+}
 export function refreshMedicineShop(s: MedicineState, age: number, random = Math.random) {
   if (s.shop && age < s.shop.refreshAt) return false;
   const pool = MEDICINES.filter((m) => m.tier === '凡品');
   const ids: string[] = [];
   while (ids.length < 3) ids.push(pool.splice(Math.floor(random() * pool.length), 1)[0].id);
   const old = s.shop;
+  // 十年换货至少换一味；只在整组撞回旧货时替换一项，不因进出重抽。
+  if (old && ids.every((id) => old.ids.includes(id)))
+    ids[2] = pool[Math.floor(random() * pool.length)].id;
   s.shop = {
     ids,
     bought: {},

@@ -29,6 +29,7 @@ import { marketBuildingArt } from './market-art.ts';
 import { marketFellowCharacter } from './market-fellow.ts';
 import { mapClick, walkRoute } from './walk-navigation.ts';
 import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
+import { SettlementPassage, SETTLEMENT_PATHS } from './settlement-passage.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -43,9 +44,21 @@ export class SectMarketScene {
   private events = new AbortController();
   private observer: ResizeObserver;
   private keys = new Set<string>();
-  private pointer: { id: number; x: number; y: number } | null = null;
+  private pointer: {
+    id: number;
+    x: number;
+    y: number;
+    target: Element | null;
+    moved: boolean;
+  } | null = null;
   private touch = { x: 0, y: 0 };
   private clickRoute: TownPoint[] = [];
+  private clickTarget: {
+    id: string;
+    generation?: number;
+    kind: 'npc' | 'venue' | 'auction';
+  } | null = null;
+  private selectedNpc: MarketCultivator | null = null;
   private enabled = false;
   private last = 0;
   private walkingSeconds = 0;
@@ -54,7 +67,7 @@ export class SectMarketScene {
   private height = 0;
   private map: HTMLElement;
   private player: HTMLElement;
-  private activeLabel: HTMLElement;
+  private passage?: SettlementPassage;
   private residents: MarketCultivator[];
   private lastTransform = '';
   private nearbyId = '';
@@ -73,6 +86,7 @@ export class SectMarketScene {
     interact: (npc: MarketCultivator) => void,
     openAuction: () => void = () => {},
     openVenue: (id: MarketVenueId) => void = () => {},
+    returnTown?: () => void,
   ) {
     this.host = host;
     this.position = position;
@@ -91,7 +105,7 @@ export class SectMarketScene {
       ...Array.from({ length: 4 }, (_, i) => [150, 650 + i * 370]),
       ...Array.from({ length: 4 }, (_, i) => [MARKET_SCENE_WIDTH - 160, 650 + i * 370]),
     ];
-    host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_SCENE_WIDTH}px;height:${MARKET_SCENE_HEIGHT}px">${trees.map(([x, y]) => `<div class="town-prop market-tree market-border-tree" style="left:${x}px;top:${y}px;width:210px;height:210px;background-position:0 0"></div>`).join('')}<div class="market-world" style="left:${MARKET_SCENE_PADDING}px;top:${MARKET_SCENE_PADDING}px;width:${MARKET_WIDTH}px;height:${MARKET_HEIGHT}px">${MARKET_BUILDINGS.map((b) => `<div class="town-building market-shop" style="left:${b.x}px;top:${b.y}px;z-index:${b.y};width:260px;height:260px;${marketBuildingArt(b.art)}"><span class="town-building-caption">${b.label}</span></div>`).join('')}${[
+    host.innerHTML = `<div class="town-map sect-market-map" aria-hidden="true" style="width:${MARKET_SCENE_WIDTH}px;height:${MARKET_SCENE_HEIGHT}px">${trees.map(([x, y]) => `<div class="town-prop market-tree market-border-tree" style="left:${x}px;top:${y}px;width:210px;height:210px;background-position:0 0"></div>`).join('')}<div class="market-world" style="left:${MARKET_SCENE_PADDING}px;top:${MARKET_SCENE_PADDING}px;width:${MARKET_WIDTH}px;height:${MARKET_HEIGHT}px">${MARKET_BUILDINGS.map((b, i) => `<div data-market-place="${i === 1 ? 'auction' : (MARKET_VENUES.find((v) => v.building === i)?.id ?? '')}" class="town-building market-shop" style="left:${b.x}px;top:${b.y}px;z-index:${b.y};width:260px;height:260px;${marketBuildingArt(b.art)}"><span class="town-building-caption">${b.label}</span></div>`).join('')}${[
       [420, 360, 160],
       [1590, 360, 160],
       [130, 1320, 150],
@@ -104,13 +118,17 @@ export class SectMarketScene {
       )
       .join(
         '',
-      )}<div class="town-prop market-lanterns" style="left:1000px;top:515px;width:220px;height:220px;z-index:515;background-position:100% 0"></div>${MARKET_VENUES.map((v) => `<div class="sect-market-auction-sign market-venue-sign" data-venue-sign="${v.id}" style="left:${v.x}px;top:${v.y - 30}px;z-index:${v.y - 20}"><small>${v.hint}</small></div>`).join('')}<div class="sect-market-auction-sign" style="left:${AUCTION_SPOT.x}px;top:${AUCTION_SPOT.y + 35}px"><small>门前入席 · 丹药法宝</small></div><div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc ${npc.roaming ? 'market-visitor' : 'market-trader'}" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${marketRealmLabel(npc, realm)}<br>${npc.role}</small></span></div>`).join('')}</div></div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${MARKET_VENUES.map((v) => `<circle cx="${v.x}" cy="${v.y}" r="22" fill="#d3be80"/>`).join('')}${this.residents.map((n) => `<circle data-market-marker="${n.id}" cx="${n.x}" cy="${n.y}" r="${n.roaming ? 18 : 28}" fill="${n.roaming ? '#a5bca0' : '#dbc17a'}"/>`).join('')}<rect x="${AUCTION_SPOT.x - 25}" y="${AUCTION_SPOT.y - 25}" width="50" height="50" fill="#f1db9a"/><circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
+      )}<div class="town-prop market-lanterns" style="left:1000px;top:515px;width:220px;height:220px;z-index:515;background-position:100% 0"></div><div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc ${npc.roaming ? 'market-visitor' : 'market-trader'}" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${marketRealmLabel(npc, realm)}<br>${npc.role}</small></span></div>`).join('')}</div></div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${MARKET_VENUES.map((v) => `<circle cx="${v.x}" cy="${v.y}" r="22" fill="#d3be80"/>`).join('')}${this.residents.map((n) => `<circle data-market-marker="${n.id}" cx="${n.x}" cy="${n.y}" r="${n.roaming ? 18 : 28}" fill="${n.roaming ? '#a5bca0' : '#dbc17a'}"/>`).join('')}<rect x="${AUCTION_SPOT.x - 25}" y="${AUCTION_SPOT.y - 25}" width="50" height="50" fill="#f1db9a"/><circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.sect-market-map')!;
     this.player = host.querySelector('.town-player')!;
-    this.activeLabel = document.createElement('span');
-    this.activeLabel.className = 'sect-market-npc-name market-active-label';
-    this.activeLabel.hidden = true;
-    host.querySelector('.market-world')!.append(this.activeLabel);
+    if (returnTown)
+      this.passage = new SettlementPassage(
+        host,
+        host.querySelector('.market-world')!,
+        'market',
+        () => true,
+        returnTown,
+      );
     this.visitorNodes = this.residents
       .filter((n) => n.roaming)
       .map((npc) => ({
@@ -134,6 +152,8 @@ export class SectMarketScene {
         if (['w', 'a', 's', 'd', 'arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key)) {
           e.preventDefault();
           this.clickRoute = [];
+          this.clickTarget = null;
+          this.selectedNpc = null;
           this.keys.add(key);
         }
         if (key === 'e' && !e.repeat) {
@@ -168,24 +188,19 @@ export class SectMarketScene {
         if (!this.enabled || this.pointer || !e.isPrimary || e.button !== 0) return;
         e.preventDefault();
         host.focus({ preventScroll: true });
+        this.clearInput();
+        this.selectedNpc = null;
         if (e.pointerType === 'mouse') {
-          this.clearInput();
-          const world = host.querySelector<HTMLElement>('.market-world')!;
-          this.clickRoute = walkRoute(
-            this.position,
-            mapClick(world, MARKET_WIDTH, MARKET_HEIGHT, e.clientX, e.clientY),
-            (p) =>
-              p.x >= 24 &&
-              p.x <= MARKET_WIDTH - 24 &&
-              p.y >= 24 &&
-              p.y <= MARKET_HEIGHT - 24 &&
-              townWalkable(p, MARKET_BUILDINGS, 260),
-            MARKET_WIDTH,
-            MARKET_HEIGHT,
-          );
+          this.queueClick(e.target as Element, e.clientX, e.clientY);
           return;
         }
-        this.pointer = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        this.pointer = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          target: e.target as Element,
+          moved: false,
+        };
         host.setPointerCapture(e.pointerId);
       },
       options,
@@ -194,11 +209,22 @@ export class SectMarketScene {
       'pointermove',
       (e) => {
         if (this.pointer?.id !== e.pointerId) return;
+        if (Math.hypot(e.clientX - this.pointer.x, e.clientY - this.pointer.y) > 8)
+          this.pointer.moved = true;
         this.touch = { x: (e.clientX - this.pointer.x) / 45, y: (e.clientY - this.pointer.y) / 45 };
       },
       options,
     );
-    for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'])
+    host.addEventListener(
+      'pointerup',
+      (e) => {
+        const tap = this.pointer?.id === e.pointerId ? this.pointer : null;
+        this.clearPointer();
+        if (tap && !tap.moved && this.enabled) this.queueClick(tap.target, e.clientX, e.clientY);
+      },
+      options,
+    );
+    for (const event of ['pointercancel', 'lostpointercapture'])
       host.addEventListener(event, () => this.clearPointer(), options);
     let loaded = 0;
     Promise.all(
@@ -239,7 +265,78 @@ export class SectMarketScene {
         );
       });
   }
+  private routeTo(point: TownPoint) {
+    this.clickRoute = walkRoute(
+      this.position,
+      point,
+      (p) =>
+        p.x >= 24 &&
+        p.x <= MARKET_WIDTH - 24 &&
+        p.y >= 24 &&
+        p.y <= MARKET_HEIGHT - 24 &&
+        townWalkable(p, MARKET_BUILDINGS, 260),
+      MARKET_WIDTH,
+      MARKET_HEIGHT,
+    );
+  }
+  private queueClick(element: Element | null, x: number, y: number) {
+    this.clickTarget = null;
+    const world = this.host.querySelector<HTMLElement>('.market-world')!;
+    let target = mapClick(world, MARKET_WIDTH, MARKET_HEIGHT, x, y);
+    const node = element?.closest<HTMLElement>(
+      '[data-market-npc], [data-market-place], [data-passage]',
+    );
+    const npc = this.residents.find((n) => n.id === node?.dataset.marketNpc);
+    if (npc) {
+      this.clickTarget = { id: npc.id, generation: npc.generation, kind: 'npc' };
+      target = npc;
+    } else if (node?.dataset.passage === 'market') target = SETTLEMENT_PATHS.market.gate;
+    else if (node) {
+      const place = node.dataset.marketPlace;
+      if (place === 'auction') {
+        this.clickTarget = { id: place, kind: 'auction' };
+        target = AUCTION_SPOT;
+      } else {
+        const venue = MARKET_VENUES.find((v) => v.id === place);
+        if (venue) {
+          this.clickTarget = { id: venue.id, kind: 'venue' };
+          target = venue;
+        }
+      }
+    }
+    this.routeTo(target);
+  }
+  private interactAfterWalking() {
+    const target = this.clickTarget;
+    if (!this.enabled || !target) return;
+    if (target.kind === 'auction' && this.nearAuction) {
+      this.clearInput();
+      this.openAuction();
+    } else if (target.kind === 'venue' && this.nearVenue?.id === target.id) {
+      this.clearInput();
+      this.openVenue(target.id as MarketVenueId);
+    } else if (target.kind === 'npc') {
+      const npc = this.residents.find(
+        (n) => n.id === target.id && n.generation === target.generation,
+      );
+      if (!npc) {
+        this.clearInput();
+        return;
+      }
+      if (Math.hypot(npc.x - this.position.x, npc.y - this.position.y) <= 100) {
+        this.clearInput();
+        this.selectedNpc = npc;
+        this.interact(npc);
+      } else if (!this.clickRoute.length) this.routeTo(npc);
+    }
+  }
   get nearbyNpc() {
+    if (
+      this.selectedNpc &&
+      this.residents.includes(this.selectedNpc) &&
+      Math.hypot(this.selectedNpc.x - this.position.x, this.selectedNpc.y - this.position.y) <= 145
+    )
+      return this.selectedNpc;
     const id = nearbyMarketCultivator(this.position, this.residents);
     return this.residents.find((npc) => npc.id === id);
   }
@@ -312,9 +409,6 @@ export class SectMarketScene {
       place &&
       (!near || place.distance < Math.hypot(this.position.x - near.x, this.position.y - near.y));
     const nearId = this.nearAuction ? 'auction' : usePlace ? place.id : (near?.id ?? '');
-    const labelOffset = `${this.position.y - (nearId === 'auction' ? AUCTION_SPOT.y : usePlace ? place.y : (near?.y ?? this.position.y))}px`;
-    if (this.host.style.getPropertyValue('--market-label-offset') !== labelOffset)
-      this.host.style.setProperty('--market-label-offset', labelOffset);
     if (this.nearbyId !== nearId || !this.host.dataset.initialized) {
       this.nearbyId = nearId;
       this.host.dataset.initialized = 'true';
@@ -332,23 +426,6 @@ export class SectMarketScene {
       this.host
         .querySelectorAll<HTMLElement>('.sect-market-npc')
         .forEach((node) => node.classList.toggle('nearby', node.dataset.marketNpc === nearId));
-      this.host
-        .querySelectorAll<HTMLElement>('.sect-market-auction-sign')
-        .forEach((node) =>
-          node.classList.toggle('nearby', (node.dataset.venueSign ?? 'auction') === nearId),
-        );
-      const label =
-        near?.id === nearId
-          ? this.host.querySelector(`[data-market-npc="${nearId}"] .sect-market-npc-name`)
-          : null;
-      this.activeLabel.hidden = !label;
-      this.activeLabel.replaceChildren(
-        ...Array.from(label?.childNodes ?? [], (node) => node.cloneNode(true)),
-      );
-    }
-    if (!this.activeLabel.hidden && near) {
-      this.activeLabel.style.left = `${near.x}px`;
-      this.activeLabel.style.top = `${this.position.y + 12}px`;
     }
     const guided = this.residents.find((n) => n.id === this.guidedId);
     const note = document.getElementById('market-guide');
@@ -382,6 +459,8 @@ export class SectMarketScene {
     marker?.setAttribute('cy', String(this.position.y));
     this.host.dataset.x = this.position.x.toFixed(1);
     this.host.dataset.y = this.position.y.toFixed(1);
+    this.interactAfterWalking();
+    this.passage?.update(this.position, this.enabled);
   }
   talk() {
     if (!this.enabled) return;
@@ -425,6 +504,7 @@ export class SectMarketScene {
   }
   private clearInput() {
     this.clickRoute = [];
+    this.clickTarget = null;
     this.keys.clear();
     this.clearPointer();
   }

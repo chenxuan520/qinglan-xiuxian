@@ -18,7 +18,12 @@ import { joinSect } from '../src/mortal.ts';
 import { curioSeekingQuote, seekCurio } from '../src/curio-market.ts';
 import { venueStamp } from '../src/market-venues.ts';
 import { beginSectMarketVisit, sectMarketDeals, exchangeSectMedicine } from '../src/sect-market.ts';
-import { prepareAuction, auctionFee, releaseAuctionItem } from '../src/auction.ts';
+import {
+  prepareAuction,
+  selectAuctionHall,
+  auctionFee,
+  releaseAuctionItem,
+} from '../src/auction.ts';
 import { auctionLots, buyAuction, sellAuction } from '../src/auction-trade.ts';
 import { AUCTION_CURIO_LOT } from '../src/auction-data.ts';
 import {
@@ -112,13 +117,18 @@ test('第三件奇物经妖王结算、寻访、竞拍均即时记入履历，�
   });
   assert.equal(battle.chronicle.milestones['curio-three'], battle.age);
   for (const sect of [false, true]) {
-    const seeking = ready();
-    twoCurios(seeking, 'jade-book');
-    if (sect) assert.equal(joinSect(seeking, 'power'), true);
-    seeking.curios.seeking['jade-book'] = 2;
-    assert.equal(curioSeekingQuote(seeking, 'jade-book', sect).reason, '');
-    assert.ok(seekCurio(seeking, 'jade-book', venueStamp(seeking), sect));
-    assert.equal(seeking.chronicle.milestones['curio-three'], 33);
+    for (const seed of [0, 2]) {
+      const seeking = ready();
+      twoCurios(seeking, 'jade-book');
+      if (sect) assert.equal(joinSect(seeking, 'power'), true);
+      seeking.curios.seed = seed;
+      seeking.curios.seeking['jade-book'] = 2;
+      assert.equal(curioSeekingQuote(seeking, 'jade-book', sect).reason, '');
+      assert.ok(seekCurio(seeking, 'jade-book', venueStamp(seeking), sect));
+      assert.equal(seeking.age, 40);
+      assert.equal(seeking.chronicle.milestones['curio-three'], seed === 0 ? 40 : undefined);
+      assert.equal(seeking.curios.bag['jade-book'] ?? 0, seed === 0 ? 1 : 0);
+    }
   }
   const auction = ready();
   twoCurios(auction, 'jade-book');
@@ -157,6 +167,7 @@ test('慧眼识珍仅真实竞得五阶以上法宝触发，四阶、落拍和�
     let found = false;
     for (let seed = 1; seed <= 100 && !found; seed++) {
       const save = ready(seed);
+      selectAuctionHall(save, level < 6 ? 1 : 2, 1);
       const lot = auctionLots(save).find(
         (item) =>
           item.kind === 'artifact' &&

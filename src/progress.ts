@@ -111,7 +111,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 27;
+export const SAVE_SCHEMA = 28;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -343,7 +343,7 @@ export function readSave(
           (id) =>
             s.curios.acquired?.includes(id) ||
             Object.hasOwn(s.curios.bag, id) ||
-            s.curios.seeking[id] === 3 ||
+            ((s.schema ?? 0) < 28 && s.curios.seeking[id] === 3) ||
             (validAuction(
               s.mortal?.auction,
               base.age,
@@ -821,7 +821,7 @@ export const forgeCost = (level: number, save?: SaveData) => {
   };
 };
 export function train(save: SaveData, kind: keyof SaveData['training']) {
-  const cost = trainingCost(save.training[kind]);
+  const cost = trainingCost(save.training[kind], save);
   const years = trainingYears(save);
   if (
     save.training[kind] >= 20 ||

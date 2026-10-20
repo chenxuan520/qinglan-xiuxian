@@ -12,6 +12,7 @@ import {
   AUCTION_HALLS,
   AUCTION_LOTS,
   AUCTION_IRON_MIN,
+  AUCTION_PREMIUM_MIN_VALUE,
   type AuctionItem,
   type AuctionKind,
   type AuctionReceipt,
@@ -139,7 +140,7 @@ export function auctionContent(
     },
   ).join(
     '',
-  )}</div><p class="panel-note">${['凡品、灵品丹药 · 低阶法宝 · 大批玄铁', '灵品为主，兼有珍品丹药 · 一至三阶法宝 · 偶有奇物', '珍品丹药为主，偶有稀有丹药 · 三至六阶法宝 · 偶有奇物'][state.hall]}。境界不足可缴费取得本世资格，${AUCTION_HALLS[2].name}资格包含${AUCTION_HALLS[1].name}。切场不计龄。</p>`;
+  )}</div><p class="panel-note">${['凡品、灵品丹药 · 大批玄铁', '灵品为主，兼有珍品丹药 · 偶有奇物', '珍品丹药为主，偶有稀有丹药 · 偶有奇物'][state.hall]} · 炼器${AUCTION_HALLS[state.hall].forgeMin}～${AUCTION_HALLS[state.hall].forgeMax}阶法宝${state.hall === 2 ? ` · 起拍至少${AUCTION_PREMIUM_MIN_VALUE}灵石` : ''}。境界不足可缴费取得本世资格，${AUCTION_HALLS[2].name}资格包含${AUCTION_HALLS[1].name}。切场不计龄。</p>`;
   const toolbar = `${halls}<div class="auction-toolbar"><span>灵石 <strong>${num(save.stones)}</strong></span><small>第 ${visit} 批 · 每场半年 · 即时结算${auctionDues(save) ? ` · 已预留供奉 ${auctionDues(save)} 灵石` : ''}</small></div><div class="medicine-tabs auction-tabs" role="group" aria-label="拍卖用途">${[
     ['buy', '参与竞拍'],
     ['sell', '委托出售'],
@@ -152,7 +153,7 @@ export function auctionContent(
     .join('')}</div>`;
   let content: string;
   if (view === 'buy') {
-    content = `<details><summary>竞拍规则与换批</summary><p class="panel-note">填一次最高预算，修士代你逐次竞价。每次竞拍消耗半年，落拍也计龄。每次加价至少为起拍价的5%（向上取整，至少1灵石）。预算包含 5% 手续费；不足下一档出价与手续费时便会落拍，不能只拿总预算与对手成交价比较。成交只扣实际成交价与手续费，落拍不扣钱。每场四份丹药、四件物品。本批每件只拍一次，本批满一年后，再入坊市才更换修士和常规拍品；偶有奇物寄拍，按十年更换，不随重进换货。奇物由代客席统一竞价。本世已获得过的奇物不再寄拍。法宝保留炼器阶数，收入收藏，自行选择本命。</p></details><div class="auction-grid">${auctionLots(
+    content = `<details><summary>竞拍规则与换批</summary><p class="panel-note">填一次最高预算，修士代你逐次竞价。每次竞拍消耗半年，落拍也计龄。每次加价至少为起拍价的5%（向上取整，至少1灵石）。预算包含 5% 手续费；不足下一档出价与手续费时便会落拍，不能只拿总预算与对手成交价比较。成交只扣实际成交价与手续费，落拍不扣钱。每场四份丹药、四件物品；本批丹药与法宝各不重名。本批每件只拍一次，本批满一年后，再入坊市才更换修士和常规拍品；偶有奇物寄拍，按十年更换，不随重进换货。奇物由代客席统一竞价。本世已获得过的奇物不再寄拍。法宝保留炼器阶数，收入收藏，自行选择本命。</p></details><div class="auction-grid">${auctionLots(
       save,
     )
       .map((lot) => {
@@ -207,7 +208,7 @@ export function auctionContent(
   } else {
     content = `<p class="panel-note">近来的结拍往来。</p>${state.history.length ? state.history.map((r) => `<article class="auction-receipt">${art(r)}<div><small>${r.age.toFixed(1)} 岁 · ${AUCTION_HALLS[r.hall].name} · 第 ${r.visit} 批</small><p>${auctionResult(save, r)}</p></div></article>`).join('') : '<p class="panel-note">尚未参与竞拍或委托出售。</p>'}`;
   }
-  return `${toolbar}<p id="auction-result" class="auction-result" role="status" hidden></p>${content}<button class="secondary-button" data-action="close">回到坊市</button>`;
+  return `${toolbar}<p id="auction-result" class="auction-result" role="status" hidden></p>${content}<button class="secondary-button auction-return" data-action="close">回到坊市</button>`;
 }
 
 // 会场切换与缴费同样先写档，再应用到当前页面。

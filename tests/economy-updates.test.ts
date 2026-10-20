@@ -197,7 +197,7 @@ test('补天丹保留任意本命法宝、炼器和五行，收束为天灵根�
     assert.equal(s.starter, 'qin');
   }
 });
-test('青莲灯只稍后于优选法宝，仍胜普通候选，不触发额外重抽；本命与觉醒维持优先', () => {
+test('青莲灯与普通法宝同档，沿用普通重悟规则；本命与觉醒维持优先', () => {
   const s = wealthy(),
     g = new Game(s, 0, 0);
   g.player.hp = g.player.maxHp;
@@ -210,20 +210,21 @@ test('青莲灯只稍后于优选法宝，仍胜普通候选，不触发额外�
     { type: 'weapon', id: 'orbit', level: 1 },
     { type: 'weapon', id: 'whip', level: 1 },
   ];
-  assert.deepEqual(autoplayChoice(g), { index: 0, reroll: false });
+  assert.deepEqual(autoplayChoice(g), { index: 0, reroll: true });
   g.choices = [
     { type: 'weapon', id: 'orbit', level: 1 },
     { type: 'heal', id: 'heal', level: 1 },
   ];
-  assert.deepEqual(autoplayChoice(g), { index: 0, reroll: false });
+  assert.deepEqual(autoplayChoice(g), { index: 0, reroll: true });
   g.choices = [
     { type: 'weapon', id: 'orbit', level: 2 },
     { type: 'weapon', id: 'sword', level: 2 },
   ];
-  assert.equal(autoplayChoice(g)!.index, 0, '非本命已有青莲灯升级保持原优先级');
+  assert.equal(autoplayChoice(g)!.index, 1, '非本命已有青莲灯升级按普通档排序');
   g.choices.reverse();
-  assert.equal(autoplayChoice(g)!.index, 0, '已有同级优选法宝保持原同分顺序');
-  s.starter = 'orbit';
+  assert.equal(autoplayChoice(g)!.index, 0, '优选法宝不依赖候选排列顺序');
+  g.save.autoplayBuild = { mode: 'native', targets: ['', ''] };
+  g.weapons = [{ id: 'orbit', level: 1, timer: 0, evolved: false }];
   g.choices = [
     { type: 'weapon', id: 'orbit', level: 2 },
     { type: 'weapon', id: 'sword', level: 2 },

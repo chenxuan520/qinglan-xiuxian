@@ -30,6 +30,8 @@ import { playerSpriteFrame } from './player-appearance.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import { GAME_SITE_URL } from './setting.ts';
 import { JOURNEY_SHARE_URL } from './sharing.ts';
+import { spiritPower } from './spirit-power.ts';
+import { formatNumber } from './number-format.ts';
 export { mountJourneyCardActions } from './journey-card-actions.ts';
 
 export const JOURNEY_CARD_QR = encode(JOURNEY_SHARE_URL, { ecc: 'M', border: 4 });
@@ -347,6 +349,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
       element: elementInfo(weapon.element).name,
       forge: save.forge[weapon.id] ?? 0,
     },
+    power: spiritPower(save).score,
     identity: `${pathInfo(save.path).name} · ${sect ? `${sect.name} · ${sectRole(save)}` : '散修'}`,
     ending: state,
     ended: save.journeyEnded && realm.max,
@@ -539,8 +542,9 @@ export async function createJourneyCard(
     );
     c.strokeStyle = '#c2b78670';
     c.strokeRect(566, 891, 136, 136);
-    text(card.weapon.name, 728, 950, 34, '#ece7d1', 270);
-    text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 728, 996, 28, '#bcc7af', 270);
+    text(card.weapon.name, 728, 928, 34, '#ece7d1', 270);
+    text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 728, 974, 28, '#bcc7af', 270);
+    text(`此世灵威 ${formatNumber(card.power)}`, 728, 1014, 24, '#d8c998', 270);
     c.save();
     c.textAlign = 'center';
     text(

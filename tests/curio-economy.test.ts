@@ -96,15 +96,18 @@ test('奇物竞得再出售始终亏损，跨十年行情也不能低买高卖�
   }
 });
 
-test('寻访按新估值分三次收费，宗门与坊市报价明确且卖出不足抵回投入', () => {
+test('寻访每次按原单次估值收费，未获也扣费；宗门与坊市都不能转售套利', () => {
   for (const id of CURIO_IDS.slice(1)) {
     for (const sect of [false, true]) {
       const s = fixture();
       if (sect) assert.ok(joinSect(s, 'power'));
       let spent = 0;
-      for (let step = 0; step < 3; step++) {
+      const price = Math.ceil((curioValue(id) * (sect ? 108 : 120)) / 300);
+      for (let step = 0; step < 20 && !ownsCurio(s, id); step++) {
         const q = curioSeekingQuote(s, id, sect);
         assert.equal(q.reason, '');
+        assert.equal(q.price, price);
+        assert.equal(q.years, 10);
         const insufficient = structuredClone(s);
         insufficient.stones = q.price - 1;
         const before = JSON.stringify(insufficient);
@@ -112,14 +115,14 @@ test('寻访按新估值分三次收费，宗门与坊市报价明确且卖出�
         assert.equal(JSON.stringify(insufficient), before);
         assert.ok(seekCurio(s, id, venueStamp(s), sect));
         spent += q.price;
-        assert.equal(s.curios.bag[id] ?? 0, step === 2 ? 1 : 0);
         s.age += 10;
       }
-      assert.equal(spent, (curioValue(id) * (sect ? 108 : 120)) / 100);
+      assert.ok(ownsCurio(s, id), id);
+      assert.equal(spent, price * s.curios.seeking[id]!);
       const receipt = sellAuction(s, item(id), 1, s.mortal.sectMarket!.visit)!;
       assert.equal(receipt.outcome, 'sold');
-      // 宗门寻访108%，最高卖出净回款13.5%，恰好最多回收投入的八分之一。
-      assert.ok(receipt.price - receipt.fee <= spent / 8);
+      // 即使首访即得，最高净回款13.5%也低于最低单次寻访费36%。
+      assert.ok(receipt.price - receipt.fee < spent);
       assert.match(curioSeekingQuote(s, id, sect).reason, /本世已寻得/);
     }
   }
@@ -151,7 +154,9 @@ test('出售页预告奇物收购与到手范围，默认保留价可成交，�
   const s = fixture();
   s.curios.seeking['soul-wood'] = 2;
   const q = curioSeekingQuote(s, 'soul-wood');
-  assert.ok(curioSeekingContent(s).includes(`剩余${q.price.toLocaleString('zh-CN')}灵石`));
+  assert.ok(curioSeekingContent(s).includes(`本次${q.price.toLocaleString('zh-CN')}灵石`));
+  assert.match(curioSeekingContent(s), /本次机会 40%/);
+  assert.doesNotMatch(curioSeekingContent(s), /剩余|\/3|三次托付/);
   assert.deepEqual(auctionSaleRates(item('soul-wood')), [10, 15]);
   assert.deepEqual(
     auctionSaleRates({ kind: 'medicine', id: 'lingru', quantity: 1, forgeLevel: 0 }),
