@@ -10,7 +10,7 @@
     "build:cloudflare": "npm run assets:check && npm run build -- --base / --outDir artifacts/cloudflare --emptyOutDir && node --experimental-strip-types scripts/size-check.ts --dir artifacts/cloudflare",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler pages deploy artifacts/cloudflare --project-name qinglan-xiuxian --branch master",
     "check:npc-ai": "node -e \"require('node:fs').mkdirSync('artifacts', { recursive: true })\" && wrangler types artifacts/npc-ai-env.d.ts --config workers/npc-ai/wrangler.jsonc --env-interface NpcAiEnv && tsc -p workers/npc-ai/tsconfig.json",
-    "deploy:npc-ai": "npm run check:npc-ai && wrangler deploy --config workers/npc-ai/wrangler.jsonc",
+    "deploy:npc-ai": "npm run check:npc-ai && wrangler deploy --config workers/npc-ai/wrangler.jsonc --keep-vars",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "docs:check": "node --experimental-strip-types --test tests/gameplay-docs.test.ts tests/guide-source.test.ts tests/bestiary.test.ts",

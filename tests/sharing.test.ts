@@ -85,13 +85,29 @@ function controls(emit?: (action: SharingAction) => void) {
     querySelector: (selector: string) =>
       ({ img: image, a: download, button, '[role="status"]': status })[selector],
   };
-  mountJourneyCardActions(
+  const dispose = mountJourneyCardActions(
     host as unknown as HTMLElement,
-    'data:image/png;base64,iVBORw==',
+    new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
     emit ?? ((a) => events.push(a)),
   );
-  return { host, events, status, download, button };
+  return { host, events, status, download, button, image, dispose };
 }
+
+test('预览与下载使用相同PNG内容，关闭只释放预览地址、不打断已经发起的下载', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const c = controls();
+  assert.deepEqual(
+    new Uint8Array(await (await fetch(c.image.src)).arrayBuffer()),
+    new Uint8Array([137, 80, 78, 71]),
+  );
+  c.download.click();
+  assert.notEqual(c.image.src, c.download.href);
+  c.dispose();
+  await assert.rejects(fetch(c.image.src));
+  assert.equal((await fetch(c.download.href)).status, 200);
+  t.mock.timers.tick(60000);
+  await assert.rejects(fetch(c.download.href));
+});
 
 test('实际分享动作区记录预览、下载请求和下载错误，不虚报保存完成', (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });

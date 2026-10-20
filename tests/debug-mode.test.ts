@@ -1,19 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import worker from '../workers/npc-ai/index.ts';
 import { DEBUG_SETTINGS } from '../src/setting.ts';
 import { debugAccess } from '../src/debug-access.ts';
 import { DebugEntry } from '../src/debug-entry.ts';
-import { debugGrant, type DebugGrant } from '../src/debug-resources.ts';
+import {
+  DEBUG_REALMS,
+  debugCultivationRemaining,
+  debugGrant,
+  type DebugGrant,
+} from '../src/debug-resources.ts';
 import type { DebugHost } from '../src/debug-panel.ts';
-import { freshSave, readSave, SAVE_SCHEMA } from '../src/progress.ts';
-import { TREASURES } from '../src/data.ts';
+import {
+  freshSave,
+  readSave,
+  SAVE_SCHEMA,
+  realmInfo,
+  realmCost,
+  IMMORTAL_CULTIVATION,
+  TRIBULATION_INTERVAL,
+} from '../src/progress.ts';
+import { FINAL_TRIAL_STAGE, TREASURES } from '../src/data.ts';
 import { CURIO_IDS } from '../src/curio-data.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 
 const origin = 'https://xiuxian.011203.xyz';
 const accessRequest = (method = 'GET', site = origin) =>
   new Request('https://npc.example' + DEBUG_SETTINGS.path, { method, headers: { Origin: site } });
+
+test('普通Worker发布保留线上调试开关，配置不再覆盖同名变量', () => {
+  const config = readFileSync(new URL('../workers/npc-ai/wrangler.jsonc', import.meta.url), 'utf8');
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.doesNotMatch(config, /"DEBUG_MODE_ENABLED"\s*:/);
+  assert.match(pkg.scripts['deploy:npc-ai'], /wrangler deploy[^&]* --keep-vars(?:\s|$)/);
+});
 
 test('Worker 调试开关默认关闭，仅明确true开放；两站与本机CORS均正常且禁止缓存', async () => {
   for (const setting of [undefined, '', 'false', 'TRUE', '1', 'true']) {
@@ -178,6 +199,62 @@ const request = (kind: string, id = '', quantity = 1, forge = 0): DebugGrant => 
   id,
   quantity,
   forge,
+});
+
+test('直达所有小境界到渡劫，使用真实累计门槛并记录突破；不改年岁本命或通关', () => {
+  let s = freshSave();
+  const before = structuredClone(s);
+  for (const target of DEBUG_REALMS) {
+    const original = structuredClone(s);
+    const result = debugGrant(s, request('realm', target.id));
+    assert.ok(result.next, result.error);
+    assert.deepEqual(s, original);
+    s = result.next;
+    const realm = realmInfo(s.cultivation, false);
+    assert.equal(realm.name, target.name);
+    assert.equal(realm.max, false);
+    assert.equal(s.age, before.age);
+    assert.equal(s.starter, before.starter);
+    assert.deepEqual(s.completed, before.completed);
+    assert.deepEqual(s.medicine, before.medicine);
+    assert.equal(
+      s.cultivation,
+      target.id === '0'
+        ? 1
+        : Array.from({ length: +target.id }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0),
+    );
+    if (+target.id >= 21) assert.equal(s.nextTribulationAge, s.age + TRIBULATION_INTERVAL);
+    assert.equal(readSave(JSON.stringify(s)).save.cultivation, s.cultivation);
+    assert.ok('error' in debugGrant(s, request('realm', target.id)));
+  }
+  assert.equal(s.cultivation, IMMORTAL_CULTIVATION);
+  assert.equal(debugCultivationRemaining(s), 0);
+  assert.ok(Object.hasOwn(s.chronicle.milestones, 'ascension'));
+  assert.ok(!Object.hasOwn(s.chronicle.milestones, 'realm-24'));
+});
+
+test('指定修为精确增加，边界跨入渡劫但不真仙；无效、超限或低境界请求不部分发放', () => {
+  const s = freshSave();
+  s.cultivation = IMMORTAL_CULTIVATION - 2;
+  const result = debugGrant(s, request('cultivation', '', 2));
+  assert.ok(result.next, result.error);
+  assert.equal(result.next.cultivation, IMMORTAL_CULTIVATION);
+  assert.equal(realmInfo(result.next.cultivation).name, '渡劫');
+  assert.equal(s.cultivation, IMMORTAL_CULTIVATION - 2);
+  for (const input of [
+    ...[0, -1, 0.5, NaN, Infinity, 3, Number.MAX_SAFE_INTEGER].map((n) =>
+      request('cultivation', '', n),
+    ),
+    ...['', '-1', '0', '21', '25', '24.0', '真仙', '__proto__'].map((id) => request('realm', id)),
+  ]) {
+    const before = structuredClone(s);
+    assert.ok('error' in debugGrant(s, input));
+    assert.deepEqual(s, before);
+  }
+  for (const base of [result.next, { ...s, completed: [FINAL_TRIAL_STAGE] }]) {
+    for (const input of [request('cultivation'), request('realm', '24')])
+      assert.ok('error' in debugGrant(base, input));
+  }
 });
 test('五类发放只返回副本，可按原存档格式保存读回；本命、功法、配方、年岁及修为保留', () => {
   let s = freshSave();

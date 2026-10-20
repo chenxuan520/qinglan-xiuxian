@@ -1,10 +1,35 @@
-import { MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
 import { isCurio, curioName, grantCurio } from './curio-data.ts';
 import { medicineInfo } from './medicine-data.ts';
-import type { SaveData } from './progress.ts';
-import { recordCurioAchievement } from './chronicle.ts';
+import {
+  gainCultivation,
+  IMMORTAL_CULTIVATION,
+  realmCost,
+  syncTribulationClock,
+  type SaveData,
+} from './progress.ts';
+import { realmTitle, recordCurioAchievement } from './chronicle.ts';
 
-export type DebugResourceKind = 'stones' | 'iron' | 'artifact' | 'medicine' | 'curio';
+export type DebugResourceKind =
+  | 'stones'
+  | 'iron'
+  | 'artifact'
+  | 'medicine'
+  | 'curio'
+  | 'cultivation'
+  | 'realm';
+export const DEBUG_REALMS = Array.from({ length: 25 }, (_, step) => ({
+  id: String(step),
+  name: step === 24 ? '渡劫' : realmTitle(step),
+  cultivation:
+    step === 0
+      ? 1
+      : Array.from({ length: step }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0),
+}));
+export const debugCultivationRemaining = (save: SaveData) =>
+  save.completed.includes(FINAL_TRIAL_STAGE)
+    ? 0
+    : Math.max(0, IMMORTAL_CULTIVATION - save.cultivation);
 export interface DebugGrant {
   kind: string;
   id: string;
@@ -12,7 +37,13 @@ export interface DebugGrant {
   forge: number;
 }
 export const debugQuantityLimit = (kind: string) =>
-  kind === 'stones' || kind === 'iron' ? 1000000 : kind === 'medicine' ? 1000 : 1;
+  kind === 'cultivation'
+    ? IMMORTAL_CULTIVATION
+    : kind === 'stones' || kind === 'iron'
+      ? 1000000
+      : kind === 'medicine'
+        ? 1000
+        : 1;
 
 // 只构造副本，持久化成功前不触碰正在游玩的存档。
 export function debugGrant(save: SaveData, input: DebugGrant) {
@@ -25,7 +56,31 @@ export function debugGrant(save: SaveData, input: DebugGrant) {
     current >= 0 &&
     Number.isSafeInteger(current + input.quantity);
   let message: string;
-  if (input.kind === 'stones' || input.kind === 'iron') {
+  if (input.kind === 'cultivation' || input.kind === 'realm') {
+    const remaining = debugCultivationRemaining(next);
+    if (!remaining) return { error: '修为调试最高到渡劫，当前已达上限。' };
+    const target = DEBUG_REALMS.find((r) => r.id === input.id);
+    const amount =
+      input.kind === 'realm' ? (target?.cultivation ?? NaN) - next.cultivation : input.quantity;
+    if (
+      !Number.isSafeInteger(next.cultivation) ||
+      !Number.isSafeInteger(amount) ||
+      amount <= 0 ||
+      amount > remaining
+    )
+      return {
+        error:
+          input.kind === 'realm'
+            ? '请选择高于当前的境界，最高到渡劫。'
+            : `请输入有效修为点数，最多可增加 ${remaining.toLocaleString('zh-CN')} 点。`,
+      };
+    gainCultivation(next, amount);
+    syncTribulationClock(next);
+    message =
+      input.kind === 'realm'
+        ? `已达${target!.name} · 永久修为 +${amount.toLocaleString('zh-CN')}`
+        : `永久修为 +${amount.toLocaleString('zh-CN')}`;
+  } else if (input.kind === 'stones' || input.kind === 'iron') {
     if (!add(next[input.kind], debugQuantityLimit(input.kind)))
       return { error: '请输入有效数量，余额不能超出上限。' };
     next[input.kind] += input.quantity;

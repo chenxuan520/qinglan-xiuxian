@@ -42,7 +42,8 @@ import { monitorResponse, type MonitorEnv } from './monitor.ts';
 export const NPC_MODEL = NPC_AI_SETTINGS.model;
 export const STORY_IMAGE_MODEL = TEA_STORY_IMAGE_SETTINGS.model;
 export const JOURNEY_APPRAISAL_MODEL = JOURNEY_APPRAISAL_SETTINGS.model;
-type WorkerEnv = NpcAiEnv & MonitorEnv & { STORY_IMAGE_SECRET?: string };
+type WorkerEnv = NpcAiEnv &
+  MonitorEnv & { STORY_IMAGE_SECRET?: string; DEBUG_MODE_ENABLED?: string };
 const textEncoder = new TextEncoder();
 async function storyImageKey(secret: string) {
   return crypto.subtle.importKey(

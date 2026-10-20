@@ -3,7 +3,7 @@ import type { SharingAction } from './sharing.ts';
 
 export function mountJourneyCardActions(
   host: HTMLElement,
-  url: string,
+  blob: Blob,
   emit: (action: SharingAction) => void,
 ) {
   const track = (action: SharingAction) => {
@@ -15,15 +15,12 @@ export function mountJourneyCardActions(
   };
   host.innerHTML =
     '<img alt="此世留影纪念卡预览"><div class="save-actions"><button class="primary-button">分享此世</button><a class="secondary-button" download="叩仙门：青岚纪-此世留影.png" target="_blank" rel="noopener" tabindex="0">保存图片</a></div><p class="panel-note" role="status">点击保存图片；手机也可长按图片，或通过「分享此世」保存。纪念图不能代替存档。</p>';
-  host.querySelector('img')!.src = url;
-  track('preview');
   const download = host.querySelector('a')!;
+  const file = new File([blob], download.download, { type: 'image/png' });
+  const url = URL.createObjectURL(file);
+  host.querySelector('img')!.src = url;
   download.href = url;
-  const file = new File(
-    [Uint8Array.from(atob(url.split(',')[1]), (char) => char.charCodeAt(0))],
-    download.download,
-    { type: 'image/png' },
-  );
+  track('preview');
   const status = host.querySelector<HTMLElement>('[role="status"]')!;
   download.onclick = () => {
     track('save-request');
@@ -52,4 +49,5 @@ export function mountJourneyCardActions(
     status.textContent =
       result === 'shared' ? '已交给系统分享面板。' : '已取消分享，图片仍在，可再次分享或保存。';
   };
+  return () => URL.revokeObjectURL(url);
 }

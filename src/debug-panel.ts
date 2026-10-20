@@ -1,11 +1,16 @@
-import { MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
 import { CURIOS } from './curio-info.ts';
 import { acquiredCurio, isCurio } from './curio-data.ts';
 import { MEDICINES } from './medicine-data.ts';
 import { debugAccess } from './debug-access.ts';
-import { debugGrant, debugQuantityLimit } from './debug-resources.ts';
+import {
+  DEBUG_REALMS,
+  debugCultivationRemaining,
+  debugGrant,
+  debugQuantityLimit,
+} from './debug-resources.ts';
 import type { DebugResourceKind } from './debug-resources.ts';
-import type { SaveData } from './progress.ts';
+import { realmInfo, type SaveData } from './progress.ts';
 
 export interface DebugHost {
   modal: HTMLElement;
@@ -35,6 +40,8 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
       ['artifact', '法宝'],
       ['medicine', '丹药'],
       ['curio', '奇物'],
+      ['cultivation', '增加永久修为'],
+      ['realm', '直达境界'],
     ]
       .map(([id, name]) => `<option value="${id}">${name}</option>`)
       .join(
@@ -54,6 +61,28 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
     const s = host.getSave();
     const selection = form.elements.namedItem('id') as HTMLSelectElement | null;
     const id = selection?.value ?? '';
+    if (kind.value === 'cultivation' || kind.value === 'realm') {
+      const remaining = debugCultivationRemaining(s);
+      const target = DEBUG_REALMS.find((r) => r.id === id);
+      root.querySelector('#debug-stock')!.textContent =
+        `当前${realmInfo(s.cultivation, s.completed.includes(FINAL_TRIAL_STAGE)).name} · 永久修为 ${s.cultivation.toLocaleString('zh-CN')} · 最多还能增加 ${remaining.toLocaleString('zh-CN')} 点，最高渡劫。`;
+      submit.disabled =
+        !remaining || (kind.value === 'realm' && (!target || target.cultivation <= s.cultivation));
+      if (!busy)
+        submit.textContent = !remaining
+          ? '已达调试上限'
+          : submit.disabled
+            ? '已达此境界'
+            : '发放到当前存档';
+      if (selection)
+        for (const option of selection.options)
+          option.disabled =
+            !remaining ||
+            (DEBUG_REALMS.find((r) => r.id === option.value)?.cultivation ?? 0) <= s.cultivation;
+      const quantity = form.elements.namedItem('quantity') as HTMLInputElement | null;
+      if (quantity) quantity.max = String(remaining);
+      return;
+    }
     const amount =
       kind.value === 'stones'
         ? s.stones
@@ -91,7 +120,12 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
             ? CURIOS.filter((c) => !acquiredCurio(host.getSave(), c.id))
             : null;
     submit.disabled = items?.length === 0;
-    fields.innerHTML = `${items ? `<label>选择物品<select name="id" aria-label="选择物品">${items.map((item) => `<option value="${item.id}">${item.name}</option>`).join('') || '<option value="">本世奇物均已结缘</option>'}</select></label>` : ''}${type === 'artifact' ? `<label>炼器阶数<input type="number" name="forge" aria-label="炼器阶数" min="0" max="${MAX_FORGE_LEVEL}" step="1" value="0"></label>` : type === 'curio' ? '<p class="panel-note">每件奇物本世唯一，每次发放一件。</p>' : `<label>数量<input type="number" name="quantity" aria-label="发放数量" min="1" max="${debugQuantityLimit(type)}" step="1" value="${type === 'stones' || type === 'iron' ? 1000 : 1}"></label>`}`;
+    fields.innerHTML = `${type === 'realm' ? `<label>选择境界<select name="id" aria-label="选择境界">${DEBUG_REALMS.map((r) => `<option value="${r.id}">${r.name}</option>`).join('')}</select></label>` : ''}${items ? `<label>选择物品<select name="id" aria-label="选择物品">${items.map((item) => `<option value="${item.id}">${item.name}</option>`).join('') || '<option value="">本世奇物均已结缘</option>'}</select></label>` : ''}${type === 'artifact' ? `<label>炼器阶数<input type="number" name="forge" aria-label="炼器阶数" min="0" max="${MAX_FORGE_LEVEL}" step="1" value="0"></label>` : type === 'realm' ? '<p class="panel-note">补足到所选境界的起点，不改变年岁、本命和通关记录。</p>' : type === 'curio' ? '<p class="panel-note">每件奇物本世唯一，每次发放一件。</p>' : `<label>${type === 'cultivation' ? '修为点数' : '数量'}<input type="number" name="quantity" aria-label="发放数量" min="1" max="${debugQuantityLimit(type)}" step="1" value="${type === 'cultivation' ? Math.min(1000, debugCultivationRemaining(host.getSave())) : type === 'stones' || type === 'iron' ? 1000 : 1}"></label>`}`;
+    if (type === 'realm') {
+      const selection = form.elements.namedItem('id') as HTMLSelectElement;
+      selection.value =
+        DEBUG_REALMS.find((r) => r.cultivation > host.getSave().cultivation)?.id ?? '24';
+    }
     fields.querySelector('select')?.addEventListener('change', () => {
       status.textContent = '';
       stock();

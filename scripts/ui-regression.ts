@@ -211,6 +211,57 @@ async function finishPage() {
   pageId = 0;
 }
 
+async function checkJourneyModuleRecovery() {
+  const viewport = '390x844x1,mobile,touch';
+  checkpoint = 'journey-cold-module';
+  const save = fixture();
+  save.cultivation = 1234;
+  await open(viewport, save);
+  await click('[data-action=chronicle]');
+  await wait('() => !!document.querySelector("[data-action=journey-card]")');
+  assert.deepEqual(
+    await evaluate(
+      "() => performance.getEntriesByType('resource').filter(e => /journey-card-[\\w-]+\\.js/.test(e.name)).map(e => e.name)",
+    ),
+    [],
+    '故障必须发生在留影模块首次加载前',
+  );
+  const before = await saved();
+  // 保持同一viewport，避免MCP重置移动设备时额外重载页面。
+  await browser.call('emulate', { pageId, viewport, networkConditions: 'Offline' });
+  await click('[data-action=journey-card]');
+  await wait('() => !!document.querySelector("[data-resource-failure]")');
+  assert.deepEqual(
+    await evaluate(
+      "() => [...document.querySelectorAll('[data-resource-failure] button')].map(e => ({text:e.textContent,action:e.dataset.action}))",
+    ),
+    [{ text: '重新加载', action: 'refresh-game' }],
+    '冷模块失败只给受保护的重新加载，不提供无效重新生成或重复刷新',
+  );
+  await check('journey-cold-module-offline');
+  await browser.call('emulate', { pageId, viewport });
+  await click('[data-action=refresh-game]');
+  await wait(
+    '() => !document.querySelector(".panel") && !!document.querySelector("[data-action=chronicle]")',
+  );
+  assert.equal((await saved()).cultivation, before.cultivation);
+  assert.deepEqual((await saved()).completed, before.completed);
+  await click('[data-action=chronicle]');
+  await wait('() => !!document.querySelector("[data-action=journey-card]")');
+  await click('[data-action=journey-card]');
+  await wait('() => document.querySelector(".journey-card-preview img")?.naturalWidth > 0');
+  assert.deepEqual(
+    await evaluate(
+      "() => { const i = document.querySelector('.journey-card-preview img'); return [i.naturalWidth,i.naturalHeight,i.src.startsWith('blob:')]; }",
+    ),
+    [1080, 1740, true],
+  );
+  await check('journey-cold-module-recovered');
+  await click('[data-action=close]');
+  await wait('() => !!document.querySelector("[data-action=journey-card]")');
+  await finishPage();
+}
+
 async function checkDebugCurios(name: string, viewport: string) {
   await open(viewport, fixture());
   await evaluate(`() => {
@@ -467,6 +518,7 @@ try {
       `页面脚本未正确提供：${url.pathname}（${response.status}，${contentType}），请核对构建与预览的 base 路径`,
     );
   }
+  await checkJourneyModuleRecovery();
   for (const [name, viewport] of viewports) {
     checkpoint = `${name}-settings`;
     await open(viewport, fixture());

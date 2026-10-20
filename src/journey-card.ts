@@ -69,23 +69,47 @@ const ACHIEVEMENT_PRIORITY = [
   'story',
 ];
 
-function loadImage(path: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    const fail = () => {
+function checkCancelled(signal: AbortSignal) {
+  if (signal.aborted) throw new DOMException('留影已取消', 'AbortError');
+}
+
+async function loadImage(path: string, signal: AbortSignal) {
+  for (let attempt = 0; ; attempt++) {
+    checkCancelled(signal);
+    try {
+      return await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        const cleanup = () => {
+          clearTimeout(timeout);
+          image.onload = image.onerror = null;
+          signal.removeEventListener('abort', cancel);
+        };
+        const fail = () => {
+          cleanup();
+          image.src = '';
+          reject(new Error(`留影素材加载失败：${path}`));
+        };
+        const cancel = () => {
+          cleanup();
+          image.src = '';
+          reject(new DOMException('留影已取消', 'AbortError'));
+        };
+        const timeout = setTimeout(fail, 15000);
+        image.onload = () => {
+          cleanup();
+          resolve(image);
+        };
+        image.onerror = fail;
+        signal.addEventListener('abort', cancel, { once: true });
+        image.src = assetUrl(path);
+      });
+    } catch (error) {
+      checkCancelled(signal);
+      if (attempt === 0) continue;
       resourceFailed(true);
-      clearTimeout(timeout);
-      image.onload = image.onerror = null;
-      reject(new Error('留影素材加载失败，请稍后重试'));
-    };
-    const timeout = setTimeout(fail, 15000);
-    image.onload = () => {
-      clearTimeout(timeout);
-      resolve(image);
-    };
-    image.onerror = fail;
-    image.src = assetUrl(path);
-  });
+      throw error;
+    }
+  }
 }
 
 export function journeyAppraisalLines(
@@ -337,217 +361,252 @@ export async function createJourneyCard(
   ending?: JourneyCardEnding,
   signal: AbortSignal = new AbortController().signal,
 ) {
-  signal.throwIfAborted();
+  checkCancelled(signal);
   const card = journeyCardData(save, ending);
   const playerFrame = playerSpriteFrame(save.path);
   const weaponArt = itemArt(card.weapon.id)!;
-  const [image, playerImage, weaponImage, appraisal] = await Promise.all([
-    loadImage(
-      card.ending === 'immortal'
-        ? '/assets/qinglan-prologue.webp'
-        : '/assets/qinglan-prologue-dark.webp',
-    ),
-    loadImage(playerFrame.url),
-    loadImage(weaponArt.src),
-    resolveJourneyAppraisal(journeyAppraisalFacts(save, card.ending), signal),
-  ]);
-  signal.throwIfAborted();
+  const children = new AbortController();
+  const cancelChildren = () => children.abort();
+  signal.addEventListener('abort', cancelChildren, { once: true });
+  const [image, playerImage, weaponImage, appraisal] = await (async () => {
+    try {
+      return await Promise.all([
+        loadImage(
+          card.ending === 'immortal'
+            ? '/assets/qinglan-prologue.webp'
+            : '/assets/qinglan-prologue-dark.webp',
+          children.signal,
+        ),
+        loadImage(playerFrame.url, children.signal),
+        loadImage(weaponArt.src, children.signal),
+        resolveJourneyAppraisal(journeyAppraisalFacts(save, card.ending), children.signal),
+      ]);
+    } finally {
+      signal.removeEventListener('abort', cancelChildren);
+      children.abort();
+    }
+  })();
+  checkCancelled(signal);
   card.appraisal = appraisal;
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 1740;
-  const c = canvas.getContext('2d');
-  if (!c) throw new Error('此浏览器无法生成留影');
-  c.fillStyle = '#102b28';
-  c.fillRect(0, 0, canvas.width, canvas.height);
-  // 山水居于人物身后；按比例居中裁切，不拉伸已有画作。
-  const sourceWidth = (image.naturalHeight * 984) / 790;
-  c.drawImage(
-    image,
-    (image.naturalWidth - sourceWidth) / 2,
-    0,
-    sourceWidth,
-    image.naturalHeight,
-    48,
-    48,
-    984,
-    790,
-  );
-  const shade = c.createLinearGradient(0, 48, 0, 838);
-  shade.addColorStop(0, '#102b28b0');
-  shade.addColorStop(0.3, '#102b2890');
-  shade.addColorStop(0.65, '#102b2840');
-  shade.addColorStop(1, '#102b28');
-  c.fillStyle = shade;
-  c.fillRect(48, 48, 984, 790);
-  c.strokeStyle = '#c2b78680';
-  c.lineWidth = 2;
-  c.strokeRect(38, 38, 1004, 1664);
-  c.strokeStyle = '#c2b78630';
-  c.lineWidth = 1;
-  c.strokeRect(48, 48, 984, 1644);
+  try {
+    const c = canvas.getContext('2d');
+    if (!c) throw new Error('此浏览器无法生成留影');
+    c.fillStyle = '#102b28';
+    c.fillRect(0, 0, canvas.width, canvas.height);
+    // 山水居于人物身后；按比例居中裁切，不拉伸已有画作。
+    const sourceWidth = (image.naturalHeight * 984) / 790;
+    c.drawImage(
+      image,
+      (image.naturalWidth - sourceWidth) / 2,
+      0,
+      sourceWidth,
+      image.naturalHeight,
+      48,
+      48,
+      984,
+      790,
+    );
+    const shade = c.createLinearGradient(0, 48, 0, 838);
+    shade.addColorStop(0, '#102b28b0');
+    shade.addColorStop(0.3, '#102b2890');
+    shade.addColorStop(0.65, '#102b2840');
+    shade.addColorStop(1, '#102b28');
+    c.fillStyle = shade;
+    c.fillRect(48, 48, 984, 790);
+    c.strokeStyle = '#c2b78680';
+    c.lineWidth = 2;
+    c.strokeRect(38, 38, 1004, 1664);
+    c.strokeStyle = '#c2b78630';
+    c.lineWidth = 1;
+    c.strokeRect(48, 48, 984, 1644);
 
-  const setFont = (size: number) => {
-    c.font = `${size >= 34 ? 600 : 400} ${size}px "Noto Serif SC", "Songti SC", "STSong", serif`;
-  };
-  // 手动字距兼容较旧的手机浏览器，仅用于评语，不改动其他区域字体。
-  let tracking = 0;
-  const measure = (value: string) =>
-    tracking
-      ? Array.from(value).reduce((width, char) => width + c.measureText(char).width, 0) +
-        Math.max(0, Array.from(value).length - 1) * tracking
-      : c.measureText(value).width;
-  const fit = (value: string, width: number) => {
-    if (measure(value) <= width) return value;
-    const chars = Array.from(value);
-    while (chars.length && measure(chars.join('') + '…') > width) chars.pop();
-    return chars.join('') + '…';
-  };
-  const text = (
-    value: string,
-    x: number,
-    y: number,
-    size: number,
-    color = '#eee8cf',
-    width = 920,
-  ) => {
-    setFont(size);
-    c.fillStyle = color;
-    const fitted = fit(value, width);
-    if (!tracking) c.fillText(fitted, x, y);
-    else {
-      let offset = x;
-      for (const char of fitted) {
-        c.fillText(char, offset, y);
-        offset += c.measureText(char).width + tracking;
+    const setFont = (size: number) => {
+      c.font = `${size >= 34 ? 600 : 400} ${size}px "Noto Serif SC", "Songti SC", "STSong", serif`;
+    };
+    // 手动字距兼容较旧的手机浏览器，仅用于评语，不改动其他区域字体。
+    let tracking = 0;
+    const measure = (value: string) =>
+      tracking
+        ? Array.from(value).reduce((width, char) => width + c.measureText(char).width, 0) +
+          Math.max(0, Array.from(value).length - 1) * tracking
+        : c.measureText(value).width;
+    const fit = (value: string, width: number) => {
+      if (measure(value) <= width) return value;
+      const chars = Array.from(value);
+      while (chars.length && measure(chars.join('') + '…') > width) chars.pop();
+      return chars.join('') + '…';
+    };
+    const text = (
+      value: string,
+      x: number,
+      y: number,
+      size: number,
+      color = '#eee8cf',
+      width = 920,
+    ) => {
+      setFont(size);
+      c.fillStyle = color;
+      const fitted = fit(value, width);
+      if (!tracking) c.fillText(fitted, x, y);
+      else {
+        let offset = x;
+        for (const char of fitted) {
+          c.fillText(char, offset, y);
+          offset += c.measureText(char).width + tracking;
+        }
       }
-    }
-  };
-  const wrap = (
-    value: string,
-    x: number,
-    y: number,
-    size: number,
-    width: number,
-    maxLines: number,
-    lineHeight = size + 12,
-  ) => {
-    setFont(size);
-    const lines = journeyAppraisalLines(value, measure, width, maxLines, size);
-    lines.slice(0, maxLines).forEach((line, i) => {
-      const clipped =
-        i === maxLines - 1 && lines.length > maxLines
-          ? fit(line + lines.slice(maxLines).join(''), width)
-          : line;
-      text(clipped, x, y + i * lineHeight, size, '#c7cfb8', width);
+    };
+    const wrap = (
+      value: string,
+      x: number,
+      y: number,
+      size: number,
+      width: number,
+      maxLines: number,
+      lineHeight = size + 12,
+    ) => {
+      setFont(size);
+      const lines = journeyAppraisalLines(value, measure, width, maxLines, size);
+      lines.slice(0, maxLines).forEach((line, i) => {
+        const clipped =
+          i === maxLines - 1 && lines.length > maxLines
+            ? fit(line + lines.slice(maxLines).join(''), width)
+            : line;
+        text(clipped, x, y + i * lineHeight, size, '#c7cfb8', width);
+      });
+    };
+    const line = (y: number) => {
+      c.strokeStyle = '#c2b78650';
+      c.beginPath();
+      c.moveTo(80, y);
+      c.lineTo(1000, y);
+      c.stroke();
+    };
+    const state = {
+      immortal: ['圆满', '已叩入仙门'],
+      lifespan: ['寿终', '此世寿终'],
+      tribulation: ['劫殒', '止于天劫'],
+      ambush: ['身陨', '殒于劫修'],
+      extreme: ['身陨', '一命问道'],
+      ongoing: ['未竟', '仙途未尽'],
+    }[card.ending];
+    text('叩仙门 · 青岚纪', 80, 106, 27, '#d8c998');
+    text('此 世 留 影', 80, 171, 48);
+    c.fillStyle = '#794b37dd';
+    c.fillRect(896, 86, 84, 132);
+    c.strokeStyle = '#d2b790';
+    c.strokeRect(904, 94, 68, 116);
+    text('此世', 913, 138, 24, '#efdfbd', 58);
+    text(state[0], 913, 182, 24, '#efdfbd', 58);
+    c.save();
+    c.textAlign = 'center';
+    text(card.realm, 540, 248, 50, '#eee8cf', 720);
+    text(
+      `${['lifespan', 'tribulation', 'ambush', 'extreme'].includes(card.ending) ? '此世行年' : '行年'} ${card.age} 载 · ${card.lifespan}`,
+      540,
+      290,
+      28,
+      '#e1d3a4',
+      850,
+    );
+    c.restore();
+    drawRealmFigure(c, playerImage, card.realmIndex, save.path);
+    c.save();
+    c.textAlign = 'center';
+    text(card.realmVerse, 540, 748, 27, REALM_COLORS[card.realmIndex], 820);
+    text(card.identity, 540, 809, 30, '#e2dfc9', 880);
+    c.restore();
+    line(834);
+    drawRootDisc(c, card.root);
+    text('本 命 法 宝', 570, 873, 26, '#b2c0a9');
+    const weaponWidth = weaponImage.naturalWidth / 4;
+    const weaponHeight = weaponImage.naturalHeight / weaponArt.rows;
+    c.fillStyle = '#0b332d';
+    c.fillRect(566, 891, 136, 136);
+    c.drawImage(
+      weaponImage,
+      weaponArt.column * weaponWidth,
+      weaponArt.row * weaponHeight,
+      weaponWidth,
+      weaponHeight,
+      570,
+      895,
+      128,
+      128,
+    );
+    c.strokeStyle = '#c2b78670';
+    c.strokeRect(566, 891, 136, 136);
+    text(card.weapon.name, 728, 950, 34, '#ece7d1', 270);
+    text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 728, 996, 28, '#bcc7af', 270);
+    c.save();
+    c.textAlign = 'center';
+    text(
+      `踏破 ${card.progress.count} / 7 境${card.progress.deepest ? ` · 最深 ${card.progress.deepest}` : ' · 尚未踏破秘境'}`,
+      540,
+      1092,
+      30,
+      '#d8c998',
+      880,
+    );
+    c.restore();
+    line(1100);
+    text('此 世 留 痕', 80, 1142, 28, '#d8c998');
+    card.memories.forEach((memory, i) => {
+      const x = 84 + (i % 2) * 450;
+      const y = 1204 + Math.floor(i / 2) * 82;
+      c.fillStyle = '#cfbc87';
+      c.fillRect(x, y - 18, 5, 48);
+      text(memory.title, x + 30, y, 25, '#e5d7ad', 380);
+      text(memory.detail, x + 30, y + 28, 18, '#b9c7b1', 380);
     });
-  };
-  const line = (y: number) => {
-    c.strokeStyle = '#c2b78650';
-    c.beginPath();
-    c.moveTo(80, y);
-    c.lineTo(1000, y);
-    c.stroke();
-  };
-  const state = {
-    immortal: ['圆满', '已叩入仙门'],
-    lifespan: ['寿终', '此世寿终'],
-    tribulation: ['劫殒', '止于天劫'],
-    ambush: ['身陨', '殒于劫修'],
-    extreme: ['身陨', '一命问道'],
-    ongoing: ['未竟', '仙途未尽'],
-  }[card.ending];
-  text('叩仙门 · 青岚纪', 80, 106, 27, '#d8c998');
-  text('此 世 留 影', 80, 171, 48);
-  c.fillStyle = '#794b37dd';
-  c.fillRect(896, 86, 84, 132);
-  c.strokeStyle = '#d2b790';
-  c.strokeRect(904, 94, 68, 116);
-  text('此世', 913, 138, 24, '#efdfbd', 58);
-  text(state[0], 913, 182, 24, '#efdfbd', 58);
-  c.save();
-  c.textAlign = 'center';
-  text(card.realm, 540, 248, 50, '#eee8cf', 720);
-  text(
-    `${['lifespan', 'tribulation', 'ambush', 'extreme'].includes(card.ending) ? '此世行年' : '行年'} ${card.age} 载 · ${card.lifespan}`,
-    540,
-    290,
-    28,
-    '#e1d3a4',
-    850,
-  );
-  c.restore();
-  drawRealmFigure(c, playerImage, card.realmIndex, save.path);
-  c.save();
-  c.textAlign = 'center';
-  text(card.realmVerse, 540, 748, 27, REALM_COLORS[card.realmIndex], 820);
-  text(card.identity, 540, 809, 30, '#e2dfc9', 880);
-  c.restore();
-  line(834);
-  drawRootDisc(c, card.root);
-  text('本 命 法 宝', 570, 873, 26, '#b2c0a9');
-  const weaponWidth = weaponImage.naturalWidth / 4;
-  const weaponHeight = weaponImage.naturalHeight / weaponArt.rows;
-  c.fillStyle = '#0b332d';
-  c.fillRect(566, 891, 136, 136);
-  c.drawImage(
-    weaponImage,
-    weaponArt.column * weaponWidth,
-    weaponArt.row * weaponHeight,
-    weaponWidth,
-    weaponHeight,
-    570,
-    895,
-    128,
-    128,
-  );
-  c.strokeStyle = '#c2b78670';
-  c.strokeRect(566, 891, 136, 136);
-  text(card.weapon.name, 728, 950, 34, '#ece7d1', 270);
-  text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 728, 996, 28, '#bcc7af', 270);
-  c.save();
-  c.textAlign = 'center';
-  text(
-    `踏破 ${card.progress.count} / 7 境${card.progress.deepest ? ` · 最深 ${card.progress.deepest}` : ' · 尚未踏破秘境'}`,
-    540,
-    1092,
-    30,
-    '#d8c998',
-    880,
-  );
-  c.restore();
-  line(1100);
-  text('此 世 留 痕', 80, 1142, 28, '#d8c998');
-  card.memories.forEach((memory, i) => {
-    const x = 84 + (i % 2) * 450;
-    const y = 1204 + Math.floor(i / 2) * 82;
-    c.fillStyle = '#cfbc87';
-    c.fillRect(x, y - 18, 5, 48);
-    text(memory.title, x + 30, y, 25, '#e5d7ad', 380);
-    text(memory.detail, x + 30, y + 28, 18, '#b9c7b1', 380);
-  });
-  line(1340);
-  text('此 世 评 语', 80, 1378, 26, '#b2c0a9');
-  tracking = 2;
-  text(card.appraisal.title, 80, 1432, 36, '#e1d3a4', 610);
-  tracking = 1.5;
-  wrap(card.appraisal.detail, 80, 1490, 26, 610, 4, 44);
-  tracking = 0;
-  text(state[1], 80, 1658, 22, '#d8c998', 610);
-  text(new URL(GAME_SITE_URL).host, 80, 1683, 18, '#aabda8', 610);
+    line(1340);
+    text('此 世 评 语', 80, 1378, 26, '#b2c0a9');
+    tracking = 2;
+    text(card.appraisal.title, 80, 1432, 36, '#e1d3a4', 610);
+    tracking = 1.5;
+    wrap(card.appraisal.detail, 80, 1490, 26, 610, 4, 44);
+    tracking = 0;
+    text(state[1], 80, 1658, 22, '#d8c998', 610);
+    text(new URL(GAME_SITE_URL).host, 80, 1683, 18, '#aabda8', 610);
 
-  // 四格浅色静区；官网链接只带固定来源标记，不携带玩家或存档数据。
-  const moduleSize = 7;
-  const qrSize = JOURNEY_CARD_QR.size * moduleSize;
-  const qrX = 1000 - qrSize;
-  const qrY = 1688 - qrSize;
-  c.fillStyle = JOURNEY_CARD_QR_COLORS.light;
-  c.fillRect(qrX, qrY, qrSize, qrSize);
-  c.fillStyle = JOURNEY_CARD_QR_COLORS.dark;
-  JOURNEY_CARD_QR.data.forEach((row, y) =>
-    row.forEach((black, x) => {
-      if (black) c.fillRect(qrX + x * moduleSize, qrY + y * moduleSize, moduleSize, moduleSize);
-    }),
-  );
-  return canvas.toDataURL('image/png');
+    // 四格浅色静区；官网链接只带固定来源标记，不携带玩家或存档数据。
+    const moduleSize = 7;
+    const qrSize = JOURNEY_CARD_QR.size * moduleSize;
+    const qrX = 1000 - qrSize;
+    const qrY = 1688 - qrSize;
+    c.fillStyle = JOURNEY_CARD_QR_COLORS.light;
+    c.fillRect(qrX, qrY, qrSize, qrSize);
+    c.fillStyle = JOURNEY_CARD_QR_COLORS.dark;
+    JOURNEY_CARD_QR.data.forEach((row, y) =>
+      row.forEach((black, x) => {
+        if (black) c.fillRect(qrX + x * moduleSize, qrY + y * moduleSize, moduleSize, moduleSize);
+      }),
+    );
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      const cancel = () => {
+        signal.removeEventListener('abort', cancel);
+        reject(new DOMException('留影已取消', 'AbortError'));
+      };
+      signal.addEventListener('abort', cancel, { once: true });
+      try {
+        checkCancelled(signal);
+        canvas.toBlob((value) => {
+          signal.removeEventListener('abort', cancel);
+          if (value?.size) resolve(value);
+          else reject(new Error('留影编码未完成，请重试'));
+        }, 'image/png');
+      } catch (error) {
+        signal.removeEventListener('abort', cancel);
+        reject(error);
+      }
+    });
+    checkCancelled(signal);
+    return blob;
+  } finally {
+    // 编码完成或失败后立即释放像素缓冲，避免手机多次留影累计占用内存。
+    canvas.width = canvas.height = 0;
+  }
 }
