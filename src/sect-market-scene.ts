@@ -86,7 +86,7 @@ export class SectMarketScene {
     interact: (npc: MarketCultivator) => void,
     openAuction: () => void = () => {},
     openVenue: (id: MarketVenueId) => void = () => {},
-    returnTown?: () => void,
+    returnTown?: (entry?: 'button') => void,
   ) {
     this.host = host;
     this.position = position;
@@ -509,6 +509,7 @@ export class SectMarketScene {
     this.clearPointer();
   }
   destroy() {
+    this.passage?.destroy();
     this.events.abort();
     this.observer.disconnect();
     this.clearInput();

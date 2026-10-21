@@ -1,24 +1,49 @@
+import { ModuleSource, retryModule } from './module-source.ts';
+import type { Orientation } from './orientation.ts';
+
 type FullscreenRoot = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 type FullscreenDocument = Document & {
   webkitFullscreenElement?: Element | null;
   webkitExitFullscreen?: () => Promise<void> | void;
 };
 
+const mobile = () => matchMedia('(pointer: coarse)').matches;
+
 export class MobileDisplay {
   private wanted = false;
-  private ownsFullscreen = false;
-  private pending: Promise<void> | null = null;
+  private owns = false;
+  private task: Promise<void> | null = null;
+  private mode = new ModuleSource<Orientation>(async (attempt) => {
+    const module = attempt
+      ? await retryModule<typeof import('./orientation.ts')>('orientation', 'screen', attempt)
+      : await import('./orientation.ts');
+    return new module.Orientation(
+      () => this.wanted && this.active,
+      () => this.enter(),
+    );
+  });
+
+  async mount(host: HTMLElement) {
+    if (!mobile()) return;
+    try {
+      (await this.mode.load()).mount(host);
+    } catch {
+      host.hidden = false;
+      host.textContent = '请重开设置。';
+    }
+  }
 
   constructor(onChange: () => void) {
     const changed = () => {
       if (!this.active) {
         this.wanted = false;
-        this.ownsFullscreen = false;
+        this.owns = false;
+        this.mode.current?.release();
       }
       onChange();
     };
-    document.addEventListener('fullscreenchange', changed);
-    document.addEventListener('webkitfullscreenchange', changed);
+    for (const event of ['fullscreenchange', 'webkitfullscreenchange'])
+      document.addEventListener(event, changed);
   }
 
   get active() {
@@ -32,11 +57,11 @@ export class MobileDisplay {
   }
 
   enter(): Promise<void> {
-    if (!matchMedia('(pointer: coarse)').matches) return Promise.resolve();
+    if (!mobile()) return Promise.resolve();
     this.wanted = true;
     // 在点击调用栈中立即请求全屏，不能延迟到资源加载或下一帧。
-    return (this.pending ??= this.acquire().finally(() => {
-      this.pending = null;
+    return (this.task ??= this.acquire().finally(() => {
+      this.task = null;
     }));
   }
 
@@ -47,23 +72,29 @@ export class MobileDisplay {
         if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
         else if (root.webkitRequestFullscreen) await root.webkitRequestFullscreen();
         else return;
-        this.ownsFullscreen = this.active;
+        this.owns = this.active;
       } catch {
         return;
       }
     }
-    // 方向由设备与系统设置决定；只在入场点击或手动操作中申请全屏。
-    if (!this.wanted) await this.release();
+    if (!this.wanted) await this.exit();
+    else
+      try {
+        await (await this.mode.load()).apply();
+      } catch {
+        // 方向设置加载失败不阻断入场；下次明确操作可重试。
+      }
   }
 
   leave() {
     this.wanted = false;
-    return this.release();
+    return this.exit();
   }
 
-  private async release() {
-    if (!this.ownsFullscreen || !this.active) return;
-    this.ownsFullscreen = false;
+  private async exit() {
+    this.mode.current?.release();
+    if (!this.owns || !this.active) return;
+    this.owns = false;
     const doc = document as FullscreenDocument;
     try {
       if (doc.exitFullscreen) await doc.exitFullscreen();

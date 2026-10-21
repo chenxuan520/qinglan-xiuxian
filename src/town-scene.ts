@@ -95,7 +95,7 @@ export class TownScene {
     playerPath: () => CultivationPath,
     scenery?: TownScenery,
     hometown?: HometownScene,
-    connection?: { open: () => boolean; enter: () => void },
+    connection?: { open: () => boolean; enter: (entry?: 'button') => void },
   ) {
     this.host = host;
     this.position = position;
@@ -581,6 +581,7 @@ export class TownScene {
     this.route = [];
   }
   destroy() {
+    this.passage?.destroy();
     this.events.abort();
     this.observer.disconnect();
     this.clearInput();

@@ -2,8 +2,12 @@ import type { ActionShell } from './action-controller.ts';
 import { sectDuesPending } from './mortal.ts';
 import { SETTLEMENT_PATHS } from './settlement-passage.ts';
 
-// 与场景一起按需载入；真正经过路口后，先保存目的地来访再切换场景。
-export function travelSettlement(shell: ActionShell, destination: 'town' | 'market') {
+// 路口与快捷入口共用入场结算；先保存目的地来访，再切换场景。
+export function travelSettlement(
+  shell: ActionShell,
+  destination: 'town' | 'market',
+  entry: 'passage' | 'button' = 'passage',
+) {
   const market = destination === 'market';
   const source = market ? shell.townScene : shell.marketScene;
   const gate = SETTLEMENT_PATHS[market ? 'town' : 'market'].gate;
@@ -21,7 +25,8 @@ export function travelSettlement(shell: ActionShell, destination: 'town' | 'mark
     sectDuesPending(shell.save) ||
     shell.save.mortal.marketSocial?.ambush ||
     (shell.save.mortal.hometown && shell.save.mortal.hometown.stage !== 'departed') ||
-    Math.hypot(source.position.x - gate.x, source.position.y - gate.y) > 48 ||
+    (entry === 'passage' &&
+      Math.hypot(source.position.x - gate.x, source.position.y - gate.y) > 48) ||
     (market && !shell.sectMarketOpen(shell.save))
   )
     return false;
@@ -34,7 +39,10 @@ export function travelSettlement(shell: ActionShell, destination: 'town' | 'mark
   try {
     shell.writeSave(next, shell.pendingRun);
   } catch {
-    if (!shell.saveLock) shell.toast('暂时无法保存这段行程，请退开后重试');
+    if (!shell.saveLock)
+      shell.toast(
+        entry === 'button' ? '暂时无法保存这段行程，请重试' : '暂时无法保存这段行程，请退开后重试',
+      );
     return false;
   }
   shell.releaseTownScene();
@@ -42,8 +50,11 @@ export function travelSettlement(shell: ActionShell, destination: 'town' | 'mark
   shell.inMarket = market;
   shell.inTown = !market;
   shell.mortalTab = market ? 'sects' : 'town';
-  if (market) shell.marketPosition = { ...SETTLEMENT_PATHS.market.arrival };
-  else shell.townPosition = { ...SETTLEMENT_PATHS.town.arrival };
+  if (entry === 'passage') {
+    if (market) shell.marketPosition = { ...SETTLEMENT_PATHS.market.arrival };
+    else shell.townPosition = { ...SETTLEMENT_PATHS.town.arrival };
+  } else if (!market && shell.save.mortal.hometown)
+    shell.townPosition = { ...shell.HOMETOWN_START };
   shell.lastMortalTick = shell.performance.now();
   if (!market) shell.telemetry.track({ type: 'town', ...shell.lifeStats() });
   shell.renderMortal();

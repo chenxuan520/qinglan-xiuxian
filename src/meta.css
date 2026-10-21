@@ -223,6 +223,7 @@
 }
 .settings-autoplay p,
 .settings-sound p,
+#screen p,
 .settings-section > summary small {
   color: #a9baaa;
   font-size: 11px;

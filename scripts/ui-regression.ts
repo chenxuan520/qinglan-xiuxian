@@ -432,6 +432,122 @@ async function clickScene(selector: string, fraction = 0.5) {
   await browser.call('click_at', { pageId, x: point.x, y: point.y });
 }
 
+async function checkDisplayAndShortcuts(name: string, viewport: string) {
+  const save = fixture();
+  save.cultivation = 352;
+  save.age = 30;
+  save.stones = save.iron = 123456789;
+  await open(viewport, save);
+  checkpoint = `${name}-display-shortcuts`;
+  if (name === 'desktop')
+    await browser.call('emulate', { pageId, viewport, networkConditions: 'Offline' });
+  await click('[data-action=settings]');
+  if (name === 'desktop') {
+    assert.equal(await evaluate('()=>document.querySelector("#screen").hidden'), true);
+    assert.equal(await evaluate('()=>document.querySelector("#screen").textContent'), '');
+    assert.doesNotMatch(
+      await browser.call('list_network_requests', { pageId, pageSize: 1000 }),
+      /\/orientation-[\w-]+\.js/,
+      '桌面设置不得请求手机方向模块',
+    );
+    await check(`${name}-settings-offline`);
+    await browser.call('emulate', { pageId, viewport });
+    // 真实刷新验证桌面恢复；断网夹具中的资源失败不混入后续正常页面控制台。
+    await browser.call('navigate_page', { pageId, type: 'reload' });
+    await wait('()=>!!document.querySelector("[data-action=settings]")');
+    await click('[data-action=settings]');
+    assert.equal(await evaluate('()=>document.querySelector("#screen").hidden'), true);
+  } else {
+    await wait('()=>!!document.querySelector("#display-orientation")');
+    assert.deepEqual(
+      await evaluate(
+        '()=>[...document.querySelector("#display-orientation").options].map(o=>o.value)',
+      ),
+      ['system', 'portrait', 'landscape'],
+    );
+    assert.equal(
+      await evaluate('()=>document.querySelector("#display-orientation").value'),
+      'system',
+    );
+    for (const [mode, count] of [
+      ['portrait', 1],
+      ['landscape', 2],
+    ] as const) {
+      await click('#display-orientation');
+      await browser.call('press_key', { pageId, key: 'Home' });
+      for (let i = 0; i < count; i++) await browser.call('press_key', { pageId, key: 'ArrowDown' });
+      await browser.call('press_key', { pageId, key: 'Enter' });
+      await wait(
+        '()=>!/正在调整/.test(document.querySelector("[data-orientation-status]").textContent)',
+      );
+      assert.equal(await evaluate('()=>localStorage.getItem("qinglan-screen-orientation")'), mode);
+      assert.match(
+        await evaluate('()=>document.querySelector("[data-orientation-status]").textContent'),
+        /已锁定|无法锁定/,
+      );
+      await check(`${name}-direction-${mode}`);
+      await click('[data-action=close]');
+      await click('[data-action=settings]');
+      await wait('()=>!!document.querySelector("#display-orientation")');
+      assert.equal(
+        await evaluate('()=>document.querySelector("#display-orientation").value'),
+        mode,
+      );
+    }
+    await click('#display-orientation');
+    await browser.call('press_key', { pageId, key: 'Home' });
+    await browser.call('press_key', { pageId, key: 'Enter' });
+    await wait(
+      '()=>document.querySelector("[data-orientation-status]").textContent.includes("当前跟随系统")',
+    );
+  }
+  await click('[data-action=close]');
+  await click('[data-action=mortal-enter]');
+  await click('[data-action=town-enter]');
+  await wait('()=>!!document.querySelector(".settlement-shortcut:not(:disabled)")');
+  const sceneButtons = async (scene: 'town' | 'market') => {
+    const layout = await evaluate(`()=>{
+      const box=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+      return {viewport:innerWidth,shortcut:box(document.querySelector('.settlement-shortcut')),exit:box(document.querySelector('[data-action=${scene === 'town' ? 'town-exit' : 'sect-market-exit'}]')),hud:box(document.querySelector('.town-hud')),count:document.querySelectorAll('.settlement-shortcut').length};
+    }`);
+    assert.equal(layout.count, 1);
+    assert.ok(layout.shortcut.width >= 44 && layout.shortcut.height >= 44);
+    assert.ok(layout.shortcut.x >= 0 && layout.exit.right <= layout.viewport + 1);
+    assert.ok(
+      layout.shortcut.right <= layout.exit.x + 1 && Math.abs(layout.shortcut.y - layout.exit.y) < 1,
+      '快捷切换紧邻离开左侧',
+    );
+    const overlaps =
+      Math.min(layout.hud.right, layout.shortcut.right) -
+        Math.max(layout.hud.x, layout.shortcut.x) >
+        1 &&
+      Math.min(layout.hud.bottom, layout.shortcut.bottom) -
+        Math.max(layout.hud.y, layout.shortcut.y) >
+        1;
+    assert.equal(overlaps, false, '场景状态与快捷按钮不可重叠');
+    await check(`${name}-${scene}-shortcut`);
+  };
+  await sceneButtons('town');
+  await click('.settlement-shortcut[data-destination=market]');
+  await wait(
+    '()=>!!document.querySelector("#sect-market-view[data-initialized]")&&!!document.querySelector(".settlement-shortcut:not(:disabled)")',
+  );
+  const batch = (await saved()).mortal.sectMarket!.visit;
+  await sceneButtons('market');
+  await click('.settlement-shortcut[data-destination=town]');
+  await wait(
+    '()=>!!document.querySelector("#town-view[data-x]")&&!!document.querySelector(".settlement-shortcut:not(:disabled)")',
+  );
+  await click('.settlement-shortcut[data-destination=market]');
+  await wait(
+    '()=>!!document.querySelector("#sect-market-view[data-initialized]")&&!!document.querySelector(".settlement-shortcut:not(:disabled)")',
+  );
+  assert.equal((await saved()).mortal.sectMarket!.visit, batch, '一年内快捷重进不换批');
+  assert.equal((await saved()).stones, save.stones, '快捷切换不收费');
+  await click('[data-action=sect-market-exit]');
+  await finishPage();
+}
+
 async function checkSettlementLinks(name: string, viewport: string) {
   const save = fixture();
   save.cultivation = 352;
@@ -981,6 +1097,7 @@ try {
   }
   await checkJourneyModuleRecovery();
   for (const [name, viewport] of viewports) {
+    await checkDisplayAndShortcuts(name, viewport);
     checkpoint = `${name}-settings`;
     await open(viewport, fixture());
     assert.equal((await saved()).sound, false, '进站默认静音');

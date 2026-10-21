@@ -1391,6 +1391,18 @@
     font-size: 12px;
     min-height: 40px;
   }
+  .town-scene-actions.settlement-actions {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    flex-shrink: 0;
+  }
+  .town-scene-actions.settlement-actions .secondary-button {
+    min-height: 44px;
+  }
+  .settlement-actions .fullscreen-button {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
   .town-scene-controls .primary-button {
     padding: 10px 12px;
     font-size: 12px;

@@ -21,18 +21,38 @@ export const SETTLEMENT_PATHS = {
 export class SettlementPassage {
   private entered = false;
   private open: () => boolean;
-  private enter: () => void;
+  private enter: (entry?: 'button') => void;
+  private button?: HTMLButtonElement;
   private path: (typeof SETTLEMENT_PATHS)[keyof typeof SETTLEMENT_PATHS];
   constructor(
     host: HTMLElement,
     map: HTMLElement,
     source: keyof typeof SETTLEMENT_PATHS,
     open: () => boolean,
-    enter: () => void,
+    enter: (entry?: 'button') => void,
   ) {
     this.path = SETTLEMENT_PATHS[source];
     this.open = open;
     this.enter = enter;
+    const exit = host
+      .closest?.('.town-scene')
+      ?.querySelector<HTMLButtonElement>(
+        `[data-action="${source === 'town' ? 'town-exit' : 'sect-market-exit'}"]`,
+      );
+    if (exit) {
+      const button = document.createElement('button');
+      button.className = 'secondary-button settlement-shortcut';
+      button.type = 'button';
+      button.dataset.destination = source === 'town' ? 'market' : 'town';
+      button.textContent = source === 'town' ? '前往坊市' : '前往小镇';
+      button.disabled = true;
+      button.onclick = () => {
+        if (!button.disabled && this.open()) this.enter('button');
+      };
+      exit.before(button);
+      exit.parentElement?.classList.add('settlement-actions');
+      this.button = button;
+    }
     const sign = document.createElement('div');
     sign.className = 'town-passage';
     sign.dataset.passage = source;
@@ -50,10 +70,19 @@ export class SettlementPassage {
     host.querySelector('.town-minimap')?.append(marker);
   }
   update(position: TownPoint, enabled: boolean) {
+    if (this.button) {
+      this.button.disabled = !enabled || !this.open();
+      this.button.title = this.open() ? '' : '获得修为后可前往坊市';
+    }
     const distance = Math.hypot(position.x - this.path.gate.x, position.y - this.path.gate.y);
     if (distance > 80) this.entered = false;
     if (!enabled || distance > 48 || this.entered || !this.open()) return;
     this.entered = true;
     this.enter();
+  }
+
+  destroy() {
+    this.button?.parentElement?.classList.remove('settlement-actions');
+    this.button?.remove();
   }
 }

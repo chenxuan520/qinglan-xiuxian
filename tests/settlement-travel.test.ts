@@ -10,6 +10,8 @@ import { releaseTownScene } from '../src/scene-flow.ts';
 import { travelSettlement } from '../src/settlement-travel.ts';
 import { SETTLEMENT_PATHS } from '../src/settlement-passage.ts';
 import { lastVisitText } from '../src/home-town.ts';
+import { joinSect } from '../src/mortal.ts';
+import { HOMETOWN_START } from '../src/town.ts';
 
 function harness(source: 'town' | 'market') {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -57,6 +59,7 @@ function harness(source: 'town' | 'market') {
     beginSectMarketVisit,
     enterTownVisit,
     freshTownPopulation,
+    HOMETOWN_START,
     performance: { now: () => 1234 },
     lastMortalTick: 0,
     writeSave(next: typeof save, run: unknown) {
@@ -142,6 +145,78 @@ test('转场保存失败保留原场景、状态和上次到访年岁，不能�
     assert.equal(h.state().destroyed, 0);
     assert.equal(h.state().renders, 0);
     assert.equal(h.logs.length, 1);
+  }
+});
+
+test('快捷入口可从远处双向切换，沿用正常再入场落点、额度与保存规则', () => {
+  for (const source of ['town', 'market'] as const) {
+    const h = harness(source),
+      target = source === 'town' ? 'market' : 'town';
+    h.scene.position = { x: 600, y: 600 };
+    const marketPosition = { ...h.shell.marketPosition };
+    assert.equal(travelSettlement(h.shell, target), false, '步行仍须到路口');
+    assert.equal(travelSettlement(h.shell, target, 'button'), true);
+    assert.equal(h.state().writes, 1);
+    assert.equal(h.state().destroyed, 1);
+    assert.equal(h.save.age, 30);
+    assert.equal(h.save.stones, 500);
+    assert.deepEqual(
+      target === 'town' ? h.shell.townPosition : h.shell.marketPosition,
+      target === 'town' ? HOMETOWN_START : marketPosition,
+    );
+  }
+  const h = harness('town');
+  beginSectMarketVisit(h.save);
+  h.save.mortal.auction!.closed = [0];
+  h.save.mortal.sectMarket!.exchanged = ['market-disciple'];
+  h.save.age += 0.5;
+  const loaded = readSave(JSON.stringify(h.save));
+  assert.equal(loaded.status, 'ok');
+  assert.deepEqual(loaded.save.mortal.sectMarket, h.save.mortal.sectMarket);
+  assert.deepEqual(loaded.save.mortal.auction, h.save.mortal.auction);
+  assert.equal(travelSettlement(h.shell, 'market', 'button'), true);
+  assert.equal(h.save.mortal.sectMarket!.visit, 1);
+  assert.deepEqual(h.save.mortal.auction!.closed, [0]);
+  assert.deepEqual(h.save.mortal.sectMarket!.exchanged, ['market-disciple']);
+});
+
+test('快捷切换失败零写入、零切图；凡人、离乡、待劫和供奉门槛仍保留', () => {
+  for (const change of [
+    (h: ReturnType<typeof harness>) => {
+      h.block();
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.save.cultivation = 0;
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.save.mortal.hometown!.stage = 'walk';
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.scene.ready = false;
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.shell.panel = 'town-event';
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.save.age = 10000;
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.save.nextTribulationAge = h.save.age;
+    },
+    (h: ReturnType<typeof harness>) => {
+      h.save.stones = 10000;
+      joinSect(h.save, 'power');
+      h.save.mortal.years = h.save.mortal.member!.dueAt;
+    },
+  ]) {
+    const h = harness('town');
+    change(h);
+    const before = structuredClone(h.save);
+    assert.equal(travelSettlement(h.shell, 'market', 'button'), false);
+    assert.deepEqual(h.save, before);
+    assert.equal(h.state().writes, 0);
+    assert.equal(h.state().destroyed, 0);
+    assert.equal(h.shell.inTown, true);
   }
 });
 

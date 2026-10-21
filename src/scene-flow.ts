@@ -74,8 +74,8 @@ export function mountTownScene(shell: ActionShell) {
             shell.showMarketEvent,
             shell.showAuction,
             (id: string) => showMarketVenue(shell, id),
-            () => {
-              if (marketHost.isConnected) module.travelSettlement(shell, 'town');
+            (entry?: 'button') => {
+              if (marketHost.isConnected) module.travelSettlement(shell, 'town', entry);
             },
           );
         },
@@ -131,8 +131,8 @@ export function mountTownScene(shell: ActionShell) {
           : undefined,
         {
           open: () => shell.sectMarketOpen(shell.save),
-          enter: () => {
-            if (host.isConnected) module.travelSettlement(shell, 'market');
+          enter: (entry?: 'button') => {
+            if (host.isConnected) module.travelSettlement(shell, 'market', entry);
           },
         },
       );
@@ -412,6 +412,7 @@ export function renderPanel(shell: ActionShell) {
     shell.showMarketEvent(shell.marketNpc);
   } else if (shell.panel === 'settings') {
     shell.panelFrame('设置', '游戏选项', shell.settingsContent(shell.save));
+    void shell.mobileDisplay.mount(shell.modal.querySelector('#screen')!);
     void shell.openOfflinePanel();
   } else if (shell.panel === 'about') {
     shell.panelFrame(

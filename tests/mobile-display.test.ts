@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MobileDisplay } from '../src/mobile-display.ts';
+import { ORIENTATION_KEY } from '../src/orientation.ts';
 
 function environment(t: test.TestContext, mobile = true) {
   const calls: string[] = [];
@@ -30,10 +31,17 @@ function environment(t: test.TestContext, mobile = true) {
       calls.push('unlock');
     },
   };
+  const preferences = new Map<string, string>();
   for (const [key, value] of Object.entries({
     document: doc,
     screen: { orientation },
     matchMedia: () => ({ matches: mobile }),
+    localStorage: {
+      getItem: (key: string) => preferences.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        preferences.set(key, value);
+      },
+    },
   })) {
     const original = Object.getOwnPropertyDescriptor(globalThis, key);
     Object.defineProperty(globalThis, key, { configurable: true, value });
@@ -42,8 +50,40 @@ function environment(t: test.TestContext, mobile = true) {
       else Reflect.deleteProperty(globalThis, key);
     });
   }
-  return { calls, doc, root, orientation, events };
+  return { calls, doc, root, orientation, events, preferences };
 }
+
+test('本机方向选择在入场全屏后锁定，回首页解锁并退出，默认仍跟随系统', async (t) => {
+  const h = environment(t);
+  h.preferences.set(ORIENTATION_KEY, 'portrait');
+  const display = new MobileDisplay(() => {});
+  await display.enter();
+  assert.deepEqual(h.calls, ['fullscreen', 'portrait']);
+  await display.leave();
+  assert.deepEqual(h.calls, ['fullscreen', 'portrait', 'unlock', 'exit']);
+  await display.enter();
+  assert.deepEqual(h.calls.slice(-2), ['fullscreen', 'portrait']);
+});
+
+test('方向锁定迟到回调不能把已回首页的屏幕重新锁住', async (t) => {
+  const h = environment(t);
+  h.preferences.set(ORIENTATION_KEY, 'landscape');
+  let resolve!: () => void;
+  h.orientation.lock = (mode: string) => {
+    h.calls.push(mode);
+    return new Promise<void>((done) => {
+      resolve = done;
+    });
+  };
+  const display = new MobileDisplay(() => {});
+  const entering = display.enter();
+  while (!resolve) await new Promise((done) => setImmediate(done));
+  await display.leave();
+  resolve();
+  await entering;
+  assert.equal(display.active, false);
+  assert.deepEqual(h.calls, ['fullscreen', 'landscape', 'exit', 'unlock']);
+});
 
 for (const direction of ['portrait-primary', 'landscape-primary']) {
   test(`手机手动请求全屏，保持${direction === 'portrait-primary' ? '竖屏' : '横屏'}`, async (t) => {
