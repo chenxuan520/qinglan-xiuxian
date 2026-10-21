@@ -28,11 +28,11 @@ export type {
 } from './game-types.ts';
 import { validateRunSnapshot } from './game-validation.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
+import { bossSkills, bossRegionalPhase, bossSkillCooldown } from './boss-skills.ts';
 import {
   regionalBossFields,
   regionalEnemyFields,
   regionalEnemyTactics,
-  regionalBossSkills,
   regionalPursuit,
   type RegionalField,
 } from './regional-combat.ts';
@@ -1537,7 +1537,7 @@ export class Game {
     this.bossChargeWarning(e);
   }
   private shuffleBossSkills(stage: number, previous?: number) {
-    const order = STAGES[stage].skills.map((_, skill) => skill);
+    const order = bossSkills(stage, this.isFinalTrial).map((_, skill) => skill);
     for (let i = order.length - 1; i > 0; i--) {
       const j = Math.floor(this.random() * (i + 1));
       [order[i], order[j]] = [order[j], order[i]];
@@ -1559,18 +1559,7 @@ export class Game {
     e.skillStep = next;
     e.bossSkillQueue = queue;
     const enraged = e.hp < e.maxHp / 2;
-    e.cooldown =
-      stage === FINAL_TRIAL_STAGE
-        ? enraged
-          ? 1.2
-          : 2
-        : this.isFinalTrial
-          ? enraged
-            ? 1.7
-            : 2.5
-          : enraged
-            ? 1.85
-            : 3;
+    e.cooldown = bossSkillCooldown(stage, this.isFinalTrial, enraged);
     const p = { x: this.player.x, y: this.player.y };
     const angle = Math.atan2(ny, nx);
     const fan = (count: number, spread: number, speed: number, center = angle) => {
@@ -1615,18 +1604,31 @@ export class Game {
           y: e.y + Math.sin((i / count) * TAU) * 90,
         }).summonedBy = !this.isFinalTrial && stage === 4 ? e.id : undefined;
     };
-    this.announce(
-      `${STAGES[stage].boss} · ${(this.isFinalTrial ? STAGES[stage].skills : regionalBossSkills(stage, STAGES[stage].skills))[phase]}`,
-    );
-    if (!this.isFinalTrial) {
-      const fields = regionalBossFields(stage, phase, e, p, nx, ny);
+    this.announce(`${STAGES[stage].boss} · ${bossSkills(stage, this.isFinalTrial)[phase]}`);
+    const regional = bossRegionalPhase(stage, phase, this.isFinalTrial);
+    if (regional !== undefined) {
+      const pursuit = regional === 3 ? regionalPursuit(stage, e, p, nx, ny) : null;
+      if (pursuit) {
+        this.addRegionalFields(e, pursuit.fields);
+        if (pursuit.destination) {
+          e.x = pursuit.destination.x;
+          e.y = pursuit.destination.y;
+        }
+        return;
+      }
+      const fields = regionalBossFields(stage, regional, e, p, nx, ny);
       if (fields) {
         this.addRegionalFields(e, fields);
         return;
       }
-      if (stage === 4 && phase === 1) {
+      if (stage === 2 && regional === 0) {
+        this.startBossCharge(e, nx, ny);
+        e.chargeFollowup = true;
+        return;
+      }
+      if (stage === 4 && regional === 1) {
         for (const side of [-150, 0, 300]) {
-          if (this.enemies.length >= 240) break;
+          if (this.enemies.length >= (this.isFinalTrial ? 210 : 240)) break;
           const illusion = this.spawnEnemy(58, false, false, {
             x: e.x - ny * side,
             y: e.y + nx * side,
@@ -2386,7 +2388,11 @@ export class Game {
   }
   private addRegionalFields(e: Enemy, fields: RegionalField[]) {
     for (const { damageScale, ...field } of fields) {
-      if (this.zones.filter((z) => z.hostile && z.life > 0).length >= (e.boss ? 14 : 10)) break;
+      if (
+        !(e.boss && this.isFinalTrial) &&
+        this.zones.filter((z) => z.hostile && z.life > 0).length >= (e.boss ? 14 : 10)
+      )
+        break;
       this.zones.push({
         ...field,
         color: e.boss ? STAGES[e.bossStage ?? this.stage].color : field.color,
@@ -2423,7 +2429,7 @@ export class Game {
     );
   }
   private enemyDeath(e: Enemy) {
-    if (!this.isFinalTrial && (e.bossStage === 4 || e.illusionOf !== undefined)) {
+    if (e.bossStage === 4 || e.illusionOf !== undefined) {
       const dissolved = new Set([e.id]);
       let found = true;
       while (found) {

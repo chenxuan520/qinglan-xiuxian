@@ -27,7 +27,7 @@ function trial() {
   return new Game(save, 6, 0, () => 0.5);
 }
 
-test('终关追击精英有冲刺；前六位首领三招，仙尊六招每轮各释放一次', () => {
+test('终关追击精英有冲刺；原生六境首领三招，仙尊六招每轮各释放一次', () => {
   const g = trial();
   g.weapons = [];
   g.time = 60;
@@ -268,7 +268,7 @@ test('最终仙尊拥有独立立绘、更强属性与二阶段弹幕，落雷�
   immortal.cooldown = 0;
   g.update(0.01);
   assert.equal(g.shots.length, 32);
-  assert.equal(immortal.cooldown, 1.2);
+  assert.equal(immortal.cooldown, 1.1);
   g.time = 8;
   immortal.skillStep = 1;
   immortal.cooldown = 0;

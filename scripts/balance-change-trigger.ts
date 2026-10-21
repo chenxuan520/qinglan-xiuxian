@@ -20,6 +20,7 @@ export const BALANCE_FILES = new Set([
   'src/regional-combat.ts',
   'src/regional-hazards.ts',
   'src/boss-followup.ts',
+  'src/boss-skills.ts',
   'src/autoplay.ts',
   'src/autoplay-build.ts',
   'src/spirit-power.ts',

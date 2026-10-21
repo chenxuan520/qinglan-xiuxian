@@ -33,6 +33,8 @@ import { trainingCost } from '../src/training.ts';
 import { ENEMY_CONTROL } from '../src/regional-hazards.ts';
 import { REGIONAL_DAMAGE_MULTIPLIER } from '../src/enemy-stats.ts';
 import { Game } from '../src/game.ts';
+import { bossSkills, bossSkillCooldown } from '../src/boss-skills.ts';
+import { bestiaryPanel } from '../src/bestiary-ui.ts';
 import { regionalEnemyFields, regionalBossFields } from '../src/regional-combat.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 import { guideContent, GUIDE_TABS } from '../src/guide.ts';
@@ -406,4 +408,24 @@ test('控制时长、漂移瘴云与人字场范围说明对照实际生效参�
       source,
       new RegExp(`${AUCTION_HALLS[0].forgeMin}\\s*～\\s*${AUCTION_HALLS[0].forgeMax}\\s*阶`),
     );
+});
+
+test('终关追加技能及间隔在帮助、图鉴与玩法文档中对照实际出招池', () => {
+  const combat = compact(guideContent('combat'));
+  const text = compact(gameplay);
+  const book = bestiaryPanel(6).body;
+  const counts = Array.from({ length: 6 }, (_, origin) => bossSkills(origin, true).length);
+  assert.ok(combat.includes(counts.join('、') + '招'));
+  assert.ok(book.includes(counts.join('／') + '招'));
+  for (let origin = 0; origin < 7; origin++) {
+    for (const name of bossSkills(origin, true)) assert.ok(book.includes(name), name);
+    for (const name of bossSkills(origin, true).slice(STAGES[origin].skills.length))
+      assert.ok(text.includes(name), name);
+  }
+  const old = [bossSkillCooldown(0, true, false), bossSkillCooldown(0, true, true)];
+  const final = [bossSkillCooldown(6, true, false), bossSkillCooldown(6, true, true)];
+  assert.ok(combat.includes(`旧王常态每${old[0]}秒出招、半血后${old[1]}秒`));
+  assert.ok(combat.includes(`仙尊为${final[0]}秒、半血后${final[1]}秒`));
+  assert.ok(text.includes(`旧王为${old.join('/')}秒，仙尊为${final.join('/')}秒`));
+  for (const source of [combat, text, book]) assert.match(source, /双王.*独立|双王各自/);
 });

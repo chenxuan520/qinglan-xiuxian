@@ -179,7 +179,7 @@ export function regionalEnemyFields(
   return fields;
 }
 
-// 前六关专属；终关仍走原有七劫招式，不共享这组危险区。
+// 原生秘境使用地域招；终关仅由 bossRegionalPhase 接入追加编号，旧0～2号不替换。
 export function regionalBossFields(
   stage: number,
   phase: number,

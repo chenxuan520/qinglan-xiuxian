@@ -21,6 +21,7 @@ import {
   spiritRootInfo,
 } from './data.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
+import { bossSkills } from './boss-skills.ts';
 import { ENEMY_CONTROL } from './regional-hazards.ts';
 import { medicineInfo } from './medicine-data.ts';
 
@@ -239,12 +240,14 @@ export function validateRunSnapshot(
             (typeof e.chargeFollowup === 'boolean' &&
               e.boss &&
               (e.bossStage ?? s.stage) === 2 &&
-              s.stage < 6)) &&
+              !s.tribulation &&
+              (s.stage === 2 || s.stage === FINAL_TRIAL_STAGE))) &&
           (e.illusionOf === undefined ||
             (Number.isSafeInteger(e.illusionOf) &&
               e.illusionOf > 0 &&
               !e.boss &&
-              s.stage === 4 &&
+              !s.tribulation &&
+              (s.stage === 4 || s.stage === FINAL_TRIAL_STAGE) &&
               e.damage === 0 &&
               e.speed === 0)) &&
           (e.windup === undefined ||
@@ -265,19 +268,22 @@ export function validateRunSnapshot(
             (e.boss &&
               Number.isInteger(e.skillStep) &&
               e.skillStep >= 0 &&
-              e.skillStep < STAGES[e.bossStage ?? s.stage].skills.length)) &&
+              e.skillStep <
+                bossSkills(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE).length)) &&
           (e.bossSkillQueue === undefined ||
             (e.boss &&
               !s.tribulation &&
               e.skillStep !== undefined &&
               Array.isArray(e.bossSkillQueue) &&
-              e.bossSkillQueue.length < STAGES[e.bossStage ?? s.stage].skills.length &&
+              e.bossSkillQueue.length <
+                bossSkills(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE).length &&
               new Set(e.bossSkillQueue).size === e.bossSkillQueue.length &&
               e.bossSkillQueue.every(
                 (skill) =>
                   Number.isInteger(skill) &&
                   skill >= 0 &&
-                  skill < STAGES[e.bossStage ?? s.stage].skills.length &&
+                  skill <
+                    bossSkills(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE).length &&
                   skill !== e.skillStep,
               ))),
       )
@@ -375,6 +381,17 @@ export function validateRunSnapshot(
       )
         return null;
     }
+    const regionalZone = (kind: string) =>
+      s.stage < FINAL_TRIAL_STAGE ||
+      (!s.tribulation &&
+        [
+          'boss-roots',
+          'boss-flame',
+          'boss-frost',
+          'boss-miasma',
+          'boss-soul',
+          'boss-rift',
+        ].includes(kind));
     if (
       !Array.isArray(s.zones) ||
       s.zones.length > 500 ||
@@ -387,19 +404,19 @@ export function validateRunSnapshot(
           z.radius > 0 &&
           ((z.endX === undefined && z.endY === undefined) ||
             (z.hostile === true &&
-              s.stage < 6 &&
+              regionalZone(z.kind) &&
               Number.isFinite(z.endX) &&
               Number.isFinite(z.endY) &&
               Math.hypot(z.endX! - z.x, z.endY! - z.y) <= 600)) &&
           ((z.vx === undefined && z.vy === undefined) ||
             (z.hostile === true &&
-              s.stage < 6 &&
+              regionalZone(z.kind) &&
               Number.isFinite(z.vx) &&
               Number.isFinite(z.vy) &&
               Math.hypot(z.vx!, z.vy!) <= 40)) &&
           (z.sourceId === undefined ||
             (z.hostile === true &&
-              s.stage < 6 &&
+              regionalZone(z.kind) &&
               Number.isSafeInteger(z.sourceId) &&
               z.sourceId > 0)) &&
           (z.castDelay === undefined || (Number.isFinite(z.castDelay) && z.castDelay >= 0)) &&

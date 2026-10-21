@@ -370,5 +370,5 @@ test('条带/游瘴在预警、激活、减少动态下保持画布状态与有�
   assert.match(bestiaryPanel(3).body, /五毒游瘴/);
   assert.match(bestiaryPanel(4).body, /幽影换形/);
   assert.match(bestiaryPanel(6).body, /摄魂灵轮/);
-  assert.ok(!bestiaryPanel(6).body.includes('幽影换形'));
+  assert.ok(bestiaryPanel(6).body.includes('幽影换形'));
 });

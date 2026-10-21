@@ -1,5 +1,6 @@
+import { bossSkills, bossSkillCooldown } from './boss-skills.ts';
 import { ENEMY_SKILLS, regionalSkillDetails } from './regional-skill-info.ts';
-import { regionalEnemyTactics, regionalBossSkills } from './regional-combat.ts';
+import { regionalEnemyTactics } from './regional-combat.ts';
 import {
   STAGES,
   DIFFICULTIES,
@@ -35,12 +36,12 @@ const bossHints = [
   '三段横雷、交织雷路与短雷追击，观察落雷节拍。',
 ];
 const trialBossHints = [
-  '环形藤阵、七发扇弹与三名护卫召唤。',
-  '九发火扇、五点火径与十六发环射。',
-  '单次扑击、三层冰牙与八点冰阵。',
-  '五处瘴池、五道毒矢与四名护卫召唤。',
-  '四名护卫召唤、二十发环射与六点鬼牢，留意中央落阵。',
-  '十字雷阵、二十二发环射与五点落阵。',
+  '环形藤阵、七发扇弹与三名护卫召唤；另有三路藤枝与长藤封路。',
+  '九发火扇、五点火径与十六发环射；另有横向火径、三叠焰路与追径。',
+  '单次扑击、三层冰牙与八点冰阵；另有分别预警的二段连扑与双道冰棱。',
+  '五处瘴池、五道毒矢与四名护卫召唤；另有持续6秒的游瘴、条形毒息与追身瘴云。',
+  '四名护卫召唤、二十发环射与六点鬼牢，留意中央落阵；另有移形留幻、内收魂障与追踪换位。',
+  '十字雷阵、二十二发环射与五点落阵；另有三叠雷路、交织雷路、三路陨雷与追身落雷。',
   '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。',
 ];
 export function bestiaryPanel(bestiaryStage: number, difficulty = 0): PanelDefinition {
@@ -126,11 +127,11 @@ export function bestiaryPanel(bestiaryStage: number, difficulty = 0): PanelDefin
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${formatTime(time)} 后现身` : `${stage.name} · ${formatTime(time)} 后现身`}</p><small>${(trial ? stage.skills : regionalBossSkills(bossStage, stage.skills)).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] })}</div></article>`;
+        return `<article class="enemy-card"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${formatTime(time)} 后现身` : `${stage.name} · ${formatTime(time)} 后现身`}</p><small>${bossSkills(bossStage, trial).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] })}</div></article>`;
       })
       .join(
         '',
-      )}</div><div class="boss-note">${smallIcon('book')} 前六位首领各有三招，最终仙尊有六招，每轮会打乱顺序；远离妖王时还会招来追袭。半血后出招加快。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
+      )}</div><div class="boss-note">${smallIcon('book')} 前六境妖王各三招；终关旧王保留原三招，再添地域招式，木／火／冰／毒／魂／雷依次共5／6／5／6／6／7招，仙尊仍为六招。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋保留完整蓄势。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
     wide: true,
   };
 }

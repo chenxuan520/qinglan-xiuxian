@@ -1,4 +1,4 @@
-import { regionalBossSkills } from '../src/regional-combat.ts';
+import { bossSkills } from '../src/boss-skills.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -29,21 +29,15 @@ function cast(g: Game, boss = g.boss!) {
   const stage = boss.bossStage ?? g.stage;
   const phase = boss.skillStep ?? 0;
   g.castBossSkill(boss, 1, 0);
-  assert.ok(
-    g.notice.includes(
-      (g.isFinalTrial ? STAGES[stage].skills : regionalBossSkills(stage, STAGES[stage].skills))[
-        phase
-      ],
-    ),
-  );
+  assert.ok(g.notice.includes(bossSkills(stage, g.isFinalTrial)[phase]));
   assert.notEqual(boss.skillStep, phase, '不能连续重复同一招');
   return phase;
 }
 
 test('七王在本关和终关均洗牌：每轮不漏招，轮次交界不连发，首招与后续轮次可变化', () => {
   for (let stage = 0; stage < STAGES.length; stage++) {
-    const count = STAGES[stage].skills.length;
     for (const arena of new Set([stage, 6])) {
+      const count = bossSkills(stage, arena === 6).length;
       const starts = new Set<number>();
       const orders = new Set<string>();
       for (let seed = 41; seed < 73; seed++) {
@@ -90,31 +84,32 @@ test('终关七王各有自己的招式队列，某位出招不推进其他王',
 });
 
 test('暂停、半血、快照及导出导入保留已排定的下一招和本轮余招，数组不共享', () => {
-  for (let stage = 0; stage < STAGES.length; stage++) {
-    const { g, boss } = encounter(stage);
-    cast(g, boss);
-    boss.hp = boss.maxHp * 0.4;
-    g.pause();
-    const snapshot = g.snapshot();
-    g.update(0.5);
-    assert.deepEqual(g.snapshot(), snapshot);
-    const restored = Game.restore(g.save, snapshot)!;
-    const imported = importSave(exportSave(g.save, g)).run!;
-    assert.ok(restored);
-    assert.ok(imported);
-    assert.notEqual(snapshot.enemies[0].bossSkillQueue, boss.bossSkillQueue);
-    assert.notEqual(restored.boss!.bossSkillQueue, snapshot.enemies[0].bossSkillQueue);
-    const scheduled = [boss.skillStep!, ...boss.bossSkillQueue!];
-    for (const game of [g, restored, imported]) {
-      assert.deepEqual([game.boss!.skillStep, ...game.boss!.bossSkillQueue!], scheduled);
-      const phases = scheduled.map(() => cast(game));
-      assert.deepEqual(phases, scheduled);
+  for (let stage = 0; stage < STAGES.length; stage++)
+    for (const arena of new Set([stage, 6])) {
+      const { g, boss } = encounter(stage, arena);
+      cast(g, boss);
+      boss.hp = boss.maxHp * 0.4;
+      g.pause();
+      const snapshot = g.snapshot();
+      g.update(0.5);
+      assert.deepEqual(g.snapshot(), snapshot);
+      const restored = Game.restore(g.save, snapshot)!;
+      const imported = importSave(exportSave(g.save, g)).run!;
+      assert.ok(restored);
+      assert.ok(imported);
+      assert.notEqual(snapshot.enemies[0].bossSkillQueue, boss.bossSkillQueue);
+      assert.notEqual(restored.boss!.bossSkillQueue, snapshot.enemies[0].bossSkillQueue);
+      const scheduled = [boss.skillStep!, ...boss.bossSkillQueue!];
+      for (const game of [g, restored, imported]) {
+        assert.deepEqual([game.boss!.skillStep, ...game.boss!.bossSkillQueue!], scheduled);
+        const phases = scheduled.map(() => cast(game));
+        assert.deepEqual(phases, scheduled);
+      }
+      assert.deepEqual(
+        [snapshot.enemies[0].skillStep, ...snapshot.enemies[0].bossSkillQueue!],
+        scheduled,
+      );
     }
-    assert.deepEqual(
-      [snapshot.enemies[0].skillStep, ...snapshot.enemies[0].bossSkillQueue!],
-      scheduled,
-    );
-  }
 });
 
 test('刷新前的一次实际出招只消耗一招，旧队列耗尽后才抽下一轮', () => {

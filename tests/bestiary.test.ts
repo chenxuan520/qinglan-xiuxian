@@ -93,7 +93,7 @@ test('妖王在原生秘境与终关使用各自数值，难度切换不漏任�
   assert.deepEqual(bestiaryPanel(0, -1), bestiaryPanel(0, 0));
 });
 
-test('图鉴区别本地招式与终关旧招，说明减速、同刻精英对照和守匣例外', () => {
+test('图鉴区别本地招式与终关追加招式，说明减速、同刻精英对照和守匣例外', () => {
   assert.match(bestiaryPanel(0).body, /同刻精英对照/);
   assert.match(bestiaryPanel(0).body, /并非每种精英都会/);
   assert.match(bestiaryPanel(0).body, /守匣守卫.*七成/);
@@ -104,5 +104,5 @@ test('图鉴区别本地招式与终关旧招，说明减速、同刻精英对�
   assert.match(trial, /唤来两名护卫/);
   assert.match(trial, /九发火扇、五点火径与十六发环射/);
   assert.match(trial, /单次扑击、三层冰牙与八点冰阵/);
-  assert.doesNotMatch(trial, /三叠天雷|五毒游瘴|幽影换形/);
+  for (const name of ['三叠天雷', '五毒游瘴', '幽影换形']) assert.ok(trial.includes(name));
 });
