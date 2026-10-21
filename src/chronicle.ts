@@ -113,7 +113,12 @@ export function restoreChronicle(save: SaveData, value: unknown, step: number, a
 export function chronicleAchievements(save: SaveData) {
   const definitions: Array<{ id: string; title: string; detail: string; difficulty: number }> = [
     { id: 'forge', difficulty: 40, title: '炉火纯青', detail: '一件法宝炼器十阶' },
-    { id: 'three-paths', difficulty: 70, title: '三道皆证', detail: '以正道、魔道和兼修分别通关' },
+    {
+      id: 'three-paths',
+      difficulty: 70,
+      title: '三道皆证',
+      detail: '同一世以正道、魔道、兼修各通关一次，可重游同一秘境',
+    },
     { id: 'permanent-medicine', difficulty: 30, title: '丹成造化', detail: '首次服用本世珍品丹药' },
     {
       id: 'story',
@@ -126,7 +131,7 @@ export function chronicleAchievements(save: SaveData) {
     { id: 'mastery', difficulty: 60, title: '仙门有道', detail: '一部宗门宝典精研十阶' },
     {
       id: 'training-master',
-      difficulty: 90,
+      difficulty: 105,
       title: '三元归一',
       detail: '淬体、悟道与身法皆修至二十阶',
     },

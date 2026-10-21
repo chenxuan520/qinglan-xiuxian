@@ -182,6 +182,7 @@ test('履历按需合并加载，失败可重试、成功复用，详细数字�
   s.retreatBonus.power = 10000;
   const value = powerBreakdown(s).current.weaponDamage.toLocaleString('zh-CN', {
     maximumFractionDigits: 2,
+    useGrouping: false,
   });
   assert.ok(chronicle.chronicleContent(s).includes('查看详细属性与增幅来源'));
   assert.ok(powerDetailsContent(s).includes(value));
@@ -203,12 +204,12 @@ test('养魂木解释训练本身的20%到26%，独立展开来源给完整比�
   const change = row.changes.find((change) => change.key === 'weaponDamage')!;
   assert.ok(
     html.includes(
-      `本命伤害 ${change.before.toLocaleString('zh-CN', { maximumFractionDigits: 2 })} →`,
+      `本命伤害 ${change.before.toLocaleString('zh-CN', { maximumFractionDigits: 2, useGrouping: false })} →`,
     ),
   );
   assert.ok(
     html.includes(
-      `→ ${change.after.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}（+26%）`,
+      `→ ${change.after.toLocaleString('zh-CN', { maximumFractionDigits: 2, useGrouping: false })}（+26%）`,
     ),
   );
   assert.match(html, /保留其他加成对比/);
@@ -221,11 +222,11 @@ test('功法的减速代价、施法间隔收益和零斩妖回血基数均正�
   const bone = fixture();
   assert.ok(joinSect(bone, 'bone'));
   const boneHtml = powerDetailsContent(bone);
-  assert.match(boneHtml, /class="power-loss">移速 [\d,.]+ 像素\/秒 → [\d,.]+ 像素\/秒（-1%）/);
+  assert.match(boneHtml, /class="power-loss">移速 [\d.]+ 像素\/秒 → [\d.]+ 像素\/秒（-1%）/);
   const soul = fixture();
   assert.ok(joinSect(soul, 'devour'));
   const html = powerDetailsContent(soul);
-  assert.match(html, /每次斩妖回血 0 → [\d,.]+（\+[\d,.]+）/);
+  assert.match(html, /每次斩妖回血 0 → [\d.]+（\+[\d.]+）/);
   assert.doesNotMatch(html, /NaN|Infinity/);
   const medicine = freshSave();
   medicine.medicine.active.juyuan = medicine.age + 100;
@@ -250,7 +251,7 @@ test('履历头部维持简写，完整灵威仅在展开明细中显示', () =>
   s.forge[s.starter] = 10;
   s.training = { power: 20, vitality: 20, speed: 20 };
   s.retreatBonus.power = 10000;
-  const full = spiritPower(s).score.toLocaleString('zh-CN');
+  const full = spiritPower(s).score.toLocaleString('zh-CN', { useGrouping: false });
   assert.ok(
     chronicle
       .chronicleContent(s)

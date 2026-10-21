@@ -72,19 +72,19 @@ export function debugGrant(save: SaveData, input: DebugGrant) {
         error:
           input.kind === 'realm'
             ? '请选择高于当前的境界，最高到渡劫。'
-            : `请输入有效修为点数，最多可增加 ${remaining.toLocaleString('zh-CN')} 点。`,
+            : `请输入有效修为点数，最多可增加 ${remaining.toLocaleString('zh-CN', { useGrouping: false })} 点。`,
       };
     gainCultivation(next, amount);
     syncTribulationClock(next);
     message =
       input.kind === 'realm'
-        ? `已达${target!.name} · 永久修为 +${amount.toLocaleString('zh-CN')}`
-        : `永久修为 +${amount.toLocaleString('zh-CN')}`;
+        ? `已达${target!.name} · 永久修为 +${amount.toLocaleString('zh-CN', { useGrouping: false })}`
+        : `永久修为 +${amount.toLocaleString('zh-CN', { useGrouping: false })}`;
   } else if (input.kind === 'stones' || input.kind === 'iron') {
     if (!add(next[input.kind], debugQuantityLimit(input.kind)))
       return { error: '请输入有效数量，余额不能超出上限。' };
     next[input.kind] += input.quantity;
-    message = `${input.kind === 'stones' ? '灵石' : '玄铁'} +${input.quantity.toLocaleString('zh-CN')}`;
+    message = `${input.kind === 'stones' ? '灵石' : '玄铁'} +${input.quantity.toLocaleString('zh-CN', { useGrouping: false })}`;
   } else if (input.kind === 'artifact') {
     const t = TREASURES.find((t) => t.id === input.id);
     if (!t || !Number.isInteger(input.forge) || input.forge < 0 || input.forge > MAX_FORGE_LEVEL)

@@ -160,12 +160,19 @@ export function installReportFilters(
         },
         scales:
           metric === 'boss'
-            ? { x: { beginAtZero: true, title: { display: true, text: '秒' } } }
+            ? {
+                x: {
+                  beginAtZero: true,
+                  title: { display: true, text: '秒' },
+                  ticks: { format: { useGrouping: false } },
+                },
+              }
             : {
                 y: {
                   beginAtZero: true,
                   ...(metric === 'clear' ? { max: 100 } : {}),
                   title: { display: true, text: metric === 'clear' ? '%' : '秒' },
+                  ticks: { format: { useGrouping: false } },
                 },
               },
       },

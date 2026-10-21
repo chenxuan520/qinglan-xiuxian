@@ -386,7 +386,7 @@ async function checkDebugCurios(name: string, viewport: string) {
   assert.equal((await saved()).stones, stones + 1000);
   assert.equal(
     await evaluate('() => document.querySelector("#debug-stock").textContent'),
-    `当前持有 ${(stones + 1000).toLocaleString('zh-CN')}`,
+    `当前持有 ${(stones + 1000).toLocaleString('zh-CN', { useGrouping: false })}`,
   );
   await finishPage();
 }

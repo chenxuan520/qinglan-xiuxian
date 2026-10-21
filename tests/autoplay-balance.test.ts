@@ -217,7 +217,14 @@ test('日报恢复只接受正式master完整或失败报告，校验来源并�
   }
 });
 test('监控展示中文、通过数、折叠口径、旧报告与失败提示，文本安全转义', () => {
-  const html = autoplayMonitorHTML(report(), Date.parse('2026-10-15T05:00:00Z'));
+  const data = { ...report(), elapsedSeconds: 1234.56 };
+  assert.equal(validAutoplayReport(data), true);
+  const before = structuredClone(data);
+  const html = autoplayMonitorHTML(data, Date.parse('2026-10-15T05:00:00Z'));
+  assert.match(html, /用时 1234\.6 秒/);
+  assert.match(html, /840\/10080矩阵维度/);
+  assert.doesNotMatch(html, /\d,\d{3}/);
+  assert.deepEqual(data, before);
   assert.match(html, /默认路线/);
   assert.match(html, /极致进攻/);
   assert.match(html, /42\.5%/);

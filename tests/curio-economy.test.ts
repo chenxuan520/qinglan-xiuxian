@@ -139,7 +139,7 @@ test('出售页预告奇物收购与到手范围，默认保留价可成交，�
     const high = value * 0.15;
     const html = auctionContent(s, 'sell', false, 'curio', id);
     for (const amount of [value, low, high, net(low), net(high)])
-      assert.ok(html.includes(amount.toLocaleString('zh-CN')));
+      assert.ok(html.includes(amount.toLocaleString('zh-CN', { useGrouping: false })));
     assert.match(html, new RegExp(`id="auction-reserve"[^>]+value="${low}"`));
     const balance = s.stones;
     const unsold = sellAuction(s, item(id), high + 1, s.mortal.sectMarket!.visit)!;
@@ -154,7 +154,11 @@ test('出售页预告奇物收购与到手范围，默认保留价可成交，�
   const s = fixture();
   s.curios.seeking['soul-wood'] = 2;
   const q = curioSeekingQuote(s, 'soul-wood');
-  assert.ok(curioSeekingContent(s).includes(`本次${q.price.toLocaleString('zh-CN')}灵石`));
+  assert.ok(
+    curioSeekingContent(s).includes(
+      `本次${q.price.toLocaleString('zh-CN', { useGrouping: false })}灵石`,
+    ),
+  );
   assert.match(curioSeekingContent(s), /本次机会 40%/);
   assert.doesNotMatch(curioSeekingContent(s), /剩余|\/3|三次托付/);
   assert.deepEqual(auctionSaleRates(item('soul-wood')), [10, 15]);

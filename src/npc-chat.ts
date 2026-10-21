@@ -21,6 +21,7 @@ import { marketContact } from './market-relations.ts';
 import { marketOpportunity } from './market-social.ts';
 import { marketTradeMotive } from './market-trade-motives.ts';
 import { marketFriendLead } from './market-world.ts';
+import { removeNumberGrouping } from './number-format.ts';
 
 export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
   /\/$/,
@@ -373,7 +374,8 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
     return;
   }
   const { reply, imageToken } = story;
-  text.textContent = reply;
+  const displayedReply = removeNumberGrouping(reply);
+  text.textContent = displayedReply;
   status.textContent = '茶馆传说 · 一回一故事';
   next.disabled = false;
   const reader = new StorySpeech((state) => {
@@ -395,7 +397,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   play.onclick = () => {
     if (!save.sound || save.volume === 0) enableSound();
     play.textContent = '朗读故事';
-    reader.play(reply, save.volume);
+    reader.play(displayedReply, save.volume);
   };
   stop.onclick = () => reader.stop();
   if (!imageToken) return;
@@ -511,7 +513,7 @@ export function mountNpcChat(
       const name = document.createElement('strong');
       name.textContent = message.role === 'user' ? '你' : npc.name;
       row.className = `npc-chat-line ${message.role}`;
-      row.append(name, document.createTextNode(message.content));
+      row.append(name, document.createTextNode(removeNumberGrouping(message.content)));
       log.append(row);
     }
     log.hidden = !log.firstChild;

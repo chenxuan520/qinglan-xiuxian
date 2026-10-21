@@ -1,7 +1,8 @@
 import { powerAttributes, powerBreakdown, type PowerAttribute } from './power-breakdown.ts';
 import type { SaveData } from './progress.ts';
 
-const num = (n: number, digits = 2) => n.toLocaleString('zh-CN', { maximumFractionDigits: digits });
+const num = (n: number, digits = 2) =>
+  n.toLocaleString('zh-CN', { maximumFractionDigits: digits, useGrouping: false });
 const signed = (n: number, digits = 2) => `${n > 0 ? '+' : ''}${num(n, digits)}`;
 const valueLabel = (key: PowerAttribute, value: number) =>
   ['crit', 'armor', 'poisonDamage'].includes(key)

@@ -213,7 +213,7 @@ export function renderReport(input: string, output: string) {
   );
   // 不上传体积翻倍的旧引擎结果；本次逐局数据、失败信息与源版本完整保留。
   writeFileSync(join(root, 'results.json'), JSON.stringify(report));
-  const summary = `每日完整平衡测试：${report.passed === true ? '通过' : '未通过'}；返回 ${report.current?.length ?? 0}/10,080 条。\n\n在线报告：https://chenxuan520.github.io/qinglan-xiuxian/balance-report/\n`;
+  const summary = `每日完整平衡测试：${report.passed === true ? '通过' : '未通过'}；返回 ${report.current?.length ?? 0}/10080 条。\n\n在线报告：https://chenxuan520.github.io/qinglan-xiuxian/balance-report/\n`;
   writeFileSync(join(root, 'summary.md'), summary);
   console.log(summary);
 }

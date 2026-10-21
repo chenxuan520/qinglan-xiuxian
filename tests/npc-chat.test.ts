@@ -289,6 +289,25 @@ test('故居只隐藏正文同句初始问候，AI与失败兜底保留，后续
   assert.equal(town.log.hidden, false);
 });
 
+test('说书显示去除数字千分位，但配图仍使用签名对应的原始正文', async (t) => {
+  const save = freshSave();
+  save.mortal.population = input.population;
+  const host = storyHost();
+  const story = '行过 12,345.6 年,青岚炊烟仍在。';
+  let imageStory = '';
+  t.after(closeNpcChat);
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (String(url).endsWith('/chat'))
+      return Response.json({ reply: story, imageToken: `1234567890.${'a'.repeat(64)}` });
+    imageStory = JSON.parse(options.body).story;
+    return new Response(null, { status: 503 });
+  });
+  await mountTeaStory(host, save, () => assert.fail('不能自动开声'));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(host.nodes['.tea-story-text'].textContent, '行过 12345.6 年,青岚炊烟仍在。');
+  assert.equal(imageStory, story);
+});
+
 test('说书接受较长正文，断网、空值与超限仅返回空结果', async () => {
   const story = {
     ...input,

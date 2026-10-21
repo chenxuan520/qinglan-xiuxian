@@ -39,7 +39,7 @@ import {
 } from './auction-trade.ts';
 
 export type AuctionView = 'buy' | 'sell' | 'history';
-const num = (n: number) => n.toLocaleString('zh-CN');
+const num = (n: number) => n.toLocaleString('zh-CN', { useGrouping: false });
 function art(item: AuctionItem) {
   if (item.kind === 'iron') return '<span class="auction-iron" aria-hidden="true">◆</span>';
   if (item.kind === 'curio') return curioArt(item.id);

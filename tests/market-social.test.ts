@@ -300,7 +300,11 @@ test('弱肉强食见闻不额外计龄，高于玩家的强横求购按70%明�
       found = true;
       assert.ok(o.price < auctionValue(o) * 0.85);
       const old = s.age;
-      assert.ok(marketSocialContent(s, n).includes(`${o.price.toLocaleString('zh-CN')} 灵石`));
+      assert.ok(
+        marketSocialContent(s, n).includes(
+          `${o.price.toLocaleString('zh-CN', { useGrouping: false })} 灵石`,
+        ),
+      );
       assert.equal(s.age, old);
       s.cultivation = 1e9;
       s.completed = [6];

@@ -12,9 +12,125 @@ import { FINAL_TRIAL_STAGE, TREASURES, treasure, passive } from '../src/data.ts'
 import { Game } from '../src/game.ts';
 import { cultivationPanel } from '../src/cultivation-ui.ts';
 import { completedJourney, damageReport } from '../src/common-ui.ts';
-import { formatNumber } from '../src/number-format.ts';
+import { formatNumber, removeNumberGrouping } from '../src/number-format.ts';
+import { auctionContent, auctionResult } from '../src/auction-ui.ts';
+import { prepareAuction } from '../src/auction.ts';
+import { beginSectMarketVisit } from '../src/sect-market.ts';
+import { marketCultivators } from '../src/sect-market-data.ts';
+import { marketSocialContent } from '../src/market-social-ui.ts';
+import { marketRequest } from '../src/market-social.ts';
+import { curioSeekingContent } from '../src/curio-ui.ts';
+import { powerDetailsContent } from '../src/power-details-ui.ts';
+import { debugGrant } from '../src/debug-resources.ts';
 
 const source = readFileSync(new URL('../src/battle-hud.ts', import.meta.url), 'utf8');
+
+test('玩家玩法文档不写数字千分位逗号', () => {
+  for (const path of ['../docs/gameplay.md', '../docs/medicine.md'])
+    assert.doesNotMatch(readFileSync(new URL(path, import.meta.url), 'utf8'), /\d,\d{3}/);
+});
+
+test('拍卖、求购、奇物寻访与灵威明细保留完整数字和精度，不出现千分位逗号', () => {
+  const save = freshSave('heaven', ['metal'], 'dual', () => 0.5);
+  save.cultivation = 15000;
+  save.age = 220;
+  save.stones = 18421;
+  save.iron = 12345;
+  save.prologueSeen = save.hometownSeen = true;
+  save.mortal.hometown!.stage = 'departed';
+  save.mortal.population = { seed: 12345, since: 15 };
+  save.forge[save.starter] = 3;
+  save.medicine.bag.lingru = 12;
+  beginSectMarketVisit(save);
+  prepareAuction(save);
+  const before = JSON.stringify(save);
+  for (const view of ['buy', 'sell', 'history'] as const) {
+    const html = auctionContent(save, view, false);
+    assert.match(html, /灵石 <strong>18421<\/strong>/);
+    assert.match(html, /缴纳 10000 灵石取得资格/);
+    assert.doesNotMatch(html.replace(/<[^>]*>/g, ''), /\d,\d{3}/);
+  }
+  const receipt = {
+    kind: 'medicine' as const,
+    id: 'lingru',
+    quantity: 2,
+    forgeLevel: 0,
+    hall: 1,
+    visit: save.mortal.sectMarket!.visit,
+    realmIndex: 5,
+    age: save.age,
+    price: 12000,
+    fee: 600,
+    bidder: 'player',
+  };
+  assert.match(auctionResult(save, { ...receipt, outcome: 'won' }), /花费 12600 灵石/);
+  assert.match(
+    auctionResult(
+      save,
+      { ...receipt, outcome: 'lost', bidderName: '道友' },
+      { budget: 12000, start: 1000 },
+    ),
+    /含费预算 12000；下一档需出价 12050 ＋手续费 603 ＝ 12653/,
+  );
+  assert.match(auctionResult(save, { ...receipt, outcome: 'sold' }), /实收 11400 灵石/);
+  for (const sect of [false, true])
+    assert.doesNotMatch(curioSeekingContent(save, sect).replace(/<[^>]*>/g, ''), /\d,\d{3}/);
+  const npc = marketCultivators(save.mortal.population, save.mortal.sectMarket!).find(
+    (npc) => (marketRequest(save, npc.id)?.price ?? 0) >= 1000,
+  )!;
+  assert.ok(npc, '求购样本必须达到千位');
+  const request = marketRequest(save, npc.id)!;
+  assert.ok(marketSocialContent(save, npc).includes(`${request.price} 灵石`));
+  assert.doesNotMatch(marketSocialContent(save, npc).replace(/<[^>]*>/g, ''), /\d,\d{3}/);
+  const power = spiritPower(save);
+  const details = powerDetailsContent(save);
+  assert.ok(details.includes(`灵威 ${power.score}`));
+  assert.ok(
+    details.includes(
+      power.weaponDamage.toLocaleString('zh-CN', { maximumFractionDigits: 2, useGrouping: false }),
+    ),
+  );
+  assert.doesNotMatch(details.replace(/<[^>]*>/g, ''), /\d,\d{3}/);
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('调试数量与修为提示不使用千分位，校验及实际发放数值保持', () => {
+  const save = freshSave();
+  const before = JSON.stringify(save);
+  for (const kind of ['stones', 'iron', 'cultivation'] as const) {
+    const result = debugGrant(save, { kind, id: '', quantity: 12345, forge: 0 });
+    assert.ok('next' in result);
+    assert.match(result.message!, /\+12345/);
+    assert.doesNotMatch(result.message!, /\d,\d{3}/);
+    assert.equal(result.next![kind], 12345);
+  }
+  const denied = debugGrant(save, {
+    kind: 'cultivation',
+    id: '',
+    quantity: Number.MAX_SAFE_INTEGER,
+    forge: 0,
+  });
+  assert.ok('error' in denied);
+  assert.match(denied.error!, /119940 点/);
+  assert.doesNotMatch(denied.error!, /\d,\d{3}/);
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('自由对白仅移除数字千分位，保留小数、负号、普通逗号与原始字符串', () => {
+  for (const [text, expected] of [
+    ['需 1,234 灵石，余下 -12,345.67。', '需 1234 灵石，余下 -12345.67。'],
+    ['行过1,234,567年,回来看看。', '行过1234567年,回来看看。'],
+    ['1,234,道友，慢行。', '1234,道友，慢行。'],
+    [
+      '1,2,3；12,34；1.234,567；1234,567；12,345,67',
+      '1,2,3；12,34；1.234,567；1234,567；12,345,67',
+    ],
+  ]) {
+    const before = text;
+    assert.equal(removeNumberGrouping(text), expected);
+    assert.equal(text, before);
+  }
+});
 
 test('共享数字格式保留小整数，万、亿、万亿最多一位小数且不加分隔符', () => {
   for (const [value, expected] of [

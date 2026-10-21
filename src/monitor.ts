@@ -112,7 +112,7 @@ function chart(
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
-        scales: { y: { beginAtZero: true } },
+        scales: { y: { beginAtZero: true, ticks: { format: { useGrouping: false } } } },
         plugins: { legend: { position: 'bottom' } },
       },
     }),

@@ -2,6 +2,7 @@ import test from 'node:test';
 import { treasure } from '../src/data.ts';
 import assert from 'node:assert/strict';
 import { Script } from 'node:vm';
+import { LinearScale, Ticks, type ChartConfiguration } from 'chart.js';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -106,6 +107,55 @@ test('图表使用计划分母和原始中位数，未击杀与无胜局不会�
     reportChartData([unknown], plan.slice(0, 1), 'clear', labels).datasets[0].data[0],
     0,
   );
+});
+test('日报三类图只关闭数值轴千分位，保留分类轴、上限与小数精度', () => {
+  const block = reportHtml({ current: [] }).match(/    const config\s*=\s*\{[^]*?^    \};/m)?.[0];
+  assert.ok(block);
+  const script = new Script(`${block}\nconfig;`);
+  const data = { labels: ['第一境'], datasets: [{ label: '当前筛选合计', data: [1234.5678] }] };
+  for (const metric of ['clear', 'time', 'boss']) {
+    const config = script.runInNewContext({
+      metric,
+      data,
+      names: { clear: '通关率', time: '胜局耗时', boss: '妖王存活' },
+      titleLines: () => ['测试范围'],
+    }) as ChartConfiguration;
+    const axis = metric === 'boss' ? 'x' : 'y';
+    const scale = Object.assign(Object.create(LinearScale.prototype), {
+      chart: { options: { locale: 'zh-CN' } },
+      options: config.options!.scales![axis],
+    });
+    assert.equal(config.type, metric === 'time' ? 'line' : 'bar');
+    assert.equal(config.options!.indexAxis, metric === 'boss' ? 'y' : 'x');
+    assert.equal(config.options!.scales![axis === 'x' ? 'y' : 'x'], undefined);
+    assert.equal(scale.options.beginAtZero, true);
+    assert.equal(scale.options.max, metric === 'clear' ? 100 : undefined);
+    assert.equal(scale.options.title.text, metric === 'clear' ? '%' : '秒');
+    assert.equal(scale.options.ticks?.format?.useGrouping, false);
+    assert.equal(scale.options.ticks.callback, undefined);
+    assert.equal(config.options!.plugins!.tooltip, undefined);
+    assert.equal(config.data, data);
+    const original = Object.assign(Object.create(LinearScale.prototype), {
+      chart: scale.chart,
+      options: { ticks: {} },
+    });
+    for (const values of [
+      [0, 1000, 2000],
+      [1234.5, 1234.6, 1234.7],
+      [0.01, 0.02, 0.03],
+    ]) {
+      const ticks = values.map((value) => ({ value }));
+      const text = Ticks.formatters.numeric.call(scale, values[1], 1, ticks);
+      assert.equal(
+        text,
+        Ticks.formatters.numeric.call(original, values[1], 1, ticks).replaceAll(',', ''),
+      );
+      assert.doesNotMatch(text, /\d,\d{3}/);
+      assert.equal(Number(text), values[1]);
+    }
+    assert.equal(scale.getLabelForValue(10080), '10080');
+    assert.equal(scale.getLabelForValue(data.datasets[0].data[0]), '1234.568');
+  }
 });
 test('自定义组合按计划分组，缺失保留分母，重复与错误身份不虚增通过率', () => {
   const base = balanceCases(true)[0];
@@ -281,6 +331,9 @@ test('完整覆盖但仅黄色诊断的报告仍通过；硬失败与缺失在�
     const raw = readFileSync(join(root, 'results.json'), 'utf8');
     const json = JSON.parse(readFileSync(join(root, 'diagnostics.json'), 'utf8'));
     const html = readFileSync(join(root, 'index.html'), 'utf8');
+    const summary = readFileSync(join(root, 'summary.md'), 'utf8');
+    assert.ok(summary.includes(`返回 ${current.length}/${balanceCases(true).length} 条`));
+    assert.doesNotMatch(summary, /\d,\d{3}/);
     assert.equal(json.passed, true);
     assert.deepEqual(json.counts, { error: 0, warning: 1 });
     assert.ok(html.indexOf('id="diagnostics"') < html.indexOf('id="statistics"'));
@@ -303,6 +356,9 @@ test('完整覆盖但仅黄色诊断的报告仍通过；硬失败与缺失在�
     );
     renderReport(input, root);
     const failed = JSON.parse(readFileSync(join(root, 'diagnostics.json'), 'utf8'));
+    const failedSummary = readFileSync(join(root, 'summary.md'), 'utf8');
+    assert.ok(failedSummary.includes(`未通过；返回 0/${balanceCases(true).length} 条`));
+    assert.doesNotMatch(failedSummary, /\d,\d{3}/);
     assert.equal(failed.passed, false);
     assert.ok(failed.counts.error > 0);
     assert.ok(readFileSync(join(root, 'index.html'), 'utf8').includes('class="diagnostic error"'));

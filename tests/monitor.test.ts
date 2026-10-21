@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { stripTypeScriptTypes } from 'node:module';
+import { Script } from 'node:vm';
+import { LinearScale, Ticks, type ChartConfiguration } from 'chart.js';
 import worker from '../workers/npc-ai/index.ts';
 import { monitorDeadline } from '../src/monitor-request.ts';
 import { monitorResponse, type MonitorEnv } from '../workers/npc-ai/monitor.ts';
@@ -17,6 +21,7 @@ import {
   monitorTime,
   monitorRate,
   monitorAverage,
+  monitorCount,
   monitorVersions,
   validMonitorCI,
 } from '../src/monitor-view.ts';
@@ -167,6 +172,86 @@ test('统计口径按结算计算胜率，加权和除以对应观测数，UTC �
   const html = monitorTable(['摘要'], [['<script>private()</script>']]);
   assert.ok(html.includes('&lt;script&gt;'));
   assert.ok(!html.includes('<script>'));
+});
+
+test('监控大数不加千分位，计数与平均值保留最多一位小数', () => {
+  for (const [value, expected] of [
+    [0, '0'],
+    [1000, '1000'],
+    [10080, '10080'],
+    [1234567.89, '1234567.9'],
+    [1234.5, '1234.5'],
+    [1234.56, '1234.6'],
+    [1234.04, '1234'],
+  ] as const) {
+    assert.equal(monitorCount(value), expected);
+    assert.equal(monitorCount(String(value)), expected);
+  }
+  assert.equal(monitorAverage(4938.24, 4, ' 秒'), '1234.6 秒');
+  const rows = [{ version: 'v1', sessions: 10080, starts: 1234567.89, errors: 1234.5 }];
+  const before = structuredClone(rows);
+  const html = monitorVersions(rows);
+  for (const value of ['10080', '1234567.9', '1234.5'])
+    assert.ok(html.includes(`<td>${value}</td>`));
+  assert.doesNotMatch(html, /\d,\d{3}/);
+  assert.deepEqual(rows, before);
+});
+
+test('线上监控图数值轴及继承标签不加千分位，保留分类轴和小数精度', () => {
+  const source = readFileSync(new URL('../src/monitor.ts', import.meta.url), 'utf8');
+  const block = source.match(/^function chart\([^]*?^\}/m)?.[0];
+  assert.ok(block);
+  const configs: ChartConfiguration[] = [];
+  const labels = ['日期'],
+    datasets = [{ label: '打开次数', data: [1234.5678], backgroundColor: '#31836a' }];
+  new Script(
+    `${stripTypeScriptTypes(block)}\nchart('trend', labels, datasets, 'line');\nchart('stages', labels, datasets);`,
+  ).runInNewContext({
+    labels,
+    datasets,
+    charts: [],
+    Chart: class {
+      constructor(_canvas: unknown, config: ChartConfiguration) {
+        configs.push(config);
+      }
+    },
+    document: {
+      createElement: () => ({
+        setAttribute() {},
+        append() {},
+      }),
+    },
+    $: () => ({ append() {} }),
+  });
+  assert.equal(configs.length, 2);
+  for (const [index, config] of configs.entries()) {
+    const scale = Object.assign(Object.create(LinearScale.prototype), {
+      chart: { options: { locale: 'zh-CN' } },
+      options: config.options!.scales!.y,
+    });
+    assert.equal(config.type, index === 0 ? 'line' : 'bar');
+    assert.equal(config.options!.scales!.x, undefined);
+    assert.equal(scale.options.beginAtZero, true);
+    assert.equal(scale.options.ticks?.format?.useGrouping, false);
+    assert.equal(scale.options.ticks.callback, undefined);
+    assert.equal(config.options!.plugins!.legend!.position, 'bottom');
+    assert.equal(config.options!.plugins!.tooltip, undefined);
+    assert.equal(config.data.labels, labels);
+    assert.equal(config.data.datasets, datasets);
+    const ticks = [1234.5, 1234.6, 1234.7].map((value) => ({ value }));
+    const original = Object.assign(Object.create(LinearScale.prototype), {
+      chart: scale.chart,
+      options: { ticks: {} },
+    });
+    const text = Ticks.formatters.numeric.call(scale, 1234.6, 1, ticks);
+    assert.equal(
+      text,
+      Ticks.formatters.numeric.call(original, 1234.6, 1, ticks).replaceAll(',', ''),
+    );
+    assert.equal(Number(text), 1234.6);
+    assert.equal(scale.getLabelForValue(10080), '10080');
+    assert.equal(scale.getLabelForValue(datasets[0].data[0]), '1234.568');
+  }
 });
 
 test('版本分布不超过20项时直接展示，不增加展开入口', () => {

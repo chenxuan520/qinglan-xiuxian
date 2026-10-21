@@ -8,7 +8,7 @@ export const monitorEscape = (value: unknown) =>
   );
 export const monitorNumber = (value: unknown) => Number(value) || 0;
 export const monitorCount = (value: unknown) =>
-  monitorNumber(value).toLocaleString('zh-CN', { maximumFractionDigits: 1 });
+  monitorNumber(value).toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false });
 export const monitorAverage = (sum: unknown, count: unknown, suffix = '') =>
   monitorNumber(count) > 0
     ? `${monitorCount(monitorNumber(sum) / monitorNumber(count))}${suffix}`

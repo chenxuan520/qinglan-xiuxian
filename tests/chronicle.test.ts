@@ -72,9 +72,9 @@ test('成就栏只保留非必经目标，并补录可由旧档确认的成就',
       'mastery',
       'three-paths',
       'level-100',
-      'training-master',
       'collection',
       'six-immortals',
+      'training-master',
       'five-tribulations',
       'hard-immortal',
       'one-life-clear',
@@ -96,7 +96,7 @@ test('成就栏只保留非必经目标，并补录可由旧档确认的成就',
   assert.equal(parseSave(JSON.stringify(butian)).chronicle.milestones['permanent-medicine'], null);
 });
 
-test('正道、魔道与兼修各通关一次后记录三道皆证', () => {
+test('同一世重游同一秘境，三路线各胜一次才达成三道皆证，失败与重复路线不补齐', () => {
   const s = freshSave();
   const run = (path: 'orthodox' | 'demonic' | 'dual') =>
     settleRun(s, {
@@ -110,12 +110,29 @@ test('正道、魔道与兼修各通关一次后记录三道皆证', () => {
       path,
     });
   run('orthodox');
+  run('orthodox');
+  settleRun(s, {
+    stage: 0,
+    difficulty: 0,
+    kills: 0,
+    time: 90,
+    victory: false,
+    iron: 0,
+    level: 1,
+    path: 'dual',
+  });
+  assert.equal(Object.hasOwn(s.chronicle.milestones, 'path-dual'), false);
   run('demonic');
   assert.equal(Object.hasOwn(s.chronicle.milestones, 'three-paths'), false);
   run('dual');
   assert.equal(s.chronicle.milestones['three-paths'], s.age);
   run('dual');
   assert.equal(s.chronicle.entries.filter((entry) => entry.title === '三道皆证').length, 1);
+  assert.match(
+    chronicleAchievements(s).find((a) => a.id === 'three-paths')!.detail,
+    /同一世.*同一秘境/,
+  );
+  assert.equal(importSave(exportSave(s, null)).save.chronicle.milestones['three-paths'], s.age);
 });
 
 test('宗门、炼器与人间故事进入年表，未遇故事不提前剧透', () => {

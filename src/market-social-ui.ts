@@ -40,7 +40,7 @@ function requestContent(save: SaveData, npc: MarketCultivator, attrs: string, un
   return `<details class="market-social-section" data-disclosure="market-request"><summary>修士求购 <small>${name} ×${request.quantity}</small></summary>${
     fulfilled
       ? '<p>本批委托已完成，物资与报酬已结算，不可重复交货。</p>'
-      : `<p class="market-trade-motive"><strong>${text(request.motiveTitle)}</strong><br>${text(request.motiveText)}</p><p>所需：<strong>${name} ×${request.quantity}</strong>${request.kind === 'artifact' ? `，至少炼器 ${request.minimumLevel} 阶，实际将交出炼器 ${request.forgeLevel} 阶` : '，只交付库存，不影响已服药效'}。</p><p>当面交货，实收 <strong>${request.price.toLocaleString('zh-CN')} 灵石</strong> · 半年 · 无额外佣金。</p><p class="panel-note">${text(request.priceText)} 当前本命不可交付，未完成历练时不可交易法宝。</p><button class="secondary-button" data-action="sect-market-request" ${attrs} data-level="${request.forgeLevel}" ${reason ? 'disabled' : ''}>${reason || '当面交货 · 实收灵石'}</button>`
+      : `<p class="market-trade-motive"><strong>${text(request.motiveTitle)}</strong><br>${text(request.motiveText)}</p><p>所需：<strong>${name} ×${request.quantity}</strong>${request.kind === 'artifact' ? `，至少炼器 ${request.minimumLevel} 阶，实际将交出炼器 ${request.forgeLevel} 阶` : '，只交付库存，不影响已服药效'}。</p><p>当面交货，实收 <strong>${request.price.toLocaleString('zh-CN', { useGrouping: false })} 灵石</strong> · 半年 · 无额外佣金。</p><p class="panel-note">${text(request.priceText)} 当前本命不可交付，未完成历练时不可交易法宝。</p><button class="secondary-button" data-action="sect-market-request" ${attrs} data-level="${request.forgeLevel}" ${reason ? 'disabled' : ''}>${reason || '当面交货 · 实收灵石'}</button>`
   }</details>`;
 }
 

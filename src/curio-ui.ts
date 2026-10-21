@@ -12,7 +12,7 @@ export function curioSeekingContent(save: SaveData, sect = false, unfinished = f
     .filter((c) => !acquiredCurio(save, c.id))
     .map((c) => {
       const q = curioSeekingQuote(save, c.id, sect, unfinished);
-      return `<article class="curio-card"><header>${curioArt(c.id)}<div><h3>${c.name}</h3><small>已寻访 ${q.progress} 次 · 本次机会 ${q.chance}%</small></div></header><p>${c.effect}</p><small>本次${q.price.toLocaleString('zh-CN')}灵石 · 十年${q.reserve ? ` · 另预留供奉${q.reserve}灵石` : ''}</small><button class="secondary-button" data-action="${sect ? 'sect-service-curio' : 'market-venue-curio'}" data-id="${c.id}" data-stamp="${venueStamp(save)}" data-cost-stones="${q.price + q.reserve}" ${q.reason ? 'disabled' : ''}>${q.reason || '托付寻访'}</button></article>`;
+      return `<article class="curio-card"><header>${curioArt(c.id)}<div><h3>${c.name}</h3><small>已寻访 ${q.progress} 次 · 本次机会 ${q.chance}%</small></div></header><p>${c.effect}</p><small>本次${q.price.toLocaleString('zh-CN', { useGrouping: false })}灵石 · 十年${q.reserve ? ` · 另预留供奉${q.reserve}灵石` : ''}</small><button class="secondary-button" data-action="${sect ? 'sect-service-curio' : 'market-venue-curio'}" data-id="${c.id}" data-stamp="${venueStamp(save)}" data-cost-stones="${q.price + q.reserve}" ${q.reason ? 'disabled' : ''}>${q.reason || '托付寻访'}</button></article>`;
     })
     .join('')}</div></details>`;
 }

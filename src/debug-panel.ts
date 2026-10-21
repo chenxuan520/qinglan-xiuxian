@@ -65,7 +65,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
       const remaining = debugCultivationRemaining(s);
       const target = DEBUG_REALMS.find((r) => r.id === id);
       root.querySelector('#debug-stock')!.textContent =
-        `当前${realmInfo(s.cultivation, s.completed.includes(FINAL_TRIAL_STAGE)).name} · 永久修为 ${s.cultivation.toLocaleString('zh-CN')} · 最多还能增加 ${remaining.toLocaleString('zh-CN')} 点，最高渡劫。`;
+        `当前${realmInfo(s.cultivation, s.completed.includes(FINAL_TRIAL_STAGE)).name} · 永久修为 ${s.cultivation.toLocaleString('zh-CN', { useGrouping: false })} · 最多还能增加 ${remaining.toLocaleString('zh-CN', { useGrouping: false })} 点，最高渡劫。`;
       submit.disabled =
         !remaining || (kind.value === 'realm' && (!target || target.cultivation <= s.cultivation));
       if (!busy)
@@ -100,7 +100,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
         ? amount === null
           ? '尚未收藏'
           : `已收藏 · 当前炼器${amount}阶；发放不会降低已有阶数。`
-        : `当前持有 ${amount?.toLocaleString('zh-CN')}`;
+        : `当前持有 ${amount?.toLocaleString('zh-CN', { useGrouping: false })}`;
     const acquired = kind.value === 'curio' && isCurio(id) && acquiredCurio(s, id);
     submit.disabled = kind.value === 'curio' && (!isCurio(id) || acquired);
     if (!busy) submit.textContent = acquired ? '本世已获得' : '发放到当前存档';
