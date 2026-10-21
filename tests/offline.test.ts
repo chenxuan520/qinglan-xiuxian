@@ -352,6 +352,22 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
       };
     }
     const initial = build('/qinglan-xiuxian/');
+    const preload = initial.plugin.transformIndexHtml('', { filename: join(root, 'index.html') });
+    assert.deepEqual(preload, [
+      {
+        tag: 'link',
+        attrs: {
+          rel: 'preload',
+          as: 'image',
+          href: `/qinglan-xiuxian/assets/sect-market-buildings.webp?qinglan-build=${initial.manifest.build}`,
+        },
+        injectTo: 'head-prepend',
+      },
+    ]);
+    assert.equal(
+      initial.plugin.transformIndexHtml('', { filename: join(root, 'monitor/index.html') }),
+      undefined,
+    );
     assert.equal(initial.manifest.base, '/qinglan-xiuxian/');
     assert.equal(initial.manifest.resources.length, 2);
     assert.equal(

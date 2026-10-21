@@ -45,16 +45,10 @@ export function debateRecipeOffer(save: SaveData, id: MarketCultivatorId) {
     ...ordered.slice(0, Math.ceil(ordered.length / 2)).map((m) => m.id),
     ...taught,
   ]);
-  const recipe = ordered.find(
-    (m) => known.has(m.id) && m.stage <= save.unlocked && !save.medicine.recipes.includes(m.id),
-  );
+  const recipe = ordered.find((m) => known.has(m.id) && !save.medicine.recipes.includes(m.id));
   if (!recipe) return undefined;
   const exchange = pool.find(
-    (m) =>
-      m.tier === recipe.tier &&
-      m.stage <= save.unlocked &&
-      save.medicine.recipes.includes(m.id) &&
-      !known.has(m.id),
+    (m) => m.tier === recipe.tier && save.medicine.recipes.includes(m.id) && !known.has(m.id),
   );
   return { id: recipe.id, price: medicineRecipePrice(recipe.id), exchange: exchange?.id };
 }

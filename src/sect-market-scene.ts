@@ -29,7 +29,7 @@ import { marketBuildingArt } from './market-art.ts';
 import { marketFellowCharacter } from './market-fellow.ts';
 import { mapClick, walkRoute } from './walk-navigation.ts';
 import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
-import { SettlementPassage, SETTLEMENT_PATHS } from './settlement-passage.ts';
+import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -89,7 +89,7 @@ export class SectMarketScene {
     returnTown?: (entry?: 'button') => void,
   ) {
     this.host = host;
-    this.position = position;
+    this.position = settlementEntry('market', position);
     this.save = save;
     this.interact = interact;
     this.openAuction = openAuction;

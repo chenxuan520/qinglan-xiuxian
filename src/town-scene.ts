@@ -25,11 +25,12 @@ import { townSceneryLayout, type TownScenery } from './town-history.ts';
 import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts';
 import { hometownParents, type HometownState } from './hometown.ts';
 import { mapClick, walkRoute } from './walk-navigation.ts';
-import { SettlementPassage, SETTLEMENT_PATHS } from './settlement-passage.ts';
+import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 
 const TOWN_IMAGES = [
   '/assets/town-ground.webp',
   '/assets/town-buildings.webp',
+  '/assets/sect-market-buildings.webp',
   '/assets/town-props.webp',
   '/assets/town-npcs.webp',
   ...Object.values(PLAYER_IMAGES),
@@ -107,6 +108,8 @@ export class TownScene {
     this.buildingSize = scenery?.revision ? 270 : 305;
     if (!townWalkable(this.position, this.layout.buildings, this.buildingSize))
       this.position = { ...TOWN_START };
+    if (connection && (!hometown || hometown.state.stage === 'departed'))
+      this.position = settlementEntry('town', this.position);
     host.dataset.townRevision = String(scenery?.revision ?? 0);
     host.dataset.townEra = String(this.layout.era);
     this.residents = townResidents(population, age, this.layout.npcs);

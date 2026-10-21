@@ -109,7 +109,7 @@ export class MedicinePanel {
         ? `${medicineInfo(id)!.name}已收入丹囊`
         : '未能购买，请检查本批货物与灵石';
     else if (action === 'medicine-recipe')
-      message = buyMedicineRecipe(save, id) ? '药方已习得，本世保留' : '尚未解锁或灵石不足';
+      message = buyMedicineRecipe(save, id) ? '药方已习得，本世保留' : '未能购方，请检查灵石与药方';
     else return true;
     if (!this.commit(save)) return true;
     if (starterChanged) actions.starterChanged();

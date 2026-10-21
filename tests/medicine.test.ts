@@ -395,6 +395,27 @@ test('买药方后合成，真实扣除全部可炼丹药的材料、灵石及10
     assert.deepEqual(s, before);
   }
 });
+
+test('凡人且只解锁首境也能按原价购齐十六丹方，钱不足或重复购买零扣费', () => {
+  for (const m of MEDICINES.filter((m) => m.years && m.tier !== '凡品')) {
+    const save = freshSave();
+    const price = m.tier === '灵品' ? 80 : 200;
+    assert.equal(save.cultivation, 0);
+    assert.equal(save.unlocked, 0);
+    save.stones = price - 1;
+    const poor = structuredClone(save);
+    assert.equal(buyMedicineRecipe(save, m.id), false);
+    assert.deepEqual(save, poor);
+    save.stones = price;
+    assert.equal(buyMedicineRecipe(save, m.id), true);
+    assert.deepEqual(save.medicine.recipes, [m.id]);
+    assert.equal(save.stones, 0);
+    const known = structuredClone(save);
+    assert.equal(buyMedicineRecipe(save, m.id), false);
+    assert.deepEqual(save, known);
+    assert.equal(save.unlocked, 0);
+  }
+});
 test('材料、钱、寿元不足或有续局时合成原子失败；到期供奉一并结算', () => {
   for (const fail of ['life', 'stones', 'materials', 'pending', 'tribulation']) {
     const s = rich();

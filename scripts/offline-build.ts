@@ -54,6 +54,20 @@ export function offlineBuild(version: string): Plugin {
         (_match, quote, path) => `url(${quote}${path}?qinglan-build=${build}${quote})`,
       );
     },
+    transformIndexHtml(_html, context) {
+      if (context.filename !== resolve(config.root, 'index.html')) return;
+      return [
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'preload',
+            as: 'image',
+            href: `${config.base}assets/sect-market-buildings.webp?qinglan-build=${build}`,
+          },
+          injectTo: 'head-prepend',
+        },
+      ];
+    },
     closeBundle() {
       if (config.command !== 'build') return;
       const output = resolve(config.root, config.build.outDir);

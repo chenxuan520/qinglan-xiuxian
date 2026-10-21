@@ -613,6 +613,7 @@
   width: 78px;
   height: 104px;
   background-repeat: no-repeat;
+  pointer-events: none;
 }
 .town-player > span {
   display: block;
@@ -1921,18 +1922,22 @@
 
 .town-passage {
   position: absolute;
-  transform: translate(-50%, -50%);
-  z-index: 1500;
-  padding: 10px 16px;
-  border: 1px solid var(--gold);
-  background: #15392fed;
-  color: var(--gold);
-  text-align: center;
-  white-space: nowrap;
-  line-height: 1.8;
-  font-size: calc(14px / var(--market-scale, 1));
+  width: 210px;
+  height: 210px;
+  transform: translate(-50%, -70px);
+  cursor: pointer;
 }
-.town-passage small {
+.town-passage[data-passage='market'] {
+  transform: translate(-50%, -120px);
+}
+.town-passage-art {
   display: block;
-  font-size: 0.8em;
+  width: 100%;
+  height: 100%;
+  background: url('/assets/sect-market-buildings.webp') no-repeat;
+  filter: drop-shadow(0 6px 4px #0004);
+}
+.town-passage .town-building-caption {
+  bottom: 0;
+  font-size: calc(13px / var(--market-scale, 1));
 }

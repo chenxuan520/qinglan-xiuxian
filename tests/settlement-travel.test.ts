@@ -8,7 +8,7 @@ import { enterTownVisit } from '../src/town-host.ts';
 import { freshTownPopulation } from '../src/town-population.ts';
 import { releaseTownScene } from '../src/scene-flow.ts';
 import { travelSettlement } from '../src/settlement-travel.ts';
-import { SETTLEMENT_PATHS } from '../src/settlement-passage.ts';
+import { SETTLEMENT_PATHS, settlementEntry } from '../src/settlement-passage.ts';
 import { lastVisitText } from '../src/home-town.ts';
 import { joinSect } from '../src/mortal.ts';
 import { HOMETOWN_START } from '../src/town.ts';
@@ -178,6 +178,27 @@ test('快捷入口可从远处双向切换，沿用正常再入场落点、额�
   assert.equal(h.save.mortal.sectMarket!.visit, 1);
   assert.deepEqual(h.save.mortal.auction!.closed, [0]);
   assert.deepEqual(h.save.mortal.sectMarket!.exchanged, ['market-disciple']);
+});
+
+test('入场避开记忆中的门口与复位区，保留安全位置，不影响继续步行穿门', () => {
+  for (const source of ['town', 'market'] as const) {
+    const path = SETTLEMENT_PATHS[source];
+    for (const distance of [0, 47.9, 48, 79.9, 80]) {
+      const remembered = { x: path.gate.x, y: path.gate.y + distance };
+      assert.deepEqual(settlementEntry(source, remembered), path.arrival);
+      assert.deepEqual(remembered, { x: path.gate.x, y: path.gate.y + distance });
+    }
+    const safe = { x: path.gate.x, y: path.gate.y + 81 };
+    assert.deepEqual(settlementEntry(source, safe), safe);
+    assert.deepEqual(settlementEntry(source, path.arrival), path.arrival);
+    assert.ok(Math.hypot(path.arrival.x - path.gate.x, path.arrival.y - path.gate.y) > 80);
+  }
+  const h = harness('town');
+  h.shell.marketPosition = { ...SETTLEMENT_PATHS.market.gate };
+  assert.equal(travelSettlement(h.shell, 'market', 'button'), true);
+  assert.deepEqual(h.shell.marketPosition, SETTLEMENT_PATHS.market.arrival);
+  assert.equal(h.state().writes, 1);
+  assert.equal(h.save.stones, 500);
 });
 
 test('快捷切换失败零写入、零切图；凡人、离乡、待劫和供奉门槛仍保留', () => {

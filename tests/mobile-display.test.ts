@@ -117,6 +117,89 @@ test('缺少屏幕方向接口不影响进入全屏', async (t) => {
   assert.deepEqual(calls, ['fullscreen', 'exit']);
 });
 
+test('指定竖屏锁定被拒绝时解除隐式方向锁并退出本次全屏', async (t) => {
+  const h = environment(t);
+  h.preferences.set(ORIENTATION_KEY, 'portrait');
+  h.orientation.lock = async (value) => {
+    h.calls.push(value);
+    throw Error('WebView does not support orientation lock');
+  };
+  const display = new MobileDisplay(() => {});
+  await display.enter();
+  assert.equal(display.active, false);
+  assert.deepEqual(h.calls, ['fullscreen', 'portrait', 'unlock', 'exit']);
+});
+
+test('锁定接口声称成功但仍横屏时不得保留全屏或冒称竖屏成功', async (t) => {
+  const h = environment(t);
+  h.preferences.set(ORIENTATION_KEY, 'portrait');
+  Object.assign(h.orientation, { type: 'landscape-primary' });
+  const display = new MobileDisplay(() => {});
+  await display.enter();
+  assert.equal(display.active, false);
+  assert.deepEqual(h.calls, ['fullscreen', 'portrait', 'unlock', 'exit']);
+});
+
+test('屏幕API声称竖屏但实际视口仍横屏时自动还原', async (t) => {
+  const h = environment(t);
+  h.preferences.set(ORIENTATION_KEY, 'portrait');
+  Object.assign(h.orientation, { type: 'portrait-primary' });
+  Object.defineProperty(globalThis, 'matchMedia', {
+    configurable: true,
+    value: (query: string) => ({ matches: query === '(pointer: coarse)' }),
+  });
+  const display = new MobileDisplay(() => {});
+  await display.enter();
+  assert.equal(display.active, false);
+  assert.deepEqual(h.calls, ['fullscreen', 'portrait', 'unlock', 'exit']);
+});
+
+test('原生退出暂时拒绝后保留本次全屏归属，允许再次还原', async (t) => {
+  const h = environment(t);
+  const display = new MobileDisplay(() => {});
+  await display.enter();
+  const exit = h.doc.exitFullscreen;
+  h.doc.exitFullscreen = async () => {
+    throw Error('temporary WebView failure');
+  };
+  assert.equal(await display.leave(), false);
+  assert.equal(display.active, true);
+  h.doc.exitFullscreen = exit;
+  assert.equal(await display.leave(), true);
+  assert.equal(display.active, false);
+  assert.deepEqual(h.calls, ['fullscreen', 'exit']);
+});
+
+test('原生方向锁挂起两秒自动退出，迟到成功不重锁，随后仍可重新选择', async (t) => {
+  const h = environment(t);
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  h.preferences.set(ORIENTATION_KEY, 'portrait');
+  let finish!: () => void;
+  h.orientation.lock = (value) => {
+    h.calls.push(value);
+    return new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+  };
+  const display = new MobileDisplay(() => {});
+  const entering = display.enter();
+  while (!finish) await new Promise((done) => setImmediate(done));
+  t.mock.timers.tick(2000);
+  await entering;
+  assert.equal(display.active, false);
+  assert.deepEqual(h.calls, ['fullscreen', 'portrait', 'unlock', 'exit']);
+  finish();
+  await new Promise((done) => setImmediate(done));
+  assert.equal(display.active, false);
+  assert.equal(h.calls.at(-1), 'unlock');
+  h.orientation.lock = async (value) => {
+    h.calls.push(value);
+  };
+  await display.enter();
+  assert.equal(display.active, true);
+  assert.deepEqual(h.calls.slice(-2), ['fullscreen', 'portrait']);
+});
+
 test('缺少全屏接口或全屏请求被拒绝时安全降级', async (t) => {
   const { calls, root } = environment(t);
   root.requestFullscreen = async () => {

@@ -20,6 +20,7 @@ export class MobileDisplay {
     return new module.Orientation(
       () => this.wanted && this.active,
       () => this.enter(),
+      () => this.leave(),
     );
   });
 
@@ -72,7 +73,7 @@ export class MobileDisplay {
         if (root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
         else if (root.webkitRequestFullscreen) await root.webkitRequestFullscreen();
         else return;
-        this.owns = this.active;
+        this.owns = true;
       } catch {
         return;
       }
@@ -80,7 +81,7 @@ export class MobileDisplay {
     if (!this.wanted) await this.exit();
     else
       try {
-        await (await this.mode.load()).apply();
+        if (!(await (await this.mode.load()).apply())) await this.exit();
       } catch {
         // 方向设置加载失败不阻断入场；下次明确操作可重试。
       }
@@ -93,8 +94,7 @@ export class MobileDisplay {
 
   private async exit() {
     this.mode.current?.release();
-    if (!this.owns || !this.active) return;
-    this.owns = false;
+    if (!this.owns) return !this.active;
     const doc = document as FullscreenDocument;
     try {
       if (doc.exitFullscreen) await doc.exitFullscreen();
@@ -102,5 +102,7 @@ export class MobileDisplay {
     } catch {
       // 浏览器可能已自行退出全屏，不影响返回首页。
     }
+    if (!this.active) this.owns = false;
+    return !this.active;
   }
 }

@@ -422,13 +422,16 @@ async function walkScene(selector: string, x: number, y: number) {
 
 async function clickScene(selector: string, fraction = 0.5) {
   const point = await evaluate(`() => {
-    const rect=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
-    return {x:rect.left+rect.width/2,y:rect.top+rect.height*${fraction},width:innerWidth,height:innerHeight};
+    const node=document.querySelector(${JSON.stringify(selector)}),rect=node.getBoundingClientRect();
+    const x=rect.left+rect.width/2,y=rect.top+rect.height*${fraction};
+    return {x,y,width:innerWidth,height:innerHeight,hit:node.contains(document.elementFromPoint(x,y))};
   }`);
   assert.ok(
     point.x > 0 && point.x < point.width && point.y > 0 && point.y < point.height,
     '实际点选目标必须可见',
   );
+  if (selector.includes('data-passage'))
+    assert.ok(point.hit, '穿门点击必须实际命中门楼，不能误点顶部快捷按钮');
   await browser.call('click_at', { pageId, x: point.x, y: point.y });
 }
 
@@ -438,6 +441,18 @@ async function checkDisplayAndShortcuts(name: string, viewport: string) {
   save.age = 30;
   save.stones = save.iron = 123456789;
   await open(viewport, save);
+  await wait(`()=>{
+    const link=document.querySelector('link[rel=preload][as=image]');
+    return !!link&&performance.getEntriesByName(link.href).length>0;
+  }`);
+  assert.ok(
+    await evaluate(`()=>{
+    const link=document.querySelector('link[rel=preload][as=image]');
+    const entry=performance.getEntriesByName(link.href)[0];
+    return link.href.includes('/assets/sect-market-buildings.webp?qinglan-build=')&&entry.initiatorType==='link';
+  }`),
+    '坊市建筑图集在首页即以相同版本URL预载',
+  );
   checkpoint = `${name}-display-shortcuts`;
   if (name === 'desktop')
     await browser.call('emulate', { pageId, viewport, networkConditions: 'Offline' });
@@ -485,6 +500,13 @@ async function checkDisplayAndShortcuts(name: string, viewport: string) {
         await evaluate('()=>document.querySelector("[data-orientation-status]").textContent'),
         /已锁定|无法锁定/,
       );
+      assert.ok(
+        await evaluate(`()=>{
+        const failed=document.querySelector('[data-orientation-status]').textContent.includes('无法锁定');
+        return !failed||!(document.fullscreenElement||document.webkitFullscreenElement);
+      }`),
+        '方向锁失败必须还原本次全屏，不能只显示失败文字',
+      );
       await check(`${name}-direction-${mode}`);
       await click('[data-action=close]');
       await click('[data-action=settings]');
@@ -500,6 +522,7 @@ async function checkDisplayAndShortcuts(name: string, viewport: string) {
     await wait(
       '()=>document.querySelector("[data-orientation-status]").textContent.includes("当前跟随系统")',
     );
+    await wait('()=>!(document.fullscreenElement||document.webkitFullscreenElement)');
   }
   await click('[data-action=close]');
   await click('[data-action=mortal-enter]');
@@ -544,6 +567,42 @@ async function checkDisplayAndShortcuts(name: string, viewport: string) {
   );
   assert.equal((await saved()).mortal.sectMarket!.visit, batch, '一年内快捷重进不换批');
   assert.equal((await saved()).stones, save.stones, '快捷切换不收费');
+  // 复现曾经的循环：步行离场会记住门口，随后快捷/普通重进不得立刻返回。
+  const stableMarket = async () => {
+    await wait(
+      '()=>!!document.querySelector("#sect-market-view[data-initialized]")&&!document.querySelector(".town-loading")',
+    );
+    assert.ok(
+      await evaluate(`async()=>{
+      await new Promise(r=>setTimeout(r,1200));
+      const host=document.querySelector('#sect-market-view');
+      return !!host&&Math.hypot(Number(host.dataset.x)-800,Number(host.dataset.y)-1360)>80;
+    }`),
+      '重新入场必须停留在坊市安全区，不得自动传回',
+    );
+  };
+  const walkBack = async () => {
+    await walkScene('#sect-market-view', 800, 1210);
+    await clickScene('[data-passage=market]', 0.9);
+    await wait(
+      '()=>!!document.querySelector("#town-view[data-x]")&&!document.querySelector(".town-loading")',
+    );
+  };
+  await walkBack();
+  await check(`${name}-town-gate`);
+  await clickScene('[data-passage=town]', 0.9);
+  await stableMarket();
+  await check(`${name}-market-gate`);
+  await walkBack();
+  await click('.settlement-shortcut[data-destination=market]');
+  await stableMarket();
+  await check(`${name}-walk-then-shortcut`);
+  await walkBack();
+  await click('[data-action=town-exit]');
+  await click('[data-action=mortal-tab][data-id=sects]');
+  await click('[data-action=sect-market-enter]');
+  await stableMarket();
+  await check(`${name}-walk-then-normal-entry`);
   await click('[data-action=sect-market-exit]');
   await finishPage();
 }
@@ -597,6 +656,12 @@ async function checkSettlementLinks(name: string, viewport: string) {
   );
   await check(`${name}-click-town-shop`);
   await click('[data-action=medicine-shop]');
+  assert.deepEqual(
+    await evaluate(
+      '()=>[...document.querySelectorAll("[data-action=medicine-tier]")].map(e=>e.dataset.id)',
+    ),
+    ['all', '凡品'],
+  );
   for (let i = 0; i < 3; i++) await click('[data-action=medicine-buy][data-id=huanglong]');
   assert.equal((await saved()).medicine.shop!.bought!.huanglong, 3);
   assert.ok(
@@ -629,7 +694,7 @@ async function checkSettlementLinks(name: string, viewport: string) {
   await click('[data-action=close]');
   await walkScene('#town-view', 1740, 770);
   await walkScene('#town-view', 1740, 440);
-  await clickScene('[data-passage=town]');
+  await clickScene('[data-passage=town]', 0.9);
   await wait(
     '()=>!!document.querySelector("#sect-market-view[data-initialized]")&&!document.querySelector(".town-loading")',
   );
@@ -698,7 +763,7 @@ async function checkSettlementLinks(name: string, viewport: string) {
     '修士字牌保留在修士节点，不创建跟随玩家的副本',
   );
   await walkScene('#sect-market-view', 800, 1210);
-  await clickScene('[data-passage=market]');
+  await clickScene('[data-passage=market]', 0.9);
   await wait(
     '()=>!!document.querySelector("#town-view[data-x]")&&!document.querySelector(".town-loading")',
   );
@@ -976,6 +1041,13 @@ async function checkHomePanels(name: string) {
           'true',
           '切换丹囊视图重置品级筛选',
         );
+        assert.deepEqual(
+          await evaluate(
+            '()=>[...document.querySelectorAll("[data-action=medicine-tier]")].map(e=>e.dataset.id)',
+          ),
+          view === 'bag' ? ['all', '凡品', '灵品', '珍品'] : ['all', '灵品', '珍品'],
+          '只显示当前用途实际存在的品级',
+        );
         await check(`${name}-medicine-${view}`);
       }
     } else if (panel === 'bestiary') {
@@ -995,6 +1067,60 @@ async function checkHomePanels(name: string) {
     }
     await click('.panel-close[data-action=close]');
   }
+}
+
+async function checkRecipeBuying(name: string, viewport: string) {
+  const save = fixture();
+  save.stones = 280;
+  assert.equal(save.cultivation, 0);
+  assert.equal(save.unlocked, 0);
+  await open(viewport, save);
+  await click('[data-action=medicine]');
+  await click('[data-action=medicine-view][data-id=recipes]');
+  assert.equal(
+    await evaluate(
+      '()=>document.querySelectorAll("[data-action=medicine-recipe]:not(:disabled)").length',
+    ),
+    16,
+    '凡人可直接购买全部十六丹方',
+  );
+  for (const [id, remaining] of [
+    ['heqi', 200],
+    ['mingqing', 0],
+  ] as const) {
+    await click(`[data-action=medicine-recipe][data-id=${id}]`);
+    assert.equal((await saved()).stones, remaining);
+    assert.ok((await saved()).medicine.recipes.includes(id));
+    assert.equal(
+      await evaluate(
+        `()=>document.querySelector('[data-action=medicine-recipe][data-id=${id}]').disabled`,
+      ),
+      true,
+    );
+  }
+  assert.equal(
+    await evaluate(
+      '()=>document.querySelectorAll("[data-action=medicine-recipe]:not(:disabled)").length',
+    ),
+    0,
+    '灵石不足及已学药方均禁用，不能重复扣费',
+  );
+  await check(`${name}-recipe-money-only`);
+  await browser.call('navigate_page', { pageId, type: 'reload' });
+  await wait('()=>!!document.querySelector("[data-action=medicine]")');
+  assert.equal((await saved()).stones, 0);
+  assert.deepEqual((await saved()).medicine.recipes, ['heqi', 'mingqing']);
+  assert.equal((await saved()).unlocked, 0);
+  await click('[data-action=medicine]');
+  await click('[data-action=medicine-view][data-id=craft]');
+  assert.match(
+    await evaluate(
+      '()=>document.querySelector("[data-action=medicine-craft][data-id=mingqing]").textContent',
+    ),
+    /解锁/,
+  );
+  await check(`${name}-recipe-reload-craft-gate`);
+  await finishPage();
 }
 
 async function checkItemHelp(name: string) {
@@ -1098,6 +1224,7 @@ try {
   await checkJourneyModuleRecovery();
   for (const [name, viewport] of viewports) {
     await checkDisplayAndShortcuts(name, viewport);
+    await checkRecipeBuying(name, viewport);
     checkpoint = `${name}-settings`;
     await open(viewport, fixture());
     assert.equal((await saved()).sound, false, '进站默认静音');

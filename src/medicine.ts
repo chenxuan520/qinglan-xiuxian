@@ -200,7 +200,6 @@ export function buyMedicineRecipe(save: SaveData, id: string) {
   if (
     !m?.years ||
     m.tier === '凡品' ||
-    save.unlocked < m.stage ||
     save.medicine.recipes.includes(id) ||
     save.stones < medicineRecipePrice(id) ||
     save.journeyEnded ||

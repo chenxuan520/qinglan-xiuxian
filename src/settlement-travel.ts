@@ -1,6 +1,6 @@
 import type { ActionShell } from './action-controller.ts';
 import { sectDuesPending } from './mortal.ts';
-import { SETTLEMENT_PATHS } from './settlement-passage.ts';
+import { SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 
 // 路口与快捷入口共用入场结算；先保存目的地来访，再切换场景。
 export function travelSettlement(
@@ -53,8 +53,11 @@ export function travelSettlement(
   if (entry === 'passage') {
     if (market) shell.marketPosition = { ...SETTLEMENT_PATHS.market.arrival };
     else shell.townPosition = { ...SETTLEMENT_PATHS.town.arrival };
-  } else if (!market && shell.save.mortal.hometown)
-    shell.townPosition = { ...shell.HOMETOWN_START };
+  } else if (market) shell.marketPosition = settlementEntry('market', shell.marketPosition);
+  else
+    shell.townPosition = shell.save.mortal.hometown
+      ? { ...shell.HOMETOWN_START }
+      : settlementEntry('town', shell.townPosition);
   shell.lastMortalTick = shell.performance.now();
   if (!market) shell.telemetry.track({ type: 'town', ...shell.lifeStats() });
   shell.renderMortal();

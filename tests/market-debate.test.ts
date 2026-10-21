@@ -102,6 +102,22 @@ test('灵品80/珍品200明码抄录：只学方、不送药、不改本世配�
     assert.deepEqual(importSave(exportSave(s, null)).save, s);
   }
 });
+test('付费抄录不要求先解锁丹方对应秘境', () => {
+  for (const tier of ['灵品', '珍品'] as const) {
+    const { s, id, offer } = offered(tier);
+    s.unlocked = 0;
+    s.completed = [];
+    s.cultivation = 1;
+    assert.ok(medicineInfo(offer.id)!.stage > s.unlocked);
+    assert.deepEqual(debateRecipeOffer(s, id), offer);
+    const before = structuredClone(s);
+    assert.ok(debateMarket(s, id, s.mortal.sectMarket!.visit, `pay:${offer.id}`));
+    assert.equal(s.stones, before.stones - offer.price);
+    assert.ok(s.medicine.recipes.includes(offer.id));
+    assert.equal(s.unlocked, 0);
+    assert.deepEqual(s.medicine.bag, before.medicine.bag);
+  }
+});
 test('互授只能用实际已知、对方未知且同品级的丹方；讲过的内容随身份记住，重逢不重抽', () => {
   const { s, id, offer } = offered('灵品', true);
   const before = structuredClone(s);

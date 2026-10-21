@@ -49,9 +49,19 @@ export function medicineContent(
         ? m.tier !== '凡品' && m.years > 0
         : true,
   );
+  if (!available.some((m) => m.tier === tier)) tier = 'all';
   const list = available.filter((m) => tier === 'all' || m.tier === tier);
   return `<div class="medicine-toolbar"><div><strong>已识丹药 ${discovered.length} 种 · 药方 ${save.medicine.recipes.length} / 16</strong><span>灵石 ${save.stones} · 年岁 ${save.age.toFixed(1)}</span></div><div class="medicine-tabs" role="group" aria-label="丹药用途">${[['bag', '丹囊与药谱'], ['craft', '开炉炼丹'], ['recipes', '购置药方'], ...(atShop ? [['shop', '药铺凡品']] : [])].map(([id, name]) => `<button data-action="medicine-view" data-id="${id}" aria-pressed="${view === id}">${name}</button>`).join('')}</div></div>
-  <div class="medicine-tabs medicine-tier-tabs" role="group" aria-label="丹药品级筛选">${(['all', '凡品', '灵品', '珍品'] as const).map((id) => `<button data-action="medicine-tier" data-id="${id}" aria-pressed="${tier === id}">${id === 'all' ? '全部' : id}<span>${available.filter((m) => id === 'all' || m.tier === id).length}</span></button>`).join('')}</div>
+  <div class="medicine-tabs medicine-tier-tabs" role="group" aria-label="丹药品级筛选">${(
+    ['all', '凡品', '灵品', '珍品'] as const
+  )
+    .map((id) => {
+      const count = available.filter((m) => id === 'all' || m.tier === id).length;
+      return id === 'all' || count
+        ? `<button data-action="medicine-tier" data-id="${id}" aria-pressed="${tier === id}">${id === 'all' ? '全部' : id}<span>${count}</span></button>`
+        : '';
+    })
+    .join('')}</div>
   <p class="panel-note">${view === 'shop' ? `药铺本批三种凡品，每种最多购三份，${Math.max(0, (save.medicine.shop?.refreshAt ?? save.age) - save.age).toFixed(1)} 年后换货。<br>` : ''}${STAGES[stage].name} · 战斗每分钟 ${STAGE_YEARS_PER_MINUTE[stage]} 年。同名丹药可叠存；仅战前服用，同时最多三种限时药效。可填写数量一次服用多份，剩余时长累加，强度不叠加。历练、闭关和人间办事均消耗药效，暂停与离线不消耗。${unfinished ? '<br>当前有未结束的历练，暂不能服药或炼丹。' : ''}</p>
   <div class="medicine-active" aria-label="当前药效"><strong>药效 ${active.length} / 3</strong>${active.length ? active.map((m) => `<div>${art(m)}<span>${m.name}<small>${medicineTime(save.medicine.active[m.id] - save.age, stage)}</small></span><button data-action="medicine-discard" data-id="${m.id}" ${unfinished ? 'disabled' : ''}>散去药效</button></div>`).join('') : '<p>尚未服用限时丹药</p>'}</div>
   <div class="medicine-grid">${list
@@ -78,7 +88,7 @@ export function medicineContent(
         view === 'shop'
           ? `<small class="medicine-source">本批已购 ${save.medicine.shop?.bought?.[m.id] || 0} / 3 份</small><button class="secondary-button" data-action="medicine-buy" data-id="${m.id}" data-cost-stones="${m.price}" ${(save.medicine.shop?.bought?.[m.id] || 0) >= 3 ? 'disabled' : ''}>${(save.medicine.shop?.bought?.[m.id] || 0) >= 3 ? '本批售罄 · 待换新货' : `${m.price} 灵石 · 购入一份`}</button>`
           : view === 'recipes'
-            ? `<small class="medicine-recipe">本世配方：${formula}<br>炼制另需 ${medicineCraftStones(m.id)} 灵石 · ${brew.years} 年 · 成丹${brew.quantity}枚</small><button class="secondary-button" data-action="medicine-recipe" data-id="${m.id}" data-cost-stones="${medicineRecipePrice(m.id)}" ${known || save.unlocked < m.stage ? 'disabled' : ''}>${known ? '本世已习得' : save.unlocked < m.stage ? `解锁第 ${m.stage + 1} 境后可购方` : `${medicineRecipePrice(m.id)} 灵石 · 购得药方`}</button>`
+            ? `<small class="medicine-recipe">本世配方：${formula}<br>炼制另需 ${medicineCraftStones(m.id)} 灵石 · ${brew.years} 年 · 成丹${brew.quantity}枚</small><button class="secondary-button" data-action="medicine-recipe" data-id="${m.id}" data-cost-stones="${medicineRecipePrice(m.id)}" ${known || save.stones < medicineRecipePrice(m.id) ? 'disabled' : ''}>${known ? '本世已习得' : `${medicineRecipePrice(m.id)} 灵石 · 购得药方`}</button>`
             : view === 'craft'
               ? `<small class="medicine-recipe">${formula}<br>${medicineCraftStones(m.id)} 灵石 · ${brew.years} 年 · 成丹${brew.quantity}枚</small><button class="secondary-button" data-action="medicine-craft" data-id="${m.id}" ${craftReason ? 'disabled' : ''}>${craftReason || '开炉炼丹'}</button>`
               : `${m.years ? `<label class="medicine-quantity" for="medicine-quantity-${m.id}">服用数量<input id="medicine-quantity-${m.id}" type="number" inputmode="numeric" min="1" max="${Math.max(1, owned)}" step="1" value="1" ${useReason ? 'disabled' : ''} aria-label="${m.name}服用数量"></label>` : ''}<button class="secondary-button" data-action="medicine-use" data-id="${m.id}" ${useReason ? 'disabled' : ''}>${useReason || ((save.medicine.active[m.id] || 0) > save.age ? '服用 · 延续药效' : '战前服用')}</button>`;
@@ -86,5 +96,5 @@ export function medicineContent(
     })
     .join(
       '',
-    )}</div>${list.length ? '' : '<p class="panel-note">此处暂无该品级丹药。</p>'}<p class="panel-note">第三至第七境首次通关各保底一份限时珍品，不含本世珍品。凡品无需炼制；以下为未计奇物的基础消耗：灵品需三份凡品与 10 年，限时珍品需四份灵品与 100 年。药方可购买，或通过坊市论道习得当前可用的未知丹方，每一世丹方不同，同品级八种可炼丹药各有不同配方，请依本世药方备料。所得丹药收入丹囊；真仙离界可赠青岚少年一枚现有丹药，其余库存与药效不带入。</p>`;
+    )}</div>${list.length ? '' : '<p class="panel-note">此处暂无该品级丹药。</p>'}<p class="panel-note">第三至第七境首次通关各保底一份限时珍品，不含本世珍品。凡品无需炼制；以下为未计奇物的基础消耗：灵品需三份凡品与 10 年，限时珍品需四份灵品与 100 年。购方不限境界或秘境进度，也可向坊市修士付费抄录。每世配方不同，同品级八丹各有药方，请按方备料。所得丹药收入丹囊；真仙离界可赠青岚少年一枚现有丹药，其余库存与药效不带入。</p>`;
 }

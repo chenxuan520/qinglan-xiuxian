@@ -56,6 +56,35 @@ test('药铺入口限制于药铺人物，切换视图后重置品级筛选', ()
   assert.match(panel.content(0, false, false), /data-id="all"[^>]*aria-pressed="true"/);
 });
 
+test('药铺只列凡品，药方与炼丹不列凡品；跨页及过期筛选回到全部', () => {
+  const { panel, save, context } = fixture();
+  save.medicine.shop = {
+    ids: ['huanglong', 'jinsui', 'bigu'],
+    refreshAt: save.age + 10,
+    bought: {},
+  };
+  const shop = { ...context, herbsShop: true };
+  for (const [view, expected] of [
+    ['shop', ['all', '凡品']],
+    ['recipes', ['all', '灵品', '珍品']],
+    ['craft', ['all', '灵品', '珍品']],
+    ['bag', ['all', '凡品', '灵品', '珍品']],
+  ] as const) {
+    panel.handle('medicine-view', view, shop);
+    const html = panel.content(0, false, true);
+    const ids = [...html.matchAll(/data-action="medicine-tier" data-id="([^"]+)"/g)].map(
+      (m) => m[1],
+    );
+    assert.deepEqual(ids, expected);
+    assert.match(html, /data-id="all"[^>]*aria-pressed="true"/);
+    if (view === 'bag') continue;
+    panel.handle('medicine-tier', view === 'shop' ? '珍品' : '凡品', shop);
+    const fallback = panel.content(0, false, true);
+    assert.match(fallback, /data-id="all"[^>]*aria-pressed="true"/);
+    assert.ok(fallback.includes('medicine-card'), '过期筛选不得把整页清空');
+  }
+});
+
 test('丹药写入失败时不扣库存、灵石或年岁，重试成功仅结算一次，补天后才切换本命显示', () => {
   for (const action of [
     'medicine-use',

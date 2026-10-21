@@ -1,23 +1,30 @@
 import type { TownPoint } from './town.ts';
+import { marketBuildingArt } from './market-art.ts';
 
 export const SETTLEMENT_PATHS = {
   town: {
     gate: { x: 1740, y: 90 },
     arrival: { x: 1740, y: 245 },
-    labelY: 230,
     name: '宗门坊市',
-    arrow: '↑',
   },
   market: {
     gate: { x: 800, y: 1360 },
     arrival: { x: 800, y: 1210 },
-    labelY: 1240,
     name: '青岚镇',
-    arrow: '↓',
   },
 } as const;
 
-// 路牌和落点都用地图坐标；一次靠近只尝试转场一次，保存失败后可退开重试。
+const CLEAR_DISTANCE = 80;
+
+// 旧场景可能记住了离开时的门口坐标；所有入场都须落在触发和复位区之外。
+export function settlementEntry(source: keyof typeof SETTLEMENT_PATHS, position: TownPoint) {
+  const path = SETTLEMENT_PATHS[source];
+  return Math.hypot(position.x - path.gate.x, position.y - path.gate.y) <= CLEAR_DISTANCE
+    ? { ...path.arrival }
+    : position;
+}
+
+// 门楼与落点均用地图坐标；一次靠近只尝试转场一次，保存失败后可退开重试。
 export class SettlementPassage {
   private entered = false;
   private open: () => boolean;
@@ -57,8 +64,10 @@ export class SettlementPassage {
     sign.className = 'town-passage';
     sign.dataset.passage = source;
     sign.style.left = `${this.path.gate.x}px`;
-    sign.style.top = `${this.path.labelY}px`;
-    sign.innerHTML = `<strong>${this.path.arrow} ${this.path.name}</strong><small>${open() ? '沿路走入 · 自动前往' : '踏入炼气后通行'}</small>`;
+    sign.style.top = `${this.path.gate.y}px`;
+    sign.style.zIndex = String(this.path.gate.y + 100);
+    sign.title = open() ? `穿过门楼前往${this.path.name}` : '获得修为后可前往坊市';
+    sign.innerHTML = `<span class="town-passage-art" style="${marketBuildingArt(5)}"></span><span class="town-building-caption">${this.path.name}</span>`;
     map.append(sign);
     const marker = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     marker.setAttribute('x', String(this.path.gate.x));
@@ -75,7 +84,7 @@ export class SettlementPassage {
       this.button.title = this.open() ? '' : '获得修为后可前往坊市';
     }
     const distance = Math.hypot(position.x - this.path.gate.x, position.y - this.path.gate.y);
-    if (distance > 80) this.entered = false;
+    if (distance > CLEAR_DISTANCE) this.entered = false;
     if (!enabled || distance > 48 || this.entered || !this.open()) return;
     this.entered = true;
     this.enter();
