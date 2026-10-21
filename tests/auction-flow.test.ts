@@ -231,12 +231,12 @@ test('真实竞拍保存失败及其他窗口写档不扣钱、扣龄或收入�
     assert.equal(h.note.hidden, true);
   }
 });
-test('高阶法宝真实竞拍同时保存慧眼识珍，使用结拍年龄且重复点击不重复记年表', () => {
+test('高阶法宝真实竞拍使用结拍年龄并保存交割，撤除慧眼识珍后不重复记年表', () => {
   const h = treasureHarness();
   const age = h.save.age;
   h.action('auction-buy', String(h.lot.index));
   assert.match(h.note.textContent, /竞得/);
-  assert.equal(h.save.chronicle.milestones['auction-treasure'], age + 0.5);
+  assert.equal(h.save.chronicle.milestones['auction-treasure'], undefined);
   assert.equal(h.save.mortal.auction!.history[0].age, age + 0.5);
   assert.equal(h.save.forge[h.lot.id], h.lot.forgeLevel);
   assert.ok(h.save.artifacts.includes(h.lot.id));
@@ -244,14 +244,15 @@ test('高阶法宝真实竞拍同时保存慧眼识珍，使用结拍年龄且�
   assert.deepEqual(h.stored().artifacts, h.save.artifacts);
   assert.deepEqual(h.stored().forge, h.save.forge);
   assert.equal(h.stored().stones, h.save.stones);
-  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '慧眼识珍').length, 1);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '慧眼识珍').length, 0);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '坊市拍卖').length, 1);
   const before = JSON.stringify(h.save),
     stored = h.stored();
   h.action('auction-buy', String(h.lot.index));
   assert.equal(JSON.stringify(h.save), before);
   assert.deepEqual(h.stored(), stored);
 });
-test('高阶竞拍保存失败连同成就回滚，恢复存储后原按钮可成功重试', () => {
+test('高阶竞拍保存失败连同交割回滚，恢复存储后原按钮可成功重试', () => {
   const h = treasureHarness();
   const before = structuredClone(h.save),
     stored = h.stored();
@@ -263,9 +264,11 @@ test('高阶竞拍保存失败连同成就回滚，恢复存储后原按钮可�
   assert.match(h.messages.at(-1)!, /拍卖未完成/);
   h.fail(false);
   h.action('auction-buy', String(h.lot.index));
-  assert.equal(h.save.chronicle.milestones['auction-treasure'], before.age + 0.5);
+  assert.equal(h.save.chronicle.milestones['auction-treasure'], undefined);
+  assert.equal(h.save.mortal.auction!.history[0].age, before.age + 0.5);
   assert.deepEqual(h.stored().chronicle, h.save.chronicle);
-  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '慧眼识珍').length, 1);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '慧眼识珍').length, 0);
+  assert.equal(h.save.chronicle.entries.filter((e) => e.title === '坊市拍卖').length, 1);
 });
 test('高阶竞拍跨窗口冲突不产生幽灵成就，也不覆盖另一窗口的存档', () => {
   const h = treasureHarness();

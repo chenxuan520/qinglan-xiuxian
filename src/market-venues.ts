@@ -15,6 +15,7 @@ import { marketContact, rememberMarketAid } from './market-relations.ts';
 import { marketInvitationReward } from './market-opportunities.ts';
 import { marketSocialRoll } from './market-social-data.ts';
 import { recordChronicle } from './chronicle.ts';
+import { seekingAttempts, seekingChance, seekingPrice, resolveSeeking } from './seeking-chance.ts';
 
 export const venueRealm = (save: SaveData) =>
   realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
@@ -61,7 +62,9 @@ export function venueSeekOffers(save: SaveData) {
       ...marketInvitationReward(save.mortal.population!, save.mortal.sectMarket!, npc.id)!.item,
       quantity: 1,
     };
-    return { npc, item, price: Math.ceil(auctionValue(item) * 1.15) };
+    const key = `${item.kind}:${item.id}`;
+    const chance = seekingChance(save, key);
+    return { npc, item, key, chance, price: seekingPrice(auctionValue(item), chance) };
   });
 }
 export function venueHostTopics(save: SaveData, id: MarketTraderId) {
@@ -132,6 +135,7 @@ export function venueActionReason(
   const host = kind === 'host' ? people.find((n) => n.id === id) : undefined;
   const favor = kind === 'favor' ? venueFavor(save) : undefined;
   if (kind === 'seek' && !seek) return '化神后可托人寻物，物品须以当前报价为准';
+  if (seek && seekingAttempts(save, seek.key) === Number.MAX_SAFE_INTEGER) return '寻访记载已满';
   if (
     kind === 'host' &&
     (!host || !venueHostTopics(save, host.id as MarketTraderId).some((t) => t.id === topic))
@@ -201,9 +205,11 @@ export function executeVenue(save: SaveData, choice: string, stamp: string, unfi
     const offer = venueSeekOffers(save).find((o) => o.npc.id === id)!;
     advanceMortal(save, 60);
     save.stones -= offer.price;
-    if (offer.item.kind === 'medicine')
+    const found = resolveSeeking(save, offer.key, offer.chance);
+    if (found === undefined) return undefined;
+    if (found && offer.item.kind === 'medicine')
       save.medicine.bag[offer.item.id] = (save.medicine.bag[offer.item.id] || 0) + 1;
-    else {
+    else if (found) {
       if (!save.artifacts.includes(offer.item.id)) save.artifacts.push(offer.item.id);
       save.forge[offer.item.id] = Math.max(save.forge[offer.item.id] || 0, offer.item.forgeLevel);
       save.artifactDrops = save.artifactDrops.filter((id) => id !== offer.item.id);
@@ -214,7 +220,7 @@ export function executeVenue(save: SaveData, choice: string, stamp: string, unfi
       recordCollectionAchievement(save);
     }
     state.workAt = save.age;
-    text = `托执事堂向${offer.npc.name}寻得${auctionItemName(offer.item)}一份，实付${offer.price}灵石（已含寻访酬金）。物品收入收藏，不改本命或已服药效。`;
+    text = `托执事堂寻访${auctionItemName(offer.item)}，此行机会${offer.chance}%，实付${offer.price}灵石、一年。${found ? '寻得一份，物品收入行囊，不改本命或已服药效。' : '此行未能寻得，费用不退；再访须等满十年。'}`;
   } else if (kind === 'host') {
     const npc = venuePeople(save).find((n) => n.id === id)!;
     const subject = venueHostTopics(save, npc.id as MarketTraderId).find((t) => t.id === topic)!;

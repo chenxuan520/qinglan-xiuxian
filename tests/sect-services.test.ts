@@ -70,8 +70,10 @@ test('十六宗各有可真实结算的专长，原本命、境界与全局掉�
     if (q.train) assert.equal(s.training[q.train], training[q.train] + (q.levels ?? 1));
     if (q.study) assert.equal(s.mortal.mastery[sect.id], mastery + (q.levels ?? 1));
     if (q.seek) {
-      assert.ok(s.artifacts.includes(q.seek));
+      const found = !text.includes('未能寻得');
+      assert.equal(s.artifacts.includes(q.seek), found);
       assert.equal(s.forge[q.seek], 0);
+      assert.equal(s.mortal.marketVenues?.seeking?.[`artifact:${q.seek}`], 1);
     }
     if (q.recipe) assert.ok(s.medicine.recipes.includes(q.recipe));
     assert.ok(validMortal(s.mortal, s.age), sect.id);
@@ -81,7 +83,7 @@ test('十六宗各有可真实结算的专长，原本命、境界与全局掉�
     assert.equal(JSON.stringify(s), before);
     assert.ok(
       !sectServiceQuote(s, choice).reason ||
-        /十年|暂|请选择/.test(sectServiceQuote(s, choice).reason),
+        /十年|再过|暂|请选择/.test(sectServiceQuote(s, choice).reason),
     );
   }
 });
@@ -93,10 +95,11 @@ test('指名寻访取得指定零阶法宝，不改本命，共用托付冷却�
   const q = seekingQuote(s, id),
     starter = s.starter,
     stones = s.stones;
-  assert.equal(q.price, 360);
+  assert.ok(q.price < 360 && q.price > 0);
+  assert.ok(q.chance >= 35 && q.chance <= 70);
   assert.equal(q.reason, '');
   assert.ok(seekArtifact(s, id, venueStamp(s)));
-  assert.equal(s.stones, stones - 360);
+  assert.equal(s.stones, stones - q.price);
   assert.equal(s.forge[id], 0);
   assert.equal(s.starter, starter);
   assert.ok(seekingQuote(s, id).reason);
@@ -110,25 +113,35 @@ test('指名寻访取得指定零阶法宝，不改本命，共用托付冷却�
   s.cultivation = 1;
   assert.match(seekingQuote(s, other).reason, /筑基/);
 });
-test('寻访不因旧掉落标记与已售赠品标记重复入账，满收藏不提供重复购买', () => {
-  const s = fixture('power');
-  const id = seekingOptions(s, true)[0].id;
-  s.artifactDrops.push(id);
-  assert.ok(executeSectService(s, id, sectServiceStamp(s)));
-  assert.ok(!s.artifactDrops.includes(id));
-  s.artifacts = TREASURES.map((t) => t.id);
-  assert.equal(seekingOptions(s).length, 0);
-  assert.equal(sectServiceChoices(s).length, 0);
+test('寻访成功清旧掉落标记、失败原样保留，满收藏不提供重复寻访', () => {
+  const outcomes = new Set<boolean>();
+  for (let seed = 0; seed < 32; seed++) {
+    const s = fixture('power');
+    s.curios.seed = seed;
+    const id = seekingOptions(s, true)[0].id;
+    s.artifactDrops.push(id);
+    const result = executeSectService(s, id, sectServiceStamp(s));
+    assert.ok(result);
+    const found = s.artifacts.includes(id);
+    outcomes.add(found);
+    assert.equal(s.artifactDrops.includes(id), !found);
+    assert.equal(result.includes('未能寻得'), !found);
+    s.artifacts = TREASURES.map((t) => t.id);
+    assert.equal(seekingOptions(s).length, 0);
+    assert.equal(sectServiceChoices(s).length, 0);
+  }
+  assert.deepEqual(outcomes, new Set([false, true]));
 });
 test('本门配套限制、十年跨宗额度与职务优惠真实生效，不能用外门报价跨门办理', () => {
   const s = fixture('power', 1);
   const id = sectServiceChoices(s)[0].id,
     price = sectServiceQuote(s, id).stones;
-  assert.equal(price, 315);
+  assert.ok(price > 0 && price < 315);
   s.cultivation = fixture('power', 4).cultivation;
-  assert.equal(sectServiceQuote(s, id).stones, 297);
+  assert.ok(sectServiceQuote(s, id).stones < price);
+  const middle = sectServiceQuote(s, id).stones;
   s.cultivation = fixture('power', 5).cultivation;
-  assert.equal(sectServiceQuote(s, id).stones, 288);
+  assert.ok(sectServiceQuote(s, id).stones < middle);
   const stamp = sectServiceStamp(s);
   leaveSect(s);
   joinSect(s, 'guard');

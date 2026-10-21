@@ -161,8 +161,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
   if (id === 'power' || id === 'frenzy') {
     const seek = seekingQuote(save, choice, true, unfinished);
     Object.assign(q, { stones: seek.price, years: seek.years, reason: seek.reason, seek: choice });
-    q.detail =
-      '法宝180灵石，另付本门代寻酬金；零阶收入收藏，本命不变。与执事堂托付、寻物共用十年间隔。';
+    q.detail = `此行寻得机会${seek.chance}%，可能落空，费用不退、不保底；行情十年一换。寻得后零阶入藏，本命不变。与执事堂托付、寻物共用办毕后十年间隔。`;
   } else if (['haste', 'spirit', 'bone'].includes(id)) {
     q.study = true;
     q.stones = Math.ceil(
@@ -318,8 +317,10 @@ export function executeSectService(
   const id = save.mortal.member!.id,
     age = save.age;
   syncTribulationClock(save);
+  let seekingResult: string | undefined;
   if (q.seek) {
-    if (!seekArtifact(save, q.seek, venueStamp(save), true, unfinished)) return undefined;
+    seekingResult = seekArtifact(save, q.seek, venueStamp(save), true, unfinished);
+    if (!seekingResult) return undefined;
   } else {
     save.stones -= q.stones;
     save.iron -= q.iron;
@@ -342,7 +343,7 @@ export function executeSectService(
     if (q.recipe) save.medicine.recipes.push(q.recipe);
   }
   const label = sectServiceChoicesLabel(save, q, choice);
-  const text = `${SECTS.find((s) => s.id === id)!.name}·${SECT_SPECIALTIES[id].title}：${label}，花费${q.stones}灵石${q.iron ? `、${q.iron}玄铁` : ''}、${q.years}年${q.reserve ? `，另缴供奉${q.reserve}灵石` : ''}。`;
+  const text = `${SECTS.find((s) => s.id === id)!.name}·${SECT_SPECIALTIES[id].title}：${seekingResult ?? `${label}，花费${q.stones}灵石${q.iron ? `、${q.iron}玄铁` : ''}、${q.years}年${q.reserve ? `，另缴供奉${q.reserve}灵石` : ''}。`}`;
   const state = (save.mortal.sectServices ??= { lastAt: null, receipts: [] });
   state.lastAt = save.age;
   state.receipts.unshift({ sect: id, at: save.age, text });
@@ -352,7 +353,7 @@ export function executeSectService(
 }
 function sectServiceChoicesLabel(save: SaveData, q: ServiceQuote, choice: string) {
   return q.seek
-    ? `寻得${treasure(q.seek).name}，收入收藏，本命不变`
+    ? `寻访${treasure(q.seek).name}`
     : q.train
       ? `${trainingName[q.train]}提升${q.levels ?? 1}阶至${save.training[q.train]}阶`
       : q.study

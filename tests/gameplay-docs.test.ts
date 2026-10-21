@@ -429,3 +429,44 @@ test('终关追加技能及间隔在帮助、图鉴与玩法文档中对照实�
   assert.ok(text.includes(`旧王为${old.join('/')}秒，仙尊为${final.join('/')}秒`));
   for (const source of [combat, text, book]) assert.match(source, /双王.*独立|双王各自/);
 });
+
+test('法宝概率寻访与圆满成就的帮助对照真实机会、收费和十四项条件', async () => {
+  const { seekingChance, seekingPrice } = await import('../src/seeking-chance.ts');
+  const { seekingQuote } = await import('../src/artifact-seeking.ts');
+  const { seekingContent } = await import('../src/artifact-seeking-ui.ts');
+  const { ACHIEVEMENT_IDS } = await import('../src/chronicle.ts');
+  const { chronicleAchievements } = await import('../src/chronicle-achievements.ts');
+  const save = freshSave('heaven', ['metal']);
+  const odds = new Set<number>();
+  for (let seed = 0; seed < 200; seed++) {
+    save.curios.seed = seed;
+    odds.add(seekingChance(save, 'artifact:pagoda'));
+  }
+  const publicMin = Math.min(...odds),
+    publicMax = Math.max(...odds);
+  assert.equal(publicMax < 100, true);
+  for (const source of [guideContent('mortal'), gameplay]) {
+    assert.ok(source.includes(`${publicMin}%～${publicMax}%`));
+    assert.ok(source.includes(`${publicMin + 5}%～${publicMax + 5}%`));
+    assert.match(source, /未获.*不退费|费用不退/);
+    assert.match(source, /不保底/);
+    assert.doesNotMatch(source, /360灵石|货价180|估值加15%酬金/);
+  }
+  assert.ok(
+    gameplay.includes(`${seekingPrice(180, publicMin)}～${seekingPrice(180, publicMax)}灵石`),
+  );
+  assert.equal(seekingQuote(save, 'pagoda').years, 1);
+  const content = seekingContent(save);
+  assert.match(content, /每十年轮换/);
+  assert.match(content, /每次耗时一年/);
+  assert.match(content, /费用不退、不保底/);
+  assert.equal(ACHIEVEMENT_IDS.length, 14);
+  assert.equal(chronicleAchievements(save).length, 15);
+  const supreme = chronicleAchievements(save).at(-1)!;
+  assert.equal(supreme.title, '万古独尊');
+  for (const source of [guideContent('save'), gameplay]) {
+    assert.match(source, /万古独尊.*本世其余十四项全部达成/);
+    assert.doesNotMatch(source, /慧眼识珍/);
+  }
+  assert.ok(!chronicleAchievements(save).some((a) => a.title === '慧眼识珍'));
+});

@@ -7,11 +7,8 @@ import {
   settleRun,
   applyBirthInheritance,
 } from '../src/progress.ts';
-import {
-  chronicleAchievements,
-  recordChronicle,
-  recordCurioAchievement,
-} from '../src/chronicle.ts';
+import { recordChronicle, recordCurioAchievement } from '../src/chronicle.ts';
+import { chronicleAchievements } from '../src/chronicle-achievements.ts';
 import { CURIO_IDS, freshCurios, grantCurio, curioCycle, type CurioId } from '../src/curio-data.ts';
 import { debugGrant } from '../src/debug-resources.ts';
 import { joinSect } from '../src/mortal.ts';
@@ -162,7 +159,7 @@ test('真实诚实私邀交付第三件奇物才达成，不因看见邀约提�
   assert.equal(found, true);
 });
 
-test('慧眼识珍仅真实竞得五阶以上法宝触发，四阶、落拍和出售不计', () => {
+test('不同阶数真实竞拍仍交割完整，已撤成就不再触发，重复交易不重复记年表', () => {
   for (const level of [4, 5, 6]) {
     let found = false;
     for (let seed = 1; seed <= 100 && !found; seed++) {
@@ -180,8 +177,10 @@ test('慧眼识珍仅真实竞得五阶以上法宝触发，四阶、落拍和�
       if (lostReceipt.outcome === 'lost') assert.equal(has(lost, 'auction-treasure'), false);
       const receipt = buyAuction(save, lot.index, save.stones, 1)!;
       assert.equal(receipt.outcome, 'won');
-      assert.equal(has(save, 'auction-treasure'), level >= 5);
-      if (level >= 5) assert.equal(save.chronicle.milestones['auction-treasure'], receipt.age);
+      assert.equal(has(save, 'auction-treasure'), false);
+      assert.equal(save.forge[lot.id], level);
+      assert.ok(save.artifacts.includes(lot.id));
+      assert.equal(save.mortal.auction!.history[0].age, receipt.age);
       const before = structuredClone(save.chronicle);
       assert.equal(buyAuction(save, lot.index, save.stones, 1), undefined);
       assert.deepEqual(save.chronicle, before);
@@ -271,14 +270,14 @@ test('旧档只据已得记录与真实成交证据补录，不从当前库存�
     detail: '宗门坊市：以追魂钉（炼器1阶） ×1 ＋ 黄龙丹 ×2换得聚灵丹 ×1，已收入丹囊。',
   });
   const loaded = parseSave(JSON.stringify(evidence));
-  assert.equal(loaded.chronicle.milestones['auction-treasure'], 28.5);
+  assert.equal(loaded.chronicle.milestones['auction-treasure'], undefined);
   assert.equal(loaded.chronicle.milestones['mixed-exchange'], undefined);
   assert.ok(loaded.chronicle.entries.some((e) => e.title === '同道互通'));
   const known = structuredClone(evidence);
   known.chronicle.milestones['auction-treasure'] = 20;
   known.chronicle.milestones['mixed-exchange'] = null;
   const knownLoaded = parseSave(JSON.stringify(known));
-  assert.equal(knownLoaded.chronicle.milestones['auction-treasure'], 20);
+  assert.equal(knownLoaded.chronicle.milestones['auction-treasure'], undefined);
   assert.equal(knownLoaded.chronicle.milestones['mixed-exchange'], undefined);
   const noProof = ready();
   noProof.artifacts = TREASURES.map((t) => t.id);

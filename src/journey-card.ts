@@ -1,7 +1,7 @@
 import { resourceFailed } from './update-check.ts';
 import { encode } from 'uqr';
 import { assetUrl } from './asset-url.ts';
-import { chronicleAchievements } from './chronicle.ts';
+import { chronicleAchievements } from './chronicle-achievements.ts';
 import {
   ELEMENTS,
   elementInfo,
@@ -58,6 +58,7 @@ const REALM_COLORS = [
   '#d9e8ff',
 ];
 const ACHIEVEMENT_PRIORITY = [
+  'peerless',
   'one-life-clear',
   'hard-immortal',
   'rootless-immortal',

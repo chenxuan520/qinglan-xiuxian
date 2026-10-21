@@ -1,3 +1,4 @@
+import { completedAchievements } from './chronicle.ts';
 import {
   FINAL_TRIAL_STAGE,
   MAX_FORGE_LEVEL,
@@ -24,6 +25,7 @@ export interface JourneyAppraisal {
   detail: string;
 }
 export const JOURNEY_APPRAISAL_FEATS = [
+  'peerless',
   'forge',
   'three-paths',
   'permanent-medicine',
@@ -124,7 +126,9 @@ export function journeyAppraisalFacts(
     forge: save.forge[save.starter] ?? 0,
     stages: [...new Set(save.completed)].sort((a, b) => a - b),
     tribulations: save.tribulations,
-    feats: JOURNEY_APPRAISAL_FEATS.filter(has),
+    feats: JOURNEY_APPRAISAL_FEATS.filter((id) =>
+      id === 'peerless' ? completedAchievements(save) : has(id),
+    ),
     ties,
   };
 }
@@ -175,6 +179,10 @@ export function validJourneyAppraisalFacts(value: unknown): value is JourneyAppr
     (f.feats.includes('one-life-clear') &&
       (f.realmIndex !== 8 || !STAGES.every((_, index) => f.stages.includes(index)))) ||
     (f.feats.includes('five-tribulations') && f.tribulations < 5) ||
+    (f.feats.includes('peerless') &&
+      (f.realmIndex !== 8 ||
+        f.tribulations < 5 ||
+        !STAGES.every((_, i) => f.stages.includes(i)))) ||
     (f.ties.includes('home-letter-read') && !f.ties.includes('home-letter-found'))
   )
     return false;
@@ -201,6 +209,7 @@ function appraisalTitle(f: JourneyAppraisalFacts) {
   if (f.ending === 'extreme') return '一命问道';
   if (f.ending === 'ambush') return '仙途止于风雪';
   if (f.ending === 'tribulation') return '一念问天';
+  if (feat('peerless')) return '万古独尊';
   if (feat('one-life-clear')) return '一命证长生';
   if (feat('rootless-immortal')) return '凡骨登仙';
   if (feat('hard-immortal')) return '逆境问道';
@@ -328,6 +337,7 @@ function endingWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) 
 }
 
 const FEAT_WORDS: Record<(typeof JOURNEY_APPRAISAL_FEATS)[number], readonly string[]> = {
+  peerless: ['万古独尊已亲证', '诸般修行皆有成', '十四道果皆已证'],
   forge: ['炼器已臻十阶', '炉火炼成十阶', '法宝曾炼至十阶'],
   'three-paths': ['三道皆曾通关', '正魔兼修皆有成', '三道历练皆留痕'],
   'permanent-medicine': ['珍丹曾入体', '本世曾服珍丹', '珍丹留下造化'],
@@ -343,6 +353,7 @@ const FEAT_WORDS: Record<(typeof JOURNEY_APPRAISAL_FEATS)[number], readonly stri
   'rootless-immortal': ['无灵根亦证仙', '无灵根也证真仙', '无灵根曾证长生'],
 };
 const FEAT_PRIORITY = [
+  'peerless',
   'one-life-clear',
   'rootless-immortal',
   'hard-immortal',
@@ -370,8 +381,10 @@ const ROOT_WORDS: Record<SpiritRootId, string> = {
 function cultivationWords(f: JourneyAppraisalFacts, pick: (words: readonly string[]) => string) {
   const feats = FEAT_PRIORITY.filter((id) => f.feats.includes(id));
   if (feats.length) {
-    const selected = feats.slice(0, 3);
-    const both = selected.includes('rootless-immortal') && selected.includes('hard-immortal');
+    const both = feats.includes('rootless-immortal') && feats.includes('hard-immortal');
+    const selected = (
+      both ? feats.filter((id) => id !== 'rootless-immortal' && id !== 'hard-immortal') : feats
+    ).slice(0, both ? 2 : 3);
     const words = both
       ? [
           '无灵根亦于最险历练证仙',

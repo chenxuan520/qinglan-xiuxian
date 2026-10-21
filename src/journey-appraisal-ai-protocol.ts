@@ -36,6 +36,7 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
   );
   const has = (id: string) => facts.feats.includes(id);
   const tie = (id: string) => facts.ties.includes(id);
+  if (!has('peerless') && /万古独尊|十四道果皆已证/.test(text)) return false;
   if (
     !has('one-life-clear') &&
     /一命(?:通关|证长生|踏破七境|修成真仙)|极限.{0,8}(?:成仙|登仙|通关)/.test(text)

@@ -30,7 +30,7 @@ import {
   finishTribulation,
 } from '../src/scene-flow.ts';
 import { importConfirmPanel } from '../src/lobby-ui.ts';
-import { chronicleAchievements } from '../src/chronicle.ts';
+import { chronicleAchievements } from '../src/chronicle-achievements.ts';
 import { FINAL_TRIAL_STAGE } from '../src/data.ts';
 import { realmInfo } from '../src/progress.ts';
 

@@ -315,13 +315,6 @@ function receipt(
     save.mortal.events.splice(6);
     recordChronicle(save, '坊市拍卖', text);
     if (outcome === 'won' && item.kind === 'curio') recordCurioAchievement(save);
-    if (outcome === 'won' && item.kind === 'artifact' && item.forgeLevel >= 5)
-      recordChronicle(
-        save,
-        '慧眼识珍',
-        `在拍卖会竞得${auctionItemName(item)}，炼器${item.forgeLevel}阶。`,
-        'auction-treasure',
-      );
   }
   return result;
 }

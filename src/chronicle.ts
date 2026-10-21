@@ -39,12 +39,50 @@ export function validChronicle(value: unknown, age: number): value is Chronicle 
     )
   );
 }
+
+export const ACHIEVEMENT_IDS = [
+  'story',
+  'permanent-medicine',
+  'curio-three',
+  'mastery',
+  'three-paths',
+  'level-100',
+  'collection',
+  'six-immortals',
+  'forge',
+  'training-master',
+  'five-tribulations',
+  'hard-immortal',
+  'one-life-clear',
+  'rootless-immortal',
+] as const;
+export const completedAchievements = (save: SaveData) =>
+  ACHIEVEMENT_IDS.every((id) => Object.hasOwn(save.chronicle.milestones, id));
+function recordCompletion(save: SaveData, restore = false) {
+  const log = save.chronicle;
+  if (!completedAchievements(save)) {
+    delete log.milestones.peerless;
+    return;
+  }
+  if (Object.hasOwn(log.milestones, 'peerless')) return;
+  const ages = ACHIEVEMENT_IDS.map((id) => log.milestones[id]);
+  const age = restore
+    ? ages.every((at) => typeof at === 'number')
+      ? Math.max(...(ages as number[]))
+      : null
+    : save.age;
+  log.milestones.peerless = age;
+  log.entries.unshift({ age, title: '万古独尊', detail: '本世十四项仙途成就尽数达成。' });
+  log.entries.splice(CHRONICLE_LIMIT);
+}
+
 export function recordChronicle(save: SaveData, title: string, detail: string, milestone?: string) {
   const log = save.chronicle;
   if (milestone && Object.hasOwn(log.milestones, milestone)) return;
   if (milestone) log.milestones[milestone] = save.age;
   log.entries.unshift({ age: save.age, title, detail });
   log.entries.splice(CHRONICLE_LIMIT);
+  if (milestone) recordCompletion(save);
 }
 export function realmTitle(step: number) {
   return step === 24
@@ -73,19 +111,14 @@ function restorePersistentAchievements(save: SaveData, milestones: Chronicle['mi
     milestones['permanent-medicine'] ??= null;
   // 已得记录可证明本世成果，不能证明第三件的获得时间。
   if (new Set(save.curios.acquired).size >= 3) milestones['curio-three'] ??= null;
-  if (!Object.hasOwn(milestones, 'auction-treasure')) {
-    const receipts = (save.mortal.auction?.history ?? []).filter(
-      (r) =>
-        r.outcome === 'won' && r.bidder === 'player' && r.kind === 'artifact' && r.forgeLevel >= 5,
-    );
-    if (receipts.length) milestones['auction-treasure'] = Math.min(...receipts.map((r) => r.age));
-  }
+  delete milestones['auction-treasure'];
   delete milestones['mixed-exchange'];
 }
 export function restoreChronicle(save: SaveData, value: unknown, step: number, ascending: boolean) {
   if (validChronicle(value, save.age)) {
     save.chronicle = value;
     restorePersistentAchievements(save, save.chronicle.milestones);
+    recordCompletion(save, true);
     return;
   }
   // 旧档只能证明已有成果，不能还原过去的突破时间。
@@ -109,55 +142,5 @@ export function restoreChronicle(save: SaveData, value: unknown, step: number, a
       },
     ],
   };
-}
-export function chronicleAchievements(save: SaveData) {
-  const definitions: Array<{ id: string; title: string; detail: string; difficulty: number }> = [
-    { id: 'forge', difficulty: 40, title: '炉火纯青', detail: '一件法宝炼器十阶' },
-    {
-      id: 'three-paths',
-      difficulty: 70,
-      title: '三道皆证',
-      detail: '同一世以正道、魔道、兼修各通关一次，可重游同一秘境',
-    },
-    { id: 'permanent-medicine', difficulty: 30, title: '丹成造化', detail: '首次服用本世珍品丹药' },
-    {
-      id: 'story',
-      difficulty: 10,
-      title: Object.hasOwn(save.chronicle.milestones, 'story') ? '炉火长明' : '未遇之缘',
-      detail: '留下一段人间旧事',
-    },
-    { id: 'collection', difficulty: 95, title: '万宝归藏', detail: '收齐三十六件法宝' },
-    { id: 'level-100', difficulty: 80, title: '百级归真', detail: '单局达到一百级' },
-    { id: 'mastery', difficulty: 60, title: '仙门有道', detail: '一部宗门宝典精研十阶' },
-    {
-      id: 'training-master',
-      difficulty: 105,
-      title: '三元归一',
-      detail: '淬体、悟道与身法皆修至二十阶',
-    },
-    { id: 'six-immortals', difficulty: 100, title: '六仙同御', detail: '单局同时觉醒六件仙器' },
-    { id: 'five-tribulations', difficulty: 110, title: '五劫不灭', detail: '累计渡过五次天劫' },
-    { id: 'hard-immortal', difficulty: 120, title: '逆境问道', detail: '以天劫降临难度成就真仙' },
-    { id: 'rootless-immortal', difficulty: 140, title: '凡骨登仙', detail: '以无灵根成就真仙' },
-    { id: 'curio-three', difficulty: 50, title: '奇珍有缘', detail: '本世先后获得三件不同奇物' },
-    {
-      id: 'auction-treasure',
-      difficulty: 20,
-      title: '慧眼识珍',
-      detail: '在拍卖会竞得一件炼器五阶及以上的法宝',
-    },
-    {
-      id: 'one-life-clear',
-      title: '一命通关',
-      detail: '以极限模式一命踏破七境，成就真仙',
-      difficulty: 130,
-    },
-  ];
-  return definitions
-    .sort((a, b) => a.difficulty - b.difficulty)
-    .map((a) => ({
-      ...a,
-      achieved: Object.hasOwn(save.chronicle.milestones, a.id),
-      age: save.chronicle.milestones[a.id],
-    }));
+  recordCompletion(save, true);
 }

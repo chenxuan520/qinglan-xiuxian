@@ -1,4 +1,4 @@
-import { chronicleAchievements } from './chronicle.ts';
+import { chronicleAchievements } from './chronicle-achievements.ts';
 import { spiritPower } from './spirit-power.ts';
 import { formatNumber } from './number-format.ts';
 import { powerDetailsContent } from './power-details-ui.ts';

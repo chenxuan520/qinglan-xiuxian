@@ -92,7 +92,17 @@ export function marketVenueAction(shell: ActionShell, action: string, choice?: s
   Object.assign(shell.save, next);
   const section = shell.modal.querySelector<HTMLElement>('.panel');
   const scroll = section?.scrollTop ?? 0;
+  const selection = {
+    school: host.querySelector<HTMLSelectElement>('#seeking-school')?.value,
+    element: host.querySelector<HTMLSelectElement>('#seeking-element')?.value,
+    id:
+      action === 'market-venue-direct-seek'
+        ? choice
+        : host.querySelector<HTMLSelectElement>('#seeking-item')?.value,
+  };
   host.innerHTML = marketVenueContent(shell.save, venue.id, !!shell.pendingRun);
+  const seeking = host.querySelector<HTMLElement>('#artifact-seeking');
+  if (seeking) seeking.innerHTML = seekingContent(shell.save, !!shell.pendingRun, selection);
   bindSeeking(shell);
   host.querySelector<HTMLElement>('#market-venue-result')!.textContent = result;
   if (section) section.scrollTop = scroll;

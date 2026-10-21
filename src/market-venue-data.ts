@@ -1,6 +1,10 @@
+import { TREASURES } from './data.ts';
+import { MEDICINES } from './medicine-data.ts';
+
 export interface MarketVenueState {
   workAt: number | null;
   favorAt: number | null;
+  seeking?: Record<string, number>;
   receipts: { kind: 'work' | 'seek' | 'host' | 'favor'; at: number; text: string }[];
 }
 export function validMarketVenues(input: unknown, age: number): input is MarketVenueState {
@@ -9,6 +13,17 @@ export function validMarketVenues(input: unknown, age: number): input is MarketV
   const at = (v: unknown): v is number =>
     typeof v === 'number' && Number.isFinite(v) && v >= 15 && v <= age;
   return (
+    (s.seeking === undefined ||
+      (!!s.seeking &&
+        typeof s.seeking === 'object' &&
+        !Array.isArray(s.seeking) &&
+        Object.entries(s.seeking).every(
+          ([key, count]) =>
+            (TREASURES.some((t) => key === `artifact:${t.id}`) ||
+              MEDICINES.some((m) => key === `medicine:${m.id}`)) &&
+            Number.isSafeInteger(count) &&
+            count >= 0,
+        ))) &&
     (s.workAt === null || at(s.workAt)) &&
     (s.favorAt === null || at(s.favorAt)) &&
     Array.isArray(s.receipts) &&

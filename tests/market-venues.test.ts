@@ -29,7 +29,7 @@ import { marketContact, rememberMarketAid, rememberMarketTrade } from '../src/ma
 import { townWalkable } from '../src/town.ts';
 import { marketDialogueContext } from '../src/npc-chat.ts';
 import { validDialogue, dialogueMessages } from '../workers/npc-ai/index.ts';
-import { TREASURES } from '../src/data.ts';
+import { TREASURES, ROOT_STARTERS } from '../src/data.ts';
 import { Game } from '../src/game.ts';
 import { mountTownScene, showMarketVenue } from '../src/scene-flow.ts';
 
@@ -133,27 +133,44 @@ test('寻物只在化神开放，成本与物品同存，本命不变、不会�
         assert.match(venueActionReason(a, `seek@${offer.npc.id}`, venueStamp(a)), /无需重复/);
         a.forge[offer.item.id] = 0;
         a.artifacts = a.artifacts.filter((id) => id !== offer.item.id);
-        a.artifactDrops.push(offer.item.id);
         a.mortal.auction = {
           hall: 0,
           visit: a.mortal.sectMarket!.visit,
           closed: [],
-          releasedArtifacts: [offer.item.id],
+          releasedArtifacts: Object.values(ROOT_STARTERS).some((ids) => ids.includes(offer.item.id))
+            ? [offer.item.id]
+            : [],
           history: [],
         };
       }
       if (venueActionReason(a, `seek@${offer.npc.id}`, venueStamp(a))) continue;
       const before = structuredClone(a);
-      assert.ok(executeVenue(a, `seek@${offer.npc.id}`, venueStamp(a)));
+      const result = executeVenue(a, `seek@${offer.npc.id}`, venueStamp(a));
+      assert.ok(result);
+      const found = !result.includes('未能寻得');
+      assert.equal(a.mortal.marketVenues?.seeking?.[offer.key], 1);
       assert.equal(a.age, before.age + 1);
       assert.equal(a.stones, before.stones - offer.price);
       assert.equal(a.starter, starter);
       if (offer.item.kind === 'medicine')
-        assert.equal(a.medicine.bag[offer.item.id], before.medicine.bag[offer.item.id] + 1);
+        assert.equal(
+          a.medicine.bag[offer.item.id],
+          before.medicine.bag[offer.item.id] + (found ? 1 : 0),
+        );
       else {
-        assert.equal(a.forge[offer.item.id], offer.item.forgeLevel);
-        assert.ok(!a.artifactDrops.includes(offer.item.id));
-        assert.ok(!a.mortal.auction!.releasedArtifacts.includes(offer.item.id));
+        assert.equal(
+          a.forge[offer.item.id],
+          found ? offer.item.forgeLevel : before.forge[offer.item.id],
+        );
+        assert.equal(a.artifacts.includes(offer.item.id), found);
+        assert.equal(
+          a.artifactDrops.includes(offer.item.id),
+          !found && before.artifactDrops.includes(offer.item.id),
+        );
+        assert.equal(
+          a.mortal.auction!.releasedArtifacts.includes(offer.item.id),
+          !found && before.mortal.auction!.releasedArtifacts.includes(offer.item.id),
+        );
       }
       assert.deepEqual(importSave(exportSave(a, null)).save, a);
     }

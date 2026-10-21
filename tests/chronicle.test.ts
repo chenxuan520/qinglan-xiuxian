@@ -8,7 +8,8 @@ import {
   settleRun,
   forge,
 } from '../src/progress.ts';
-import { recordChronicle, chronicleAchievements, CHRONICLE_LIMIT } from '../src/chronicle.ts';
+import { recordChronicle, CHRONICLE_LIMIT } from '../src/chronicle.ts';
+import { chronicleAchievements } from '../src/chronicle-achievements.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { chronicleContent } from '../src/chronicle-content.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
@@ -65,20 +66,20 @@ test('成就栏只保留非必经目标，并补录可由旧档确认的成就',
     chronicleAchievements(s).map((achievement) => achievement.id),
     [
       'story',
-      'auction-treasure',
       'permanent-medicine',
-      'forge',
       'curio-three',
       'mastery',
       'three-paths',
       'level-100',
       'collection',
       'six-immortals',
+      'forge',
       'training-master',
       'five-tribulations',
       'hard-immortal',
       'one-life-clear',
       'rootless-immortal',
+      'peerless',
     ],
   );
   s.mortal.mastery.power = 10;
@@ -128,9 +129,9 @@ test('同一世重游同一秘境，三路线各胜一次才达成三道皆证�
   assert.equal(s.chronicle.milestones['three-paths'], s.age);
   run('dual');
   assert.equal(s.chronicle.entries.filter((entry) => entry.title === '三道皆证').length, 1);
-  assert.match(
+  assert.equal(
     chronicleAchievements(s).find((a) => a.id === 'three-paths')!.detail,
-    /同一世.*同一秘境/,
+    '同一世以正道、魔道、兼修各通关一次',
   );
   assert.equal(importSave(exportSave(s, null)).save.chronicle.milestones['three-paths'], s.age);
 });

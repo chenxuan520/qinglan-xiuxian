@@ -67,7 +67,7 @@ export class SettlementPassage {
     sign.style.top = `${this.path.gate.y}px`;
     sign.style.zIndex = String(this.path.gate.y + 100);
     sign.title = open() ? `穿过门楼前往${this.path.name}` : '获得修为后可前往坊市';
-    sign.innerHTML = `<span class="town-passage-art" style="${marketBuildingArt(5)}"></span><span class="town-building-caption">${this.path.name}</span>`;
+    sign.innerHTML = `<span class="town-passage-art${source === 'town' ? ' town-passage-lantern' : ''}" style="${source === 'market' ? marketBuildingArt(5) : ''}"></span><span class="town-building-caption">${this.path.name}</span>`;
     map.append(sign);
     const marker = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     marker.setAttribute('x', String(this.path.gate.x));

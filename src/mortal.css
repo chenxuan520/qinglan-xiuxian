@@ -1585,10 +1585,6 @@
 .market-tree {
   transform: translate(-50%, -100%);
 }
-.market-lanterns {
-  transform: translate(-50%, -100%);
-  pointer-events: none;
-}
 .sect-market-npc {
   width: 64px;
   height: 86px;
@@ -1940,4 +1936,16 @@
 .town-passage .town-building-caption {
   bottom: 0;
   font-size: calc(13px / var(--market-scale, 1));
+}
+
+.town-passage-lantern {
+  background-image: url('/assets/town-props.webp');
+  background-size: 300% 200%;
+  background-position: 100% 0;
+}
+#market-venue-content > button[data-action='close'],
+#sect-service-content > button[data-action='close'],
+.panel[data-panel='sect-market-event'] > button[data-action='close'] {
+  display: block;
+  margin-top: 24px;
 }
