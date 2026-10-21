@@ -1,166 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import {
-  chmodSync,
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runInNewContext } from 'node:vm';
-import { balanceChangedFiles, detectBalanceChanges } from '../scripts/balance-change-trigger.ts';
 import { checkReportDiagnostics } from '../scripts/check-balance-report.ts';
 import { eligibleBalanceReportRun } from '../scripts/ci-artifacts.ts';
 import { renderReport } from '../scripts/balance-report.ts';
-
-test('敌人数值独立模块的改动继续触发全量平衡检查', () => {
-  assert.deepEqual(balanceChangedFiles(['src/enemy-stats.ts', 'src/bestiary-stats.ts']), [
-    'src/enemy-stats.ts',
-  ]);
-});
-
-test('纯界面/文档不触发全量，经验与实际判定文件触发', () => {
-  assert.deepEqual(balanceChangedFiles(['src/style.css', 'src/guide.ts', 'docs/gameplay.md']), []);
-  assert.deepEqual(
-    balanceChangedFiles([
-      'src/boss-followup.ts',
-      'src/game-validation.ts',
-      'src/game-types.ts',
-      'src/regional-combat.ts',
-      'src/regional-hazards.ts',
-      'src/render-overlays.ts',
-    ]),
-    [
-      'src/boss-followup.ts',
-      'src/game-types.ts',
-      'src/game-validation.ts',
-      'src/regional-combat.ts',
-      'src/regional-hazards.ts',
-    ],
-  );
-  assert.deepEqual(
-    balanceChangedFiles([
-      'src/data.ts',
-      'src/progress.ts',
-      'src/ads.ts',
-      'scripts/balance-metrics.ts',
-      'src/data.ts',
-    ]),
-    ['scripts/balance-metrics.ts', 'src/ads.ts', 'src/data.ts', 'src/progress.ts'],
-  );
-  for (const event of ['schedule', 'workflow_dispatch'])
-    assert.equal(detectBalanceChanges(event, {}).full, false);
-  for (const event of [
-    {},
-    { before: '0'.repeat(40), after: '1'.repeat(40) },
-    { before: 'bad', after: '1'.repeat(40) },
-    { before: '1'.repeat(40), after: '2'.repeat(40) },
-  ])
-    assert.equal(detectBalanceChanges('push', event).full, true);
-});
-
-function temporaryRepository() {
-  const cwd = mkdtempSync(join(tmpdir(), 'qinglan-ci-changes-'));
-  const git = (...args: string[]) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  git('init', '-b', 'master');
-  git('config', 'user.name', 'CI verification');
-  git('config', 'user.email', 'ci@example.invalid');
-  mkdirSync(join(cwd, 'src'));
-  writeFileSync(join(cwd, 'src/data.ts'), '经验=1');
-  writeFileSync(join(cwd, 'src/guide.ts'), '玩法说明');
-  const commit = () => {
-    git('add', '.');
-    git('commit', '-m', 'Add test fixture');
-    return git('rev-parse', 'HEAD');
-  };
-  const base = commit();
-  return { cwd, git, commit, base };
-}
-
-test('真实 git push 检测多次提交、数值新增及移走原路径，CLI 输出触发标志', () => {
-  const r = temporaryRepository();
-  try {
-    writeFileSync(join(r.cwd, 'src/guide.ts'), '更新说明');
-    const ui = r.commit();
-    assert.equal(detectBalanceChanges('push', { before: r.base, after: ui }, r.cwd).full, false);
-    writeFileSync(join(r.cwd, 'src/data.ts'), '经验=2');
-    const numeric = r.commit();
-    assert.deepEqual(
-      detectBalanceChanges('push', { before: r.base, after: numeric }, r.cwd).files,
-      ['src/data.ts'],
-    );
-    renameSync(join(r.cwd, 'src/data.ts'), join(r.cwd, 'src/other.ts'));
-    const moved = r.commit();
-    assert.deepEqual(detectBalanceChanges('push', { before: numeric, after: moved }, r.cwd).files, [
-      'src/data.ts',
-    ]);
-    writeFileSync(join(r.cwd, 'src/progress.ts'), '境界=1');
-    const added = r.commit();
-    assert.deepEqual(detectBalanceChanges('push', { before: moved, after: added }, r.cwd).files, [
-      'src/progress.ts',
-    ]);
-    const event = join(r.cwd, 'event.json'),
-      output = join(r.cwd, 'output');
-    writeFileSync(event, JSON.stringify({ before: moved, after: added }));
-    execFileSync(
-      process.execPath,
-      ['--experimental-strip-types', join(process.cwd(), 'scripts/balance-change-trigger.ts')],
-      {
-        cwd: r.cwd,
-        env: {
-          ...process.env,
-          GITHUB_EVENT_NAME: 'push',
-          GITHUB_EVENT_PATH: event,
-          GITHUB_OUTPUT: output,
-          GITHUB_STEP_SUMMARY: '',
-        },
-        stdio: 'pipe',
-      },
-    );
-    assert.equal(readFileSync(output, 'utf8'), 'full=true\n');
-  } finally {
-    rmSync(r.cwd, { recursive: true, force: true });
-  }
-});
-
-test('PR 按共同祖先识别自己的改动，不因主分支后来变更数值而误触发', () => {
-  const r = temporaryRepository();
-  try {
-    r.git('checkout', '-b', 'feature');
-    writeFileSync(join(r.cwd, 'src/guide.ts'), 'PR 说明');
-    const head = r.commit();
-    r.git('checkout', 'master');
-    writeFileSync(join(r.cwd, 'src/data.ts'), '主分支经验=2');
-    const base = r.commit();
-    assert.equal(
-      detectBalanceChanges(
-        'pull_request',
-        { pull_request: { base: { sha: base }, head: { sha: head } } },
-        r.cwd,
-      ).full,
-      false,
-    );
-    r.git('checkout', 'feature');
-    writeFileSync(join(r.cwd, 'src/data.ts'), 'PR 经验=3');
-    const numeric = r.commit();
-    assert.deepEqual(
-      detectBalanceChanges(
-        'pull_request',
-        { pull_request: { base: { sha: base }, head: { sha: numeric } } },
-        r.cwd,
-      ).files,
-      ['src/data.ts'],
-    );
-  } finally {
-    rmSync(r.cwd, { recursive: true, force: true });
-  }
-});
 
 const diagnostic = (passed: boolean, severities: string[]) => ({
   schemaVersion: 1,
@@ -297,31 +144,85 @@ const publishJob = workflow.match(/^  publish-report:\n([^]*)/m)![0];
 function actionExpression(expression: string, context: Record<string, unknown>) {
   return runInNewContext(
     expression
+      .replace(/^\s*\$\{\{\s*|\s*\}\}\s*$/g, '')
       .replace(/needs\.perf-render/g, "needs['perf-render']")
       .replace(/outputs\.report-id/g, "outputs['report-id']"),
     context,
   );
 }
 
-test('同源分支的 push/PR 全量共用取消组，定时/手动同组、外仓及其他分支隔离', () => {
+test('push和PR只跑快检，即使存在旧检测结果也不启动全量或渲染', () => {
+  for (const event of ['push', 'pull_request']) {
+    for (const job of ['full', 'perf-render']) {
+      const source = workflow.match(new RegExp(`^  ${job}:\\n([^]*?)(?=^  [a-z-]+:)`, 'm'))![0];
+      const expression = source.match(/^    if: (.+)$/m)![1];
+      for (const inputs of [{}, { full: true }, { render_only: true }])
+        assert.equal(
+          actionExpression(expression, {
+            cancelled: () => false,
+            github: { event_name: event },
+            inputs,
+            needs: { changes: { outputs: { full: 'true' }, result: 'failure' } },
+          }),
+          false,
+          `${event}: ${job}`,
+        );
+    }
+    const quick = workflow.match(/^  quick:\n([^]*?)(?=^  [a-z-]+:)/m)![0];
+    assert.equal(
+      actionExpression(quick.match(/^    if: (.+)$/m)![1], {
+        github: { event_name: event },
+        inputs: {},
+      }),
+      true,
+    );
+  }
+});
+
+test('每天北京时间12点全量与渲染，手动保持full和render-only且取消不运行', () => {
+  assert.match(workflow, /cron: '0 4 \* \* \*'/);
+  for (const [event, inputs, full, render] of [
+    ['schedule', {}, true, true],
+    ['workflow_dispatch', {}, false, false],
+    ['workflow_dispatch', { full: true }, true, true],
+    ['workflow_dispatch', { render_only: true }, false, true],
+    ['workflow_dispatch', { full: true, render_only: true }, false, true],
+  ] as const)
+    for (const [job, expected] of [
+      ['full', full],
+      ['perf-render', render],
+    ] as const) {
+      const source = workflow.match(new RegExp(`^  ${job}:\\n([^]*?)(?=^  [a-z-]+:)`, 'm'))![0];
+      assert.doesNotMatch(source, /^    needs:/m, job);
+      const expression = source.match(/^    if: (.+)$/m)![1];
+      for (const cancelled of [false, true])
+        assert.equal(
+          actionExpression(expression, {
+            cancelled: () => cancelled,
+            github: { event_name: event },
+            inputs,
+          }),
+          expected && !cancelled,
+          `${event}: ${job}`,
+        );
+    }
+});
+
+test('同分支定时/手动全量共用取消组，其他分支及仓库隔离，快检不受影响', () => {
   const template = fullJob.match(/^      group: (.+)$/m)![1];
-  const group = (branch: string, fork = '', pr = false) => {
+  const group = (branch: string, repository = 'chenxuan520/qinglan-xiuxian') => {
     const github = {
-      repository: 'chenxuan520/qinglan-xiuxian',
-      head_ref: pr ? branch : '',
-      ref_name: pr ? '9/merge' : branch,
-      event: { pull_request: { head: { repo: { full_name: fork } } } },
+      repository,
+      ref_name: branch,
     };
     return template.replace(/\$\{\{(.*?)\}\}/g, (_, expression) =>
       actionExpression(expression, { github }),
     );
   };
   assert.match(fullJob, /^      cancel-in-progress: true$/m);
-  assert.equal(group('feat/combat'), group('feat/combat', 'chenxuan520/qinglan-xiuxian', true));
-  assert.equal(group('master'), group('master', 'chenxuan520/qinglan-xiuxian', true));
+  assert.equal(group('master'), 'balance-full-chenxuan520/qinglan-xiuxian-master');
   assert.notEqual(group('feat/combat'), group('feat/other'));
-  assert.notEqual(group('feat/combat'), group('feat/combat', 'other/fork', true));
-  assert.notEqual(group('master'), group('master', 'other/fork', true));
+  assert.notEqual(group('master'), group('master', 'other/fork'));
   // 并发只设在全量作业，快检和渲染不因另一次全量被取消。
   assert.ok(!workflow.slice(0, workflow.indexOf('jobs:')).includes('concurrency:'));
   assert.ok(!workflow.match(/^  quick:\n([^]*?)(?=^  [a-z-]+:)/m)![0].includes('concurrency:'));
