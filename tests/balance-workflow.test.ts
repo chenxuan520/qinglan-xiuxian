@@ -327,10 +327,26 @@ test('同源分支的 push/PR 全量共用取消组，定时/手动同组、外�
   assert.ok(!workflow.match(/^  quick:\n([^]*?)(?=^  [a-z-]+:)/m)![0].includes('concurrency:'));
 });
 
+test('取消快检或渲染时跳过收尾，正常失败仍保留诊断产物', () => {
+  for (const job of ['quick', 'perf-render']) {
+    const source = workflow.match(new RegExp(`^  ${job}:\\n([^]*?)(?=^  [a-z-]+:)`, 'm'))![0];
+    const cleanup = [...source.matchAll(/- name: (.+)\n\s+if: (.+)/g)];
+    assert.equal(cleanup.length, job === 'quick' ? 3 : 2);
+    for (const [, name, expression] of cleanup)
+      for (const cancelled of [false, true])
+        assert.equal(
+          actionExpression(expression, { always: () => true, cancelled: () => cancelled }),
+          !cancelled,
+          `${job}: ${name}`,
+        );
+  }
+});
+
 test('取消矩阵跳过日报和诊断，真实失败仍生成上传并让CI失败', () => {
   for (const name of [
     'Generate daily web report even on failure',
     'Preserve daily web report',
+    'Preserve complete report',
     'Fail CI on report Error after preserving artifacts',
   ]) {
     const expression = fullJob.match(new RegExp(`name: ${name}\\n\\s+if: ([^\\n]+)`))![1];
