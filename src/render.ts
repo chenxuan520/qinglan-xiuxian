@@ -520,7 +520,6 @@ export class Renderer {
           game.path,
         );
         c.globalAlpha = 1;
-        drawPlayerAilments(c, game, time, this.reducedMotion.matches);
       } else {
         if (e.illusionOf !== undefined) {
           c.save();
@@ -944,6 +943,8 @@ export class Renderer {
       c.restore();
     }
     this.drawEnemyWarnings(game);
+    // 状态文字最后绘制，避免危险区边线穿过禁锢或封宝提示。
+    drawPlayerAilments(c, game, time, this.reducedMotion.matches);
   }
   private drawEnemyWarnings(game: Game) {
     drawEnemyWarnings(this.ctx, game, (at, camera, margin) => this.visible(at, camera, margin));

@@ -22,6 +22,12 @@ function choiceScore(c: Choice, g: Game) {
     const hp = g.player.hp / g.player.maxHp;
     return hp < 0.3 ? 120 : hp < 0.5 ? 30 : -10;
   }
+  if (
+    c.type === 'passive' &&
+    g.player.hp < g.player.maxHp * 0.3 &&
+    ['guard', 'bone', 'duration', 'devour'].includes(c.id)
+  )
+    return 95;
   if (c.type === 'weapon')
     return (
       (favored.includes(c.id) ? 15 : 10) +
@@ -34,7 +40,7 @@ function choiceScore(c: Choice, g: Game) {
         : 0) +
       (c.level === 1 && g.evolutionRequirements(c.id).some((id) => g.passives[id]) ? 2 : 0)
     );
-  // 六重法宝优先从领悟起补满配套功法；实际觉醒仍是最高优先级。
+  // 已持法宝优先从领悟起补满一套配方，不等待法宝六重。
   if (
     c.level >= 1 &&
     c.level <= MAX_PASSIVE_LEVEL &&
@@ -43,9 +49,11 @@ function choiceScore(c: Choice, g: Game) {
       const required = g.evolutionRequirements(w.id);
       return (
         !w.evolved &&
-        w.level === MAX_WEAPON_LEVEL &&
         required.includes(c.id) &&
-        !required.some((id) => (g.passives[id] || 0) >= MAX_PASSIVE_LEVEL)
+        !required.some((id) => (g.passives[id] || 0) >= MAX_PASSIVE_LEVEL) &&
+        !required.some(
+          (id) => id !== c.id && (g.passives[id] || 0) >= Math.max(1, g.passives[c.id] || 0),
+        )
       );
     })
   )
@@ -64,6 +72,7 @@ function choiceScore(c: Choice, g: Game) {
   return g.passives[c.id] ? Math.max(32, score + 12) : score;
 }
 export function autoplayInput(g: Game) {
+  if (g.immobilized > 0) return { x: 0, y: 0 };
   const p = g.player;
   let dx = 0,
     dy = 0;

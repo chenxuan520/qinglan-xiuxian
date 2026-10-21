@@ -209,9 +209,9 @@ test('私邀承诺保持原抽取，取得同物后撤掉整桩邀约，旧操�
   assert.equal(found, true);
 });
 
-test('旧档多件收束为一件，已售与已寻记录补入本世唯一记录，同版损坏不静默重置', () => {
+test('27版旧档多件收束为一件，已售与已寻记录补入本世唯一记录，同版损坏不静默重置', () => {
   const old: any = ready();
-  old.schema = SAVE_SCHEMA - 1;
+  old.schema = 27; // 三次保底与多件库存实际使用的旧结构，不能随当前版本号漂移。
   old.curios.bag = { 'soul-wood': 3, 'wind-wings': 0 };
   delete old.curios.acquired;
   old.curios.seeking['jade-book'] = 3;
@@ -266,4 +266,18 @@ test('结算只授予尚未获得的一件，重复或畸形待结收获不追�
   assert.equal(s.curios.bag['jade-book'], 1);
   assert.equal(s.curios.bag['wind-wings'], undefined);
   assert.equal(s.curios.acquired.filter((id) => id === 'soul-wood').length, 1);
+});
+
+test('28版概率寻访三次未获不误迁移成已经获得，普通未完战斗不跨结构保留', () => {
+  const old = ready();
+  old.schema = 28;
+  old.curios.seeking['jade-book'] = 3;
+  old.activeRun = new Game(old, 0, 0).snapshot();
+  const result = readSave(JSON.stringify(old));
+  assert.equal(result.status, 'ok');
+  assert.equal(result.save.schema, SAVE_SCHEMA);
+  assert.equal(result.save.curios.seeking['jade-book'], 3);
+  assert.equal(acquiredCurio(result.save, 'jade-book'), false);
+  assert.equal(result.save.activeRun, undefined);
+  assert.deepEqual(importSave(JSON.stringify(old)).save.curios, result.save.curios);
 });

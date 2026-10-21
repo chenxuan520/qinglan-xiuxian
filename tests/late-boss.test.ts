@@ -51,7 +51,8 @@ test('三难度七境妖王使用固定强化倍率，终关单列，移动速�
             rules.damage *
             scaling.damage *
             realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
-            (stage === FINAL_TRIAL_STAGE ? BOSS_COMBAT.trialDamage : BOSS_COMBAT.damage[stage]),
+            (stage === FINAL_TRIAL_STAGE ? BOSS_COMBAT.trialDamage : BOSS_COMBAT.damage[stage]) *
+            (stage > 0 && stage < FINAL_TRIAL_STAGE ? 1.1 : 1),
         );
         assert.equal(boss.bossStage, bossStage);
         assert.equal(boss.radius, bossStage === FINAL_TRIAL_STAGE ? 62 : 48);
@@ -74,7 +75,12 @@ test('第二境新出场妖王气血恰增30%，固定强度不随玩家资质�
         assert.equal(boss.hp, boss.maxHp);
         assert.equal(
           boss.damage,
-          68 * rules.damage * STAGE_COMBAT_SCALING[1].damage * realmHealthMultiplier(6) * 1.15,
+          68 *
+            rules.damage *
+            STAGE_COMBAT_SCALING[1].damage *
+            realmHealthMultiplier(6) *
+            1.15 *
+            1.1,
         );
       }
     }

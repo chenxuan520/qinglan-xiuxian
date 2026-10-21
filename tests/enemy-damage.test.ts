@@ -46,8 +46,10 @@ test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣�
   for (let stage = 0; stage < 6; stage++) {
     for (let difficulty = 0; difficulty < 3; difficulty++) {
       for (const elite of [false, true]) {
-        const g = new Game(freshSave(), stage, difficulty, () => 0.5);
-        g.weapons = [];
+        const save = freshSave();
+        save.unlocked = stage;
+        const g = new Game(save, stage, difficulty, () => 0.5);
+        g.weapons[0].timer = 9999;
         g.time = STAGES[stage].minutes * 30;
         g.nextElite = 9999;
         g.passives.guard = 3;
@@ -62,8 +64,12 @@ test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣�
           (elite ? 2.2 : 1.3) *
           (1 + [0, 0.08, 0.16, 0.24, 0.85, 0.9][stage] * (elite ? 1 : 0.65)) *
           realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
-          (elite ? [1, 1, 1.2, 1.3, 1.4, 1.5][stage] : 1);
+          (elite ? [1, 1, 1.2, 1.3, 1.4, 1.5][stage] : 1) *
+          (stage === 0 ? 1 : 1.1);
         assert.ok(Math.abs(e.damage - expected) < 1e-8);
+        const restored = Game.restore(g.save, g.snapshot())!;
+        assert.ok(restored);
+        assert.equal(restored.enemies[0].damage, e.damage, '续局不能再乘一次出生伤害');
         const before = g.player.hp;
         g.update(0.01);
         assert.ok(Math.abs(before - g.player.hp - expected * g.stats.armor) < 1e-8);
@@ -87,7 +93,8 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
         DIFFICULTIES[difficulty].damage *
         [1, 1.08, 1.16, 1.24, 1.85, 1.9][stage] *
         realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
-        BOSS_COMBAT.damage[stage];
+        BOSS_COMBAT.damage[stage] *
+        (stage === 0 ? 1 : 1.1);
       assert.equal(boss.damage, expected);
       if (stage <= 2) {
         boss.skillStep = stage === 1 ? 0 : 1;

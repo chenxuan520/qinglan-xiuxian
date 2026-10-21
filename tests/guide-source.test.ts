@@ -61,6 +61,11 @@ test('寿终与弃劫先落幕可留影，确认轮回才清空', () => {
 
 test('配套功法优先级以默认培养倾向为前提', () => {
   assert.match(guide.guideContent('builds'), /自动历练采用默认培养倾向时/);
+  assert.match(
+    guide.guideContent('builds'),
+    /优先领悟已持未觉醒法宝的配套功法并修至五重，不必等法宝六重/,
+  );
+  assert.doesNotMatch(guide.guideContent('builds'), /优先把六重未觉醒法宝的配套功法/);
   assert.match(guide.guideContent('builds'), /其他培养倾向按设置取舍/);
   assert.match(guide.guideContent('combat'), /默认路线优先觉醒与修习已学功法/);
   assert.match(guide.guideContent('combat'), /已有法宝全满且还有空位时，优先补入新法宝/);

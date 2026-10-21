@@ -680,7 +680,7 @@ async function checkHeavenHouse(name: string, viewport: string) {
     const before = await saved();
     await click(`[data-action=train][data-id=${kind}]`);
     const after = await saved();
-    assert.equal(after.stones, before.stones - 1179, '二十阶按2358灵石半价结算');
+    assert.equal(after.stones, before.stones - 1651, '二十阶按2358灵石七折向上取整');
     assert.equal(after.age, before.age, '天机屋根基修习零年岁');
     assert.equal(after.training[kind as keyof SaveData['training']], 20);
     assert.ok(
@@ -695,7 +695,7 @@ async function checkHeavenHouse(name: string, viewport: string) {
   await click('[data-action=mortal-activity][data-id=study]');
   const studied = await saved();
   assert.equal(studied.age, direct.age);
-  assert.equal(direct.stones - studied.stones, 55, '直接精研只收110的一半');
+  assert.equal(direct.stones - studied.stones, 77, '直接精研按110灵石七折结算');
   assert.equal(studied.mortal.mastery.haste, 5);
   assert.equal(studied.mortal.activity, null);
   assert.equal(
@@ -709,7 +709,7 @@ async function checkHeavenHouse(name: string, viewport: string) {
   await click('[data-action=sect-service-act]');
   const specialized = await saved();
   assert.equal(specialized.age, studied.age);
-  assert.equal(studied.stones - specialized.stones, 98, '专长195灵石只减半一次，向上取整');
+  assert.equal(studied.stones - specialized.stones, 137, '专长195灵石只折减30%一次，向上取整');
   assert.equal(specialized.mortal.mastery.haste, 6);
   assert.equal(specialized.mortal.activity, null);
   assert.ok(

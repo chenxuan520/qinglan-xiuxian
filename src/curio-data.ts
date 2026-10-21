@@ -105,7 +105,7 @@ export function curioRoll(seed: number, key: string) {
 export const curioTrainingYears = (save: { curios: CurioState }, years: number) =>
   ownsCurio(save, 'heaven-house') ? 0 : years;
 export const curioTrainingCost = (save: { curios: CurioState } | undefined, stones: number) =>
-  save && ownsCurio(save, 'heaven-house') ? Math.ceil(stones / 2) : stones;
+  save && ownsCurio(save, 'heaven-house') ? Math.ceil((stones * 70) / 100) : stones;
 export const curioAlchemy = (save: { curios: CurioState }, years: number) =>
   ownsCurio(save, 'heaven-bottle')
     ? { years: Math.ceil(years - 1e-9) / 10, quantity: 3 }

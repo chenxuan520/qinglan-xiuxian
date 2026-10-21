@@ -148,7 +148,7 @@ test('掌天瓶两种丹炉均一份原料三枚成丹，十年变一年、百�
   near(s.age - age, 0.4);
   assert.equal(s.medicine.bag[m.id], 3);
 });
-test('天机屋三项根基对全部灵根零年岁、逐阶灵石减半；出售即恢复原费用与年岁', () => {
+test('天机屋三项根基对全部灵根零年岁、逐阶灵石减少30%；出售即恢复原费用与年岁', () => {
   for (const root of SPIRIT_ROOTS) {
     const s = ready();
     s.spiritRoot = root.id;
@@ -158,11 +158,11 @@ test('天机屋三项根基对全部灵根零年岁、逐阶灵石减半；出�
         const age = s.age,
           stones = s.stones;
         assert.equal(trainingYears(s), 0);
-        assert.equal(trainingCost(level, s), Math.ceil(trainingCost(level) / 2));
+        assert.equal(trainingCost(level, s), Math.ceil((trainingCost(level) * 70) / 100));
         assert.ok(train(s, kind));
         assert.equal(s.training[kind], level + 1);
         assert.equal(s.age, age);
-        assert.equal(stones - s.stones, Math.ceil(trainingCost(level) / 2));
+        assert.equal(stones - s.stones, Math.ceil((trainingCost(level) * 70) / 100));
       }
       const full = structuredClone(s);
       assert.equal(train(s, kind), false);
@@ -173,7 +173,7 @@ test('天机屋三项根基对全部灵根零年岁、逐阶灵石减半；出�
     assert.equal(trainingCost(0, s), trainingCost(0));
   }
 });
-test('天机屋直接精研零年岁、灵石减半，五阶十阶赐丹各一次且不残留活动', () => {
+test('天机屋直接精研零年岁、灵石减少30%，五阶十阶赐丹各一次且不残留活动', () => {
   const s = ready();
   s.cultivation = IMMORTAL_CULTIVATION;
   s.completed = [6];
@@ -186,7 +186,7 @@ test('天机屋直接精研零年岁、灵石减半，五阶十阶赐丹各一�
       stones = s.stones;
     const q = studyPlan(s);
     assert.equal(q.years, 0);
-    assert.equal(q.stones, Math.ceil(studyPlan(s, false).stones / 2));
+    assert.equal(q.stones, Math.ceil((studyPlan(s, false).stones * 70) / 100));
     assert.ok(startActivity(s, 'study', () => 0));
     assert.equal(s.age, age);
     assert.equal(s.mortal.years, years);
@@ -237,7 +237,7 @@ test('天机屋宗门精研与根基专长零年岁、只折一次灵石，献�
     assert.equal(q.years, 0, sect);
     assert.equal(q.iron, plain.iron, sect);
     if (!['bone', 'devour'].includes(sect))
-      assert.equal(q.stones, Math.ceil(plain.stones / 2), sect);
+      assert.equal(q.stones, Math.ceil((plain.stones * 70) / 100), sect);
     else assert.ok((q.levels ?? 1) >= (plain.levels ?? 1), '折后抵价应足额容纳物品价值');
     const age = s.age,
       years = s.mortal.years,

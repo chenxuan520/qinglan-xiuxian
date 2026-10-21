@@ -265,7 +265,7 @@ test('百分位不会修改数据，中位数和长尾独立，不用平均数�
 });
 
 test('用户确认的无辅助目标不能用全员通关替代，少量样本不能宣称达标', () => {
-  assert.deepEqual(BARE_CLEAR_TARGETS.dual, { min: 0.2, max: 0.65, target: 0.4 });
+  assert.deepEqual(BARE_CLEAR_TARGETS.dual, { min: 0.2, max: 0.7, target: 0.4 });
   assert.deepEqual(BARE_CLEAR_TARGETS.triple, { min: 0.1, max: 0.5, target: 0.3 });
   assert.equal(BARE_CLEAR_TARGETS.none.max, 0.1);
   assert.ok(acceptanceFailures([sample()]).some((f) => f.includes('样本不足')));

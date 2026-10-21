@@ -138,7 +138,7 @@ test('每场严格四丹四物，百种种子验证品级、法宝阶数、低�
             permanent += Number(m.years === 0);
           }
         } else if (lot.kind === 'artifact') {
-          assert.ok(lot.forgeLevel >= [0, 3, 6][hall] && lot.forgeLevel <= [1, 6, 10][hall]);
+          assert.ok(lot.forgeLevel >= [0, 3, 6][hall] && lot.forgeLevel <= [2, 6, 10][hall]);
         }
       }
       assert.equal(
@@ -562,4 +562,25 @@ test('新去重药槽成交后保留真实药名，混合出售和跨场历史�
   assert.match(stillUnknown, /本拍品已结拍/);
   assert.doesNotMatch(stillUnknown, new RegExp(`<h3>${medicineInfo(recent.id)!.name}`));
   assert.deepEqual(importSave(exportSave(s, null)).save.mortal.auction, s.mortal.auction);
+});
+
+test('人字场实际出现二阶，竞得更高阶同名法宝后覆盖并保存，保持本命与单件收藏', () => {
+  let upgraded = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const s = fixture(0, seed);
+    const lot = auctionLots(s).find((l) => l.kind === 'artifact' && l.forgeLevel === 2);
+    if (!lot) continue;
+    if (!s.artifacts.includes(lot.id)) s.artifacts.push(lot.id);
+    s.forge[lot.id] = 1;
+    const starter = s.starter;
+    const result = buyAuction(s, lot.index, s.stones, 1)!;
+    assert.equal(result.outcome, 'won');
+    assert.equal(s.forge[lot.id], 2);
+    assert.equal(s.artifacts.filter((id) => id === lot.id).length, 1);
+    assert.equal(s.starter, starter);
+    const restored = importSave(exportSave(s, null)).save;
+    assert.equal(restored.forge[lot.id], 2);
+    upgraded++;
+  }
+  assert.ok(upgraded > 15, '二阶须真实进入常规拍品池');
 });

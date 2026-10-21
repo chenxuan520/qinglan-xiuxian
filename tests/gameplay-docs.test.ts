@@ -30,6 +30,10 @@ import {
 } from '../src/progress.ts';
 import { entryCost, masteryRewardPool, sectDues, studyPlan } from '../src/mortal.ts';
 import { trainingCost } from '../src/training.ts';
+import { ENEMY_CONTROL } from '../src/regional-hazards.ts';
+import { REGIONAL_DAMAGE_MULTIPLIER } from '../src/enemy-stats.ts';
+import { Game } from '../src/game.ts';
+import { regionalEnemyFields, regionalBossFields } from '../src/regional-combat.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 import { guideContent, GUIDE_TABS } from '../src/guide.ts';
 import { AUCTION_HALLS, AUCTION_IRON_MIN, AUCTION_PREMIUM_MIN_VALUE } from '../src/auction-data.ts';
@@ -318,21 +322,21 @@ test('奇物寻访帮助与实际十年耗时、递增机会、非保底和逐�
     );
 });
 
-test('天机屋零年岁、半价灵石的帮助与根基、精研真实报价一致', () => {
+test('天机屋零年岁、七折灵石的帮助与根基、精研真实报价一致', () => {
   const save = freshSave('heaven', ['metal']);
   const before = studyPlan(save);
   grantCurio(save, 'heaven-house');
   assert.equal(trainingYears(save), 0);
-  assert.equal(trainingCost(0, save), Math.ceil(trainingCost(0) / 2));
+  assert.equal(trainingCost(0, save), Math.ceil((trainingCost(0) * 70) / 100));
   assert.equal(studyPlan(save).years, 0);
-  assert.equal(studyPlan(save).stones, Math.ceil(before.stones / 2));
+  assert.equal(studyPlan(save).stones, Math.ceil((before.stones * 70) / 100));
   for (const source of [
     guideContent('items'),
     guideContent('mortal'),
     guideContent('builds'),
     gameplay,
   ]) {
-    assert.match(source, /(?:天机屋[^。]+)?(?:不耗年岁|不消耗年岁)[^。]*灵石减半/);
+    assert.match(source, /(?:天机屋[^。]+)?(?:不耗年岁|不消耗年岁)[^。]*灵石减少30%/);
     assert.doesNotMatch(source, /天机屋[^。]*(?:耗时减半|年岁减半|至少一年|最少 1 年)/);
   }
 });
@@ -379,4 +383,27 @@ test('急需互换的让利说明保持8%设计上限，并能找到实际小赚
   const deal = sectMarketDeals(save, 'market-wanderer').find((d) => d.receiveValue > d.giveValue);
   assert.ok(deal, '不能只有让利文案而没有真实盈利报价');
   assert.ok(deal.receiveValue * 100 <= deal.giveValue * (100 + Number(guide![1])));
+});
+
+test('控制时长、漂移瘴云与人字场范围说明对照实际生效参数', () => {
+  const guide = compact(guideContent('combat')),
+    text = compact(gameplay);
+  for (const source of [guide, text]) {
+    assert.ok(source.includes(`禁锢${ENEMY_CONTROL.bind}秒`));
+    assert.ok(source.includes(`封宝${ENEMY_CONTROL.seal}秒`));
+    assert.ok(source.includes(`${ENEMY_CONTROL.protection}秒再次触发间隔`));
+  }
+  assert.ok(text.includes(`第二至第六境普通、精英与妖王伤害再乘${REGIONAL_DAMAGE_MULTIPLIER}`));
+  const g = new Game(freshSave(), 3, 0),
+    e = g.spawnEnemy(50, false, false);
+  const cloud = regionalEnemyFields(e, 'miasma', 1, 0)![0];
+  const boss = regionalBossFields(3, 0, e, g.player, 1, 0)![0];
+  assert.ok(guide.includes(`小怪瘴云持续${+cloud.life.toFixed(1)}秒`));
+  assert.ok(text.includes(`小怪瘴云持续${+cloud.life.toFixed(1)}秒`));
+  assert.ok(guide.includes(`持续${boss.life}秒的漂移瘴云`));
+  for (const source of [guideContent('mortal'), gameplay])
+    assert.match(
+      source,
+      new RegExp(`${AUCTION_HALLS[0].forgeMin}\\s*～\\s*${AUCTION_HALLS[0].forgeMax}\\s*阶`),
+    );
 });

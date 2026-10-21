@@ -159,23 +159,34 @@ export function drawPlayerAilments(
   reduced: boolean,
 ) {
   const p = game.player;
-  const thunder = game.stage === 5 && !game.tribulation;
-  if (!game.slowed && !game.burning.life) return;
+  if (!game.slowed && !game.burning.life && !game.immobilized && !game.sealed) return;
   c.save();
   c.font = 'bold 13px serif';
   c.textAlign = 'center';
   c.lineWidth = 3;
   c.strokeStyle = '#173e4e';
   if (game.slowed > 0) {
-    const label = `${thunder ? '雷麻' : '迟滞'} · 移速 −25%`;
-    c.fillStyle = thunder ? '#e5ddff' : '#d3f1ff';
+    const label = '迟滞 · 移速 −25%';
+    c.fillStyle = '#d3f1ff';
     c.strokeText(label, p.x, p.y + 46);
     c.fillText(label, p.x, p.y + 46);
-    c.strokeStyle = thunder ? '#c7baff' : '#a8e1f4';
+    c.strokeStyle = '#a8e1f4';
     c.lineWidth = 2;
     c.beginPath();
     c.ellipse(p.x, p.y + 12, 25, 10, 0, 0, Math.PI * 2);
     c.stroke();
+  }
+  let labelY = p.y + (game.slowed > 0 ? 62 : 46);
+  for (const [active, label] of [
+    [game.immobilized, '雷麻 · 禁锢'],
+    [game.sealed, '封宝 · 无法施法'],
+  ] as const) {
+    if (active <= 0) continue;
+    c.strokeStyle = '#173e4e';
+    c.fillStyle = '#e5ddff';
+    c.strokeText(label, p.x, labelY);
+    c.fillText(label, p.x, labelY);
+    labelY += 16;
   }
   if (game.burning.life > 0) {
     c.fillStyle = '#ffc58b';
@@ -191,8 +202,8 @@ export function drawPlayerAilments(
     }
     c.strokeStyle = '#543b29';
     c.lineWidth = 3;
-    c.strokeText('灼烧', p.x, p.y + (game.slowed ? 62 : 46));
-    c.fillText('灼烧', p.x, p.y + (game.slowed ? 62 : 46));
+    c.strokeText('灼烧', p.x, labelY);
+    c.fillText('灼烧', p.x, labelY);
   }
   c.restore();
 }

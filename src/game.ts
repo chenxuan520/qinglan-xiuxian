@@ -36,7 +36,7 @@ import {
   regionalPursuit,
   type RegionalField,
 } from './regional-combat.ts';
-import { hazardDistance, slowingHazard } from './regional-hazards.ts';
+import { hazardDistance, slowingHazard, bindingHazard, ENEMY_CONTROL } from './regional-hazards.ts';
 import { medicineEffects, medicineLoot } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
@@ -142,6 +142,8 @@ export class Game {
   notice = '';
   noticeTime = 0;
   slowed = 0;
+  immobilized = 0;
+  sealed = 0;
   burning = { life: 0, damage: 0 };
   bossSpawned = false;
   trialBossesDefeated = 0;
@@ -155,6 +157,8 @@ export class Game {
   cacheChallenge: CacheChallenge | null = null;
   private cacheApproachStartedAt: number | null = null;
   private nextEnemySlowAt = 0;
+  private nextEnemyBindAt = 0;
+  private nextEnemySealAt = 0;
   tribulation = 0;
   tribulationStep = 0;
   tribulationNextAt = 1.2;
@@ -260,6 +264,8 @@ export class Game {
       this.player.hp = this.player.maxHp;
       this.player.invincible = 3;
       this.slowed = 0;
+      this.immobilized = 0;
+      this.sealed = 0;
       this.burning = { life: 0, damage: 0 };
       this.state = 'paused';
       this.announce(`向天借寿 · 寿元 +${years} 年`);
@@ -485,6 +491,8 @@ export class Game {
         ? { ...this.cacheChallenge, guardians: [...this.cacheChallenge.guardians] }
         : null,
       nextEnemySlowAt: this.nextEnemySlowAt,
+      nextEnemyBindAt: this.nextEnemyBindAt,
+      nextEnemySealAt: this.nextEnemySealAt,
       lateEliteWaves: this.lateEliteWaves,
       stage: this.stage,
       stageDuration: this.stageDuration,
@@ -546,6 +554,8 @@ export class Game {
       spawnBudget: this.spawnBudget,
       serial: this.serial,
       slowed: this.slowed,
+      immobilized: this.immobilized,
+      sealed: this.sealed,
       burning: { ...this.burning },
       nextEnemySkillAt: this.nextEnemySkillAt,
       nextMedicinePulse: this.nextMedicinePulse,
@@ -581,6 +591,8 @@ export class Game {
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       g.time = s.time;
       g.nextEnemySlowAt = s.nextEnemySlowAt ?? 0;
+      g.nextEnemyBindAt = s.nextEnemyBindAt ?? 0;
+      g.nextEnemySealAt = s.nextEnemySealAt ?? 0;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
@@ -590,6 +602,8 @@ export class Game {
       g.rerolls = s.rerolls;
       g.player = { ...s.player, moving: false };
       g.slowed = s.slowed ?? 0;
+      g.immobilized = s.immobilized ?? 0;
+      g.sealed = s.sealed ?? 0;
       g.burning = { ...(s.burning ?? { life: 0, damage: 0 }) };
       if (
         s.nextMedicinePulse !== undefined &&
@@ -756,6 +770,8 @@ export class Game {
     const progress = this.combatProgress;
     this.noticeTime -= dt;
     this.slowed = Math.max(0, this.slowed - dt);
+    this.immobilized = Math.max(0, this.immobilized - dt);
+    this.sealed = Math.max(0, this.sealed - dt);
     const p = this.player,
       stats = this.stats;
     p.invincible = Math.max(0, p.invincible - dt);
@@ -773,7 +789,7 @@ export class Game {
       }
     }
     const length = Math.hypot(this.input.x, this.input.y);
-    p.moving = length > 0.05;
+    p.moving = length > 0.05 && this.immobilized <= 0;
     if (p.moving) {
       p.x += (this.input.x / Math.max(1, length)) * stats.speed * dt;
       p.y += (this.input.y / Math.max(1, length)) * stats.speed * dt;
@@ -814,7 +830,8 @@ export class Game {
     }
     for (const w of this.weapons) {
       w.timer -= dt;
-      if (w.timer <= 0) {
+      if (this.sealed > 0) w.timer = Math.max(0, w.timer);
+      else if (w.timer <= 0) {
         this.cast(w);
         w.timer = treasure(w.id).cooldown * stats.cooldown * (w.evolved ? EVOLVED_COOLDOWN : 1);
       }
@@ -1491,7 +1508,7 @@ export class Game {
         const dx = e.dx * 300 + e.dy * side,
           dy = e.dy * 300 - e.dx * side;
         const length = Math.hypot(dx, dy);
-        this.hostileShot(from, dx / length, dy / length, 165, e.damage * 0.8);
+        this.hostileShot(from, dx / length, dy / length, 165, e.damage * 0.8).enemySkill = 'soul';
       } else {
         const a = ['nova', 'gapring'].includes(skill)
           ? angle + (i / count) * TAU
@@ -2129,6 +2146,7 @@ export class Game {
       if (b.kind === 'hostile') {
         if (distance(b, this.player) < b.radius + 12) {
           if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
+          if (b.enemySkill === 'soul' || b.bossStage === 4) this.enemySeal();
           this.hurtPlayer(
             b.damage * (b.bossStage === 3 ? this.medicine.poison : 1),
             !this.isFinalTrial && this.stage === 1 && b.enemySkill === 'firebolt',
@@ -2216,11 +2234,11 @@ export class Game {
       if (
         z.hostile &&
         z.life > 0 &&
-        slowingHazard(z) &&
+        (slowingHazard(z) || bindingHazard(z)) &&
         this.player.invincible <= 0 &&
         hazardDistance(z, this.player) < z.radius + 8
       )
-        this.enemySlow();
+        bindingHazard(z) ? this.enemyBind() : this.enemySlow();
       if (z.kind === 'vortex')
         for (const e of this.enemies) {
           const d = distance(e, z);
@@ -2353,8 +2371,18 @@ export class Game {
   }
   private enemySlow() {
     if (this.player.invincible > 0 || this.time < this.nextEnemySlowAt) return;
-    this.slowed = 0.55;
-    this.nextEnemySlowAt = this.time + 2.5;
+    this.slowed = ENEMY_CONTROL.slow;
+    this.nextEnemySlowAt = this.time + ENEMY_CONTROL.protection;
+  }
+  private enemyBind() {
+    if (this.player.invincible > 0 || this.time < this.nextEnemyBindAt) return;
+    this.immobilized = ENEMY_CONTROL.bind;
+    this.nextEnemyBindAt = this.time + ENEMY_CONTROL.protection;
+  }
+  private enemySeal() {
+    if (this.player.invincible > 0 || this.time < this.nextEnemySealAt) return;
+    this.sealed = ENEMY_CONTROL.seal;
+    this.nextEnemySealAt = this.time + ENEMY_CONTROL.protection;
   }
   private addRegionalFields(e: Enemy, fields: RegionalField[]) {
     for (const { damageScale, ...field } of fields) {
@@ -2796,6 +2824,8 @@ export class Game {
     if (this.state !== 'lost' || this.revivesUsed >= MAX_REVIVES || this.expired) return false;
     this.revivesUsed++;
     this.slowed = 0;
+    this.immobilized = 0;
+    this.sealed = 0;
     this.burning = { life: 0, damage: 0 };
     this.player.hp = this.player.maxHp;
     this.player.invincible = 3;

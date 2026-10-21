@@ -263,10 +263,10 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
     if (save.training[q.train] >= 20) q.reason = `${trainingName[q.train]}已修至二十阶`;
     q.detail += `根基至多二十阶${id === 'devour' ? '' : '，只提升一阶'}。`;
   }
-  // 献物按已打折的逐阶费用足额抵价；其他专长在自身报价后只减半一次灵石，玄铁不变。
+  // 献物按已打折的逐阶费用足额抵价；其他专长在自身报价后只折减一次灵石，玄铁不变。
   if (q.study || q.train) {
     if (id !== 'bone' && id !== 'devour') q.stones = curioTrainingCost(save, q.stones);
-    if (ownsCurio(save, 'heaven-house')) q.detail += '天机屋：不耗年岁，所需灵石减半。';
+    if (ownsCurio(save, 'heaven-house')) q.detail += '天机屋：不耗年岁，所需灵石减少30%。';
   }
   // 年岁以十分之一年报价和结算，向上取整避免比明示时间更长。
   q.years = roundYears(q.years);

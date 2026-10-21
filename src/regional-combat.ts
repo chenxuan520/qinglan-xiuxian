@@ -22,48 +22,6 @@ export function regionalBossSkills(stage: number, original: string[]) {
   );
 }
 
-export function regionalSkillDetails(
-  skill: EnemySkill,
-  original: { name: string; hint: string; eliteHint: string },
-) {
-  return (
-    (
-      {
-        roots: {
-          name: '青藤横生',
-          hint: '藤枝封路并短暂减速，击杀施法者可散阵',
-          eliteHint: '双枝封路，命中移速降低25%',
-        },
-        frost: {
-          name: '凝霜冰棱',
-          hint: '直线冰棱命中后短暂减速，侧移避开',
-          eliteHint: '双道冰棱夹击，命中移速降低25%，中间留有空隙',
-        },
-        miasma: {
-          name: '游瘴吐息',
-          hint: '瘴云向箭头方向漂移，寻找干净落脚点',
-          eliteHint: '游瘴持续漂移，绕开行进路径',
-        },
-        storm: {
-          name: '错拍雷织',
-          hint: '两道雷路依次落下，命中短暂雷麻；先避亮起的一道',
-          eliteHint: '交错雷路依次生效，趁落雷间隙换位',
-        },
-        firebolt: {
-          ...original,
-          hint: '火球命中后短暂灼烧，侧移避开弹道',
-          eliteHint: '双火球扇射，命中后短暂灼烧',
-        },
-        firecharge: {
-          ...original,
-          hint: '扑杀路线留下短时火痕，换一条路走',
-          eliteHint: '扑杀路线燃起火痕，绕开回头路',
-        },
-      } as Partial<Record<EnemySkill, typeof original>>
-    )[skill] ?? original
-  );
-}
-
 const tacticsCache = new Map<number, Tactics>();
 const overrides: Record<number, Record<number, EnemySkill>> = {
   0: { 2: 'roots', 10: 'roots' },
@@ -152,7 +110,7 @@ function cloud(
     vx,
     vy,
     radius,
-    life,
+    life: life * 1.5,
     delay,
     castDelay: delay,
     damageScale,
@@ -206,7 +164,7 @@ export function regionalEnemyFields(
         ),
       );
   } else if (skill === 'miasma') {
-    fields.push(cloud('enemy-miasma', offset(e, nx, ny, 75), nx * 18, ny * 18, 50, 3.2, 1, 0.65));
+    fields.push(cloud('enemy-miasma', offset(e, nx, ny, 75), nx * 12, ny * 12, 50, 3.2, 1, 0.65));
   } else if (skill === 'storm') {
     for (const [index, side] of [-1, 1].entries()) {
       const angle = Math.atan2(ny, nx) + side * 0.48;

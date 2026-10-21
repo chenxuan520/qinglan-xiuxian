@@ -1,8 +1,5 @@
-import {
-  regionalEnemyTactics,
-  regionalBossSkills,
-  regionalSkillDetails,
-} from './regional-combat.ts';
+import { ENEMY_SKILLS, regionalSkillDetails } from './regional-skill-info.ts';
+import { regionalEnemyTactics, regionalBossSkills } from './regional-combat.ts';
 import {
   STAGES,
   DIFFICULTIES,
@@ -10,7 +7,6 @@ import {
   TRIAL_BOSS_BUFFER_SECONDS,
   ENEMIES,
   ENEMY_TACTICS,
-  ENEMY_SKILLS,
   STAGE_ENEMIES,
   FINAL_TRIAL_STAGE,
   TRIAL_BOSS_STAGES,

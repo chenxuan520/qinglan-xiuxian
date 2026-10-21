@@ -21,6 +21,7 @@ import {
   spiritRootInfo,
 } from './data.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
+import { ENEMY_CONTROL } from './regional-hazards.ts';
 import { medicineInfo } from './medicine-data.ts';
 
 // 校验原始对局结构；恢复气血、升级选项与修为入账仍由 Game.restore 完成。
@@ -115,6 +116,17 @@ export function validateRunSnapshot(
       (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
     )
       return null;
+    for (const [duration, limit] of [
+      ['immobilized', ENEMY_CONTROL.bind],
+      ['sealed', ENEMY_CONTROL.seal],
+    ] as const)
+      if (
+        s[duration] !== undefined &&
+        (!Number.isFinite(s[duration]) || s[duration] < 0 || s[duration] > limit)
+      )
+        return null;
+    for (const key of ['nextEnemyBindAt', 'nextEnemySealAt'] as const)
+      if (s[key] !== undefined && (!Number.isFinite(s[key]) || s[key] < 0)) return null;
     if (s.cacheChallenge != null) {
       const c = s.cacheChallenge;
       if (
@@ -306,7 +318,8 @@ export function validateRunSnapshot(
             'pierce',
             'bounce',
           ]) &&
-          (b.enemySkill === undefined || ['firebolt', 'frostbolt'].includes(b.enemySkill)) &&
+          (b.enemySkill === undefined ||
+            ['firebolt', 'frostbolt', 'soul'].includes(b.enemySkill)) &&
           (b.bossStage === undefined ||
             (b.kind === 'hostile' &&
               Number.isInteger(b.bossStage) &&

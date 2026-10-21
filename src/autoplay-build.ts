@@ -75,8 +75,7 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
     return original;
   }
   const protective = ['guard', 'bone', 'duration', 'devour'];
-  if (hp < 0.35 && c.type === 'passive' && protective.includes(c.id))
-    return Math.max(original, 85 + c.level);
+  if (hp < 0.35 && c.type === 'passive' && protective.includes(c.id)) return Math.max(original, 96);
   if (build.mode === 'offense') {
     if (original >= 50) return original;
     if (c.type === 'weapon') return original + (c.level > 1 ? 10 : 3);
@@ -122,11 +121,7 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
       ) ??
       required[0];
     if (recipe && !g.passives[recipe]) recipes.push(recipe);
-    if (c.type === 'passive' && c.id === recipe)
-      return Math.max(
-        original,
-        owned.level >= 6 ? 85 + c.level : owned.level >= 3 ? 60 + c.level : 38,
-      );
+    if (c.type === 'passive' && c.id === recipe) return Math.max(original, 88 + c.level);
   }
   // 培养目标尚未成型时留出末格；后半程允许补入其他法宝，避免空等。
   if (c.type === 'weapon' && c.level === 1 && g.time < Math.min(120, g.stageDuration * 0.6)) {

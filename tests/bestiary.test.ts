@@ -21,7 +21,7 @@ test('图鉴使用关卡实战数值，不能把原始模板的气血与伤害�
   assert.equal(normal.first, 0);
   assert.equal(normal.end, 180);
   assert.ok(Math.abs(normal.hp[0] - 321.8429052) < 1e-8);
-  assert.ok(Math.abs(normal.damage[0] - 40.4960145408) < 1e-8);
+  assert.ok(Math.abs(normal.damage[0] - 40.4960145408 * 1.1) < 1e-8);
   assert.ok(Math.abs(normal.hp[1] - 544.6572241846154) < 1e-8);
   assert.notEqual(normal.hp[0], ENEMIES[28].hp);
   const elite = bestiaryEnemyStats(5, 0, 64, true)!;

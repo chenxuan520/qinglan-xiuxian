@@ -57,7 +57,7 @@ export interface Shot extends Point {
   bounce: number;
   crit: boolean;
   bossAttack?: BossAttack;
-  enemySkill?: 'firebolt' | 'frostbolt';
+  enemySkill?: 'firebolt' | 'frostbolt' | 'soul';
   bossStage?: number;
 }
 export interface Zone extends Point {

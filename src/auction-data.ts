@@ -16,7 +16,7 @@ export const AUCTION_HALLS = [
     realms: '炼气、筑基、金丹',
     minRealm: 0,
     forgeMin: 0,
-    forgeMax: 1,
+    forgeMax: 2,
     admission: 0,
   },
   {

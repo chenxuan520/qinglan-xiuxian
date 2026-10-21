@@ -96,7 +96,7 @@ test('普通与精英火弹霜弹可见飞行、锁定方向且有射程，星�
   }
 });
 
-test('霜弹命中减速0.55秒，2.5秒内不连控，无敌及暂停期间不被追加减速', () => {
+test('霜弹命中减速0.55秒，1秒内不连控，无敌及暂停期间不被追加减速', () => {
   const { g, e } = cast(45);
   g.fireEnemyVolley(e, 'frostbolt');
   const b = g.shots[0];
@@ -104,13 +104,13 @@ test('霜弹命中减速0.55秒，2.5秒内不连控，无敌及暂停期间不�
   b.y = g.player.y;
   g.updateShots(0);
   assert.equal(g.slowed, 0.55);
-  assert.equal(g.nextEnemySlowAt, 2.5);
+  assert.equal(g.nextEnemySlowAt, 1);
   g.player.invincible = 0;
   g.slowed = 0;
-  g.time = 1;
+  g.time = 0.999;
   g.enemySlow();
   assert.equal(g.slowed, 0);
-  g.time = 2.6;
+  g.time = 1.1;
   g.player.invincible = 1;
   g.enemySlow();
   assert.equal(g.slowed, 0);
@@ -122,7 +122,7 @@ test('霜弹命中减速0.55秒，2.5秒内不连控，无敌及暂停期间不�
   assert.ok(restored);
   restored.update(0.05);
   assert.equal(restored.slowed, 0.55);
-  assert.equal(restored.nextEnemySlowAt, 5.1);
+  assert.equal(restored.nextEnemySlowAt, 2.1);
 });
 
 test('毒孢只在死亡位置出现一次，召唤者死亡令护卫散去且不额外结算收益', () => {

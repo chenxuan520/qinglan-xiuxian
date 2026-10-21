@@ -11,6 +11,8 @@ import {
 } from './data.ts';
 import { realmDamageMultiplier, realmHealthMultiplier } from './progress.ts';
 
+export const REGIONAL_DAMAGE_MULTIPLIER = 1.1;
+
 // 图鉴与出生时共用数值，不读取玩家资质、装备或已造成的伤害。
 export function enemyCombatStats(
   stage: number,
@@ -70,6 +72,7 @@ export function enemyCombatStats(
         ? isFinalTrial
           ? BOSS_COMBAT.trialDamage
           : BOSS_COMBAT.damage[stage]
-        : 1),
+        : 1) *
+      (!tribulation && stage >= 1 && stage < FINAL_TRIAL_STAGE ? REGIONAL_DAMAGE_MULTIPLIER : 1),
   };
 }

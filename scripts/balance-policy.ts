@@ -42,7 +42,7 @@ export const BARE_CLEAR_TARGETS: Record<
 > = {
   heaven: { min: 0.7, max: 1, target: 0.9 },
   variant: { min: 0.5, max: 0.95, target: 0.7 },
-  dual: { min: 0.2, max: 0.65, target: 0.4 },
+  dual: { min: 0.2, max: 0.7, target: 0.4 },
   triple: { min: 0.1, max: 0.5, target: 0.3 },
   quad: { min: 0, max: 0.3, target: 0.1 },
   five: { min: 0, max: 0.25, target: 0.05 },

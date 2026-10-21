@@ -27,11 +27,12 @@ test('默认路线从一至四重优先修习已学功法，六重法宝的觉�
     g.passives = { duration: known };
     g.choices = [
       { type: 'weapon', id: 'sword', level: 6 },
-      { type: 'passive', id: 'power', level: 1 },
+      { type: 'passive', id: 'magnet', level: 1 },
       { type: 'passive', id: 'duration', level: known + 1 },
     ];
     assert.equal(pick(g).id, 'duration');
   }
+  g.choices[1] = { type: 'passive', id: 'power', level: 1 };
   g.weapons[0].level = MAX_WEAPON_LEVEL;
   own(g, ['sword', 'fire']);
   g.weapons[1].level = 3;
@@ -293,4 +294,52 @@ test('排序不改变候选、随机数、快照、属性、走位，恢复对�
   const restored = Game.restore(structuredClone(g.save), before);
   assert.ok(restored);
   assert.deepEqual(autoplayChoice(restored), actual);
+});
+
+test('已持一至五重法宝的未学配套优先于法宝升重，各倾向和纯修路线均可真实修习', () => {
+  for (const path of ['orthodox', 'demonic', 'dual'] as const)
+    for (const t of TREASURES.filter((t) => allowsSchool(path, t.school)))
+      for (const level of [1, 3, 5])
+        for (const { id: mode } of AUTOPLAY_BUILDS) {
+          const g = game(path);
+          own(g, [t.id], level);
+          g.save.autoplayBuild = { mode, targets: [t.id, ''] };
+          const recipe = g.evolutionRequirements(t.id)[0];
+          g.choices = [
+            { type: 'weapon', id: t.id, level: level + 1 },
+            { type: 'passive', id: recipe, level: 1 },
+          ];
+          assert.equal(pick(g).id, recipe, `${path}/${t.id}/${level}/${mode}`);
+          g.state = 'upgrade';
+          assert.ok(g.choose(autoplayChoice(g)!.index));
+          assert.equal(g.passives[recipe], 1);
+          assert.equal(g.weapons[0].level, level);
+        }
+});
+
+test('未学配套不抢已学替代配方的槽位，已觉醒或已有满级配方不会继续强补第二套', () => {
+  for (const mode of ['default', 'native', 'custom'] as const) {
+    const g = game();
+    own(g, ['sword'], 3);
+    g.save.autoplayBuild = { mode, targets: ['sword', ''] };
+    g.passives = { power: 2 };
+    g.choices = [
+      { type: 'passive', id: 'blood', level: 1 },
+      { type: 'passive', id: 'power', level: 3 },
+      { type: 'weapon', id: 'sword', level: 4 },
+    ];
+    assert.equal(pick(g).id, 'power', mode);
+    g.passives.power = 5;
+    g.choices.splice(1, 1);
+    assert.equal(pick(g).id, 'sword', mode);
+    g.passives = {};
+    g.weapons[0].evolved = true;
+    assert.equal(pick(g).id, 'sword', mode);
+    g.weapons[0].evolved = false;
+    g.player.hp = g.player.maxHp * 0.2;
+    g.choices.push({ type: 'passive', id: 'guard', level: 1 });
+    assert.equal(pick(g).id, 'guard', `${mode}濒死时护体优先`);
+    g.choices.push({ type: 'heal', id: 'heal', level: 1 });
+    assert.equal(pick(g).type, 'heal', mode);
+  }
 });
