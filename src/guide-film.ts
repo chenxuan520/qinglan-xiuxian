@@ -18,7 +18,7 @@ if (!STANDALONE && typeof customElements !== 'undefined' && !customElements.get(
       connectedCallback() {
         if (this.video) return;
         this.style.cssText = 'display:block;margin:18px 0';
-        this.innerHTML = `<button type="button" class="secondary-button" aria-expanded="false">观看青岚短片 · 30 秒</button>
+        this.innerHTML = `<button type="button" class="secondary-button" style="width:100%" aria-expanded="false">观看青岚短片 · 30 秒</button>
 <div hidden><video controls playsinline preload="none" aria-label="青岚短片" style="display:block;width:100%;max-height:60vh;aspect-ratio:16/9;object-fit:contain;background:#071d17;margin-top:14px;border:1px solid #b8c99e33"></video>
 <p class="panel-note" role="status" hidden></p><button type="button" class="secondary-button" hidden>重新加载短片</button></div>`;
         this.toggle = this.querySelector('button')!;

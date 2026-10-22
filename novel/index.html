@@ -48,7 +48,27 @@
           </button>
           <span class="reading-caption" id="reading-caption">青岚纪 · 不系舟</span>
           <div class="reading-controls">
-            <button type="button" id="theme-toggle" aria-pressed="false">夜读</button>
+            <button type="button" id="theme-toggle" aria-label="切换暗色书页" aria-pressed="false">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <g class="theme-sun">
+                  <circle cx="12" cy="12" r="4" />
+                  <path
+                    d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"
+                  />
+                </g>
+                <path class="theme-moon" d="M21 12.8A9 9 0 0 1 11.2 3 9 9 0 1 0 21 12.8Z" />
+              </svg>
+            </button>
             <div class="type-controls" role="group" aria-label="正文字号">
               <button type="button" id="type-smaller" aria-label="缩小正文字号">字−</button>
               <span id="type-size" aria-live="polite">20</span>

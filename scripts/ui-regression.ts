@@ -1153,6 +1153,76 @@ async function checkItemHelp(name: string) {
   assert.deepEqual(await saved(), before, '查看与切换说明不改变存档');
 }
 
+async function checkNovelReader(name: string, viewport: string) {
+  const before = await saved();
+  await click('[data-action=guide]');
+  await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=lore]")');
+  await click('[data-action=guide-tab][data-id=lore]');
+  await wait('() => !!document.querySelector("qinglan-film > button")');
+  assert.ok(
+    await evaluate(`() => {
+      const link = document.querySelector('.guide-lore > a');
+      const button = document.querySelector('qinglan-film > button');
+      return Math.abs(link.getBoundingClientRect().width - button.getBoundingClientRect().width) <= 1;
+    }`),
+    '小说与短片入口必须同宽',
+  );
+  assert.equal(
+    await evaluate('() => document.querySelector("qinglan-film video").getAttribute("src")'),
+    null,
+    '阅读帮助不能自动加载短片',
+  );
+  await check(`${name}-lore-buttons`);
+  const gamePageId = pageId;
+  await click('.guide-lore > a');
+  const pages = await browser.call('list_pages');
+  pageId = Number(
+    pages
+      .split('\n')
+      .find((line) => line.includes(new URL('novel/', baseUrl).href))
+      ?.match(/^(\d+):/)?.[1],
+  );
+  assert.ok(pageId && pageId !== gamePageId, '小说入口必须打开独立阅读页');
+  await browser.call('emulate', { pageId, viewport });
+  for (const [phase, theme] of [
+    ['initial', 'light'],
+    ['dark', 'dark'],
+    ['reload-dark', 'dark'],
+    ['light', 'light'],
+    ['reload-light', 'light'],
+  ] as const) {
+    if (phase.startsWith('reload')) await browser.call('navigate_page', { pageId, type: 'reload' });
+    else if (phase !== 'initial') await click('#theme-toggle');
+    await wait(
+      '() => document.querySelector("#chapter-title")?.textContent !== "正在展卷" && !!document.querySelector(".chapter-prose p")',
+    );
+    assert.deepEqual(
+      await evaluate(`() => ({
+        theme: document.documentElement.dataset.theme,
+        pressed: document.querySelector('#theme-toggle').getAttribute('aria-pressed'),
+        label: document.querySelector('#theme-toggle').getAttribute('aria-label'),
+        sun: getComputedStyle(document.querySelector('.theme-sun')).display !== 'none',
+        moon: getComputedStyle(document.querySelector('.theme-moon')).display !== 'none',
+        saved: JSON.parse(localStorage.getItem('qinglan-novel-reader-v1')).theme,
+      })`),
+      {
+        theme,
+        pressed: String(theme === 'dark'),
+        label: theme === 'dark' ? '切回浅色书页' : '切换暗色书页',
+        sun: theme === 'light',
+        moon: theme === 'dark',
+        saved: theme,
+      },
+      '当前主题、太阳／月亮图标、操作提示与保存偏好必须一致',
+    );
+    await check(`${name}-reader-${phase}`);
+  }
+  assert.deepEqual(await saved(), before, '小说阅读与主题切换不能改变游戏存档');
+  await finishPage();
+  pageId = gamePageId;
+  await click('.guide-close');
+}
+
 async function checkTourScrollRestore(name: string) {
   const cases = [
     { top: 0, complete: false },
@@ -1283,6 +1353,7 @@ try {
     await click('[data-action=close]');
     await checkHomePanels(name);
     await checkItemHelp(name);
+    await checkNovelReader(name, viewport);
     await checkTourScrollRestore(name);
     await click('[data-action=sound]');
     await check(`${name}-volume`);

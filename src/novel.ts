@@ -91,6 +91,7 @@ function updateTheme() {
   document.documentElement.dataset.theme = theme;
   themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
   themeToggle.title = theme === 'dark' ? '切回浅色书页' : '切换暗色书页';
+  themeToggle.setAttribute('aria-label', themeToggle.title);
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!.content =
     theme === 'dark' ? '#0e201d' : '#142e29';
 }
