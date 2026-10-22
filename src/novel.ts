@@ -113,6 +113,12 @@ function renderChapter(target: number, fraction = 0, focus = false) {
   document.title = `${chapter.label} · 不系舟`;
   const paragraphs = document.createDocumentFragment();
   for (const text of chapter.paragraphs) {
+    if (text === '---') {
+      const separator = document.createElement('hr');
+      separator.className = 'scene-break';
+      paragraphs.append(separator);
+      continue;
+    }
     const p = document.createElement('p');
     p.textContent = text;
     paragraphs.append(p);
