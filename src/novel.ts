@@ -9,6 +9,7 @@ interface ReadingPlace {
   chapter: string;
   position: number;
   size: number;
+  theme: 'light' | 'dark';
 }
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const page = get<HTMLElement>('reading-page');
@@ -21,6 +22,7 @@ const dialog = get<HTMLDialogElement>('contents-dialog');
 const toggle = get<HTMLButtonElement>('contents-toggle');
 const smaller = get<HTMLButtonElement>('type-smaller');
 const larger = get<HTMLButtonElement>('type-larger');
+const themeToggle = get<HTMLButtonElement>('theme-toggle');
 const previous = get<HTMLButtonElement>('previous-chapter');
 const next = get<HTMLButtonElement>('next-chapter');
 let saved: ReadingPlace | null = null;
@@ -44,6 +46,8 @@ try {
 }
 let index = 0;
 let size = saved?.size ?? 20;
+let theme: ReadingPlace['theme'] =
+  document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 let scrollTimer: ReturnType<typeof setTimeout> | undefined;
 let restoring = false;
 let restoreFrame = 0;
@@ -61,6 +65,7 @@ function remember() {
         chapter: book.chapters[index].id,
         position: position(),
         size,
+        theme,
       } satisfies ReadingPlace),
     );
   } catch {
@@ -81,6 +86,13 @@ function updateType() {
   get('type-size').textContent = String(size);
   smaller.disabled = size === sizes[0];
   larger.disabled = size === sizes[sizes.length - 1];
+}
+function updateTheme() {
+  document.documentElement.dataset.theme = theme;
+  themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
+  themeToggle.title = theme === 'dark' ? '切回浅色书页' : '切换暗色书页';
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!.content =
+    theme === 'dark' ? '#0e201d' : '#142e29';
 }
 function closeContents() {
   if (dialog.open) dialog.close();
@@ -164,6 +176,11 @@ for (const volume of book.volumes) {
 get('book-count').textContent = `${book.volumes.length} 卷 · ${book.chapters.length} 章`;
 previous.addEventListener('click', () => selectChapter(index - 1));
 next.addEventListener('click', () => selectChapter(index + 1));
+themeToggle.addEventListener('click', () => {
+  theme = theme === 'light' ? 'dark' : 'light';
+  updateTheme();
+  remember();
+});
 for (const [button, step] of [
   [smaller, -1],
   [larger, 1],
@@ -222,6 +239,7 @@ window.addEventListener('hashchange', () => {
   }
   renderChapter(target, 0, true);
 });
+updateTheme();
 updateType();
 const initial = chapterAtHash();
 index =

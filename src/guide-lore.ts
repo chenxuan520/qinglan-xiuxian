@@ -1,5 +1,6 @@
 import { assetUrl } from './asset-url.ts';
 import { STANDALONE } from './build-mode.ts';
+import './guide-film.ts';
 
 export function guideLoreContent(): string {
   return `<div class="guide-lore">
@@ -8,7 +9,7 @@ export function guideLoreContent(): string {
 <p class="panel-note">灵根有高下，求道却不只一条路。有人借器，有人炼丹，有人拜入山门，也有人独行。修为能留在身上，岁月却仍从人间流过。等你再次回到青岚，旧桥也许已经修过，灯下坐着的，也许已是后来人。</p>
 <p class="panel-note">若想从一个人的故事读起，可翻开《青岚纪·不系舟》，随陆迟走过青岚与远山。书中含后期情节，可自行择读。</p>
 <a class="secondary-button" href="${assetUrl('novel/')}" target="_blank" rel="noopener">阅读《青岚纪·不系舟》 <span aria-hidden="true">↗</span></a>
-${STANDALONE ? '' : '<p class="panel-note"><a href="https://xiuxian.011203.xyz/media/qinglan-promo-30s.mp4" target="_blank" rel="noopener">观看青岚短片 · 30 秒 <span aria-hidden="true">↗</span></a></p>'}
+${STANDALONE ? '' : '<qinglan-film></qinglan-film>'}
 <details class="disclosure guide-lore-section" data-disclosure="lore-world">
 <summary>天地与岁月</summary>
 <h3 class="guide-subheading">潮来以前，潮退以后</h3>

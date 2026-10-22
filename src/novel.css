@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   font-family: 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'SimSun', serif;
-  color: #34413a;
+  color: var(--ink);
   background: #142e29;
   font-synthesis: none;
   --paper: #eee6d4;
@@ -9,6 +9,10 @@
   --muted: #7a7d68;
   --rule: #a8a18b66;
   --reading-size: 20px;
+  --edge-light: #cec7b2;
+  --edge-middle: #a59f8d;
+  --edge-paper: #d5cfbe;
+  --edge-dark: #8e917d;
 }
 * {
   box-sizing: border-box;
@@ -81,10 +85,10 @@ button:not(:disabled):hover {
   border: 1px solid #b7b098;
   border-radius: 3px 5px 5px 3px;
   box-shadow:
-    3px 0 0 #cec7b2,
-    5px 0 0 #a59f8d,
-    8px 0 0 #d5cfbe,
-    10px 0 0 #8e917d,
+    3px 0 0 var(--edge-light),
+    5px 0 0 var(--edge-middle),
+    8px 0 0 var(--edge-paper),
+    10px 0 0 var(--edge-dark),
     0 22px 65px #071b2280;
   overflow: hidden;
 }
@@ -275,9 +279,22 @@ button:not(:disabled):hover {
   height: 24px;
   background: var(--paper);
 }
+.reading-controls,
 .type-controls {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+}
+.reading-controls {
+  gap: 12px;
+}
+#theme-toggle {
+  min-width: 52px;
+  min-height: 44px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+.type-controls {
   gap: 4px;
   font-size: 13px;
 }
@@ -427,6 +444,87 @@ button:not(:disabled):hover {
 .reader-error {
   line-height: 1.8;
 }
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  background: #0e201d;
+  --paper: #1c302b;
+  --ink: #d9d6c5;
+  --muted: #a6b1a0;
+  --rule: #798b715c;
+  --edge-light: #45574a;
+  --edge-middle: #293f35;
+  --edge-paper: #4d5c4b;
+  --edge-dark: #20362d;
+}
+[data-theme='dark'] body {
+  background: radial-gradient(ellipse at 45% 0, #28423866, transparent 65%);
+}
+[data-theme='dark'] .book,
+[data-theme='dark'] .contents-dialog {
+  border-color: #55644e;
+}
+[data-theme='dark'] .book-contents {
+  background: linear-gradient(90deg, #172b25, #20352c 88%, #172b25);
+  border-right-color: var(--rule);
+}
+[data-theme='dark'] .book-contents,
+[data-theme='dark'] .reading-page {
+  scrollbar-color: #687b63 transparent;
+}
+[data-theme='dark'] .reading-page {
+  background: linear-gradient(90deg, #10241c38, transparent 10%);
+}
+[data-theme='dark']
+  :is(
+    .book-series,
+    .book-intro,
+    .story-note,
+    .contents-caption > span,
+    .chapter-index,
+    .reading-toolbar,
+    .chapter-number,
+    .chapter-navigation span,
+    .reading-footer,
+    .dialog-toolbar
+  ) {
+  color: var(--muted);
+}
+[data-theme='dark'] .chapter-link {
+  color: #b9c2ae;
+}
+[data-theme='dark'] :is(.volume-title, .book-ending, .chapter-heading h2) {
+  color: #d9c88e;
+}
+[data-theme='dark'] .book-seal {
+  color: #d9a18a;
+  border-color: #a27761;
+}
+[data-theme='dark'] .contents-caption,
+[data-theme='dark'] .volume {
+  border-color: var(--rule);
+}
+[data-theme='dark'] .volume summary::before {
+  color: var(--muted);
+}
+[data-theme='dark'] .chapter-rule {
+  background: #8e845d;
+}
+[data-theme='dark'] .chapter-link:hover,
+[data-theme='dark'] button:not(:disabled):hover {
+  background: #c4cb9b12;
+}
+[data-theme='dark'] .chapter-link[aria-current='page'],
+[data-theme='dark'] #theme-toggle[aria-pressed='true'] {
+  color: #e0d09b;
+  background: #c4cb9b1c;
+  border-color: #ac9969;
+}
+[data-theme='dark'] .chapter-link[aria-current='page'] .chapter-index {
+  color: #d9c88e;
+}
+[data-theme='dark'] :focus-visible {
+  outline-color: #d9c88e;
+}
 @media (max-width: 760px) {
   body {
     padding: 10px 15px 14px 11px;
@@ -442,8 +540,8 @@ button:not(:disabled):hover {
     height: calc(100dvh - 78px);
     min-height: 240px;
     box-shadow:
-      2px 0 0 #cec7b2,
-      4px 0 0 #9c9c86,
+      2px 0 0 var(--edge-light),
+      4px 0 0 var(--edge-dark),
       0 12px 35px #071b2260;
   }
   .book::after {
@@ -462,6 +560,9 @@ button:not(:disabled):hover {
   }
   .reading-caption {
     display: none;
+  }
+  .reading-controls {
+    gap: 8px;
   }
   .contents-toggle {
     display: inline-block;
@@ -494,6 +595,12 @@ button:not(:disabled):hover {
   }
 }
 @media (max-width: 360px) {
+  .reading-controls {
+    gap: 4px;
+  }
+  .contents-toggle {
+    min-width: 52px;
+  }
   .reading-page {
     padding-left: 18px;
     padding-right: 18px;

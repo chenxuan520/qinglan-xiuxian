@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#142e29" />
+    <script>
+      try {
+        const place = JSON.parse(localStorage.getItem('qinglan-novel-reader-v1') || 'null');
+        if (place && !Array.isArray(place) && place.theme === 'dark') {
+          document.documentElement.dataset.theme = 'dark';
+          document.querySelector('meta[name="theme-color"]').content = '#0e201d';
+        }
+      } catch {}
+    </script>
     <meta
       name="description"
       content="《青岚纪·不系舟》：一个青岚少年的修行长卷。山河辽阔，故人有信。"
@@ -38,10 +47,13 @@
             卷目
           </button>
           <span class="reading-caption" id="reading-caption">青岚纪 · 不系舟</span>
-          <div class="type-controls" role="group" aria-label="正文字号">
-            <button type="button" id="type-smaller" aria-label="缩小正文字号">字−</button>
-            <span id="type-size" aria-live="polite">20</span>
-            <button type="button" id="type-larger" aria-label="放大正文字号">字＋</button>
+          <div class="reading-controls">
+            <button type="button" id="theme-toggle" aria-pressed="false">夜读</button>
+            <div class="type-controls" role="group" aria-label="正文字号">
+              <button type="button" id="type-smaller" aria-label="缩小正文字号">字−</button>
+              <span id="type-size" aria-live="polite">20</span>
+              <button type="button" id="type-larger" aria-label="放大正文字号">字＋</button>
+            </div>
           </div>
         </div>
         <article class="chapter" id="chapter" aria-labelledby="chapter-title">

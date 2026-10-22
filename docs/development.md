@@ -141,7 +141,7 @@ Vite 的 `scripts/offline-build.ts` 为每次生产构建生成 `offline-manifes
 
 ## 独立小说阅读页
 
-帮助「山河旧闻」通过新标签页链接打开 `novel/`，承接《青岚纪·不系舟》。正文唯一来源为 `docs/novel.md`，由阅读器按原卷章解析；作者笔记不进入网页。`novel/index.html` 是 Vite 正式多页入口，联网与单机均构建，专用脚本与样式只由阅读页加载，不引入游戏控制器、战斗模块或全局样式。阅读位置与游戏存档分开，小说页不读写 `qinglan-immortal-v1`，也不访问游戏后端或远程字体。
+帮助「山河旧闻」通过新标签页链接打开 `novel/`，承接《青岚纪·不系舟》。正文唯一来源为 `docs/novel.md`，由阅读器按原卷章解析；作者笔记不进入网页。`novel/index.html` 是 Vite 正式多页入口，联网与单机均构建，专用脚本与样式只由阅读页加载，不引入游戏控制器、战斗模块或全局样式。阅读位置、字号与明暗偏好共用独立本机键 `qinglan-novel-reader-v1`；顶部「夜读」切换浅色纸页与墨绿暗色，默认及旧记录保留浅色。HTML 在样式加载前读出已选暗色，避免刷新时先亮一下；存储被拒绝仍能切换和阅读。阅读偏好与游戏存档分开，小说页不读写 `qinglan-immortal-v1`，也不访问游戏后端或远程字体。
 
 游戏内入口使用 `assetUrl('novel/')` 保留末尾斜线；阅读页用 `../` 返回所在部署的游戏首页。主站为 `/novel/`，Pages 为 `/qinglan-xiuxian/novel/`；相对路径单机包搬入任意目录后，入口、返回及静态资源仍须在该目录内。阅读页 favicon 交由 Vite 按构建 base 重写，不能直接把单机的 `./` 当成网站根目录。
 
@@ -161,6 +161,8 @@ npm run deploy:cloudflare
 ```
 
 首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。Cloudflare 通过上述命令发布，GitHub Pages 仍在推送 master 后自动发布。
+
+帮助短片由随指南按需载入的 `guide-film.ts` 自定义元素承接，不打开新标签。未展开时 `<video>` 无 `src` 且 `preload="none"`，点击才设置官网地址并播放；原生控件支持暂停、拖动和全屏。收起及元素卸载都暂停、移除地址并释放媒体，覆盖关闭帮助、切分类和重绘；播放失败只在播放器旁提供重试。单机版不注册或显示此联网入口。
 
 宣传视频独立托管于官网 `/media/qinglan-promo-30s.mp4`，不属于游戏运行素材，不纳入离线清单、单机包或 Git。`deploy:cloudflare` 先完成原有游戏构建及 18 MB 体积门禁，再执行 `scripts/restore-promo-video.ts`，从固定的 [Cloudflare 预览副本](https://075ca3ea.qinglan-xiuxian.pages.dev/qinglan-promo-30s.mp4) 下载 6,137,116 字节的视频，核对 HTTP 状态、大小与脚本内固定 SHA-256 后，原子写入发布目录的 `media/`。下载或校验失败会中止部署，保留已有目标文件；以后沿用部署命令即可恢复视频，不会被重新构建遗漏。预览副本只供发布机恢复，玩家使用官网链接；视频保存在固定预览与生产部署两处，不通过 Git 二进制提交或 GitHub Release 保存。发布机需有 `curl`，下载沿用其 HTTPS 代理设置；可用 `node --experimental-strip-types scripts/restore-promo-video.ts <发布目录>` 单独执行恢复，默认目录为 `artifacts/cloudflare`。游戏体积预算及构建命令保持不变。
 
