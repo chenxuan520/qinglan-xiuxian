@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 // 匿名游玩统计：前端上报与 Worker 校验共用。不读取 DOM，依赖由调用方注入。
 import {
   SPIRIT_ROOTS,
@@ -154,7 +155,8 @@ export interface TelemetryOptions {
 }
 export function createTelemetry(options: TelemetryOptions) {
   const { storage, send } = options;
-  const active = (TELEMETRY_SETTINGS.origins as readonly string[]).includes(options.origin);
+  const active =
+    !STANDALONE && (TELEMETRY_SETTINGS.origins as readonly string[]).includes(options.origin);
   const version = /^[\w.+-]{1,40}$/.test(options.version) ? options.version : 'unknown';
   let queue: TelemetryEvent[] = [];
   let id = '';
@@ -165,7 +167,7 @@ export function createTelemetry(options: TelemetryOptions) {
       return null;
     }
   };
-  const enabled = () => read(TELEMETRY_SETTINGS.offKey) !== '1';
+  const enabled = () => !STANDALONE && read(TELEMETRY_SETTINGS.offKey) !== '1';
   const anonymousId = () => {
     if (id) return id;
     const stored = read(TELEMETRY_SETTINGS.idKey);
@@ -197,6 +199,7 @@ export function createTelemetry(options: TelemetryOptions) {
     active,
     enabled,
     setEnabled(on: boolean) {
+      if (STANDALONE) return;
       try {
         if (on) storage?.removeItem(TELEMETRY_SETTINGS.offKey);
         else storage?.setItem(TELEMETRY_SETTINGS.offKey, '1');

@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 // 激励广告供给层：复活、自选灵根、物资补给、借寿四个广告位共用一套 provider 接口。
 // main.ts 只管界面（占位倒计时与领取按钮），provider 决定「什么时刻算看完」：
 // 占位 provider 走 5 秒倒计时（无 SDK 的默认行为），真实 SDK provider 以看完回调解锁。
@@ -49,6 +50,7 @@ const PROVIDERS: Record<string, RewardAdProvider> = {
 };
 
 export function getAdProvider(): RewardAdProvider {
+  if (STANDALONE) return placeholderProvider;
   return PROVIDERS[ADS_SETTINGS.provider] ?? placeholderProvider;
 }
 

@@ -184,6 +184,33 @@ test('离线缓存只在明确操作后建立，完整缓存包含未访问地�
   assert.equal(await (await h.request('assets/font.woff2')).text(), 'font');
 });
 
+test('相对base单机包在根目录与任意子目录缓存、断网重开，仍拒绝外部和越界资源', async () => {
+  for (const base of ['/', '/games/qinglan/']) {
+    const h = harness(base);
+    const manifest = h.fixture();
+    manifest.base = './';
+    h.responses.set(
+      new URL(`offline-manifest-${BUILD}.json`, h.scope).href,
+      Response.json(manifest),
+    );
+    assert.equal((await h.message('cache')).error, undefined);
+    h.setOffline(true);
+    assert.equal(await (await h.request('', { navigate: true })).text(), '<html>old</html>');
+    assert.equal(await (await h.request('assets/journey-card.js')).text(), 'lazy export');
+  }
+  for (const path of ['https://other.test/file.js', '../file.js', '/file.js']) {
+    const h = harness('/local/');
+    const manifest = h.fixture();
+    manifest.base = './';
+    manifest.resources[0].path = path;
+    h.responses.set(
+      new URL(`offline-manifest-${BUILD}.json`, h.scope).href,
+      Response.json(manifest),
+    );
+    assert.equal((await h.message('cache')).error, 'invalid-manifest');
+  }
+});
+
 test('新旧版本素材隔离，成功更新后断网导航使用完整新版本', async () => {
   const h = harness();
   h.fixture();
@@ -340,9 +367,10 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
       'output/assets/lazy.js',
     ])
       writeFileSync(join(root, path), path);
-    function build(base) {
+    function build(base, mode = 'production') {
       const plugin = offlineBuild('test-v1');
       const config = { root, base, command: 'build', define: {}, build: { outDir: 'output' } };
+      config.mode = mode;
       plugin.configResolved(config);
       plugin.closeBundle();
       return {
@@ -376,6 +404,10 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
     );
     assert.equal(initial.manifest.build, build('/qinglan-xiuxian/').manifest.build);
     assert.notEqual(initial.manifest.build, build('/').manifest.build);
+    assert.notEqual(
+      initial.manifest.build,
+      build('/qinglan-xiuxian/', 'standalone').manifest.build,
+    );
     writeFileSync(join(root, 'monitor/index.html'), 'monitor changed');
     const monitorChanged = build('/qinglan-xiuxian/');
     assert.notEqual(initial.manifest.build, monitorChanged.manifest.build);
@@ -415,6 +447,7 @@ test('构建产物与清单不收录 public 复制来的点文件，输出目录
     const plugin = offlineBuild('test-v1');
     plugin.configResolved({
       root,
+      mode: 'production',
       base: '/',
       command: 'build',
       define: {},

@@ -1,3 +1,5 @@
+import { STANDALONE } from './build-mode.ts';
+import { localTeaStory } from './local-tea-stories.ts';
 import {
   MARKET_DIALOGUE_CLUES,
   MARKET_DIALOGUE_EVENTS,
@@ -23,10 +25,9 @@ import { marketTradeMotive } from './market-trade-motives.ts';
 import { marketFriendLead } from './market-world.ts';
 import { removeNumberGrouping } from './number-format.ts';
 
-export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
-  /\/$/,
-  '',
-);
+export const NPC_AI_BASE = STANDALONE
+  ? ''
+  : (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(/\/$/, '');
 
 export function marketDialogueContext(
   save: SaveData,
@@ -166,6 +167,11 @@ async function requestNpcDialogueResponse(
     : NPC_AI_SETTINGS.requestTimeoutMs,
   onRetry?: (attempt: number, error: string) => void,
 ): Promise<NpcDialogueResponse | NpcDialogueFailure> {
+  if (signal.aborted) return { error: 'request-cancelled', retryable: false };
+  if (STANDALONE)
+    return input.mode === 'tea-story'
+      ? { reply: localTeaStory(input.population.seed, input.age) }
+      : { error: 'local-dialogue', retryable: false };
   if (typeof navigator !== 'undefined' && navigator.onLine === false)
     return { error: 'offline', retryable: false };
   const attempts = input.mode === 'tea-story' ? TEA_STORY_SETTINGS.maxAttempts : 1;
@@ -263,6 +269,7 @@ export async function requestTeaStoryImage(
   fetcher: typeof fetch = fetch,
   timeout = TEA_STORY_IMAGE_SETTINGS.requestTimeoutMs,
 ): Promise<Blob | null> {
+  if (STANDALONE) return null;
   const text = story.trim();
   if (
     !text ||
@@ -548,7 +555,9 @@ export function mountNpcChat(
       : townId
         ? reply
           ? '街巷闲谈 · 随口聊聊'
-          : '闲谈暂歇 · 仍可照常买卖、接取委托'
+          : STANDALONE
+            ? '街巷闲谈 · 随口聊聊'
+            : '闲谈暂歇 · 仍可照常买卖、接取委托'
         : reply
           ? '家中叙话 · 随口聊聊'
           : '家常依旧 · 随口聊聊';

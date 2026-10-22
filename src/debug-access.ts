@@ -1,6 +1,8 @@
+import { STANDALONE } from './build-mode.ts';
 import { DEBUG_SETTINGS } from './setting.ts';
 
 export async function debugAccess(endpoint: string, fetcher: typeof fetch = fetch) {
+  if (STANDALONE) return 'disabled' as const;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DEBUG_SETTINGS.requestTimeoutMs);
   try {

@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 // Google AdSense 激励广告 provider（H5 Placement API）。
 // 官方脚本模式：adsbygoogle.push() 队列 + 页面定义 adConfig/adBreak 推送包装器。
 // 未配置 client、脚本加载失败、无广告库存或玩家中途关闭，全部经 onFailed 回退占位倒计时。
@@ -62,7 +63,7 @@ export const adsenseProvider: RewardAdProvider = {
   name: 'adsense',
   placementName: (placement) => `qinglan-${placement}`,
   async prepare() {
-    if (!ADS_SETTINGS.adsense.client) return false;
+    if (STANDALONE || !ADS_SETTINGS.adsense.client) return false;
     if (scriptState === 'ready') return true;
     if (scriptState === 'failed') return false;
     if (scriptState === 'loading') return false; // 简化：并发请求视为不可用，下一次广告位再试。

@@ -260,30 +260,42 @@ npm run stats -- --days=30
 
 各工作流按职责独立触发，测试失败由对应Actions门禁标红和通知，不阻塞部署，也不因部署成功把测试标为成功：
 
-| 工作流         | 职责                                                               | 触发                            |
-| -------------- | ------------------------------------------------------------------ | ------------------------------- |
-| `pages.yml`    | 编译、产物上限、恢复报告、部署                                     | master推送、手动                |
-| `checks.yml`   | 独立job：单元测试；格式与Worker类型；生产子路径下手机/电脑界面回归 | 所有分支推送、v\*标签、PR、手动 |
-| `binaries.yml` | 禁止未授权二进制与字体                                             | 所有分支/标签推送、PR、手动     |
-| `balance.yml`  | 推送/PR跑840快检及模拟/体积；全量与渲染仅定时或手动                | 推送/PR快检、每日12:00、手动    |
-| `release.yml`  | 编译、产物上限、离线包与校验和、Release                            | v\*标签                         |
+| 工作流         | 职责                                                          | 触发                            |
+| -------------- | ------------------------------------------------------------- | ------------------------------- |
+| `pages.yml`    | 编译、产物上限、恢复报告、部署                                | master推送、手动                |
+| `checks.yml`   | 独立job：单元、文档、格式与Worker类型、联网界面及单机产物契约 | 所有分支推送、v\*标签、PR、手动 |
+| `binaries.yml` | 禁止未授权二进制与字体                                        | 所有分支/标签推送、PR、手动     |
+| `balance.yml`  | 推送/PR跑840快检及模拟/体积；全量与渲染仅定时或手动           | 推送/PR快检、每日12:00、手动    |
+| `release.yml`  | 编译、产物上限、离线包与校验和、Release                       | v\*标签                         |
 
-Quality gates的手机/电脑回归仍用Chrome DevTools MCP及独立浏览器工具，报告/失败截图保存为7天artifact，不提交仓库。当前游戏与构建规则未改。
+Quality gates的手机/电脑回归仍用Chrome DevTools MCP及独立浏览器工具，报告/失败截图保存为7天artifact，不提交仓库。两种构建的检查彼此独立，部署流水线不等待这些测试。
 
 构建会使用 Pages 提供的子目录路径，地图、人物、法宝图标和后台计时 Worker 均支持仓库地址下访问。本地 `npm run dev` 与默认构建继续使用根路径。
 
 GitHub Pages 和 localhost 是不同来源，浏览器存档各自独立，不会自动同步。
 
-## GitHub Release · 离线版
+## GitHub Release · 单机版
 
-推送 `v*` 标签会触发 `.github/workflows/release.yml`。发布流水线只编译、校验18MB产物上限、打包并创建GitHub Release；`v*`标签同时独立触发Quality gates与二进制门禁，不在发布job内重复单测。发布流程创建GitHub Release，并附带离线包及 SHA-256 校验文件。
+推送 `v*` 标签会触发 `.github/workflows/release.yml`。发布流水线使用 `npm run build:standalone` 编译、校验18MB产物上限、打包并创建GitHub Release；`v*`标签同时独立触发Quality gates与二进制门禁，不在发布job内重复单测。发布流程创建GitHub Release，并附带离线包及 SHA-256 校验文件。
 
 ```bash
 git tag v0.0.1
 git push origin v0.0.1
 ```
 
-离线包只包含生产构建后的静态文件，不包含后端。解压后在该目录启动任意 HTTP 静态服务器并打开其本地地址；不要直接双击 `index.html`。战斗、成长、城镇、图片、音乐和本地存档可断网运行；NPC AI 闲谈与茶馆故事仍需联网，普通闲谈失败时使用本地对白。
+单机包只包含静态文件，无需部署 Worker 或其他游戏服务端。解压后在该目录启动任意 HTTP 静态服务器并打开其本地地址；不要直接双击 `index.html`。默认相对路径 `./`，可放在根目录或任意子目录。页面标题和「关于」版本号标注「单机版」。
+
+本地构建：
+
+```bash
+npm run build:standalone -- --outDir artifacts/standalone --emptyOutDir
+node --experimental-strip-types scripts/size-check.ts --dir artifacts/standalone
+node --experimental-strip-types scripts/standalone-check.ts artifacts/standalone
+```
+
+`--mode standalone` 将编译常量 `__QINGLAN_STANDALONE__` 设为 true，不是运行时设置。NPC 闲谈使用本地对白，茶馆轮换收录的旧闻，不请求 AI 或配图；留影和评语均本地生成。战斗中的自动历练是本地策略，照常可用。匿名统计、错误和分享上报、调试入口、服务端白名单和外部广告 SDK 全部停用；即使使用官网来源或设置 `VITE_NPC_AI_URL` 也不能重新启用。单机包不包含监控页面，不加载公共字体，直接使用系统字体兜底。官网、源码和留影二维码保留链接，只有玩家主动访问才会打开。
+
+单机版与联网版沿用同一存档格式，不增删游戏资源或改变战斗数值；浏览器存档仍按来源隔离，换地址用导出/导入转移。可选资源缓存仍需玩家主动点击，构建号包含模式，完整缓存按构建号区分。独立 Quality job 编译并检查单机包的标识、清单、监控缺席及后端地址残留，发布 job 不运行测试。`npm run build`、Pages 和 Cloudflare 的常规构建保持联网版；推送新 `v*` 标签自动发布单机 zip 和校验和，不改变官网构建模式。
 
 ## 项目结构
 

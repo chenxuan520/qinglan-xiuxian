@@ -97,3 +97,20 @@ jobs:
           path: artifacts/ui-regression/
           if-no-files-found: ignore
           retention-days: 7
+
+  standalone:
+    name: Standalone build contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:standalone -- --outDir artifacts/standalone --emptyOutDir
+      - run: node --experimental-strip-types scripts/size-check.ts --dir artifacts/standalone
+      - run: node --experimental-strip-types scripts/standalone-check.ts artifacts/standalone

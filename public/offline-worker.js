@@ -25,7 +25,7 @@ function validateManifest(manifest, build) {
     manifest.schema !== 1 ||
     manifest.build !== build ||
     !/^[a-f0-9]{24}$/.test(build) ||
-    manifest.base !== new URL(scope).pathname ||
+    (manifest.base !== new URL(scope).pathname && manifest.base !== './') ||
     typeof manifest.version !== 'string' ||
     !Array.isArray(manifest.resources) ||
     manifest.resources.length === 0

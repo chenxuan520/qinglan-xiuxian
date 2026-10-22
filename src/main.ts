@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
@@ -246,14 +247,16 @@ const telemetry = createTelemetry({
   endpoint: `${NPC_AI_BASE}${TELEMETRY_SETTINGS.path}`,
   version: GAME_VERSION,
   storage: storageAvailable ? localStorage : null,
-  send: (url, body) =>
-    navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain;charset=UTF-8' })) ||
-    fetch(url, {
-      method: 'POST',
-      body,
-      keepalive: true,
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-    }).catch(() => {}),
+  send: STANDALONE
+    ? () => {}
+    : (url, body) =>
+        navigator.sendBeacon?.(url, new Blob([body], { type: 'text/plain;charset=UTF-8' })) ||
+        fetch(url, {
+          method: 'POST',
+          body,
+          keepalive: true,
+          // 字符串 body 的浏览器默认 Content-Type 即 text/plain;charset=UTF-8。
+        }).catch(() => {}),
 });
 telemetry.track({ type: 'session', fresh: saveRead.status === 'empty', ...lifeStats() });
 if (

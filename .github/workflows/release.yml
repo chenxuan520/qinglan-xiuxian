@@ -27,8 +27,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Build offline package
-        run: npm run build -- --outDir artifacts/release/qinglan-xiuxian --emptyOutDir
+      - name: Build standalone package
+        run: npm run build:standalone -- --outDir artifacts/release/qinglan-xiuxian --emptyOutDir
       - name: Check complete offline build size
         run: node --experimental-strip-types scripts/size-check.ts --dir artifacts/release/qinglan-xiuxian
       - name: Package release
@@ -43,12 +43,12 @@ jobs:
         run: |
           if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" \
-              "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip#Offline web package" \
+              "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip#Standalone web package" \
               "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip.sha256#SHA-256 checksum" \
               --clobber
           else
             gh release create "${{ github.ref_name }}" \
-            "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip#Offline web package" \
+            "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip#Standalone web package" \
             "artifacts/qinglan-xiuxian-${{ github.ref_name }}-offline.zip.sha256#SHA-256 checksum" \
             --verify-tag \
             --generate-notes \

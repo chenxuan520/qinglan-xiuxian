@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 import { assetUrl } from './asset-url.ts';
 
 const build = typeof __QINGLAN_BUILD_ID__ === 'undefined' ? '' : __QINGLAN_BUILD_ID__;
@@ -112,7 +113,7 @@ function message(error: unknown) {
 }
 
 export function offlinePanel() {
-  return `<section class="offline-resources" aria-label="离线资源缓存"><p>缓存完成后，断网重新打开也能游玩秘境与城镇。AI 对话与新故事需要联网。</p><p class="offline-status" role="status" aria-live="polite"></p><progress aria-label="离线资源缓存进度" max="100" value="0" hidden></progress><div class="offline-actions"><button class="primary-button" data-action="offline-cache">缓存所有离线资源</button><button class="secondary-button" data-action="offline-cancel" hidden>取消缓存</button><button class="secondary-button" data-action="offline-clear" disabled>清除所有缓存资源</button></div><small>资源保存在当前浏览器中；清理浏览器数据后需重新缓存。清除缓存不会删除存档，清除后可联网重新打开，加载最新版本。</small></section>`;
+  return `<section class="offline-resources" aria-label="离线资源缓存"><p>缓存完成后，断网重新打开也能游玩秘境与城镇。${STANDALONE ? '单机版的镇民对白、茶馆旧闻与留影均可离线使用。' : 'AI 对话与新故事需要联网。'}</p><p class="offline-status" role="status" aria-live="polite"></p><progress aria-label="离线资源缓存进度" max="100" value="0" hidden></progress><div class="offline-actions"><button class="primary-button" data-action="offline-cache">缓存所有离线资源</button><button class="secondary-button" data-action="offline-cancel" hidden>取消缓存</button><button class="secondary-button" data-action="offline-clear" disabled>清除所有缓存资源</button></div><small>资源保存在当前浏览器中；清理浏览器数据后需重新缓存。清除缓存不会删除存档，清除后可联网重新打开，加载最新版本。</small></section>`;
 }
 
 export function refreshOfflinePanel() {

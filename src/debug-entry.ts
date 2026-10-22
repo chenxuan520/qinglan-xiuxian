@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 import { DEBUG_SETTINGS } from './setting.ts';
 import type { DebugHost } from './debug-panel.ts';
 
@@ -16,7 +17,7 @@ export class DebugEntry {
     this.now = now;
   }
   async tap(button: HTMLElement | null) {
-    if (!button?.isConnected || !this.host.canOpen() || this.busy) return;
+    if (STANDALONE || !button?.isConnected || !this.host.canOpen() || this.busy) return;
     const now = this.now();
     if (button !== this.button || now - this.since > DEBUG_SETTINGS.tapWindowMs) {
       this.button = button;

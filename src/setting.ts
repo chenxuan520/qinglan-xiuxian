@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
 // 微信赞赏码是小程序码，二维码库无法重新生成；更换时直接替换这张图片。
 export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
@@ -32,7 +33,7 @@ export const SECT_MARKET_SETTINGS = {
 
 export const NPC_AI_SETTINGS = {
   // 可用构建环境变量 VITE_NPC_AI_URL 覆盖；地址不要带 /chat。
-  baseUrl: 'https://qinglan-npc-ai.011203.xyz',
+  baseUrl: STANDALONE ? '' : 'https://qinglan-npc-ai.011203.xyz',
   model: '@cf/zai-org/glm-4.7-flash',
   requestTimeoutMs: 20000,
   inferenceTimeoutMs: 12000,

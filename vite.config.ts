@@ -14,17 +14,40 @@ function describeVersion() {
 }
 
 const version = describeVersion();
-export default defineConfig({
-  plugins: [offlineBuild(version)],
-  build: {
-    rollupOptions: {
-      input: {
-        index: fileURLToPath(new URL('./index.html', import.meta.url)),
-        monitor: fileURLToPath(new URL('./monitor/index.html', import.meta.url)),
+export default defineConfig(({ mode }) => {
+  const standalone = mode === 'standalone';
+  return {
+    plugins: [
+      offlineBuild(version),
+      ...(standalone
+        ? [
+            {
+              name: 'qinglan-standalone-html',
+              transformIndexHtml(html: string) {
+                return html
+                  .replace(
+                    '<title>叩仙门：青岚纪</title>',
+                    '<title>叩仙门：青岚纪 · 单机版</title>',
+                  )
+                  .replace(/<link\b[^>]*href="https:\/\/fonts\.loli\.net\/[^>]*>/g, '');
+              },
+            },
+          ]
+        : []),
+    ],
+    build: {
+      rollupOptions: {
+        input: {
+          index: fileURLToPath(new URL('./index.html', import.meta.url)),
+          ...(!standalone
+            ? { monitor: fileURLToPath(new URL('./monitor/index.html', import.meta.url)) }
+            : {}),
+        },
       },
     },
-  },
-  define: {
-    __QINGLAN_VERSION__: JSON.stringify(version),
-  },
+    define: {
+      __QINGLAN_VERSION__: JSON.stringify(version),
+      __QINGLAN_STANDALONE__: standalone,
+    },
+  };
 });

@@ -59,3 +59,12 @@ test('Pages保留四类报告并从独立性能artifact恢复，二进制与平�
   for (const command of ['balance:ci', 'perf:sim', 'size:check', 'balance:gate:full'])
     assert.ok(read('balance.yml').includes(`npm run ${command}`), command);
 });
+
+test('tag只打单机包，官网仍正常联网构建，独立门禁检查单机产物', () => {
+  assert.match(read('release.yml'), /npm run build:standalone -- --outDir artifacts\/release\//);
+  assert.doesNotMatch(read('pages.yml'), /build:standalone|--mode standalone/);
+  const checks = read('checks.yml');
+  assert.match(checks, /^  standalone:/m);
+  assert.match(checks, /npm run build:standalone/);
+  assert.match(checks, /scripts\/standalone-check\.ts/);
+});

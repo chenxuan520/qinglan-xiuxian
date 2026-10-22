@@ -1,13 +1,13 @@
+import { STANDALONE } from './build-mode.ts';
 import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import type { SaveData } from './progress.ts';
 import type * as Chat from './npc-chat.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
 
-export const NPC_AI_BASE = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(
-  /\/$/,
-  '',
-);
+export const NPC_AI_BASE = STANDALONE
+  ? ''
+  : (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(/\/$/, '');
 type ChatModule = Pick<typeof Chat, 'closeNpcChat' | 'mountNpcChat' | 'mountTeaStory'>;
 
 // 闲谈按需载入；同一次载入期间换人、关窗或离开场景均使旧挂载失效。

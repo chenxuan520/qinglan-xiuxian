@@ -99,7 +99,7 @@
   background: #acc1a408;
 }
 .about-maker > span,
-.about-meta span {
+.about-meta p > span:first-child {
   color: #9eb29f;
   font-size: 9px;
   letter-spacing: 2px;
@@ -131,7 +131,7 @@
   color: #c5ceb9;
   font-size: 11px;
 }
-.about-meta span {
+.about-meta p > span:first-child {
   width: 58px;
   flex: 0 0 auto;
 }

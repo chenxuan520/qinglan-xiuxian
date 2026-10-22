@@ -26,6 +26,8 @@
 
 ## 技术与目录
 
+单机构建使用 `npm run build:standalone`（编译期 `--mode standalone`），tag Release 默认走此命令；普通 `build` 和两站部署保持联网版。单机包不得请求游戏后端、遥测、调试/白名单或外部字体/SDK，NPC、茶馆、留影沿用本地内容，页面标注「单机版」；自动历练不受影响。改动相关请求链路时同时验证两种构建、根/子路径与可选离线缓存，不能仅靠来源白名单阻止请求。详见 [开发与部署](docs/development.md)。
+
 前端使用 Vite + TypeScript + Canvas 2D，无运行时游戏框架。战斗与存档本地运行，NPC 闲谈使用独立 Cloudflare Workers AI，失败回退本地对白。需要 Node.js **22.18+**。
 
 | 路径                                                                | 职责                                      |

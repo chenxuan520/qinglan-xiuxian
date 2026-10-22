@@ -1,3 +1,4 @@
+import { STANDALONE } from './build-mode.ts';
 import {
   localJourneyAppraisal,
   type JourneyAppraisal,
@@ -7,8 +8,11 @@ import { validJourneyAppraisal } from './journey-appraisal-ai-protocol.ts';
 import { GAME_SITE_URL, JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from './setting.ts';
 
 const cache = new Map<string, JourneyAppraisal>();
-const baseUrl = (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(/\/$/, '');
+const baseUrl = STANDALONE
+  ? ''
+  : (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(/\/$/, '');
 export function journeyAppraisalAiOrigin(origin: string) {
+  if (STANDALONE) return false;
   if (origin === new URL(GAME_SITE_URL).origin) return true;
   try {
     const url = new URL(origin);
@@ -28,6 +32,7 @@ export async function resolveJourneyAppraisal(
   options: { origin?: string; online?: boolean; fetcher?: typeof fetch; timeoutMs?: number } = {},
 ): Promise<JourneyAppraisal> {
   const fallback = localJourneyAppraisal(facts);
+  if (STANDALONE) return fallback;
   const origin = options.origin ?? (typeof location === 'undefined' ? '' : location.origin);
   const online = options.online ?? (typeof navigator === 'undefined' || navigator.onLine !== false);
   if (signal.aborted || !online || !journeyAppraisalAiOrigin(origin)) return fallback;

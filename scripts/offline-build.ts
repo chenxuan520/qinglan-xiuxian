@@ -30,6 +30,7 @@ export function offlineBuild(version: string): Plugin {
       const hash = createHash('sha256')
         .update(version)
         .update(config.base)
+        .update(config.mode)
         .update(JSON.stringify(config.env || {}));
       const inputs = [
         ...files(resolve(config.root, 'src')),
