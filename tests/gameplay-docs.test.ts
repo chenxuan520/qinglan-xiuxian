@@ -349,6 +349,7 @@ test('每一帮助分类都进入一致性检查，CI独立运行且不混入部
     'builds',
     'combat',
     'items',
+    'lore',
     'medicine',
     'mortal',
     'roots',
