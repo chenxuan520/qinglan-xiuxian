@@ -5,6 +5,8 @@ import { ACHIEVEMENT_IDS, recordChronicle } from '../src/chronicle.ts';
 import { chronicleAchievements } from '../src/chronicle-achievements.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { journeyCardData } from '../src/journey-card.ts';
+import { useMedicine } from '../src/medicine.ts';
+import { releaseAuctionItem } from '../src/auction-items.ts';
 import {
   journeyAppraisalFacts,
   localJourneyAppraisal,
@@ -86,4 +88,64 @@ test('旧档十四项齐备才补圆满，未知年岁不编造，旧拍卖记�
   const s = ready();
   s.chronicle.milestones.peerless = 100;
   assert.equal(parseSave(JSON.stringify(s)).chronicle.milestones.peerless, undefined);
+});
+
+test('传承三类遗物都不能达成万古独尊，用掉或售出后仍排除，其他十四项保留', async () => {
+  const { applyBirthInheritance } = await import('../src/progress.ts');
+  for (const gift of [
+    { kind: 'artifact', id: 'pagoda', level: 10 },
+    { kind: 'medicine', id: 'peiying' },
+    { kind: 'curio', id: 'soul-wood' },
+  ] as const) {
+    const s = freshSave('none', [], 'dual', () => 0.5);
+    assert.ok(applyBirthInheritance(s, gift));
+    s.birthInheritance = null;
+    Object.assign(s, {
+      cultivation: IMMORTAL_CULTIVATION,
+      completed: [0, 1, 2, 3, 4, 5, 6],
+      unlocked: 6,
+      tribulations: 5,
+      age: 9000,
+    });
+    if (gift.kind === 'medicine') {
+      assert.ok(useMedicine(s, gift.id).ok);
+      assert.equal(s.medicine.bag[gift.id], 0);
+    } else {
+      releaseAuctionItem(s, {
+        kind: gift.kind,
+        id: gift.id,
+        quantity: 1,
+        forgeLevel: gift.kind === 'artifact' ? gift.level : 0,
+      });
+      if (gift.kind === 'artifact') assert.ok(!s.artifacts.includes(gift.id));
+      else assert.equal(s.curios.bag[gift.id] ?? 0, 0);
+    }
+    for (const id of ACHIEVEMENT_IDS) s.chronicle.milestones[id] = 100;
+    s.chronicle.milestones.peerless = 200;
+    s.chronicle.entries.unshift({ age: 200, title: '万古独尊', detail: '旧条件已达成。' });
+    const restored = importSave(exportSave(s)).save;
+    assert.equal(final(restored).achieved, false, gift.kind);
+    assert.equal(restored.chronicle.milestones.peerless, undefined);
+    assert.equal(chronicleAchievements(restored).filter((a) => a.achieved).length, 14);
+    assert.ok(!restored.chronicle.entries.some((e) => e.title === '万古独尊'));
+    assert.ok(!journeyCardData(restored).memories.some((m) => m.title === '万古独尊'));
+    const facts = journeyAppraisalFacts(restored, 'ongoing');
+    assert.ok(!facts.feats.includes('peerless'));
+    assert.notEqual(localJourneyAppraisal(facts).title, '万古独尊');
+    assert.equal(final(parseSave(JSON.stringify(restored))).achieved, false);
+  }
+});
+
+test('只留指引不赠物仍可圆满；当前合法传承元数据缺少历史标记时也不能误颁', async () => {
+  const { applyBirthInheritance } = await import('../src/progress.ts');
+  const s = ready();
+  s.chronicle.milestones['immortal-successor'] = 15;
+  for (const id of ACHIEVEMENT_IDS) s.chronicle.milestones[id] = 100;
+  assert.equal(final(parseSave(JSON.stringify(s))).achieved, true);
+  const inherited = freshSave();
+  assert.ok(applyBirthInheritance(inherited, { kind: 'medicine', id: 'peiying' }));
+  delete inherited.chronicle.milestones['birth-inheritance'];
+  for (const id of ACHIEVEMENT_IDS) inherited.chronicle.milestones[id] = 15;
+  inherited.chronicle.milestones.peerless = 15;
+  assert.equal(final(parseSave(JSON.stringify(inherited))).achieved, false);
 });

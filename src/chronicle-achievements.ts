@@ -31,7 +31,12 @@ export function chronicleAchievements(save: SaveData) {
     { id: 'hard-immortal', difficulty: 120, title: '逆境问道', detail: '以天劫降临难度成就真仙' },
     { id: 'rootless-immortal', difficulty: 140, title: '凡骨登仙', detail: '以无灵根成就真仙' },
     { id: 'curio-three', difficulty: 50, title: '奇珍有缘', detail: '本世先后获得三件不同奇物' },
-    { id: 'peerless', difficulty: 150, title: '万古独尊', detail: '达成本世其余十四项仙途成就' },
+    {
+      id: 'peerless',
+      difficulty: 150,
+      title: '万古独尊',
+      detail: '未受传承遗物，达成本世其余十四项仙途成就',
+    },
     {
       id: 'one-life-clear',
       title: '一命通关',

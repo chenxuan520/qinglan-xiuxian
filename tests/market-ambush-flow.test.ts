@@ -22,8 +22,46 @@ import { exportSave, importSave } from '../src/save-transfer.ts';
 import { FINAL_TRIAL_STAGE, MAX_REVIVES } from '../src/data.ts';
 import { startAdWatch } from '../src/scene-flow.ts';
 import { resourceFailureContent } from '../src/resource-panel.ts';
+import { ModuleSource } from '../src/module-source.ts';
 
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+test('遭遇冷模块失败缓存不能锁死重试，并发重试只用当前构建的新URL一次', async () => {
+  const source = main.match(
+    /^(?:let|const) ambushFlow[^]*?^function loadAmbushFlow\([^]*?^\}/m,
+  )?.[0];
+  assert.ok(source);
+  // 模拟浏览器永久缓存同一URL的失败，执行真实入口工厂，重试仅替换网络边界。
+  const failed = Promise.reject(Error('冷模块断网'));
+  void failed.catch(() => {});
+  let initialCalls = 0;
+  const retries: unknown[][] = [];
+  const module = { mountAmbush() {} };
+  const context = createContext({
+    ModuleSource,
+    initialModule() {
+      initialCalls++;
+      return failed;
+    },
+    retryModule(...args: unknown[]) {
+      retries.push(args);
+      return Promise.resolve(module);
+    },
+    resourceFailed() {},
+  });
+  new Script(
+    stripTypeScriptTypes(source).replace("import('./market-ambush-flow.ts')", 'initialModule()'),
+  ).runInContext(context);
+  const first = context.loadAmbushFlow();
+  assert.equal(context.loadAmbushFlow(), first);
+  await assert.rejects(first, /冷模块断网/);
+  const retry = context.loadAmbushFlow();
+  assert.equal(context.loadAmbushFlow(), retry);
+  assert.equal(await retry, module);
+  assert.deepEqual(retries, [['market-ambush-flow', 'ambush', 1]]);
+  assert.equal(await context.loadAmbushFlow(), module);
+  assert.equal(initialCalls, 1);
+  assert.equal(retries.length, 1);
+});
 const flow = readFileSync(new URL('../src/market-ambush-flow.ts', import.meta.url), 'utf8');
 const functions = (source: string, names: string[]) =>
   names
@@ -115,6 +153,9 @@ function harness(data = fixture()) {
   }
   const noop = () => {};
   const context = createContext({
+    // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
+    chronicleSource: { observe() {} },
+    hideAchievementNotice() {},
     resourceFailureContent,
     save: data,
     saveLock: null,

@@ -8,7 +8,7 @@ export { SectMarketScene } from './sect-market-scene.ts';
 
 export { renderSectService, sectServiceAction } from './sect-service-flow.ts';
 
-export { catalogPanel } from './catalog-ui.ts';
+export { catalogPanel, forgeTreasure } from './catalog-ui.ts';
 
 export {
   auctionContent,

@@ -104,6 +104,9 @@ function harness(save: SaveData) {
   const rootLayout = { innerHTML: '' };
   let rolls = 0;
   const context = createContext({
+    // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
+    chronicleSource: { observe() {} },
+    hideAchievementNotice() {},
     dispatchAction,
     ...lifeMode,
     lifeModeChoice,

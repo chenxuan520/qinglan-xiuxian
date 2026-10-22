@@ -57,11 +57,14 @@ export const ACHIEVEMENT_IDS = [
   'rootless-immortal',
 ] as const;
 export const completedAchievements = (save: SaveData) =>
+  !save.birthInheritance &&
+  !('birth-inheritance' in save.chronicle.milestones) &&
   ACHIEVEMENT_IDS.every((id) => Object.hasOwn(save.chronicle.milestones, id));
 function recordCompletion(save: SaveData, restore = false) {
   const log = save.chronicle;
   if (!completedAchievements(save)) {
     delete log.milestones.peerless;
+    log.entries = log.entries.filter((entry) => entry.title !== '万古独尊');
     return;
   }
   if (Object.hasOwn(log.milestones, 'peerless')) return;
@@ -72,7 +75,11 @@ function recordCompletion(save: SaveData, restore = false) {
       : null
     : save.age;
   log.milestones.peerless = age;
-  log.entries.unshift({ age, title: '万古独尊', detail: '本世十四项仙途成就尽数达成。' });
+  log.entries.unshift({
+    age,
+    title: '万古独尊',
+    detail: '未受传承遗物，本世十四项仙途成就尽数达成。',
+  });
   log.entries.splice(CHRONICLE_LIMIT);
 }
 

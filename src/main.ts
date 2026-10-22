@@ -55,6 +55,7 @@ import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
 import { DebugEntry } from './debug-entry.ts';
 import { createUpdateCheck, resourceFailed } from './update-check.ts';
+import { ModuleSource, retryModule } from './module-source.ts';
 import {
   resourceFailureContent,
   resourcesUpdated,
@@ -120,7 +121,6 @@ import {
   SAVE_SCHEMA,
   realmInfo,
   train,
-  forge,
   settleRun,
   attuneSpiritRoot,
   alignStarterWithPath,
@@ -218,6 +218,7 @@ app.innerHTML = `<canvas id="world" aria-label="修仙战斗场景"></canvas><di
 const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const modal = document.querySelector<HTMLDivElement>('#modal-root')!;
 const joystick = document.querySelector<HTMLDivElement>('#joystick')!;
+const toastElement = document.querySelector<HTMLDivElement>('#toast')!;
 const renderer = new Renderer(document.querySelector<HTMLCanvasElement>('#world')!);
 const frameRate = new FrameRate();
 let sceneLoading = false;
@@ -369,6 +370,7 @@ let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 const guideSource = new GuideSource();
 const chronicleSource = new ChronicleSource();
+chronicleSource.observe(save, true);
 const marketEventSource = new MarketEventSource();
 const townSource = new TownSource();
 let guideTab = 'basics';
@@ -412,7 +414,7 @@ setResourceRefreshWarning(() =>
     : '',
 );
 // 只在存档仍是本页上次读写的内容时写入，其他窗口写过后本页停止保存。
-function writeSave(data: SaveData, run: Game | null) {
+function writeSave(data: SaveData, run: Game | null, reset = false) {
   if (saveLock) throw new Error('存档已停止写入');
   if (localStorage.getItem(SAVE_KEY) !== lastSaveText) {
     lockStaleSave();
@@ -421,6 +423,8 @@ function writeSave(data: SaveData, run: Game | null) {
   const text = JSON.stringify({ ...data, activeRun: run?.snapshot() ?? null });
   localStorage.setItem(SAVE_KEY, text);
   lastSaveText = text;
+  chronicleSource.observe(data, reset);
+  if (reset) hideAchievementNotice();
 }
 function persist() {
   if (
@@ -477,14 +481,23 @@ function downloadJson(text: string, name: string) {
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-function toast(text: string, duration = 3200) {
-  const el = document.querySelector<HTMLDivElement>('#toast')!;
+function toast(text: string, duration = 3200, achievement = false) {
+  const el = toastElement;
+  el.hidden = false;
   el.textContent = text;
+  el.toggleAttribute('data-achievement', achievement);
   el.classList.add('visible');
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => el.classList.remove('visible'), duration);
 }
 let toastTimer = 0;
+function hideAchievementNotice() {
+  if (toastElement.hasAttribute('data-achievement')) {
+    toastElement.hidden = true;
+    toastElement.classList.remove('visible');
+    window.clearTimeout(toastTimer);
+  }
+}
 const panelHost = new PanelHost(modal, ui);
 const journeyCardPanel = new JourneyCardPanel(modal, panelFrame, (detail) => {
   telemetry.track({ type: 'sharing', detail, ...lifeStats() });
@@ -794,13 +807,13 @@ function refreshMarketActivities() {
   }
   if (section) section.scrollTop = scroll;
 }
-let ambushFlow: Promise<typeof import('./market-ambush-flow.ts')> | undefined;
+const ambushFlow = new ModuleSource<typeof import('./market-ambush-flow.ts')>((attempt) =>
+  attempt
+    ? retryModule('market-ambush-flow', 'ambush', attempt)
+    : import('./market-ambush-flow.ts'),
+);
 function loadAmbushFlow() {
-  return (ambushFlow ??= import('./market-ambush-flow.ts').catch((error) => {
-    ambushFlow = undefined;
-    resourceFailed(true);
-    throw error;
-  }));
+  return ambushFlow.load();
 }
 function showMarketAmbush() {
   if (!save.mortal.marketSocial?.ambush || saveLock) return;
@@ -1271,7 +1284,7 @@ function resetLifetime(
     departHometown(next);
   }
   try {
-    writeSave(next, null);
+    writeSave(next, null, true);
   } catch {
     if (!saveLock) toast('轮回尚未保存，旧世进度保留，请重试');
     return false;
@@ -1476,7 +1489,7 @@ function shellBindings(): ActionShell {
     get finishDeparture() { return finishDeparture; },
     get finishMarketAmbush() { return finishMarketAmbush; },
     get finishRun() { return finishRun; },
-    get forge() { return forge; },
+    get forgeTreasure() { return marketEventSource.current!.forgeTreasure; },
     get freshTownPopulation() { return freshTownPopulation; },
     get game() { return game; },
     set game(next) { game = next; },
@@ -2188,6 +2201,15 @@ function tick(now: number, draw: boolean) {
 function frame(now: number) {
   // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
   requestAnimationFrame(frame);
+  const blocked = game || ambushScene || save.mortal.marketSocial?.ambush || saveLock;
+  if (blocked) hideAchievementNotice();
+  chronicleSource.flush(
+    !blocked &&
+      !document.hidden &&
+      !guideSource.current?.tourActive &&
+      !toastElement.classList.contains('visible'),
+    (text) => toast(text, 3200, true),
+  );
   if (saveLock) guideSource.current?.stopInterfaceTour();
   if (guideSource.current?.tourActive) {
     lastFrame = lastMortalTick = now;

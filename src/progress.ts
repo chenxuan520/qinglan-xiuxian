@@ -519,6 +519,8 @@ export function readSave(
       base.mortal.member.dues = Math.min(base.mortal.member.dues, SECT_DUES[realm.index].stones);
       if (realm.max) base.mortal.member.dueAt = 0;
     }
+    if (validBirthInheritance(base, s.birthInheritance))
+      base.birthInheritance = { ...s.birthInheritance };
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
     if (upgrading && ascensionCultivation > 0) {
       // 旧记录无法证明当年通关的灵根、难度和年岁，不补造相关成就。
@@ -543,8 +545,6 @@ export function readSave(
         (s.pendingReincarnation === 'extreme' && isExtremeLife(base)))
     )
       base.pendingReincarnation = s.pendingReincarnation;
-    if (validBirthInheritance(base, s.birthInheritance))
-      base.birthInheritance = { ...s.birthInheritance };
     return { save: base, status: newer ? 'newer' : 'ok' };
   } catch {
     return { save: base, status: newer ? 'newer' : 'unreadable' };

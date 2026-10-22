@@ -8,7 +8,8 @@ import {
   evolutionPassives,
   treasure,
 } from './data.ts';
-import { forgeCost, forgeDamageBonus, type SaveData } from './progress.ts';
+import { forge, forgeCost, forgeDamageBonus, type SaveData } from './progress.ts';
+import type { ActionShell } from './action-controller.ts';
 import { currency, weaponAffinity, catalogEvolutionRecipe } from './common-ui.ts';
 import { icon, smallIcon } from './icons.ts';
 import { masteryDescription } from './mortal-ui.ts';
@@ -22,6 +23,21 @@ export interface CatalogView {
   treasurePage: number;
   selectedTreasure: string;
   bookTab: string;
+}
+// 与藏器阁共用按需模块；保存成功后才应用炼器与成就。
+export function forgeTreasure(shell: ActionShell) {
+  const next = structuredClone(shell.save);
+  if (!forge(next, shell.selectedTreasure)) return;
+  try {
+    shell.writeSave(next, shell.pendingRun);
+  } catch {
+    if (!shell.saveLock) shell.toast('炼器未保存，请重试');
+    return;
+  }
+  Object.assign(shell.save, next);
+  shell.renderLobby();
+  shell.renderPanel();
+  shell.toast(`${treasure(shell.selectedTreasure).name}炼器成功 · 伤害永久提升`);
 }
 export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition {
   const { panel, catalogTreasures, schoolFilter, treasurePage, selectedTreasure, bookTab } = view;

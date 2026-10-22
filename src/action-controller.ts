@@ -25,7 +25,7 @@ import { changeAutoplayBuild } from './autoplay-build.ts';
 import { sectEntryMedicinePool } from './mortal.ts';
 import type { ironMarketContent } from './iron-market-ui.ts';
 import type { MedicinePanel } from './medicine-panel.ts';
-import type { catalogPanel } from './catalog-ui.ts';
+import type { catalogPanel, forgeTreasure } from './catalog-ui.ts';
 import type { cultivationPanel } from './cultivation-ui.ts';
 import type { BattleHud } from './battle-hud.ts';
 import type { JourneyCardPanel } from './journey-card-panel.ts';
@@ -73,7 +73,6 @@ import type {
   completeTribulation,
   enterImmortalGate,
   extendLifespan,
-  forge,
   lifespanInfo,
   realmInfo,
   resolveInheritance,
@@ -211,7 +210,7 @@ export interface ActionShell {
   readonly finishDeparture: (skipOpening?: boolean) => void;
   readonly finishMarketAmbush: (outcome: AmbushOutcome) => void;
   readonly finishRun: () => void;
-  readonly forge: typeof forge;
+  readonly forgeTreasure: typeof forgeTreasure;
   readonly freshTownPopulation: typeof freshTownPopulation;
   game: Game | null;
   readonly gameAudio: GameAudio;
@@ -357,7 +356,7 @@ export interface ActionShell {
   readonly updateStorySoundButton: typeof updateStorySoundButton;
   volumeOpen: boolean;
   readonly window: Window;
-  readonly writeSave: (data: SaveData, run: Game | null) => void;
+  readonly writeSave: (data: SaveData, run: Game | null, reset?: boolean) => void;
   readonly AD_DURATION_MS: number;
   readonly AD_PLACEHOLDER_HTML: string;
   readonly AD_SECONDS: typeof AD_SECONDS;
@@ -1307,7 +1306,7 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
   ) {
     const candidate = shell.pendingImport;
     try {
-      shell.writeSave(candidate.save, candidate.run);
+      shell.writeSave(candidate.save, candidate.run, true);
     } catch {
       if (!shell.saveLock) shell.toast('浏览器无法写入存档，当前进度未更改');
       return true;
@@ -1815,11 +1814,8 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
     shell.renderPanel();
     shell.toast(`已将${shell.treasure(shell.selectedTreasure).name}设为本命法宝`);
   }
-  if (action === 'forge' && shell.forge(shell.save, shell.selectedTreasure)) {
-    shell.persist();
-    shell.renderLobby();
-    shell.renderPanel();
-    shell.toast(`${shell.treasure(shell.selectedTreasure).name}炼器成功 · 伤害永久提升`);
+  if (action === 'forge') {
+    shell.forgeTreasure(shell);
   }
   if (action === 'retreat' && !shell.game && shell.panel === 'cultivation') {
     const input = shell.document.querySelector<HTMLInputElement>('#retreat-years');

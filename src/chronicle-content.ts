@@ -3,6 +3,7 @@ import { spiritPower } from './spirit-power.ts';
 import { formatNumber } from './number-format.ts';
 import { powerDetailsContent } from './power-details-ui.ts';
 import type { SaveData } from './progress.ts';
+export { AchievementNotices } from './achievement-notices.ts';
 
 const escape = (value: string) =>
   value.replace(

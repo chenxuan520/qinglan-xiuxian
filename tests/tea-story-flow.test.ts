@@ -115,6 +115,9 @@ function harness(t: TestContext) {
   const writes: string[] = [];
   const messages: string[] = [];
   const context = createContext({
+    // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
+    chronicleSource: { observe() {} },
+    hideAchievementNotice() {},
     dispatchAction,
     save,
     modal,
