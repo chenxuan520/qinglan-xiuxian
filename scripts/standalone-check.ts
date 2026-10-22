@@ -7,31 +7,35 @@ import { createHash } from 'node:crypto';
 const directory = resolve(process.argv[2] || 'artifacts/standalone');
 const html = readFileSync(join(directory, 'index.html'), 'utf8');
 assert.match(html, /<title>叩仙门：青岚纪 · 单机版<\/title>/);
-for (const [tag] of html.matchAll(/<(?:script|link)\b[^>]*>/g)) {
-  if (/rel="canonical"/.test(tag)) continue;
-  assert.doesNotMatch(tag, /(?:src|href)="(?:https?:)?\/\//);
-}
 assert.equal(existsSync(join(directory, 'monitor')), false, '单机包不得夹带监控入口');
 // 对同一份相对路径产物分别按根目录和搬入子目录解析；不另建预览HTML或第二服务。
-for (const base of ['https://static.test/', 'https://static.test/games/qinglan/']) {
-  for (const [tag] of html.matchAll(/<(?:script|link)\b[^>]*>/g)) {
+for (const page of ['index.html', 'novel/index.html']) {
+  const content = readFileSync(join(directory, page), 'utf8');
+  for (const [tag] of content.matchAll(/<(?:script|link|img|source|audio|video|iframe)\b[^>]*>/g)) {
     if (/rel="canonical"/.test(tag)) continue;
-    const path = tag.match(/(?:src|href)="([^"]+)"/)?.[1];
-    if (!path) continue;
-    const url = new URL(path, base);
-    assert.ok(url.href.startsWith(base), `静态入口引用越界：${url.href}`);
-    assert.equal(
-      existsSync(
-        join(directory, decodeURIComponent(url.pathname.slice(new URL(base).pathname.length))),
-      ),
-      true,
-      url.href,
-    );
+    for (const [, path] of tag.matchAll(/(?:src|href|poster)="([^"]+)"/g)) {
+      assert.doesNotMatch(path, /^(?:https?:)?\/\//, `${page} 不得加载外部资源`);
+      for (const base of ['https://static.test/', 'https://static.test/games/qinglan/']) {
+        const url = new URL(path, new URL(page, base));
+        assert.ok(url.href.startsWith(base), `${page} 静态入口引用越界：${url.href}`);
+        assert.equal(
+          existsSync(
+            join(directory, decodeURIComponent(url.pathname.slice(new URL(base).pathname.length))),
+          ),
+          true,
+          `${page}: ${url.href}`,
+        );
+      }
+    }
   }
 }
 const manifest = JSON.parse(readFileSync(join(directory, 'offline-manifest.json'), 'utf8'));
 assert.equal(manifest.base, './', '默认单机包使用可搬动的相对路径');
 assert.match(manifest.build, /^[a-f0-9]{24}$/);
+assert.ok(
+  manifest.resources.some((entry: { path: string }) => entry.path === 'novel/index.html'),
+  '单机包离线清单须包含独立小说入口',
+);
 let bytes = 0;
 let editionLabel = false;
 for (const entry of manifest.resources) {

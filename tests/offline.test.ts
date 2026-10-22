@@ -249,6 +249,33 @@ test('缓存后的监控目录导航保留独立页面，兼容根路径与 GitH
   }
 });
 
+test('完整缓存包含未访问的小说，根路径、Pages 与相对单机断网导航保持正文入口', async () => {
+  for (const [base, manifestBase] of [
+    ['/', '/'],
+    ['/qinglan-xiuxian/', '/qinglan-xiuxian/'],
+    ['/games/qinglan/', './'],
+  ]) {
+    const h = harness(base);
+    const manifest = h.fixture(BUILD, 'game', {
+      'novel/index.html': '<html>novel</html>',
+      'assets/novel.js': 'chapter content',
+      'assets/novel.css': 'book styles',
+    });
+    manifest.base = manifestBase;
+    h.responses.set(
+      new URL(`offline-manifest-${BUILD}.json`, h.scope).href,
+      Response.json(manifest),
+    );
+    assert.equal((await h.message('cache')).error, undefined);
+    h.setOffline(true);
+    for (const path of ['novel/#chapter-42', 'novel/index.html?from=guide'])
+      assert.equal(await (await h.request(path, { navigate: true })).text(), '<html>novel</html>');
+    assert.equal(await (await h.request('assets/novel.js')).text(), 'chapter content');
+    assert.equal(await (await h.request('assets/novel.css')).text(), 'book styles');
+    assert.equal(await (await h.request('', { navigate: true })).text(), '<html>game</html>');
+  }
+});
+
 test('部署资源变化、网络失败和空间不足不能标记完整，也不会破坏旧版缓存', async () => {
   for (const failure of ['changed', 'network', 'quota', 'marker-quota']) {
     const h = harness();
@@ -353,11 +380,21 @@ test('清单越界、重复或缺少首页时拒绝缓存', async () => {
 test('构建清单收录完整输出并校验内容，部署子路径和资源变化进入构建号', () => {
   const root = mkdtempSync(join(tmpdir(), 'qinglan-manifest-'));
   try {
-    for (const dir of ['src', 'public/assets', 'scripts', 'monitor', 'output/assets'])
+    for (const dir of [
+      'src',
+      'public/assets',
+      'scripts',
+      'monitor',
+      'novel',
+      'docs',
+      'output/assets',
+    ])
       mkdirSync(join(root, dir), { recursive: true });
     for (const path of [
       'index.html',
       'monitor/index.html',
+      'novel/index.html',
+      'docs/novel.md',
       'vite.config.ts',
       'scripts/offline-build.ts',
       'package-lock.json',
@@ -408,9 +445,15 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
       initial.manifest.build,
       build('/qinglan-xiuxian/', 'standalone').manifest.build,
     );
+    writeFileSync(join(root, 'novel/index.html'), 'novel page changed');
+    const novelPageChanged = build('/qinglan-xiuxian/');
+    assert.notEqual(initial.manifest.build, novelPageChanged.manifest.build);
+    writeFileSync(join(root, 'docs/novel.md'), 'novel text changed');
+    const novelTextChanged = build('/qinglan-xiuxian/');
+    assert.notEqual(novelPageChanged.manifest.build, novelTextChanged.manifest.build);
     writeFileSync(join(root, 'monitor/index.html'), 'monitor changed');
     const monitorChanged = build('/qinglan-xiuxian/');
-    assert.notEqual(initial.manifest.build, monitorChanged.manifest.build);
+    assert.notEqual(novelTextChanged.manifest.build, monitorChanged.manifest.build);
     writeFileSync(join(root, 'public/assets/map.webp'), 'changed');
     assert.notEqual(monitorChanged.manifest.build, build('/qinglan-xiuxian/').manifest.build);
     assert.match(
@@ -425,11 +468,13 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
 test('构建产物与清单不收录 public 复制来的点文件，输出目录原有 .git 保留', () => {
   const root = mkdtempSync(join(tmpdir(), 'qinglan-dotfiles-'));
   try {
-    for (const dir of ['src', 'scripts', 'monitor', 'output/.git'])
+    for (const dir of ['src', 'scripts', 'monitor', 'novel', 'docs', 'output/.git'])
       mkdirSync(join(root, dir), { recursive: true });
     for (const path of [
       'index.html',
       'monitor/index.html',
+      'novel/index.html',
+      'docs/novel.md',
       'vite.config.ts',
       'scripts/offline-build.ts',
       'package-lock.json',

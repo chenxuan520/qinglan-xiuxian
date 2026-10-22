@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#142e29" />
+    <meta
+      name="description"
+      content="《青岚纪·不系舟》：一个青岚少年的修行长卷。山河辽阔，故人有信。"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>青岚纪 · 不系舟</title>
+  </head>
+  <body>
+    <header class="reading-masthead">
+      <a href="../" class="home-link">← 青岚首页</a>
+      <span>山河旧闻 · 藏书</span>
+    </header>
+    <main class="book" aria-label="青岚纪·不系舟阅读器">
+      <aside class="book-contents" aria-label="小说目录">
+        <div class="contents-inner" id="contents-inner">
+          <header class="book-cover">
+            <p class="book-series">青岚纪</p>
+            <h1>不系舟<span class="book-seal" aria-hidden="true">旧闻</span></h1>
+            <p class="book-intro">山河辽阔，故人有信。</p>
+            <p class="story-note">故事含后期情节，可随心翻阅。</p>
+          </header>
+          <div class="contents-caption">
+            <h2>卷目</h2>
+            <span id="book-count"></span>
+          </div>
+          <nav id="chapter-list" aria-label="卷章目录"></nav>
+        </div>
+      </aside>
+      <section class="reading-page" id="reading-page" aria-label="小说正文" tabindex="0">
+        <div class="reading-toolbar">
+          <button type="button" class="contents-toggle" id="contents-toggle" aria-haspopup="dialog">
+            卷目
+          </button>
+          <span class="reading-caption" id="reading-caption">青岚纪 · 不系舟</span>
+          <div class="type-controls" role="group" aria-label="正文字号">
+            <button type="button" id="type-smaller" aria-label="缩小正文字号">字−</button>
+            <span id="type-size" aria-live="polite">20</span>
+            <button type="button" id="type-larger" aria-label="放大正文字号">字＋</button>
+          </div>
+        </div>
+        <article class="chapter" id="chapter" aria-labelledby="chapter-title">
+          <header class="chapter-heading">
+            <p id="volume-title" class="volume-title"></p>
+            <p class="chapter-number" id="chapter-number"></p>
+            <h2 id="chapter-title" tabindex="-1">正在展卷</h2>
+            <span class="chapter-rule" aria-hidden="true"></span>
+          </header>
+          <div class="chapter-prose" id="chapter-prose"><p>书页尚未展开。</p></div>
+          <p class="book-ending" id="book-ending" hidden>山河未尽，此卷已终。</p>
+        </article>
+        <nav class="chapter-navigation" aria-label="前后章节">
+          <button type="button" id="previous-chapter" disabled>
+            <span>上一章</span><strong></strong>
+          </button>
+          <button type="button" id="next-chapter" disabled>
+            <span>下一章</span><strong></strong>
+          </button>
+        </nav>
+        <footer class="reading-footer">
+          <span>青岚纪 · 不系舟</span><span id="chapter-position"></span>
+        </footer>
+        <noscript><p class="reader-error">请开启浏览器的 JavaScript 后阅读。</p></noscript>
+      </section>
+    </main>
+    <dialog class="contents-dialog" id="contents-dialog" aria-label="选择章节">
+      <div class="dialog-toolbar">
+        <span>翻阅卷目</span
+        ><button type="button" id="contents-close" aria-label="关闭目录">关闭 ×</button>
+      </div>
+    </dialog>
+    <script type="module" src="/src/novel.ts"></script>
+  </body>
+</html>

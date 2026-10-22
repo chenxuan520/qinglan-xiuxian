@@ -139,6 +139,16 @@ Vite 的 `scripts/offline-build.ts` 为每次生产构建生成 `offline-manifes
 
 `npm test` 覆盖完整性、版本切换、中断、空间不足、失效检测、作用域隔离和音乐范围请求；`tests/offline-controls.test.ts` 另覆盖注销后的残留清理、清除时重开面板与重复操作、其他页面重新缓存、迟到及乱序状态响应，检查实际文案、按钮、缓存与存档结果。浏览器使用 Chrome DevTools MCP，在正常入口的隔离存档下验证实际缓存、断网导航、未访问地图和清除后的存档。离线功能需要 HTTPS 或 localhost 的安全上下文；普通局域网 HTTP 地址可能不支持。
 
+## 独立小说阅读页
+
+帮助「山河旧闻」通过新标签页链接打开 `novel/`，承接《青岚纪·不系舟》。正文唯一来源为 `docs/novel.md`，由阅读器按原卷章解析；作者笔记不进入网页。`novel/index.html` 是 Vite 正式多页入口，联网与单机均构建，专用脚本与样式只由阅读页加载，不引入游戏控制器、战斗模块或全局样式。阅读位置与游戏存档分开，小说页不读写 `qinglan-immortal-v1`，也不访问游戏后端或远程字体。
+
+游戏内入口使用 `assetUrl('novel/')` 保留末尾斜线；阅读页用 `../` 返回所在部署的游戏首页。主站为 `/novel/`，Pages 为 `/qinglan-xiuxian/novel/`；相对路径单机包搬入任意目录后，入口、返回及静态资源仍须在该目录内。阅读页 favicon 交由 Vite 按构建 base 重写，不能直接把单机的 `./` 当成网站根目录。
+
+`scripts/offline-build.ts` 将 `novel/index.html` 与 `docs/novel.md` 纳入构建号输入，修改任一文件都会更新缓存版本；小说 HTML、正文分块及样式自动列入完整离线清单。由游戏设置完成整包缓存后，未访问过的小说也能断网打开与刷新，不由阅读页自行注册或下载整包缓存。`scripts/standalone-check.ts` 同时检查根入口与小说嵌套入口的资源引用，按根目录和搬入子目录两种位置核验文件存在及无外部资源。三种正式构建仍执行原入口与完整目录体积预算，不另放宽限额。
+
+共享脚本输出为 `assets/[hash].js`，缩短入口和动态依赖表重复引用的路径；HTML 入口与动态导入入口仍保留 `index-`、`novel-`、`guide-` 等名称，其中懒入口名称用于 `retryModule` 加载失败后的重试定位，不得删去。此命名不改变模块边界或加载时机；Vite modulepreload 兼容代码完整保留，体积检查仍计入全部入口依赖。小说只共享这段预加载兼容代码，不引用游戏的共享业务模块。
+
 ## Cloudflare Pages · 主站
 
 官网：[叩仙门：青岚纪](https://xiuxian.011203.xyz/)。
@@ -151,6 +161,8 @@ npm run deploy:cloudflare
 ```
 
 首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。Cloudflare 通过上述命令发布，GitHub Pages 仍在推送 master 后自动发布。
+
+宣传视频独立托管于官网 `/media/qinglan-promo-30s.mp4`，不属于游戏运行素材，不纳入离线清单、单机包或 Git。`deploy:cloudflare` 先完成原有游戏构建及 18 MB 体积门禁，再执行 `scripts/restore-promo-video.ts`，从固定的 [Cloudflare 预览副本](https://075ca3ea.qinglan-xiuxian.pages.dev/qinglan-promo-30s.mp4) 下载 6,137,116 字节的视频，核对 HTTP 状态、大小与脚本内固定 SHA-256 后，原子写入发布目录的 `media/`。下载或校验失败会中止部署，保留已有目标文件；以后沿用部署命令即可恢复视频，不会被重新构建遗漏。预览副本只供发布机恢复，玩家使用官网链接；视频保存在固定预览与生产部署两处，不通过 Git 二进制提交或 GitHub Release 保存。发布机需有 `curl`，下载沿用其 HTTPS 代理设置；可用 `node --experimental-strip-types scripts/restore-promo-video.ts <发布目录>` 单独执行恢复，默认目录为 `artifacts/cloudflare`。游戏体积预算及构建命令保持不变。
 
 不同网址的浏览器存档独立。迁移时先在原网址的洞府导出存档，再到新网址导入。
 

@@ -39,9 +39,15 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           index: fileURLToPath(new URL('./index.html', import.meta.url)),
+          novel: fileURLToPath(new URL('./novel/index.html', import.meta.url)),
           ...(!standalone
             ? { monitor: fileURLToPath(new URL('./monitor/index.html', import.meta.url)) }
             : {}),
+        },
+        output: {
+          // 共享块缩短依赖表路径；懒入口保留名称供加载失败后重试，模块边界、兼容代码与预算计量不变。
+          chunkFileNames: (chunk) =>
+            chunk.isDynamicEntry ? 'assets/[name]-[hash].js' : 'assets/[hash].js',
         },
       },
     },

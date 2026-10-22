@@ -38,6 +38,8 @@ export function offlineBuild(version: string): Plugin {
         ...[
           'index.html',
           'monitor/index.html',
+          'novel/index.html',
+          'docs/novel.md',
           'vite.config.ts',
           'scripts/offline-build.ts',
           'package-lock.json',
