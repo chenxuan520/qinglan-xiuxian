@@ -15,6 +15,45 @@ import { chronicleContent } from '../src/chronicle-content.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { joinSect, leaveSect } from '../src/mortal.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
+import { AchievementNotices } from '../src/achievement-notices.ts';
+import { journeyCardData } from '../src/journey-card.ts';
+
+test('成就改名同步旧年表、成就提示与留影，保留达成标识、年龄和存档原文', () => {
+  const save = freshSave();
+  const renamed = [
+    ['one-life-clear', '一命通关', '生死证道'],
+    ['level-100', '百级归真', '百炼归真'],
+    ['mastery', '仙门有道', '一脉真传'],
+    ['hard-immortal', '逆境问道', '逆天证道'],
+  ];
+  // 只造旧版已达成记录；实际触发条件仍由极限、精研和结算套件验证。
+  for (const [id, oldTitle] of renamed) {
+    save.chronicle.milestones[id] = 15;
+    save.chronicle.entries.push({ age: 15, title: oldTitle, detail: '此世所成。' });
+  }
+  const before = JSON.stringify(save);
+  const content = chronicleContent(save);
+  const achievements = chronicleAchievements(save);
+  const notices = new AchievementNotices();
+  for (const [id, oldTitle, newTitle] of renamed) {
+    assert.ok(!content.includes(oldTitle), oldTitle);
+    assert.ok(content.includes(`<h4>${newTitle}</h4>`), newTitle);
+    const achievement = achievements.find((entry) => entry.id === id)!;
+    assert.equal(achievement.title, newTitle);
+    assert.equal(achievement.age, 15);
+    assert.equal(achievement.achieved, true);
+    notices.add(save, [id]);
+    let notice = '';
+    notices.flush(true, (text) => {
+      notice = text;
+    });
+    assert.ok(notice.includes(newTitle));
+  }
+  const memories = journeyCardData(save).memories.map((memory) => memory.title);
+  for (const [, , title] of renamed) assert.ok(memories.includes(title), title);
+  assert.equal(JSON.stringify(save), before);
+  assert.deepEqual(importSave(exportSave(save, null)).save.chronicle, save.chronicle);
+});
 
 test('连续突破逐境记录真实年龄，待渡劫不提前获得真仙成就，重复结算不重复记首通', () => {
   const s = freshSave();

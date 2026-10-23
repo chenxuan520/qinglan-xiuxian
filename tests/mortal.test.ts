@@ -188,13 +188,13 @@ test('入门赠药避开数量已满的凡品，全部已满或随机值非法�
   }
 });
 
-test('任意宗门宝典精研十阶后记录仙门有道', () => {
+test('任意宗门宝典精研十阶后记录一脉真传', () => {
   const s = wealthy(24);
   assert.equal(joinSect(s, 'power'), true);
   for (let i = 0; i < MAX_MASTERY; i++) assert.equal(startActivity(s, 'study'), true);
   assert.equal(s.mortal.mastery.power, MAX_MASTERY);
   assert.equal(s.chronicle.milestones.mastery, s.age);
-  assert.equal(s.chronicle.entries.filter((entry) => entry.title === '仙门有道').length, 1);
+  assert.equal(s.chronicle.entries.filter((entry) => entry.title === '一脉真传').length, 1);
 });
 test('供奉在边界准时扣除；不足暂停待补缴，放弃才清退', () => {
   const s = wealthy();

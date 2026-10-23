@@ -185,7 +185,7 @@ test('修为达标但第七关未通关显示渡劫，通关后成为真仙并�
     iron: 0,
     victory: true,
   });
-  assert.equal(hard.chronicle.entries.filter((entry) => entry.title === '逆境问道').length, 1);
+  assert.equal(hard.chronicle.entries.filter((entry) => entry.title === '逆天证道').length, 1);
 
   const total = Array.from({ length: 24 }, (_, index) => realmCost(index)).reduce(
     (sum, cost) => sum + cost,

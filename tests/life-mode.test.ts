@@ -183,7 +183,7 @@ test('极限必须先写入初始快照再开战，存储失败或素材未就�
   }
 });
 
-test('一命通关只在极限真实七境胜利结算达成，普通、落败和只打终关不发', () => {
+test('生死证道只在极限真实七境胜利结算达成，普通、落败和只打终关不发', () => {
   const run = (stage: number, victory = true) => ({
     stage,
     difficulty: 1,
@@ -208,9 +208,9 @@ test('一命通关只在极限真实七境胜利结算达成，普通、落败�
       achievements.map((a) => a.difficulty).sort((a, b) => a - b),
     );
     if (kind === 'extreme') {
-      const before = save.chronicle.entries.filter((e) => e.title === '一命通关').length;
+      const before = save.chronicle.entries.filter((e) => e.title === '生死证道').length;
       settleRun(save, run(FINAL_TRIAL_STAGE));
-      assert.equal(save.chronicle.entries.filter((e) => e.title === '一命通关').length, before);
+      assert.equal(save.chronicle.entries.filter((e) => e.title === '生死证道').length, before);
       assert.equal(
         importSave(exportSave(save, null)).save.chronicle.milestones['one-life-clear'],
         save.age,

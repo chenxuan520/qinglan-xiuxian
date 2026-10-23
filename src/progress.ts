@@ -963,7 +963,7 @@ export function settleRun(
       run.stage === FINAL_TRIAL_STAGE &&
       STAGES.every((_, index) => save.completed.includes(index))
     )
-      recordChronicle(save, '一命通关', '以极限模式一命踏破七境，成就真仙。', 'one-life-clear');
+      recordChronicle(save, '生死证道', '以极限模式一命踏破七境，成就真仙。', 'one-life-clear');
     if (ascensionCultivation > 0)
       recordChronicle(save, '七劫登仙', `尽破七劫，补足成仙修为 ${ascensionCultivation}。`);
     recordChronicle(
@@ -983,7 +983,7 @@ export function settleRun(
       !(run.startedImmortal ?? before.step >= 24) &&
       realmInfo(save.cultivation, true).step === 24
     )
-      recordChronicle(save, '逆境问道', '以天劫降临难度踏破第七境，证得真仙。', 'hard-immortal');
+      recordChronicle(save, '逆天证道', '以天劫降临难度踏破第七境，证得真仙。', 'hard-immortal');
   }
   syncTribulationClock(save);
   return rewards;

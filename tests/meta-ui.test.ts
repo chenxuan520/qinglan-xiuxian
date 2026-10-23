@@ -34,7 +34,7 @@ test('境界展示直接给出气血与本命伤害，指南示例与实际入�
   assert.match(source, /当前入场气血/);
   assert.match(source, /下次突破后/);
   assert.doesNotMatch(source, /境界独立倍率|当前境界加成/);
-  const guide = guideContent('builds');
+  const guide = guideContent('cultivation');
   assert.doesNotMatch(guide, /境界倍率|境界独立乘区|基础收益/);
   for (const step of [0, 3, 6, 9, 12, 15, 18, 21]) {
     const save = freshSave();
@@ -106,7 +106,7 @@ test('洞府使用此世存档文案并保留原导入导出动作', () => {
   assert.match(source, /导出存档文件，换设备也能接续这一世/);
   assert.match(source, /data-action="export-save">导出此世<\/button>/);
   assert.match(source, /data-action="import-save">导入旧档<\/button>/);
-  const guide = guideContent('save');
+  const guide = guideContent('basics');
   assert.match(guide, /洞府底部「此世存档」可用「导出此世」保存存档文件/);
   assert.match(guide, /点「导入旧档」/);
   assert.doesNotMatch(guide, /「存档备份」|「导入存档」/);
@@ -122,7 +122,7 @@ test('完整重开使用游戏风格的自绘复选框', () => {
 });
 
 test('指南使用自动历练、归处与本世珍品的新称呼', () => {
-  const guide = ['basics', 'medicine', 'builds', 'mortal', 'save']
+  const guide = ['basics', 'medicine', 'builds', 'mortal', 'cultivation']
     .map((tab) => guideContent(tab))
     .join('');
   assert.match(guide, /自动历练/);

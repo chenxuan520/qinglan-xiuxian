@@ -3,6 +3,37 @@ import assert from 'node:assert/strict';
 import { GuideSource } from '../src/guide-source.ts';
 import * as guide from '../src/guide.ts';
 
+test('帮助按器法、修行与操作问题归类，保留九类且常见问题默认折叠', () => {
+  assert.equal(guide.GUIDE_TABS.length, 9);
+  const roots = guide.GUIDE_TABS.findIndex((tab) => tab.id === 'roots');
+  assert.deepEqual(guide.GUIDE_TABS[roots + 1], { id: 'cultivation', title: '修行轮回' });
+  assert.equal(guide.GUIDE_TABS.find((tab) => tab.id === 'builds')?.title, '法宝功法');
+  assert.ok(!guide.GUIDE_TABS.some((tab) => tab.id === 'save'));
+  const basics = guide.guideContent('basics');
+  assert.match(basics, /<details><summary>常见问题<\/summary>/);
+  for (const topic of ['导出此世', '导入旧档', '缓存所有离线资源', '音乐', '音效'])
+    assert.ok(basics.includes(topic), topic);
+  assert.match(basics, /极限模式未完战斗刷新或关闭后重开即身陨/);
+  const cultivation = guide.guideContent('cultivation');
+  for (const topic of [
+    '境界突破与成仙',
+    '修习根基',
+    '闭关修炼',
+    '年岁与寿元',
+    '大乘天劫',
+    '仙途履历与灵威',
+    '轮回与离界传承',
+  ])
+    assert.ok(cultivation.includes(`<h3>${topic}</h3>`), topic);
+  assert.doesNotMatch(cultivation, /缓存所有离线资源|依次排列|列在十五项成就的最后/);
+  const combat = guide.guideContent('combat');
+  assert.match(combat, /继续上次历练/);
+  assert.match(combat, /该局未结算的灵石、玄铁和通关奖励作废/);
+  assert.doesNotMatch(guide.guideContent('builds'), /<h3>修习根基|<h3>闭关修炼/);
+  for (const tab of guide.GUIDE_TABS)
+    assert.doesNotMatch(guide.guideContent(tab.id), /法宝与成长|进度保存|200 像素|大 BOSS/);
+});
+
 test('全部帮助分类不出现广告文案；指南保留主动进入导览的入口', () => {
   for (const tab of guide.GUIDE_TABS) assert.doesNotMatch(guide.guideContent(tab.id), /广告/);
   assert.match(guide.guideContent('basics'), /data-action="guide-tour"/);
@@ -21,8 +52,8 @@ test('帮助将三成边界限定为功法合计系数，并说明奇物另算',
   const builds = guide.guideContent('builds');
   assert.match(builds, /施法间隔与承伤的功法合计系数各最低取基础的 30%/);
   assert.match(builds, /之后仍乘丹药及相应奇物效果，最终值可更低/);
-  assert.match(builds, /未持有奇物时的修习效果/);
-  assert.match(builds, /养魂木另使淬体气血与悟道增伤的加成提高 30%/);
+  assert.match(guide.guideContent('cultivation'), /未持有奇物时的修习效果/);
+  assert.match(guide.guideContent('cultivation'), /养魂木另使淬体气血与悟道增伤的加成提高 30%/);
   assert.doesNotMatch(builds, /施法间隔最低为基础的 30%|承伤最低为基础的 30%/);
 });
 
@@ -38,11 +69,11 @@ test('预警帮助区分前六境小怪、秘境妖王与独立天劫', () => {
 });
 
 test('离界帮助说明法宝、丹药与奇物共用一份传承名额', () => {
-  const builds = guide.guideContent('builds');
+  const builds = guide.guideContent('cultivation');
   assert.match(builds, /已收藏法宝、丹囊现有丹药或随身奇物中选择一物/);
   assert.match(builds, /三类共用一个赠物名额/);
   assert.match(builds, /奇物在新世持有即生效/);
-  assert.match(guide.guideContent('save'), /法宝、现有丹药或随身奇物中选一物赠给少年/);
+  assert.match(builds, /可从已收藏法宝、丹囊现有丹药或随身奇物中选择一物赠给少年/);
 });
 
 test('入宗凡品赠药与精研门槛赠药分开说明', () => {
@@ -53,7 +84,7 @@ test('入宗凡品赠药与精研门槛赠药分开说明', () => {
 });
 
 test('寿终与弃劫先落幕可留影，确认轮回才清空', () => {
-  const save = guide.guideContent('save');
+  const save = guide.guideContent('cultivation');
   assert.match(save, /不再借寿时进入「此世寿终」，可先留存此世；确认轮回后才清空本世进度/);
   assert.match(save, /确认放弃后进入「止于天劫」落幕页，可先留存此世，再确认轮回/);
   assert.doesNotMatch(save, /放弃续命则强制轮回|主动放弃并确认后强制轮回/);

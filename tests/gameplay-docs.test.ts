@@ -230,7 +230,7 @@ test('宗门入门礼、供奉及精研赠药说明与实际报价和奖励池�
 });
 
 test('帮助中的根基年岁、炼器增伤与满阶费用对照真实计算', () => {
-  const builds = guideContent('builds');
+  const builds = guideContent('cultivation');
   const training = builds.match(/<table[^>]*><caption>每阶修习[^]*?<\/table>/)?.[0];
   assert.ok(training);
   const rows = [...training.matchAll(/<tr><th scope="row">([^<]+)<\/th><td>([^<]+)<\/td><\/tr>/g)];
@@ -336,7 +336,7 @@ test('天机屋零年岁、七折灵石的帮助与根基、精研真实报价�
   for (const source of [
     guideContent('items'),
     guideContent('mortal'),
-    guideContent('builds'),
+    guideContent('cultivation'),
     gameplay,
   ]) {
     assert.match(source, /(?:天机屋[^。]+)?(?:不耗年岁|不消耗年岁)[^。]*灵石减少30%/);
@@ -349,12 +349,12 @@ test('每一帮助分类都进入一致性检查，CI独立运行且不混入部
     'basics',
     'builds',
     'combat',
+    'cultivation',
     'items',
     'lore',
     'medicine',
     'mortal',
     'roots',
-    'save',
   ]);
   for (const { id } of GUIDE_TABS) assert.ok(guideContent(id).length > 200, id);
   const workflow = readFileSync(
@@ -486,7 +486,7 @@ test('法宝概率寻访与圆满成就的帮助对照真实机会、收费和�
   assert.equal(chronicleAchievements(save).length, 15);
   const supreme = chronicleAchievements(save).at(-1)!;
   assert.equal(supreme.title, '万古独尊');
-  for (const source of [guideContent('save'), gameplay]) {
+  for (const source of [guideContent('cultivation'), gameplay]) {
     assert.match(source, /万古独尊.*本世其余十四项全部达成/);
     assert.doesNotMatch(source, /慧眼识珍/);
   }

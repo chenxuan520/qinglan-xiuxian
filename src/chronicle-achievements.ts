@@ -1,6 +1,22 @@
 import type { SaveData } from './progress.ts';
 import { completedAchievements } from './chronicle.ts';
 
+// 年表保留原有记录，展示时与当前成就名称一致。
+export function chronicleEntryTitle(title: string) {
+  switch (title) {
+    case '一命通关':
+      return '生死证道';
+    case '百级归真':
+      return '百炼归真';
+    case '仙门有道':
+      return '一脉真传';
+    case '逆境问道':
+      return '逆天证道';
+    default:
+      return title;
+  }
+}
+
 export function chronicleAchievements(save: SaveData) {
   const definitions: Array<{ id: string; title: string; detail: string; difficulty: number }> = [
     { id: 'forge', difficulty: 102, title: '炉火纯青', detail: '一件法宝炼器十阶' },
@@ -18,8 +34,8 @@ export function chronicleAchievements(save: SaveData) {
       detail: '留下一段人间旧事',
     },
     { id: 'collection', difficulty: 95, title: '万宝归藏', detail: '收齐三十六件法宝' },
-    { id: 'level-100', difficulty: 80, title: '百级归真', detail: '单局达到一百级' },
-    { id: 'mastery', difficulty: 60, title: '仙门有道', detail: '一部宗门宝典精研十阶' },
+    { id: 'level-100', difficulty: 80, title: '百炼归真', detail: '单局达到一百级' },
+    { id: 'mastery', difficulty: 60, title: '一脉真传', detail: '一部宗门宝典精研十阶' },
     {
       id: 'training-master',
       difficulty: 105,
@@ -28,7 +44,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     { id: 'six-immortals', difficulty: 100, title: '六仙同御', detail: '单局同时觉醒六件仙器' },
     { id: 'five-tribulations', difficulty: 110, title: '五劫不灭', detail: '累计渡过五次天劫' },
-    { id: 'hard-immortal', difficulty: 120, title: '逆境问道', detail: '以天劫降临难度成就真仙' },
+    { id: 'hard-immortal', difficulty: 120, title: '逆天证道', detail: '以天劫降临难度成就真仙' },
     { id: 'rootless-immortal', difficulty: 140, title: '凡骨登仙', detail: '以无灵根成就真仙' },
     { id: 'curio-three', difficulty: 50, title: '奇珍有缘', detail: '本世先后获得三件不同奇物' },
     {
@@ -39,7 +55,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'one-life-clear',
-      title: '一命通关',
+      title: '生死证道',
       detail: '以极限模式一命踏破七境，成就真仙',
       difficulty: 130,
     },

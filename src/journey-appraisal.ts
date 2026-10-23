@@ -210,9 +210,9 @@ function appraisalTitle(f: JourneyAppraisalFacts) {
   if (f.ending === 'ambush') return '仙途止于风雪';
   if (f.ending === 'tribulation') return '一念问天';
   if (feat('peerless')) return '万古独尊';
-  if (feat('one-life-clear')) return '一命证长生';
+  if (feat('one-life-clear')) return '生死证道';
   if (feat('rootless-immortal')) return '凡骨登仙';
-  if (feat('hard-immortal')) return '逆境问道';
+  if (feat('hard-immortal')) return '逆天证道';
   if (f.ending === 'immortal')
     return home ? '仙心有归处' : bond ? '长生有旧灯' : allStages ? '七境问长生' : '此世叩仙门';
   if (f.ending === 'lifespan')

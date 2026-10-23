@@ -418,7 +418,14 @@ test('普通真仙评语不能编造一命通关，真实成就和极限落幕�
   save.cultivation = 1e9;
   save.completed = [0, 1, 2, 3, 4, 5, 6];
   const input = journeyAppraisalFacts(save, 'ongoing');
-  for (const phrase of ['一命通关', '一命证长生', '一命踏破七境', '一命修成真仙', '极限修行成仙']) {
+  for (const phrase of [
+    '生死证道',
+    '一命通关',
+    '一命证长生',
+    '一命踏破七境',
+    '一命修成真仙',
+    '极限修行成仙',
+  ]) {
     const appraisal = {
       title: '长生已证',
       detail: `长生已经证得，此世还待亲手写下新的篇章。${phrase}，亦在山河之间留下修行的来路。`,

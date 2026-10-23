@@ -171,7 +171,7 @@ test('七连点不载入调试模块，广告供给不注入外部SDK', async ()
 });
 
 test('单机帮助不承诺联网新故事或配图，保留本地留影说明', () => {
-  const save = guideContent('save');
+  const save = guideContent('basics');
   const mortal = guideContent('mortal');
   assert.match(save, /单机版.*生成留影/);
   assert.doesNotMatch(save, /新故事与配图需要联网/);

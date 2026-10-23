@@ -438,7 +438,7 @@ export class Game {
   }
   private recordRunAchievements() {
     if (this.level >= MAX_RUN_LEVEL)
-      recordChronicle(this.save, '百级归真', '一场历练中修至一百级。', 'level-100');
+      recordChronicle(this.save, '百炼归真', '一场历练中修至一百级。', 'level-100');
     if (
       this.weapons.length === MAX_WEAPONS &&
       new Set(this.weapons.map((weapon) => weapon.id)).size === MAX_WEAPONS &&

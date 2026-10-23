@@ -285,7 +285,7 @@ function completeActivity(save: SaveData, random: () => number) {
         `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。${reward}`,
       );
       if (world.mastery[id] === MAX_MASTERY)
-        recordChronicle(save, '仙门有道', `${passive(id).name}已精研至十阶。`, 'mastery');
+        recordChronicle(save, '一脉真传', `${passive(id).name}已精研至十阶。`, 'mastery');
     } else {
       const job = TOWN_JOBS[activity.kind];
       const stones = activity.kind === 'tea' ? (random() < 0.3 ? 8 : 0) : job.stones;
