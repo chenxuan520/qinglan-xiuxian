@@ -12,6 +12,7 @@ import { sceneAssets } from './scene-assets.ts';
 import { drawPlayerFormation } from './player-formation.ts';
 import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
 import { ModuleSource, retryModule } from './module-source.ts';
+import { BattleResolution } from './battle-resolution.ts';
 
 type BattleArt = typeof import('./battle-art.ts');
 const battleArtSource = new ModuleSource<BattleArt>((attempt) =>
@@ -25,7 +26,13 @@ export class Renderer {
   private sprites = new Map<string, HTMLCanvasElement>();
   private formations = new Map<string, HTMLCanvasElement>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
+  private shade: CanvasGradient | null = null;
+  private dangerShade: CanvasGradient | null = null;
+  private previewShade: CanvasGradient | null = null;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  private coarsePointer = window.matchMedia('(pointer: coarse)');
+  private resolution = new BattleResolution();
+  private pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
   width = 0;
   height = 0;
   scale = 1;
@@ -117,10 +124,11 @@ export class Renderer {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
     this.scale = this.width < 700 ? 0.76 : Math.min(1.1, Math.max(0.8, this.height / 860));
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.pixelRatio);
     this.canvas.width = Math.round(this.width * dpr);
     this.canvas.height = Math.round(this.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.shade = this.dangerShade = this.previewShade = null;
   }
   draw(
     game: Game | null,
@@ -130,6 +138,16 @@ export class Renderer {
     previewPath: CultivationPath = 'orthodox',
   ) {
     if (this.ctx.isContextLost?.()) return;
+    const ratio = this.resolution.sample(
+      now,
+      game?.state === 'playing',
+      !!game && this.coarsePointer.matches,
+      window.devicePixelRatio || 1,
+    );
+    if (ratio !== this.pixelRatio) {
+      this.pixelRatio = ratio;
+      this.resize();
+    }
     if (this.needsRedraw) {
       this.resize();
       this.sprites.clear();
@@ -162,34 +180,43 @@ export class Renderer {
     if (game) this.drawGame(game, time);
     else this.drawPreview(camera, time, previewRealm, previewPath);
     c.restore();
-    const shade = c.createRadialGradient(w * 0.52, h * 0.4, h * 0.15, w / 2, h / 2, w * 0.73);
-    shade.addColorStop(0, '#06221f00');
-    shade.addColorStop(0.65, '#061c2340');
-    shade.addColorStop(1, '#041919c9');
-    c.fillStyle = shade;
+    if (!this.shade) {
+      this.shade = c.createRadialGradient(w * 0.52, h * 0.4, h * 0.15, w / 2, h / 2, w * 0.73);
+      this.shade.addColorStop(0, '#06221f00');
+      this.shade.addColorStop(0.65, '#061c2340');
+      this.shade.addColorStop(1, '#041919c9');
+    }
+    c.fillStyle = this.shade;
     c.fillRect(0, 0, w, h);
     const danger = game?.lowHealth ?? 0;
     if (danger > 0) {
       const pulse = this.reducedMotion.matches ? 0.5 : 0.5 + Math.sin(time * 5) * 0.5;
-      const edge = c.createRadialGradient(
-        w / 2,
-        h / 2,
-        Math.min(w, h) * 0.25,
-        w / 2,
-        h / 2,
-        Math.hypot(w, h) * 0.55,
-      );
-      edge.addColorStop(0, 'rgba(190, 38, 30, 0)');
-      edge.addColorStop(1, `rgba(190, 38, 30, ${(0.38 + 0.37 * danger) * (0.7 + 0.3 * pulse)})`);
-      c.fillStyle = edge;
+      if (!this.dangerShade) {
+        this.dangerShade = c.createRadialGradient(
+          w / 2,
+          h / 2,
+          Math.min(w, h) * 0.25,
+          w / 2,
+          h / 2,
+          Math.hypot(w, h) * 0.55,
+        );
+        this.dangerShade.addColorStop(0, 'rgba(190, 38, 30, 0)');
+        this.dangerShade.addColorStop(1, 'rgba(190, 38, 30, 1)');
+      }
+      c.save();
+      c.globalAlpha = (0.38 + 0.37 * danger) * (0.7 + 0.3 * pulse);
+      c.fillStyle = this.dangerShade;
       c.fillRect(0, 0, w, h);
+      c.restore();
     }
     if (!game) {
-      const g = c.createLinearGradient(0, 0, w, 0);
-      g.addColorStop(0, '#0b252bea');
-      g.addColorStop(0.45, '#102a29b5');
-      g.addColorStop(1, '#0a242528');
-      c.fillStyle = g;
+      if (!this.previewShade) {
+        this.previewShade = c.createLinearGradient(0, 0, w, 0);
+        this.previewShade.addColorStop(0, '#0b252bea');
+        this.previewShade.addColorStop(0.45, '#102a29b5');
+        this.previewShade.addColorStop(1, '#0a242528');
+      }
+      c.fillStyle = this.previewShade;
       c.fillRect(0, 0, w, h);
     }
     for (let i = 0; i < 35; i++) {
@@ -414,24 +441,27 @@ export class Renderer {
       c.save();
       c.translate(item.x, item.y);
       if (item.kind === 'xp') {
-        const r = item.value > 15 ? 6 : 3.7;
-        c.fillStyle = '#96ded170';
-        c.beginPath();
-        c.arc(0, 0, r + 2, 0, TAU);
-        c.fill();
-        c.fillStyle = item.value > 15 ? '#eddda0' : '#b7f0de';
-        c.beginPath();
-        c.moveTo(0, -r);
-        c.lineTo(r * 0.8, 0);
-        c.lineTo(0, r);
-        c.lineTo(-r * 0.8, 0);
-        c.closePath();
-        c.fill();
-        c.strokeStyle = '#194c42';
-        c.lineWidth = 1;
-        c.stroke();
-        c.fillStyle = '#edfff2';
-        c.fillRect(-1, -r + 1, 2, 2);
+        const large = item.value > 15;
+        this.glowSprite(large ? 'pickup:xp:large' : 'pickup:xp:small', 24, 24, (c) => {
+          const r = large ? 6 : 3.7;
+          c.fillStyle = '#96ded170';
+          c.beginPath();
+          c.arc(0, 0, r + 2, 0, TAU);
+          c.fill();
+          c.fillStyle = large ? '#eddda0' : '#b7f0de';
+          c.beginPath();
+          c.moveTo(0, -r);
+          c.lineTo(r * 0.8, 0);
+          c.lineTo(0, r);
+          c.lineTo(-r * 0.8, 0);
+          c.closePath();
+          c.fill();
+          c.strokeStyle = '#194c42';
+          c.lineWidth = 1;
+          c.stroke();
+          c.fillStyle = '#edfff2';
+          c.fillRect(-1, -r + 1, 2, 2);
+        });
       } else {
         const kind = item.kind;
         this.glowSprite(`pickup:${kind}`, 60, 60, (c) => {
@@ -1044,34 +1074,36 @@ export class Renderer {
     c.translate(x, y);
     c.rotate(angle);
     c.scale(scale, scale);
-    const g = c.createLinearGradient(-55, 0, 10, 0);
-    g.addColorStop(0, color + '00');
-    g.addColorStop(1, color + 'b0');
-    c.strokeStyle = g;
-    c.lineWidth = 2;
-    c.beginPath();
-    c.moveTo(-55, -3);
-    c.quadraticCurveTo(-25, 6, 8, 0);
-    c.stroke();
-    c.fillStyle = '#edead0';
-    c.strokeStyle = color;
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(25, 0);
-    c.lineTo(0, -3);
-    c.lineTo(-4, 0);
-    c.lineTo(0, 3);
-    c.closePath();
-    c.fill();
-    c.stroke();
-    c.strokeStyle = '#c9a76a';
-    c.lineWidth = 2;
-    c.beginPath();
-    c.moveTo(-5, -7);
-    c.lineTo(-5, 7);
-    c.moveTo(-5, 0);
-    c.lineTo(-17, 0);
-    c.stroke();
+    this.glowSprite(`sword:${color}`, 128, 40, (c) => {
+      const g = c.createLinearGradient(-55, 0, 10, 0);
+      g.addColorStop(0, color + '00');
+      g.addColorStop(1, color + 'b0');
+      c.strokeStyle = g;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(-55, -3);
+      c.quadraticCurveTo(-25, 6, 8, 0);
+      c.stroke();
+      c.fillStyle = '#edead0';
+      c.strokeStyle = color;
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(25, 0);
+      c.lineTo(0, -3);
+      c.lineTo(-4, 0);
+      c.lineTo(0, 3);
+      c.closePath();
+      c.fill();
+      c.stroke();
+      c.strokeStyle = '#c9a76a';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(-5, -7);
+      c.lineTo(-5, 7);
+      c.moveTo(-5, 0);
+      c.lineTo(-17, 0);
+      c.stroke();
+    });
     c.restore();
   }
   private lotus(x: number, y: number, angle: number, scale: number) {

@@ -579,6 +579,7 @@ const debugEntry = new DebugEntry(
 );
 
 function renderLobby(returnYears?: number) {
+  battleHud.reset();
   if (save.pendingReincarnation) {
     renderJourneyFarewell(save.pendingReincarnation);
     return;
@@ -1363,6 +1364,7 @@ function endLifetime() {
   );
 }
 function renderJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation']>) {
+  battleHud.reset();
   clearInput();
   panel = `${reason}-farewell`;
 

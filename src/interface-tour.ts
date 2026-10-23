@@ -96,6 +96,7 @@ export function startInterfaceTour(
   function close() {
     if (closed) return;
     closed = true;
+    hud.reset();
     abort.abort();
     cancelAnimationFrame(animation);
     cancelAnimationFrame(layoutFrame);
@@ -130,6 +131,7 @@ export function startInterfaceTour(
   }
   function renderScene(next: string) {
     if (scene === next) return;
+    hud.reset();
     scene = next;
     move = { x: 0, y: 0 };
     held.clear();
@@ -413,6 +415,7 @@ export function startInterfaceTour(
           preview.xp = 0;
         } else if (preview.state !== 'playing') {
           preview = new Game(structuredClone(sample), 0, 0, random);
+          hud.reset();
           hud = new BattleHud(ui, preview.save, display);
         }
         hud.update(preview);

@@ -178,6 +178,8 @@ test('七个大境界适配手机和横屏，减少动态效果静止，动态�
           const g = encounter(index * 3);
           earn(g);
           g.enemies = [];
+          // 此项只核对动态突破演出；静态经验图形的有界缓存另由渲染缓存测试覆盖。
+          g.pickups = [];
           g.effects = g.effects.filter((e) => e.kind === 'realm-breakthrough');
           const effect = g.effects[0];
           const before = g.snapshot();

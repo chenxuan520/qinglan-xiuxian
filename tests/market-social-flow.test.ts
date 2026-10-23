@@ -170,6 +170,7 @@ function harness(
     }
   }
   const context = createContext({
+    battleHud: { reset() {} },
     // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
     chronicleSource: { observe() {} },
     hideAchievementNotice() {},

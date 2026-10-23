@@ -8,6 +8,7 @@ import type { PanelLocation } from './panel-host.ts';
 import type { AdPlacement } from './ads.ts';
 import type { Game } from './game.ts';
 export function renderEpilogue(shell: ActionShell) {
+  shell.battleHud.reset();
   shell.leaveTown();
   shell.inMortalWorld = false;
   shell.game = shell.pendingRun = null;
