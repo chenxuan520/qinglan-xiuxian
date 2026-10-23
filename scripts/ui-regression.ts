@@ -1371,7 +1371,7 @@ try {
     await click('[data-action=close]');
     await click('[data-action=resume]');
     await click('.combat-actions [data-action=guide]');
-    await wait('() => !!document.querySelector("[data-action=guide-tab][data-id=save]")');
+    await wait('() => !!document.querySelector("[data-action=guide-tour]")');
     const beforeTour = await evaluate("() => localStorage.getItem('qinglan-immortal-v1')");
     await click('[data-action=guide-tour]');
     let tourNavigation: { left: number; top: number; width: number; height: number } | undefined;
@@ -1441,7 +1441,7 @@ try {
       beforeTour,
       '完整演练不能改变真实存档与暂停中的历练',
     );
-    await click('[data-action=guide-tab][data-id=save]');
+    await click('[data-action=guide-tab][data-id=cultivation]');
     const scroll = await evaluate(`() => {
       const panel=document.querySelector('.panel'), tabs=document.querySelector('.guide-tabs');
       const top=tabs.getBoundingClientRect().top;panel.scrollTop=panel.scrollHeight;
