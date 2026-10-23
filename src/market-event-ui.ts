@@ -20,3 +20,5 @@ export {
 export { openDebugPanel } from './debug-panel.ts';
 
 export { travelSettlement } from './settlement-travel.ts';
+
+export { treasureTrialSource } from './treasure-trial-source.ts';

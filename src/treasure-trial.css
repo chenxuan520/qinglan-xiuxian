@@ -1,0 +1,301 @@
+.treasure-trial {
+  position: fixed;
+  inset: 0;
+  z-index: 250;
+  overflow: hidden;
+  background: #102c28;
+  isolation: isolate;
+  pointer-events: auto;
+}
+.treasure-trial-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.treasure-trial-header {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: max(24px, env(safe-area-inset-left));
+  right: max(24px, env(safe-area-inset-right));
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: none;
+}
+.treasure-trial-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px 14px 12px;
+  border-left: 2px solid #d5c58e99;
+  background: linear-gradient(90deg, #102e2bf5, #102e2bd4);
+}
+.treasure-trial-heading > .icon {
+  width: 48px;
+  height: 48px;
+}
+.treasure-trial-heading p {
+  color: var(--jade);
+  font-size: 11px;
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+}
+.treasure-trial-heading h2 {
+  color: #e2d4a7;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 2px;
+}
+.treasure-trial button {
+  min-height: 44px;
+  color: #d6d9bc;
+  border: 1px solid #b8c49d4d;
+  background: #173a31f5;
+  font-size: 13px;
+  letter-spacing: 1px;
+  pointer-events: auto;
+}
+.treasure-trial .treasure-trial-return {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  flex-shrink: 0;
+}
+.treasure-trial-tools {
+  position: absolute;
+  top: max(82px, calc(env(safe-area-inset-top) + 62px));
+  right: max(24px, env(safe-area-inset-right));
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.treasure-trial-tools button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.treasure-trial button[aria-pressed='true'] {
+  border-color: #d5c58e;
+  color: #f0dfaa;
+  background: #425b42;
+}
+.treasure-trial-controls {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  width: min(780px, calc(100% - 48px));
+  transform: translateX(-50%);
+  padding: 15px 20px 12px;
+  border: 1px solid #c5cf9b66;
+  background: #102f2bf5;
+}
+.treasure-trial-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.treasure-trial-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.treasure-trial-group > span {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #a5b99c;
+}
+.treasure-trial-group > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 1;
+  gap: 6px;
+}
+.treasure-trial-group button {
+  padding: 7px 5px;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+.treasure-trial-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 12px;
+  padding-top: 10px;
+  color: #9eb49f;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.treasure-trial-notes > :last-child {
+  grid-column: 1 / -1;
+}
+.treasure-trial-notes > :nth-child(2) {
+  text-align: right;
+}
+.treasure-trial-message {
+  position: absolute;
+  top: 42%;
+  left: 50%;
+  width: min(360px, calc(100% - 40px));
+  transform: translate(-50%, -50%);
+  padding: 24px;
+  background: #12362ff5;
+  border: 1px solid #b8c49d66;
+  text-align: center;
+  color: #e2d4a7;
+  line-height: 1.8;
+}
+.treasure-trial-message[hidden],
+.treasure-trial-stick[hidden] {
+  display: none;
+}
+.treasure-trial-message .resource-failure-actions {
+  justify-content: center;
+  margin-top: 16px;
+}
+.treasure-trial-stick {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border: 1px solid #d5d7ab88;
+  border-radius: 50%;
+  background: #102c2833;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.treasure-trial-stick span {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e0d49a99;
+  background: #c6d4a555;
+  border-radius: 50%;
+}
+@media (pointer: coarse) {
+  .treasure-trial-movement {
+    font-size: 0;
+  }
+  .treasure-trial-movement::after {
+    content: '按住空白处拖动 · 自由走位';
+    font-size: 11px;
+  }
+}
+@media (max-width: 650px) {
+  .treasure-trial-header {
+    top: max(12px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    gap: 8px;
+  }
+  .treasure-trial-heading {
+    padding: 9px 10px 10px 8px;
+    gap: 8px;
+  }
+  .treasure-trial-heading > .icon {
+    width: 32px;
+    height: 36px;
+  }
+  .treasure-trial-heading p {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .treasure-trial-heading h2 {
+    font-size: 19px;
+    letter-spacing: 0;
+  }
+  .treasure-trial .treasure-trial-return {
+    gap: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .treasure-trial-return .small-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .treasure-trial-tools {
+    top: max(86px, calc(env(safe-area-inset-top) + 74px));
+    right: max(12px, env(safe-area-inset-right));
+  }
+  .treasure-trial-tools button {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .treasure-trial-controls {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: calc(100% - 24px);
+    padding: 10px;
+  }
+  .treasure-trial-options {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .treasure-trial-group {
+    gap: 8px;
+  }
+  .treasure-trial-group button {
+    font-size: 12px;
+  }
+  .treasure-trial-notes {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    padding-top: 8px;
+    font-size: 10px;
+  }
+  .treasure-trial-notes > :nth-child(2) {
+    text-align: left;
+  }
+  .treasure-trial-notes > :last-child {
+    min-height: 32px;
+  }
+}
+@media (max-height: 500px) and (min-width: 651px) {
+  .treasure-trial-header {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+  }
+  .treasure-trial-heading {
+    padding: 6px 12px 7px 8px;
+    gap: 8px;
+  }
+  .treasure-trial-heading > .icon {
+    width: 34px;
+    height: 38px;
+  }
+  .treasure-trial-heading h2 {
+    font-size: 20px;
+  }
+  .treasure-trial-heading p {
+    font-size: 10px;
+    margin-bottom: 0;
+  }
+  .treasure-trial-tools {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(166px, calc(env(safe-area-inset-right) + 154px));
+  }
+  .treasure-trial-controls {
+    width: min(780px, calc(100% - 24px));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    padding: 8px 12px;
+  }
+  .treasure-trial-notes {
+    padding-top: 5px;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    font-size: 10px;
+  }
+  .treasure-trial-notes > :last-child {
+    grid-column: auto;
+    text-align: right;
+  }
+  .treasure-trial-movement::after {
+    font-size: 10px;
+  }
+}

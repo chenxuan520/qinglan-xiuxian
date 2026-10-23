@@ -1791,6 +1791,22 @@ function handleAction(action: string, id?: string) {
     void debugEntry.tap(modal.querySelector('[data-action=debug-version]'));
     return;
   }
+  if (action === 'treasure-trial' && panel === 'treasure-detail' && !game) {
+    const id = selectedTreasure;
+    const currentSave = save;
+    const valid = () =>
+      !saveLock &&
+      !game &&
+      save === currentSave &&
+      panel === 'treasure-detail' &&
+      selectedTreasure === id &&
+      save.artifacts.includes(id);
+    if (valid()) {
+      clearInput();
+      void marketEventSource.current?.treasureTrialSource.open(ui, modal, id, valid);
+    }
+    return;
+  }
   if (action === 'guide-tour' && panel === 'guide') {
     if (!assetsReady || sceneLoading) {
       toast('场景仍在准备，请稍后再试');
@@ -2175,7 +2191,7 @@ function syncScreenAwake() {
   );
 }
 function tick(now: number, draw: boolean) {
-  if (guideSource.current?.tourActive) {
+  if (guideSource.current?.tourActive || marketEventSource.current?.treasureTrialSource.active) {
     lastFrame = lastMortalTick = now;
     return;
   }
@@ -2212,7 +2228,12 @@ function tick(now: number, draw: boolean) {
 function frame(now: number) {
   // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
   requestAnimationFrame(frame);
-  const blocked = game || ambushScene || save.mortal.marketSocial?.ambush || saveLock;
+  const blocked =
+    game ||
+    ambushScene ||
+    save.mortal.marketSocial?.ambush ||
+    saveLock ||
+    marketEventSource.current?.treasureTrialSource.active;
   if (blocked) hideAchievementNotice();
   chronicleSource.flush(
     !blocked &&
@@ -2221,8 +2242,11 @@ function frame(now: number) {
       !toastElement.classList.contains('visible'),
     (text) => toast(text, 3200, true),
   );
-  if (saveLock) guideSource.current?.stopInterfaceTour();
-  if (guideSource.current?.tourActive) {
+  if (saveLock) {
+    guideSource.current?.stopInterfaceTour();
+    marketEventSource.current?.treasureTrialSource.stop();
+  }
+  if (guideSource.current?.tourActive || marketEventSource.current?.treasureTrialSource.active) {
     lastFrame = lastMortalTick = now;
     return;
   }

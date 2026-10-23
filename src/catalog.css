@@ -277,9 +277,10 @@
   gap: 8px;
 }
 .detail-actions button {
+  width: 100%;
   font-size: 10px;
   letter-spacing: 1px;
-  min-height: 36px;
+  min-height: 44px;
   padding: 9px 13px;
 }
 .detail-actions small {
