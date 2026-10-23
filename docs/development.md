@@ -307,7 +307,7 @@ node --experimental-strip-types scripts/size-check.ts --dir artifacts/standalone
 node --experimental-strip-types scripts/standalone-check.ts artifacts/standalone
 ```
 
-`--mode standalone` 将编译常量 `__QINGLAN_STANDALONE__` 设为 true，不是运行时设置。NPC 闲谈使用本地对白，茶馆轮换收录的旧闻，不请求 AI 或配图；留影和评语均本地生成。战斗中的自动历练是本地策略，照常可用。匿名统计、错误和分享上报、调试入口、服务端白名单和外部广告 SDK 全部停用；即使使用官网来源或设置 `VITE_NPC_AI_URL` 也不能重新启用。单机包不包含监控页面，不加载公共字体，直接使用系统字体兜底。官网、源码和留影二维码保留链接，只有玩家主动访问才会打开。
+`--mode standalone` 将编译常量 `__QINGLAN_STANDALONE__` 设为 true，不是运行时设置。NPC 闲谈使用本地对白，茶馆轮换收录的旧闻，不请求 AI 或配图；留影和评语均本地生成。本地旧闻维护在 `src/local-tea-stories.ts`，其中陆迟《不系舟》篇据 `docs/novel.md` 第42章的渡口情节改编。战斗中的自动历练是本地策略，照常可用。匿名统计、错误和分享上报、调试入口、服务端白名单和外部广告 SDK 全部停用；即使使用官网来源或设置 `VITE_NPC_AI_URL` 也不能重新启用。单机包不包含监控页面，不加载公共字体，直接使用系统字体兜底。官网、源码和留影二维码保留链接，只有玩家主动访问才会打开。
 
 单机版与联网版沿用同一存档格式，不增删游戏资源或改变战斗数值；浏览器存档仍按来源隔离，换地址用导出/导入转移。可选资源缓存仍需玩家主动点击，构建号包含模式，完整缓存按构建号区分。独立 Quality job 编译并检查单机包的标识、清单、监控缺席及后端地址残留，发布 job 不运行测试。`npm run build`、Pages 和 Cloudflare 的常规构建保持联网版；推送新 `v*` 标签自动发布单机 zip 和校验和，不改变官网构建模式。
 
