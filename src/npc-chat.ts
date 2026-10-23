@@ -1,5 +1,6 @@
 import { STANDALONE } from './build-mode.ts';
-import { localTeaStory } from './local-tea-stories.ts';
+import { localTeaStory, LU_CHI_TEA_STORY } from './local-tea-stories.ts';
+import { teaStoryMemory } from './tea-story-memory.ts';
 import {
   MARKET_DIALOGUE_CLUES,
   MARKET_DIALOGUE_EVENTS,
@@ -353,24 +354,27 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
     if (host.isConnected && !retry.disabled) void mountTeaStory(host, save, enableSound);
   };
   host.setAttribute('aria-busy', 'true');
-  const story = await requestNpcDialogueResponse(
-    {
-      mode: 'tea-story',
-      population: save.mortal.population!,
-      age: save.age,
-      npcId: 'tea',
-      realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
-      message: TEA_STORY_SETTINGS.requestMessage,
-      history: [],
-    },
-    controller.signal,
-    undefined,
-    undefined,
-    () => {
-      if (host.isConnected && activeRequest === controller && !controller.signal.aborted)
-        status.textContent = '说书人稍作停顿，请稍候…';
-    },
-  );
+  const firstLuChiStory = !teaStoryMemory.hasHeard();
+  const story = await (firstLuChiStory
+    ? Promise.resolve<NpcDialogueResponse>({ reply: LU_CHI_TEA_STORY })
+    : requestNpcDialogueResponse(
+        {
+          mode: 'tea-story',
+          population: save.mortal.population!,
+          age: save.age,
+          npcId: 'tea',
+          realm: realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name,
+          message: TEA_STORY_SETTINGS.requestMessage,
+          history: [],
+        },
+        controller.signal,
+        undefined,
+        undefined,
+        () => {
+          if (host.isConnected && activeRequest === controller && !controller.signal.aborted)
+            status.textContent = '说书人稍作停顿，请稍候…';
+        },
+      ));
   if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
   activeRequest = null;
   host.setAttribute('aria-busy', 'false');
@@ -383,6 +387,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   const { reply, imageToken } = story;
   const displayedReply = removeNumberGrouping(reply);
   text.textContent = displayedReply;
+  if (firstLuChiStory) teaStoryMemory.markHeard();
   status.textContent = '茶馆传说 · 一回一故事';
   next.disabled = false;
   const reader = new StorySpeech((state) => {

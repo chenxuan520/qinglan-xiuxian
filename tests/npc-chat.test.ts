@@ -8,6 +8,8 @@ import {
   mountNpcChat,
   closeNpcChat,
 } from '../src/npc-chat.ts';
+import { LU_CHI_TEA_STORY } from '../src/local-tea-stories.ts';
+import { TeaStoryMemory, teaStoryMemory } from '../src/tea-story-memory.ts';
 import { freshSave } from '../src/progress.ts';
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
@@ -290,6 +292,7 @@ test('故居只隐藏正文同句初始问候，AI与失败兜底保留，后续
 });
 
 test('说书显示去除数字千分位，但配图仍使用签名对应的原始正文', async (t) => {
+  t.mock.method(teaStoryMemory, 'hasHeard', () => true);
   const save = freshSave();
   save.mortal.population = input.population;
   const host = storyHost();
@@ -494,7 +497,98 @@ function storyHost() {
   };
 }
 
+function teaMemoryFixture(t, values = new Map()) {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: storage });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else delete globalThis.localStorage;
+    closeNpcChat();
+  });
+  const memory = new TeaStoryMemory();
+  t.mock.method(teaStoryMemory, 'hasHeard', () => memory.hasHeard());
+  t.mock.method(teaStoryMemory, 'markHeard', () => memory.markHeard());
+  return { values, storage, memory };
+}
+
+test('陆迟首篇无网络也完整展示，成功后另记听过；换角色与重载仍转入后续故事', async (t) => {
+  const save = freshSave();
+  save.mortal.population = input.population;
+  const before = JSON.stringify(save);
+  const { memory, values } = teaMemoryFixture(t);
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    requests++;
+    return Response.json({ reply: '下一回是别人的故事。' });
+  });
+  const host = storyHost();
+  await mountTeaStory(host, save, () => assert.fail('不自动开声'));
+  assert.equal(host.nodes['.tea-story-text'].textContent, LU_CHI_TEA_STORY);
+  assert.equal(host.nodes['.tea-story-next'].disabled, false);
+  assert.equal(requests, 0);
+  assert.equal(memory.hasHeard(), true);
+  assert.deepEqual([...values], [['qinglan-tea-luchi-heard-v1', '1']]);
+  assert.equal(new TeaStoryMemory().hasHeard(), true);
+  assert.equal(JSON.stringify(save), before);
+  const next = storyHost();
+  const reborn = freshSave();
+  reborn.mortal.population = { seed: 88, since: 15 };
+  await mountTeaStory(next, reborn, () => {});
+  assert.equal(next.nodes['.tea-story-text'].textContent, '下一回是别人的故事。');
+  assert.equal(requests, 1);
+});
+
+test('陆迟故事关闭、离场或被新面板替换时不提前记为讲过', async (t) => {
+  const save = freshSave();
+  const { memory, values } = teaMemoryFixture(t);
+  t.mock.method(globalThis, 'fetch', async () => assert.fail('首篇不联网'));
+  const closed = storyHost();
+  const pending = mountTeaStory(closed, save, () => {});
+  closeNpcChat();
+  await pending;
+  assert.equal(closed.nodes['.tea-story-text'].textContent, '');
+  assert.equal(memory.hasHeard(), false);
+  const detached = storyHost();
+  const leaving = mountTeaStory(detached, save, () => {});
+  detached.isConnected = false;
+  await leaving;
+  assert.equal(values.size, 0);
+  const replaced = storyHost();
+  const old = mountTeaStory(replaced, save, () => {});
+  const current = storyHost();
+  await mountTeaStory(current, save, () => {});
+  await old;
+  assert.equal(replaced.nodes['.tea-story-text'].textContent, '');
+  assert.equal(current.nodes['.tea-story-text'].textContent, LU_CHI_TEA_STORY);
+  assert.equal(values.size, 1);
+});
+
+test('听书偏好储存被拒不阻断正文或反复抢占本页后续故事', async (t) => {
+  const { storage, memory } = teaMemoryFixture(t);
+  storage.getItem = () => {
+    throw new Error('denied');
+  };
+  storage.setItem = () => {
+    throw new Error('denied');
+  };
+  const save = freshSave();
+  save.mortal.population = input.population;
+  const host = storyHost();
+  await mountTeaStory(host, save, () => {});
+  assert.equal(host.nodes['.tea-story-text'].textContent, LU_CHI_TEA_STORY);
+  assert.equal(memory.hasHeard(), true);
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ reply: '后续故事照常。' }));
+  const next = storyHost();
+  await mountTeaStory(next, save, () => {});
+  assert.equal(next.nodes['.tea-story-text'].textContent, '后续故事照常。');
+});
+
 test('听书失败明确提醒，手动重试不改存档，成功后才能再听一回', async (t) => {
+  t.mock.method(teaStoryMemory, 'hasHeard', () => true);
   const save = freshSave();
   save.mortal.population = input.population;
   const before = JSON.stringify(save);
@@ -528,6 +622,7 @@ test('听书失败明确提醒，手动重试不改存档，成功后才能再�
 });
 
 test('自动重试等待期间关闭立即取消，不发第二次请求也不弹失败提醒', async (t) => {
+  t.mock.method(teaStoryMemory, 'hasHeard', () => true);
   const save = freshSave();
   save.mortal.population = input.population;
   const host = storyHost();
@@ -550,6 +645,7 @@ test('自动重试等待期间关闭立即取消，不发第二次请求也不�
 });
 
 test('配图失败不打断正文、朗读和下一回入口', async (t) => {
+  t.mock.method(teaStoryMemory, 'hasHeard', () => true);
   const save = freshSave();
   save.mortal.population = input.population;
   const host = storyHost();
@@ -572,6 +668,7 @@ test('配图失败不打断正文、朗读和下一回入口', async (t) => {
 });
 
 test('故事正文不等待配图，关闭会取消图片请求，成功后才显示背景', async (t) => {
+  t.mock.method(teaStoryMemory, 'hasHeard', () => true);
   const save = freshSave();
   save.mortal.population = input.population;
   const snapshot = JSON.stringify(save);
@@ -620,6 +717,7 @@ test('故事正文不等待配图，关闭会取消图片请求，成功后才�
 });
 
 test('说书正文只写入文本，失败不补固定故事，关闭后丢弃迟到结果且不修改存档', async (t) => {
+  t.mock.method(teaStoryMemory, 'hasHeard', () => true);
   const save = freshSave();
   save.mortal.population = input.population;
   const snapshot = JSON.stringify(save);

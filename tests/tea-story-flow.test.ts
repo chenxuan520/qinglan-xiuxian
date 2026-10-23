@@ -10,6 +10,7 @@ import { freshSave, lifespanInfo, realmInfo, SAVE_KEY, tribulationDue } from '..
 import { departHometown, acceptHometownRoot } from '../src/hometown.ts';
 import { syncHumanStories } from '../src/human-stories.ts';
 import { startActivity, resolveActivity, sectDuesPending, settleSectDues } from '../src/mortal.ts';
+import { LU_CHI_TEA_STORY } from '../src/local-tea-stories.ts';
 import { TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { AD_SECONDS } from '../src/ads.ts';
 import { MedicinePanel } from '../src/medicine-panel.ts';
@@ -56,7 +57,7 @@ const flow = new Script(
 
 type Reply = { reply: string } | { error: string; retryable: boolean };
 
-function harness(t: TestContext) {
+function harness(t: TestContext, firstStory = false) {
   const save = freshSave();
   departHometown(save);
   acceptHometownRoot(save);
@@ -140,6 +141,13 @@ function harness(t: TestContext) {
     SAVE_KEY,
     AD_SECONDS,
     TEA_STORY_SETTINGS,
+    LU_CHI_TEA_STORY,
+    teaStoryMemory: {
+      hasHeard: () => !firstStory,
+      markHeard: () => {
+        firstStory = false;
+      },
+    },
     removeNumberGrouping,
     executeMortalAction,
     teaStoryPanel,
@@ -220,6 +228,25 @@ function harness(t: TestContext) {
     },
   };
 }
+
+test('首次陆迟旧闻沿真实听书结算半载，连点不多扣，下一回转入原故事请求', async (t) => {
+  const { context: c, save, modal, requests, rolls, writes, reply } = harness(t, true);
+  c.handleAction('mortal-activity', 'tea');
+  c.handleAction('mortal-activity', 'tea');
+  assert.equal(save.age, 15.5);
+  await setImmediate();
+  assert.equal(modal.querySelector('.tea-story-text')!.textContent, LU_CHI_TEA_STORY);
+  assert.equal(modal.querySelector('.tea-story-next')!.disabled, false);
+  assert.equal(requests.length, 0);
+  assert.equal(writes.length, 1);
+  assert.equal(rolls.length, 2);
+  c.handleAction('mortal-activity', 'tea');
+  assert.equal(save.age, 16);
+  assert.equal(writes.length, 2);
+  assert.equal(requests.length, 1);
+  await reply({ reply: '下一回旧事。' });
+  assert.equal(modal.querySelector('.tea-story-text')!.textContent, '下一回旧事。');
+});
 
 test('连续听书仅成功后可开下一回，每回半载且只判定一次，重建按钮防连点并保留街巷关闭', async (t) => {
   const h = harness(t);

@@ -8,9 +8,8 @@ const { debugAccess } = await import('../src/debug-access.ts');
 const { DebugEntry } = await import('../src/debug-entry.ts');
 const { createTelemetry } = await import('../src/telemetry.ts');
 const { NPC_AI_SETTINGS, TELEMETRY_SETTINGS } = await import('../src/setting.ts');
-const { requestNpcDialogue, requestTeaStoryImage, NPC_AI_BASE } = await import(
-  '../src/npc-chat.ts'
-);
+const { requestNpcDialogue, requestTeaStoryImage, mountTeaStory, closeNpcChat, NPC_AI_BASE } =
+  await import('../src/npc-chat.ts');
 const { resolveJourneyAppraisal, journeyAppraisalAiOrigin } = await import(
   '../src/journey-appraisal-ai.ts'
 );
@@ -76,6 +75,49 @@ test('本地茶馆连续听书不联网、已取消请求不回正文', async ()
     null,
   );
   assert.equal(requests, 0);
+});
+
+test('单机首回同样优先陆迟，展示后记录，随后三篇旧闻轮换且无网络', async (t) => {
+  const { LU_CHI_TEA_STORY } = await import('../src/local-tea-stories.ts');
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const values = new Map();
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+    },
+  });
+  t.after(() => {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else delete globalThis.localStorage;
+    closeNpcChat();
+  });
+  t.mock.method(globalThis, 'fetch', async () => assert.fail('单机听书不能联网'));
+  const save = freshSave();
+  save.mortal.population = input.population;
+  const displayed = [];
+  for (let i = 0; i < 5; i++) {
+    const nodes = new Map();
+    const host = {
+      isConnected: true,
+      setAttribute() {},
+      classList: { remove() {} },
+      style: { removeProperty() {} },
+      querySelector(selector) {
+        if (!nodes.has(selector)) nodes.set(selector, { setAttribute() {} });
+        return nodes.get(selector);
+      },
+    };
+    await mountTeaStory(host, save, () => assert.fail('不自动开声'));
+    displayed.push(nodes.get('.tea-story-text').textContent);
+    save.age += 0.5;
+  }
+  assert.equal(displayed[0], LU_CHI_TEA_STORY);
+  assert.equal(values.get('qinglan-tea-luchi-heard-v1'), '1');
+  assert.ok(displayed.slice(1).every((story) => story !== LU_CHI_TEA_STORY));
+  assert.equal(new Set(displayed.slice(1, 4)).size, 3);
+  assert.equal(displayed[1], displayed[4]);
 });
 
 test('统计无法重新开启、不写匿名标识或偏好、手动flush不发送', () => {
