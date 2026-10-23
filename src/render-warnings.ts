@@ -57,7 +57,7 @@ export function drawEnemyWarnings(
   // 普通秘境小怪的预警直接由战斗状态绘制，刷新续局也不会丢失。
   for (const e of game.enemies) {
     if (!game.usesRegionalSkill(e)) continue;
-    if (e.dead || e.boss || !visible(e, p, 260)) continue;
+    if (e.dead || e.boss || e.bossSummon || !visible(e, p, 260)) continue;
     if (e.charge <= 0.55 && !(e.windup && e.pendingSkill)) continue;
     c.save();
     c.strokeStyle = '#ffc199';

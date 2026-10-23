@@ -1,3 +1,4 @@
+import * as battleArt from '../src/battle-art.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, type Effect, type Zone } from '../src/game.ts';
@@ -536,6 +537,7 @@ test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普�
         },
       });
       const r = Object.assign(Object.create(Renderer.prototype), {
+        battleArt,
         ctx,
         width: 1280,
         height: 800,

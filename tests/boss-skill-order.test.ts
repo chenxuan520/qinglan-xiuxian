@@ -160,12 +160,12 @@ test('队列为空是合法轮次末尾；错误类型、重复、越界或当�
   raw.enemies[0].skillStep = 0;
   raw.enemies[0].bossSkillQueue = [];
   assert.ok(Game.restore(g.save, raw));
-  for (const queue of [null, 'bad', {}, [1, 1], [1, 2, 0], [0], [-1], [3], [1.5], [NaN], ['1']]) {
+  for (const queue of [null, 'bad', {}, [1, 1], [1, 2, 0], [0], [-1], [4], [1.5], [NaN], ['1']]) {
     const bad = structuredClone(raw);
     Object.assign(bad.enemies[0], { bossSkillQueue: queue });
     assert.equal(Game.restore(g.save, bad), null, JSON.stringify(queue));
   }
-  for (const step of [null, '1', -1, 3, 0.5, NaN]) {
+  for (const step of [null, '1', -1, 4, 0.5, NaN]) {
     const bad = structuredClone(raw);
     Object.assign(bad.enemies[0], { skillStep: step });
     assert.equal(Game.restore(g.save, bad), null);

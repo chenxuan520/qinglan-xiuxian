@@ -1,3 +1,4 @@
+import { bossPursuitCooldown } from '../src/boss-skills.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -31,7 +32,10 @@ test('终关七位妖王远距离追袭先预警，锁定方向，冲刺距离�
     while (boss.charge > 0) g.update(0.01);
     assert.ok(Math.abs(boss.x - warning.x2!) < 1e-8);
     assert.equal(boss.y, 0, '冲刺不能转弯追踪侧向闪避的玩家');
-    assert.ok(boss.pursuitCooldown! > 7, '不会在冲刺结束后立即重复追袭');
+    assert.ok(
+      boss.pursuitCooldown! > bossPursuitCooldown(false) - 1.6,
+      '不会在冲刺结束后立即重复追袭',
+    );
   }
 });
 
@@ -46,7 +50,7 @@ test('追袭有距离和独立冷却限制，半血加快，普通冲刺保持�
   boss.hp = boss.maxHp * 0.4;
   boss.pursuitCooldown = 0;
   g.update(0.01);
-  assert.equal(boss.pursuitCooldown, 6.5);
+  assert.equal(boss.pursuitCooldown, bossPursuitCooldown(true));
   const mob = g.spawnEnemy(0, false, false, { x: -100, y: 300 });
   mob.charge = 0.5;
   mob.dx = 1;

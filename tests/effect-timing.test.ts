@@ -1,3 +1,4 @@
+import * as battleArt from '../src/battle-art.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -37,6 +38,7 @@ function draw(g: Game) {
   });
   // 保留真实 drawGame；只跳过图集和法阵叶节点，记录实际几何及透明度。
   const renderer = Object.assign(Object.create(Renderer.prototype), {
+    battleArt,
     ctx,
     width: 1280,
     height: 800,

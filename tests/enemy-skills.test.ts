@@ -1,3 +1,4 @@
+import * as battleArt from '../src/battle-art.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -48,6 +49,7 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
     });
     // 只跳过无关图集与装饰，直接执行原 drawGame 和弹丸绘制。
     const renderer = Object.assign(Object.create(Renderer.prototype), {
+      battleArt,
       ctx,
       width: 1280,
       height: 800,

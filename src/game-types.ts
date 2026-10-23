@@ -1,3 +1,4 @@
+import type { BossMotion, BossSummon } from './boss-mechanics.ts';
 import type { WeaponKind, EnemySkill, ElementId } from './data.ts';
 
 export interface Point {
@@ -23,6 +24,7 @@ export interface Enemy extends Point {
   bossStage?: number;
   skillStep?: number;
   bossSkillQueue?: number[];
+  bossSummon?: BossSummon;
   pursuitCooldown?: number;
   windup?: number;
   pendingSkill?: EnemySkill;
@@ -56,6 +58,7 @@ export interface Shot extends Point {
   age: number;
   bounce: number;
   crit: boolean;
+  bossMotion?: BossMotion;
   bossAttack?: BossAttack;
   enemySkill?: 'firebolt' | 'frostbolt' | 'soul';
   bossStage?: number;

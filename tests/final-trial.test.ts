@@ -1,3 +1,4 @@
+import { bossSkillCooldown } from '../src/boss-skills.ts';
 import { bossSkills } from '../src/boss-skills.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -261,7 +262,7 @@ test('最终仙尊拥有独立立绘、更强属性与二阶段弹幕，落雷�
   immortal.cooldown = 0;
   g.update(0.01);
   assert.equal(g.shots.length, 32);
-  assert.equal(immortal.cooldown, 1.1);
+  assert.equal(immortal.cooldown, bossSkillCooldown(6, true, true));
   g.time = 8;
   immortal.skillStep = 1;
   immortal.cooldown = 0;

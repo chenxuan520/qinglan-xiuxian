@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   ELEMENTS,
+  BOSS_COMBAT,
   REALMS,
   EVOLVED_DAMAGE,
   MAX_WEAPON_LEVEL,
@@ -33,7 +34,7 @@ import { trainingCost } from '../src/training.ts';
 import { ENEMY_CONTROL } from '../src/regional-hazards.ts';
 import { REGIONAL_DAMAGE_MULTIPLIER } from '../src/enemy-stats.ts';
 import { Game } from '../src/game.ts';
-import { bossSkills, bossSkillCooldown } from '../src/boss-skills.ts';
+import { bossSkills, bossSkillCooldown, bossPursuitCooldown } from '../src/boss-skills.ts';
 import { bestiaryPanel } from '../src/bestiary-ui.ts';
 import { regionalEnemyFields } from '../src/regional-combat.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
@@ -422,24 +423,27 @@ test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际�
   const text = compact(gameplay);
   const book = bestiaryPanel(6).body;
   const counts = Array.from({ length: 6 }, (_, origin) => bossSkills(origin, true).length);
-  assert.deepEqual(counts, [3, 3, 3, 3, 3, 3]);
-  assert.ok(combat.includes('各有原本三招'));
-  assert.ok(book.includes('各有原本三招'));
-  assert.ok(text.includes('各有原本三招'));
-  for (const removed of [
-    '三路藤牢',
-    '离火横径',
-    '三叠焰路',
-    '五毒游瘴',
-    '幽影换形',
-    '三叠天雷',
-    '游魂双障',
-  ])
+  assert.deepEqual(counts, [4, 4, 5, 5, 6, 4]);
+  assert.ok(combat.includes('各有不同的圆阵、弹幕与特色招式'));
+  assert.ok(book.includes('各有不同的圆阵、弹幕与特色招式'));
+  assert.ok(text.includes('保留原本三招与非条带特色招式'));
+  for (const removed of ['三路藤牢', '离火横径', '三叠焰路', '三叠天雷', '游魂双障'])
     for (const source of [combat, book, text]) assert.ok(!source.includes(removed), removed);
   for (let origin = 0; origin < 7; origin++) {
     for (const name of bossSkills(origin, true)) assert.ok(book.includes(name), name);
-    assert.deepEqual(bossSkills(origin, true), STAGES[origin].skills);
+    assert.deepEqual(
+      bossSkills(origin, true).slice(0, STAGES[origin].skills.length),
+      STAGES[origin].skills,
+    );
   }
+  const hp = BOSS_COMBAT.hp.map((n) => Number(n.toFixed(3))).join('/');
+  assert.ok(text.includes(`气血分别再乘${hp}`));
+  for (const enraged of [false, true])
+    assert.ok(text.includes(`${bossPursuitCooldown(enraged)}秒`));
+  assert.ok(text.includes('原生毒君使用六秒漂移追云、冥主瞬移追近'));
+  assert.ok(text.includes('终关毒君与冥主另将追云、瞬移列入常规轮换'));
+  for (const source of [combat, book]) assert.ok(source.includes('各有不同的圆阵、弹幕与特色招式'));
+  assert.ok(text.includes('非条带特色招式'));
   const old = [bossSkillCooldown(0, true, false), bossSkillCooldown(0, true, true)];
   const final = [bossSkillCooldown(6, true, false), bossSkillCooldown(6, true, true)];
   assert.ok(combat.includes(`旧王常态每${old[0]}秒出招、半血后${old[1]}秒`));

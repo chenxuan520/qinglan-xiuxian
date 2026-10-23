@@ -1,3 +1,4 @@
+import * as battleArt from '../src/battle-art.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -129,6 +130,7 @@ test('出场法阵逐帧扩散和重复登场不累积离屏画布缓存', async
   });
   try {
     const renderer = Object.assign(Object.create(Renderer.prototype), {
+      battleArt,
       ctx,
       width: 390,
       height: 844,
@@ -268,6 +270,7 @@ test('七种登场在桌面、手机和横屏可绘制，减少动态效果停�
             },
         });
         const renderer = Object.assign(Object.create(Renderer.prototype), {
+          battleArt,
           ctx,
           width,
           height,

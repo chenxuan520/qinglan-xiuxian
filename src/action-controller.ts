@@ -197,6 +197,7 @@ export interface ActionShell {
     next: () => void,
     run?: Game | null,
     tribulation?: boolean,
+    combat?: boolean,
   ) => boolean;
   readonly enterImmortalGate: typeof enterImmortalGate;
   readonly enterTownVisit: typeof enterTownVisit;

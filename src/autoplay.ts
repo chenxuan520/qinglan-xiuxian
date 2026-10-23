@@ -1,3 +1,4 @@
+import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
 import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
 import { hazardDistance, regionalExposure, regionalHazard } from './regional-hazards.ts';
@@ -97,7 +98,15 @@ export function autoplayInput(g: Game) {
             g.enemies.some((child) => !child.dead && child.summonedBy === e.id),
         )
       : undefined;
+  const heart = g.enemies.find(
+    (e) =>
+      !e.dead &&
+      e.bossSummon?.kind === 'heart' &&
+      e.bossSummon.age < BOSS_MECHANICS.heartGrow - 0.4 &&
+      Math.hypot(e.x - p.x, e.y - p.y) < 210,
+  );
   const target =
+    heart ??
     owner ??
     nearest ??
     (g.stage === 6 ? g.enemies[0] : g.enemies.find((e) => !e.dead && e.illusionOf === undefined));
@@ -110,7 +119,8 @@ export function autoplayInput(g: Game) {
     dy = Math.sin(g.time * 0.3);
   }
   for (const e of g.enemies) {
-    if (e.illusionOf !== undefined || (g.stage < 6 && e.dead)) continue;
+    if (e.bossSummon?.kind === 'heart' || e.illusionOf !== undefined || (g.stage < 6 && e.dead))
+      continue;
     const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
     const radius = e.radius + (e.boss ? 135 : 100);
     if (d < radius) {
@@ -129,8 +139,14 @@ export function autoplayInput(g: Game) {
   }
   const norm = Math.hypot(dx, dy) || 1;
   const preferred = { x: dx / norm, y: dy / norm };
+  const movingShots = g.shots.filter(
+    (b) => b.kind === 'hostile' && b.bossMotion && Math.hypot(b.x - p.x, b.y - p.y) < 420,
+  );
   const charges = g.enemies.filter(
-    (e) => (e.boss || g.usesRegionalSkill(e)) && !e.dead && e.charge > 0,
+    (e) =>
+      (e.boss || e.bossSummon?.kind === 'wolf' || g.usesRegionalSkill(e)) &&
+      !e.dead &&
+      e.charge > 0,
   );
   const speed = g.stats.speed;
   const zones = g.zones.filter(
@@ -139,7 +155,7 @@ export function autoplayInput(g: Game) {
       z.life > 0 &&
       hazardDistance(z, p) < z.radius + 8 + speed * 1.6 + Math.hypot(z.vx || 0, z.vy || 0) * 1.6,
   );
-  if (!charges.length && !zones.length) return preferred;
+  if (!charges.length && !zones.length && !movingShots.length) return preferred;
   // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
   const clearance = (e: (typeof charges)[number]) => e.radius + 13 + speed * 0.24;
   const distanceToPath = (x: number, y: number, e: (typeof charges)[number]) => {
@@ -152,7 +168,11 @@ export function autoplayInput(g: Game) {
     );
     return Math.hypot(x - e.x - e.dx * along, y - e.y - e.dy * along);
   };
-  if (!zones.length && !charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e)))
+  if (
+    !movingShots.length &&
+    !zones.length &&
+    !charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e))
+  )
     return preferred;
   let best = preferred;
   let bestScore = Infinity;
@@ -219,6 +239,17 @@ export function autoplayInput(g: Game) {
       // 无伤路线优先于拾取；所有方向都有风险时仍按累计损失选，而非停住。
       score += risk > 0 ? 1 + risk : 0;
     }
+    for (const b of movingShots)
+      for (const seconds of [0.12, 0.24, 0.36, 0.6]) {
+        if (b.life <= seconds) continue;
+        const point = bossShotPose(b, b.age + seconds);
+        if (!point.active) continue;
+        const separation = Math.hypot(
+          p.x + x * speed * seconds - point.x,
+          p.y + y * speed * seconds - point.y,
+        );
+        score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 2;
+      }
     for (const e of charges) {
       for (const seconds of [0.12, 0.24, 0.36]) {
         const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);

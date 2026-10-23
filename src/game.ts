@@ -1,3 +1,9 @@
+import {
+  BOSS_MECHANICS,
+  bossShotPose,
+  cloneBossMotion,
+  type TrailPoint,
+} from './boss-mechanics.ts';
 import { enemyCombatStats } from './enemy-stats.ts';
 import { ownsCurio, bossCurio } from './curio-data.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
@@ -28,7 +34,7 @@ export type {
 } from './game-types.ts';
 import { validateRunSnapshot } from './game-validation.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
-import { bossSkills, bossSkillCooldown } from './boss-skills.ts';
+import { bossSkills, bossSkillCooldown, bossPursuitCooldown } from './boss-skills.ts';
 import {
   regionalEnemyFields,
   regionalEnemyTactics,
@@ -111,6 +117,7 @@ const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
 export class Game {
   state: GameState = 'playing';
+  playerTrail: TrailPoint[] = [];
   time = 0;
   elapsedYears: number | undefined = 0;
   loot = {
@@ -480,6 +487,7 @@ export class Game {
       ...new Set(this.shots.flatMap((b) => (b.bossAttack ? [b.bossAttack.volley] : []))),
     ];
     return {
+      playerTrail: this.playerTrail.map((p) => ({ ...p })),
       spiritRoot: this.spiritRoot,
       rootElements: [...this.rootElements],
       startedImmortal: this.startedImmortal,
@@ -518,11 +526,13 @@ export class Game {
       enemies: this.enemies.map((e) => ({
         ...e,
         ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+        ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
       })),
       bossVolleys: bossVolleys.map((v) => ({ weapon: v.weapon, hitBosses: [...v.hitBosses] })),
       shots: this.shots.map(({ bossAttack, ...s }) => ({
         ...s,
         hit: [...s.hit],
+        ...(s.bossMotion ? { bossMotion: cloneBossMotion(s.bossMotion) } : {}),
         ...(bossAttack
           ? {
               bossAttack: {
@@ -588,6 +598,7 @@ export class Game {
       g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       g.time = s.time;
+      g.playerTrail = (s.playerTrail ?? []).map((p) => ({ ...p }));
       g.nextEnemySlowAt = s.nextEnemySlowAt ?? 0;
       g.nextEnemyBindAt = s.nextEnemyBindAt ?? 0;
       g.nextEnemySealAt = s.nextEnemySealAt ?? 0;
@@ -625,6 +636,7 @@ export class Game {
       g.enemies = s.enemies.map((e) => ({
         ...e,
         ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+        ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
       }));
       for (const e of g.enemies)
         if (e.boss) {
@@ -634,7 +646,6 @@ export class Game {
             e.bossSkillQueue = e.bossSkillQueue.filter(
               (skill) => skill < count && skill !== e.skillStep,
             );
-          delete e.chargeFollowup;
         }
       for (const e of g.enemies) if (e.boss && !e.dead && e.charge > 0.7) g.bossChargeWarning(e);
       const bossVolleys = (s.bossVolleys ?? []).map((v) => ({
@@ -644,6 +655,7 @@ export class Game {
       g.shots = s.shots.map(({ bossAttack, ...b }) => ({
         ...b,
         hit: new Set(b.hit),
+        ...(b.bossMotion ? { bossMotion: cloneBossMotion(b.bossMotion) } : {}),
         ...(bossAttack
           ? {
               bossAttack: {
@@ -654,14 +666,7 @@ export class Game {
           : {}),
       }));
       g.zones = s.zones
-        .filter(
-          (z) =>
-            !(
-              z.hostile &&
-              z.kind.startsWith('boss-') &&
-              (z.endX !== undefined || z.vx !== undefined)
-            ),
-        )
+        .filter((z) => !(z.hostile && z.kind.startsWith('boss-') && z.endX !== undefined))
         .map((z) => ({ ...z }));
       g.pickups = s.pickups
         .filter((p) => !g.isFinalTrial || p.kind !== 'heal')
@@ -811,6 +816,14 @@ export class Game {
       p.x += (this.input.x / Math.max(1, length)) * stats.speed * dt;
       p.y += (this.input.y / Math.max(1, length)) * stats.speed * dt;
       if (Math.abs(this.input.x) > 0.05) p.facing = this.input.x > 0 ? 1 : -1;
+    }
+    if (
+      (this.stage === 4 || this.isFinalTrial) &&
+      (!this.playerTrail.length ||
+        this.time - this.playerTrail.at(-1)!.time >= BOSS_MECHANICS.trailStep)
+    ) {
+      this.playerTrail.push({ x: p.x, y: p.y, time: this.time });
+      if (this.playerTrail.length > BOSS_MECHANICS.trailLimit) this.playerTrail.shift();
     }
     if (this.tribulation) {
       const radius = Math.hypot(p.x, p.y);
@@ -1136,6 +1149,10 @@ export class Game {
     const progress = this.combatProgress;
     for (const e of this.enemies) {
       if (e.dead) continue;
+      if (e.bossSummon) {
+        this.updateBossSummon(e, dt);
+        continue;
+      }
       if (e.illusionOf !== undefined) {
         e.cooldown -= dt;
         if (
@@ -1159,8 +1176,19 @@ export class Game {
       if (e.boss) {
         e.pursuitCooldown = (e.pursuitCooldown ?? 2.5) - dt;
         if (d > 330 && e.charge <= 0 && e.pursuitCooldown <= 0) {
-          this.startBossCharge(e, nx, ny);
-          this.announce(`${STAGES[e.bossStage ?? this.stage].boss} · 裂空追袭`);
+          const stage = e.bossStage ?? this.stage;
+          if (!this.isFinalTrial && (stage === 3 || stage === 4)) {
+            e.pursuitCooldown = bossPursuitCooldown(e.hp < e.maxHp / 2);
+            e.cooldown = Math.max(e.cooldown, 1.8 * 0.85 * (e.hp < e.maxHp / 2 ? 0.85 : 1));
+            this.castBossPursuit(e, nx, ny);
+            this.announce(`${STAGES[stage].boss} · ${stage === 3 ? '游瘴驱逐' : '幽影追踪'}`);
+            d = distance(e, p);
+            nx = (p.x - e.x) / (d || 1);
+            ny = (p.y - e.y) / (d || 1);
+          } else {
+            this.startBossCharge(e, nx, ny);
+            this.announce(`${STAGES[stage].boss} · 裂空追袭`);
+          }
         }
       }
       const charging = e.charge > 0;
@@ -1185,6 +1213,11 @@ export class Game {
         } else if (e.charge < 0.55) {
           e.x += e.dx * 380 * dt;
           e.y += e.dy * 380 * dt;
+        }
+        if (e.charge === 0 && e.chargeFollowup) {
+          e.chargeFollowup = false;
+          const nextDistance = distance(e, p) || 1;
+          this.startBossCharge(e, (p.x - e.x) / nextDistance, (p.y - e.y) / nextDistance);
         }
       } else {
         const localCaster = ['roots', 'frost', 'miasma', 'storm'].includes(
@@ -1530,7 +1563,7 @@ export class Game {
     e.charge = warning + 0.7;
     e.dx = nx;
     e.dy = ny;
-    e.pursuitCooldown = e.hp < e.maxHp / 2 ? 6.5 : 9;
+    e.pursuitCooldown = bossPursuitCooldown(e.hp < e.maxHp / 2);
     e.cooldown = Math.max(e.cooldown, e.charge + 0.5);
     this.bossChargeWarning(e);
   }
@@ -1603,6 +1636,38 @@ export class Game {
         }).summonedBy = !this.isFinalTrial && stage === 4 ? e.id : undefined;
     };
     this.announce(`${STAGES[stage].boss} · ${bossSkills(stage, this.isFinalTrial)[phase]}`);
+    if (stage === 2 && phase === 4) {
+      this.startBossCharge(e, nx, ny);
+      e.chargeFollowup = true;
+      return;
+    }
+    if (stage === 4 && phase === 4) {
+      for (const side of [-150, 0, 300]) {
+        if (this.enemies.length >= (this.isFinalTrial ? 210 : 240)) break;
+        const illusion = this.spawnEnemy(58, false, false, {
+          x: e.x - ny * side,
+          y: e.y + nx * side,
+        });
+        illusion.illusionOf = e.id;
+        illusion.radius = e.radius;
+        illusion.hp = illusion.maxHp = 1;
+        illusion.damage = illusion.speed = 0;
+        illusion.elite = false;
+        illusion.cooldown = 3;
+      }
+      this.effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
+      e.x -= ny * 150;
+      e.y += nx * 150;
+      return;
+    }
+    if (this.isFinalTrial && ((stage === 3 && phase === 4) || (stage === 4 && phase === 5))) {
+      this.castBossPursuit(e, nx, ny);
+      return;
+    }
+    if (stage < 6 && phase === 3) {
+      this.castBossMechanic(e, nx, ny);
+      return;
+    }
     switch (stage) {
       case 0:
         if (phase === 0) ringZones(6, 130, 42, 2, 0.3);
@@ -1668,6 +1733,170 @@ export class Game {
           blast(e.x, e.y, 85);
         }
         break;
+    }
+  }
+  private castBossPursuit(e: Enemy, nx: number, ny: number) {
+    if ((e.bossStage ?? this.stage) === 3) {
+      this.zone(
+        e.x + nx * 165,
+        e.y + ny * 165,
+        58,
+        6,
+        e.damage * 0.8,
+        STAGES[3].color,
+        'boss-miasma',
+        1.2,
+        true,
+      );
+      Object.assign(this.zones.at(-1)!, { vx: nx * 32, vy: ny * 32 });
+    } else {
+      this.effect(e.x, e.y, 0.7, e.radius, STAGES[4].color, 'pulse');
+      e.x = this.player.x - nx * 260;
+      e.y = this.player.y - ny * 260;
+    }
+  }
+  private castBossMechanic(e: Enemy, nx: number, ny: number) {
+    const stage = e.bossStage ?? this.stage,
+      rules = BOSS_MECHANICS;
+    if (stage === 0 || stage === 2) {
+      const kind = stage === 0 ? 'heart' : 'wolf';
+      const limit = stage === 0 ? rules.heartLimit : rules.wolfLimit;
+      const alive = this.enemies.filter(
+        (c) => !c.dead && c.bossSummon?.kind === kind && c.summonedBy === e.id,
+      ).length;
+      for (let i = alive; i < limit && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++) {
+        const side = i % 2 ? -1 : 1;
+        const angle =
+          stage === 0 ? (i / limit) * TAU + Math.atan2(ny, nx) : Math.atan2(ny, nx) + side * 1.15;
+        const center = stage === 0 ? this.player : e;
+        const child = this.spawnEnemy(stage === 0 ? 10 : 41, false, false, {
+          x: center.x + Math.cos(angle) * 145,
+          y: center.y + Math.sin(angle) * 145,
+        });
+        child.summonedBy = e.id;
+        child.bossSummon = { kind, age: 0, side };
+        child.radius = stage === 0 ? 20 : 23;
+        child.hp = child.maxHp *= stage === 0 ? 0.45 : 0.6;
+        child.damage = stage === 0 ? 0 : e.damage * 0.65;
+        child.speed = stage === 0 ? 0 : 210;
+        child.dx = nx;
+        child.dy = ny;
+        child.cooldown = 99;
+        if (stage === 0) {
+          this.zone(
+            child.x,
+            child.y,
+            58,
+            rules.heartLife - rules.heartGrow,
+            e.damage * 0.55,
+            STAGES[0].color,
+            'boss-roots',
+            rules.heartGrow,
+            true,
+          );
+          this.zones.at(-1)!.sourceId = child.id;
+        }
+      }
+    } else if (stage === 1) {
+      if (this.shots.filter((b) => b.bossMotion?.kind === 'return').length >= 10) return;
+      for (let i = 0; i < 5; i++) {
+        const a = Math.atan2(ny, nx) + (i / 4 - 0.5) * 1.2;
+        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), 155, e.damage * 0.55);
+        shot.bossMotion = { kind: 'return', velocity: { x: shot.vx, y: shot.vy } };
+        shot.life = rules.returnWarmup + 2 * rules.returnOut + rules.returnRest;
+        shot.radius = 10;
+      }
+    } else if (stage === 3) {
+      // 保留原来六秒漂移毒瘴，不带回条形毒息。
+      for (const side of [-105, 0, 105]) {
+        this.zone(
+          this.player.x + nx * (side ? 60 : 0) - ny * side,
+          this.player.y + ny * (side ? 60 : 0) + nx * side,
+          62,
+          6,
+          e.damage,
+          STAGES[3].color,
+          'boss-miasma',
+          1.2 + (side ? 0.25 : 0),
+          true,
+        );
+        const z = this.zones.at(-1)!;
+        z.vx = -ny * Math.sign(side || 1) * 24;
+        z.vy = nx * Math.sign(side || 1) * 24;
+      }
+    } else if (stage === 4) {
+      if (this.shots.filter((b) => b.bossMotion?.kind === 'memory').length >= 6) return;
+      const path = [
+        { x: e.x, y: e.y },
+        { x: this.player.x, y: this.player.y },
+        ...this.playerTrail
+          .slice()
+          .reverse()
+          .map((p) => ({ x: p.x, y: p.y })),
+      ];
+      let length = 0;
+      for (let i = 1; i < path.length; i++) length += distance(path[i - 1], path[i]);
+      for (let i = 0; i < 3; i++) {
+        const shot = this.hostileShot(e, nx, ny, rules.memorySpeed, e.damage * 0.5);
+        shot.bossMotion = {
+          kind: 'memory',
+          path: path.map((p) => ({ ...p })),
+          warmup: 1 + i * 0.35,
+        };
+        shot.life = shot.bossMotion.warmup + length / rules.memorySpeed;
+        shot.radius = 10;
+      }
+    } else if (stage === 5) {
+      if (this.shots.filter((b) => b.bossMotion?.kind === 'star').length >= 6) return;
+      for (let i = 0; i < 3; i++) {
+        const shot = this.hostileShot(e, 1, 0, 220, e.damage * 0.85);
+        shot.bossMotion = {
+          kind: 'star',
+          center: { x: e.x, y: e.y },
+          angle: (i / 3) * TAU,
+          launchAt: 1.3 + i * 0.45,
+        };
+        shot.life = shot.bossMotion.launchAt + 1.8;
+        shot.radius = 12;
+        const { x, y, vx, vy } = bossShotPose(shot);
+        Object.assign(shot, { x, y, vx, vy });
+      }
+    }
+  }
+  private updateBossSummon(e: Enemy, dt: number) {
+    const state = e.bossSummon!,
+      before = state.age;
+    state.age += dt;
+    e.flash = Math.max(0, e.flash - dt);
+    const owner = this.enemies.find((b) => b.id === e.summonedBy && !b.dead);
+    if (
+      !owner ||
+      state.age > (state.kind === 'heart' ? BOSS_MECHANICS.heartLife : BOSS_MECHANICS.wolfLife)
+    ) {
+      e.dead = true;
+      return;
+    }
+    if (state.kind === 'heart') return;
+    if (state.age < BOSS_MECHANICS.wolfFlank) {
+      const tx = this.player.x - e.dy * state.side * 145,
+        ty = this.player.y + e.dx * state.side * 145;
+      const d = Math.hypot(tx - e.x, ty - e.y) || 1,
+        travel = Math.min(d, e.speed * dt);
+      e.x += ((tx - e.x) / d) * travel;
+      e.y += ((ty - e.y) / d) * travel;
+    } else if (before < BOSS_MECHANICS.wolfFlank) {
+      const d = distance(e, this.player) || 1;
+      e.dx = (this.player.x - e.x) / d;
+      e.dy = (this.player.y - e.y) / d;
+      e.charge = 1.4;
+    } else if (e.charge > 0) {
+      const previous = e.charge;
+      e.charge = Math.max(0, e.charge - dt);
+      const travel = (Math.min(0.55, previous) - Math.min(0.55, e.charge)) * 380;
+      e.x += e.dx * travel;
+      e.y += e.dy * travel;
+      if (e.charge <= 0.55 && distance(e, this.player) < e.radius + 13) this.hurtPlayer(e.damage);
+      if (e.charge === 0) e.dead = true;
     }
   }
   private nearest(at: Point, excluded = new Set<number>(), range = 950) {
@@ -2092,17 +2321,23 @@ export class Game {
         b.vx = vx * Math.cos(angle) - b.vy * Math.sin(angle);
         b.vy = vx * Math.sin(angle) + b.vy * Math.cos(angle);
       }
-      if (b.kind === 'hostile' && b.bossStage === 4) {
+      if (!b.bossMotion && b.kind === 'hostile' && b.bossStage === 4) {
         // 幽魂先盘旋再沿切线飞出，不持续追踪角色。
         const turn = Math.max(0, Math.min(dt, 1.2 - (b.age - dt))) * 0.55;
         const vx = b.vx;
         b.vx = vx * Math.cos(turn) - b.vy * Math.sin(turn);
         b.vy = vx * Math.sin(turn) + b.vy * Math.cos(turn);
       }
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
+      if (b.bossMotion) {
+        const { x, y, vx, vy } = bossShotPose(b);
+        Object.assign(b, { x, y, vx, vy });
+      } else {
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+      }
       if (b.life <= 0) continue;
       if (b.kind === 'hostile') {
+        if (b.bossMotion && !bossShotPose(b).active) continue;
         if (distance(b, this.player) < b.radius + 12) {
           if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
           if (b.enemySkill === 'soul' || b.bossStage === 4) this.enemySeal();
@@ -2231,7 +2466,11 @@ export class Game {
           }
         } else {
           const hits = this.enemies.some(
-            (e) => !e.dead && e.illusionOf === undefined && distance(e, z) < z.radius + e.radius,
+            (e) =>
+              !e.dead &&
+              e.illusionOf === undefined &&
+              e.bossSummon?.kind !== 'heart' &&
+              distance(e, z) < z.radius + e.radius,
           );
           this.areaDamage(z, z.radius, z.damage, z.kind);
           if (hits && (z.kind === 'cauldron' || z.kind === 'bloodpool'))
@@ -2386,6 +2625,9 @@ export class Game {
     );
   }
   private enemyDeath(e: Enemy) {
+    if (e.boss)
+      for (const child of this.enemies)
+        if (child.bossSummon && child.summonedBy === e.id) child.dead = true;
     if (e.bossStage === 4 || e.illusionOf !== undefined) {
       const dissolved = new Set([e.id]);
       let found = true;
@@ -2404,7 +2646,7 @@ export class Game {
         }
       }
     }
-    if (e.boss) return;
+    if (e.boss || e.bossSummon) return;
     const tactics = ENEMY_TACTICS[e.type];
     if (tactics.deathMiasma)
       this.enemyField(e, 0, 0, 50, 2.4, e.damage * 0.35, '#bdcc79', 'enemy-miasma');
@@ -2651,7 +2893,7 @@ export class Game {
     if (e.hp <= 0) {
       e.dead = true;
       this.enemyDeath(e);
-      if (e.cacheGuardian) return;
+      if (e.cacheGuardian || e.bossSummon) return;
       this.kills++;
       if (this.tribulation) {
         this.state = this.player.hp > 0 ? 'won' : 'lost';

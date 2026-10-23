@@ -440,7 +440,7 @@ export function startInterfaceTour(
     cardResize.observe(card);
     animation = requestAnimationFrame(animate);
     void renderer
-      .prepareScene(0, false, [], () => {})
+      .prepareScene(0, false, [], () => {}, [], true)
       .then(
         () => {
           if (closed) return;

@@ -8,6 +8,7 @@ export function sceneAssets(stage: number, tribulation = false, extraSprites: nu
     : [
         0,
         ...STAGE_ENEMIES[stage].map((type) => ENEMIES[type].sprite),
+        ...(stage === FINAL_TRIAL_STAGE ? [ENEMIES[41].sprite] : []),
         ...(stage === FINAL_TRIAL_STAGE ? STAGES.map((s) => s.sprite) : [STAGES[stage].sprite]),
         ...extraSprites,
       ];

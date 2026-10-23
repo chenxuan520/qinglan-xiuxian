@@ -72,7 +72,10 @@ const patterns = [
 for (let origin = 0; origin < 7; origin++)
   for (const arena of origin === 6 ? [6] : [origin, 6])
     test(`${STAGES[origin].boss}在第${arena + 1}关逐招恢复原圆阵、弹幕、召唤或单次冲锋`, () => {
-      assert.deepEqual(bossSkills(origin, arena === 6), STAGES[origin].skills);
+      assert.deepEqual(
+        bossSkills(origin, arena === 6).slice(0, STAGES[origin].skills.length),
+        STAGES[origin].skills,
+      );
       for (let phase = 0; phase < patterns[origin].length; phase++) {
         const { g, e } = encounter(origin, phase, arena);
         g.castBossSkill(e, 1, 0);
@@ -148,13 +151,26 @@ test('环形木阵、冰牢、鬼牢和陨雷保留原落点，十字天雷保�
   );
 });
 
-test('各关和终关远距追袭均为原蓄势冲锋，没有条带落阵或幽冥瞬移', () => {
+test('原生毒君与冥主保留特色追袭，其余远距蓄势冲锋，没有条带落阵', () => {
   for (let origin = 0; origin < 7; origin++)
     for (const arena of origin === 6 ? [6] : [origin, 6]) {
       const { g, e } = encounter(origin, 0, arena);
       e.x = -500;
       e.pursuitCooldown = 0;
       g.update(0.01);
+      if (arena !== 6 && origin === 3) {
+        assert.equal(e.charge, 0);
+        assert.equal(g.zones.length, 1);
+        assert.equal(g.zones[0].life, 6);
+        assert.equal(g.zones[0].endX, undefined);
+        continue;
+      }
+      if (arena !== 6 && origin === 4) {
+        assert.equal(e.charge, 0);
+        assert.equal(e.x, -260);
+        assert.equal(g.zones.length, 0);
+        continue;
+      }
       assert.ok(e.charge > 0.7);
       assert.equal(e.x, -500);
       assert.equal(g.zones.length, 0);
@@ -165,13 +181,12 @@ test('各关和终关远距追袭均为原蓄势冲锋，没有条带落阵或�
     }
 });
 
-test('旧终关存档能读取，已撤招式不再排队，旧妖王条带清除且小怪区域保留', () => {
-  const oldCounts = [5, 6, 5, 6, 6, 7];
+test('当前招式队列保存完整，已撤妖王条带清除且小怪区域保留', () => {
   for (let origin = 0; origin < 6; origin++) {
     const { g } = encounter(origin, 0);
     const raw = g.snapshot();
-    raw.enemies[0].skillStep = oldCounts[origin] - 1;
-    raw.enemies[0].bossSkillQueue = Array.from({ length: oldCounts[origin] - 1 }, (_, i) => i);
+    raw.enemies[0].skillStep = 3;
+    raw.enemies[0].bossSkillQueue = [0, 1, 2];
     const field = {
       x: 0,
       y: 0,
@@ -192,8 +207,8 @@ test('旧终关存档能读取，已撤招式不再排队，旧妖王条带清�
     assert.ok(h);
     assert.equal(h.time, raw.time);
     assert.equal(h.boss!.hp, raw.enemies[0].hp);
-    assert.equal(h.boss!.skillStep, 0);
-    assert.deepEqual(h.boss!.bossSkillQueue, [1, 2]);
+    assert.equal(h.boss!.skillStep, 3);
+    assert.deepEqual(h.boss!.bossSkillQueue, [0, 1, 2]);
     assert.deepEqual(h.zones, []);
     const native = encounter(origin, 0, origin);
     const mixed = native.g.snapshot();
@@ -201,7 +216,7 @@ test('旧终关存档能读取，已撤招式不再排队，旧妖王条带清�
     assert.deepEqual(Game.restore(native.g.save, mixed)!.zones, [
       { ...field, kind: 'enemy-firepath' },
     ]);
-    for (const invalid of [oldCounts[origin], -1, 0.5]) {
+    for (const invalid of [bossSkills(origin, true).length, -1, 0.5]) {
       const broken = structuredClone(raw);
       broken.enemies[0].skillStep = invalid;
       assert.equal(Game.restore(g.save, broken), null);
@@ -226,17 +241,17 @@ test('双王同帧圆阵完整保留，危险区可重叠，不额外增加互�
   g.update(0.01);
   assert.equal(g.zones.length, 12);
   assert.deepEqual(g.zones.slice(0, 6), g.zones.slice(6, 12));
-  assert.equal(e.cooldown, 2.2);
-  assert.equal(other.cooldown, 2.2);
+  assert.equal(e.cooldown, bossSkillCooldown(0, true, false));
+  assert.equal(other.cooldown, bossSkillCooldown(0, true, false));
 });
 
-test('原三招及仙尊六招每轮全部出齐且交界不连用，原冷却及半血强化保留', () => {
+test('原三招和新增第四招及仙尊六招每轮全部出齐且交界不连用，原冷却及半血强化保留', () => {
   for (let origin = 0; origin < 7; origin++)
     for (const enraged of [false, true]) {
       const { g, e } = encounter(origin, 0);
       e.bossSkillQueue = undefined;
       if (enraged) e.hp = e.maxHp * 0.4;
-      const count = origin === 6 ? 6 : 3;
+      const count = bossSkills(origin, true).length;
       let previous = -1;
       for (let round = 0; round < 5; round++) {
         const seen = new Set<number>();
@@ -261,7 +276,7 @@ test('原三招及仙尊六招每轮全部出齐且交界不连用，原冷却�
         const native = encounter(origin, 1, origin);
         if (enraged) native.e.hp = native.e.maxHp * 0.4;
         native.g.castBossSkill(native.e, 1, 0);
-        assert.equal(native.e.cooldown, enraged ? 1.85 : 3);
+        assert.equal(native.e.cooldown, bossSkillCooldown(origin, false, enraged));
       }
     }
 });

@@ -756,6 +756,7 @@ export function ensureScene(
   next: () => void,
   run?: Game | null,
   tribulation = false,
+  combat = false,
 ) {
   const extra =
     run?.enemies.map((e) =>
@@ -773,7 +774,8 @@ export function ensureScene(
       .max
   )
     extraImages.push('/assets/qinglan-prologue.webp');
-  if (shell.renderer.hasScene(stage, isTribulation, extra, extraImages)) return true;
+  const battle = combat || !!run || isTribulation;
+  if (shell.renderer.hasScene(stage, isTribulation, extra, extraImages, battle)) return true;
   if (shell.sceneLoading) return false;
   shell.sceneLoading = true;
   const loading = shell.document.createElement('div');
@@ -798,6 +800,7 @@ export function ensureScene(
           `${Math.round((done / total) * 100)}% · ${done} / ${total} 项资源`;
       },
       extraImages,
+      battle,
     )
     .then(() => {
       loading.remove();
@@ -812,7 +815,7 @@ export function ensureScene(
       retry.onclick = () => {
         loading.remove();
         shell.sceneLoading = false;
-        shell.ensureScene(stage, next, run, tribulation);
+        shell.ensureScene(stage, next, run, tribulation, combat);
       };
       retry.focus();
     });
@@ -842,7 +845,7 @@ export function startRun(shell: ActionShell) {
     shell.panelFrame(...shell.restartRunPanel());
     return;
   }
-  if (!shell.ensureScene(shell.selectedStage, shell.startRun)) {
+  if (!shell.ensureScene(shell.selectedStage, shell.startRun, null, false, true)) {
     return;
   }
   let entering: Game | null = null;

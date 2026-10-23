@@ -24,7 +24,7 @@ function encounter(stage: number, regional = false) {
   return { g, boss };
 }
 
-// 仅构造已保存的旧幻影，当前妖王不再生成这种追加招式。
+// 仅为边界回归构造假影；实际瞬移留影由保留技能套件验证。
 function legacyShadows(g: Game, boss: Enemy) {
   return [-150, 0, 150].map((side) => {
     const shadow = g.spawnEnemy(58, false, false, { x: boss.x, y: boss.y + side });
@@ -133,15 +133,26 @@ test('六关首批特色小怪有实际技能差异，终关兵种保持原行�
   }
 });
 
-test('前六关远距追袭恢复有完整预警的直线冲锋，不再用地域条带替代', () => {
+test('前六境远距保留毒君追云和冥主瞬移，其余冲锋完整预警，不生成条带', () => {
   for (let stage = 0; stage < 6; stage++) {
     const { g, boss } = encounter(stage);
     boss.x = -500;
     boss.pursuitCooldown = 0;
     g.update(0.01);
-    assert.ok(boss.charge > 0.7);
-    assert.equal(g.zones.length, 0);
-    assert.ok(g.effects.some((e) => e.kind === 'line' && e.life > 0));
+    if (stage === 3) {
+      assert.equal(boss.charge, 0);
+      assert.equal(g.zones.length, 1);
+      assert.equal(g.zones[0].endX, undefined);
+      assert.equal(g.zones[0].vx, 32);
+    } else if (stage === 4) {
+      assert.equal(boss.charge, 0);
+      assert.equal(boss.x, -260);
+      assert.equal(g.zones.length, 0);
+    } else {
+      assert.ok(boss.charge > 0.7);
+      assert.equal(g.zones.length, 0);
+      assert.ok(g.effects.some((e) => e.kind === 'line' && e.life > 0));
+    }
     assert.ok(Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot()))));
   }
 });
@@ -366,5 +377,6 @@ test('小怪条带/游瘴在预警、激活、减少动态下保持画布状态�
   assert.match(bestiaryPanel(3).body, /五毒瘴池/);
   assert.match(bestiaryPanel(4).body, /摄魂灵轮/);
   assert.match(bestiaryPanel(6).body, /摄魂灵轮/);
-  assert.ok(!bestiaryPanel(6).body.includes('幽影换形'));
+  assert.ok(bestiaryPanel(6).body.includes('幽影换形'));
+  assert.ok(!bestiaryPanel(6).body.includes('游魂双障'));
 });

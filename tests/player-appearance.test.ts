@@ -1,3 +1,4 @@
+import * as battleArt from '../src/battle-art.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -48,6 +49,7 @@ test('首页主体、元婴与实战读取各自道途，换道不改变旧局�
     get: () => () => gradient,
   });
   const renderer = Object.assign(Object.create(Renderer.prototype), {
+    battleArt,
     ctx,
     width: 1365,
     height: 900,

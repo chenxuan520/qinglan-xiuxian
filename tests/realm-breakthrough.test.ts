@@ -1,3 +1,4 @@
+import * as battleArt from '../src/battle-art.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -165,6 +166,7 @@ test('七个大境界适配手机和横屏，减少动态效果静止，动态�
               },
           });
           const renderer = Object.assign(Object.create(Renderer.prototype), {
+            battleArt,
             ctx,
             width,
             height,

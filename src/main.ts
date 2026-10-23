@@ -1190,8 +1190,14 @@ function closeRewardAd() {
 function renderResult() {
   return sceneFlow.renderResult(shellBindings());
 }
-function ensureScene(stage: number, next: () => void, run?: Game | null, tribulation = false) {
-  return sceneFlow.ensureScene(shellBindings(), stage, next, run, tribulation);
+function ensureScene(
+  stage: number,
+  next: () => void,
+  run?: Game | null,
+  tribulation = false,
+  combat = false,
+) {
+  return sceneFlow.ensureScene(shellBindings(), stage, next, run, tribulation, combat);
 }
 function startRun() {
   return sceneFlow.startRun(shellBindings());

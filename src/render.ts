@@ -1,5 +1,4 @@
 import { resourceFailed } from './update-check.ts';
-import { drawRealmBreakthrough, drawBossEntrance } from './render-overlays.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
 import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
 import { hazardMargin } from './regional-hazards.ts';
@@ -12,17 +11,16 @@ import { sceneAssets } from './scene-assets.ts';
 
 import { drawPlayerFormation } from './player-formation.ts';
 import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
-import { drawBossField, drawBossShot } from './boss-effects.ts';
-import {
-  hasArtifactField,
-  drawArtifactField,
-  drawArtifactObject,
-  drawArtifactBeam,
-  drawArtifactBurst,
-} from './artifact-effects.ts';
+import { ModuleSource, retryModule } from './module-source.ts';
+
+type BattleArt = typeof import('./battle-art.ts');
+const battleArtSource = new ModuleSource<BattleArt>((attempt) =>
+  attempt ? retryModule('battle-art', 'battle-art', attempt) : import('./battle-art.ts'),
+);
 
 export class Renderer {
   ctx: CanvasRenderingContext2D;
+  private battleArt: BattleArt | null = null;
   private images = new Map<string, HTMLImageElement>();
   private sprites = new Map<string, HTMLCanvasElement>();
   private formations = new Map<string, HTMLCanvasElement>();
@@ -46,9 +44,13 @@ export class Renderer {
     tribulation = false,
     extraSprites: number[] = [],
     extraImages: string[] = [],
+    combat = false,
   ) {
-    return [...sceneAssets(stage, tribulation, extraSprites), ...extraImages].every((url) =>
-      this.loadedImages.has(url),
+    return (
+      (!combat || !!this.battleArt) &&
+      [...sceneAssets(stage, tribulation, extraSprites), ...extraImages].every((url) =>
+        this.loadedImages.has(url),
+      )
     );
   }
   async prepareScene(
@@ -57,12 +59,22 @@ export class Renderer {
     extraSprites: number[],
     progress: (done: number, total: number) => void,
     extraImages: string[] = [],
+    combat = false,
   ) {
     const urls = [...sceneAssets(stage, tribulation, extraSprites), ...extraImages];
     let done = 0;
-    progress(0, urls.length);
-    await Promise.all(
-      urls.map(async (url) => {
+    const total = urls.length + Number(combat);
+    progress(0, total);
+    await Promise.all([
+      ...(combat
+        ? [
+            battleArtSource.load().then((art) => {
+              this.battleArt = art;
+              progress(++done, total);
+            }),
+          ]
+        : []),
+      ...urls.map(async (url) => {
         let request = this.imageRequests.get(url);
         if (!request) {
           request = new Promise<void>((resolve, reject) => {
@@ -87,9 +99,9 @@ export class Renderer {
           this.imageRequests.set(url, request);
         }
         await request;
-        progress(++done, urls.length);
+        progress(++done, total);
       }),
-    );
+    ]);
   }
   private terrainPattern(image: HTMLImageElement) {
     const texture = document.createElement('canvas');
@@ -197,10 +209,16 @@ export class Renderer {
     this.needsRedraw = false;
   }
   private drawRealmBreakthrough(game: Game) {
-    drawRealmBreakthrough(this.ctx, this.width, this.height, game, this.reducedMotion.matches);
+    this.battleArt!.drawRealmBreakthrough(
+      this.ctx,
+      this.width,
+      this.height,
+      game,
+      this.reducedMotion.matches,
+    );
   }
   private drawBossEntrance(game: Game) {
-    drawBossEntrance(
+    this.battleArt!.drawBossEntrance(
       this.ctx,
       this.width,
       this.height,
@@ -361,12 +379,12 @@ export class Renderer {
     }
     // 先画地面底色；危险边界集中放在法宝、人物和装饰之后绘制。
     for (const z of game.zones)
-      if (hasArtifactField(z) && this.visible(z, p, z.radius + 50))
-        drawArtifactField(c, z, time, this.reducedMotion.matches);
+      if (this.battleArt!.hasArtifactField(z) && this.visible(z, p, z.radius + 50))
+        this.battleArt!.drawArtifactField(c, z, time, this.reducedMotion.matches);
     for (const z of game.zones) {
-      if (hasArtifactField(z) || !this.visible(z, p, hazardMargin(z))) continue;
+      if (this.battleArt!.hasArtifactField(z) || !this.visible(z, p, hazardMargin(z))) continue;
       if (drawRegionalField(c, z, time, this.reducedMotion.matches)) continue;
-      if (drawBossField(c, z, time, this.reducedMotion.matches)) continue;
+      if (this.battleArt!.drawBossField(c, z, time, this.reducedMotion.matches)) continue;
       c.save();
       c.translate(z.x, z.y);
       const alpha = z.delay > 0 ? 0.15 + Math.sin(time * 13) * 0.06 : 0.22;
@@ -521,6 +539,10 @@ export class Renderer {
         );
         c.globalAlpha = 1;
       } else {
+        if ('bossSummon' in e && e.bossSummon) {
+          this.battleArt!.drawBossSummon(c, e);
+          if (e.bossSummon.kind === 'heart') continue;
+        }
         if (e.illusionOf !== undefined) {
           c.save();
           c.globalAlpha = 0.38;
@@ -606,8 +628,8 @@ export class Renderer {
       }
     }
     for (const z of game.zones)
-      if (hasArtifactField(z) && this.visible(z, p, z.radius + 180))
-        drawArtifactObject(c, z, time, this.reducedMotion.matches);
+      if (this.battleArt!.hasArtifactField(z) && this.visible(z, p, z.radius + 180))
+        this.battleArt!.drawArtifactObject(c, z, time, this.reducedMotion.matches);
     const lotus = game.weapons.find((w) => w.id === 'orbit');
     if (lotus) {
       const count = 2 + Math.floor(lotus.level / 2) + (lotus.evolved ? 3 : 0),
@@ -632,7 +654,12 @@ export class Renderer {
         c.rotate(a);
         if (shot.kind === 'blade') c.rotate(time * 12);
         if (shot.kind === 'hostile' && shot.bossStage !== undefined) {
-          drawBossShot(c, shot);
+          if (shot.bossMotion) {
+            c.save();
+            this.battleArt!.drawBossShot(c, shot);
+            c.restore();
+            this.battleArt!.drawBossMotionCue(c, shot);
+          } else this.battleArt!.drawBossShot(c, shot);
         } else if (shot.kind === 'dragon') {
           const bend = this.reducedMotion.matches ? 0 : Math.sin(shot.age * 7) * 8;
           c.strokeStyle = shot.color + '50';
@@ -909,7 +936,7 @@ export class Renderer {
           c.stroke();
         }
       } else if (['chain', 'whip', 'starline', 'tower-ray'].includes(e.kind)) {
-        drawArtifactBeam(c, e, this.reducedMotion.matches);
+        this.battleArt!.drawArtifactBeam(c, e, this.reducedMotion.matches);
       } else if (e.kind === 'lightning') {
         c.translate(e.x, e.y);
         this.glowSprite(`lightning:${e.color}`, 110, 570, (c) => {
@@ -929,7 +956,7 @@ export class Renderer {
           c.stroke();
         });
       } else if (e.kind === 'ice' || e.kind === 'bell') {
-        drawArtifactBurst(c, e, this.reducedMotion.matches);
+        this.battleArt!.drawArtifactBurst(c, e, this.reducedMotion.matches);
       } else if (e.kind === 'awaken') {
         this.awakening(p.x, p.y, 1 - e.life / e.maxLife, e.radius, e.color, e.element);
       } else {

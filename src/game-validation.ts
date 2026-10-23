@@ -1,3 +1,5 @@
+import { BOSS_MECHANICS, validBossMotion } from './boss-mechanics.ts';
+import { bossSkills } from './boss-skills.ts';
 import { isCurio, acquiredCurio } from './curio-data.ts';
 import type { Game } from './game.ts';
 import type { SaveData } from './progress.ts';
@@ -24,9 +26,9 @@ import { BOSS_FOLLOWUP } from './boss-followup.ts';
 import { ENEMY_CONTROL } from './regional-hazards.ts';
 import { medicineInfo } from './medicine-data.ts';
 
-// 现有快照中终关曾排入追加招式；保留合法编号校验，恢复时只留下原招式。
+// 当前招式池同时用于原生秘境与终关快照校验。
 const savedBossSkillCount = (stage: number, finalTrial: boolean) =>
-  finalTrial ? [5, 6, 5, 6, 6, 7, 6][stage] : STAGES[stage].skills.length;
+  bossSkills(stage, finalTrial).length;
 
 // 校验原始对局结构；恢复气血、升级选项与修为入账仍由 Game.restore 完成。
 export function validateRunSnapshot(
@@ -118,6 +120,19 @@ export function validateRunSnapshot(
     if (
       s.nextEnemySlowAt !== undefined &&
       (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
+    )
+      return null;
+    if (
+      s.playerTrail !== undefined &&
+      (!Array.isArray(s.playerTrail) ||
+        s.playerTrail.length > BOSS_MECHANICS.trailLimit ||
+        !s.playerTrail.every(
+          (p, i) =>
+            numbers(p, ['x', 'y', 'time']) &&
+            p.time >= 0 &&
+            p.time <= s.time &&
+            (i === 0 || p.time > s.playerTrail[i - 1].time),
+        ))
     )
       return null;
     for (const [duration, limit] of [
@@ -239,6 +254,17 @@ export function validateRunSnapshot(
             'dy',
           ]) &&
           ENEMIES[e.type] &&
+          (e.bossSummon === undefined ||
+            (!!e.bossSummon &&
+              !e.boss &&
+              !s.tribulation &&
+              ['heart', 'wolf'].includes(e.bossSummon.kind) &&
+              Number.isFinite(e.bossSummon.age) &&
+              e.bossSummon.age >= 0 &&
+              e.bossSummon.age <= 8 &&
+              [-1, 1].includes(e.bossSummon.side) &&
+              Number.isSafeInteger(e.summonedBy) &&
+              e.summonedBy! > 0)) &&
           (e.chargeFollowup === undefined ||
             (typeof e.chargeFollowup === 'boolean' &&
               e.boss &&
@@ -327,6 +353,10 @@ export function validateRunSnapshot(
             'pierce',
             'bounce',
           ]) &&
+          (b.bossMotion === undefined ||
+            (b.kind === 'hostile' &&
+              !s.tribulation &&
+              validBossMotion(b.bossMotion, b.bossStage))) &&
           (b.enemySkill === undefined ||
             ['firebolt', 'frostbolt', 'soul'].includes(b.enemySkill)) &&
           (b.bossStage === undefined ||
