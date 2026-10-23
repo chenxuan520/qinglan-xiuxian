@@ -346,6 +346,13 @@
   border: 1px solid #c5d3aa40;
   background: #153b3320;
 }
+.auction-admission {
+  display: grid;
+  gap: 16px;
+}
+.auction-admission .result-actions button {
+  min-height: 48px;
+}
 .auction-card header {
   display: flex;
   align-items: center;

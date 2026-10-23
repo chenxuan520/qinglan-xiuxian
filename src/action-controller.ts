@@ -858,8 +858,8 @@ function handleSectAndMarket(shell: ActionShell, action: string, id?: string): b
     shell.panel === 'sect-auction' &&
     shell.marketScene?.nearAuction
   ) {
-    if (action === 'auction-hall') {
-      shell.marketEventSource.current?.auctionHallAction(shell, id);
+    if (['auction-hall', 'auction-hall-confirm', 'auction-hall-cancel'].includes(action)) {
+      shell.marketEventSource.current?.auctionHallAction(shell, id, action);
       return true;
     }
     if (action === 'auction-view' && (id === 'buy' || id === 'sell' || id === 'history')) {

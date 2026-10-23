@@ -58,6 +58,7 @@ function harness(
   const note = { hidden: true, textContent: '' };
   const section = { scrollTop: 123 };
   const host = {
+    querySelector: () => ({ focus() {} }),
     get innerHTML() {
       return html;
     },
@@ -76,11 +77,7 @@ function harness(
       if (selector === '#auction-reserve') return { value: reserve };
       if (selector === '#auction-quantity') return { value: '2' };
       if (selector.startsWith('[data-action="auction-')) {
-        const action = selector.includes('auction-hall')
-          ? 'auction-hall'
-          : selector.includes('auction-buy')
-            ? 'auction-buy'
-            : 'auction-sell';
+        const action = selector.match(/data-action="([^"]+)"/)![1];
         const id = selector.match(/data-id="(\d+)"/)?.[1];
         const button = html.match(
           new RegExp(
@@ -90,11 +87,12 @@ function harness(
         return button
           ? {
               dataset: {
-                visit: button.match(/data-visit="(\d+)"/)![1],
+                visit: button.match(/data-visit="(\d+)"/)?.[1],
                 hall: button.match(/data-hall="(\d+)"/)?.[1],
                 pay: button.match(/data-pay="(\d+)"/)?.[1],
               },
               disabled: button.includes('disabled'),
+              focus() {},
             }
           : null;
       }
@@ -104,6 +102,7 @@ function harness(
   const context = createContext({
     // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
     chronicleSource: { observe() {} },
+    medicinePanel: { handle: () => false },
     hideAchievementNotice() {},
     dispatchAction,
     save,
@@ -158,6 +157,7 @@ function harness(
     note,
     section,
     messages,
+    html: () => html,
     action: (a: string, id?: string) => context.handleAction(a, id),
     stored: () => JSON.parse(stored),
     fail: (value = true) => {
@@ -338,6 +338,8 @@ test('真实会场缴费保存失败或跨窗口冲突零扣费，成功资格�
     const before = JSON.stringify(h.save);
     if (failure !== 'none') h[failure]();
     h.action('auction-hall', '1');
+    assert.equal(JSON.stringify(h.save), before);
+    h.action('auction-hall-confirm', '1');
     if (failure !== 'none') {
       assert.equal(JSON.stringify(h.save), before);
       continue;
@@ -346,7 +348,7 @@ test('真实会场缴费保存失败或跨窗口冲突零扣费，成功资格�
     assert.equal(h.save.age, 30);
     assert.equal(h.save.mortal.auction!.paidHall, 1);
     assert.equal(h.stored().mortal.auction.paidHall, 1);
-    assert.equal(h.section.scrollTop, 123);
+    assert.equal(h.section.scrollTop, 0);
     h.action('auction-hall', '1');
     assert.equal(h.save.stones, 7000);
     h.action('auction-hall', '0');
@@ -356,6 +358,7 @@ test('真实会场缴费保存失败或跨窗口冲突零扣费，成功资格�
 test('出售页跨会场重置非法种类，界面所见与真实提交一致', () => {
   const h = harness();
   h.action('auction-hall', '1');
+  h.action('auction-hall-confirm', '1');
   h.action('auction-view', 'sell');
   h.context.auctionKind = 'curio';
   h.context.refreshAuction();
@@ -368,4 +371,100 @@ test('出售页跨会场重置非法种类，界面所见与真实提交一致',
   h.context.refreshAuction();
   h.action('auction-hall', '1');
   assert.equal(h.context.auctionKind, 'medicine');
+});
+
+for (const [hall, fee, name] of [
+  [1, 3000, '地字场'],
+  [2, 10000, '天字场'],
+] as const) {
+  test(`${name}付费资格先确认，取消不改存档，确认后只扣一次并可免费切场`, () => {
+    const h = harness();
+    const before = structuredClone(h.save);
+    const stored = h.stored();
+    h.action('auction-hall-confirm', String(hall));
+    assert.deepEqual(h.save, before, '不能从普通列表跳过确认直接扣费');
+    h.action('auction-hall', String(hall));
+    assert.deepEqual(h.save, before);
+    assert.deepEqual(h.stored(), stored);
+    assert.match(h.html(), new RegExp(`取得${name}资格`));
+    assert.match(h.html(), new RegExp(`确认支付 ${fee} 灵石`));
+    if (hall === 2) assert.match(h.html(), /同时可进入地字场/);
+    h.action('auction-hall-cancel', String(hall));
+    assert.deepEqual(h.save, before);
+    assert.deepEqual(h.stored(), stored);
+    assert.doesNotMatch(h.html(), /data-action="auction-hall-confirm"/);
+    h.action('auction-hall', String(hall));
+    h.action('auction-hall-confirm', String(hall === 1 ? 2 : 1));
+    assert.deepEqual(h.save, before, '确认按钮只能支付展示的那个会场');
+    h.action('auction-hall-confirm', String(hall));
+    assert.equal(h.save.stones, before.stones - fee);
+    assert.equal(h.save.age, before.age);
+    assert.equal(h.save.mortal.auction!.paidHall, hall);
+    assert.equal(h.save.mortal.auction!.hall, hall);
+    assert.equal(h.stored().mortal.auction.paidHall, hall);
+    assert.doesNotMatch(h.html(), /data-action="auction-hall-confirm"/);
+    h.action('auction-hall-confirm', String(hall));
+    h.action('auction-hall', '0');
+    h.action('auction-hall', String(hall));
+    if (hall === 2) h.action('auction-hall', '1');
+    assert.equal(h.save.stones, before.stones - fee);
+    assert.doesNotMatch(h.html(), /data-action="auction-hall-confirm"/);
+  });
+}
+test('资格付款确认保存失败后保留确认供重试，余额和批次变化时重新校验', () => {
+  const h = harness();
+  h.action('auction-hall', '2');
+  const before = structuredClone(h.save);
+  h.fail();
+  h.action('auction-hall-confirm', '2');
+  assert.deepEqual(h.save, before);
+  assert.match(h.html(), /确认支付 10000 灵石/);
+  h.fail(false);
+  h.action('auction-hall-confirm', '2');
+  assert.equal(h.save.stones, 0);
+  assert.equal(h.stored().mortal.auction.paidHall, 2);
+  for (const change of ['balance', 'visit'] as const) {
+    const h = harness();
+    h.action('auction-hall', '1');
+    if (change === 'balance') h.save.stones = 2999;
+    else h.save.mortal.sectMarket!.visit++;
+    const before = structuredClone(h.save);
+    h.action('auction-hall-confirm', '1');
+    assert.deepEqual(h.save, before);
+    assert.ok(h.messages.length);
+  }
+});
+test('境界足够免费入场，不足费用禁用入口，离场及锁档后确认不能扣费', () => {
+  const qualified = harness(false, {
+    setup(save) {
+      save.cultivation = Array.from({ length: 18 }, (_, i) => realmCost(i)).reduce(
+        (a, b) => a + b,
+        0,
+      );
+    },
+  });
+  const stones = qualified.save.stones;
+  qualified.action('auction-hall', '0');
+  qualified.action('auction-hall', '2');
+  assert.equal(qualified.save.stones, stones);
+  assert.equal(qualified.save.mortal.auction!.hall, 2);
+  assert.doesNotMatch(qualified.html(), /data-action="auction-hall-confirm"/);
+  const poor = harness(false, {
+    setup(save) {
+      save.stones = 2999;
+    },
+  });
+  poor.action('auction-hall', '1');
+  assert.doesNotMatch(poor.html(), /data-action="auction-hall-confirm"/);
+  assert.equal(poor.save.stones, 2999);
+  for (const field of ['panel', 'saveLock', 'inMarket'] as const) {
+    const h = harness();
+    h.action('auction-hall', '1');
+    const before = structuredClone(h.save);
+    if (field === 'panel') h.context.panel = '';
+    else if (field === 'saveLock') h.context.saveLock = 'stale';
+    else h.context.inMarket = false;
+    h.action('auction-hall-confirm', '1');
+    assert.deepEqual(h.save, before);
+  }
 });

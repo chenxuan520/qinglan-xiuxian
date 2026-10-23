@@ -212,11 +212,18 @@ export function auctionContent(
 }
 
 // 会场切换与缴费同样先写档，再应用到当前页面。
-export function auctionHallAction(shell: ActionShell, id?: string) {
+export function auctionHallAction(shell: ActionShell, id?: string, action = 'auction-hall') {
   const button = shell.modal.querySelector<HTMLButtonElement>(
-    `[data-action="auction-hall"][data-id="${Number(id)}"]`,
+    `[data-action="${action}"][data-id="${Number(id)}"]`,
   );
   if (!button || button.disabled) return;
+  if (action === 'auction-hall-cancel') {
+    shell.refreshAuction();
+    shell.modal
+      .querySelector<HTMLButtonElement>(`[data-action="auction-hall"][data-id="${Number(id)}"]`)
+      ?.focus({ preventScroll: true });
+    return;
+  }
   const next = shell.structuredClone(shell.save);
   const reason = selectAuctionHall(
     next,
@@ -226,6 +233,16 @@ export function auctionHallAction(shell: ActionShell, id?: string) {
   );
   if (reason) {
     shell.toast(reason);
+    return;
+  }
+  if (next.stones < shell.save.stones && action !== 'auction-hall-confirm') {
+    const host = shell.modal.querySelector<HTMLElement>('#auction-content');
+    if (!host) return;
+    const hall = AUCTION_HALLS[Number(id)]!;
+    host.innerHTML = `<section class="auction-card auction-admission" aria-labelledby="auction-admission-title"><h3 id="auction-admission-title">取得${hall.name}资格？</h3><p>支付 <strong>${num(hall.admission)} 灵石</strong>，取得本世${hall.name}资格${Number(id) === 2 ? `，同时可进入${AUCTION_HALLS[1].name}` : ''}。</p><p class="panel-note">确认后扣除灵石并进入会场，本世不再重复收费。</p><div class="result-actions"><button class="secondary-button" data-action="auction-hall-cancel" data-id="${Number(id)}">暂不支付</button><button class="primary-button" data-action="auction-hall-confirm" data-id="${Number(id)}" data-visit="${button.dataset.visit}" data-pay="1">确认支付 ${num(hall.admission)} 灵石</button></div></section>`;
+    const section = shell.modal.querySelector<HTMLElement>('.panel');
+    if (section) section.scrollTop = 0;
+    host.querySelector<HTMLButtonElement>('[data-action="auction-hall-cancel"]')?.focus();
     return;
   }
   try {
