@@ -5,7 +5,12 @@ export interface MarketVenueState {
   workAt: number | null;
   favorAt: number | null;
   seeking?: Record<string, number>;
-  receipts: { kind: 'work' | 'seek' | 'host' | 'favor'; at: number; text: string }[];
+  shops?: { exchangeAt: number | null; caravanAt: number | null };
+  receipts: {
+    kind: 'work' | 'seek' | 'host' | 'favor' | 'exchange' | 'salvage' | 'caravan';
+    at: number;
+    text: string;
+  }[];
 }
 export function validMarketVenues(input: unknown, age: number): input is MarketVenueState {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
@@ -13,6 +18,12 @@ export function validMarketVenues(input: unknown, age: number): input is MarketV
   const at = (v: unknown): v is number =>
     typeof v === 'number' && Number.isFinite(v) && v >= 15 && v <= age;
   return (
+    (s.shops === undefined ||
+      (!!s.shops &&
+        typeof s.shops === 'object' &&
+        !Array.isArray(s.shops) &&
+        (s.shops.exchangeAt === null || at(s.shops.exchangeAt)) &&
+        (s.shops.caravanAt === null || at(s.shops.caravanAt)))) &&
     (s.seeking === undefined ||
       (!!s.seeking &&
         typeof s.seeking === 'object' &&
@@ -31,7 +42,7 @@ export function validMarketVenues(input: unknown, age: number): input is MarketV
     s.receipts.every(
       (r) =>
         r &&
-        ['work', 'seek', 'host', 'favor'].includes(r.kind) &&
+        ['work', 'seek', 'host', 'favor', 'exchange', 'salvage', 'caravan'].includes(r.kind) &&
         at(r.at) &&
         typeof r.text === 'string' &&
         r.text.length > 0 &&

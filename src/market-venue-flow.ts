@@ -5,6 +5,7 @@ import { executeVenue } from './market-venues.ts';
 import { marketVenueContent } from './market-venue-ui.ts';
 import { seekingContent, type SeekingSelection } from './artifact-seeking-ui.ts';
 import { seekArtifact } from './artifact-seeking.ts';
+import { bindMarketShop, marketShopAction } from './market-shop-flow.ts';
 
 function bindSeeking(shell: ActionShell) {
   const host = shell.modal.querySelector<HTMLElement>('#artifact-seeking');
@@ -42,6 +43,7 @@ export function renderVenue(shell: ActionShell, id: MarketVenueId) {
     `<div id="market-venue-content" data-venue="${id}">${marketVenueContent(shell.save, id, !!shell.pendingRun)}</div>`,
   );
   bindSeeking(shell);
+  bindMarketShop(shell);
 }
 export function marketVenueAction(shell: ActionShell, action: string, choice?: string) {
   const host = shell.modal.querySelector<HTMLElement>('#market-venue-content');
@@ -60,6 +62,10 @@ export function marketVenueAction(shell: ActionShell, action: string, choice?: s
     (b) => b.dataset.action === action && b.dataset.id === choice,
   );
   if (!button || button.disabled || !choice) return;
+  if (action.startsWith('market-venue-shop')) {
+    marketShopAction(shell, action, choice, button);
+    return;
+  }
   if (action === 'market-venue-guide') {
     if (!shell.marketScene.guideTo(choice)) return;
     shell.panel = '';

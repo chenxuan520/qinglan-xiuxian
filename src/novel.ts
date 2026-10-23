@@ -1,4 +1,5 @@
 import manuscript from '../docs/novel.md?raw';
+import manuscriptUrl from '../docs/novel.md?url';
 import { parseNovel } from './novel-content.ts';
 import './novel.css';
 
@@ -180,6 +181,9 @@ for (const volume of book.volumes) {
   details.append(summary, ol);
   list.append(details);
 }
+const download = get<HTMLAnchorElement>('download-manuscript');
+download.href = manuscriptUrl;
+download.hidden = false;
 get('book-count').textContent = `${book.volumes.length} 卷 · ${book.chapters.length} 章`;
 previous.addEventListener('click', () => selectChapter(index - 1));
 next.addEventListener('click', () => selectChapter(index + 1));

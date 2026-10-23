@@ -225,10 +225,24 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   const visitor = shell.save.mortal.immortal;
   if (visitor?.npcId === npc.id && !shell.save.journeyEnded) {
     shell.closeNpcChat();
-    const granted = shell.meetTownImmortal(shell.save, npc.id, npc.name);
-    if (granted) shell.persist();
+    const next = shell.structuredClone(shell.save);
+    const granted = shell.meetTownImmortal(next, npc.id, npc.name, shell.pendingRun?.loot.curios);
+    if (granted) {
+      try {
+        shell.writeSave(next, shell.pendingRun);
+      } catch {
+        if (!shell.saveLock) {
+          shell.panel = '';
+          shell.toast('这场相逢未能保存，请再与前辈交谈');
+        }
+        return;
+      }
+      Object.assign(shell.save, next);
+    }
 
-    shell.panelFrame(...shell.immortalEncounterPanel(shell.save, npc, granted));
+    shell.panelFrame(
+      ...shell.immortalEncounterPanel(shell.save, npc, granted, shell.pendingRun?.loot.curios),
+    );
     return;
   }
   const storyId = Object.keys(shell.HUMAN_STORIES).find(

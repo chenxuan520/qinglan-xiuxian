@@ -6,7 +6,7 @@ import { MEDICINES, medicineInfo } from './medicine-data.ts';
 import { medicineArt } from './medicine-ui.ts';
 import { itemArt } from './item-art.ts';
 import { assetUrl } from './asset-url.ts';
-import type { SaveData } from './progress.ts';
+import { forgeDamageBonus, type SaveData } from './progress.ts';
 import { marketCultivators } from './sect-market-data.ts';
 import {
   AUCTION_HALLS,
@@ -58,6 +58,18 @@ function artifactInspection(item: AuctionItem) {
   if (item.kind !== 'artifact') return '';
   const t = treasure(item.id);
   return `<details class="auction-inspection"><summary>鉴宝 · 攻击与配套</summary><p>${elementInfo(t.element).name}系 · ${t.tag}</p><p>${t.desc}</p>${catalogEvolutionRecipe(t)}<p class="panel-note">${pathInfo(t.school).name}或兼修路线可领悟此宝、设为本命。法宝六重与任一配套功法五重齐备后，在局内升级中选择仙器觉醒。纯修仅可用本流派功法，兼修可任选配套功法；炼器阶数不代替局内重数。</p></details>`;
+}
+export function auctionArtifactComparison(save: SaveData, item: AuctionItem) {
+  if (item.kind !== 'artifact') return '';
+  const owned = save.artifacts.includes(item.id);
+  const current = save.forge[item.id] || 0;
+  const bonus = Math.round(forgeDamageBonus(item.forgeLevel) * 100);
+  const detail = !owned
+    ? `尚未收藏 · 竞得后收入藏器阁<br>此宝炼器增伤 +${bonus}%`
+    : item.forgeLevel > current
+      ? `已有 ${current} 阶 → 竞得后 ${item.forgeLevel} 阶<br><strong>同等搭配，此宝伤害 +${(((1 + forgeDamageBonus(item.forgeLevel)) / (1 + forgeDamageBonus(current)) - 1) * 100).toFixed(1)}%</strong><br>炼器增伤 +${Math.round(forgeDamageBonus(current) * 100)}% → +${bonus}%`
+      : `已有 ${current} 阶 · 拍品 ${item.forgeLevel} 阶<br>现有炼器${current === item.forgeLevel ? '相同' : '更高'}，无需竞拍`;
+  return `<p class="panel-note" data-artifact-comparison="${item.id}">${detail}</p>`;
 }
 export function auctionResult(
   save: SaveData,
@@ -163,7 +175,7 @@ export function auctionContent(
         }
         const reason = auctionBuyReason(save, lot.index, visit, unfinished);
         const minimum = lot.start + auctionFee(lot.start);
-        return `<article class="auction-card"><header>${art(lot)}<div><small>${lot.seller}的委托</small><h3>${auctionItemName(lot)} ×${lot.quantity}</h3></div></header><p>${detail(lot)}</p>${artifactInspection(lot)}<strong>起拍 ${num(lot.start)} 灵石</strong><label>最高预算（含手续费）<input id="auction-budget-${lot.index}" type="number" inputmode="numeric" min="${minimum}" max="${available}" step="1" value="${minimum}" aria-label="${auctionItemName(lot)}最高预算" ${reason || available < minimum ? 'disabled' : ''}></label><button class="secondary-button" data-action="auction-buy" data-id="${lot.index}" data-visit="${visit}" data-hall="${state.hall}" data-cycle="${save.curios.consignment?.cycle ?? -1}" ${reason || available < minimum ? 'disabled' : ''}>${reason || (available < minimum ? '灵石不足起拍预算' : '委托竞拍')}</button></article>`;
+        return `<article class="auction-card"><header>${art(lot)}<div><small>${lot.seller}的委托</small><h3>${auctionItemName(lot)} ×${lot.quantity}</h3></div></header><p>${detail(lot)}</p>${auctionArtifactComparison(save, lot)}${artifactInspection(lot)}<strong>起拍 ${num(lot.start)} 灵石</strong><label>最高预算（含手续费）<input id="auction-budget-${lot.index}" type="number" inputmode="numeric" min="${minimum}" max="${available}" step="1" value="${minimum}" aria-label="${auctionItemName(lot)}最高预算" ${reason || available < minimum ? 'disabled' : ''}></label><button class="secondary-button" data-action="auction-buy" data-id="${lot.index}" data-visit="${visit}" data-hall="${state.hall}" data-cycle="${save.curios.consignment?.cycle ?? -1}" ${reason || available < minimum ? 'disabled' : ''}>${reason || (available < minimum ? '灵石不足起拍预算' : '委托竞拍')}</button></article>`;
       })
       .join(
         '',

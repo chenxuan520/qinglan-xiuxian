@@ -492,3 +492,31 @@ test('法宝概率寻访与圆满成就的帮助对照真实机会、收费和�
   }
   assert.ok(!chronicleAchievements(save).some((a) => a.title === '慧眼识珍'));
 });
+
+test('坊中小铺帮助覆盖真实换丹投入、拆解返还、货单品级与办毕后间隔', async () => {
+  const { marketShopQuote, MARKET_SHOP_YEARS, MARKET_SHOP_COOLDOWN, SALVAGE_RATE, caravanOffers } =
+    await import('../src/market-shop.ts');
+  const save = freshSave('heaven', ['metal']);
+  save.cultivation = 1;
+  save.age = 30;
+  save.mortal.population = { seed: 12345, since: 15 };
+  save.medicine.bag.heqi = 2;
+  beginSectMarketVisit(save);
+  const text = guideContent('mortal');
+  for (const source of [text, gameplay]) {
+    assert.match(source, /两份同名时效丹换一份指定的同品级时效丹/);
+    assert.match(source, /办毕后隔十年再[换买]/);
+    assert.match(source, /不返灵石/);
+    assert.match(source, /灵品需筑基[，、]珍品需元婴/);
+    assert.match(source, /同等搭配下[该这]件?法宝/);
+  }
+  const q = marketShopQuote(save, 'medicine', 'heqi@juyuan');
+  assert.deepEqual([q.give[0].quantity, q.receive[0].quantity, q.stones], [2, 1, 0]);
+  assert.equal(MARKET_SHOP_YEARS, 0.5);
+  assert.equal(MARKET_SHOP_COOLDOWN, 10);
+  assert.equal(SALVAGE_RATE, 0.4);
+  assert.deepEqual(
+    caravanOffers(save).map((o) => o.minRealm),
+    [0, 1, 3],
+  );
+});

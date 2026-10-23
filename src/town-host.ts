@@ -2,6 +2,8 @@ import type { CultivationPath } from './data.ts';
 import type { SaveData } from './progress.ts';
 import { medicineInfo } from './medicine-data.ts';
 import { medicineArt } from './medicine-ui.ts';
+import { curioArt } from './curio-art.ts';
+import { curioName, acquiredCurio } from './curio-data.ts';
 import { freshTownPopulation, type TownResident } from './town-population.ts';
 import { townVisit, townReturnMemory } from './town-history.ts';
 import { visitTownImmortal } from './town-immortal.ts';
@@ -19,16 +21,32 @@ export function immortalEncounterPanel(
   save: SaveData,
   npc: TownResident,
   granted: boolean,
+  pendingCurios: Record<string, number> = {},
 ): PanelParts {
   const visitor = save.mortal.immortal!;
   const medicine = medicineInfo(visitor.medicineId)!;
-  const story = granted
+  const curio =
+    visitor.curioId &&
+    (visitor.claimed || (!acquiredCurio(save, visitor.curioId) && !pendingCurios[visitor.curioId]))
+      ? visitor.curioId
+      : undefined;
+  const name = curio ? curioName(curio) : medicine.name;
+  const held = curio ? save.curios.bag[curio] || 0 : save.medicine.bag[medicine.id] || 0;
+  const offered = visitor.claimed;
+  let story = granted
     ? '<p>那人混在赶集的人群里，衣衫寻常，正替摊主扶稳一盏旧灯。你停步问路，他却笑着说起千年前的渡口——连那时桥下的一株老柳，也记得清楚。</p><p>街声依旧喧闹，四周灵机却在他抬眼时静了一瞬。你才明白，眼前并非凡人。</p><p>“走得远了，才知人间一碗热茶，也值得回来。”他将一只小瓷瓶放入你掌心，“长生路长，莫只顾赶路。今日相逢，便赠你这一炉余香。”</p><p>再望去，他仍只是街巷里一张平常的面孔。你收好瓷瓶，把这场相逢记在心里。</p>'
-    : '<p>你再度向这位前辈问候。他仍坐在街巷间，笑着与你说起人间烟火。这场仙缘已记在心里，此次相遇的丹药也已赠过。</p>';
+    : '<p>你再度向这位前辈问候。他仍坐在街巷间，笑着与你说起人间烟火。这场仙缘已记在心里，此次相遇的赠礼也已收下。</p>';
+  if (curio)
+    story = story
+      .replace('一只小瓷瓶', '一件随身旧物')
+      .replace('这一炉余香', '这件随我走过山河的旧物')
+      .replace('收好瓷瓶', '将旧物收入行囊');
+  if (!offered)
+    story = '<p>前辈将赠礼收在袖中，笑着等你整理行囊。腾出余地后，再来领这场仙缘便是。</p>';
   return [
     '市井逢仙',
     `青岚镇 · 与${npc.name}的一席闲谈`,
-    `<section class="immortal-gift${granted ? '' : ' is-claimed'}" aria-label="仙人赠药">${medicineArt(medicine)}<div><small>仙人赠药 · ${medicine.years ? '珍品' : '本世珍品'}</small><strong>${granted ? '获赠' : '此前获赠'}：${medicine.name} <span>×1</span></strong><p>${granted ? '已收入丹囊' : '此前已赠药'} · 现持有 ${save.medicine.bag[medicine.id] || 0} 份</p></div></section><div class="town-story immortal-encounter">${story}</div><button class="primary-button" data-action="close">${granted ? '谢过前辈' : '与前辈作别'} · 继续游历</button>`,
+    `<section class="immortal-gift${granted ? '' : ' is-claimed'}" aria-label="仙人赠礼">${curio ? curioArt(curio) : medicineArt(medicine)}<div><small>仙人赠礼 · ${curio ? '奇物' : medicine.years ? '珍品' : '本世珍品'}</small><strong>${granted ? '获赠' : offered ? '此前获赠' : '待赠'}：${name} <span>×1</span></strong><p>${granted ? (curio ? '已收入行囊 · 持有即生效' : '已收入丹囊') : offered ? '此次赠礼已收下' : '行囊已满，尚未领取'} · 现持有 ${held} ${curio ? '件' : '份'}</p></div></section><div class="town-story immortal-encounter">${story}</div><button class="primary-button" data-action="close">${granted ? '谢过前辈' : '与前辈作别'} · 继续游历</button>`,
   ];
 }
 

@@ -18,13 +18,13 @@ export const MARKET_BUILDINGS = [
   { x: 1760, y: 1000, art: 8, label: '游商摊' },
 ] as const;
 export const MARKET_VENUES = [
-  { id: 'medicine', building: 0, x: 600, y: 670, hint: '余丹与换物' },
+  { id: 'medicine', building: 0, x: 600, y: 670, hint: '余丹调剂' },
   { id: 'artifacts', building: 2, x: 1400, y: 670, hint: '法器与求购' },
   { id: 'forum', building: 3, x: 520, y: 1300, hint: '听道 · 互证 · 主持' },
   { id: 'office', building: 4, x: 220, y: 600, hint: '托付与寻物' },
   { id: 'guests', building: 5, x: 1780, y: 600, hint: '旧识与求助' },
-  { id: 'stalls', building: 6, x: 240, y: 1080, hint: '散修见闻' },
-  { id: 'caravan', building: 7, x: 1760, y: 1080, hint: '来客与货讯' },
+  { id: 'stalls', building: 6, x: 240, y: 1080, hint: '旧器拆解' },
+  { id: 'caravan', building: 7, x: 1760, y: 1080, hint: '游商货单' },
 ] as const;
 export type MarketVenueId = (typeof MARKET_VENUES)[number]['id'];
 export const MARKET_LANES = [
