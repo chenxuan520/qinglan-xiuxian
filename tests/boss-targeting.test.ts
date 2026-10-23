@@ -69,7 +69,7 @@ test('妖王脚下落阵先预警再伤害，暂停与续局不改落点，移�
   for (const move of [false, true]) {
     const g = fixture(5);
     const e = g.spawnEnemy(10, false, true, { x: -1000, y: 0 }, 5);
-    e.skillStep = 1;
+    e.skillStep = 0;
     g.castBossSkill(e, 1, 0);
     g.state = 'paused';
     const restored = Game.restore(g.save, g.snapshot())!;
@@ -131,7 +131,7 @@ test('自动走位能离开妖王锁定主角的十字雷阵，原地停留会�
   for (const moving of [false, true]) {
     const g = fixture(5);
     const e = g.spawnEnemy(10, false, true, { x: -1000, y: 0 }, 5);
-    e.skillStep = 1;
+    e.skillStep = 0;
     g.castBossSkill(e, 1, 0);
     e.speed = 0;
     e.cooldown = e.pursuitCooldown = 9999;

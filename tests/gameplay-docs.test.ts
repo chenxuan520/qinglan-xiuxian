@@ -35,7 +35,7 @@ import { REGIONAL_DAMAGE_MULTIPLIER } from '../src/enemy-stats.ts';
 import { Game } from '../src/game.ts';
 import { bossSkills, bossSkillCooldown } from '../src/boss-skills.ts';
 import { bestiaryPanel } from '../src/bestiary-ui.ts';
-import { regionalEnemyFields, regionalBossFields } from '../src/regional-combat.ts';
+import { regionalEnemyFields } from '../src/regional-combat.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 import { guideContent, GUIDE_TABS } from '../src/guide.ts';
 import { AUCTION_HALLS, AUCTION_IRON_MIN, AUCTION_PREMIUM_MIN_VALUE } from '../src/auction-data.ts';
@@ -400,10 +400,16 @@ test('控制时长、漂移瘴云与人字场范围说明对照实际生效参�
   const g = new Game(freshSave(), 3, 0),
     e = g.spawnEnemy(50, false, false);
   const cloud = regionalEnemyFields(e, 'miasma', 1, 0)![0];
-  const boss = regionalBossFields(3, 0, e, g.player, 1, 0)![0];
+  const caster = g.spawnEnemy(10, false, true);
+  caster.skillStep = 0;
+  g.castBossSkill(caster, 1, 0);
+  const boss = g.zones[0];
   assert.ok(guide.includes(`小怪瘴云持续${+cloud.life.toFixed(1)}秒`));
   assert.ok(text.includes(`小怪瘴云持续${+cloud.life.toFixed(1)}秒`));
-  assert.ok(guide.includes(`持续${boss.life}秒的漂移瘴云`));
+  assert.equal(g.zones.length, 5);
+  assert.ok(g.zones.every((z) => z.endX === undefined && z.vx === undefined));
+  assert.ok(text.includes(`固定瘴池持续${boss.life}秒`));
+  assert.ok(guide.includes('五处固定瘴池'));
   for (const source of [guideContent('mortal'), gameplay])
     assert.match(
       source,
@@ -411,17 +417,28 @@ test('控制时长、漂移瘴云与人字场范围说明对照实际生效参�
     );
 });
 
-test('终关追加技能及间隔在帮助、图鉴与玩法文档中对照实际出招池', () => {
+test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际出招池', () => {
   const combat = compact(guideContent('combat'));
   const text = compact(gameplay);
   const book = bestiaryPanel(6).body;
   const counts = Array.from({ length: 6 }, (_, origin) => bossSkills(origin, true).length);
-  assert.ok(combat.includes(counts.join('、') + '招'));
-  assert.ok(book.includes(counts.join('／') + '招'));
+  assert.deepEqual(counts, [3, 3, 3, 3, 3, 3]);
+  assert.ok(combat.includes('各有原本三招'));
+  assert.ok(book.includes('各有原本三招'));
+  assert.ok(text.includes('各有原本三招'));
+  for (const removed of [
+    '三路藤牢',
+    '离火横径',
+    '三叠焰路',
+    '五毒游瘴',
+    '幽影换形',
+    '三叠天雷',
+    '游魂双障',
+  ])
+    for (const source of [combat, book, text]) assert.ok(!source.includes(removed), removed);
   for (let origin = 0; origin < 7; origin++) {
     for (const name of bossSkills(origin, true)) assert.ok(book.includes(name), name);
-    for (const name of bossSkills(origin, true).slice(STAGES[origin].skills.length))
-      assert.ok(text.includes(name), name);
+    assert.deepEqual(bossSkills(origin, true), STAGES[origin].skills);
   }
   const old = [bossSkillCooldown(0, true, false), bossSkillCooldown(0, true, true)];
   const final = [bossSkillCooldown(6, true, false), bossSkillCooldown(6, true, true)];

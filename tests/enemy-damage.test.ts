@@ -113,7 +113,8 @@ test('前六妖王伤害随关卡递增，弹幕和预警落地技能均继承�
       boss.cooldown = 0;
       g.update(0.01);
       assert.ok(g.zones.length > 0);
-      assert.ok(g.zones.every((zone) => zone.damage === expected * (stage === 4 ? 0.85 : 1)));
+      assert.ok(g.zones.every((zone) => zone.damage === expected));
+      assert.ok(g.zones.every((zone) => zone.endX === undefined && zone.vx === undefined));
     }
   }
 });

@@ -225,7 +225,7 @@ test('AI按可见错拍预警换位，画面在减少动态下也能区分灼烧
   assert.equal(ENEMIES[e.type].name, '曜日星灵');
 });
 
-test('漂移瘴云时长延长50%，保留预警、伤害与小怪完整漂移范围', () => {
+test('小怪漂移瘴云时长延长50%，妖王恢复五处固定瘴池', () => {
   const g = arena(3),
     e = g.spawnEnemy(50, false, false, { x: 0, y: 0 });
   const [cloud] = regionalEnemyFields(e, 'miasma', 1, 0)!;
@@ -240,8 +240,8 @@ test('漂移瘴云时长延长50%，保留预警、伤害与小怪完整漂移�
   const boss = g.spawnEnemy(10, false, true);
   boss.skillStep = 0;
   g.castBossSkill(boss, 1, 0);
-  assert.equal(g.zones.length, 3);
-  assert.ok(g.zones.every((z) => z.life === 6));
+  assert.equal(g.zones.length, 5);
+  assert.ok(g.zones.every((z) => z.life === 5 && z.vx === undefined && z.endX === undefined));
 });
 
 function soulHit(g: Game) {

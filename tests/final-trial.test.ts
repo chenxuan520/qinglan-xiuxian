@@ -1,4 +1,4 @@
-import { regionalBossSkills } from '../src/regional-combat.ts';
+import { bossSkills } from '../src/boss-skills.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
@@ -54,14 +54,7 @@ test('终关追击精英有冲刺；原生六境首领三招，仙尊六招每�
       boss.charge = 0;
       boss.cooldown = 0;
       h.update(0.01);
-      assert.match(
-        h.notice,
-        new RegExp(
-          (h.isFinalTrial ? STAGES[stage].skills : regionalBossSkills(stage, STAGES[stage].skills))[
-            phase
-          ],
-        ),
-      );
+      assert.ok(h.notice.includes(bossSkills(stage, h.isFinalTrial)[phase]));
       assert.notEqual(boss.skillStep, phase);
     }
     assert.equal(new Set(phases).size, STAGES[stage].skills.length);

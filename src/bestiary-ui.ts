@@ -28,22 +28,14 @@ function statLine(label: string, stats: { hp: readonly number[]; damage: readonl
   return `<small class="enemy-stats"><b>${label}</b><br>气血 约${numberRange(stats.hp)}<br>触碰伤害 约${numberRange(stats.damage)}</small>`;
 }
 const bossHints = [
-  '三道藤枝封路、扇形灵弹与山灵召唤，优先寻找藤枝间隙。',
-  '火扇、横向火径与错时火径交替封路，避开已经点亮的地面。',
-  '连续扑击、分层冰牙与错时冰棱，横移后留意第二次攻击。',
-  '漂移瘴云、长条毒息与群蛊召唤，沿干净地面迂回。',
-  '唤鬼、移形留幻与内收魂障；幻影无伤、一击即散，击杀召唤者可散去所唤护卫。',
-  '三段横雷、交织雷路与短雷追击，观察落雷节拍。',
+  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，留意藤圈间隙。',
+  '九发火扇、五点火径与十六发火弹环射，离开火圈并穿过弹幕间隙。',
+  '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后。',
+  '五处固定瘴池、五道毒矢与四名护卫召唤，绕开毒池，清灵散可减伤。',
+  '四名护卫召唤、二十发摄魂环弹与六点鬼牢，留意中央落阵；魂弹命中封宝1秒。',
+  '十字天雷分两拍落下、二十二发星环与五点陨雷，观察圆形预警后换位。',
 ];
-const trialBossHints = [
-  '环形藤阵、七发扇弹与三名护卫召唤；另有三路藤枝与长藤封路。',
-  '九发火扇、五点火径与十六发环射；另有横向火径、三叠焰路与追径。',
-  '单次扑击、三层冰牙与八点冰阵；另有分别预警的二段连扑与双道冰棱。',
-  '五处瘴池、五道毒矢与四名护卫召唤；另有持续6秒的游瘴、条形毒息与追身瘴云。',
-  '四名护卫召唤、二十发环射与六点鬼牢，留意中央落阵；另有移形留幻、内收魂障与追踪换位。',
-  '十字雷阵、二十二发环射与五点落阵；另有三叠雷路、交织雷路、三路陨雷与追身落雷。',
-  '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。',
-];
+const trialBossHints = [...bossHints, '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。'];
 export function bestiaryPanel(bestiaryStage: number, difficulty = 0): PanelDefinition {
   if (!DIFFICULTIES[difficulty]) difficulty = 0;
   const behavior: Record<string, string> = {
@@ -131,7 +123,7 @@ export function bestiaryPanel(bestiaryStage: number, difficulty = 0): PanelDefin
       })
       .join(
         '',
-      )}</div><div class="boss-note">${smallIcon('book')} 前六境妖王各三招；终关旧王保留原三招，再添地域招式，木／火／冰／毒／魂／雷依次共5／6／5／6／6／7招，仙尊仍为六招。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋保留完整蓄势。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
+      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有原本三招，仙尊有六招。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋保留完整蓄势。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
     wide: true,
   };
 }

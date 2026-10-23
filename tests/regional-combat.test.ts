@@ -1,19 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Game, type Zone } from '../src/game.ts';
+import { Game, type Zone, type Enemy } from '../src/game.ts';
 import { freshSave, parseSave, SAVE_SCHEMA } from '../src/progress.ts';
 import { autoplayInput, autoplayChoice } from '../src/autoplay.ts';
 import { hazardDistance, hazardCrossing } from '../src/regional-hazards.ts';
-import { regionalBossFields, regionalEnemyFields } from '../src/regional-combat.ts';
+import { regionalEnemyFields } from '../src/regional-combat.ts';
 import { drawRegionalField } from '../src/regional-render.ts';
 import { bestiaryPanel } from '../src/bestiary-ui.ts';
 import { ENEMY_TACTICS, STAGES } from '../src/data.ts';
 
-function encounter(stage: number) {
+function encounter(stage: number, regional = false) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.unlocked = 6;
   save.cultivation = 1e6;
-  const g = new Game(save, stage, 0, () => 0.5);
+  const g = new Game(save, regional ? 6 : stage, 0, () => 0.5);
   g.weapons[0].timer = 9999;
   g.spawnBudget = -10000;
   g.nextElite = g.nextTrialBossAt = 99999;
@@ -22,6 +22,22 @@ function encounter(stage: number) {
   boss.speed = 0;
   boss.cooldown = boss.pursuitCooldown = 99999;
   return { g, boss };
+}
+
+// 仅构造已保存的旧幻影，当前妖王不再生成这种追加招式。
+function legacyShadows(g: Game, boss: Enemy) {
+  return [-150, 0, 150].map((side) => {
+    const shadow = g.spawnEnemy(58, false, false, { x: boss.x, y: boss.y + side });
+    Object.assign(shadow, {
+      illusionOf: boss.id,
+      hp: 1,
+      maxHp: 1,
+      damage: 0,
+      speed: 0,
+      cooldown: 3,
+    });
+    return shadow;
+  });
 }
 
 function capsule(): Zone {
@@ -36,7 +52,7 @@ function capsule(): Zone {
     maxLife: 1.5,
     damage: 20,
     tick: 0,
-    kind: 'boss-flame',
+    kind: 'enemy-firepath',
     color: '#ffad63',
     hostile: true,
     castDelay: 1.2,
@@ -82,7 +98,7 @@ test('移动云和条带警示期间无伤，激活后按真实边界命中且�
   }
 });
 
-test('所有小怪新危险区及全部漂移路径均在施法者200像素内，boss另有完整预警', () => {
+test('所有小怪新危险区及全部漂移路径均在施法者200像素内', () => {
   for (const skill of ['roots', 'firecharge', 'firepath', 'frost', 'miasma', 'storm'] as const)
     for (const elite of [false, true])
       for (const angle of [0, 0.7, Math.PI, -1.2]) {
@@ -99,12 +115,6 @@ test('所有小怪新危险区及全部漂移路径均在施法者200像素内�
           }
         }
       }
-  for (let stage = 0; stage < 6; stage++) {
-    const { g, boss } = encounter(stage);
-    for (let phase = 0; phase < 3; phase++)
-      for (const f of regionalBossFields(stage, phase, boss, g.player, 1, 0) ?? [])
-        assert.ok(f.delay >= 1.2);
-  }
 });
 
 test('六关首批特色小怪有实际技能差异，终关兵种保持原行为', () => {
@@ -123,28 +133,25 @@ test('六关首批特色小怪有实际技能差异，终关兵种保持原行�
   }
 });
 
-test('前六关远距招式按地域变化，冥主换位留安全距离，狼王保留直线扑击', () => {
+test('前六关远距追袭恢复有完整预警的直线冲锋，不再用地域条带替代', () => {
   for (let stage = 0; stage < 6; stage++) {
     const { g, boss } = encounter(stage);
     boss.x = -500;
     boss.pursuitCooldown = 0;
     g.update(0.01);
-    if (stage === 2) assert.ok(boss.charge > 0.7);
-    else {
-      assert.equal(boss.charge, 0);
-      if (stage === 4) assert.equal(Math.hypot(boss.x - g.player.x, boss.y - g.player.y), 260);
-      else assert.ok(g.zones.every((z) => z.delay >= 1.19));
-    }
+    assert.ok(boss.charge > 0.7);
+    assert.equal(g.zones.length, 0);
+    assert.ok(g.effects.some((e) => e.kind === 'line' && e.life > 0));
     assert.ok(Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot()))));
   }
 });
 
 test('藤枝随施法者死亡散去，幽冥主魂及嵌套护卫一起消散且不追加收益', () => {
   const wood = encounter(0);
-  wood.boss.skillStep = 0;
-  wood.g.castBossSkill(wood.boss, 1, 0);
-  assert.equal(wood.g.zones.length, 3);
-  wood.boss.dead = true;
+  const woodCaster = wood.g.spawnEnemy(2, false, false, { x: 0, y: 0 });
+  wood.g.addRegionalFields(woodCaster, regionalEnemyFields(woodCaster, 'roots', 1, 0)!);
+  assert.equal(wood.g.zones.length, 1);
+  woodCaster.dead = true;
   wood.g.updateZones(0.01);
   assert.equal(wood.g.zones.length, 0);
   const { g, boss } = encounter(4);
@@ -160,10 +167,8 @@ test('藤枝随施法者死亡散去，幽冥主魂及嵌套护卫一起消散�
 });
 
 test('幻影可辨认、没有碰撞伤害及经验掉落，三秒后或本体倒下时消散', () => {
-  const { g, boss } = encounter(4);
-  boss.skillStep = 1;
-  g.castBossSkill(boss, 1, 0);
-  const shadows = g.enemies.filter((e) => e.illusionOf === boss.id);
+  const { g, boss } = encounter(4, true);
+  const shadows = legacyShadows(g, boss);
   assert.equal(shadows.length, 3);
   const before = {
     kills: g.kills,
@@ -192,11 +197,11 @@ test('幻影可辨认、没有碰撞伤害及经验掉落，三秒后或本体�
   assert.ok(shadows.every((e) => e.dead));
 });
 
-test('条带、移动瘴云、幻影和狼王二段扑击暂停/导入导出后保留，损坏字段拒绝续局', () => {
+test('小怪条带和移动瘴云暂停后保留，损坏字段拒绝续局', () => {
   for (const stage of [0, 1, 2, 3, 4, 5]) {
-    const { g, boss } = encounter(stage);
-    boss.skillStep = stage === 1 || stage === 4 ? 1 : 0;
-    g.castBossSkill(boss, 1, 0);
+    const { g } = encounter(stage);
+    const caster = g.spawnEnemy(50, false, false, { x: 0, y: 0 });
+    g.addRegionalFields(caster, regionalEnemyFields(caster, stage % 2 ? 'miasma' : 'roots', 1, 0)!);
     g.pause();
     const snapshot = g.snapshot();
     const restored = Game.restore(g.save, JSON.parse(JSON.stringify(snapshot)))!;
@@ -224,10 +229,8 @@ test('条带、移动瘴云、幻影和狼王二段扑击暂停/导入导出后�
 
 test('神农鼎和化血盏命中幻影不吸取气血，命中真实妖物仍正常回血', () => {
   for (const kind of ['cauldron', 'bloodpool']) {
-    const { g, boss } = encounter(4);
-    boss.skillStep = 1;
-    g.castBossSkill(boss, 1, 0);
-    const shadow = g.enemies.find((e) => e.illusionOf !== undefined)!;
+    const { g, boss } = encounter(4, true);
+    const [shadow] = legacyShadows(g, boss);
     boss.x = 900;
     g.player.hp = g.player.maxHp / 2;
     const hp = g.player.hp;
@@ -260,16 +263,12 @@ test('神农鼎和化血盏命中幻影不吸取气血，命中真实妖物仍�
 
 test('移动魂障在旋转线段的预警和激活期都显示实际世界方向的箭头', () => {
   for (const angle of [0, 0.7, -1.2]) {
-    const { boss } = encounter(4);
-    const fields = regionalBossFields(
-      4,
-      2,
-      boss,
-      { x: 0, y: 0 },
-      Math.cos(angle),
-      Math.sin(angle),
-    )!;
-    assert.equal(fields.length, 2);
+    const field = capsule();
+    field.endX = field.x + Math.cos(angle) * 320;
+    field.endY = field.y + Math.sin(angle) * 320;
+    field.vx = -Math.sin(angle) * 22;
+    field.vy = Math.cos(angle) * 22;
+    const fields = [field];
     for (const field of fields)
       for (const delay of [field.delay, 0]) {
         const rotations: number[] = [];
@@ -336,7 +335,7 @@ test('AI不提前读取下轮技能，仙器觉醒与配套选技优先级保留
   assert.equal(autoplayChoice(g)!.index, 1);
 });
 
-test('条带/游瘴在预警、激活、减少动态下保持画布状态与有限坐标，妖物志区分普通与终关技能', () => {
+test('小怪条带/游瘴在预警、激活、减少动态下保持画布状态，妖物志列出原妖王招式', () => {
   let depth = 0;
   const c = new Proxy({} as CanvasRenderingContext2D, {
     get:
@@ -351,24 +350,21 @@ test('条带/游瘴在预警、激活、减少动态下保持画布状态与有�
         assert.ok(depth >= 0);
       },
   });
-  for (let stage = 0; stage < 6; stage++) {
-    const { g, boss } = encounter(stage);
-    for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
-      boss.skillStep = phase;
-      g.castBossSkill(boss, 1, 0);
-    }
+  for (const skill of ['roots', 'firecharge', 'frost', 'miasma', 'storm'] as const) {
+    const { g } = encounter(0);
+    const e = g.spawnEnemy(2, false, false, { x: 0, y: 0 });
+    g.addRegionalFields(e, regionalEnemyFields(e, skill, 1, 0)!);
     for (const z of g.zones)
-      if (z.endX !== undefined || z.vx !== undefined)
-        for (const reduced of [false, true])
-          for (const warning of [false, true]) {
-            assert.ok(drawRegionalField(c, z, 12, reduced, warning));
-            assert.ok(drawRegionalField(c, { ...z, delay: 0 }, 12, reduced, warning));
-            assert.equal(depth, 0);
-          }
+      for (const reduced of [false, true])
+        for (const warning of [false, true]) {
+          assert.ok(drawRegionalField(c, z, 12, reduced, warning));
+          assert.ok(drawRegionalField(c, { ...z, delay: 0 }, 12, reduced, warning));
+          assert.equal(depth, 0);
+        }
   }
   assert.match(bestiaryPanel(0).body, /青藤横生/);
-  assert.match(bestiaryPanel(3).body, /五毒游瘴/);
-  assert.match(bestiaryPanel(4).body, /幽影换形/);
+  assert.match(bestiaryPanel(3).body, /五毒瘴池/);
+  assert.match(bestiaryPanel(4).body, /摄魂灵轮/);
   assert.match(bestiaryPanel(6).body, /摄魂灵轮/);
-  assert.ok(bestiaryPanel(6).body.includes('幽影换形'));
+  assert.ok(!bestiaryPanel(6).body.includes('幽影换形'));
 });

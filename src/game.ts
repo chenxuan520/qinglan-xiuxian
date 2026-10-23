@@ -28,12 +28,10 @@ export type {
 } from './game-types.ts';
 import { validateRunSnapshot } from './game-validation.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
-import { bossSkills, bossRegionalPhase, bossSkillCooldown } from './boss-skills.ts';
+import { bossSkills, bossSkillCooldown } from './boss-skills.ts';
 import {
-  regionalBossFields,
   regionalEnemyFields,
   regionalEnemyTactics,
-  regionalPursuit,
   type RegionalField,
 } from './regional-combat.ts';
 import { hazardDistance, slowingHazard, bindingHazard, ENEMY_CONTROL } from './regional-hazards.ts';
@@ -628,6 +626,16 @@ export class Game {
         ...e,
         ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
       }));
+      for (const e of g.enemies)
+        if (e.boss) {
+          const count = bossSkills(e.bossStage ?? s.stage, g.isFinalTrial).length;
+          if (e.skillStep !== undefined && e.skillStep >= count) e.skillStep = 0;
+          if (e.bossSkillQueue)
+            e.bossSkillQueue = e.bossSkillQueue.filter(
+              (skill) => skill < count && skill !== e.skillStep,
+            );
+          delete e.chargeFollowup;
+        }
       for (const e of g.enemies) if (e.boss && !e.dead && e.charge > 0.7) g.bossChargeWarning(e);
       const bossVolleys = (s.bossVolleys ?? []).map((v) => ({
         weapon: v.weapon,
@@ -645,7 +653,16 @@ export class Game {
             }
           : {}),
       }));
-      g.zones = s.zones.map((z) => ({ ...z }));
+      g.zones = s.zones
+        .filter(
+          (z) =>
+            !(
+              z.hostile &&
+              z.kind.startsWith('boss-') &&
+              (z.endX !== undefined || z.vx !== undefined)
+            ),
+        )
+        .map((z) => ({ ...z }));
       g.pickups = s.pickups
         .filter((p) => !g.isFinalTrial || p.kind !== 'heal')
         .map((p) => ({ ...p }));
@@ -1142,22 +1159,8 @@ export class Game {
       if (e.boss) {
         e.pursuitCooldown = (e.pursuitCooldown ?? 2.5) - dt;
         if (d > 330 && e.charge <= 0 && e.pursuitCooldown <= 0) {
-          const stage = e.bossStage ?? this.stage;
-          const pursuit = !this.isFinalTrial ? regionalPursuit(stage, e, p, nx, ny) : null;
-          if (pursuit) {
-            e.pursuitCooldown = e.hp < e.maxHp / 2 ? 6.5 : 9;
-            e.cooldown = Math.max(e.cooldown, 1.8);
-            this.addRegionalFields(e, pursuit.fields);
-            if (pursuit.destination) {
-              this.effect(e.x, e.y, 0.7, e.radius, STAGES[stage].color, 'pulse');
-              e.x = pursuit.destination.x;
-              e.y = pursuit.destination.y;
-            }
-            this.announce(`${STAGES[stage].boss} · ${pursuit.label}`);
-          } else {
-            this.startBossCharge(e, nx, ny);
-            this.announce(`${STAGES[stage].boss} · 裂空追袭`);
-          }
+          this.startBossCharge(e, nx, ny);
+          this.announce(`${STAGES[e.bossStage ?? this.stage].boss} · 裂空追袭`);
         }
       }
       const charging = e.charge > 0;
@@ -1182,11 +1185,6 @@ export class Game {
         } else if (e.charge < 0.55) {
           e.x += e.dx * 380 * dt;
           e.y += e.dy * 380 * dt;
-        }
-        if (e.charge === 0 && e.chargeFollowup) {
-          e.chargeFollowup = false;
-          const d = distance(e, p) || 1;
-          this.startBossCharge(e, (p.x - e.x) / d, (p.y - e.y) / d);
         }
       } else {
         const localCaster = ['roots', 'frost', 'miasma', 'storm'].includes(
@@ -1605,46 +1603,6 @@ export class Game {
         }).summonedBy = !this.isFinalTrial && stage === 4 ? e.id : undefined;
     };
     this.announce(`${STAGES[stage].boss} · ${bossSkills(stage, this.isFinalTrial)[phase]}`);
-    const regional = bossRegionalPhase(stage, phase, this.isFinalTrial);
-    if (regional !== undefined) {
-      const pursuit = regional === 3 ? regionalPursuit(stage, e, p, nx, ny) : null;
-      if (pursuit) {
-        this.addRegionalFields(e, pursuit.fields);
-        if (pursuit.destination) {
-          e.x = pursuit.destination.x;
-          e.y = pursuit.destination.y;
-        }
-        return;
-      }
-      const fields = regionalBossFields(stage, regional, e, p, nx, ny);
-      if (fields) {
-        this.addRegionalFields(e, fields);
-        return;
-      }
-      if (stage === 2 && regional === 0) {
-        this.startBossCharge(e, nx, ny);
-        e.chargeFollowup = true;
-        return;
-      }
-      if (stage === 4 && regional === 1) {
-        for (const side of [-150, 0, 300]) {
-          if (this.enemies.length >= (this.isFinalTrial ? 210 : 240)) break;
-          const illusion = this.spawnEnemy(58, false, false, {
-            x: e.x - ny * side,
-            y: e.y + nx * side,
-          });
-          illusion.illusionOf = e.id;
-          illusion.hp = illusion.maxHp = 1;
-          illusion.damage = illusion.speed = 0;
-          illusion.radius = e.radius;
-          illusion.cooldown = 3;
-        }
-        this.effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
-        e.x -= ny * 150;
-        e.y += nx * 150;
-        return;
-      }
-    }
     switch (stage) {
       case 0:
         if (phase === 0) ringZones(6, 130, 42, 2, 0.3);
@@ -1661,7 +1619,6 @@ export class Game {
       case 2:
         if (phase === 0) {
           this.startBossCharge(e, nx, ny);
-          if (!this.isFinalTrial) e.chargeFollowup = true;
         } else if (phase === 1) {
           // 快慢三层冰牙，施法时锁定方向，玩家侧移后不再追踪。
           fan(3, 0.5, 240);

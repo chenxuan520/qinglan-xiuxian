@@ -21,9 +21,12 @@ import {
   spiritRootInfo,
 } from './data.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
-import { bossSkills } from './boss-skills.ts';
 import { ENEMY_CONTROL } from './regional-hazards.ts';
 import { medicineInfo } from './medicine-data.ts';
+
+// 现有快照中终关曾排入追加招式；保留合法编号校验，恢复时只留下原招式。
+const savedBossSkillCount = (stage: number, finalTrial: boolean) =>
+  finalTrial ? [5, 6, 5, 6, 6, 7, 6][stage] : STAGES[stage].skills.length;
 
 // 校验原始对局结构；恢复气血、升级选项与修为入账仍由 Game.restore 完成。
 export function validateRunSnapshot(
@@ -269,21 +272,21 @@ export function validateRunSnapshot(
               Number.isInteger(e.skillStep) &&
               e.skillStep >= 0 &&
               e.skillStep <
-                bossSkills(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE).length)) &&
+                savedBossSkillCount(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE))) &&
           (e.bossSkillQueue === undefined ||
             (e.boss &&
               !s.tribulation &&
               e.skillStep !== undefined &&
               Array.isArray(e.bossSkillQueue) &&
               e.bossSkillQueue.length <
-                bossSkills(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE).length &&
+                savedBossSkillCount(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE) &&
               new Set(e.bossSkillQueue).size === e.bossSkillQueue.length &&
               e.bossSkillQueue.every(
                 (skill) =>
                   Number.isInteger(skill) &&
                   skill >= 0 &&
                   skill <
-                    bossSkills(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE).length &&
+                    savedBossSkillCount(e.bossStage ?? s.stage, s.stage === FINAL_TRIAL_STAGE) &&
                   skill !== e.skillStep,
               ))),
       )

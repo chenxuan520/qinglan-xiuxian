@@ -103,9 +103,9 @@ test('幽魂先转弯再直飞，暂停与续局保留弹幕轨迹；旧弹不�
   }
 });
 
-test('木阵冰牢只在落地后减速，毒君的瘴云与毒息受解毒丹减伤，残圈不再伤人', () => {
+test('木阵冰牢只在落地后减速，固定瘴池与毒矢受解毒丹减伤，残圈不再伤人', () => {
   for (const stage of [0, 2, 3]) {
-    const { g, e } = encounter(stage, stage, stage === 3);
+    const { g, e } = encounter(stage, stage === 3 ? 6 : stage, stage === 3);
     e.skillStep = stage === 2 ? 2 : 0;
     g.castBossSkill(e, 1, 0);
     const z = g.zones[0];
@@ -128,12 +128,11 @@ test('木阵冰牢只在落地后减速，毒君的瘴云与毒息受解毒丹�
     if (stage === 3) {
       e.skillStep = 1;
       g.castBossSkill(e, 1, 0);
-      const breath = g.zones.at(-1)!;
-      Object.assign(g.player, { x: breath.x, y: breath.y });
-      breath.delay = 0;
-      g.zones = [breath];
-      g.updateZones(0.01);
-      assert.ok(Math.abs(after - g.player.hp - breath.damage * 0.8) < 1e-8);
+      const arrow = g.shots[0];
+      Object.assign(arrow, { x: g.player.x, y: g.player.y });
+      g.player.invincible = 0;
+      g.updateShots(0);
+      assert.ok(Math.abs(after - g.player.hp - arrow.damage * 0.8) < 1e-8);
     }
   }
 });

@@ -111,9 +111,15 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
   const boss = g.spawnEnemy(10, false, true, { x: -500, y: 0 });
   boss.pursuitCooldown = 0;
   g.update(0.01);
-  const warning = g.zones.find((z) => z.endX !== undefined)!;
+  const warning = g.effects.find((e) => e.kind === 'line')!;
   assert.ok(warning);
-  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === warning.radius));
+  assert.equal(g.zones.length, 0);
+  assert.ok(boss.charge > 0.7);
+  assert.ok(
+    draw(g).some(
+      (c) => c.method === 'lineTo' && c.args[0] === warning.x2 && c.args[1] === warning.y2,
+    ),
+  );
   g.zones = [];
   boss.charge = 0;
   boss.pursuitCooldown = 999;
@@ -122,7 +128,9 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
   boss.x = -300;
   g.update(0.01);
   assert.ok(g.zones.some((z) => z.delay > 0));
-  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 32));
+  assert.equal(g.zones.length, 5);
+  assert.ok(g.zones.every((z) => z.endX === undefined && z.vx === undefined));
+  assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 50));
 });
 
 test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近身自爆', () => {
