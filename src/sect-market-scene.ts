@@ -30,6 +30,7 @@ import { marketFellowCharacter } from './market-fellow.ts';
 import { mapClick, walkRoute } from './walk-navigation.ts';
 import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
+import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -62,11 +63,21 @@ export class SectMarketScene {
   private enabled = false;
   private last = 0;
   private walkingSeconds = 0;
-  private visitorNodes: Array<{ npc: MarketCultivator; node: HTMLElement; marker: Element }> = [];
+  private visitorNodes: Array<{
+    npc: MarketCultivator;
+    node: HTMLElement;
+    marker: Element;
+    sprite: SettlementSprite;
+    moving: boolean;
+  }> = [];
   private width = 0;
   private height = 0;
   private map: HTMLElement;
-  private player: HTMLElement;
+  private playerSprite: SettlementSprite;
+  private marker: Element;
+  private lastScale = 0;
+  private lastPosition = '';
+  private lastVisitorSeconds = -1;
   private passage?: SettlementPassage;
   private residents: MarketCultivator[];
   private lastTransform = '';
@@ -89,6 +100,7 @@ export class SectMarketScene {
     returnTown?: (entry?: 'button') => void,
   ) {
     this.host = host;
+    host.style.contain = 'layout paint style';
     this.position = settlementEntry('market', position);
     this.save = save;
     this.interact = interact;
@@ -120,7 +132,8 @@ export class SectMarketScene {
         '',
       )}<div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc ${npc.roaming ? 'market-visitor' : 'market-trader'}" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${marketRealmLabel(npc, realm)}<br>${npc.role}</small></span></div>`).join('')}</div></div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${MARKET_VENUES.map((v) => `<circle cx="${v.x}" cy="${v.y}" r="22" fill="#d3be80"/>`).join('')}${this.residents.map((n) => `<circle data-market-marker="${n.id}" cx="${n.x}" cy="${n.y}" r="${n.roaming ? 18 : 28}" fill="${n.roaming ? '#a5bca0' : '#dbc17a'}"/>`).join('')}<rect x="${AUCTION_SPOT.x - 25}" y="${AUCTION_SPOT.y - 25}" width="50" height="50" fill="#f1db9a"/><circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.sect-market-map')!;
-    this.player = host.querySelector('.town-player')!;
+    this.playerSprite = new SettlementSprite(host.querySelector('.town-player')!, this.position);
+    this.marker = host.querySelector('.town-map-marker')!;
     if (returnTown)
       this.passage = new SettlementPassage(
         host,
@@ -135,6 +148,8 @@ export class SectMarketScene {
         npc,
         node: host.querySelector(`[data-market-npc="${npc.id}"]`)!,
         marker: host.querySelector(`[data-market-marker="${npc.id}"]`)!,
+        sprite: new SettlementSprite(host.querySelector(`[data-market-npc="${npc.id}"]`)!, npc),
+        moving: marketVisitorPosition(npc, 0).moving,
       }));
     this.observer = new ResizeObserver(() => {
       this.width = host.clientWidth;
@@ -392,15 +407,10 @@ export class SectMarketScene {
       this.clickRoute.shift();
     if (this.enabled) {
       this.walkingSeconds += dt;
-      for (const { npc, node, marker } of this.visitorNodes) {
-        const point = marketVisitorPosition(npc, this.walkingSeconds);
-        Object.assign(npc, point);
-        node.style.left = `${point.x}px`;
-        node.style.top = `${point.y}px`;
-        node.style.zIndex = String(Math.round(point.y));
-        node.classList.toggle('walking', point.moving);
-        marker.setAttribute('cx', String(point.x));
-        marker.setAttribute('cy', String(point.y));
+      for (const visitor of this.visitorNodes) {
+        const point = marketVisitorPosition(visitor.npc, this.walkingSeconds);
+        Object.assign(visitor.npc, point);
+        visitor.moving = point.moving;
       }
     }
     const near = this.nearbyNpc;
@@ -445,20 +455,44 @@ export class SectMarketScene {
           node.classList.toggle('market-guided', node.dataset.marketMarker === this.guidedId),
         );
     const { scale, x, y } = marketCamera(this.width, this.height, this.position);
+    const view = {
+      width: this.width,
+      height: this.height,
+      scale,
+      x: x + MARKET_SCENE_PADDING * scale,
+      y: y + MARKET_SCENE_PADDING * scale,
+    };
+    const animateVisitors = this.walkingSeconds - this.lastVisitorSeconds >= 1 / 30;
+    if (animateVisitors) this.lastVisitorSeconds = this.walkingSeconds;
+    for (const { npc, node, marker, sprite, moving } of this.visitorNodes) {
+      const revealed = sprite.show(settlementSpriteVisible(npc, view));
+      if (!node.hidden && (animateVisitors || revealed)) {
+        sprite.move(npc);
+        node.classList.toggle('walking', moving);
+      }
+      if (animateVisitors) {
+        if (marker.getAttribute('cx') !== String(npc.x)) marker.setAttribute('cx', String(npc.x));
+        if (marker.getAttribute('cy') !== String(npc.y)) marker.setAttribute('cy', String(npc.y));
+      }
+    }
     const transform = `translate(${x}px,${y}px) scale(${scale})`;
     if (transform !== this.lastTransform) {
       this.map.style.transform = transform;
-      this.map.style.setProperty('--market-scale', String(scale));
       this.lastTransform = transform;
     }
-    this.player.style.left = `${this.position.x}px`;
-    this.player.style.top = `${this.position.y}px`;
-    this.player.style.zIndex = String(Math.round(this.position.y));
-    const marker = this.host.querySelector('.town-map-marker');
-    marker?.setAttribute('cx', String(this.position.x));
-    marker?.setAttribute('cy', String(this.position.y));
-    this.host.dataset.x = this.position.x.toFixed(1);
-    this.host.dataset.y = this.position.y.toFixed(1);
+    if (scale !== this.lastScale) {
+      this.map.style.setProperty('--market-scale', String(scale));
+      this.lastScale = scale;
+    }
+    this.playerSprite.move(this.position);
+    const position = `${this.position.x}:${this.position.y}`;
+    if (position !== this.lastPosition) {
+      this.marker.setAttribute('cx', String(this.position.x));
+      this.marker.setAttribute('cy', String(this.position.y));
+      this.host.dataset.x = this.position.x.toFixed(1);
+      this.host.dataset.y = this.position.y.toFixed(1);
+      this.lastPosition = position;
+    }
     this.interactAfterWalking();
     this.passage?.update(this.position, this.enabled);
   }

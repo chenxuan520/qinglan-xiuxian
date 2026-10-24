@@ -26,6 +26,7 @@ import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts
 import { hometownParents, type HometownState } from './hometown.ts';
 import { mapClick, walkRoute } from './walk-navigation.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
+import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';
 
 const TOWN_IMAGES = [
   '/assets/town-ground.webp',
@@ -60,15 +61,19 @@ export class TownScene {
   private events = new AbortController();
   private map: HTMLElement;
   private player: HTMLElement;
+  private playerSprite: SettlementSprite;
+  private marker: Element;
+  private lastScale = 0;
+  private lastPosition = '';
   private nearby?: TownResident;
   private residents: TownResident[];
   private nextSuccession: number;
   private walkingSeconds = 0;
   private reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  private villagers: Array<{ npc: TownNpc; element: HTMLElement }> = [];
+  private villagers: Array<{ npc: TownNpc; sprite: SettlementSprite }> = [];
   private layout: ReturnType<typeof townSceneryLayout>;
   private lastTransform = '';
-  private crowd: Array<{ npc: TownPasserby; element: HTMLElement; art: HTMLElement }> = [];
+  private crowd: Array<{ npc: TownPasserby; sprite: SettlementSprite; art: HTMLElement }> = [];
   private lastCrowdSeconds = -1;
   private homeTarget: 'home' | 'dock' | null = null;
   private homeAppearance = '';
@@ -99,6 +104,7 @@ export class TownScene {
     connection?: { open: () => boolean; enter: (entry?: 'button') => void },
   ) {
     this.host = host;
+    host.style.contain = 'layout paint style';
     this.position = position;
     this.population = population;
     this.interact = interact;
@@ -126,6 +132,8 @@ export class TownScene {
       )}<div class="town-player" style="background:${playerSpriteBackground(playerPath())}"><span>你</span></div>${this.residents.map((npc) => `<div class="town-npc ${npc.id.startsWith('villager-') ? 'town-villager' : ''}" data-npc="${npc.id}" data-resident="${npc.id}:${npc.generation}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="town-npc-art" style="background-position:${(npc.art % 3) * 50}% ${Math.floor(npc.art / 3) * 50}%;filter:hue-rotate(${npc.tint}deg)"></span><span class="town-npc-name">${npc.name}<small>${npc.place} · ${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${TOWN_WIDTH} ${TOWN_HEIGHT}" aria-label="青岚镇方位图"><rect width="3600" height="2500" fill="#253b2d"/><rect x="3180" width="420" height="2500" fill="#315658"/>${TOWN_STREETS.map(([x, y, r, b]) => `<rect x="${x}" y="${y}" width="${r - x}" height="${b - y}" fill="#8b8d72"/>`).join('')}${this.layout.npcs.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="37" fill="#dbc17a"/>`).join('')}<circle class="town-map-marker" r="45" fill="#fff" stroke="#315e41" stroke-width="16"/></svg><div class="town-loading" role="status"><div>青岚镇 · 街巷铺展中<progress max="${TOWN_IMAGES.length}" value="0" aria-label="城镇加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.town-map')!;
     this.player = host.querySelector('.town-player')!;
+    this.playerSprite = new SettlementSprite(this.player, this.position);
+    this.marker = host.querySelector('.town-map-marker')!;
     if (connection && (!hometown || hometown.state.stage === 'departed'))
       this.passage = new SettlementPassage(
         host,
@@ -166,13 +174,17 @@ export class TownScene {
       element.hidden = true;
       element.innerHTML = `<span class="town-npc-art" style="background-position:${(npc.art % 3) * 50}% ${Math.floor(npc.art / 3) * 50}%;filter:hue-rotate(${npc.tint}deg)"></span>`;
       this.map.append(element);
-      return { npc, element, art: element.firstElementChild as HTMLElement };
+      return {
+        npc,
+        sprite: new SettlementSprite(element, npc),
+        art: element.firstElementChild as HTMLElement,
+      };
     });
     this.villagers = this.layout.npcs
       .filter((npc) => npc.id.startsWith('villager-'))
       .map((npc) => ({
         npc,
-        element: host.querySelector<HTMLElement>(`[data-npc="${npc.id}"]`)!,
+        sprite: new SettlementSprite(host.querySelector(`[data-npc="${npc.id}"]`)!, npc),
       }));
     this.observer = new ResizeObserver(() => {
       this.width = host.clientWidth;
@@ -461,10 +473,6 @@ export class TownScene {
     if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
       route.shift();
     if (this.enabled && !this.reducedMotion.matches) this.walkingSeconds += Math.min(dt, 0.05);
-    for (const { npc, element } of this.villagers) {
-      const point = townNpcPosition(npc, this.walkingSeconds);
-      element.style.transform = `translate(calc(-50% + ${point.x - npc.x}px), -100%)`;
-    }
     const nearId = this.nearbyNpc?.id;
     const departure = this.hometown && this.hometown.state.stage !== 'departed';
     const homeTarget = this.hometown
@@ -520,9 +528,18 @@ export class TownScene {
       Math.min(0, this.height / 2 - this.position.y * scale),
     );
     const transform = `translate(${x}px,${y}px) scale(${scale})`;
-    if (this.walkingSeconds - this.lastCrowdSeconds >= 1 / 30 || transform !== this.lastTransform) {
-      this.lastCrowdSeconds = this.walkingSeconds;
-      for (const { npc, element, art } of this.crowd) {
+    const view = { width: this.width, height: this.height, scale, x, y };
+    for (const { npc, sprite } of this.villagers) {
+      const point = townNpcPosition(npc, this.walkingSeconds);
+      if (settlementSpriteVisible(point, view)) {
+        sprite.show(true);
+        sprite.move(point);
+      } else sprite.show(false);
+    }
+    const animateCrowd = this.walkingSeconds - this.lastCrowdSeconds >= 1 / 30;
+    if (animateCrowd || transform !== this.lastTransform) {
+      if (animateCrowd) this.lastCrowdSeconds = this.walkingSeconds;
+      for (const { npc, sprite, art } of this.crowd) {
         const point = townCrowdPosition(npc, this.walkingSeconds);
         const screenX = point.x * scale + x;
         const screenY = point.y * scale + y;
@@ -531,31 +548,37 @@ export class TownScene {
           screenX > this.width + 90 ||
           screenY < -10 ||
           screenY > this.height + 100;
-        if (element.hidden !== hidden) element.hidden = hidden;
+        const revealed = sprite.show(!hidden);
         if (hidden) continue;
-        element.style.transform = `translate(${Math.round(point.x) - 40}px,${Math.round(point.y) - 80}px)`;
-        element.style.zIndex = String(Math.round(point.y));
-        art.style.transform = `scaleX(${point.facing})`;
+        if (animateCrowd || revealed) {
+          sprite.move({ x: Math.round(point.x), y: Math.round(point.y) });
+          const facing = `scaleX(${point.facing})`;
+          if (art.style.transform !== facing) art.style.transform = facing;
+        }
       }
     }
     if (transform !== this.lastTransform) {
       this.map.style.transform = transform;
-      this.map.style.setProperty('--market-scale', String(scale));
       this.lastTransform = transform;
+    }
+    if (scale !== this.lastScale) {
+      this.map.style.setProperty('--market-scale', String(scale));
+      this.lastScale = scale;
     }
     const path = this.playerPath();
     if (this.player.dataset.path !== path) {
       this.player.style.background = playerSpriteBackground(path);
       this.player.dataset.path = path;
     }
-    this.player.style.left = `${this.position.x}px`;
-    this.player.style.top = `${this.position.y}px`;
-    this.player.style.zIndex = `${Math.round(this.position.y)}`;
-    const marker = this.host.querySelector('.town-map-marker');
-    marker?.setAttribute('cx', String(this.position.x));
-    marker?.setAttribute('cy', String(this.position.y));
-    this.host.dataset.x = this.position.x.toFixed(1);
-    this.host.dataset.y = this.position.y.toFixed(1);
+    this.playerSprite.move(this.position);
+    const position = `${this.position.x}:${this.position.y}`;
+    if (position !== this.lastPosition) {
+      this.marker.setAttribute('cx', String(this.position.x));
+      this.marker.setAttribute('cy', String(this.position.y));
+      this.host.dataset.x = this.position.x.toFixed(1);
+      this.host.dataset.y = this.position.y.toFixed(1);
+      this.lastPosition = position;
+    }
     this.interactAfterWalking();
     this.passage?.update(this.position, this.enabled);
   }
