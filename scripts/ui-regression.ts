@@ -1496,12 +1496,19 @@ try {
         '明清灵水',
       ),
     );
+    // 剩余年数会随战斗推进；提示、药效文本和布局必须取自同一次同步快照。
     const compactHud = await evaluate(`() => {
       const hud = document.querySelector('#medicine-hud'), panel = document.querySelector('.player-panel').getBoundingClientRect(), box = hud.getBoundingClientRect();
       const style = getComputedStyle(hud);
+      const medicines = [...hud.children].map(item => {
+        const range = document.createRange(); range.selectNodeContents(item);
+        const rect = item.getBoundingClientRect();
+        return {text:item.textContent, lines:new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top))).size, top:rect.top, bottom:rect.bottom,
+          inside:rect.left >= box.left - 1 && rect.right <= box.right + 1};
+      });
       return {mobile:matchMedia('(pointer: coarse)').matches, title:hud.title,
         inside:box.left >= panel.left && box.right <= panel.right,
-        height:box.height, lineHeight:parseFloat(style.lineHeight), overflow:style.overflowX, ellipsis:style.textOverflow};
+        height:box.height, lineHeight:parseFloat(style.lineHeight), overflow:style.overflowX, ellipsis:style.textOverflow, medicines};
     }`);
     assert.equal(compactHud.inside, true, '药效栏不能溢出状态栏');
     if (compactHud.mobile) {
@@ -1509,15 +1516,7 @@ try {
       assert.equal(compactHud.overflow, 'hidden');
       assert.equal(compactHud.ellipsis, 'ellipsis', '超长药效显示省略号');
     }
-    const medicines = await evaluate(`() => {
-      const hud = document.querySelector('#medicine-hud'), box = hud.getBoundingClientRect();
-      return [...hud.children].map(item => {
-        const range = document.createRange(); range.selectNodeContents(item);
-        const rect = item.getBoundingClientRect();
-        return {text:item.textContent, lines:new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top))).size, top:rect.top, bottom:rect.bottom,
-          inside:rect.left >= box.left - 1 && rect.right <= box.right + 1};
-      });
-    }`);
+    const medicines = compactHud.medicines;
     assert.equal(medicines.length, 3, '三种药效的完整信息均须保留');
     for (const [index, medicine] of medicines.entries()) {
       assert.match(medicine.text, /^(明清灵水|万年灵乳|无常丹) \d+年$/);
