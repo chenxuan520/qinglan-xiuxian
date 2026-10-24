@@ -11,7 +11,8 @@ export function chronicleEntryTitle(title: string) {
     case '仙门有道':
       return '一脉真传';
     case '逆境问道':
-      return '逆天证道';
+    case '逆天证道':
+      return '逆天改命';
     default:
       return title;
   }
@@ -30,7 +31,7 @@ export function chronicleAchievements(save: SaveData) {
     {
       id: 'story',
       difficulty: 10,
-      title: Object.hasOwn(save.chronicle.milestones, 'story') ? '炉火长明' : '未遇之缘',
+      title: Object.hasOwn(save.chronicle.milestones, 'story') ? '尘缘初结' : '未遇之缘',
       detail: '留下一段人间旧事',
     },
     { id: 'collection', difficulty: 95, title: '万宝归藏', detail: '收齐三十六件法宝' },
@@ -44,7 +45,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     { id: 'six-immortals', difficulty: 100, title: '六仙同御', detail: '单局同时觉醒六件仙器' },
     { id: 'five-tribulations', difficulty: 110, title: '五劫不灭', detail: '累计渡过五次天劫' },
-    { id: 'hard-immortal', difficulty: 120, title: '逆天证道', detail: '以天劫降临难度成就真仙' },
+    { id: 'hard-immortal', difficulty: 120, title: '逆天改命', detail: '以天劫降临难度成就真仙' },
     { id: 'rootless-immortal', difficulty: 140, title: '凡骨登仙', detail: '以无灵根成就真仙' },
     { id: 'curio-three', difficulty: 50, title: '奇珍有缘', detail: '本世先后获得三件不同奇物' },
     {

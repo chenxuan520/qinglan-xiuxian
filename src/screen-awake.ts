@@ -5,27 +5,36 @@ export class ScreenAwake {
   private pending = false;
   private retryAt = 0;
   private generation = 0;
+  private recoverAt = 0;
   private browser: Partial<Pick<Navigator, 'wakeLock'>>;
   private page: Pick<Document, 'visibilityState' | 'addEventListener'>;
 
   constructor(
     browser: Partial<Pick<Navigator, 'wakeLock'>> = navigator,
     page: Pick<Document, 'visibilityState' | 'addEventListener'> = document,
+    orientation: Pick<ScreenOrientation, 'addEventListener'> | undefined = typeof screen ===
+    'undefined'
+      ? undefined
+      : screen.orientation,
   ) {
     this.browser = browser;
     this.page = page;
-    page.addEventListener('visibilitychange', () => {
+    const refresh = () => {
       this.generation++;
       this.retryAt = 0;
       this.update();
-    });
+    };
+    for (const event of ['visibilitychange', 'fullscreenchange', 'webkitfullscreenchange'])
+      page.addEventListener(event, refresh);
+    page.addEventListener('focus', refresh, true);
+    orientation?.addEventListener('change', refresh);
   }
 
   setActive(active: boolean) {
     if (this.wanted !== active) {
       this.wanted = active;
       this.generation++;
-      this.retryAt = 0;
+      this.retryAt = this.recoverAt = 0;
     }
     this.update();
   }
@@ -61,7 +70,14 @@ export class ScreenAwake {
       lock.addEventListener(
         'release',
         () => {
-          if (this.lock === lock) this.lock = null;
+          if (this.lock !== lock) return;
+          this.lock = null;
+          // 系统首次收回时立即补一次；连续收回仍保持限频，避免逐帧请求。
+          if (Date.now() >= this.recoverAt) {
+            this.recoverAt = Date.now() + 30_000;
+            this.retryAt = 0;
+          }
+          this.update();
         },
         { once: true },
       );

@@ -299,5 +299,20 @@ async function handleFetch(request) {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET' || !url.href.startsWith(scope)) return;
-  event.respondWith(handleFetch(event.request));
+  event.respondWith(
+    handleFetch(event.request).then((response) => {
+      if (!response.ok || !/\/assets\/novel-[\w-]+\.md$/.test(url.pathname)) return response;
+      // 普通导航经过缓存后再发起附件下载，避免原生 download 请求绕过离线服务。
+      const headers = new Headers(response.headers);
+      headers.set(
+        'Content-Disposition',
+        `attachment; filename="qinglan-novel.md"; filename*=UTF-8''${encodeURIComponent('青岚纪_不系舟.md')}`,
+      );
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }),
+  );
 });

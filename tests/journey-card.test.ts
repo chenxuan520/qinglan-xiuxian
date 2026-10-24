@@ -191,7 +191,7 @@ test('已达成成就优先于六仙同御和渡劫记录，留痕最多两行�
   save.chronicle.milestones['hard-immortal'] = 50;
   assert.deepEqual(
     journeyCardData(save).memories.map((memory) => memory.title),
-    ['逆天证道', '三道皆证', '万宝归藏', '炉火纯青'],
+    ['逆天改命', '三道皆证', '万宝归藏', '炉火纯青'],
   );
 });
 

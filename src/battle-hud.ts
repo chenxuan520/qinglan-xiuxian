@@ -90,20 +90,17 @@ export class BattleHud {
         );
       }
     }
-    set(
-      'medicine-hud',
-      activeMedicines(save.medicine, save.age)
-        .map(
-          (m) =>
-            `<span>${m.name} ${Math.max(0, save.medicine.active[m.id] - save.age).toFixed(0)}年</span>`,
-        )
-        .join(' '),
-      true,
+    const medicines = activeMedicines(save.medicine, save.age).map(
+      (m) =>
+        `${m.name} ${formatNumber(Math.max(0, Math.round(save.medicine.active[m.id] - save.age)))}年`,
     );
+    set('medicine-hud', medicines.map((text) => `<span>${text}</span>`).join(' '), true);
+    document.getElementById('medicine-hud')?.setAttribute('title', medicines.join(' · '));
     const life = lifespanInfo(save);
     set(
       'lifespan-text',
-      `年岁 ${life.age.toFixed(1)} / ${Number.isFinite(life.limit) ? life.limit : '∞'} · ${game.tribulation ? '渡劫暂停计龄' : `${STAGE_YEARS_PER_MINUTE[game.stage]}年/分`}`,
+      `<span>${life.age < 1000000 ? life.age.toFixed(1) : formatNumber(life.age)}/${Number.isFinite(life.limit) ? life.limit : '∞'}岁</span> · <span>${game.tribulation ? '渡劫暂停计龄' : `${STAGE_YEARS_PER_MINUTE[game.stage]}年/分`}</span>`,
+      true,
     );
     document
       .getElementById('lifespan-text')

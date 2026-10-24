@@ -1496,23 +1496,61 @@ try {
         '明清灵水',
       ),
     );
+    const compactHud = await evaluate(`() => {
+      const hud = document.querySelector('#medicine-hud'), panel = document.querySelector('.player-panel').getBoundingClientRect(), box = hud.getBoundingClientRect();
+      const style = getComputedStyle(hud);
+      return {mobile:matchMedia('(pointer: coarse)').matches, title:hud.title,
+        inside:box.left >= panel.left && box.right <= panel.right,
+        height:box.height, lineHeight:parseFloat(style.lineHeight), overflow:style.overflowX, ellipsis:style.textOverflow};
+    }`);
+    assert.equal(compactHud.inside, true, '药效栏不能溢出状态栏');
+    if (compactHud.mobile) {
+      assert.ok(compactHud.height <= compactHud.lineHeight + 1, '手机所有药效只占一行');
+      assert.equal(compactHud.overflow, 'hidden');
+      assert.equal(compactHud.ellipsis, 'ellipsis', '超长药效显示省略号');
+    }
     const medicines = await evaluate(`() => {
       const hud = document.querySelector('#medicine-hud'), box = hud.getBoundingClientRect();
       return [...hud.children].map(item => {
         const range = document.createRange(); range.selectNodeContents(item);
         const rect = item.getBoundingClientRect();
-        return {text:item.textContent, lines:range.getClientRects().length, top:rect.top, bottom:rect.bottom,
+        return {text:item.textContent, lines:new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top))).size, top:rect.top, bottom:rect.bottom,
           inside:rect.left >= box.left - 1 && rect.right <= box.right + 1};
       });
     }`);
-    assert.equal(medicines.length, 3, '三种药效必须分别完整显示');
+    assert.equal(medicines.length, 3, '三种药效的完整信息均须保留');
     for (const [index, medicine] of medicines.entries()) {
       assert.match(medicine.text, /^(明清灵水|万年灵乳|无常丹) \d+年$/);
       assert.equal(medicine.lines, 1, '同一种丹药的药名与剩余年数不能拆行');
-      assert.equal(medicine.inside, true, '药效不能溢出状态栏');
-      if (index > 0)
-        assert.ok(medicine.top >= medicines[index - 1].bottom - 1, '每种药效必须独占一行');
+      assert.ok(compactHud.title.includes(medicine.text), '省略显示仍保留完整药效说明');
+      if (!compactHud.mobile) assert.equal(medicine.inside, true, '桌面药效不能溢出状态栏');
+      if (index > 0) {
+        if (compactHud.mobile)
+          assert.ok(Math.abs(medicine.top - medicines[0].top) < 1, '手机药效必须同一行');
+        else assert.ok(medicine.top >= medicines[index - 1].bottom - 1, '桌面每种药效独占一行');
+      }
     }
+    const ageItems = await evaluate(`() => {
+      const panel = document.querySelector('.player-panel').getBoundingClientRect();
+      return [...document.querySelectorAll('#lifespan-text > span')].map(item => {
+        const range = document.createRange(); range.selectNodeContents(item);
+        const rect = item.getBoundingClientRect();
+        return {text:item.textContent, lines:range.getClientRects().length,
+          inside:rect.left >= panel.left && rect.right <= panel.right};
+      });
+    }`);
+    assert.equal(ageItems.length, 2, '年岁与计龄速度分别成项');
+    for (const item of ageItems) {
+      assert.equal(item.lines, 1, '年岁或流速单位不能拆成孤字');
+      assert.equal(item.inside, true, '年岁与计龄速度不能溢出状态栏');
+    }
+    assert.equal(
+      await evaluate(
+        `() => {const e=document.querySelector('#lifespan-text'),s=getComputedStyle(e);return e.clientHeight <= parseFloat(s.lineHeight)+1}`,
+      ),
+      true,
+      '年岁与计龄速度合计只占一行',
+    );
     if (name === 'phone') {
       await browser.call('emulate', { pageId, viewport: '844x390x1,mobile,touch,landscape' });
       await check('rotate-landscape', true);

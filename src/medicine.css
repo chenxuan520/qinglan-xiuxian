@@ -216,7 +216,6 @@
 
 #medicine-hud {
   display: block;
-  max-width: 250px;
   font-size: 10px;
   line-height: 1.6;
   color: #ddcf9c;
@@ -226,5 +225,15 @@
 }
 #medicine-hud > span {
   display: block;
-  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  #medicine-hud > span {
+    display: inline;
+  }
+}
+@media (max-width: 650px) {
+  .lifespan-hud,
+  #medicine-hud {
+    font-size: 9px;
+  }
 }

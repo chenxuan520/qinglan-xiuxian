@@ -983,7 +983,7 @@ export function settleRun(
       !(run.startedImmortal ?? before.step >= 24) &&
       realmInfo(save.cultivation, true).step === 24
     )
-      recordChronicle(save, '逆天证道', '以天劫降临难度踏破第七境，证得真仙。', 'hard-immortal');
+      recordChronicle(save, '逆天改命', '以天劫降临难度踏破第七境，证得真仙。', 'hard-immortal');
   }
   syncTribulationClock(save);
   return rewards;

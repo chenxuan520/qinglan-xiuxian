@@ -184,6 +184,41 @@ for (const volume of book.volumes) {
 const download = get<HTMLAnchorElement>('download-manuscript');
 download.href = manuscriptUrl;
 download.hidden = false;
+let downloading = false;
+download.addEventListener('click', (event) => {
+  if (!navigator.serviceWorker?.controller) return;
+  event.preventDefault();
+  if (downloading) return;
+  downloading = true;
+  document.getElementById('download-error')?.remove();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  void fetch(manuscriptUrl, { signal: controller.signal })
+    .then((response) => {
+      if (!response.ok) throw new Error('download-unavailable');
+      const link = document.createElement('a');
+      link.href = manuscriptUrl;
+      // 附件响应须用普通导航接收；未启用缓存时沿用同源静态下载。
+      if (!response.headers.get('Content-Disposition')?.startsWith('attachment'))
+        link.download = download.download;
+      void response.body?.cancel().catch(() => {});
+      document.body.append(link);
+      link.click();
+      link.remove();
+    })
+    .catch(() => {
+      const error = document.createElement('p');
+      error.id = 'download-error';
+      error.className = 'story-note';
+      error.setAttribute('role', 'status');
+      error.textContent = '原文暂未下载，请联网后再试。';
+      download.after(error);
+    })
+    .finally(() => {
+      clearTimeout(timeout);
+      downloading = false;
+    });
+});
 get('book-count').textContent = `${book.volumes.length} 卷 · ${book.chapters.length} 章`;
 previous.addEventListener('click', () => selectChapter(index - 1));
 next.addEventListener('click', () => selectChapter(index + 1));

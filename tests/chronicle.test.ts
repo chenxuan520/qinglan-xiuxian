@@ -24,7 +24,8 @@ test('成就改名同步旧年表、成就提示与留影，保留达成标识�
     ['one-life-clear', '一命通关', '生死证道'],
     ['level-100', '百级归真', '百炼归真'],
     ['mastery', '仙门有道', '一脉真传'],
-    ['hard-immortal', '逆境问道', '逆天证道'],
+    ['hard-immortal', '逆境问道', '逆天改命'],
+    ['hard-immortal', '逆天证道', '逆天改命'],
   ];
   // 只造旧版已达成记录；实际触发条件仍由极限、精研和结算套件验证。
   for (const [id, oldTitle] of renamed) {
@@ -177,7 +178,7 @@ test('同一世重游同一秘境，三路线各胜一次才达成三道皆证�
 
 test('宗门、炼器与人间故事进入年表，未遇故事不提前剧透', () => {
   const s = freshSave();
-  assert.ok(!chronicleContent(s).includes('炉火长明'));
+  assert.ok(!chronicleContent(s).includes('尘缘初结'));
   s.stones = 1e8;
   s.iron = 1e6;
   s.age = 26;

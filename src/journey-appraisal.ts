@@ -212,7 +212,7 @@ function appraisalTitle(f: JourneyAppraisalFacts) {
   if (feat('peerless')) return '万古独尊';
   if (feat('one-life-clear')) return '生死证道';
   if (feat('rootless-immortal')) return '凡骨登仙';
-  if (feat('hard-immortal')) return '逆天证道';
+  if (feat('hard-immortal')) return '逆天改命';
   if (f.ending === 'immortal')
     return home ? '仙心有归处' : bond ? '长生有旧灯' : allStages ? '七境问长生' : '此世叩仙门';
   if (f.ending === 'lifespan')

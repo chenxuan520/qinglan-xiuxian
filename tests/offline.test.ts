@@ -512,3 +512,29 @@ test('构建产物与清单不收录 public 复制来的点文件，输出目录
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+for (const base of ['/', '/qinglan-xiuxian/']) {
+  test(`缓存原文经普通导航可在离线时作为附件下载：${base}`, async () => {
+    const h = harness(base);
+    const path = 'assets/novel-abCD_12.md';
+    const text = '# 青岚纪 · 不系舟\n\n山河未尽。\n';
+    h.fixture(BUILD, 'book', { [path]: text });
+    assert.equal((await h.message('cache')).error, undefined);
+    for (const offline of [false, true]) {
+      h.setOffline(offline);
+      for (const navigate of [false, true]) {
+        const response = await h.request(path, { navigate });
+        assert.equal(response.status, 200);
+        assert.match(response.headers.get('Content-Disposition'), /^attachment;/);
+        assert.ok(
+          response.headers
+            .get('Content-Disposition')
+            .includes(encodeURIComponent('青岚纪_不系舟.md')),
+        );
+        assert.equal(await response.text(), text);
+      }
+    }
+    const html = await h.request('index.html', { navigate: true });
+    assert.equal(html.headers.has('Content-Disposition'), false, '正常页面不能被误作附件');
+  });
+}
