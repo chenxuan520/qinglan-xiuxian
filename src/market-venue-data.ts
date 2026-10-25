@@ -5,6 +5,7 @@ export interface MarketVenueState {
   workAt: number | null;
   favorAt: number | null;
   seeking?: Record<string, number>;
+  // caravanAt 和旧购货收据仅保留历史存档数据，不再用于购货或发放物品。
   shops?: { exchangeAt: number | null; caravanAt: number | null };
   receipts: {
     kind: 'work' | 'seek' | 'host' | 'favor' | 'exchange' | 'salvage' | 'caravan';

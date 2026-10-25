@@ -5,12 +5,7 @@ import { icon } from './icons.ts';
 import type { SaveData } from './progress.ts';
 import { auctionItemName } from './auction-items.ts';
 import { serviceEscape as esc } from './sect-service-ui.ts';
-import {
-  caravanOffers,
-  marketShopQuote,
-  marketShopStamp,
-  type MarketShopId,
-} from './market-shop.ts';
+import { marketShopQuote, marketShopStamp, type MarketShopId } from './market-shop.ts';
 
 export interface MarketShopSelection {
   from?: string;
@@ -23,6 +18,7 @@ export function marketShopContent(
   unfinished = false,
   selection: MarketShopSelection = {},
 ) {
+  if (venue !== 'medicine' && venue !== 'stalls') return '';
   const quote = (choice: string) => {
     const q = marketShopQuote(save, venue, choice, unfinished);
     if (!q.title) return `<p class="panel-note">${esc(q.reason)}</p>`;
@@ -34,14 +30,8 @@ export function marketShopContent(
       .map((i) => `<p class="panel-note">${auctionItemName(i)}：${medicineInfo(i.id)!.desc}</p>`)
       .join(
         '',
-      )}${q.kind === 'salvage' ? '<p class="panel-note">拆解后此宝及其炼器阶数一并失去，只返还用材，不返灵石。</p>' : ''}<div class="service-price"><strong>${q.stones ? `${q.stones} 灵石` : '不收灵石'}</strong><span>半年${q.reserve ? ` · 另预留${q.reserve}灵石供奉` : ''}</span></div><button class="${q.kind === 'salvage' ? 'secondary' : 'primary'}-button" data-action="market-venue-shop" data-id="${esc(choice)}" data-stamp="${esc(marketShopStamp(save, venue, choice))}" ${q.reason ? 'disabled' : ''}>${esc(q.reason || (q.kind === 'exchange' ? '以两换一 · 半年' : q.kind === 'salvage' ? '拆解这件旧器' : '购置这份货单 · 半年'))}</button></article>`;
+      )}${q.kind === 'salvage' ? '<p class="panel-note">拆解后此宝及其炼器阶数一并失去，只返还用材，不返灵石。</p>' : ''}<div class="service-price"><strong>${q.stones ? `${q.stones} 灵石` : '不收灵石'}</strong><span>半年${q.reserve ? ` · 另预留${q.reserve}灵石供奉` : ''}</span></div><button class="${q.kind === 'salvage' ? 'secondary' : 'primary'}-button" data-action="market-venue-shop" data-id="${esc(choice)}" data-stamp="${esc(marketShopStamp(save, venue, choice))}" ${q.reason ? 'disabled' : ''}>${esc(q.reason || (q.kind === 'exchange' ? '以两换一 · 半年' : '拆解这件旧器'))}</button></article>`;
   };
-  if (venue === 'caravan')
-    return `<h3>游商货单</h3><p class="panel-note">远道带来的成丹，货色与价格每十年一换。三份货单择一购置，交割后隔十年再买；灵品需筑基，珍品需元婴。只售时效丹，入囊后自行服用。</p><div class="market-venue-grid">${caravanOffers(
-      save,
-    )
-      .map((o) => quote(o.id))
-      .join('')}</div>`;
   if (venue === 'medicine') {
     const from = medicineInfo(selection.from ?? ''),
       to = medicineInfo(selection.to ?? '');

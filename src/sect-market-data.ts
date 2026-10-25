@@ -24,7 +24,7 @@ export const MARKET_VENUES = [
   { id: 'office', building: 4, x: 220, y: 600, hint: '托付与寻物' },
   { id: 'guests', building: 5, x: 1780, y: 600, hint: '旧识与求助' },
   { id: 'stalls', building: 6, x: 240, y: 1080, hint: '旧器拆解' },
-  { id: 'caravan', building: 7, x: 1760, y: 1080, hint: '游商货单' },
+  { id: 'caravan', building: 7, x: 1760, y: 1080, hint: '坊中求购与货讯' },
 ] as const;
 export type MarketVenueId = (typeof MARKET_VENUES)[number]['id'];
 export const MARKET_LANES = [

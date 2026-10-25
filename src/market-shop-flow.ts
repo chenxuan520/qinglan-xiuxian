@@ -51,7 +51,7 @@ export function marketShopAction(
 ) {
   const host = shell.modal.querySelector<HTMLElement>('#market-shop-content');
   const venue = host?.dataset.shop;
-  if (!host || (venue !== 'medicine' && venue !== 'stalls' && venue !== 'caravan')) return;
+  if (!host || (venue !== 'medicine' && venue !== 'stalls')) return;
   if (action === 'market-venue-shop-cancel' && venue === 'stalls') {
     host.innerHTML = marketShopContent(shell.save, venue, !!shell.pendingRun, { artifact: choice });
     bindMarketShop(shell);

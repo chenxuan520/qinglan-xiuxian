@@ -124,15 +124,13 @@ function harness(venue: MarketShopId) {
     fail: (v: boolean) => {
       fail = v;
     },
-    action: (
-      a = 'market-venue-shop',
-      c = venue === 'stalls' ? 'pagoda' : venue === 'medicine' ? 'heqi@juyuan' : '0',
-    ) => marketVenueAction(shell, a, c),
+    action: (a = 'market-venue-shop', c = venue === 'stalls' ? 'pagoda' : 'heqi@juyuan') =>
+      marketVenueAction(shell, a, c),
   };
 }
 
-test('三处小铺保存失败零改动，重试只结算一次并刷新真实选项、数量和禁用状态', () => {
-  for (const venue of ['medicine', 'stalls', 'caravan'] as const) {
+test('调剂与拆解保存失败零改动，重试只结算一次并刷新真实选项、数量和禁用状态', () => {
+  for (const venue of ['medicine', 'stalls'] as const) {
     const h = harness(venue),
       before = structuredClone(h.save);
     if (venue === 'stalls') h.action();
@@ -198,4 +196,16 @@ test('拆解必须经过原面板确认，取消不扣物，旧报价与离场�
     assert.deepEqual(t.save, initial, field);
     assert.equal(t.writes(), 0);
   }
+});
+
+test('旧游商购货按钮即使残留也不能经院落控制器扣款或产丹', () => {
+  const h = harness('medicine');
+  const host = h.shell.modal.querySelector<HTMLElement>('#market-venue-content')!;
+  const shop = h.shell.modal.querySelector<HTMLElement>('#market-shop-content')!;
+  host.dataset.venue = shop.dataset.shop = 'caravan';
+  h.shell.marketScene = { nearVenue: { id: 'caravan' } } as ActionShell['marketScene'];
+  const before = structuredClone(h.save);
+  h.action('market-venue-shop', 'heqi@juyuan');
+  assert.deepEqual(h.save, before);
+  assert.equal(h.writes(), 0);
 });

@@ -4,7 +4,7 @@ import { advanceMortal } from './mortal.ts';
 import { auctionDues, auctionReason } from './auction.ts';
 import { auctionItemName, auctionValue } from './auction-items.ts';
 import { MEDICINES } from './medicine-data.ts';
-import { debateMarket, debateReason } from './market-social.ts';
+import { debateMarket, debateReason, marketRequest } from './market-social.ts';
 import {
   marketCultivators,
   marketIdentity,
@@ -25,6 +25,16 @@ export function venuePeople(save: SaveData) {
         (n) => !marketContact(save, n.id)?.dead,
       )
     : [];
+}
+// 只转述同批在场修士的实际求购，查看不创建委托、库存或交情。
+export function venueRequests(save: SaveData) {
+  const state = save.mortal.sectMarket,
+    social = save.mortal.marketSocial;
+  if (!state || social?.visit !== state.visit || social.ambush) return [];
+  return venuePeople(save).flatMap((npc) => {
+    const request = marketRequest(save, npc.id);
+    return request ? [{ npc, request, fulfilled: social.fulfilled.includes(npc.id) }] : [];
+  });
 }
 export function venueStamp(save: SaveData) {
   return `${save.mortal.sectMarket?.visit}:${venueRealm(save)}:${Math.floor(save.age / 10)}`;

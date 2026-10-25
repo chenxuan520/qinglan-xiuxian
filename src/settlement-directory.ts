@@ -4,8 +4,19 @@ import { TOWN_NPCS } from './town.ts';
 import { MEDICINES } from './medicine-data.ts';
 import { MARKET_BUILDINGS, MARKET_VENUES } from './sect-market-data.ts';
 import { sectMarketOpen } from './sect-market.ts';
-import { marketShopQuote, MARKET_SHOP_YEARS, SALVAGE_RATE } from './market-shop.ts';
-import { venueWork, venueActionReason, venueStamp, venueCooldown } from './market-venues.ts';
+import {
+  marketShopQuote,
+  MARKET_SHOP_YEARS,
+  SALVAGE_RATE,
+  type MarketShopId,
+} from './market-shop.ts';
+import {
+  venueWork,
+  venueActionReason,
+  venueStamp,
+  venueCooldown,
+  venueRequests,
+} from './market-venues.ts';
 import { AUCTION_SETTINGS } from './setting.ts';
 
 interface Place {
@@ -50,7 +61,7 @@ export function settlementPlaces(save: SaveData, market = false, unfinished = fa
     : !save.mortal.sectMarket || !save.mortal.auction
       ? '入坊后查看当期事务'
       : '';
-  const shopStatus = (id: 'medicine' | 'stalls' | 'caravan') => {
+  const shopStatus = (id: MarketShopId) => {
     if (entry) return entry;
     const choices =
       id === 'medicine'
@@ -59,15 +70,14 @@ export function settlementPlaces(save: SaveData, market = false, unfinished = fa
               (to) => `${from.id}@${to.id}`,
             ),
           )
-        : id === 'stalls'
-          ? save.artifacts.filter((id) => id !== save.starter && save.forge[id] > 0)
-          : ['0', '1', '2'];
+        : save.artifacts.filter((id) => id !== save.starter && save.forge[id] > 0);
     if (!choices.length)
       return id === 'medicine' ? '尚无两份同名时效丹可供调剂' : '尚无已炼器的非本命法宝可拆';
     const quotes = choices.map((choice) => marketShopQuote(save, id, choice, unfinished));
     return quotes.some((q) => !q.reason) ? '眼下有可办理的选择，入铺后择物' : quotes[0].reason;
   };
   const work = venueWork(save);
+  const requests = venueRequests(save).filter((r) => !r.fulfilled);
   const descriptions: Record<(typeof MARKET_VENUES)[number]['id'], Omit<Place, 'name'>> = {
     medicine: {
       use: '余丹调剂：两份同名时效丹换一份同品丹',
@@ -101,9 +111,13 @@ export function settlementPlaces(save: SaveData, market = false, unfinished = fa
       status: shopStatus('stalls'),
     },
     caravan: {
-      use: '购买成丹货单，入囊后自行服用',
-      cost: `${MARKET_SHOP_YEARS}年 · 按货单明价 · 办毕后隔十年再买`,
-      status: shopStatus('caravan'),
+      use: '打听本批真实求购，记下修士去处后当面交易',
+      cost: '查看消息不耗年岁或灵石；求购交货半年，按对方明价结算',
+      status:
+        entry ||
+        (requests.length
+          ? `本批有${requests.length}条求购待交货`
+          : '本批暂无未完成求购，可入摊查看余丹货讯'),
     },
   };
   return [

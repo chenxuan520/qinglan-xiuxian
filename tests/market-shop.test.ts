@@ -8,7 +8,6 @@ import {
   marketShopQuote,
   marketShopStamp,
   executeMarketShop,
-  caravanOffers,
   salvageIron,
 } from '../src/market-shop.ts';
 import { marketShopContent } from '../src/market-shop-ui.ts';
@@ -34,11 +33,8 @@ function fixture(rank = 3) {
   s.forge.pagoda = 5;
   return readSave(JSON.stringify(s)).save;
 }
-const trade = (
-  s: ReturnType<typeof fixture>,
-  venue: 'medicine' | 'stalls' | 'caravan',
-  choice: string,
-) => executeMarketShop(s, venue, choice, marketShopStamp(s, venue, choice));
+const trade = (s: ReturnType<typeof fixture>, venue: 'medicine' | 'stalls', choice: string) =>
+  executeMarketShop(s, venue, choice, marketShopStamp(s, venue, choice));
 
 test('余丹调剂只收两份同名时效丹，不改药效与药方；选择在成交后保留，不能重复办理', () => {
   const s = fixture(),
@@ -129,55 +125,49 @@ test('炼器后拆解以及购买后拆解都不增值，十阶和奇物折价�
   s.curios.acquired.push('jade-book');
   assert.equal(marketShopQuote(s, 'stalls', 'pagoda').receive[0].quantity, 30);
 });
-test('游商货单十年固定，换批/境界/库存/读档不重抽；三份货单共用购置额度', () => {
-  const s = fixture(),
-    offers = caravanOffers(s),
-    before = structuredClone(s);
-  s.age += 1;
-  beginSectMarketVisit(s);
-  s.cultivation = 1;
-  assert.deepEqual(caravanOffers(s), offers);
-  assert.match(marketShopQuote(s, 'caravan', '1').reason, /筑基/);
-  assert.match(marketShopQuote(s, 'caravan', '2').reason, /元婴/);
-  s.cultivation = before.cultivation;
-  assert.ok(trade(s, 'caravan', '2'));
-  assert.equal(s.stones, before.stones - offers[2].price);
-  for (const item of offers[2].receive) assert.equal(s.medicine.bag[item.id], 1);
-  assert.equal(trade(s, 'caravan', '0'), undefined);
+test('游商不再生成成丹货单，旧购货参数与未知场所均拒绝且不改物资', () => {
+  const s = fixture();
+  for (const venue of ['caravan', 'unknown'])
+    for (const choice of ['0', '1', '2', 'pagoda', 'heqi@juyuan']) {
+      const before = structuredClone(s);
+      const q = marketShopQuote(s, venue as never, choice);
+      assert.match(q.reason, /不办理购货/);
+      assert.deepEqual(q.receive, []);
+      assert.equal(marketShopContent(s, venue as never), '');
+      assert.equal(
+        executeMarketShop(s, venue as never, choice, marketShopStamp(s, venue as never, choice)),
+        undefined,
+      );
+      assert.deepEqual(s, before);
+    }
+});
+test('旧游商购买记录与已获丹药完整往返，但不恢复购货和额外额度', () => {
+  const s = fixture();
+  s.medicine.bag.mingqing = 2;
+  s.mortal.marketVenues = {
+    workAt: null,
+    favorAt: null,
+    shops: { exchangeAt: null, caravanAt: 29 },
+    receipts: [{ kind: 'caravan', at: 29, text: '旧日购置远游珍匣，所得丹药已收入丹囊。' }],
+  };
   const restored = importSave(exportSave(s)).save;
   assert.deepEqual(restored, s);
-  assert.deepEqual(caravanOffers(restored), offers);
-  s.age = 40;
-  assert.notDeepEqual(caravanOffers(s), offers);
-  assert.match(marketShopQuote(s, 'caravan', '0').reason, /再过/, '跨十年货期不提前补额度');
-  s.age = 41.5;
-  assert.equal(marketShopQuote(s, 'caravan', '0').reason, '');
-});
-test('游商不出售永久珍品或奇物；多时段包价高于物品估值与一次让利换物后的回售上限', () => {
-  const s = fixture();
-  for (let seed = 0; seed < 20; seed++)
-    for (let age = 15; age < 215; age += 10) {
-      s.medicine.recipeSeed = seed;
-      s.age = age;
-      for (const offer of caravanOffers(s)) {
-        let value = 0;
-        for (const item of offer.receive) {
-          assert.equal(item.kind, 'medicine');
-          const m = MEDICINES.find((m) => m.id === item.id)!;
-          assert.ok(m.years > 0);
-          assert.equal(m.tier, offer.tier);
-          value += medicineMarketValue(m.id) * item.quantity;
-        }
-        assert.ok(offer.price >= value * 1.15);
-        assert.ok(value * 1.08 * 0.98 < offer.price);
-      }
-    }
+  assert.equal(marketShopQuote(restored, 'medicine', 'heqi@juyuan').reason, '');
+  assert.equal(
+    executeMarketShop(
+      restored,
+      'caravan' as never,
+      '2',
+      marketShopStamp(restored, 'caravan' as never, '2'),
+    ),
+    undefined,
+  );
+  assert.deepEqual(restored, s);
 });
 test('寿元、天劫、供奉、未结历练、落幕、数量溢出、陈旧报价均在扣费前拒绝', () => {
   for (const [venue, choice] of [
     ['medicine', 'heqi@juyuan'],
     ['stalls', 'pagoda'],
-    ['caravan', '0'],
   ] as const) {
     for (const change of [
       (s: ReturnType<typeof fixture>) => {
@@ -220,13 +210,13 @@ test('供奉使用全程预留，不能用成交所得垫付；真正交割后�
   const s = fixture();
   s.path = 'orthodox';
   s.mortal.member = { id: 'power', dueAt: s.mortal.years + 0.25, dues: 50 };
-  const q = marketShopQuote(s, 'caravan', '0');
+  const q = marketShopQuote(s, 'medicine', 'heqi@juyuan');
   assert.equal(q.reserve, serviceDues(s, 0.5));
   assert.ok(q.reserve > 0);
   s.stones = q.stones + q.reserve - 1;
-  assert.equal(trade(s, 'caravan', '0'), undefined);
+  assert.equal(trade(s, 'medicine', 'heqi@juyuan'), undefined);
   s.stones++;
-  assert.ok(trade(s, 'caravan', '0'));
+  assert.ok(trade(s, 'medicine', 'heqi@juyuan'));
   assert.equal(s.stones, 0);
   assert.deepEqual(importSave(exportSave(s)).save, s);
 });

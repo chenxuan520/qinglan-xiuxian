@@ -1,20 +1,20 @@
 import { TREASURES, treasure } from './data.ts';
-import { MEDICINES, medicineInfo, medicineMarketValue } from './medicine-data.ts';
+import { medicineInfo } from './medicine-data.ts';
 import { forgeCost, type SaveData } from './progress.ts';
 import { advanceMortal } from './mortal.ts';
 import { sectMarketOpen } from './sect-market.ts';
 import { serviceDues, serviceReason } from './service-preflight.ts';
 import { auctionItemName, releaseAuctionItem } from './auction-items.ts';
 import type { AuctionItem } from './auction-data.ts';
-import { venueRealm, venueStamp } from './market-venues.ts';
+import { venueStamp } from './market-venues.ts';
 import { recordChronicle } from './chronicle.ts';
 
-export type MarketShopId = 'medicine' | 'stalls' | 'caravan';
+export type MarketShopId = 'medicine' | 'stalls';
 export const MARKET_SHOP_YEARS = 0.5;
 export const MARKET_SHOP_COOLDOWN = 10;
 export const SALVAGE_RATE = 0.4;
 export interface MarketShopQuote {
-  kind: 'exchange' | 'salvage' | 'caravan';
+  kind: 'exchange' | 'salvage';
   title: string;
   stones: number;
   reserve: number;
@@ -36,37 +36,10 @@ export function salvageIron(level: number) {
   return Math.floor(spent * SALVAGE_RATE);
 }
 
-// 货单只由本世种子与十年时段决定；境界仅决定可购买的品级，不重抽货物。
-export function caravanOffers(save: SaveData) {
-  let seed = save.medicine.recipeSeed ^ Math.imul(Math.floor(save.age / 10) + 1, 2654435761);
-  const next = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed;
-  };
-  return (['凡品', '灵品', '珍品'] as const).map((tier, index) => {
-    const pool = MEDICINES.filter((m) => m.years > 0 && m.tier === tier);
-    const first = pool.splice(next() % pool.length, 1)[0];
-    const second = pool[next() % pool.length];
-    const receive = [pill(first.id, index === 0 ? 2 : 1), pill(second.id, index === 0 ? 2 : 1)];
-    const value = receive.reduce(
-      (sum, item) => sum + medicineMarketValue(item.id) * item.quantity,
-      0,
-    );
-    return {
-      id: String(index),
-      tier,
-      minRealm: [0, 1, 3][index],
-      title: ['行脚药囊', '山行丹匣', '远游珍匣'][index],
-      receive,
-      price: Math.ceil((value * (115 + (next() % 16))) / 100),
-    };
-  });
-}
-
-export function marketShopCooldown(save: SaveData, kind: 'exchange' | 'caravan') {
-  const at = save.mortal.marketVenues?.shops?.[kind === 'exchange' ? 'exchangeAt' : 'caravanAt'];
+export function marketShopCooldown(save: SaveData) {
+  const at = save.mortal.marketVenues?.shops?.exchangeAt;
   return at != null && save.age < at + MARKET_SHOP_COOLDOWN - 1e-9
-    ? `再过${Math.ceil((at + MARKET_SHOP_COOLDOWN - save.age - 1e-9) * 10) / 10}年可再${kind === 'exchange' ? '调剂' : '购置'}`
+    ? `再过${Math.ceil((at + MARKET_SHOP_COOLDOWN - save.age - 1e-9) * 10) / 10}年可再调剂`
     : '';
 }
 
@@ -77,7 +50,7 @@ export function marketShopQuote(
   unfinished = false,
 ): MarketShopQuote {
   const q: MarketShopQuote = {
-    kind: venue === 'medicine' ? 'exchange' : venue === 'stalls' ? 'salvage' : 'caravan',
+    kind: venue === 'medicine' ? 'exchange' : 'salvage',
     title: '',
     stones: 0,
     reserve: serviceDues(save, MARKET_SHOP_YEARS),
@@ -89,6 +62,7 @@ export function marketShopQuote(
     q.reason = reason;
     return q;
   };
+  if (venue !== 'medicine' && venue !== 'stalls') return invalid('此处不办理购货');
   if (venue === 'medicine') {
     const [fromId, toId, extra] = choice.split('@');
     const from = medicineInfo(fromId),
@@ -115,21 +89,13 @@ export function marketShopQuote(
     q.title = `拆解${treasure(choice).name}`;
     q.give = [{ kind: 'artifact', id: choice, quantity: 1, forgeLevel: level }];
     q.receive = [{ kind: 'iron', id: 'iron', quantity: iron, forgeLevel: 0 }];
-  } else {
-    const offer = caravanOffers(save).find((o) => o.id === choice);
-    if (!offer) return invalid('请选择货单');
-    q.title = offer.title;
-    q.receive = offer.receive;
-    q.stones = offer.price;
-    if (venueRealm(save) < offer.minRealm)
-      return invalid(`${offer.minRealm === 1 ? '筑基' : '元婴'}后可购置此匣`);
   }
   if (!sectMarketOpen(save) || !save.mortal.population || !save.mortal.sectMarket)
     return invalid('请先进入坊市');
   const reason = serviceReason(save, MARKET_SHOP_YEARS, unfinished || !!save.tribulationReturn);
   if (reason) return invalid(reason);
   if (q.kind !== 'salvage') {
-    const cooldown = marketShopCooldown(save, q.kind);
+    const cooldown = marketShopCooldown(save);
     if (cooldown) return invalid(cooldown);
   }
   if (save.stones < q.stones + q.reserve) return invalid('请备足价款与到期供奉');
@@ -166,7 +132,7 @@ export function executeMarketShop(
   const state = (save.mortal.marketVenues ??= { workAt: null, favorAt: null, receipts: [] });
   if (q.kind !== 'salvage') {
     state.shops ??= { exchangeAt: null, caravanAt: null };
-    state.shops[q.kind === 'exchange' ? 'exchangeAt' : 'caravanAt'] = save.age;
+    state.shops.exchangeAt = save.age;
   }
   const items = (list: AuctionItem[]) =>
     list.map((i) => `${auctionItemName(i)} ×${i.quantity}`).join('、');
