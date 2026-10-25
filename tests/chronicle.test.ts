@@ -17,6 +17,36 @@ import { joinSect, leaveSect } from '../src/mortal.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
 import { AchievementNotices } from '../src/achievement-notices.ts';
 import { journeyCardData } from '../src/journey-card.ts';
+import { achievementArt } from '../src/achievement-art.ts';
+
+test('十五项成就各有独立印记，亮灭对应真实达成状态且保留文字与存档', () => {
+  const save = freshSave();
+  const definitions = chronicleAchievements(save);
+  assert.equal(definitions.length, 15);
+  const marks = definitions.map((a) => achievementArt(a.id, false));
+  assert.equal(new Set(marks.map((mark) => mark.match(/<g[^>]*>([\s\S]*)<\/g>/)?.[1])).size, 15);
+  for (const mode of ['none', 'some', 'all']) {
+    definitions.forEach((a, i) => {
+      if (mode === 'all' || (mode === 'some' && i % 2 === 0)) save.chronicle.milestones[a.id] = 15;
+      else delete save.chronicle.milestones[a.id];
+    });
+    const before = JSON.stringify(save);
+    const html = chronicleContent(save);
+    const cards = [...html.matchAll(/<article class="[^"]*">([\s\S]*?)<\/article>/g)];
+    assert.equal(cards.length, 15);
+    chronicleAchievements(save).forEach((a, i) => {
+      const card = cards[i][1];
+      assert.ok(card.includes(`data-achievement-icon="${a.id}" data-achieved="${a.achieved}"`));
+      assert.ok(card.includes(`<span>${a.title}</span>`));
+      assert.ok(card.includes(a.detail));
+      assert.ok(card.includes(a.achieved ? '15 岁' : '尚未达成'));
+      assert.match(card, /aria-hidden="true" focusable="false"/);
+    });
+    assert.equal(JSON.stringify(save), before);
+  }
+  assert.equal(achievementArt('__proto__', true), '');
+  assert.equal(achievementArt('<img src=x>', true), '');
+});
 
 test('成就改名同步旧年表、成就提示与留影，保留达成标识、年龄和存档原文', () => {
   const save = freshSave();
