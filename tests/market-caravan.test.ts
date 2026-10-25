@@ -10,6 +10,7 @@ import {
 import { marketRequest, fulfillMarketRequest, requestReason } from '../src/market-social.ts';
 import { venueRequests, venuePeople } from '../src/market-venues.ts';
 import { marketVenueContent } from '../src/market-venue-ui.ts';
+import { marketSocialContent } from '../src/market-social-ui.ts';
 import { marketVenueAction } from '../src/market-venue-flow.ts';
 import { rememberMarketContact } from '../src/market-relations.ts';
 import { settlementPlaces } from '../src/settlement-directory.ts';
@@ -55,7 +56,13 @@ test('游商求购逐项对应本批在场当事人的实际条件、报酬，�
       assert.ok(primary.includes(`${request.price}灵石`));
       if (request.kind === 'artifact') {
         assert.ok(primary.includes(`至少炼器${request.minimumLevel}阶`));
-        assert.ok(primary.includes(`现有炼器${request.forgeLevel}阶`));
+        assert.ok(
+          primary.includes(
+            s.artifacts.includes(request.id)
+              ? `现有炼器${s.forge[request.id] || 0}阶`
+              : '尚未持有此法宝',
+          ),
+        );
       }
       assert.ok(primary.includes(`data-id="${npc.id}"`));
     }
@@ -103,6 +110,13 @@ test('按消息找到当事人交药仅扣所需库存、增加报价灵石；�
     settlementPlaces(restored, true).find((p) => p.name === '游商摊')!.status!,
     /暂无未完成求购/,
   );
+  for (const venue of ['medicine', 'stalls', 'artifacts'] as const) {
+    const html = marketVenueContent(restored, venue);
+    const card = html.split(`<h3>${npc.name}</h3>`)[1].split('</article>')[0];
+    assert.match(card, /本批求购已成交，不再收货/);
+    assert.doesNotMatch(card, /公开求购|挂牌|交货实收|参考报价/);
+    assert.ok(card.includes(`data-id="${npc.id}"`), '交谈和换物指路仍保留');
+  }
   const after = structuredClone(restored);
   assert.equal(
     fulfillMarketRequest(restored, npc.id, restored.mortal.sectMarket!.visit, request.forgeLevel),
@@ -202,4 +216,79 @@ test('游商指路只标记真实目标、关闭面板，角色位置和存档�
     assert.deepEqual(scene.position, { x: 1760, y: 1080 });
     assert.deepEqual(s, before);
   }
+});
+
+test('法宝求购区分真实库存阶数、最低要求与参考报价，所有消息入口和当面面板一致', () => {
+  const s = fixture(4);
+  const { npc, request } = venueRequests(s)[0];
+  assert.equal(request.id, 'banner');
+  assert.equal(request.minimumLevel, 2);
+  for (const level of [0, 1, 2, 4, 10, null]) {
+    s.artifacts = s.artifacts.filter((id) => id !== request.id);
+    if (level !== null) s.artifacts.push(request.id);
+    s.forge[request.id] = level ?? 0;
+    const current = marketRequest(s, npc.id)!;
+    const before = structuredClone(s);
+    const pages = [
+      ...(['caravan', 'medicine', 'stalls', 'artifacts'] as const).map((venue) => {
+        const html = marketVenueContent(s, venue);
+        return html.split(`<h3>${npc.name}</h3>`)[1].split('</article>')[0];
+      }),
+      marketSocialContent(s, npc)
+        .split('data-disclosure="market-request"')[1]
+        .split('</details>')[0],
+    ];
+    for (const html of pages) {
+      assert.ok(html.includes('至少炼器2阶'));
+      if (level === null) {
+        assert.match(html, /尚未持有此法宝/);
+        assert.doesNotMatch(html, /现有炼器/);
+      } else {
+        assert.ok(html.includes(`现有炼器${level}阶`));
+        if (level < 2) assert.match(html, /尚未达到要求/);
+      }
+      assert.ok(html.includes(String(current.price)));
+      if (level === null || level < 2) {
+        assert.match(html, /按炼器2阶参考报价/);
+        assert.doesNotMatch(html, /交货实收/);
+      } else {
+        assert.match(html, /交货实收/);
+        assert.doesNotMatch(html, /参考报价/);
+      }
+    }
+    if (level === null || level < 2) {
+      assert.ok(requestReason(s, npc.id, s.mortal.sectMarket!.visit, current.forgeLevel));
+      assert.equal(
+        fulfillMarketRequest(s, npc.id, s.mortal.sectMarket!.visit, current.forgeLevel),
+        undefined,
+      );
+    }
+    assert.deepEqual(s, before);
+  }
+});
+
+test('法宝成交后的四店消息读回都只标完成，不重新挂牌转出后的低阶价格', () => {
+  const s = fixture(4);
+  const { npc, request } = venueRequests(s)[0];
+  s.artifacts.push(request.id);
+  s.forge[request.id] = 4;
+  const quote = marketRequest(s, npc.id)!;
+  const stones = s.stones;
+  assert.ok(fulfillMarketRequest(s, npc.id, s.mortal.sectMarket!.visit, 4));
+  assert.equal(s.stones, stones + quote.price);
+  assert.equal(s.forge[request.id], 0);
+  assert.equal(s.artifacts.includes(request.id), false);
+  const restored = readSave(JSON.stringify(s)).save;
+  const before = structuredClone(restored);
+  for (const venue of ['caravan', 'medicine', 'stalls', 'artifacts'] as const) {
+    const html = marketVenueContent(restored, venue);
+    const card = html.split(`<h3>${npc.name}</h3>`)[1].split('</article>')[0];
+    assert.match(card, /本批求购已成交，不再收货/);
+    assert.doesNotMatch(card, /公开求购|挂牌|交货实收|参考报价|现有炼器/);
+  }
+  assert.equal(
+    fulfillMarketRequest(restored, npc.id, restored.mortal.sectMarket!.visit, 4),
+    undefined,
+  );
+  assert.deepEqual(restored, before);
 });

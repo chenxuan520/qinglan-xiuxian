@@ -13,7 +13,7 @@ import { marketBuildingArt } from './market-art.ts';
 import { assetUrl } from './asset-url.ts';
 import { auctionItemName } from './auction-items.ts';
 import { sectMarketOffer } from './sect-market.ts';
-import { marketRequest } from './market-social.ts';
+import { requestForgeDescription, requestPriceLabel } from './market-request-ui.ts';
 import { debateContent } from './market-debate-ui.ts';
 import { marketContact } from './market-relations.ts';
 import { marketFellowCharacter } from './market-fellow.ts';
@@ -75,16 +75,17 @@ export function marketVenueContent(save: SaveData, id: MarketVenueId, unfinished
         ? [{ npc, offer, exchanged: save.mortal.sectMarket!.exchanged.includes(npc.id) }]
         : [];
     });
-    content = `<section data-caravan-requests><h3>坊中求购</h3><p>游商把此番来客的求购抄在摊前。若有合用的余物，可记下去处，亲自找对方交谈。</p>${requests.length ? `<div class="market-venue-grid">${requests.map(({ npc, request, fulfilled }) => person(npc, fulfilled ? '<p class="market-inspection">本批求购已成交，不再收货。</p>' : `<p class="market-trade-motive"><strong>${esc(request.motiveTitle)}</strong><br>${esc(request.motiveText)}</p><p>求购：<strong>${auctionItemName(request)} ×${request.quantity}</strong>${request.kind === 'artifact' ? `<br>至少炼器${request.minimumLevel}阶；按现有炼器${request.forgeLevel}阶交出并估价。` : ''}</p><p>交货实收 <strong>${request.price}灵石</strong> · 半年 · 无额外佣金。</p><p class="panel-note">${esc(request.priceText)}</p>${guide(npc)}`)).join('')}</div>` : '<p class="market-inspection">本批暂无公开求购，可看看余丹货讯，或日后再访。</p>'}<p class="panel-note">查看消息不耗年岁或灵石。物品与报价以当面交割时为准，每位求购修士本批只收一次；当前本命不可交付，未结束历练时不能交易法宝。</p></section><details class="market-venue-history" data-caravan-stock><summary>本批余丹货讯</summary><p class="panel-note">这些是眼下在坊修士愿换的余丹，须带合用之物当面相换，每人每批一次。</p>${stock.length ? `<div class="market-venue-grid">${stock.map(({ npc, offer, exchanged }) => person(npc, `<p>${exchanged ? '本批已互换' : '可换余丹'}：${offer.name} · ${offer.tier}</p>${exchanged ? '' : guide(npc)}`)).join('')}</div>` : '<p class="market-inspection">眼下没有可询问的余丹货讯。</p>'}</details>`;
+    content = `<section data-caravan-requests><h3>坊中求购</h3><p>游商把此番来客的求购抄在摊前。若有合用的余物，可记下去处，亲自找对方交谈。</p>${requests.length ? `<div class="market-venue-grid">${requests.map(({ npc, request, fulfilled }) => person(npc, fulfilled ? '<p class="market-inspection">本批求购已成交，不再收货。</p>' : `<p class="market-trade-motive"><strong>${esc(request.motiveTitle)}</strong><br>${esc(request.motiveText)}</p><p>求购：<strong>${auctionItemName(request)} ×${request.quantity}</strong>${request.kind === 'artifact' ? `<br>${esc(requestForgeDescription(save, request))}` : ''}</p><p>${requestPriceLabel(save, request)} <strong>${request.price}灵石</strong> · 半年 · 无额外佣金。</p><p class="panel-note">${esc(request.priceText)}</p>${guide(npc)}`)).join('')}</div>` : '<p class="market-inspection">本批暂无公开求购，可看看余丹货讯，或日后再访。</p>'}<p class="panel-note">查看消息不耗年岁或灵石。物品与报价以当面交割时为准，每位求购修士本批只收一次；当前本命不可交付，未结束历练时不能交易法宝。</p></section><details class="market-venue-history" data-caravan-stock><summary>本批余丹货讯</summary><p class="panel-note">这些是眼下在坊修士愿换的余丹，须带合用之物当面相换，每人每批一次。</p>${stock.length ? `<div class="market-venue-grid">${stock.map(({ npc, offer, exchanged }) => person(npc, `<p>${exchanged ? '本批已互换' : '可换余丹'}：${offer.name} · ${offer.tier}</p>${exchanged ? '' : guide(npc)}`)).join('')}</div>` : '<p class="market-inspection">眼下没有可询问的余丹货讯。</p>'}</details>`;
   } else {
     const medicines = id === 'medicine' || id === 'stalls';
+    const requests = venueRequests(save);
     content = `<p>${medicines ? '铺前修士各有余丹与所需，先看谁带着合用的东西，再去门前交谈。' : '来客的法宝与行囊各不相同。公开求购照明示报价，私下机缘仍须当面辨清。'}这里列的是此番来坊的修士；查看和记下去处不扣物资。</p><div class="market-venue-grid">${people
       .map((npc) => {
         const offer = sectMarketOffer(save, npc.id),
-          request = marketRequest(save, npc.id);
+          lead = requests.find((r) => r.npc.id === npc.id);
         return person(
           npc,
-          `${offer ? `<p>可换余丹：${offer.name} · ${offer.tier}</p>` : ''}${request ? `<p>公开求购：${auctionItemName(request)} ×${request.quantity}<br>挂牌${request.price}灵石。</p>` : '<p>暂无公开求购，可以互换或闲谈。</p>'}${guide(npc)}`,
+          `${offer ? `<p>可换余丹：${offer.name} · ${offer.tier}</p>` : ''}${lead ? (lead.fulfilled ? '<p class="market-inspection">本批求购已成交，不再收货。</p>' : `<p>公开求购：${auctionItemName(lead.request)} ×${lead.request.quantity}${lead.request.kind === 'artifact' ? `<br>${esc(requestForgeDescription(save, lead.request))}` : ''}<br>${requestPriceLabel(save, lead.request)}${lead.request.price}灵石。</p>`) : '<p>暂无公开求购，可以互换或闲谈。</p>'}${guide(npc)}`,
         );
       })
       .join('')}</div>`;
