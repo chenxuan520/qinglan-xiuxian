@@ -1,3 +1,4 @@
+import { bindSettlementDirectory } from './settlement-directory-source.ts';
 import { STANDALONE } from './build-mode.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
@@ -1818,6 +1819,8 @@ function handleAction(action: string, id?: string) {
   }
   dispatchAction(shellBindings(), action, id);
 }
+bindSettlementDirectory(ui, () => ({ save, unfinished: !!pendingRun, locked: !!saveLock }));
+
 document.addEventListener('click', (event) => {
   if (
     (event.target as Element).matches('.modal-backdrop') &&

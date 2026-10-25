@@ -11,6 +11,7 @@ import {
 } from './common-ui.ts';
 import { icon } from './icons.ts';
 import type { PanelDefinition } from './panel-host.ts';
+import { trainingStepText } from './training-preview.ts';
 export function cultivationPanel(save: SaveData, selectedStage: number): PanelDefinition {
   const r = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const current = spiritPower(save);
@@ -60,11 +61,11 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
     )
       .map(
         (t) =>
-          `<article class="training-card">${icon(t.icon, '#cfcb9c')}<h3>${t.name}<small>${save.training[t.id]} / 20 阶</small></h3><p>${t.detail}</p><strong>${t.desc}</strong><button class="secondary-button" data-action="train" data-id="${t.id}" data-cost-stones="${trainingCost(save.training[t.id], save)}" ${save.training[t.id] >= 20 || lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? 'disabled' : ''}>${save.training[t.id] >= 20 ? '修习圆满' : lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? '寿元不足' : `修炼 · ${trainingCost(save.training[t.id], save)} 灵石 · ${trainingYears(save)} 年`}</button></article>`,
+          `<article class="training-card">${icon(t.icon, '#cfcb9c')}<h3>${t.name}<small>${save.training[t.id]} / 20 阶</small></h3><p>${t.detail}</p><strong>${t.desc}<br><span class="training-step">${trainingStepText(save, t.id)}</span></strong><button class="secondary-button" data-action="train" data-id="${t.id}" data-cost-stones="${trainingCost(save.training[t.id], save)}" ${save.training[t.id] >= 20 || lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? 'disabled' : ''}>${save.training[t.id] >= 20 ? '修习圆满' : lifespanInfo(save).remaining <= trainingYears(save) + 1e-9 ? '寿元不足' : `修炼 · ${trainingCost(save.training[t.id], save)} 灵石 · ${trainingYears(save)} 年`}</button></article>`,
       )
       .join(
         '',
-      )}</div><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；修习费用随阶数缓升，单项修满共需 ${Array.from({ length: 20 }, (_, i) => trainingCost(i, save)).reduce((a, b) => a + b, 0)} 灵石；悟道后十阶增伤逐阶提高，满阶按三十个基础阶计算；淬体与身法十一至十五阶为基础的 1.05 倍，十六至二十阶为 1.1 倍。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，普通模式失败也有收益；极限战败即此世落幕。</p>${retreatSection(save)}<div class="save-record"><div class="save-record-copy"><h3>此世存档</h3><p>把这一世的修为与旧事收进行囊。普通模式可续未尽历练；极限未完战斗重开将身陨。</p><small>导出存档文件，换设备也能接续这一世。</small></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出此世</button><button class="secondary-button" data-action="import-save">导入旧档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
+      )}</div><p class="panel-note">数值按当前搭配对比下一阶的新历练入场效果，本命按一重、未觉醒、非暴击计算；仅比较根基提升，药效仍随修习年岁流逝。</p><p class="panel-note">修习根基每阶消耗 ${trainingYears(save)} 年岁（${spiritRootInfo(save.spiritRoot).name}），资质越高修炼越快；寿元不足不扣资源。悟道各阶增伤相加后独立生效，不被境界与功法稀释；修习费用随阶数缓升，单项修满共需 ${Array.from({ length: 20 }, (_, i) => trainingCost(i, save)).reduce((a, b) => a + b, 0)} 灵石；悟道后十阶增伤逐阶提高，满阶按三十个基础阶计算；淬体与身法十一至十五阶为基础的 1.05 倍，十六至二十阶为 1.1 倍。斩妖与升级的修为实时入账，突破立即生效。通关额外修为、灵石和玄铁在历练结束时结算，普通模式失败也有收益；极限战败即此世落幕。</p>${retreatSection(save)}<div class="save-record"><div class="save-record-copy"><h3>此世存档</h3><p>把这一世的修为与旧事收进行囊。普通模式可续未尽历练；极限未完战斗重开将身陨。</p><small>导出存档文件，换设备也能接续这一世。</small></div><div class="save-actions"><button class="secondary-button" data-action="export-save">导出此世</button><button class="secondary-button" data-action="import-save">导入旧档</button><input id="save-import" type="file" accept=".json,application/json" hidden></div></div>`,
     wide: true,
   };
 }

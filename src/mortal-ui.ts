@@ -1,4 +1,6 @@
 import { lastVisitText } from './home-town.ts';
+import { humanRevisitText } from './human-recollection.ts';
+import { settlementDirectoryEntrance } from './settlement-directory-source.ts';
 import { marketBuildingArt } from './market-art.ts';
 import { playerSpriteBackground } from './player-appearance.ts';
 import { SECT_SPECIALTIES } from './sect-service-data.ts';
@@ -122,12 +124,12 @@ export function mortalTabContent(
 ) {
   const world = save.mortal;
   if (tab === 'town')
-    return `<section class="town-arrival"><div><span class="eyebrow">山下烟火</span><h2>青岚镇</h2><p>商铺沿街，炊烟绕巷。<br>走进城镇，去港口听潮，拜访行当中人，与街巷里的镇民闲谈。</p><p class="panel-note">${lastVisitText(save.age, save.mortal.scenery?.lastVisitAge)}<br>街巷闲逛计龄，交谈或退回入口时暂停。</p><button class="primary-button" data-action="town-enter">走进青岚镇 →</button></div><div class="town-arrival-art" aria-hidden="true"><span></span><span></span><span></span></div></section>`;
+    return `<section class="town-arrival"><div><span class="eyebrow">山下烟火</span><h2>青岚镇</h2><p>商铺沿街，炊烟绕巷。<br>走进城镇，去港口听潮，拜访行当中人，与街巷里的镇民闲谈。</p><p class="panel-note">${lastVisitText(save.age, save.mortal.scenery?.lastVisitAge)}<br>街巷闲逛计龄，交谈或退回入口时暂停。</p><button class="primary-button" data-action="town-enter">走进青岚镇 →</button></div><div class="town-arrival-art" aria-hidden="true"><span></span><span></span><span></span></div></section>${settlementDirectoryEntrance()}`;
   const member = SECTS.find((s) => s.id === world.member?.id);
   const plan = studyPlan(save);
   const dues = sectDues(save);
   const effectiveLevel = Math.min(plan.level, plan.limit);
-  return `${sectMarketEntrance(save)}<section class="mortal-membership"><div><small>我的仙门 · ${sectRole(save)}</small><h2>${member?.name ?? '尚未拜入宗门'}</h2><p>${member ? `${passive(member.id).name} · 精研 ${plan.level} / ${MAX_MASTERY} 阶 · 当前生效 ${effectiveLevel} 阶 · 正向效果 +${effectiveLevel * 3}%` : '同时只能加入一个宗门；入宗锁定本门正魔路线，不能兼修。开局赠本门功法一重，退宗后可重新选择路线。'}</p><p>入宗后锁定本门路线，不能兼修；退宗才可换道或改投他门。精研每阶增强本门功法正向效果 3%，满阶 30%；离宗保留成果，加成暂停。新历练自动获本门功法一重，占 4 个功法槽之一；局内修满五重才能参与仙器觉醒。</p></div>${member ? `<div class="mortal-study"><button class="primary-button" data-action="mortal-activity" data-id="study" data-cost-stones="${plan.stones}" ${world.activity || !plan.eligible ? 'disabled' : ''}>${plan.level >= MAX_MASTERY ? '本门精研已满' : !plan.eligible ? `需${plan.requiredRealm}解锁` : world.activity ? '有事项待结算' : `精研下一阶 · ${plan.stones} 灵石 / ${plan.years} 年`}</button><small>当前境界可精研至 ${plan.limit} 阶${plan.requiredRealm ? ` · 下一阶需${plan.requiredRealm}` : ''}<br>境界只作门槛，不消耗修为；精研效果随境界逐步生效。<br>${spiritRootInfo(save.spiritRoot).name} · 消耗 ${plan.years} 年<br>点击即扣灵石与年岁，立即精研；遇供奉、寿尽或天劫时先处理，未完成时退宗不退费。精研五阶赠随机灵品丹药一颗，十阶赠随机限时珍品丹药一颗；每门各一次，自动收入丹囊。</small><button class="secondary-button" data-action="sect-service-open">本门专长 · ${SECT_SPECIALTIES[member.id].title}</button><button class="mortal-leave" data-action="mortal-leave">退出宗门</button></div>` : ''}</section>    <section class="mortal-sects"><div class="section-heading"><div><span class="section-number">仙门</span><h2>各宗门庭，各有其道</h2></div><div class="mortal-filters" role="group" aria-label="宗门流派">${[
+  return `${sectMarketEntrance(save)}${settlementDirectoryEntrance(true)}<section class="mortal-membership"><div><small>我的仙门 · ${sectRole(save)}</small><h2>${member?.name ?? '尚未拜入宗门'}</h2><p>${member ? `${passive(member.id).name} · 精研 ${plan.level} / ${MAX_MASTERY} 阶 · 当前生效 ${effectiveLevel} 阶 · 正向效果 +${effectiveLevel * 3}%` : '同时只能加入一个宗门；入宗锁定本门正魔路线，不能兼修。开局赠本门功法一重，退宗后可重新选择路线。'}</p><p>入宗后锁定本门路线，不能兼修；退宗才可换道或改投他门。精研每阶增强本门功法正向效果 3%，满阶 30%；离宗保留成果，加成暂停。新历练自动获本门功法一重，占 4 个功法槽之一；局内修满五重才能参与仙器觉醒。</p></div>${member ? `<div class="mortal-study"><button class="primary-button" data-action="mortal-activity" data-id="study" data-cost-stones="${plan.stones}" ${world.activity || !plan.eligible ? 'disabled' : ''}>${plan.level >= MAX_MASTERY ? '本门精研已满' : !plan.eligible ? `需${plan.requiredRealm}解锁` : world.activity ? '有事项待结算' : `精研下一阶 · ${plan.stones} 灵石 / ${plan.years} 年`}</button><small>当前境界可精研至 ${plan.limit} 阶${plan.requiredRealm ? ` · 下一阶需${plan.requiredRealm}` : ''}<br>境界只作门槛，不消耗修为；精研效果随境界逐步生效。<br>${spiritRootInfo(save.spiritRoot).name} · 消耗 ${plan.years} 年<br>点击即扣灵石与年岁，立即精研；遇供奉、寿尽或天劫时先处理，未完成时退宗不退费。精研五阶赠随机灵品丹药一颗，十阶赠随机限时珍品丹药一颗；每门各一次，自动收入丹囊。</small><button class="secondary-button" data-action="sect-service-open">本门专长 · ${SECT_SPECIALTIES[member.id].title}</button><button class="mortal-leave" data-action="mortal-leave">退出宗门</button></div>` : ''}</section>    <section class="mortal-sects"><div class="section-heading"><div><span class="section-number">仙门</span><h2>各宗门庭，各有其道</h2></div><div class="mortal-filters" role="group" aria-label="宗门流派">${[
     ['all', '全部'],
     ['orthodox', '正道'],
     ['demonic', '魔道'],
@@ -157,7 +159,7 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     const job = TOWN_JOBS[npc.id];
     actions = `<p>${job.desc}</p><p class="panel-note">消耗 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>点击即增加年岁并结算收益，完成后不自动重复。</p>${npc.id === 'herbs' ? '<div class="town-event-actions">' : ''}<button class="primary-button" data-action="mortal-activity" data-id="${npc.id}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '有事项待结算' : npc.id === 'tea' ? '入座听书' : '接下这件事'}</button>${npc.id === 'herbs' ? '<button class="secondary-button" data-action="medicine-shop">药铺 · 看看本批丹药</button></div>' : ''}`;
   }
-  return `<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}${HUMAN_STORY_IDS.filter(
+  return `${npc.id === 'tea' ? `<p class="panel-note">案头旧书《不系舟》里，也有从青岚渡口出发的少年。陆迟的故事已成旧闻，你仍可走自己的路。</p><a class="secondary-button" href="${assetUrl('novel/')}" target="_blank" rel="noopener">翻阅《青岚纪·不系舟》 ↗</a><p class="panel-note">随手翻阅，不耗年岁。</p>` : ''}<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}${HUMAN_STORY_IDS.filter(
     (id) => HUMAN_STORIES[id].npcId === npc.id,
   )
     .map((id) => humanStoryContent(save, id, true))
@@ -192,7 +194,7 @@ export function humanStoryJournal(save: SaveData, heading = true) {
     .map((id) => {
       const story = save.mortal.humanStories![id]!;
       const view = humanStoryView(save, id)!;
-      return `<article><small>${view.phase}${view.keepsake && !story.read ? ' · 有一封未读旧信' : ''}</small><h3>${escape(view.name)}</h3><p>${view.title} · ${story.metAt.toFixed(1)} 岁相识</p><p>${view.keepsake ? `留下「${view.keepsake}」` : story.choice === 'bond' ? '此世道侣 · 人间有一处归灯' : '故人尚在人间，别后亦可再访'}</p><button class="secondary-button" data-action="human-memory" data-id="${id}">${view.keepsake ? '展读旧信' : '重读相逢'} →</button></article>`;
+      return `<article><small>${view.phase}${view.keepsake && !story.read ? ' · 有一封未读旧信' : ''}</small><h3>${escape(view.name)}</h3><p>${view.title} · ${story.metAt.toFixed(1)} 岁相识</p><p>${view.keepsake ? `留下「${view.keepsake}」` : escape(humanRevisitText(save, id)) || (story.choice === 'bond' ? '此世道侣 · 人间有一处归灯' : '故人尚在人间，别后亦可再访')}</p><button class="secondary-button" data-action="human-memory" data-id="${id}">${view.keepsake ? '展读旧信' : '重读相逢'} →</button></article>`;
     })
     .join('')}</div></section>`;
 }
