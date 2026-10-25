@@ -134,6 +134,7 @@ export class TownScene {
     this.player = host.querySelector('.town-player')!;
     this.playerSprite = new SettlementSprite(this.player, this.position);
     this.marker = host.querySelector('.town-map-marker')!;
+    this.marker.parentElement!.style.transform = 'translateZ(0)';
     if (connection && (!hometown || hometown.state.stage === 'departed'))
       this.passage = new SettlementPassage(
         host,
@@ -527,7 +528,7 @@ export class TownScene {
       Math.min(0, this.height - TOWN_HEIGHT * scale),
       Math.min(0, this.height / 2 - this.position.y * scale),
     );
-    const transform = `translate(${x}px,${y}px) scale(${scale})`;
+    const transform = `translate3d(${x}px,${y}px,0) scale(${scale})`;
     const view = { width: this.width, height: this.height, scale, x, y };
     for (const { npc, sprite } of this.villagers) {
       const point = townNpcPosition(npc, this.walkingSeconds);

@@ -37,11 +37,16 @@ test('静止或暂停后重复呈现同一坐标不再写样式；离屏重返�
   const point = { x: 1200, y: 790 };
   const sprite = new SettlementSprite(node, point);
   writes.length = 0;
-  for (let i = 0; i < 120; i++) sprite.move(point);
+  for (let i = 0; i < 120; i++) {
+    sprite.show(true);
+    sprite.move(point);
+  }
   assert.deepEqual(writes, []);
   assert.equal(sprite.show(false), false);
   assert.equal(node.hidden, true);
+  assert.equal(node.style.willChange, '');
   assert.equal(sprite.show(true), true);
+  assert.equal(node.style.willChange, 'transform');
   sprite.move({ x: 1300, y: 820 });
   assert.equal(node.hidden, false);
   assert.equal(node.style.transform, 'translate(1300px,820px) translate(-50%,-100%)');

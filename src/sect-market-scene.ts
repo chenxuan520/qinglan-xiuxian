@@ -134,6 +134,7 @@ export class SectMarketScene {
     this.map = host.querySelector('.sect-market-map')!;
     this.playerSprite = new SettlementSprite(host.querySelector('.town-player')!, this.position);
     this.marker = host.querySelector('.town-map-marker')!;
+    this.marker.parentElement!.style.transform = 'translateZ(0)';
     if (returnTown)
       this.passage = new SettlementPassage(
         host,
@@ -475,7 +476,7 @@ export class SectMarketScene {
         if (marker.getAttribute('cy') !== String(npc.y)) marker.setAttribute('cy', String(npc.y));
       }
     }
-    const transform = `translate(${x}px,${y}px) scale(${scale})`;
+    const transform = `translate3d(${x}px,${y}px,0) scale(${scale})`;
     if (transform !== this.lastTransform) {
       this.map.style.transform = transform;
       this.lastTransform = transform;

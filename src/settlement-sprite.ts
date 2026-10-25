@@ -23,13 +23,17 @@ export class SettlementSprite {
   private depth = NaN;
   constructor(element: HTMLElement, point: TownPoint) {
     this.element = element;
+    if (!element.hidden) element.style.willChange = 'transform';
     element.style.left = '0px';
     element.style.top = '0px';
     this.move(point);
   }
   show(visible: boolean) {
     const revealed = visible && this.element.hidden;
-    if (this.element.hidden === visible) this.element.hidden = !visible;
+    if (this.element.hidden === visible) {
+      this.element.hidden = !visible;
+      this.element.style.willChange = visible ? 'transform' : '';
+    }
     return revealed;
   }
   move(point: TownPoint) {
