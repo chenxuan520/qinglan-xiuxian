@@ -365,7 +365,7 @@ test('NPC 请求与界面用同一身份/境界；拒绝缺失和越界身份，
     const realmReply = marketLocalReply(npc, '你修到什么境界？', 4);
     if (npc.realmIndex > 4) assert.doesNotMatch(realmReply, new RegExp(npc.realm));
     else assert.match(realmReply, new RegExp(npc.realm));
-    assert.match(marketLocalReply(npc, '换药怎么弄？', 4), /按相近估值互换/);
+    assert.match(marketLocalReply(npc, '换药怎么弄？', 4), /合用之物.*照说好的数目相换/);
     assert.equal(validDialogue({ ...request, marketVisit: undefined }), false);
     assert.equal(validDialogue({ ...request, marketVisit: { visit: 0, realmIndex: 4 } }), false);
     assert.equal(validDialogue({ ...request, marketVisit: { visit: 1, realmIndex: 9 } }), false);
@@ -465,7 +465,7 @@ test('离线闲聊同样不看穿前辈，也不凭当前境界推断同阶或�
     assert.match(marketLocalReply(npc, '你看得出我的突破和进展吗？', rank), /只凭一面，难知/);
   assert.match(marketLocalReply(npc, '你的境界呢？', 4), /我如今修至筑基/);
   assert.doesNotMatch(marketLocalReply(npc, '你自己近来如何精进？', 4), /前辈的修为/);
-  assert.match(marketLocalReply(npc, '换丹药怎么弄？', 4), /按相近估值互换/);
+  assert.match(marketLocalReply(npc, '换丹药怎么弄？', 4), /合用之物.*照说好的数目相换/);
 });
 test('场地可达三位修士、保持距离才可交谈；边界与两处建筑挡住脚点，移动速度不随帧间隔爆跳', () => {
   for (const npc of MARKET_CULTIVATORS) {

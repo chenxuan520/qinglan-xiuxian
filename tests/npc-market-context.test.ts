@@ -245,15 +245,16 @@ test('私下邀约实际致命规则进入模型和离线对白，模型不能�
   assert.match(prompt, /左侧退路.*持续两秒/);
   assert.match(prompt, /普通拍卖、当面求购与互换不触发这种致命战斗/);
   const local = marketDialogueLocalReply(request);
-  assert.match(local, /战败会身陨/);
-  assert.match(local, /左侧退路.*两息/);
+  assert.match(local, /性命相搏/);
+  assert.match(local, /凭据.*同行的人.*回来的路/);
+  assert.doesNotMatch(local, /界面|结算|闲聊不能保命/);
   for (const falseReply of [
     '包你无事，这路绝对安全。',
     '只损失80灵石，不会死。',
     '刷新一下就能逃脱。',
     '点击一下即可脱身。',
   ])
-    assert.match(guardDialogueReply(request, falseReply), /战败会身陨/);
+    assert.equal(guardDialogueReply(request, falseReply), local);
 });
 
 test('自称宗门照应仅作为公开说法，不能提升为真实身份或安全保证', () => {

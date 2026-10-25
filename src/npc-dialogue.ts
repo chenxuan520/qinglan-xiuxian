@@ -471,7 +471,7 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
   if (context?.risk?.inspection === 'fraud-exposed' && riskQuestion)
     return `${address}，你已当面查出这桩机缘的破绽，别再为好听话垫款。普通拍卖、互换照各自明示规则，不与这桩私下邀约混为一谈。`;
   if (context?.risk?.kind === 'invitation' && !context.risk.resolved && riskQuestion)
-    return `${address}，私下赴约可能遇劫修，战败会身陨。撤离须实际走到左侧退路并拉开距离，稳住两息；胜负、复活与所得都由历练界面结算，闲聊不能保命。`;
+    return `${address}，坊外少人照应，若翻了脸，可就是性命相搏。凭据、同行的人、回来的路，都先问清楚，莫为一件宝物轻易赴险。`;
   if (context?.risk && riskQuestion) {
     if (context.risk.inspection === 'no-flaw-found')
       return `${address}，你已当面核验，眼下未见破绽。凭据仍须与实际交付对上，没查出问题也不是替往后的交易作保。`;

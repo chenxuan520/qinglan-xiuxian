@@ -228,7 +228,7 @@ export function executeVenue(save: SaveData, choice: string, stamp: string, unfi
     save.stones -= 30;
     save.mortal.marketSocial!.lastDebateAt = save.age;
     rememberMarketAid(save, npc.id);
-    text = `在论道院开席讲法一年，以「${subject.name}」指点${npc.name}，支出30灵石茶水场地费。对方记下这份指点，未凭一席话骤然突破。`;
+    text = `在论道院开席讲法一年，以「${subject.name}」指点${npc.name}，支出30灵石茶水场地费。对方认真听完，将几处要紧的地方记了下来。`;
   } else {
     const favor = venueFavor(save)!;
     const senior = venueRealm(save) >= favor.other.realmIndex;

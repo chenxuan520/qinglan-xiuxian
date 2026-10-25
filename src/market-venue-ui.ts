@@ -53,7 +53,7 @@ export function marketVenueContent(save: SaveData, id: MarketVenueId, unfinished
         const topics = venueHostTopics(save, npc.id as MarketTraderId);
         return person(
           npc,
-          `${debateContent(save, npc.id, venueStamp(save))}${topics.length ? `<details><summary>开席讲法</summary><p class="panel-note">一年，30灵石茶水与场地费。指点实际在坊中的后学，增加一次有来由的交情，不发修为或战力。</p>${topics.map((t) => button(`host@${npc.id}@${t.id}`, `讲${t.name}`)).join('')}</details>` : ''}`,
+          `${debateContent(save, npc.id, venueStamp(save))}${topics.length ? `<details><summary>开席讲法</summary><p class="panel-note">一年，三十灵石茶水与场地费。向在坊后学讲授心得，结识同道。此事不增加修为或属性。</p>${topics.map((t) => button(`host@${npc.id}@${t.id}`, `讲${t.name}`)).join('')}</details>` : ''}`,
         );
       })
       .join(

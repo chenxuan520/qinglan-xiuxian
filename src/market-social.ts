@@ -184,7 +184,7 @@ export function debateMarket(
     rememberMarketContact(save, id)!.debateGiftAt = save.age;
   }
   save.mortal.marketSocial!.lastDebateAt = save.age;
-  const text = `与${n.name}论道一年，${opening}。${root.name} · ${pathInfo(save.path).name} · 本命${item.name}。${rootLine}${advice}${reward.kind === 'recipe' ? `${reward.exchange ? `向对方讲授${medicineInfo(reward.exchange)!.name}丹方，互授` : `支付${reward.price}灵石抄录`}所得为${medicineInfo(reward.id)!.name}丹方，本世材料组合不变，未领取成品丹药。` : reward.kind === 'medicine' ? `旧识以${medicineInfo(reward.id)!.name}一份答谢当年相助，已收入丹囊；本人本世不再重复赠送。` : '此番交流修行取舍，未获赠丹药或丹方，修为与属性不变。'}`;
+  const text = `与${n.name}论道一年，${opening}。${root.name} · ${pathInfo(save.path).name} · 本命${item.name}。${rootLine}${advice}${reward.kind === 'recipe' ? (reward.exchange ? `你向对方讲授《${medicineInfo(reward.exchange)!.name}》丹方，换得《${medicineInfo(reward.id)!.name}》丹方。` : `你支付${reward.price}灵石，抄录了《${medicineInfo(reward.id)!.name}》丹方。`) : reward.kind === 'medicine' ? `旧识以${medicineInfo(reward.id)!.name}一份答谢当年相助，已收入丹囊；本人本世不再重复赠送。` : '此番交流修行取舍，未获赠丹药或丹方，修为与属性不变。'}`;
   return log(save, id, 'debate', text);
 }
 export function marketRequest(save: SaveData, id: MarketCultivatorId) {
@@ -497,7 +497,7 @@ export function chooseMarketOpportunity(
       o.kind === 'haggle'
         ? `你查了价，${medicineInfo(o.item.id)!.name}只是凡品，药铺参考价${medicineInfo(o.item.id)!.price}灵石；对方却开价${o.cost}。`
         : o.honest
-          ? `你花半年${o.item.kind === 'artifact' ? '核对器纹与寄存凭据' : '验看封签、当面核实凭据'}，这桩${o.kind === 'invitation' ? '坊外邀约' : '交易'}未见破绽；具体交付仍以界面为准。`
+          ? `你花半年${o.item.kind === 'artifact' ? '核对器纹与寄存凭据' : '验看封签、当面核实凭据'}，这桩${o.kind === 'invitation' ? '坊外邀约' : '交易'}未见破绽。`
           : o.kind === 'goods'
             ? '封签重贴，瓶中无药香，丹丸一捻便散。所谓好丹，不过掺灰泥丸。'
             : o.kind === 'deposit'

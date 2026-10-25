@@ -316,9 +316,9 @@ export function marketLocalReply(npc: MarketCultivator, message: string, playerR
   if (/骗|险|劫|机缘/.test(message))
     return '话说得好听，未必有真货。看封签，问凭据，辨来路；私下机缘可核验或作别。普通拍卖照明示规则，闲聊不扣物资。';
   if (/拍卖|竞拍|买|卖/.test(message))
-    return '坊市中央有拍卖行，可竞拍丹药和法宝，也可委托出售余物。每场花半年，报价、手续费和成交以拍卖行按钮为准；闲聊不会扣钱或换物。';
+    return '坊市中央有拍卖行，丹药法宝都可竞买，余物也可托人寄售。入席前，先问清价钱与佣钱。';
   if (/丹|药|换/.test(message))
-    return '互通有无，要先看看你我各自带了什么。界面列着我愿换出的丹药，丹药、法宝或搭配余丹的组合都可商量，按相近估值互换，这批只换一次。';
+    return '我愿换的余丹都摆在这里。道友看看，若有合用之物，我们便照说好的数目相换。';
   if (/精进|进境|进展|突破/.test(message) && /我|看(?:得|不)?出|看穿|察觉/.test(message))
     return npc.realmIndex < playerRealm
       ? '前辈的修为，我看不透，也不敢妄评。若愿指点一二，晚辈洗耳恭听。'
