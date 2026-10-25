@@ -26,6 +26,8 @@ import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { prepareAuction } from '../src/auction.ts';
 import { marketShopQuote, executeMarketShop, marketShopStamp } from '../src/market-shop.ts';
 import { MARKET_BUILDINGS } from '../src/sect-market-data.ts';
+import { Game } from '../src/game.ts';
+import { lobbyView, settlementModal } from '../src/lobby-ui.ts';
 
 function fixture() {
   const save = freshSave('heaven', ['metal'], 'dual', () => 0.5);
@@ -244,4 +246,48 @@ test('茶馆旧书为主动独立阅读入口，不改写玩家身份、不替�
   assert.match(html, /data-action="mortal-activity" data-id="tea"/);
   assert.match(html, /消耗 0.5 年/);
   assert.deepEqual(s, before);
+});
+
+test('提升建议仅出现在失败结算，首页与普通/终关通关均不显示', () => {
+  const save = fixture();
+  save.stones = save.iron = 100000;
+  const rewards = {
+    stones: 1,
+    iron: 1,
+    cultivation: 0,
+    cultivationRemaining: 0,
+    ascensionCultivation: 0,
+  };
+  const before = structuredClone(save);
+  for (const stage of [0, 6]) {
+    const game = new Game(save, stage, 0, () => 0.5);
+    for (const narrow of [false, true])
+      for (const pending of [null, game]) {
+        const home = lobbyView(
+          save,
+          stage,
+          0,
+          false,
+          { available: false, active: false },
+          pending,
+          true,
+          true,
+          narrow,
+        );
+        assert.doesNotMatch(home, /preparation-advice|行前可备/);
+        assert.match(home, /data-action="cultivation"/);
+      }
+    game.state = 'lost';
+    const failed = settlementModal(save, game, rewards, '凡人');
+    assert.match(failed, /preparation-advice/);
+    assert.ok(failed.includes(preparationAdvice(save)!.text));
+    assert.match(failed, /data-action="return"/);
+    assert.match(failed, /data-action="retry"/);
+    game.state = 'won';
+    const won = settlementModal(save, game, rewards, '凡人');
+    assert.doesNotMatch(won, /preparation-advice|行前可备/);
+    assert.match(won, /data-action="return"/);
+    if (stage === 0) assert.match(won, /data-action="next"/);
+  }
+  assert.deepEqual(save, before, '渲染不得改变物资与年岁');
 });
