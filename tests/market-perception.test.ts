@@ -168,17 +168,30 @@ test('故人突破与跨年故事保持真实进程，但对低阶玩家不自�
   }
 });
 
-test('已存旧系统见闻在两处展示都去掉前辈境界，且不改写原存档', () => {
+test('游戏故人旧记录统一新名并隐藏前辈境界，小说引文与原存档保留', () => {
   const save = fixture();
   const detail = '在坊市炉边结识筑基丹修温照川，听他谈起还未走过的药路。';
-  save.mortal.events = [detail];
-  save.chronicle.entries = [{ age: 30, title: '炉边故人', detail }];
+  const successor = '建议温氏后人接续旧愿，读过温氏药册与温氏路书。';
+  save.mortal.events = [detail, successor];
+  save.chronicle.entries = [
+    { age: 30, title: '炉边故人', detail },
+    { age: 30, title: '炉边故人', detail: successor },
+  ];
   const before = JSON.stringify(save);
   for (const html of [chronicleContent(save), mortalPage(save, 'sects', 'all')]) {
-    assert.ok(html.includes('结识丹修温照川'));
+    assert.ok(html.includes('结识丹修沈怀朴'));
+    assert.ok(html.includes('沈氏后人'));
+    assert.ok(html.includes('沈氏药册与沈氏路书'));
+    assert.doesNotMatch(html, /温照川|温氏/);
     assert.doesNotMatch(html, /结识筑基丹修/);
   }
   assert.equal(JSON.stringify(save), before);
+  save.chronicle.entries.push({ age: 30, title: '听书旧闻', detail: '陆迟与温照川在炉边交谈。' });
+  save.mortal.events.push('30.0 岁 · 阅读《不系舟》：陆迟与温照川在炉边交谈。');
+  const withNovel = JSON.stringify(save);
+  assert.ok(chronicleContent(save).includes('陆迟与温照川在炉边交谈。'));
+  assert.ok(mortalPage(save, 'sects', 'all').includes('陆迟与温照川在炉边交谈。'));
+  assert.equal(JSON.stringify(save), withNovel);
 });
 
 test('游逛丹药对白、在线与离线境界问答均不泄露前辈', () => {

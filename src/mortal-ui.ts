@@ -1,3 +1,4 @@
+import { marketFellowRecordText } from './market-fellow-data.ts';
 import { lastVisitText } from './home-town.ts';
 import { humanRevisitText } from './human-recollection.ts';
 import { settlementDirectoryEntrance } from './settlement-directory-source.ts';
@@ -112,7 +113,7 @@ export function mortalPage(
       )
       .join('')}</nav>
     <div id="mortal-content">${mortalTabContent(save, tab, filter, unfinishedPath)}</div>
-    ${humanStoryJournal(save)}${smithStoryJournal(save)}<section class="mortal-journal"><h2>人间见闻</h2><ol>${save.mortal.events.length ? save.mortal.events.map((event) => `<li>${escape(event.replace('结识筑基丹修温照川', '结识丹修温照川'))}</li>`).join('') : '<li>初入人间，山河待访。</li>'}</ol></section>
+    ${humanStoryJournal(save)}${smithStoryJournal(save)}<section class="mortal-journal"><h2>人间见闻</h2><ol>${save.mortal.events.length ? save.mortal.events.map((event) => `<li>${escape(marketFellowRecordText(event))}</li>`).join('') : '<li>初入人间，山河待访。</li>'}</ol></section>
     <footer class="mortal-footer">一程烟火，一卷仙缘。<button data-action="home">返回仙途 →</button></footer>
   </main>`;
 }

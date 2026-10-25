@@ -40,7 +40,7 @@ test('同道首逢自然记录，一年内反复进出保留原十五位访客�
   const randomVisitors = marketCharacters(save.mortal.population!, save.mortal.sectMarket!);
   assert.equal(randomVisitors.length, 15);
   const fellow = marketFellowCharacter(save)!;
-  assert.equal(fellow.name, '温照川');
+  assert.equal(fellow.name, '沈怀朴');
   assert.equal(fellow.realm, '筑基');
   assert.ok(meetMarketFellow(save));
   assert.equal(save.mortal.marketFellow!.metAt, 30);
@@ -124,14 +124,14 @@ test('第一次晚来按真正相识年岁起算，突破或短期重复来访�
   assert.doesNotMatch(marketFellowView(save)!.knownMemory, /30\.0岁|再逢|后人/);
 });
 
-test('初逢后跨数千年归来由后人接旧愿，选择不会复活温照川，也不能同龄完成', () => {
+test('初逢后跨数千年归来由后人接旧愿，选择不会复活沈怀朴，也不能同龄完成', () => {
   const save = fixture();
   meetMarketFellow(save);
   save.age = 10030;
   assert.ok(enterNextMarketBatch(save));
   assert.ok(meetMarketFellow(save));
   const npc = marketFellowCharacter(save)!;
-  assert.equal(npc.name, '温氏后人');
+  assert.equal(npc.name, '沈氏后人');
   assert.ok(npc.generation > 1);
   assert.equal(npc.realm, '炼气');
   const view = marketFellowView(save)!;
@@ -140,13 +140,13 @@ test('初逢后跨数千年归来由后人接旧愿，选择不会复活温照�
   assert.match(view.text.join(''), /并非亲历/);
   assert.ok(view.actions.every((a) => a.label.includes('后人')));
   assert.ok(chooseMarketFellow(save, 'stay', 2));
-  assert.equal(marketFellowCharacter(save)!.name, '温氏后人');
+  assert.equal(marketFellowCharacter(save)!.name, '沈氏后人');
   assert.equal(chooseMarketFellow(save, 'read', 2), false);
   save.age += 10;
   assert.ok(chooseMarketFellow(save, 'read', 2));
   assert.match(marketFellowView(save)!.text.join(''), /后人按你重访时的建议/);
-  assert.doesNotMatch(marketFellowView(save)!.text.join(''), /温照川认出了你|温照川从外地归来/);
-  assert.match(marketFellowView(save)!.knownMemory, /建议温氏后人延续旧愿/);
+  assert.doesNotMatch(marketFellowView(save)!.text.join(''), /沈怀朴认出了你|沈怀朴从外地归来/);
+  assert.match(marketFellowView(save)!.knownMemory, /建议沈氏后人延续旧愿/);
   assert.ok(validMortal(save.mortal, save.age));
 });
 
@@ -193,9 +193,9 @@ test('生前留坊十年结丹，访药八十年结婴，寿数随真实突破�
       assert.doesNotMatch(marketFellowView(save)!.text.join(''), /金丹|元婴/);
     const deathAge = choice === 'stay' ? 450 : 950;
     save.age = deathAge - 0.001;
-    assert.equal(marketFellowCharacter(save)!.name, '温照川');
+    assert.equal(marketFellowCharacter(save)!.name, '沈怀朴');
     save.age = deathAge;
-    assert.equal(marketFellowCharacter(save)!.name, '温氏后人');
+    assert.equal(marketFellowCharacter(save)!.name, '沈氏后人');
     assert.equal(marketFellowCharacter(save)!.generation, 1);
     assert.equal(marketFellowCharacter(save)!.realm, '炼气');
     assert.match(marketFellowView(save)!.knownMemory, new RegExp(`${deathAge}\\.0岁那年寿尽`));
@@ -213,26 +213,26 @@ test('十年突破必须严格早于原寿尽；最后十年才选的人不会�
     timely.age = 149.999;
     assert.equal(marketFellowCharacter(timely)!.realm, '金丹');
     timely.age = 150;
-    assert.equal(marketFellowCharacter(timely)!.name, '温照川');
+    assert.equal(marketFellowCharacter(timely)!.name, '沈怀朴');
     for (const age of [140, 149.999]) {
       const late = choiceFixture(choice, age);
       late.age = 149.999;
-      assert.equal(marketFellowCharacter(late)!.name, '温照川');
+      assert.equal(marketFellowCharacter(late)!.name, '沈怀朴');
       assert.equal(marketFellowCharacter(late)!.realm, '筑基');
       late.age = 150;
-      assert.equal(marketFellowCharacter(late)!.name, '温氏后人');
+      assert.equal(marketFellowCharacter(late)!.name, '沈氏后人');
       late.age = age + 10;
       assert.ok(chooseMarketFellow(late, 'read', 1));
       assert.equal(marketFellowCharacter(late)!.realm, '炼气');
       assert.match(marketFellowView(late)!.text.join(''), /未及圆愿.*未能走成的十年之约.*后人/);
       assert.doesNotMatch(marketFellowView(late)!.text.join(''), /结成金丹|已修至元婴/);
       late.age = 1100;
-      assert.equal(marketFellowCharacter(late)!.name, '温氏后人');
+      assert.equal(marketFellowCharacter(late)!.name, '沈氏后人');
       assert.ok(validMortal(late.mortal, late.age));
     }
     const posthumous = choiceFixture(choice, 150);
     posthumous.age = 250;
-    assert.equal(marketFellowCharacter(posthumous)!.name, '温氏后人');
+    assert.equal(marketFellowCharacter(posthumous)!.name, '沈氏后人');
     assert.match(marketFellowView(posthumous)!.text.join(''), /后人按你重访时的建议/);
   }
 });

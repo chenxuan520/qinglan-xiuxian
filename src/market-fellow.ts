@@ -91,7 +91,7 @@ export function marketFellowCharacter(save: SaveData): MarketCultivator | null {
     id: 'market-fellow',
     x: 930,
     y: 1030,
-    name: alive ? '温照川' : '温氏后人',
+    name: alive ? '沈怀朴' : '沈氏后人',
     role: alive ? '守炉丹修' : '药册传人',
     path: 'dual',
     generation,
@@ -105,18 +105,18 @@ export function marketFellowCharacter(save: SaveData): MarketCultivator | null {
 
 function knownMemory(story: MarketFellowState | undefined, alive: boolean) {
   if (!story) return '';
-  const parts = [`你在${story.metAt.toFixed(1)}岁时，于坊市炉边结识了温照川。`];
+  const parts = [`你在${story.metAt.toFixed(1)}岁时，于坊市炉边结识了沈怀朴。`];
   if (story.reunionAt !== null)
     parts.push(
       story.reunionAt < endedAt(story)
         ? `${story.reunionAt.toFixed(1)}岁再逢故人，听他谈起安炉与访药的取舍。`
-        : `${story.reunionAt.toFixed(1)}岁归来时，只见到守着旧药册的温氏后人。`,
+        : `${story.reunionAt.toFixed(1)}岁归来时，只见到守着旧药册的沈氏后人。`,
     );
   if (story.choice)
     parts.push(
-      `${story.chosenAt!.toFixed(1)}岁，你${story.chosenAt! < endedAt(story) ? '劝他' : '建议温氏后人延续旧愿，'}${story.choice === 'stay' ? '留坊安炉' : '外出访药'}。`,
+      `${story.chosenAt!.toFixed(1)}岁，你${story.chosenAt! < endedAt(story) ? '劝他' : '建议沈氏后人延续旧愿，'}${story.choice === 'stay' ? '留坊安炉' : '外出访药'}。`,
     );
-  if (!alive) parts.push(`温照川已在你${endedAt(story).toFixed(1)}岁那年寿尽，此刻说话的是后人。`);
+  if (!alive) parts.push(`沈怀朴已在你${endedAt(story).toFixed(1)}岁那年寿尽，此刻说话的是后人。`);
   if (story.completedAt !== null)
     parts.push(`${story.completedAt.toFixed(1)}岁，你读过了这段选择的后续。`);
   return parts.join('');
@@ -130,18 +130,18 @@ function outcome(story: MarketFellowState, alive: boolean, realm: string, readab
     ? '一批重贴封签的药曾送到炉前。他们没有只闻瓶外药香，而是当面开瓶、核对原料和交货凭据，才拦下混进真药的泥丸。'
     : '药路上曾有人把临时改道说成捷径。他们先在公开渡口核对接应者和退路，发现约定之外的埋伏，便放弃那一炉便宜药。';
   const result = interrupted
-    ? `温照川未及圆愿，便在你${endedAt(story).toFixed(1)}岁那年寿尽。旧信里只留下刚开始整理的几页笔记，没有那场未能走成的十年之约。后人循着你当年${stay ? '留坊安炉' : '外出访药'}的建议，将未尽的事接了下去，药册上终于添了新的见闻。`
+    ? `沈怀朴未及圆愿，便在你${endedAt(story).toFixed(1)}岁那年寿尽。旧信里只留下刚开始整理的几页笔记，没有那场未能走成的十年之约。后人循着你当年${stay ? '留坊安炉' : '外出访药'}的建议，将未尽的事接了下去，药册上终于添了新的见闻。`
     : chosenAlive
       ? alive
         ? stay
-          ? '温照川留在坊市，替往来丹修验药，把认得的药性一页页记下。炉旁渐渐多了几位肯认真学的人。他翻开新写的药册，说：“留下来，也遇得见许多远方。”'
-          : '温照川从外地归来，袍角添了补丁，药册却厚了许多。他找到过好药，也空手走过几段山路：“这一趟最值钱的，是知道哪条路该回头。”'
+          ? '沈怀朴留在坊市，替往来丹修验药，把认得的药性一页页记下。炉旁渐渐多了几位肯认真学的人。他翻开新写的药册，说：“留下来，也遇得见许多远方。”'
+          : '沈怀朴从外地归来，袍角添了补丁，药册却厚了许多。他找到过好药，也空手走过几段山路：“这一趟最值钱的，是知道哪条路该回头。”'
         : stay
-          ? '后人取出温照川留下的药册。听从你当年的建议后，他守炉验药，把辨认药材和交货凭据的办法传给后来人。如今炉火仍在，书页间还压着当年的封签。'
-          : '后人展平温照川寄回的路书。听从你当年的建议后，他外出访药，将沿途渡口、接应人和退路逐一记下。人已经不在，走过的路仍能提醒后来者。'
+          ? '后人取出沈怀朴留下的药册。听从你当年的建议后，他守炉验药，把辨认药材和交货凭据的办法传给后来人。如今炉火仍在，书页间还压着当年的封签。'
+          : '后人展平沈怀朴寄回的路书。听从你当年的建议后，他外出访药，将沿途渡口、接应人和退路逐一记下。人已经不在，走过的路仍能提醒后来者。'
       : stay
-        ? '后人按你重访时的建议，整理旧炉与药册，开了一处当面验药的小摊。旧页里的疏漏用新见闻补齐，温照川未决的心愿，在后来人手里有了归处。'
-        : '后人按你重访时的建议，带着旧药册访过几处药山，将新见闻寄回坊市。温照川留下的空白，在后来人的脚步里渐渐有了答案。';
+        ? '后人按你重访时的建议，整理旧炉与药册，开了一处当面验药的小摊。旧页里的疏漏用新见闻补齐，沈怀朴未决的心愿，在后来人手里有了归处。'
+        : '后人按你重访时的建议，带着旧药册访过几处药山，将新见闻寄回坊市。沈怀朴留下的空白，在后来人的脚步里渐渐有了答案。';
   const progress = alive
     ? !readable
       ? '岁月又在药册上添了新页。再说起初逢时的疑问，他仍肯把不懂的地方留白，慢慢去问。'
@@ -152,8 +152,8 @@ function outcome(story: MarketFellowState, alive: boolean, realm: string, readab
   return {
     text: [result, ...(progress ? [progress] : []), experience],
     hint: stay
-      ? '温氏药册：封签与香气只能作线索；当面核对实物、原料和交货凭据，再决定是否付钱。'
-      : '温氏路书：私下邀约先核对接应人、约定处与退路；临时改道或催你独行时，先停一步。',
+      ? '沈氏药册：封签与香气只能作线索；当面核对实物、原料和交货凭据，再决定是否付钱。'
+      : '沈氏路书：私下邀约先核对接应人、约定处与退路；临时改道或催你独行时，先停一步。',
   };
 }
 
@@ -179,7 +179,7 @@ export function marketFellowView(save: SaveData): MarketFellowView | null {
     return {
       ...base,
       text: [
-        '温照川将一本旧药册从炉边挪开，给你腾了个落座的地方。他在坊市替人看药，闲下来也惦记山外的草木。你们说起各自走过的路，记住了彼此的名字。',
+        '沈怀朴将一本旧药册从炉边挪开，给你腾了个落座的地方。他在坊市替人看药，闲下来也惦记山外的草木。你们说起各自走过的路，记住了彼此的名字。',
         '他正攒着几页未辨清的药性，想再看几年，再定往后是留坊安炉，还是外出访药。此后若顺路回来，炉边仍有一处落脚地。',
       ],
     };
@@ -189,11 +189,11 @@ export function marketFellowView(save: SaveData): MarketFellowView | null {
       phase: alive ? '一炉两路' : '旧愿待续',
       text: alive
         ? [
-            '温照川认出了你，取来那本旧药册。几年的观察已添了许多新页，他却还拿不定主意：留在坊市，能替更多来客验药；外出访药，也许能辨清册中那些空白。',
+            '沈怀朴认出了你，取来那本旧药册。几年的观察已添了许多新页，他却还拿不定主意：留在坊市，能替更多来客验药；外出访药，也许能辨清册中那些空白。',
             '“各有各的好，也各有要舍下的。”他把茶续上，想听听你的意思。',
           ]
         : [
-            `炉边坐着的是温氏后人。温照川已在你${endedAt(story).toFixed(1)}岁那年寿尽，旧药册却还存着。对方知道你曾来过，这些旧事是药册和家中传言留下的，并非亲历。`,
+            `炉边坐着的是沈氏后人。沈怀朴已在你${endedAt(story).toFixed(1)}岁那年寿尽，旧药册却还存着。对方知道你曾来过，这些旧事是药册和家中传言留下的，并非亲历。`,
             '药册末页仍记着安炉与访药两种心愿。后人准备接着做一点事，想请你替后来人选一条起步的路。',
           ],
       actions:
@@ -212,9 +212,9 @@ export function marketFellowView(save: SaveData): MarketFellowView | null {
         story.chosenAt! < endedAt(story)
           ? alive
             ? story.choice === 'stay'
-              ? '温照川已经定下留坊的打算，开始整理旧炉和验药笔记。这些事还须慢慢做，你再来时，他仍会请你坐一坐。'
-              : '温照川已定下访药的打算，正备齐行囊、核对药路，短暂回坊也会在炉边歇脚。一程山河尚未走完，待往后再听他的见闻。'
-            : '温照川未及圆愿便已寿尽，后人正在整理他留下的几页笔记，并接着完成未尽之事。页页旧事需要辨明，下一次相逢再将整理出的见闻说给你听。'
+              ? '沈怀朴已经定下留坊的打算，开始整理旧炉和验药笔记。这些事还须慢慢做，你再来时，他仍会请你坐一坐。'
+              : '沈怀朴已定下访药的打算，正备齐行囊、核对药路，短暂回坊也会在炉边歇脚。一程山河尚未走完，待往后再听他的见闻。'
+            : '沈怀朴未及圆愿便已寿尽，后人正在整理他留下的几页笔记，并接着完成未尽之事。页页旧事需要辨明，下一次相逢再将整理出的见闻说给你听。'
           : '后人已照你的建议接续旧愿。安炉与访药都须亲历年月，待药册添上新页，再向你讲述这一程。',
       ],
     };
@@ -254,7 +254,7 @@ export function meetMarketFellow(save: SaveData) {
       chosenAt: null,
       completedAt: null,
     };
-    remember(save, '在坊市炉边结识丹修温照川，听他谈起还未走过的药路。');
+    remember(save, '在坊市炉边结识丹修沈怀朴，听他谈起还未走过的药路。');
     return true;
   }
   const story = save.mortal.marketFellow;
@@ -264,8 +264,8 @@ export function meetMarketFellow(save: SaveData) {
   remember(
     save,
     save.age < endedAt(story)
-      ? '再逢温照川，他谈起留坊安炉与外出访药的取舍。'
-      : '迟归坊市，得知温照川已经寿尽；守着旧药册的后人请你谈谈如何接续旧愿。',
+      ? '再逢沈怀朴，他谈起留坊安炉与外出访药的取舍。'
+      : '迟归坊市，得知沈怀朴已经寿尽；守着旧药册的后人请你谈谈如何接续旧愿。',
   );
   return true;
 }
@@ -279,14 +279,14 @@ export function chooseMarketFellow(save: SaveData, choice: string, visit: number
     story.completedAt = save.age;
     remember(
       save,
-      `读过${view.alive ? '温照川这一程的见闻' : '温氏后人留存的旧信与药册'}，记下${story.choice === 'stay' ? '当面验药、核对交货凭据' : '核对接应人与退路，遇临时改道先停步'}的提醒。`,
+      `读过${view.alive ? '沈怀朴这一程的见闻' : '沈氏后人留存的旧信与药册'}，记下${story.choice === 'stay' ? '当面验药、核对交货凭据' : '核对接应人与退路，遇临时改道先停步'}的提醒。`,
     );
   } else {
     story.choice = choice as MarketFellowChoice;
     story.chosenAt = save.age;
     remember(
       save,
-      `${view.alive ? '劝温照川' : '建议温氏后人接续旧愿，'}${choice === 'stay' ? '留坊安炉，将验药所得传给来客' : '外出访药，亲自辨清药册中的空白'}。`,
+      `${view.alive ? '劝沈怀朴' : '建议沈氏后人接续旧愿，'}${choice === 'stay' ? '留坊安炉，将验药所得传给来客' : '外出访药，亲自辨清药册中的空白'}。`,
     );
   }
   return true;

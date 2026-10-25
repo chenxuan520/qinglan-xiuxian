@@ -10,6 +10,22 @@ export const MARKET_FELLOW_SETTINGS = {
   successorYears: 80,
 } as const;
 
+// 只统一游戏故人的历史显示，不改写已保存的原始记录。
+export function marketFellowRecordText(text: string) {
+  if (
+    !/^(?:[\d.e+]+ 岁 · )?(?:在坊市炉边结识(?:筑基)?丹修温照川|再逢温照川|迟归坊市，得知温照川|劝温照川|建议温氏后人接续旧愿|读过(?:温照川这一程的见闻|温氏后人留存的旧信与药册))/.test(
+      text,
+    )
+  )
+    return text;
+  return text
+    .replace('结识筑基丹修温照川', '结识丹修温照川')
+    .replaceAll('温照川', '沈怀朴')
+    .replaceAll('温氏后人', '沈氏后人')
+    .replaceAll('温氏药册', '沈氏药册')
+    .replaceAll('温氏路书', '沈氏路书');
+}
+
 export type MarketFellowChoice = 'stay' | 'travel';
 export interface MarketFellowState {
   metAt: number;
