@@ -4,11 +4,20 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ciCases, ciCsv, ciSummary, simulationHash } from '../scripts/balance-ci.ts';
 import { caseKey } from '../scripts/balance-policy.ts';
 import { summarize, verifyCoverage } from '../scripts/balance-metrics.ts';
 import type { CampaignSample } from '../scripts/balance-simulation.ts';
 import { simulateCampaign } from '../scripts/balance-simulation.ts';
+
+test('真实模拟依赖可完整验证，共用广告时长不引入浏览器播放与动态加载模块', () => {
+  const result = simulationHash(fileURLToPath(new URL('..', import.meta.url)));
+  assert.match(result.hash, /^[a-f0-9]{64}$/);
+  assert.ok(result.files.includes('src/ad-rules.ts'));
+  for (const name of ['src/ads.ts', 'src/ads-house-source.ts', 'src/module-source.ts'])
+    assert.ok(!result.files.includes(name), name);
+});
 
 test('每次提交固定840条、每根120条、初入仙途无辅助，覆盖三路两场地', () => {
   const cases = ciCases();

@@ -8,8 +8,7 @@ import { ADS_SETTINGS } from './setting.ts';
 import { adsenseProvider } from './ads-adsense.ts';
 import { houseAdProvider } from './ads-house-source.ts';
 
-export const AD_DURATION_MS = 5000;
-export const AD_SECONDS = AD_DURATION_MS / 1000;
+export { AD_DURATION_MS, AD_SECONDS } from './ad-rules.ts';
 // 接入次数限制时，按广告位区分单元与额度。
 export type AdPlacement = 'revive' | 'reward-root' | 'reward-supplies' | 'lifespan';
 export const AD_PLACEHOLDER_HTML = '<div class="revive-ad">广告位招租</div>';

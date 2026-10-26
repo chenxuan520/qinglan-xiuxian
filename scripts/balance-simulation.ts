@@ -15,7 +15,7 @@ import {
   STAGE_YEARS_PER_MINUTE,
   treasure,
 } from '../src/data.ts';
-import { AD_SECONDS } from '../src/ads.ts';
+import { AD_SECONDS } from '../src/ad-rules.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
 import { validAutoplayBuild, type AutoplayBuild } from '../src/autoplay-build.ts';
 import {
