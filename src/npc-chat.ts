@@ -505,6 +505,15 @@ export function mountNpcChat(
     conversation = { identity, messages: memory ? [{ role: 'assistant', content: memory }] : [] };
     conversations.set(npc.id, conversation);
   }
+  if (market) {
+    const request = makeRequest('', []);
+    conversation.messages = conversation.messages.filter(
+      (message) =>
+        message.role !== 'assistant' || !marketReplyRevealsRealm(request, message.content),
+    );
+    if (conversation.greeting && marketReplyRevealsRealm(request, conversation.greeting.content))
+      delete conversation.greeting;
+  }
   const messages = conversation.messages;
   const log = host.querySelector<HTMLElement>('.npc-chat-log')!;
   const form = host.querySelector<HTMLFormElement>('form')!;

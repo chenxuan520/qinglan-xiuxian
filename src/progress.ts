@@ -292,16 +292,20 @@ export function parseSave(raw: string | null, random: () => number = Math.random
 }
 export function endExtremeLife(save: SaveData, reason: 'defeat' | 'interrupted') {
   if (!isExtremeLife(save) || save.journeyEnded || save.pendingReincarnation) return false;
-  save.pendingReincarnation = 'extreme';
+  const life = lifespanInfo(save);
+  const expired = Number.isFinite(life.limit) && life.remaining === 0;
+  save.pendingReincarnation = expired ? 'lifespan' : 'extreme';
   save.autoplay = false;
   save.tribulationReturn = null;
   recordChronicle(
     save,
-    '大道无情，生死有命',
-    reason === 'defeat'
-      ? '极限修行中战败身陨，这一世的问道之路至此落幕。'
-      : '极限战斗未完便离开，此世问道之路随之落幕。',
-    'extreme-death',
+    expired ? '此世寿终' : '大道无情，生死有命',
+    expired
+      ? '寿元行尽，这一世的问道之路至此落幕。'
+      : reason === 'defeat'
+        ? '极限修行中战败身陨，这一世的问道之路至此落幕。'
+        : '极限战斗未完便离开，此世问道之路随之落幕。',
+    expired ? 'lifespan-end' : 'extreme-death',
   );
   return true;
 }
@@ -545,6 +549,22 @@ export function readSave(
         (s.pendingReincarnation === 'extreme' && isExtremeLife(base)))
     )
       base.pendingReincarnation = s.pendingReincarnation;
+    // 旧极限档曾将自然寿尽写成战败；只校正已耗尽有限寿元的落幕。
+    if (!newer && base.pendingReincarnation === 'extreme' && lifespanInfo(base).remaining === 0) {
+      const at = base.chronicle.milestones['extreme-death'];
+      base.chronicle.entries = base.chronicle.entries.filter(
+        (entry) =>
+          !(
+            entry.age === at &&
+            entry.title === '大道无情，生死有命' &&
+            (entry.detail === '极限修行中战败身陨，这一世的问道之路至此落幕。' ||
+              entry.detail === '极限战斗未完便离开，此世问道之路随之落幕。')
+          ),
+      );
+      delete base.chronicle.milestones['extreme-death'];
+      base.pendingReincarnation = null;
+      endExtremeLife(base, 'defeat');
+    }
     return { save: base, status: newer ? 'newer' : 'ok' };
   } catch {
     return { save: base, status: newer ? 'newer' : 'unreadable' };

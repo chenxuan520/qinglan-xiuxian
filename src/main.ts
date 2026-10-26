@@ -1388,13 +1388,14 @@ function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation
   const ended = structuredClone(save);
   if (reason === 'extreme') {
     if (!endExtremeLife(ended, 'defeat') && ended.pendingReincarnation !== 'extreme') return;
+    reason = ended.pendingReincarnation!;
   } else ended.pendingReincarnation = reason;
   ended.autoplay = false;
   ended.tribulationReturn = null;
   try {
     writeSave(ended, null);
   } catch {
-    if (!saveLock && reason === 'extreme') {
+    if (!saveLock && (reason === 'extreme' || (reason === 'lifespan' && isExtremeLife(save)))) {
       game?.pause();
       clearInput();
       panel = 'extreme-death-retry';

@@ -12,6 +12,7 @@ import {
   type JourneyCardEnding,
 } from '../src/journey-appraisal.ts';
 import { freshSave, readSave } from '../src/progress.ts';
+import { ACHIEVEMENT_IDS } from '../src/chronicle.ts';
 
 function facts(patch: Partial<JourneyAppraisalFacts> = {}): JourneyAppraisalFacts {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0);
@@ -323,7 +324,7 @@ test('大量有区别的真实组合得到丰富且有边界的正文，四类�
 });
 
 test('每一个成就和牵挂枚举有对应措辞，不接纳开放文本或无先决状态', () => {
-  assert.equal(JOURNEY_APPRAISAL_FEATS.length, 14);
+  assert.deepEqual([...JOURNEY_APPRAISAL_FEATS].sort(), [...ACHIEVEMENT_IDS, 'peerless'].sort());
   assert.equal(JOURNEY_APPRAISAL_TIES.length, 18);
   const valid = facts();
   const invalid: unknown[] = [
@@ -415,7 +416,7 @@ test('审查发现的三项长成就加四组旧信回归，短版仍保留三�
   assert.ok(appraisal.detail.endsWith('。'));
 });
 
-test('穷举16384成就组合与多个措辞种子和结局，全类牵挂仍限长且不截断', () => {
+test('穷举32768成就组合与多个措辞种子和结局，全类牵挂仍限长且不截断', () => {
   const ties = [
     'home-reunion',
     'home-letter-found',
@@ -460,5 +461,5 @@ test('穷举16384成就组合与多个措辞种子和结局，全类牵挂仍限
       }
     }
   }
-  assert.equal(checked, 327680);
+  assert.equal(checked, 655360);
 });

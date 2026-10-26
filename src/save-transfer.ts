@@ -14,6 +14,7 @@ import {
   endExtremeLife,
   SAVE_KEY,
   SAVE_SCHEMA,
+  lifespanInfo,
   validBirthInheritance,
   type SaveData,
 } from './progress.ts';
@@ -192,7 +193,13 @@ export function importSave(text: string) {
     throw new Error('存档中的传承遗物无效，当前进度未更改');
   if (
     data.pendingReincarnation !== undefined &&
-    data.pendingReincarnation !== save.pendingReincarnation
+    data.pendingReincarnation !== save.pendingReincarnation &&
+    !(
+      data.pendingReincarnation === 'extreme' &&
+      save.pendingReincarnation === 'lifespan' &&
+      isExtremeLife(save) &&
+      lifespanInfo(save).remaining === 0
+    )
   )
     throw new Error('存档中的本世落幕状态无效，当前进度未更改');
   // 老版本档的进行中对局格式不保证兼容，升级时直接放弃历练、保留永久进度。

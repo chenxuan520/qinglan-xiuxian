@@ -29,6 +29,7 @@ export const JOURNEY_APPRAISAL_FEATS = [
   'forge',
   'three-paths',
   'permanent-medicine',
+  'curio-three',
   'story',
   'collection',
   'level-100',
@@ -341,6 +342,7 @@ const FEAT_WORDS: Record<(typeof JOURNEY_APPRAISAL_FEATS)[number], readonly stri
   forge: ['炼器已臻十阶', '炉火炼成十阶', '法宝曾炼至十阶'],
   'three-paths': ['三道皆曾通关', '正魔兼修皆有成', '三道历练皆留痕'],
   'permanent-medicine': ['珍丹曾入体', '本世曾服珍丹', '珍丹留下造化'],
+  'curio-three': ['三件奇物曾入手', '奇珍有缘已亲证', '曾获三件不同奇物'],
   story: ['炉火旧事已圆', '曾续起炉火旧缘', '人间炉火留了痕'],
   collection: ['万宝已归藏', '三十六宝归藏', '诸宝皆入珍藏'],
   'level-100': ['百级曾归真', '百级修行曾亲证', '百级历练已亲证'],
@@ -366,6 +368,7 @@ const FEAT_PRIORITY = [
   'level-100',
   'forge',
   'permanent-medicine',
+  'curio-three',
   'story',
 ] as const;
 const ROOT_WORDS: Record<SpiritRootId, string> = {
