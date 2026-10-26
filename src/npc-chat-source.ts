@@ -1,6 +1,6 @@
 import { STANDALONE } from './build-mode.ts';
 import { resourceFailureContent } from './resource-panel.ts';
-import { resourceFailed } from './update-check.ts';
+import { ModuleSource, retryModule } from './module-source.ts';
 import type { SaveData } from './progress.ts';
 import type * as Chat from './npc-chat.ts';
 import { NPC_AI_SETTINGS } from './setting.ts';
@@ -10,18 +10,20 @@ export const NPC_AI_BASE = STANDALONE
   : (import.meta.env?.VITE_NPC_AI_URL || NPC_AI_SETTINGS.baseUrl).replace(/\/$/, '');
 type ChatModule = Pick<typeof Chat, 'closeNpcChat' | 'mountNpcChat' | 'mountTeaStory'>;
 
+async function fetchChat(attempt: number): Promise<ChatModule> {
+  if (!attempt) return import('./npc-chat.ts');
+  return retryModule<ChatModule>('npc-chat', 'chat', attempt);
+}
+
 // 闲谈按需载入；同一次载入期间换人、关窗或离开场景均使旧挂载失效。
-export class NpcChatSource {
-  private pending: Promise<ChatModule> | undefined;
-  private loaded: ChatModule | undefined;
+export class NpcChatSource extends ModuleSource<ChatModule> {
   private epoch = 0;
-  private load: () => Promise<ChatModule>;
-  constructor(load: () => Promise<ChatModule>) {
-    this.load = load;
+  constructor(load = fetchChat) {
+    super(load);
   }
   close() {
     this.epoch++;
-    this.loaded?.closeNpcChat();
+    this.current?.closeNpcChat();
   }
   async show(
     host: Pick<HTMLElement, 'isConnected'>,
@@ -32,17 +34,11 @@ export class NpcChatSource {
     const epoch = this.epoch;
     let chat: ChatModule;
     try {
-      this.pending ??= this.load().catch((error) => {
-        this.pending = undefined;
-        throw error;
-      });
-      chat = await this.pending;
+      chat = await this.load();
     } catch {
-      resourceFailed(true);
       if (epoch === this.epoch && host.isConnected) failure();
       return;
     }
-    this.loaded = chat;
     if (epoch === this.epoch && host.isConnected) {
       try {
         await mount(chat);
@@ -55,7 +51,7 @@ export class NpcChatSource {
     }
   }
 }
-const source = new NpcChatSource(() => import('./npc-chat.ts'));
+const source = new NpcChatSource();
 export function closeNpcChat() {
   source.close();
 }

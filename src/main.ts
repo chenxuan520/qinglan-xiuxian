@@ -425,6 +425,12 @@ function writeSave(data: SaveData, run: Game | null, reset = false) {
   const text = JSON.stringify({ ...data, activeRun: run?.snapshot() ?? null });
   localStorage.setItem(SAVE_KEY, text);
   lastSaveText = text;
+  storageAvailable = true;
+  const storageNote = globalThis.document?.querySelector?.('.lobby-save-status.storage-warning');
+  if (storageNote) {
+    storageNote.classList.remove('storage-warning');
+    storageNote.textContent = '关于《叩仙门》 · GitHub';
+  }
   chronicleSource.observe(data, reset);
   if (reset) hideAchievementNotice();
 }

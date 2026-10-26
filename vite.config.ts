@@ -36,6 +36,11 @@ export default defineConfig(({ mode }) => {
         : []),
     ],
     build: {
+      modulePreload: {
+        // 闲谈入口失败后可独立重试，避免断网预载同时缓存其尚未加载的依赖失败。
+        resolveDependencies: (file, deps) =>
+          /^assets\/npc-chat-[\w-]+\.js$/.test(file) ? [] : deps,
+      },
       rollupOptions: {
         input: {
           index: fileURLToPath(new URL('./index.html', import.meta.url)),

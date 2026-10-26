@@ -26,6 +26,7 @@ test('闲谈懒加载迟到时不重开旧人、已关闭或已脱离DOM的面�
     },
     () => assert.fail(),
   );
+  await Promise.resolve();
   resolve(chat());
   await Promise.all([first, second]);
   assert.equal(loads, 1);
@@ -62,6 +63,7 @@ test('载入失败可重试，旧失败不覆盖已换人的新面板', async ()
       errors++;
     },
   );
+  await Promise.resolve();
   source.close();
   reject(Error('network'));
   await pending;
@@ -75,4 +77,32 @@ test('载入失败可重试，旧失败不覆盖已换人的新面板', async ()
   );
   assert.equal(loads, 2);
   assert.equal(mounts, 1);
+});
+
+test('闲谈连续失败后递增原构建重试次数，并发共用请求，成功后复用模块', async () => {
+  const attempts: number[] = [];
+  let mounts = 0,
+    failures = 0;
+  const source = new NpcChatSource(async (attempt) => {
+    attempts.push(attempt);
+    if (attempt < 2) throw Error('offline');
+    return chat();
+  });
+  const show = () =>
+    source.show(
+      { isConnected: true },
+      () => {
+        mounts++;
+      },
+      () => {
+        failures++;
+      },
+    );
+  await show();
+  await show();
+  await Promise.all([show(), show()]);
+  await show();
+  assert.deepEqual(attempts, [0, 1, 2]);
+  assert.equal(failures, 2);
+  assert.equal(mounts, 2);
 });

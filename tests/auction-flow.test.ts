@@ -30,6 +30,8 @@ function harness(
   options: {
     setup?: (save: ReturnType<typeof freshSave>) => void;
     selectLot?: (lot: ReturnType<typeof auctionLots>[number]) => boolean;
+    followRenderedSelection?: boolean;
+    quantity?: string;
   } = {},
 ) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -73,9 +75,15 @@ function harness(
       if (selector === '.panel') return section;
       if (selector === '#auction-result') return note;
       if (selector.startsWith('#auction-budget-')) return { value: budget };
-      if (selector === '#auction-item') return { value: selected };
+      if (selector === '#auction-item') {
+        if (options.followRenderedSelection) {
+          const choices = html.split('<select id="auction-item"')[1]?.split('</select>')[0] || '';
+          return { value: choices.match(/<option value="([^"]+)" selected/)?.[1] || '' };
+        }
+        return { value: selected };
+      }
       if (selector === '#auction-reserve') return { value: reserve };
-      if (selector === '#auction-quantity') return { value: '2' };
+      if (selector === '#auction-quantity') return { value: options.quantity ?? '2' };
       if (selector.startsWith('[data-action="auction-')) {
         const action = selector.match(/data-action="([^"]+)"/)![1];
         const id = selector.match(/data-id="(\d+)"/)?.[1];
@@ -188,6 +196,29 @@ function treasureHarness() {
   assert.equal(auctionBuyReason(h.save, h.lot.index, h.save.mortal.sectMarket!.visit), '');
   return h;
 }
+test('丹药卖空后保留零库存选择，连续出售不换物、不多扣半年，手动改选才可继续', () => {
+  const h = harness(false, { followRenderedSelection: true, quantity: '1' });
+  h.save.medicine.bag = { huanglong: 1, jinsui: 2 };
+  h.action('auction-view', 'sell');
+  h.context.refreshAuction('huanglong');
+  h.action('auction-sell');
+  assert.equal(h.save.medicine.bag.huanglong, 0);
+  assert.equal(h.save.age, 30.5);
+  assert.equal(h.context.modal.querySelector('#auction-item').value, 'huanglong');
+  assert.match(h.html(), /value="huanglong" selected>黄龙丹（持有 0）/);
+  assert.equal(h.context.modal.querySelector('[data-action="auction-sell"]').disabled, true);
+  const after = JSON.stringify(h.save),
+    stored = h.stored();
+  h.action('auction-sell');
+  assert.equal(JSON.stringify(h.save), after);
+  assert.deepEqual(h.stored(), stored);
+  h.context.refreshAuction('jinsui');
+  h.action('auction-sell');
+  assert.equal(h.save.medicine.bag.jinsui, 1);
+  assert.equal(h.save.age, 31);
+  assert.equal(h.context.modal.querySelector('#auction-item').value, 'jinsui');
+  assert.equal(h.context.modal.querySelector('[data-action="auction-sell"]').disabled, false);
+});
 test('落拍路由保留临时金额说明，保存失败不展示成功结拍且不新增存档字段', () => {
   const h = harness(false, {
     setup: (save) => {

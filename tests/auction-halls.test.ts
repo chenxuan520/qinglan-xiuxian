@@ -49,6 +49,35 @@ const iron = (quantity: number): AuctionItem => ({
 });
 const curio: AuctionItem = { kind: 'curio', id: 'soul-wood', quantity: 1, forgeLevel: 0 };
 
+test('四类委托库存耗尽仍停留所选物品，禁用出售并保留其他手动选项', () => {
+  for (const kind of ['medicine', 'artifact', 'curio', 'iron'] as const) {
+    const s = fixture(kind === 'curio' ? 3 : 0);
+    s.medicine.bag = { huanglong: 0, jinsui: 1 };
+    s.artifacts = ['sword'];
+    s.curios.bag = { 'jade-book': 1 };
+    s.iron = 0;
+    const id = { medicine: 'huanglong', artifact: 'pagoda', curio: 'soul-wood', iron: 'iron' }[
+      kind
+    ];
+    const before = JSON.stringify(s);
+    const html = auctionContent(s, 'sell', false, kind, id);
+    const choices = html.match(/<select id="auction-item"[^>]*>([^]*?)<\/select>/)![1];
+    assert.equal(choices.match(/<option value="([^"]+)" selected/)?.[1], id);
+    assert.match(html.match(/<button[^>]*data-action="auction-sell"[^>]*>/)![0], /disabled/);
+    if (kind !== 'iron') assert.ok((choices.match(/<option /g)?.length ?? 0) >= 2);
+    assert.equal(
+      sellAuction(
+        s,
+        { kind, id, quantity: kind === 'iron' ? 150 : 1, forgeLevel: 0 },
+        1,
+        s.mortal.sectMarket!.visit,
+      ),
+      undefined,
+    );
+    assert.equal(JSON.stringify(s), before);
+  }
+});
+
 test('九境门槛读取实时境界，低不能越级、高可回低，付费资格另行保存', () => {
   for (let realm = 0; realm <= 8; realm++) {
     const s = fixture(realm);

@@ -1737,6 +1737,33 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
 }
 
 // 行前准备：选关、路线与难度，藏器阁与洞府修炼。
+function savePreparation(shell: ActionShell, next: SaveData, updateRun = false) {
+  shell.syncHumanStories(next);
+  const run =
+    updateRun && shell.pendingRun
+      ? shell.Game.restore(next, shell.pendingRun.snapshot())
+      : shell.pendingRun;
+  if (updateRun && shell.pendingRun && !run) {
+    shell.toast('未能衔接上次历练，本次操作未生效');
+    return false;
+  }
+  try {
+    shell.writeSave(next, run);
+  } catch {
+    if (!shell.saveLock) {
+      shell.storageAvailable = false;
+      shell.toast('未能保存，本次操作未生效，请重试');
+    }
+    return false;
+  }
+  Object.assign(shell.save, next);
+  if (updateRun) {
+    shell.pendingRun = run;
+    if (run) run.save = shell.save;
+  }
+  return true;
+}
+
 function handlePreparation(shell: ActionShell, action: string, id?: string): boolean {
   if (action === 'stage') {
     if (Number(id) <= shell.save.unlocked) {
@@ -1815,8 +1842,9 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
     shell.save.artifacts.includes(shell.selectedTreasure) &&
     shell.allowsSchool(shell.save.path, shell.treasure(shell.selectedTreasure).school)
   ) {
-    shell.save.starter = shell.selectedTreasure;
-    shell.persist();
+    const next = shell.structuredClone(shell.save);
+    next.starter = shell.selectedTreasure;
+    if (!savePreparation(shell, next)) return true;
     shell.renderLobby();
     shell.renderPanel();
     shell.toast(`已将${shell.treasure(shell.selectedTreasure).name}设为本命法宝`);
@@ -1827,11 +1855,10 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
   if (action === 'retreat' && !shell.game && shell.panel === 'cultivation') {
     const input = shell.document.querySelector<HTMLInputElement>('#retreat-years');
     if (!input || !input.reportValidity()) return true;
-    const result = shell.retreat(shell.save, Number(input.value));
+    const next = shell.structuredClone(shell.save);
+    const result = shell.retreat(next, Number(input.value));
     if (!result) return true;
-    if (shell.pendingRun)
-      shell.pendingRun = shell.Game.restore(shell.save, shell.pendingRun.snapshot());
-    shell.persist();
+    if (!savePreparation(shell, next, true)) return true;
     shell.renderLobby();
     if (shell.tribulationDue(shell.save)) {
       shell.renderTribulationPending();
@@ -1842,15 +1869,10 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
     shell.panelFrame(...shell.retreatResultPanel(shell.save, result));
     return true;
   }
-  if (
-    action === 'train' &&
-    !shell.game &&
-    shell.panel === 'cultivation' &&
-    shell.train(shell.save, id as 'vitality' | 'power' | 'speed')
-  ) {
-    if (shell.pendingRun)
-      shell.pendingRun = shell.Game.restore(shell.save, shell.pendingRun.snapshot());
-    shell.persist();
+  if (action === 'train' && !shell.game && shell.panel === 'cultivation') {
+    const next = shell.structuredClone(shell.save);
+    if (!shell.train(next, id as 'vitality' | 'power' | 'speed')) return true;
+    if (!savePreparation(shell, next, true)) return true;
     shell.renderLobby();
     shell.renderPanel();
     shell.gameAudio.play('upgrade');

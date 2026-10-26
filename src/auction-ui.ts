@@ -183,14 +183,14 @@ export function auctionContent(
   } else if (view === 'sell') {
     const choices = (
       kind === 'iron'
-        ? save.iron > 0
+        ? save.iron > 0 || selected === 'iron'
           ? [{ id: 'iron', name: '玄铁' }]
           : []
         : kind === 'medicine'
-          ? MEDICINES.filter((m) => (save.medicine.bag[m.id] || 0) > 0)
+          ? MEDICINES.filter((m) => (save.medicine.bag[m.id] || 0) > 0 || m.id === selected)
           : kind === 'curio'
-            ? CURIOS.filter((c) => (save.curios.bag[c.id] ?? 0) > 0)
-            : TREASURES.filter((t) => save.artifacts.includes(t.id))
+            ? CURIOS.filter((c) => (save.curios.bag[c.id] ?? 0) > 0 || c.id === selected)
+            : TREASURES.filter((t) => save.artifacts.includes(t.id) || t.id === selected)
     ).filter((i) => auctionItemAllowed(state.hall, { kind, id: i.id, quantity: 1, forgeLevel: 0 }));
     const id = choices.some((i) => i.id === selected) ? selected : choices[0]?.id;
     const item: AuctionItem | undefined = id
