@@ -64,11 +64,14 @@ test('实际领取入口须广告结束，分档提示与到账一致，重复�
       lifespanInfo,
       realmInfo,
       adSupplies,
+      structuredClone,
+      syncHumanStories() {},
       completed: false,
       writes: 0,
       messages: [] as string[],
       adCompleted: () => context.completed,
       persist: () => context.writes++,
+      writeSave: () => context.writes++,
       closeRewardAd: () => {
         context.panel = '';
         context.rewardAd = '';

@@ -6,6 +6,7 @@ import { STANDALONE } from './build-mode.ts';
 // 再在 setting.ts 的 ADS_SETTINGS.provider 指名启用；任何 provider 不可用都回退占位。
 import { ADS_SETTINGS } from './setting.ts';
 import { adsenseProvider } from './ads-adsense.ts';
+import { houseAdProvider } from './ads-house-source.ts';
 
 export const AD_DURATION_MS = 5000;
 export const AD_SECONDS = AD_DURATION_MS / 1000;
@@ -14,18 +15,28 @@ export type AdPlacement = 'revive' | 'reward-root' | 'reward-supplies' | 'lifesp
 export const AD_PLACEHOLDER_HTML = '<div class="revive-ad">广告位招租</div>';
 
 export interface RewardAdCallbacks {
+  // 仅自营图片在成功显示后接管可见观看计时，加载超时不包含后台停留。
+  onStarted?(): void;
   // 广告完整看完，解锁奖励；恰好回调一次。
   onWatched(): void;
   // SDK 不可用、加载失败、无库存或被跳过——恰好回调一次，调用方回退占位倒计时。
   onFailed(reason: string): void;
 }
 
+export interface RewardAdContext {
+  host: HTMLElement;
+  signal: AbortSignal;
+  onProgress(seconds: number): void;
+}
+
 export interface RewardAdProvider {
   name: string;
+  loadTimeoutMs?: number;
+  ownsPlaybackClock?: boolean;
   placementName(placement: AdPlacement): string;
   // 检测 SDK 可用性（未配置或加载失败返回 false）；false 时调用方走占位，不会调 play。
   prepare(): Promise<boolean>;
-  play(placement: AdPlacement, callbacks: RewardAdCallbacks): void;
+  play(placement: AdPlacement, callbacks: RewardAdCallbacks, context?: RewardAdContext): void;
 }
 
 // 游戏当前声音状态：main.ts 在初始化与开关声音时同步给广告层，供 SDK 的 sound 参数跟随静音。
@@ -47,6 +58,7 @@ const placeholderProvider: RewardAdProvider = {
 const PROVIDERS: Record<string, RewardAdProvider> = {
   placeholder: placeholderProvider,
   adsense: adsenseProvider,
+  house: houseAdProvider,
 };
 
 export function getAdProvider(): RewardAdProvider {
@@ -66,17 +78,25 @@ export interface WatchPlacementOptions {
   onWatched(): void;
   onFallback(reason: string): void;
   timeoutMs?: number;
+  host?: HTMLElement;
+  onProgress?(seconds: number): void;
 }
 
 // 触发 provider.prepare → play 的完整一轮，SDK 任何装死/出错都能在 timeoutMs 内落回占位。
 export function watchAdPlacement(options: WatchPlacementOptions): void {
   const { provider, placement, alive, onWatched, onFallback } = options;
-  const timeoutMs = options.timeoutMs ?? AD_WATCH_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? provider.loadTimeoutMs ?? AD_WATCH_TIMEOUT_MS;
   let finished = false;
+  const controller = new AbortController();
+  const aliveTimer = setInterval(() => {
+    if (!alive()) done();
+  }, 200);
   const timer = setTimeout(() => finishFallback('广告无响应，回退占位'), timeoutMs);
   const done = () => {
     finished = true;
     clearTimeout(timer);
+    clearInterval(aliveTimer);
+    controller.abort();
   };
   const finishWatched = () => {
     if (finished || !alive()) return;
@@ -94,10 +114,25 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
       if (finished) return;
       if (!alive()) return done();
       if (!ready) return finishFallback('广告 SDK 不可用');
-      provider.play(placement, {
-        onWatched: finishWatched,
-        onFailed: finishFallback,
-      });
+      provider.play(
+        placement,
+        {
+          onStarted: () => {
+            if (!finished && alive() && provider.ownsPlaybackClock) clearTimeout(timer);
+          },
+          onWatched: finishWatched,
+          onFailed: finishFallback,
+        },
+        options.host
+          ? {
+              host: options.host,
+              signal: controller.signal,
+              onProgress: (seconds) => {
+                if (!finished && alive()) options.onProgress?.(seconds);
+              },
+            }
+          : undefined,
+      );
     })
     .catch(() => finishFallback('广告 SDK 准备失败'));
 }

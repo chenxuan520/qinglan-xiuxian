@@ -801,11 +801,21 @@ function handleLifeLimit(shell: ActionShell, action: string): boolean {
     const claim = action === 'claim-lifespan';
     if (claim && !shell.adCompleted()) return true;
     const target = shell.game ?? shell.pendingRun;
-    const years = claim ? (target ? target.borrowLife() : shell.extendLifespan(shell.save)) : 0;
-    if (years) shell.resolveActivity(shell.save);
+    let years = 0;
+    if (claim) {
+      const next = shell.structuredClone(shell.save);
+      const restored = target ? shell.Game.restore(next, target.snapshot()) : null;
+      if (target && !restored) {
+        shell.toast('未能衔接当前历练，请重试');
+        return true;
+      }
+      years = restored ? restored.borrowLife() : shell.extendLifespan(next);
+      if (years) shell.resolveActivity(next);
+      if (!saveAdRun(shell, next, restored, !!shell.game)) return true;
+    }
     shell.clearInterval(shell.adTimer);
     shell.adReadyAt = 0;
-    shell.persist();
+    if (!claim) shell.persist();
     if (shell.lifespanInfo(shell.save).remaining === 0) shell.renderLifespanEnd();
     else if (shell.game) {
       shell.panel = '';
@@ -1404,17 +1414,20 @@ function handleRewardAd(shell: ActionShell, action: string, id?: string): boolea
       return true;
     const kind = shell.rewardAd;
     const supplies = shell.adSupplies(shell.save.unlocked);
+    const next = shell.structuredClone(shell.save);
     if (kind === 'root') {
-      if (!shell.attuneSpiritRoot(shell.save, shell.adRoot, shell.adElements)) return true;
+      if (!shell.attuneSpiritRoot(next, shell.adRoot, shell.adElements)) return true;
+    } else {
+      next.stones += supplies.stones;
+      next.iron += supplies.iron;
+    }
+    if (!savePreparation(shell, next)) return true;
+    if (kind === 'root') {
       shell.selectedTreasure = shell.save.starter;
       shell.treasurePage = Math.floor(
         shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
       );
-    } else {
-      shell.save.stones += supplies.stones;
-      shell.save.iron += supplies.iron;
     }
-    shell.persist();
     shell.closeRewardAd();
     shell.toast(
       kind === 'root'
@@ -1465,13 +1478,12 @@ function handleRunOutcome(shell: ActionShell, action: string): boolean {
     return true;
   }
   if (action === 'ad-revive') {
-    if (
-      shell.panel !== 'revive-ad' ||
-      !shell.adCompleted() ||
-      shell.settled ||
-      !shell.game?.revive()
-    )
+    if (shell.panel !== 'revive-ad' || !shell.adCompleted() || shell.settled || !shell.game)
       return true;
+    const next = shell.structuredClone(shell.save);
+    const revived = shell.Game.restore(next, shell.game.snapshot());
+    if (!revived || !revived.revive()) return true;
+    if (!saveAdRun(shell, next, revived, true)) return true;
     shell.clearInterval(shell.adTimer);
     shell.adReadyAt = 0;
     shell.clearInput();
@@ -1484,10 +1496,32 @@ function handleRunOutcome(shell: ActionShell, action: string): boolean {
     }
     shell.lastFrame = shell.performance.now();
     shell.updateHud();
-    shell.persist();
     return true;
   }
   return false;
+}
+
+// 广告完成只解锁领取；领取仍须先成功写入，失败后保留本次观看资格以便原位重试。
+function saveAdRun(shell: ActionShell, next: SaveData, run: Game | null, active: boolean) {
+  try {
+    shell.syncHumanStories(next);
+    shell.writeSave(next, run);
+  } catch {
+    if (!shell.saveLock) {
+      shell.storageAvailable = false;
+      shell.toast('奖励尚未保存，请留在当前页面重试领取');
+    }
+    return false;
+  }
+  const original = active ? shell.game : shell.pendingRun;
+  Object.assign(shell.save, next);
+  if (run) {
+    run.save = shell.save;
+    run.onEvent = original?.onEvent ?? shell.gameEvent;
+  }
+  if (active) shell.game = run;
+  else shell.pendingRun = run;
+  return true;
 }
 
 // 主动轮回。

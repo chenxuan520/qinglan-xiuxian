@@ -3,12 +3,13 @@ export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
 // 微信赞赏码是小程序码，二维码库无法重新生成；更换时直接替换这张图片。
 export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 
-// 激励广告供给。provider='placeholder' 保持占位倒计时（当前线上行为）；
+// 激励广告供给。自营图片按需读取独立投放服务，无有效投放时沿用占位倒计时。
 // 接入真实 SDK 时新增对应 RewardAdProvider（src/ads.ts 接口），注册后在此指名启用。
 // 任何 provider 不可用（未配置、SDK 加载失败、无库存）都自动回退占位倒计时，不影响游戏。
 export const ADS_SETTINGS = {
-  // 过审前必须 placeholder：未过审账号的 Placement API 完全静默没有任何回调，会把玩家卡死在广告面板。
-  provider: 'placeholder' as 'placeholder' | 'adsense',
+  // 谷歌正式投放另行启用；自营与占位不会加载谷歌 SDK。
+  provider: 'house' as 'placeholder' | 'adsense' | 'house',
+  house: { endpoint: STANDALONE ? '' : 'https://qinglan-ads.011203.xyz/v1/ad' },
   adsense: {
     // AdSense 审核通过后把 pub ID 填入此处；SDK 按需注入，失败全回退占位。
     client: 'ca-pub-9047842625721721',

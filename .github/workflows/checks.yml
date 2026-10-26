@@ -56,6 +56,7 @@ jobs:
       - run: npm ci
       - run: npm run format:check
       - run: npm run check:npc-ai
+      - run: npm run check:house-ads
 
   interface:
     name: Desktop and mobile interfaces

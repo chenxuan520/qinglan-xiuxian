@@ -1,0 +1,23 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "qinglan-house-ads",
+  "main": "index.ts",
+  "compatibility_date": "2026-10-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "routes": [{ "pattern": "qinglan-ads.011203.xyz", "custom_domain": true }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "qinglan-house-ads",
+      "database_id": "d18d2613-8f1f-45d8-ac1c-f4ed87e40f14",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "011203.cloudflareaccess.com",
+    "ADMIN_ORIGIN": "https://qinglan-ads.011203.xyz",
+    "ALLOWED_ORIGINS": "https://xiuxian.011203.xyz,https://chenxuan520.github.io",
+  },
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

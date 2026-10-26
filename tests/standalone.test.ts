@@ -19,6 +19,7 @@ const { journeyAppraisalFacts, localJourneyAppraisal } = await import(
 );
 const { getAdProvider } = await import('../src/ads.ts');
 const { adsenseProvider } = await import('../src/ads-adsense.ts');
+const { requestHouseAd } = await import('../src/ads-house.ts');
 const { guideContent } = await import('../src/guide.ts');
 const input = {
   population: { seed: 12345, since: 15 },
@@ -41,6 +42,10 @@ test('单机常量关闭所有后端，即使在线且来源已获白名单授�
   const signal = new AbortController().signal;
   assert.equal(await debugAccess('https://qinglan-npc-ai.011203.xyz', fetcher), 'disabled');
   assert.equal(await requestNpcDialogue(input, signal, fetcher), null);
+  assert.equal(await requestHouseAd('revive', signal, fetcher), null);
+  assert.equal(await requestHouseAd('reward-root', signal, fetcher), null);
+  assert.equal(await requestHouseAd('reward-supplies', signal, fetcher), null);
+  assert.equal(await requestHouseAd('lifespan', signal, fetcher), null);
   assert.equal(
     await requestTeaStoryImage('故事', `1234567890.${'a'.repeat(64)}`, signal, fetcher),
     null,

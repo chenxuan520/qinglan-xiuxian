@@ -646,9 +646,23 @@ export function startAdWatch(
   shell.watchAdPlacement({
     provider,
     placement,
+    host: shell.modal.querySelector<HTMLElement>('.revive-ad') ?? undefined,
+    onProgress: (seconds) => {
+      if (!waiting) return;
+      waiting.dataset.adRemaining = `${seconds} 秒后${label}`;
+      waiting.textContent = waiting.dataset.adRemaining;
+      waiting.disabled = true;
+    },
     alive: () => shell.panel === watchPanel && shell.adWatchEpoch === epoch,
     onWatched: () => shell.markAdWatched(action, label),
-    onFallback: () => shell.startAdCountdown(action, label),
+    onFallback: () => {
+      const host = shell.modal.querySelector<HTMLElement>('.revive-ad');
+      if (host) {
+        host.removeAttribute('style');
+        host.textContent = '广告位招租';
+      }
+      shell.startAdCountdown(action, label);
+    },
   });
 }
 
@@ -667,6 +681,12 @@ export function refreshAdCountdown(shell: ActionShell, action: string, label: st
   if (isExtremeLife(shell.save)) {
     button.disabled = true;
     return 0;
+  }
+  // 选择五行也会刷新按钮，图片尚未看完时仍须保持不可领取。
+  if (shell.adReadyAt === 0 && !shell.adWatched) {
+    button.disabled = true;
+    button.textContent = button.dataset.adRemaining || '观看广告中…';
+    return 1;
   }
   const seconds = Math.max(0, Math.ceil((shell.adReadyAt - Date.now()) / 1000));
   const incomplete =

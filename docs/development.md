@@ -193,6 +193,24 @@ npm run deploy:cloudflare
 
 AdSense 站点注册认注册根域 `011203.xyz`，而根域默认重定向到个人主页（`www.chenxuanweb.top`）；Cloudflare 的 Redirect Rule 位于 Worker 之前执行，单靠 Worker 路由抢不出 `/ads.txt`，需要在重定向规则的表达式里排除 `/ads.txt`（在控制台手动改，不在本仓库脚本里）。Worker `qinglan-ads-verify`（`workers/ads-verify/`）经路由 `011203.xyz/ads.txt` 返回授权行 `google.com, pub-9047842625721721, DIRECT, f08c47fec0942fa0`，pub ID 与 `src/setting.ts` 的 `ADS_SETTINGS.adsense.client` 同源；换账号时三处一起改。部署：`npx wrangler deploy --config workers/ads-verify/wrangler.jsonc`。
 
+## 自营图片广告 · 独立投放服务
+
+游戏与后台代码保留在同一仓库，`workers/house-ads/` 独立部署到 `https://qinglan-ads.011203.xyz`；不复用 NPC Worker、游戏存档或统计凭据。管理入口为 `/admin/`，使用现有 Cloudflare Access 邮箱验证码登录，仅允许部署时指定的管理邮箱。Access 应用只保护 `/admin` 及其子路径，公开投放接口 `/v1/ad` 不要求登录。Worker 还独立验证 Access 的 RS256 签名、签发方、应用 audience、有效期和管理邮箱，不能靠伪造邮箱标头或 workers.dev 地址绕过。
+
+后台支持最多 20 条广告，每条包含名称、HTTPS 图片链接、HTTPS 点击跳转链接、启用开关及投放位置；不接受 HTML、脚本或奖励参数。填写后可先预览，再点击「保存投放」；修改、停用、移除均须保存才生效。无投放时列表为空，不内置示例广告。多窗口保存使用 D1 revision 条件更新；旧版本返回冲突并保留编辑内容，不能覆盖新版本。保存失败不会提示成功。图片由所填地址托管，不上传到游戏仓库；需确保有使用权且链接长期可访问。
+
+`GET /v1/ad?placement=revive|reward-root|reward-supplies|lifespan` 只返回该位置随机一条已启用广告的名称、图片及跳转链接，或 `{ "ad": null }`。客户端明确打开现有广告面板时才按需加载；不在首页预取，不发送存档、管理身份或登录凭据，配置接口禁用缓存。图片加载成功、页面前台有焦点且至少半张图在视口内时才累计 5 秒观看；切后台、另开推广页或滚出图片暂停累计。点击图片仅另开推广页，完成观看后仍须回游戏主动领取；关闭、切换或导入后旧响应失效。加载或图片失败、无投放、断网沿用原 5 秒占位，不阻断游戏。自选灵根、物资、复活与借寿保留原奖励、限次和极限模式限制，领取均先写入存档再应用，写入失败可原位重试。
+
+默认 `ADS_SETTINGS.provider` 为 `house`；Google adapter 和 pub ID 仍保留但不启用，自营及占位均不加载 Google SDK。单机版编译时清空自营端点、不载入投放模块或发出请求，保留本地占位规则；离线缓存不保存外部广告图片。
+
+```bash
+npm run check:house-ads
+npx wrangler d1 migrations apply qinglan-house-ads --remote --config workers/house-ads/wrangler.jsonc
+npm run deploy:house-ads
+```
+
+首次部署先创建同名 D1 数据库，将 ID 写入配置并应用迁移。创建仅覆盖 `qinglan-ads.011203.xyz/admin` 的 self-hosted Access 应用，选已有邮箱 OTP 身份源，并添加仅包含指定管理邮箱的 Allow 策略。运行环境维护 `ACCESS_AUD`（该应用 audience）和 `ADMIN_EMAIL`；不把个人邮箱、凭据或绑定值写入前端、公开配置、文档。仓库配置仅声明固定团队域名、管理来源与官网/Pages CORS；后续部署使用 `--keep-vars` 保留运行环境值。先部署并核验 Worker，再发布游戏两站；不修改其他 Access 应用、组织设置或既有授权。测试身份只在本地隔离夹具内生成，不能用于线上登录；上线不自动发送验证码。
+
 ## NPC 对话 · Cloudflare Workers AI
 
 独立 Worker 名称为 `qinglan-npc-ai`，配置在 `workers/npc-ai/wrangler.jsonc`。默认入口为 `https://qinglan-npc-ai.011203.xyz`，`GET /health` 检查服务信息，`POST /chat` 生成对白，`POST /story-image` 生成茶馆故事配图，`POST /journey-appraisal` 生成留影评语；所有入口都必须携带受支持的 `Origin`。自定义域名已写入 routes，后续发布保留绑定；文字使用 `@cf/zai-org/glm-4.7-flash`，配图使用 `@cf/black-forest-labs/flux-1-schnell`，均通过原生 `AI` binding 调用，前端没有 API 密钥。

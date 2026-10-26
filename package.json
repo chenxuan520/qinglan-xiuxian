@@ -12,6 +12,8 @@
     "deploy:cloudflare": "npm run build:cloudflare && node --experimental-strip-types scripts/restore-promo-video.ts && wrangler pages deploy artifacts/cloudflare --project-name qinglan-xiuxian --branch master",
     "check:npc-ai": "node -e \"require('node:fs').mkdirSync('artifacts', { recursive: true })\" && wrangler types artifacts/npc-ai-env.d.ts --config workers/npc-ai/wrangler.jsonc --env-interface NpcAiEnv && tsc -p workers/npc-ai/tsconfig.json",
     "deploy:npc-ai": "npm run check:npc-ai && wrangler deploy --config workers/npc-ai/wrangler.jsonc --keep-vars",
+    "check:house-ads": "node -e \"require('node:fs').mkdirSync('artifacts', { recursive: true })\" && wrangler types artifacts/house-ads-env.d.ts --config workers/house-ads/wrangler.jsonc --env-interface HouseAdsEnv --strict-vars false && tsc -p workers/house-ads/tsconfig.json",
+    "deploy:house-ads": "npm run check:house-ads && wrangler deploy --config workers/house-ads/wrangler.jsonc --keep-vars",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "docs:check": "node --experimental-strip-types --test tests/gameplay-docs.test.ts tests/guide-source.test.ts tests/bestiary.test.ts",
