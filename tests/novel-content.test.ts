@@ -28,16 +28,16 @@ test('已审小说六卷四十二章完整进入阅读数据，正文无改写�
     }
   }
   const paragraphs = novel.chapters.flatMap((chapter) => chapter.paragraphs);
-  assert.equal(paragraphs.length, 2848);
+  assert.equal(paragraphs.length, 2825);
   assert.equal(paragraphs[0], '陆迟十五岁那年，青岚的春水涨得很早。');
   assert.equal(
     paragraphs.at(-1),
     '街口有炉子刚揭开盖，热气呼地升起来。他从中穿过去，身影一时看不清了。',
   );
-  // 绑定用户已认可的终稿正文（不含目录、卷章标题和作者说明），防止接入时静默漏段。
+  // 绑定用户提供的完整修订版3正文（不含目录、卷章标题和作者说明），防止接入时静默漏段。
   assert.equal(
     createHash('sha256').update(paragraphs.join('\n\n')).digest('hex'),
-    'ed6c5a815924a35c6780a4496f4186a42aa11494600e6f3ad9f2ea22c8f56de9',
+    'e03d799eb88050900741b344a878c72a1278eefd382b2a9cbf6f8abb75b69742',
   );
 });
 
