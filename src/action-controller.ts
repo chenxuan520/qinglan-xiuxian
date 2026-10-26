@@ -51,11 +51,11 @@ import type {
 } from './lobby-ui.ts';
 import type {
   enterTownVisit,
-  executeMarketSocial,
   executeMortalAction,
   immortalEncounterPanel,
   marketAmbushPanel,
 } from './town-host.ts';
+import type { executeMarketSocial } from './market-social-actions.ts';
 import type { isImmortalSuccessor } from './inheritance-ui.ts';
 import type { AD_SECONDS, AdPlacement, getAdProvider, watchAdPlacement } from './ads.ts';
 import type { GAME_VERSION } from './version.ts';

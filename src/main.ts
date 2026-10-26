@@ -45,7 +45,6 @@ import {
 } from './lobby-ui.ts';
 import {
   enterTownVisit,
-  executeMarketSocial,
   executeMortalAction,
   immortalEncounterPanel,
   marketAmbushPanel,
@@ -161,11 +160,9 @@ import type { TownScene } from './town-scene.ts';
 import { TownSource } from './town-source.ts';
 import type { SectMarketScene } from './sect-market-scene.ts';
 import { MarketEventSource } from './market-event-source.ts';
-import { marketFellowCharacter, meetMarketFellow, chooseMarketFellow } from './market-fellow.ts';
 import type { MarketAmbushScene } from './market-ambush-scene.ts';
 import type { AmbushOutcome } from './market-ambush.ts';
 import { marketCultivators } from './sect-market-data.ts';
-import { prepareAuction } from './auction.ts';
 import type { AuctionView } from './auction-ui.ts';
 import type { AuctionKind } from './auction-data.ts';
 import { MARKET_START, isMarketCultivatorId, type MarketCultivator } from './sect-market-data.ts';
@@ -719,9 +716,10 @@ function showTownEvent(npc: TownResident) {
 }
 function showMarketEvent(npc: MarketCultivator) {
   if (!inMarket || marketScene?.nearbyNpc?.id !== npc.id) return;
-  if (npc.id === 'market-fellow') {
+  const market = marketEventSource.current;
+  if (npc.id === 'market-fellow' && market) {
     const next = structuredClone(save);
-    if (meetMarketFellow(next)) {
+    if (market.meetMarketFellow(next)) {
       try {
         writeSave(next, pendingRun);
       } catch {
@@ -730,7 +728,7 @@ function showMarketEvent(npc: MarketCultivator) {
       }
       Object.assign(save, next);
     }
-    const fellow = marketFellowCharacter(save);
+    const fellow = market.marketFellowCharacter(save);
     if (!fellow) return;
     npc = fellow;
   }
@@ -747,13 +745,13 @@ function showMarketEvent(npc: MarketCultivator) {
     const chat = modal.querySelector<HTMLElement>('.npc-dialogue');
     if (npc.id !== 'market-fellow' && chat) mountNpcChat(chat, save, npc);
   };
-  if (marketEventSource.current) {
+  if (market) {
     render();
     return;
   }
   panelFrame(
     npc.name,
-    '宗门坊市 · 同道往来',
+    npc.id === 'market-fellow' ? '宗门坊市 · 炉边故人' : '宗门坊市 · 同道往来',
     '<div id="market-event-loading" role="status"><p class="panel-note">正在展开坊间见闻…</p></div>',
   );
   const host = modal.querySelector<HTMLElement>('#market-event-loading')!;
@@ -771,7 +769,10 @@ function showMarketEvent(npc: MarketCultivator) {
     host.innerHTML = '<p class="panel-note">正在展开坊间见闻…</p>';
     void marketEventSource.load().then(
       () => {
-        if (current()) render();
+        // 炉边故人的相逢记录与人物信息随坊市包载入，载入后重新走一次完整入口。
+        if (!current()) return;
+        if (npc.id === 'market-fellow') showMarketEvent(npc);
+        else render();
       },
       () => {
         if (!current()) return;
@@ -1476,7 +1477,7 @@ function shellBindings(): ActionShell {
     set bookTab(next) { bookTab = next; },
     get catalogTreasures() { return catalogTreasures; },
     get chooseHumanStory() { return chooseHumanStory; },
-    get chooseMarketFellow() { return chooseMarketFellow; },
+    get chooseMarketFellow() { return marketEventSource.current!.chooseMarketFellow; },
     get chooseSmithStory() { return chooseSmithStory; },
     get clearInput() { return clearInput; },
     get clearInterval() { return clearInterval.bind(globalThis); },
@@ -1494,7 +1495,7 @@ function shellBindings(): ActionShell {
     get epilogueReincarnatePanel() { return epilogueReincarnatePanel; },
     get exchangeSectMedicine() { return exchangeSectMedicine; },
     get executeAuctionTrade() { return marketEventSource.current!.executeAuctionTrade; },
-    get executeMarketSocial() { return executeMarketSocial; },
+    get executeMarketSocial() { return marketEventSource.current!.executeMarketSocial; },
     get executeMortalAction() { return executeMortalAction; },
     get exportSave() { return exportSave; },
     get extendLifespan() { return extendLifespan; },
@@ -1704,7 +1705,7 @@ function shellBindings(): ActionShell {
     get openOfflinePanel() { return openOfflinePanel; },
     get panelHost() { return panelHost; },
     get pausePanel() { return pausePanel; },
-    get prepareAuction() { return prepareAuction; },
+    get prepareAuction() { return marketEventSource.current!.prepareAuction; },
     get releaseTownScene() { return releaseTownScene; },
     get rememberRewardReturn() { return rememberRewardReturn; },
     get renderSectDues() { return renderSectDues; },

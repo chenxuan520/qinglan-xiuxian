@@ -20,7 +20,7 @@ import {
 } from '../src/market-relations.ts';
 import { validMarketRelations } from '../src/market-relations-data.ts';
 import { executeVenue, venueStamp } from '../src/market-venues.ts';
-import { executeMarketSocial } from '../src/town-host.ts';
+import { executeMarketSocial } from '../src/market-social-actions.ts';
 import { marketVenueContent } from '../src/market-venue-ui.ts';
 import { marketSocialContent } from '../src/market-social-ui.ts';
 const ids = MARKET_CULTIVATORS.map((n) => n.id);

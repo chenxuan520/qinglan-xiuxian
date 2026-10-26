@@ -27,11 +27,8 @@ import { debateRecipeOffer } from '../src/market-debate.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 import { marketSocialContent } from '../src/market-social-ui.ts';
 import { townStatus } from '../src/mortal-ui.ts';
-import {
-  executeMarketSocial,
-  marketAmbushRecoveryPanel,
-  marketAmbushPanel,
-} from '../src/town-host.ts';
+import { marketAmbushRecoveryPanel, marketAmbushPanel } from '../src/town-host.ts';
+import { executeMarketSocial } from '../src/market-social-actions.ts';
 import { dispatchAction } from '../src/action-controller.ts';
 import { Game } from '../src/game.ts';
 import { FINAL_TRIAL_STAGE, MAX_REVIVES } from '../src/data.ts';
