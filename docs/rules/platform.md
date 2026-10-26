@@ -1,0 +1,22 @@
+# 后端、统计、调试与平台行为约定
+
+> 改动 NPC Worker、匿名统计、调试入口、公开监控、资源加载失败处理、留影或手机方向/镇坊快捷前通读。本文件由 AGENTS.md 拆出，条文为用户已确认的约定，修改须经用户同意。
+
+## 后端与运营
+
+- NPC 域名、模型、超时、对话长度与换代年限集中在 `src/setting.ts`；姓名与换代在 `src/town-population.ts`，百年城景和上次入城记录在 `src/town-history.ts`，对白 UI 在 `src/npc-chat.ts`，共享协议与兜底在 `src/npc-dialogue.ts`。Worker 在 `workers/npc-ai/`；修改后执行 `npm run check:npc-ai` 与相关测试，`npm run deploy:npc-ai` 单独发布。默认域名 `qinglan-npc-ai.011203.xyz`，绑定和 CORS 来源随配置维护；严禁将 API 密钥放入前端，AI 文本不能改变游戏数值或当作 HTML 执行。
+- 匿名游玩统计在 `src/telemetry.ts`，经同一 Worker 的 `POST /event` 写入 Analytics Engine（`qinglan_events`），只在官网与 GitHub Pages 发送，静态部署不依赖它；`npm run stats` 查询。改事件字段需同步 Worker 校验、查询脚本与 [开发与部署](docs/development.md)。发布时先部署 Worker 再推送；上线验证写入的记录用版本号 `verification`，不要用真实版本号制造测试数据。
+- 物资调试入口隐藏在「关于」版本号七连点（七秒内），不在设置或首页增加显眼入口。`GET /debug/access` 由 NPC Worker 的 `DEBUG_MODE_ENABLED` 决定，未配置时默认关闭；仓库不声明该变量，普通 Worker 发布使用 `--keep-vars` 保留线上开关，只有显式 `--var DEBUG_MODE_ENABLED:true/false` 才切换；只有明确字符串 `true` 开放，入口与每次发放都重新联网核验，不缓存许可，断网/超时/异常一律拒绝。调试直接使用当前存档，可发灵石、玄铁、法宝及炼器阶数、丹药、奇物，也可增加指定整数永久修为或补足到指定境界。修为调试只增加、最高渡劫（累计 `IMMORTAL_CULTIVATION` 且未通终关），超额拒绝、不截断，不添加通关记录或真仙，突破年表与大乘天劫时钟沿用真实进度函数；不自动改本命或服药，不允许未完历练、已落幕或劫修遭遇中发放。沿用 clone→writeSave→apply，保存失败及关闭面板后的迟到响应不得生效；成功后关闭本机匿名统计。开关部署及验证见开发文档。
+- 统一公开监控入口 `/monitor/` 在两站「关于」中，公开聚合接口 `GET https://qinglan-npc-ai.011203.xyz/monitor/stats`（留影保存、分享与二维码来源在 `sections.sharing`），服务端凭证不得进入前端；`MONITOR_PUBLIC=false` 关闭线上公开查询。CI 诊断及每日渲染 / 模拟 / 体积摘要从 GitHub Pages 动态读取，性能 JSON 位于 `monitor/performance.json`，每日渲染只保留数值报告，不生成、保存或发布采样截图；逐项标明时间与源提交，失败或缺数据不能冒充成功；只发布 artifact，不提交生成报告或截图，详见 [开发与部署](docs/development.md)。
+
+## 资源加载失败
+
+资源加载失败统一通知 `update-check.ts`，只有最新清单确认构建不同才显示「游戏已更新」，断网/同版/坏清单沿用原重试说明；不自动刷新、清缓存或删除存档。已处理的加载失败使用 `resource-panel.ts` 在原界面显示操作：尚未进入的场景只留一个「重新加载」，指南、履历等面板保留重试与刷新；版本结果只更新该处文字，不另叠故障弹框；关闭或切换后迟到结果不得重开。刷新必须先 `persist()` 返回成功，存档锁定、未结胜局或保存失败均留在页面。`module-source.ts` 合并并发并保留失败重试，重试只使用当前构建固定清单。指南与妖物志共用 `GuideSource` 按需载入，关闭、换分类和存档锁定后迟到回调不得重开面板。
+
+## 此世留影
+
+留影本命炼器信息下方展示生成时spiritPower真实score，沿用formatNumber显示万/亿小数，以淡金小字保持层级，不另抄灵威公式或改变其含义。留影直接异步编码 PNG Blob，不经 base64/逐字节映射重建文件；预览 URL 在面板关闭或替换时释放，Canvas 编码结束清零。图片下载保留独立的延时释放 URL，不因关闭预览中断下载。关闭后的迟到编码或素材回调不得重开面板；素材失败最多自动重试一次，取消不计为加载失败。 留影模块尚未加载就失败时只给一个受保护的「重新加载」（refresh-game），不能把缓存的失败import包装成无效「重新生成」；只有素材或编码阶段失败才允许原地重新生成。CI浏览器门禁须验证手机冷页断网→恢复联网→保护保存后重新加载→成功留影。
+
+## 手机方向与镇坊快捷
+
+手机方向设置由mobile-display.ts按需加载orientation.ts，使用独立本机键qinglan-screen-orientation，缺省跟随系统；不改变游戏存档结构或清除续局。方向锁定失败须明确提示，不能把触屏模拟或API夹具当实体手机验证；跟随系统、退出全屏及迟到结果均释放本游戏的方向锁。镇坊快捷按钮与路口共用settlement-travel.ts，按钮仅豁免路口距离，不得绕过境界、离乡、场景就绪、供奉、寿元、天劫或先保存后切换；正常快捷回镇从故居落地，路口仍用安全落点；场景所有入场入口须把路口触发/复位区内的旧坐标归到安全落点，不能仅给步行入口加保护。

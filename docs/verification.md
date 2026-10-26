@@ -2855,3 +2855,10 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 - 最终根路径、Pages 子路径与单机干净构建均通过类型及原预算，入口 JS／CSS／整包分别为 554679／149801／16183322、554791／149993／16183962、550172／149825／15919012 字节。无样式、依赖、锁文件、二进制或预算改动。沿用原 5173 服务，仅追加新资源并原子换正常入口，保留旧 hash；市场源文件冻结后只补帮助两句，最终 build `7c7bd62eb594e76b00380d63`，没有重跑未受该文案改动影响的成交操作。
 - 实施者通过 Chrome DevTools MCP 正常首页、隔离合法存档完成四屏 1440×1000、390×844、320×640、844×390 的零阶提示与当面拒绝、四阶真实成交后四店完成及首页刷新，共 8 组；手机另补未持有与药品实际成交两组，市场共 10/10。五行阵旗实收 946 灵石、仅移除该法宝并归零炼器；药品只扣所需数量，生效药效不变，实际交货均耗半年。最终帮助四屏 4/4，切换分类及返回后存档一致。38 张市场主图与 8 张帮助图逐张亲看，个别滚动后一帧文字漏绘另以 6 张稳定帧补齐；三张额外定位图未完整覆盖目标，仅作诊断保留，不当作覆盖证明。补图用合法已成交夹具，只核画面，不冒称重复真实成交。原始报告与图片仅在 `/tmp/qinglan-market-sync-*`。
 - 实施者临时脚本曾误选隐藏余丹货讯中的同名卡、误用返回按钮选择器；均单列原始失败，只修 `/tmp` 后完成对应流程。独立审查者亲自完成四屏十二组、手机药品一组、完成后保留指路一组和最终帮助四组，共 18 组，独立定向 9/9；其 81 张原图均亲看，68 张有效，11 张瞬时漏绘图已用稳定帧替代，2 张换批／构建 guard 的夹具失败保留且不计通过。Chrome 触屏模拟不冒充实体手机，隔离浏览器瞬时漏绘不臆定为产品缺陷。最终独立结论需绑定本轮八文件；用户已授权修复及新 tag `v0.0.5`，推送、两站部署、tag、Release 与 CI 仍以各自实际回读另核，不提前记成功。
+
+## 坊市逻辑并入按需包与开发指南拆分（2026-10-26）
+
+- 改动：`executeMarketSocial` 移入新的 `market-social-actions.ts`，与 `prepareAuction`、`marketFellowCharacter`/`meetMarketFellow`/`chooseMarketFellow` 一并由已有坊市按需包 `market-event-ui.ts` 导出；`main.ts` 不再静态导入，`shellBindings()` 改取 `marketEventSource.current!`，与既有 `executeAuctionTrade` 等一致。坊市场景本身由该包创建，玩家能触发这些操作时包必然已载入，调用时机与存档写入顺序不变。`AGENTS.md` 由约 48KB 精简到约 20KB，领域细则原文移入 `docs/rules/*.md`；新增 `tests/entry-boundaries.test.ts` 与 `tests/repo-guardrails.test.ts` 守护入口边界与可机械判定的仓库约定。
+- 实测：入口 JS 554,666 → 522,216 字节（gzip 205,853 → 191,875），预算 560,000；CSS 149,801 未变，仍接近 150,000 上限，本次未处理。`npm test` 1629/1629，`format:check`、`docs:check` 36/36、`build:cloudflare`（含二进制与体积门禁）、`build:standalone`、`check:npc-ai` 均通过。`npm run ui:check` 四视口 320 个检查点通过（本机 Chromium，经 Chrome DevTools MCP）；该轮在两处文档/测试修正之前运行，修正不涉及界面代码。首轮 ui:check 曾因实施者在运行中临时切换源码干扰开发服务器而中断，干净重跑通过，不计为产品问题。
+- 独立审查子 agent 首轮结论未通过：`docs/rules/combat.md` 残留旧模块分工段落、固定定位选择器正则漏报复数类名。修复后复审通过；新正则命中 `.book-tabs` 等六个真实栏位类名，现有 17 个 fixed 选择器无误报，追加固定标签栏的变异会使测试失败。审查者按 REVIEW.md 未做浏览器回归（本次无界面改动），浏览器部分以上述 ui:check 为准。
+- 未验证：实体手机；Cloudflare 主站部署与线上回读以发布后实际结果为准。
