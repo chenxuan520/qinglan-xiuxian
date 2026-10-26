@@ -2,10 +2,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { lobbyView } from '../src/lobby-ui.ts';
+import { freshSave } from '../src/progress.ts';
 
 const root = new URL('../', import.meta.url);
 const read = (path: string) => readFileSync(new URL(path, root), 'utf8');
 const html = read('index.html');
+const title = '叩仙门：青岚纪';
+const slogan = '一世修行，叩问仙门';
+const description =
+  '一世修行，叩问仙门。在秘境与人间修行，见岁月流转、故人离合；叩入仙门后，可留一物传承，让后来人接续问道。';
 const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // 校验存在一条 <meta>，其同一标签内某属性等于 key、content 等于 value；容忍 prettier 拆行。
@@ -38,11 +44,45 @@ test('入口页声明 canonical 与 Open Graph / Twitter 分享卡片', () => {
   expectMeta('property', 'og:locale', 'zh_CN');
   expectMeta('property', 'og:site_name', '叩仙门：青岚纪');
   expectMeta('property', 'og:title', '叩仙门：青岚纪');
-  expectMeta('property', 'og:description', '只需走位的修仙生存游戏。一世修行，叩问仙门。');
+  expectMeta('name', 'description', `${title}｜${description}`);
+  expectMeta('property', 'og:description', description);
   expectMeta('property', 'og:url', 'https://xiuxian.011203.xyz/');
   expectMeta('name', 'twitter:card', 'summary_large_image');
   expectMeta('name', 'twitter:title', '叩仙门：青岚纪');
-  expectMeta('name', 'twitter:description', '只需走位的修仙生存游戏。一世修行，叩问仙门。');
+  expectMeta('name', 'twitter:description', description);
+});
+
+test('首页、README 与安装信息统一名称和宣传语，传承说明保留真实条件', () => {
+  const manifest = JSON.parse(read('public/manifest.webmanifest'));
+  assert.equal(manifest.name, title);
+  assert.equal(manifest.short_name, '叩仙门');
+  assert.equal(manifest.description, description);
+  expectMeta('name', 'apple-mobile-web-app-title', manifest.short_name);
+  const readme = read('README.md');
+  assert.ok(readme.startsWith(`# ${title}\n`));
+  assert.ok(readme.includes(slogan));
+  assert.match(readme, /叩入仙门后，可从法宝、丹药或奇物中留下一物/);
+  assert.match(readme, /也可只留一句指引/);
+  for (const lifeMode of ['normal', 'extreme'] as const) {
+    const save = freshSave();
+    save.lifeMode = lifeMode;
+    const home = lobbyView(
+      save,
+      0,
+      0,
+      false,
+      { available: false, active: false },
+      null,
+      true,
+      true,
+      false,
+    );
+    assert.ok(home.includes(`aria-label="${title}"`));
+    assert.ok(home.includes(slogan));
+    for (const word of ['岁月', '故人', '传承']) assert.ok(home.includes(word));
+    assert.match(home, /叩入仙门后可留一物传承/);
+    assert.doesNotMatch(home, /御剑问长生|青岚入仙途|青岚仙途/);
+  }
 });
 
 test('og:image 指向官网绝对地址，封面文件存在、JPEG、1200x630', () => {
