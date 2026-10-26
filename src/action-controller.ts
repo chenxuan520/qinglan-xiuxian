@@ -238,6 +238,7 @@ export interface ActionShell {
     | 'ambush-farewell'
     | 'extreme-farewell'
     | 'epilogue';
+  journeyCardReturnLocation: PanelLocation | null;
   lastFrame: number;
   lastMortalTick: number;
   readonly leaveTown: () => void;
@@ -1574,7 +1575,12 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
         shell.renderJourneyFarewell('lifespan');
       else if (shell.journeyCardReturn === 'tribulation-farewell')
         shell.renderJourneyFarewell('tribulation');
-      else shell.showPanel('chronicle');
+      else {
+        const location = shell.journeyCardReturnLocation;
+        shell.journeyCardReturnLocation = null;
+        if (location) shell.restorePanel(location);
+        else shell.showPanel('chronicle');
+      }
       return true;
     }
     shell.closeNpcChat();

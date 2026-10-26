@@ -2,8 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TREASURES, evolutionPassives, passive, pathInfo } from '../src/data.ts';
 import { catalogEvolutionRecipe, choiceCard } from '../src/common-ui.ts';
-import { freshSave } from '../src/progress.ts';
+import { freshSave, dropArtifacts } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
+import { catalogPanel } from '../src/catalog-ui.ts';
+
+test('藏器阁说明覆盖未集齐、不足三件与已集齐，实际遗宝不重复或补足虚构法宝', () => {
+  for (const remaining of [4, 3, 2, 1, 0]) {
+    const save = freshSave();
+    save.artifacts = TREASURES.slice(0, TREASURES.length - remaining).map((t) => t.id);
+    const header = catalogPanel(save, {
+      panel: 'arsenal',
+      catalogTreasures: TREASURES,
+      schoolFilter: 'all',
+      treasurePage: 0,
+      selectedTreasure: save.starter,
+      bookTab: 'treasures',
+    }).body.split('</p>')[0];
+    assert.match(header, /至多掉落 3 件未拥有法宝/);
+    assert.match(header, /不足 3 件时掉剩余数量，收齐后不再重复掉落/);
+    assert.doesNotMatch(header, /必掉 3 件/);
+    const owned = [...save.artifacts];
+    const dropped = dropArtifacts(save, () => 0.5);
+    assert.equal(dropped.length, Math.min(remaining, 3));
+    assert.equal(new Set(dropped).size, dropped.length);
+    assert.ok(dropped.every((id) => !owned.includes(id) && save.artifacts.includes(id)));
+  }
+});
 
 test('完整法宝图鉴始终写明两种配套五重功法及所属流派，同流派先列出', () => {
   for (const t of TREASURES) {

@@ -9,6 +9,7 @@ import { visitTownImmortal, meetTownImmortal } from '../src/town-immortal.ts';
 import { joinSect } from '../src/mortal.ts';
 import { SECTS } from '../src/mortal-data.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
+import { importConfirmPanel } from '../src/lobby-ui.ts';
 
 test('新功能完整往返：丹囊药效药方限购、宗门城景旧事奇遇、履历与受伤续局', () => {
   const save = freshSave('heaven', ['fire']);
@@ -112,6 +113,32 @@ test('终章状态读档和导入后仍封存此世，旧续局不会恢复', ()
   assert.equal(restored.run, null);
   assert.equal(importSave(JSON.stringify({ ...save, activeRun: run.snapshot() })).run, null);
   assert.equal(importSave(exportSave(restored.save, null)).save.journeyEnded, true);
+});
+
+test('导入摘要仅对已叩门终章档明确提示不能继续此世，保留覆盖确认与备份取消', () => {
+  for (const lifeMode of ['normal', 'extreme'] as const) {
+    const save = freshSave();
+    save.lifeMode = lifeMode;
+    save.cultivation = 1e9;
+    save.completed = [0, 1, 2, 3, 4, 5, 6];
+    const completed = importConfirmPanel(importSave(exportSave(save, null)))[2];
+    assert.doesNotMatch(completed, /此世修行已结束|不能返回此世继续修行/);
+    assert.equal(enterImmortalGate(save), true);
+    const ended = importConfirmPanel(importSave(exportSave(save, null)))[2];
+    assert.match(ended, /已叩入仙门.*导入后将进入终章，不能返回此世继续修行/);
+    assert.match(ended, /导入会替换此网址的全部进度和续局/);
+    for (const action of ['export-save', 'cultivation', 'confirm-import'])
+      assert.match(ended, new RegExp(`data-action="${action}"`));
+  }
+  const running = freshSave();
+  const active = importConfirmPanel(importSave(exportSave(running, new Game(running, 0, 0))))[2];
+  assert.match(active, /未完成历练：/);
+  assert.doesNotMatch(active, /此世修行已结束|不能返回此世继续修行/);
+  running.age = 100;
+  running.pendingReincarnation = 'lifespan';
+  const fallen = importConfirmPanel(importSave(exportSave(running, null)))[2];
+  assert.match(fallen, /此世已落幕/);
+  assert.doesNotMatch(fallen, /已叩入仙门/);
 });
 
 test('寿终与天劫落幕状态随刷新和导入保留，且不会恢复旧对局', () => {

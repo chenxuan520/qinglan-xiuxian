@@ -351,6 +351,7 @@ let journeyCardReturn:
   | 'ambush-farewell'
   | 'extreme-farewell'
   | 'epilogue' = 'chronicle';
+let journeyCardReturnLocation: PanelLocation | null = null;
 
 let inMortalWorld = false;
 let mortalFilter = 'all';
@@ -1006,8 +1007,10 @@ async function renderJourneyCard() {
     panel === 'ambush-farewell' ||
     panel === 'extreme-farewell' ||
     panel === 'epilogue'
-  )
+  ) {
     journeyCardReturn = panel;
+    journeyCardReturnLocation = panel === 'chronicle' ? rememberPanel() : null;
+  }
   panel = 'journey-card';
   await journeyCardPanel.show(
     save,
@@ -1529,6 +1532,8 @@ function shellBindings(): ActionShell {
     get isMarketCultivatorId() { return isMarketCultivatorId; },
     get journeyCardPanel() { return journeyCardPanel; },
     get journeyCardReturn() { return journeyCardReturn; },
+    get journeyCardReturnLocation() { return journeyCardReturnLocation; },
+    set journeyCardReturnLocation(next) { journeyCardReturnLocation = next; },
     get lastFrame() { return lastFrame; },
     set lastFrame(next) { lastFrame = next; },
     get lastMortalTick() { return lastMortalTick; },

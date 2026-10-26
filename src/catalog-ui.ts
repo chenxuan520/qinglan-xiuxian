@@ -61,7 +61,7 @@ export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition
       wide: false,
     };
   }
-  const header = `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 妖王必掉 3 件未拥有法宝，击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar collection-toolbar"><div class="book-tabs" role="group" aria-label="藏器分类">${[
+  const header = `<p class="panel-note">已收藏 ${save.artifacts.length} / ${TREASURES.length} 件 · 每位妖王至多掉落 3 件未拥有法宝，不足 3 件时掉剩余数量，收齐后不再重复掉落。击败即收入藏器阁，可设本命与炼器。</p><div class="panel-toolbar collection-toolbar"><div class="book-tabs" role="group" aria-label="藏器分类">${[
     { id: 'treasures', name: '法宝', count: TREASURES.length },
     { id: 'passives', name: '功法', count: PASSIVES.length },
     { id: 'curios', name: '奇物', count: CURIOS.length },
