@@ -2,45 +2,111 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { relative, isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
+const root = fileURLToPath(new URL('..', import.meta.url));
+const sourceRoot = fileURLToPath(new URL('../src/', import.meta.url));
+const config = ts.readConfigFile(`${root}/tsconfig.json`, ts.sys.readFile);
+assert.equal(config.error, undefined);
+const { options, errors } = ts.parseJsonConfigFileContent(config.config, ts.sys, root);
+assert.deepEqual(errors, []);
 const source = (name: string) =>
   readFileSync(new URL(`../src/${name}.ts`, import.meta.url), 'utf8');
 
 // 只跟随运行时静态导入；`import type`、全部为类型的具名导入与动态 import() 不计入入口。
-function staticImports(name: string) {
+function staticImports(name: string, content = source(name)) {
+  const filename = fileURLToPath(new URL(`../src/${name}.ts`, import.meta.url));
+  const file = ts.createSourceFile(filename, content, ts.ScriptTarget.Latest, true);
   const deps = new Set<string>();
-  for (const match of source(name).matchAll(
-    /^(?:import|export)\s+(type\s+)?([\s\S]*?)\s*from\s+'\.\/([\w-]+)\.ts';/gm,
-  )) {
-    if (match[1]) continue;
-    const clause = match[2];
-    const named = clause.match(/^\{([\s\S]*)\}$/);
+  for (const node of file.statements) {
+    if (!ts.isImportDeclaration(node) && !ts.isExportDeclaration(node)) continue;
+    if (!node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier)) continue;
+    if (ts.isImportDeclaration(node)) {
+      const clause = node.importClause;
+      if (clause?.isTypeOnly) continue;
+      const named = clause?.namedBindings;
+      if (
+        !clause?.name &&
+        named &&
+        ts.isNamedImports(named) &&
+        named.elements.length > 0 &&
+        named.elements.every((item) => item.isTypeOnly)
+      )
+        continue;
+    } else {
+      if (node.isTypeOnly) continue;
+      const named = node.exportClause;
+      if (
+        named &&
+        ts.isNamedExports(named) &&
+        named.elements.length > 0 &&
+        named.elements.every((item) => item.isTypeOnly)
+      )
+        continue;
+    }
+    const resolved = ts.resolveModuleName(
+      node.moduleSpecifier.text,
+      filename,
+      options,
+      ts.sys,
+    ).resolvedModule;
+    if (!resolved) continue; // CSS 和外部包不属于 src TypeScript 入口图。
+    const local = relative(sourceRoot, resolved.resolvedFileName).split('\\').join('/');
     if (
-      named &&
-      named[1]
-        .split(',')
-        .map((part) => part.trim())
-        .filter(Boolean)
-        .every((part) => part.startsWith('type '))
+      !isAbsolute(local) &&
+      !local.startsWith('../') &&
+      local.endsWith('.ts') &&
+      !local.endsWith('.d.ts')
     )
-      continue;
-    deps.add(match[3]);
+      deps.add(local.slice(0, -3));
   }
-  for (const match of source(name).matchAll(/^import\s+'\.\/([\w-]+)\.ts';/gm)) deps.add(match[1]);
   return deps;
 }
 
-function entryModules() {
+function entryModules(readSource = source) {
   const seen = new Set(['main']);
   const queue = ['main'];
-  while (queue.length)
-    for (const dep of staticImports(queue.pop()!))
+  while (queue.length) {
+    const name = queue.pop()!;
+    for (const dep of staticImports(name, readSource(name)))
       if (!seen.has(dep)) {
         seen.add(dep);
         queue.push(dep);
       }
+  }
   return seen;
 }
+
+test('副作用导入后的类型导入、类型重导出和动态加载不进入运行时入口图', () => {
+  const content = `import './styles.ts';
+import type { debateMarket } from './market-social.ts';
+import { type MarketFellowView } from './market-fellow.ts';
+export type { AuctionView } from './auction-ui.ts';
+export { type MarketFellowView } from './market-fellow.ts';
+export type Debate = typeof debateMarket;
+void import('./market-social.ts');
+// import { prepareAuction } from './auction.ts';
+const text = "import { prepareAuction } from './auction.ts';";`;
+  assert.deepEqual([...staticImports('main', content)], ['styles']);
+});
+
+test('运行时导入与重导出不因引号、换行、扩展名或混合类型标记漏检', () => {
+  for (const content of [
+    'import { marketRequest } from "./market-social"; void marketRequest;',
+    "import './styles.ts'; import { marketRequest } from './market-social.ts'; void marketRequest;",
+    "export { marketRequest, type MarketRiskClue } from './market-social';",
+    "export * from './market-social.ts';",
+    "export * as social from './market-social';",
+    "import * as social from './market-social'; void social;",
+    "import { marketRequest, type MarketRiskClue } from './market-social'; void marketRequest;",
+  ]) {
+    const entry = entryModules((name) => (name === 'main' ? content : source(name)));
+    assert.ok(entry.has('market-social'), content);
+    assert.ok(entry.has('auction'), '运行时依赖需继续追踪传递导入');
+  }
+});
 
 test('坊间互动、炉边故人与拍卖准备只随坊市按需模块加载', () => {
   const entry = entryModules();

@@ -1,8 +1,8 @@
 // 把 AGENTS.md 中可机械判定的仓库约定落成测试；文档只保留原则并指向此处。
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { join, relative, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -18,13 +18,86 @@ function walk(dir: string, skip: Set<string>, out: string[] = []) {
   return out;
 }
 
+function assertOfficialRegistry(lock: string, content = read(lock)) {
+  let count = 0;
+  function visit(value: unknown) {
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key !== 'resolved') {
+        visit(child);
+        continue;
+      }
+      assert.equal(typeof child, 'string', `${lock} 的 resolved 必须是地址`);
+      assert.ok(URL.canParse(child as string), `${lock} 含无效 resolved 地址`);
+      const url = new URL(child as string);
+      assert.equal(url.protocol, 'https:', `${lock} 的 resolved 必须使用 HTTPS`);
+      assert.equal(url.hostname, 'registry.npmjs.org', `${lock} 出现非官方源`);
+      assert.ok(
+        !url.port && !url.username && !url.password,
+        `${lock} 的 resolved 含非官方端口或凭据`,
+      );
+      count++;
+    }
+  }
+  visit(JSON.parse(content));
+  assert.ok(count > 0, `${lock} 应含 resolved 地址`);
+}
+
 test('锁文件只引用公网官方 npm 源，不残留内网镜像', () => {
-  for (const lock of ['package-lock.json', 'scripts/browser-tools/package-lock.json']) {
-    const hosts = new Set(
-      [...read(lock).matchAll(/"resolved": "https:\/\/([^/"]+)/g)].map((match) => match[1]),
-    );
-    assert.ok(hosts.size > 0, `${lock} 应含 resolved 地址`);
-    assert.deepEqual([...hosts], ['registry.npmjs.org'], `${lock} 出现非官方源：${[...hosts]}`);
+  for (const lock of ['package-lock.json', 'scripts/browser-tools/package-lock.json'])
+    assertOfficialRegistry(lock);
+});
+
+test('混合官方源与非 HTTPS、非官方或损坏地址时仍拒绝，不受 JSON 排版影响', () => {
+  const fixture = (resolved: unknown) =>
+    JSON.stringify({
+      packages: {
+        '': { name: 'fixture' },
+        'node_modules/official': { resolved: 'https://registry.npmjs.org/official/-/official.tgz' },
+        'node_modules/changed': { resolved },
+      },
+    });
+  assert.doesNotThrow(() =>
+    assertOfficialRegistry('fixture', fixture('https://registry.npmjs.org/changed/-/changed.tgz')),
+  );
+  for (const resolved of [
+    'http://intranet.invalid/pkg.tgz',
+    'http://registry.npmjs.org/pkg.tgz',
+    'https://intranet.invalid/pkg.tgz',
+    'git+https://intranet.invalid/pkg.git',
+    'file:../pkg.tgz',
+    'https://registry.npmjs.org.intranet.invalid/pkg.tgz',
+    'https://fixture-user@registry.npmjs.org/pkg.tgz',
+    'https://registry.npmjs.org:8443/pkg.tgz',
+    'not-a-url',
+    '',
+    null,
+    42,
+  ])
+    assert.throws(() => assertOfficialRegistry('fixture', fixture(resolved)), /resolved|非官方源/);
+  assert.throws(() => assertOfficialRegistry('fixture', '{"packages":{}}'), /应含 resolved/);
+  assert.throws(() =>
+    assertOfficialRegistry(
+      'fixture',
+      JSON.stringify({
+        dependencies: {
+          parent: { dependencies: { nested: { resolved: 'http://intranet.invalid/pkg.tgz' } } },
+        },
+      }),
+    ),
+  );
+});
+
+test('领域规则内的相对文档链接在搬迁后仍可定位', () => {
+  for (const name of readdirSync(join(root, 'docs/rules')).filter((name) => name.endsWith('.md'))) {
+    const path = `docs/rules/${name}`;
+    for (const [, target] of read(path).matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+      if (/^[a-z][a-z\d+.-]*:/i.test(target) || target.startsWith('#')) continue;
+      assert.ok(
+        existsSync(resolve(root, dirname(path), target.split('#')[0])),
+        `${path} 链接失效：${target}`,
+      );
+    }
   }
 });
 

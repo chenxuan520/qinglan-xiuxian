@@ -5,9 +5,9 @@
 ## 后端与运营
 
 - NPC 域名、模型、超时、对话长度与换代年限集中在 `src/setting.ts`；姓名与换代在 `src/town-population.ts`，百年城景和上次入城记录在 `src/town-history.ts`，对白 UI 在 `src/npc-chat.ts`，共享协议与兜底在 `src/npc-dialogue.ts`。Worker 在 `workers/npc-ai/`；修改后执行 `npm run check:npc-ai` 与相关测试，`npm run deploy:npc-ai` 单独发布。默认域名 `qinglan-npc-ai.011203.xyz`，绑定和 CORS 来源随配置维护；严禁将 API 密钥放入前端，AI 文本不能改变游戏数值或当作 HTML 执行。
-- 匿名游玩统计在 `src/telemetry.ts`，经同一 Worker 的 `POST /event` 写入 Analytics Engine（`qinglan_events`），只在官网与 GitHub Pages 发送，静态部署不依赖它；`npm run stats` 查询。改事件字段需同步 Worker 校验、查询脚本与 [开发与部署](docs/development.md)。发布时先部署 Worker 再推送；上线验证写入的记录用版本号 `verification`，不要用真实版本号制造测试数据。
+- 匿名游玩统计在 `src/telemetry.ts`，经同一 Worker 的 `POST /event` 写入 Analytics Engine（`qinglan_events`），只在官网与 GitHub Pages 发送，静态部署不依赖它；`npm run stats` 查询。改事件字段需同步 Worker 校验、查询脚本与 [开发与部署](../development.md)。发布时先部署 Worker 再推送；上线验证写入的记录用版本号 `verification`，不要用真实版本号制造测试数据。
 - 物资调试入口隐藏在「关于」版本号七连点（七秒内），不在设置或首页增加显眼入口。`GET /debug/access` 由 NPC Worker 的 `DEBUG_MODE_ENABLED` 决定，未配置时默认关闭；仓库不声明该变量，普通 Worker 发布使用 `--keep-vars` 保留线上开关，只有显式 `--var DEBUG_MODE_ENABLED:true/false` 才切换；只有明确字符串 `true` 开放，入口与每次发放都重新联网核验，不缓存许可，断网/超时/异常一律拒绝。调试直接使用当前存档，可发灵石、玄铁、法宝及炼器阶数、丹药、奇物，也可增加指定整数永久修为或补足到指定境界。修为调试只增加、最高渡劫（累计 `IMMORTAL_CULTIVATION` 且未通终关），超额拒绝、不截断，不添加通关记录或真仙，突破年表与大乘天劫时钟沿用真实进度函数；不自动改本命或服药，不允许未完历练、已落幕或劫修遭遇中发放。沿用 clone→writeSave→apply，保存失败及关闭面板后的迟到响应不得生效；成功后关闭本机匿名统计。开关部署及验证见开发文档。
-- 统一公开监控入口 `/monitor/` 在两站「关于」中，公开聚合接口 `GET https://qinglan-npc-ai.011203.xyz/monitor/stats`（留影保存、分享与二维码来源在 `sections.sharing`），服务端凭证不得进入前端；`MONITOR_PUBLIC=false` 关闭线上公开查询。CI 诊断及每日渲染 / 模拟 / 体积摘要从 GitHub Pages 动态读取，性能 JSON 位于 `monitor/performance.json`，每日渲染只保留数值报告，不生成、保存或发布采样截图；逐项标明时间与源提交，失败或缺数据不能冒充成功；只发布 artifact，不提交生成报告或截图，详见 [开发与部署](docs/development.md)。
+- 统一公开监控入口 `/monitor/` 在两站「关于」中，公开聚合接口 `GET https://qinglan-npc-ai.011203.xyz/monitor/stats`（留影保存、分享与二维码来源在 `sections.sharing`），服务端凭证不得进入前端；`MONITOR_PUBLIC=false` 关闭线上公开查询。CI 诊断及每日渲染 / 模拟 / 体积摘要从 GitHub Pages 动态读取，性能 JSON 位于 `monitor/performance.json`，每日渲染只保留数值报告，不生成、保存或发布采样截图；逐项标明时间与源提交，失败或缺数据不能冒充成功；只发布 artifact，不提交生成报告或截图，详见 [开发与部署](../development.md)。
 
 ## 资源加载失败
 

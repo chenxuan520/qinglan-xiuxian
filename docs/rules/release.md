@@ -27,7 +27,7 @@ PY
 
 - 仓库：<https://github.com/chenxuan520/qinglan-xiuxian>。
 - 平台部署地址：<https://chenxuan520.github.io/qinglan-xiuxian/>，仅供部署检查。README 和仓库网站栏只放唯一官网 <https://xiuxian.011203.xyz/>。
-- 文档一致性门禁 `npm run docs:check` 对照真实规则函数核对丹药表、灵根、秘境倍率、妖王时序与修为、累计门槛、本命、低重伤害、宗门费用与赠药、修习年岁和炼器加成，并复查全部帮助分类与妖物志。修改规则或增添表格时须补充对应检查，不以更新手填期望值、快照或删除检查来放行。文案语义与实际行为的人工核对要求统一见 [REVIEW.md](REVIEW.md)。独立 Quality job 在每次 push / PR 执行，失败标红；部署流程不混入这些测试。
+- 文档一致性门禁 `npm run docs:check` 对照真实规则函数核对丹药表、灵根、秘境倍率、妖王时序与修为、累计门槛、本命、低重伤害、宗门费用与赠药、修习年岁和炼器加成，并复查全部帮助分类与妖物志。修改规则或增添表格时须补充对应检查，不以更新手填期望值、快照或删除检查来放行。文案语义与实际行为的人工核对要求统一见 [REVIEW.md](../../REVIEW.md)。独立 Quality job 在每次 push / PR 执行，失败标红；部署流程不混入这些测试。
 - `.github/workflows/pages.yml` 在 push `master` 后只按仓库子路径构建、校验18MB产物上限、恢复已有报告并发布，不运行单元/浏览器/平衡测试，不等待其他测试门禁；也支持手动触发。单元测试、格式/Worker类型、界面回归在独立 `checks.yml`，平衡在 `balance.yml`，二进制在 `binaries.yml`，发布和全量平衡不重复运行单测。仓库 Pages 来源为 GitHub Actions。
 - 经用户授权提交后，`git push origin master`，再用 `gh run list` / `gh run view <run-id>` 检查这次提交的部署结果。发布后用 MCP 确认新入口、资源与关键交互，不能只以 push 成功作为发布完成。
 
