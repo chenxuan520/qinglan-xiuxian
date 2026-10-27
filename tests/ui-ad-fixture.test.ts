@@ -35,11 +35,7 @@ test('通用界面广告夹具固定无库存、保留设备请求并透传其�
   assert.match(window.__uiAdFixtureRequests[2].query, /device=mobile/);
   assert.equal(forwarded.length, 0);
   assert.deepEqual(
-    await (
-      await window.fetch(
-        ADS_SETTINGS.house.endpoint.replace(/\/ad$/, '/preload') + '?device=mobile',
-      )
-    ).json(),
+    await (await window.fetch(ADS_SETTINGS.house.preloadEndpoint + '?device=mobile')).json(),
     { images: [] },
   );
   assert.equal(window.__uiAdFixtureRequests.length, 4);

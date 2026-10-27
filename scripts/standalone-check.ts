@@ -48,7 +48,7 @@ for (const entry of manifest.resources) {
     const source = buffer.toString('utf8');
     assert.doesNotMatch(
       source,
-      /qinglan-npc-ai|qinglan-ads|\/v1\/(?:ad|settings|event)|\/debug\/access|\/story-image|\/journey-appraisal|\/monitor\/stats|googlesyndication/,
+      /qinglan-npc-ai|qinglan-ads|\/api\/reward-content\/|\/v1\/(?:ad|settings|event)|\/debug\/access|\/story-image|\/journey-appraisal|\/monitor\/stats|googlesyndication/,
       entry.path,
     );
     if (source.includes('单机版')) editionLabel = true;

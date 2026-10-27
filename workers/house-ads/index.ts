@@ -55,6 +55,8 @@ function publicHeaders(request: Request, configured: string, methods = 'GET'): H
     result.set('Access-Control-Allow-Methods', methods);
     result.set('Access-Control-Allow-Headers', 'Content-Type');
   }
+  result.set('X-Qinglan-Content', 'reward-content-v1');
+  result.set('Access-Control-Expose-Headers', 'X-Qinglan-Content');
   return result;
 }
 async function config(env: HouseAdsWorkerEnv): Promise<HouseAdConfig> {
@@ -129,7 +131,18 @@ export const createHouseAdsWorker = (
   ({
     async fetch(request: Request, env: HouseAdsWorkerEnv): Promise<Response> {
       const url = new URL(request.url);
-      const path = url.pathname.replace(/^\/ads(?=\/)/, '');
+      let path = url.pathname.replace(/^\/ads(?=\/)/, '');
+      if (url.pathname.startsWith('/api/reward-content/')) {
+        // 仅四个公开玩家接口，不能将管理或认证路由挂到这个入口。
+        const route = new Map([
+          ['/api/reward-content/config', '/v1/settings'],
+          ['/api/reward-content/creative', '/v1/ad'],
+          ['/api/reward-content/preload', '/v1/preload'],
+          ['/api/reward-content/event', '/v1/event'],
+        ]).get(url.pathname);
+        if (!route) return json({ error: 'not-found' }, 404);
+        path = route;
+      }
       if (path === '/api/client-status') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');
         if (!extra || !request.headers.get('Origin')) return json({ error: 'origin-denied' }, 403);

@@ -127,7 +127,7 @@ test('预加载去重并限制4张，只读preload而不申请广告凭条/打�
     },
   );
   assert.equal(requested.length, 1);
-  assert.match(requested[0], /\/v1\/preload\?device=/);
+  assert.match(requested[0], /\/api\/reward-content\/preload\?device=/);
   assert.deepEqual(images, urls.slice(0, 4));
   const cancel = new AbortController();
   cancel.abort();

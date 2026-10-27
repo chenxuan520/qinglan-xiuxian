@@ -6,7 +6,7 @@ import { defaultAdPlatformSettings } from '../src/ad-platform-contract.ts';
 export const UI_AD_FIXTURE = `{
   const settingsUrl=new URL(${JSON.stringify(ADS_SETTINGS.platform.endpoint)}),
     adUrl=new URL(${JSON.stringify(ADS_SETTINGS.house.endpoint)}),
-    preloadPath=adUrl.pathname.slice(0,-3)+'/preload',
+    preloadPath=new URL(${JSON.stringify(ADS_SETTINGS.house.preloadEndpoint)}).pathname,
     original=window.fetch.bind(window);
   window.__uiAdFixtureRequests=[];
   window.fetch=(input,init)=>{

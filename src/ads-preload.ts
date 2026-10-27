@@ -10,7 +10,7 @@ export async function preloadAdImages(
   fetcher: typeof fetch = fetch,
   makeImage = () => new Image(),
 ) {
-  const url = new URL(ADS_SETTINGS.house.endpoint.replace(/\/ad$/, '/preload'));
+  const url = new URL(ADS_SETTINGS.house.preloadEndpoint);
   const device = currentHouseAdDevice();
   url.searchParams.set('device', device);
   const body = await adLoadJson(url, signal, 48_000, fetcher);

@@ -326,7 +326,7 @@ test('客户端按实际事件累计快照，重复事件零请求、点击不�
       (c) =>
         c.options.credentials === 'omit' &&
         c.options.keepalive === true &&
-        c.input === 'https://xiuxian.011203.xyz/ads/v1/event',
+        c.input === 'https://xiuxian.011203.xyz/api/reward-content/event',
     ),
   );
   assert.ok(calls.every((c) => Object.keys(c.body).sort().join(',') === 'flags,receipt'));

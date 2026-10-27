@@ -46,7 +46,16 @@ export async function adLoadJson(
         body = await Promise.race([adResponseJson(response, maxBytes), cancelled]);
       } catch (error) {
         if (controller.signal.aborted) throw error;
-        if (trace) trace.code = error instanceof AdResponseError ? error.code : 'body-read';
+        if (trace)
+          trace.code =
+            error instanceof AdResponseError &&
+            error.code === 'json' &&
+            url.pathname.startsWith('/api/reward-content/') &&
+            response.headers.get('X-Qinglan-Content') !== 'reward-content-v1'
+              ? 'unexpected-response'
+              : error instanceof AdResponseError
+                ? error.code
+                : 'body-read';
         return null;
       } finally {
         controller.signal.removeEventListener('abort', stopReading);

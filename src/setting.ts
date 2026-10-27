@@ -7,8 +7,12 @@ export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 // 供给、Google参数和广告权重在广告管理后台配置；此处仅保留公开服务地址。
 // 任何 provider 不可用（未配置、SDK 加载失败、无库存）都自动回退占位倒计时，不影响游戏。
 export const ADS_SETTINGS = {
-  platform: { endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/ads/v1/settings' },
-  house: { endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/ads/v1/ad' },
+  platform: { endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/api/reward-content/config' },
+  house: {
+    endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/api/reward-content/creative',
+    preloadEndpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/api/reward-content/preload',
+    eventEndpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/api/reward-content/event',
+  },
 } as const;
 
 // NPC 相关常量集中在这里；改动后重新构建前端，并部署 npc-ai Worker。

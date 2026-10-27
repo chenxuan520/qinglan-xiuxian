@@ -11,8 +11,7 @@ export function adTracker(receipt: unknown, fetcher: typeof fetch = fetch) {
     // 统计完全独立于奖励；simple request + keepalive，不携带管理Cookie、不阻塞跳转或保存。
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const url = new URL(ADS_SETTINGS.house.endpoint);
-      url.pathname = url.pathname.replace(/\/ad$/, '/event');
+      const url = new URL(ADS_SETTINGS.house.eventEndpoint);
       const controller = new AbortController();
       timer = setTimeout(() => controller.abort(), 4000);
       void fetcher(url, {

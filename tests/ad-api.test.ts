@@ -37,6 +37,23 @@ test('公开机器说明在D1不可用时仍可发现，登录提示不进入可
   ]);
   assert.equal(spec.paths['/admin/config'].put.parameters[0].schema.const, env.ADMIN_ORIGIN);
   assert.deepEqual(spec.paths['/admin/login'].post.security, []);
+  for (const [route, method] of [
+    ['config', 'get'],
+    ['creative', 'get'],
+    ['preload', 'get'],
+    ['event', 'post'],
+  ]) {
+    const path = spec.paths['/api/reward-content/' + route];
+    assert.equal(path.servers[0].url, env.ADMIN_ORIGIN);
+    assert.deepEqual(path[method].security, []);
+  }
+  assert.equal(spec.paths['/api/reward-content/admin/config'], undefined);
+  const ids = Object.values(spec.paths).flatMap((path: any) =>
+    Object.values(path)
+      .filter((op: any) => op.operationId)
+      .map((op: any) => op.operationId),
+  );
+  assert.equal(new Set(ids).size, ids.length, '公开别名仍须有唯一OpenAPI operationId');
   assert.equal((await get('/ads/openapi.json', 'PUT')).status, 405);
   const guide = await get('/ads/api.md');
   assert.match(guide.headers.get('Content-Type')!, /^text\/markdown/);

@@ -25,6 +25,7 @@ export const AD_LOAD_ERRORS = [
   'json',
   'schema',
   'too-large',
+  'unexpected-response',
 ] as const;
 export const AD_LOAD_BROWSERS = ['via', 'chromium', 'safari', 'firefox', 'other'] as const;
 export interface AdLoadDiagnostic {
