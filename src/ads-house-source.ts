@@ -10,11 +10,12 @@ const source = STANDALONE
 
 export const houseAdProvider: RewardAdProvider = {
   name: 'house',
-  loadTimeoutMs: 8000,
+  loadTimeoutMs: 30000,
   ownsPlaybackClock: true,
   placementName: (placement) => `qinglan-${placement}`,
-  async prepare() {
+  async prepare(context) {
     if (!source) return false;
+    context?.trace?.at('house-module');
     await source.load();
     return true;
   },

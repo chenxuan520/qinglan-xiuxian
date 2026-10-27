@@ -74,6 +74,7 @@ import './journey-map.css';
 import {
   AD_DURATION_MS,
   AD_SECONDS,
+  preloadRewardAds,
   AD_PLACEHOLDER_HTML,
   getAdProvider,
   watchAdPlacement,
@@ -2321,6 +2322,7 @@ ensureScene(selectedStage, () => {
   renderPrologue();
 });
 requestAnimationFrame(frame);
+preloadRewardAds();
 void import('./first-run-tour.ts')
   .then(({ queueFirstRunTour }) => queueFirstRunTour(shellBindings(), saveRead.status === 'empty'))
   .catch(() => resourceFailed(true));

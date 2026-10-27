@@ -27,6 +27,12 @@ export function adStore() {
   );
   let failRead = false,
     failWrite = false;
+  sqlite.exec(
+    readFileSync(
+      new URL('../../workers/house-ads/migrations/0004_ad_load_diagnostics.sql', import.meta.url),
+      'utf8',
+    ),
+  );
   const db = {
     prepare(sql: string) {
       let args: Array<string | number> = [];
@@ -108,6 +114,16 @@ export function adEnv(store: ReturnType<typeof adStore>, origin = 'https://xiuxi
     DB: store.db,
     ADMIN_ORIGIN: origin,
     ALLOWED_ORIGINS: 'https://xiuxian.011203.xyz,https://chenxuan520.github.io',
+    AD_RECEIPT_LIMITER: {
+      async limit() {
+        return { success: true };
+      },
+    },
+    AD_DIAGNOSTIC_LIMITER: {
+      async limit() {
+        return { success: true };
+      },
+    },
   } as unknown as HouseAdsWorkerEnv;
 }
 export const exampleAd = {
@@ -120,7 +136,16 @@ export const exampleAd = {
 };
 
 // 既有SQL/鉴权用例不访问公网；新图片校验另有HTTP成功/失败/重定向/超时用例。
-export const adWorker = createHouseAdsWorker(
+const sqlWorker = createHouseAdsWorker(
   async () =>
     new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } }),
 );
+// 模块级SQL用例没有真实Cloudflare边缘，显式补合成地址和允许的频控绑定。
+// 真实限流、缺地址、拒绝与异常由ad-receipt-rate-limit.test.ts及本地原生绑定验证。
+export const adWorker = {
+  fetch(request: Request, env: HouseAdsWorkerEnv) {
+    const headers = new Headers(request.headers);
+    if (!headers.has('CF-Connecting-IP')) headers.set('CF-Connecting-IP', '198.51.100.7');
+    return sqlWorker.fetch(new Request(request, { headers }), env);
+  },
+};

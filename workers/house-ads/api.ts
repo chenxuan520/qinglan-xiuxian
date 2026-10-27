@@ -7,7 +7,7 @@ export function houseAdsOpenApi(origin: string) {
     required: true,
     content: { 'application/json': { schema } },
   });
-  const response = (description: string, schema = ref('Message')) => ({
+  const response = (description: string, schema: Record<string, unknown> = ref('Message')) => ({
     description,
     content: { 'application/json': { schema } },
   });
@@ -53,6 +53,53 @@ export function houseAdsOpenApi(origin: string) {
     externalDocs: { description: '登录、编辑、冲突处理与调用示例', url: origin + '/ads/api.md' },
     security: [{ adminSession: [] }],
     paths: {
+      '/admin/diagnostics': {
+        get: {
+          ...operation('getLoadDiagnostics', '只读查询匿名广告加载故障'),
+          parameters: [
+            {
+              name: 'days',
+              in: 'query',
+              schema: { type: 'integer', enum: [1, 7, 30], default: 7 },
+            },
+          ],
+          responses: {
+            '200': response(
+              'UTC日聚合，最多500行；含阶段/错误类别/版本/设备/浏览器族/状态码/次数/总耗时/最后时间',
+              {
+                type: 'object',
+                properties: { rows: { type: 'array', items: { type: 'object' } } },
+              },
+            ),
+            ...errors,
+          },
+        },
+      },
+      '/v1/preload': {
+        get: {
+          operationId: 'preloadImages',
+          summary: '预加载当前端最多4张已启用素材，不签发凭条或累计指标',
+          security: [],
+          parameters: [
+            {
+              name: 'device',
+              in: 'query',
+              required: true,
+              schema: { type: 'string', enum: ['mobile', 'desktop'] },
+            },
+          ],
+          responses: {
+            '200': response('为四位置按本端权重预选创意及去重图片，Google/占位模式无创意', {
+              type: 'object',
+              properties: {
+                images: { type: 'array', maxItems: 4, items: { type: 'string', format: 'uri' } },
+                ads: { type: 'object', description: '四个位置各自的公开创意或null，不含receipt' },
+              },
+            }),
+            ...errors,
+          },
+        },
+      },
       '/admin/login': {
         post: {
           ...operation('login', '账号密码登录，保存Set-Cookie', {
@@ -125,7 +172,7 @@ export function houseAdsOpenApi(origin: string) {
           summary: '只读抽取该端与广告位的一条当前广告',
           security: [],
           description:
-            'agent检查必须带verification=1，不带管理Cookie，不上报观看、点击或领取事件。无有效投放时ad为null。',
+            'agent检查必须带verification=1，不带管理Cookie，不上报观看、点击或领取事件。无有效投放时ad为null；统计签发受频控时仍返回广告，receipt可以缺省。',
           parameters: [
             {
               name: 'placement',
@@ -138,6 +185,13 @@ export function houseAdsOpenApi(origin: string) {
               in: 'query',
               schema: { type: 'string', enum: ['desktop', 'mobile'] },
               description: '建议显式指定；缺省按UA/Client Hint判定。',
+            },
+            {
+              name: 'campaign',
+              in: 'query',
+              schema: { type: 'string', pattern: '^[a-zA-Z0-9-]{1,64}$' },
+              description:
+                '仅实际打开已预备的创意时指定；须仍启用、包含该位置且本端正权重，否则ad=null。',
             },
             {
               name: 'verification',
@@ -294,7 +348,11 @@ export function houseAdsOpenApi(origin: string) {
                 },
               ],
             },
-            receipt: { type: 'string', description: '验证时不用于伪造观看、点击或领取。' },
+            receipt: {
+              type: 'string',
+              description:
+                '可选；频控、缺边缘IP或统计服务异常时不签发，仍可观看广告；验证时不伪造观看、点击或领取。',
+            },
           },
         },
       },
@@ -332,7 +390,11 @@ settings结构见OpenAPI；保留未要求更改的Google参数和provider。自
 
 GET /admin/stats?days=1|7|30，默认7。返回from/to/timezone/rows，按北京时间及请求日归集。每行含id/name/provider/archived及requests/shown/clicked/watched/claimed；零分母比率不应当作0%，Google点击与收入以官方报表为准。统计失败不能伪装零数据。
 
-验证投放可匿名GET /v1/ad?placement=revive&device=mobile&verification=1；device可为desktop/mobile，无投放ad=null。不要携带管理Cookie，不调用游戏事件接口伪造展示、点击、看完或领取。图片预览直接读取HTTPS素材；指标只供参考，不用于结算。
+GET /v1/preload?device=mobile|desktop，匿名按四广告位及当前端正权重分别抽取一条创意，返回ads及最多4张去重图片；不签发receipt、不计请求或曝光。首页空闲时预加载模块、配置和图片，自营类型最多复用15秒，图片成功加载后仅为对应位置缓存15秒且一次消费；打开立即显示预备素材，后台GET /v1/ad携带campaign=id核验当前启用、位置、端权重并申请新凭条。失效或已改素材立即停止并回退，不继续观看或解锁；未核验成功不能完成。未预备或已过期走原即时抽取；不提前播放或启动观看时钟，省流量模式不预热。
+
+GET /admin/diagnostics?days=1|7|30 复用管理登录，返回rows，按UTC日聚合加载故障，最多500行。字段为day/version/placement/device/browser/stage/code/status/count/elapsed_total/last_seen；stage为platform-module/settings/house-module/creative/image/sdk，code为timeout/network/http/invalid/unavailable。仅故障上报，不把无投放或玩家关闭视为故障；Via仅在UA声明Via时识别，否则记录实际可识别的浏览器族，不能据此排除Via。故障上报独立入口 POST https://xiuxian.011203.xyz/api/client-status，Origin白名单、512字节封闭字段校验、每IP单机房每分钟约30次的独立边缘频控，故障静默丢弃，不影响游戏；保留最近约30天。不会保存原始IP、完整UA、链接、异常原文、存档或任何账号凭据。此聚合只供诊断，不能单凭network类别断言被浏览器拦截。机器验证不要向正式入口造故障数据。
+
+验证投放可匿名GET /v1/ad?placement=revive&device=mobile&verification=1；device可为desktop/mobile，无投放ad=null。凭条签发使用Cloudflare边缘频控：同一CF-Connecting-IP在单机房每60秒约60张，自营和Google（/v1/settings）所有位置、设备及verification请求共用额度。超限、缺可信边缘IP/绑定或限流异常时，仍200返回广告或settings，但不发receipt、不新增统计写入；已发凭条的事件继续按原规则处理。共享出口IP可能少记，机房之间独立且计数近似，不能作为全球严格配额或结算防作弊。不要携带管理Cookie，不调用游戏事件接口伪造展示、点击、看完或领取。图片预览直接读取HTTPS素材；指标只供参考，不用于结算。
 
 ## Python示例：只读登录、配置、指标、退出
 

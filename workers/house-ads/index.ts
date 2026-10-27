@@ -5,6 +5,8 @@ import {
   isHouseAdDevice,
   houseAdDeviceFromUserAgent,
   publicHouseAd,
+  houseAdWeight,
+  HOUSE_AD_PLACEMENTS,
   validHouseAdConfig,
   weightedHouseAd,
   type HouseAdConfig,
@@ -15,6 +17,7 @@ import { adSellerLine } from '../../src/ad-platform-contract.ts';
 import { adMetrics, issueAdReceipt, recordAdMetrics, validAdMetricEvent } from './metrics.ts';
 import { AD_API_GUIDE, houseAdsOpenApi } from './api.ts';
 import { validateCampaignImages } from './images.ts';
+import { recordAdLoadDiagnostic, adLoadDiagnostics } from './diagnostics.ts';
 
 // 登录账号与密码校验值由D1维护，不写入公开仓库。
 export type HouseAdsWorkerEnv = HouseAdsEnv;
@@ -83,6 +86,17 @@ async function receiptFor(
   if (origin !== env.ADMIN_ORIGIN && !env.ALLOWED_ORIGINS.split(',').includes(origin))
     return undefined;
   try {
+    // 只信任边缘提供的地址；缺少绑定/地址或频控异常时仍返回广告，只不写统计。
+    const ip = request.headers.get('CF-Connecting-IP')?.trim();
+    if (!ip || ip.length > 64 || !env.AD_RECEIPT_LIMITER) return undefined;
+    const hash = new Uint8Array(
+      await crypto.subtle.digest('SHA-256', new TextEncoder().encode(ip)),
+    );
+    const key =
+      'qinglan-house-ads:receipt:v1:' +
+      Array.from(hash, (b) => b.toString(16).padStart(2, '0')).join('');
+    // 两种供给、四个位置、两端及验证请求共用额度，避免切换参数绕过。
+    if (!(await env.AD_RECEIPT_LIMITER.limit({ key })).success) return undefined;
     return await issueAdReceipt(
       env.DB,
       ad,
@@ -110,6 +124,49 @@ export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
     async fetch(request: Request, env: HouseAdsWorkerEnv): Promise<Response> {
       const url = new URL(request.url);
       const path = url.pathname.replace(/^\/ads(?=\/)/, '');
+      if (path === '/api/client-status') {
+        const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');
+        if (!extra || !request.headers.get('Origin')) return json({ error: 'origin-denied' }, 403);
+        if (request.method === 'OPTIONS')
+          return new Response(null, { status: 204, headers: extra });
+        if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405, extra);
+        if (
+          ['text/plain', 'application/json'].includes(
+            request.headers.get('Content-Type')?.split(';')[0].trim() ?? '',
+          )
+        )
+          await recordAdLoadDiagnostic(request, env);
+        return new Response(null, { status: 204, headers: extra });
+      }
+      if (path === '/v1/preload') {
+        const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
+        if (!extra) return json({ error: 'origin-denied' }, 403);
+        if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405, extra);
+        const device = url.searchParams.get('device');
+        if (!isHouseAdDevice(device)) return json({ error: 'invalid-device' }, 400, extra);
+        try {
+          const current = await config(env);
+          const ads = Object.fromEntries(
+            HOUSE_AD_PLACEMENTS.map((placement) => {
+              const ad =
+                current.settings!.provider === 'house'
+                  ? weightedHouseAd(current.campaigns, placement, undefined, device)
+                  : null;
+              return [placement, ad ? publicHouseAd(ad, device) : null];
+            }),
+          );
+          const images = [
+            ...new Set(
+              Object.values(ads)
+                .filter((ad) => ad !== null)
+                .map((ad) => ad.imageUrl),
+            ),
+          ];
+          return json({ images, ads }, 200, extra);
+        } catch {
+          return json({ error: 'unavailable' }, 503, extra);
+        }
+      }
       if (path === '/openapi.json' || path === '/api.md') {
         if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405);
         return path === '/openapi.json'
@@ -189,6 +246,9 @@ export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
         const placement = url.searchParams.get('placement');
         if (!isHouseAdPlacement(placement)) return json({ error: 'invalid-placement' }, 400, extra);
         const requestedDevice = url.searchParams.get('device');
+        const campaign = url.searchParams.get('campaign');
+        if (campaign !== null && !/^[a-zA-Z0-9-]{1,64}$/.test(campaign))
+          return json({ error: 'invalid-campaign' }, 400, extra);
         if (requestedDevice !== null && !isHouseAdDevice(requestedDevice))
           return json({ error: 'invalid-device' }, 400, extra);
         const device =
@@ -201,7 +261,15 @@ export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
           const current = await config(env);
           const ad =
             current.settings!.provider === 'house'
-              ? weightedHouseAd(current.campaigns, placement, undefined, device)
+              ? campaign
+                ? (current.campaigns.find(
+                    (ad) =>
+                      ad.id === campaign &&
+                      ad.enabled &&
+                      ad.placements.includes(placement) &&
+                      houseAdWeight(ad, device) > 0,
+                  ) ?? null)
+                : weightedHouseAd(current.campaigns, placement, undefined, device)
               : null;
           let receipt: string | undefined;
           if (ad) {
@@ -258,6 +326,15 @@ export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
       }
       if (request.method === 'GET') {
         if (path === '/admin/') return page(ADMIN_HTML, 'text/html; charset=utf-8');
+        if (path === '/admin/diagnostics') {
+          const days = Number(url.searchParams.get('days') ?? '7');
+          if (![1, 7, 30].includes(days)) return json({ error: 'invalid-window' }, 400);
+          try {
+            return json({ rows: await adLoadDiagnostics(env.DB, days) });
+          } catch {
+            return json({ error: 'unavailable' }, 503);
+          }
+        }
         if (path === '/admin/app.js') return page(ADMIN_SCRIPT, 'text/javascript; charset=utf-8');
         if (path === '/admin/app.css') return page(ADMIN_CSS, 'text/css; charset=utf-8');
         if (path === '/admin/config') {

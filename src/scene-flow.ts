@@ -610,7 +610,7 @@ export function showReviveAd(shell: ActionShell) {
   )
     return;
   shell.panel = 'revive-ad';
-  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div>${shell.AD_PLACEHOLDER_HTML}<p>观看结束即可重返秘境。</p><div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>${shell.AD_SECONDS} 秒后可复活</button><button class="secondary-button" data-action="finish-run">${shell.game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
+  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="复活广告"><div class="eyebrow">复活机缘</div>${shell.AD_PLACEHOLDER_HTML}<div class="result-actions death-actions"><button class="primary-button" data-action="ad-revive" disabled>${shell.AD_SECONDS} 秒后可复活</button><button class="secondary-button" data-action="finish-run">${shell.game.tribulation ? '放弃渡劫 · 此世落幕' : '放弃复活并结算'}</button></div></section></div>`;
   shell.startAdWatch('ad-revive', '满血复活', 'revive');
 }
 
@@ -637,6 +637,12 @@ export function startAdWatch(
   }
   // SDK 分支与倒计时互不承认：先掐断任何遗留的 adReadyAt，避免上个面板的倒计时残留放行领取。
   shell.adReadyAt = 0;
+  const adHost = shell.modal.querySelector<HTMLElement>('.revive-ad');
+  if (adHost) {
+    adHost.hidden = false;
+    adHost.removeAttribute('style');
+    adHost.textContent = '广告加载中…';
+  }
   const watchPanel = shell.panel;
   // 真实广告全屏播放期间按钮保持禁用；看完回调会解锁为「广告已结束 · …」。
   const waiting = shell.modal.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
@@ -662,6 +668,7 @@ export function startAdWatch(
     onFallback: () => {
       const host = shell.modal.querySelector<HTMLElement>('.revive-ad');
       if (host) {
+        host.hidden = false;
         host.removeAttribute('style');
         host.textContent = '广告位招租';
       }
@@ -741,9 +748,9 @@ export function showRewardAd(shell: ActionShell, kind: 'root' | 'supplies') {
   shell.panel = 'reward-ad';
   const reward =
     kind === 'root'
-      ? '自选灵根资质与五行，解锁对应入门法宝。后续新历练生效，未完成的历练保留原来的灵根和武器。'
-      : `领取 ${shell.adSupplies(shell.save.unlocked).stones} 灵石与 ${shell.adSupplies(shell.save.unlocked).iron} 玄铁，可再次观看领取。`;
-  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${kind === 'root' ? 'root-ad-panel' : ''}" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '自选灵根' : '仙缘补给'}</div>${shell.AD_PLACEHOLDER_HTML}<p>${reward}<br>完整观看 ${shell.AD_SECONDS} 秒后点击领取，中途离开不发放奖励。</p>${kind === 'root' ? '<div id="root-picker"></div>' : ''}<div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>${shell.AD_SECONDS} 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
+      ? '自选灵根与五行'
+      : `${shell.adSupplies(shell.save.unlocked).stones} 灵石 · ${shell.adSupplies(shell.save.unlocked).iron} 玄铁`;
+  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel ${kind === 'root' ? 'root-ad-panel' : ''}" role="dialog" aria-modal="true" aria-label="仙缘广告"><div class="eyebrow">${kind === 'root' ? '自选灵根' : '仙缘补给'}</div>${shell.AD_PLACEHOLDER_HTML}<p>${reward} · ${shell.AD_SECONDS} 秒</p>${kind === 'root' ? '<div id="root-picker"></div>' : ''}<div class="result-actions death-actions"><button class="primary-button" data-action="claim-ad-reward" disabled>${shell.AD_SECONDS} 秒后领取奖励</button><button class="secondary-button" data-action="cancel-reward-ad">放弃领取</button></div></section></div>`;
   if (kind === 'root') shell.renderRootPicker();
   shell.startAdWatch(
     'claim-ad-reward',

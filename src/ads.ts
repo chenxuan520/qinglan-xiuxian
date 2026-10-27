@@ -4,6 +4,8 @@ import { STANDALONE } from './build-mode.ts';
 // 占位 provider 走 5 秒倒计时（无 SDK 的默认行为），真实 SDK provider 以看完回调解锁。
 // 供给由广告平台按需选择；新增适配器同步平台协议和后台配置，任何 provider 不可用都回退占位。
 import { platformAdProvider } from './ads-platform-source.ts';
+export { preloadRewardAds } from './ads-platform-source.ts';
+import { AdLoadTrace } from './ad-load-diagnostics.ts';
 
 export { AD_DURATION_MS, AD_SECONDS } from './ad-rules.ts';
 // 接入次数限制时，按广告位区分单元与额度。
@@ -23,6 +25,7 @@ export interface RewardAdContext {
   host: HTMLElement;
   signal: AbortSignal;
   onProgress(seconds: number): void;
+  trace?: AdLoadTrace;
 }
 
 export interface RewardAdProvider {
@@ -35,6 +38,7 @@ export interface RewardAdProvider {
     placement: AdPlacement;
     signal: AbortSignal;
     alive?: () => boolean;
+    trace?: AdLoadTrace;
   }): Promise<boolean>;
   play(placement: AdPlacement, callbacks: RewardAdCallbacks, context?: RewardAdContext): void;
 }
@@ -82,10 +86,14 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
   const timeoutMs = options.timeoutMs ?? provider.loadTimeoutMs ?? AD_WATCH_TIMEOUT_MS;
   let finished = false;
   const controller = new AbortController();
+  const trace = new AdLoadTrace();
   const aliveTimer = setInterval(() => {
     if (!alive()) done();
   }, 200);
-  const timer = setTimeout(() => finishFallback('广告无响应，回退占位'), timeoutMs);
+  const timer = setTimeout(() => {
+    trace.code = 'timeout';
+    finishFallback('广告无响应，回退占位');
+  }, timeoutMs);
   const done = () => {
     finished = true;
     clearTimeout(timer);
@@ -99,11 +107,12 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
   };
   const finishFallback = (reason: string) => {
     if (finished || !alive()) return;
+    trace.report(placement);
     done();
     onFallback(reason);
   };
   provider
-    .prepare({ placement, signal: controller.signal, alive })
+    .prepare({ placement, signal: controller.signal, alive, trace })
     .then((ready) => {
       if (finished) return;
       if (!alive()) return done();
@@ -121,6 +130,7 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
           ? {
               host: options.host,
               signal: controller.signal,
+              trace,
               onProgress: (seconds) => {
                 if (!finished && alive()) options.onProgress?.(seconds);
               },

@@ -6,7 +6,6 @@ import {
 } from './ads.ts';
 import { ADS_SETTINGS } from './setting.ts';
 import {
-  boundedAdJson,
   validHouseAd,
   houseAdDeviceFromUserAgent,
   type HouseAd,
@@ -14,6 +13,9 @@ import {
 } from './house-ad-contract.ts';
 import { adTracker } from './ad-metrics.ts';
 import { adReceiptId } from './ad-metrics-contract.ts';
+import { adLoadJson } from './ad-load-request.ts';
+import { AdLoadTrace } from './ad-load-diagnostics.ts';
+import { takePreparedAd } from './ad-preload-cache.ts';
 
 // 只累计图片已显示、前台有焦点且图片在视口内的时间；恢复后的长计时空洞不补算。
 export class HouseAdClock {
@@ -49,19 +51,30 @@ export async function requestHouseAd(
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
   device = currentHouseAdDevice(),
-): Promise<(HouseAd & { receipt?: string; device: HouseAdDevice }) | null> {
+  trace?: AdLoadTrace,
+  usePrepared = true,
+  campaign?: string,
+): Promise<(HouseAd & { receipt?: string; device: HouseAdDevice; preloaded?: boolean }) | null> {
   if (
     !ADS_SETTINGS.house.endpoint ||
     signal.aborted ||
     (typeof navigator !== 'undefined' && navigator.onLine === false)
   )
     return null;
+  if (usePrepared && fetcher === fetch) {
+    const prepared = takePreparedAd(placement, device);
+    if (prepared) return { ...prepared, device, preloaded: true };
+  }
   const url = new URL(ADS_SETTINGS.house.endpoint);
   url.searchParams.set('placement', placement);
   url.searchParams.set('device', device);
-  const response = await fetcher(url, { signal, credentials: 'omit', cache: 'no-store' });
-  if (!response.ok) return null;
-  const body = await boundedAdJson(response, 16_000);
+  if (campaign) url.searchParams.set('campaign', campaign);
+  trace?.at('creative');
+  const body = await adLoadJson(url, signal, 16_000, fetcher, trace);
+  if (trace && body && typeof body === 'object' && 'ad' in body) {
+    if (body.ad === null) trace.empty = true;
+    else if (!validHouseAd(body.ad)) trace.code = 'invalid';
+  } else if (trace && body) trace.code = 'invalid';
   return body && typeof body === 'object' && 'ad' in body && validHouseAd(body.ad)
     ? {
         ...body.ad,
@@ -89,19 +102,21 @@ function coverHouseAd(
   layer.setAttribute('aria-modal', 'true');
   layer.setAttribute('aria-label', '广告展示');
   layer.style.cssText =
-    'position:fixed;inset:0;z-index:1200;box-sizing:border-box;width:100%;height:100vh;height:100dvh;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;background:#071b18;color:#f2ead0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));text-align:center;overscroll-behavior:contain';
+    'position:fixed;inset:0;z-index:1200;box-sizing:border-box;width:100%;height:100vh;height:100dvh;display:grid;grid-template-rows:minmax(0,1fr);background:#071b18;color:#f2ead0;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));text-align:center;overscroll-behavior:contain';
   const styles = [content, link, picture, image].map((node) => node.style.cssText);
   content.style.cssText =
-    'display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;min-width:0;min-height:0;line-height:1.6';
+    'display:grid;grid-template-rows:auto minmax(0,1fr) 44px;gap:8px;min-width:0;min-height:0;line-height:1.6';
   link.style.cssText = 'display:flex;min-width:0;min-height:0;overflow:hidden';
   picture.style.cssText = 'display:flex;min-width:0;min-height:0;width:100%;height:100%';
   image.style.cssText = 'display:block;width:100%;height:100%;min-height:0;object-fit:contain';
   const close = document.createElement('button');
   close.type = 'button';
   close.className = 'secondary-button';
-  close.textContent = cancel.textContent;
+  close.textContent = '×';
+  close.setAttribute('aria-label', cancel.textContent ?? '关闭广告');
   close.dataset.action = cancel.dataset.action;
-  close.style.cssText = 'justify-self:center;max-width:100%;min-height:44px';
+  close.style.cssText =
+    'position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:44px;height:44px;min-height:44px;padding:0;font:24px system-ui;border-radius:50%';
   const visibility = panel.style.visibility,
     inert = panel.inert;
   panel.style.visibility = 'hidden';
@@ -156,18 +171,65 @@ export async function playHouseAd(
   };
   signal.addEventListener('abort', cleanup, { once: true });
   try {
-    const ad = await requestHouseAd(placement, signal);
+    const ad = await requestHouseAd(
+      placement,
+      signal,
+      fetch,
+      currentHouseAdDevice(),
+      context.trace,
+    );
     if (signal.aborted || !host.isConnected) {
       cleanup();
       return;
     }
     if (!ad) throw Error('no-ad');
-    const track = adTracker(ad.receipt);
+    let verified = !ad.preloaded;
+    let sink = adTracker(ad.receipt),
+      pending = !!ad.preloaded;
+    const queued: Parameters<typeof sink>[0][] = [];
+    const track = (kind: Parameters<typeof sink>[0]) => {
+      if (pending) queued.push(kind);
+      else sink(kind);
+    };
+    if (ad.preloaded) {
+      const receiptTrace = new AdLoadTrace();
+      // 先显示已经备好的图片；新凭条在后台申请，不让统计拖慢播放。
+      void requestHouseAd(placement, signal, fetch, ad.device, receiptTrace, false, ad.id)
+        .then((fresh) => {
+          if (signal.aborted || stopped || !host.isConnected) return;
+          pending = false;
+          if (
+            fresh?.id === ad.id &&
+            fresh.imageUrl === ad.imageUrl &&
+            fresh.mobileImageUrl === ad.mobileImageUrl &&
+            fresh.targetUrl === ad.targetUrl
+          ) {
+            sink = adTracker(fresh.receipt);
+            verified = true;
+            queued.forEach(sink);
+            sample();
+          } else {
+            if (context.trace) {
+              context.trace.at('creative');
+              context.trace.code = receiptTrace.code;
+              context.trace.status = receiptTrace.status;
+              context.trace.empty = receiptTrace.empty || !!fresh;
+            }
+            cleanup();
+            callbacks.onFailed('广告投放已更新');
+          }
+          queued.length = 0;
+        })
+        .catch(() => {
+          pending = false;
+          queued.length = 0;
+        });
+    }
     const content = document.createElement('div');
     content.style.cssText = 'display:grid;gap:8px;width:100%;text-align:center';
     const label = document.createElement('small');
-    label.textContent = `广告 · ${ad.name}`;
-    label.style.cssText = 'font-size:12px;letter-spacing:0;overflow-wrap:anywhere';
+    label.textContent = '广告';
+    label.style.cssText = 'font:12px system-ui;letter-spacing:0;justify-self:start;opacity:.65';
     const link = document.createElement('a');
     link.href = ad.targetUrl;
     link.target = '_blank';
@@ -188,8 +250,9 @@ export async function playHouseAd(
     image.style.cssText =
       'display:block;max-width:100%;max-height:min(26vh,220px);object-fit:contain;margin:auto';
     const status = document.createElement('small');
-    status.textContent = '正在加载广告图片…';
-    status.style.cssText = 'font-size:12px;letter-spacing:0;line-height:1.6';
+    status.textContent = '加载中…';
+    status.style.cssText =
+      'font:14px/44px system-ui;letter-spacing:0;padding:0 52px;white-space:nowrap';
     const picture = document.createElement('picture');
     picture.append(image);
     link.append(picture);
@@ -198,6 +261,7 @@ export async function playHouseAd(
     host.style.cssText =
       'height:auto;min-height:0;margin:12px 0;padding:12px;font-size:14px;letter-spacing:normal';
     uncover = coverHouseAd(host, content, link, picture, image);
+    context.trace?.at('image');
     await new Promise<void>((resolve, reject) => {
       const abort = () => {
         image!.src = '';
@@ -220,6 +284,7 @@ export async function playHouseAd(
     }
     const clock = new HouseAdClock();
     image.onerror = () => {
+      if (context.trace) context.trace.code = 'network';
       cleanup();
       if (!signal.aborted && host.isConnected) callbacks.onFailed('图片广告暂不可用');
     };
@@ -231,6 +296,7 @@ export async function playHouseAd(
       }
       // picture 换源失败时可能没有派发 error，仍须回退，不能卡住观看。
       if (image!.complete && image!.naturalWidth === 0) {
+        if (context.trace) context.trace.code = 'invalid';
         cleanup();
         callbacks.onFailed('图片广告暂不可用');
         return;
@@ -244,13 +310,13 @@ export async function playHouseAd(
       const seconds = clock.sample(performance.now(), visible);
       if (visible) track('shown');
       context.onProgress(seconds);
-      status.textContent = visible
-        ? `观看 ${seconds} 秒后返回奖励页；点击图片可另开推广页。`
-        : '回到当前页面并显示图片后继续观看。';
-      if (clock.remaining === 0) {
+      status.textContent = visible ? `${seconds} 秒` : '已暂停';
+      if (clock.remaining === 0 && verified) {
         completed = true;
-        status.textContent = '观看已完成，可领取奖励；点击图片可另开推广页。';
         cleanup();
+        host.replaceChildren();
+        host.hidden = true;
+        host.style.display = 'none';
         track('watched');
         callbacks.onWatched(() => track('claimed'));
         host
@@ -275,6 +341,7 @@ export async function playHouseAd(
     sample();
     if (!stopped) timer = setInterval(sample, 100);
   } catch {
+    if (context.trace?.stage === 'image') context.trace.code = 'network';
     cleanup();
     if (!signal.aborted && host.isConnected) callbacks.onFailed('图片广告暂不可用');
   }

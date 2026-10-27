@@ -166,7 +166,7 @@ function harness(data = fixture()) {
     settled: false,
     ambushScene: null,
     panel: '',
-    modal: { innerHTML: '', querySelector: () => ({ remove: noop }) },
+    modal: { innerHTML: '', querySelector: () => ({ remove: noop, removeAttribute: noop }) },
     MarketAmbushDuel,
     MarketAmbushScene: TestScene,
     MAX_REVIVES,
