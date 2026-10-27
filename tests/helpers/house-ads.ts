@@ -33,6 +33,12 @@ export function adStore() {
       'utf8',
     ),
   );
+  sqlite.exec(
+    readFileSync(
+      new URL('../../workers/house-ads/migrations/0005_ad_access_key.sql', import.meta.url),
+      'utf8',
+    ),
+  );
   const db = {
     prepare(sql: string) {
       let args: Array<string | number> = [];

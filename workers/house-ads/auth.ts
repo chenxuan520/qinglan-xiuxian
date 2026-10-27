@@ -7,7 +7,7 @@ const SESSION_SECONDS = 8 * 60 * 60;
 const hex = (bytes: ArrayBuffer | Uint8Array) =>
   Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('');
 export const adRandomToken = () => hex(crypto.getRandomValues(new Uint8Array(32)));
-const digest = async (value: string) =>
+export const digest = async (value: string) =>
   hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
 async function passwordKey(password: string, salt: string) {
   const key = await crypto.subtle.importKey(

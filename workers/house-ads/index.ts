@@ -19,6 +19,7 @@ import { AD_API_GUIDE, houseAdsOpenApi } from './api.ts';
 import { validateCampaignImages } from './images.ts';
 import { recordAdLoadDiagnostic, adLoadDiagnostics } from './diagnostics.ts';
 import { loginSiteKey } from './turnstile.ts';
+import { adAccessKeyAction, adAccessKeyIdentity } from './access-key.ts';
 
 // 登录账号与密码校验值由D1维护，不写入公开仓库。
 export type HouseAdsWorkerEnv = HouseAdsEnv;
@@ -317,8 +318,10 @@ export const createHouseAdsWorker = (
       if (
         ['/admin/login', '/admin/logout', '/admin/password'].includes(path) &&
         request.method !== 'GET'
-      )
+      ) {
+        if (request.headers.has('Authorization')) return json({ error: 'key-scope-denied' }, 403);
         return adAuthAction(request, env, verifyFetch);
+      }
       if (request.method === 'GET') {
         if (path === '/admin/login')
           return page(
@@ -330,13 +333,40 @@ export const createHouseAdsWorker = (
         if (path === '/admin/app.css') return page(ADMIN_CSS, 'text/css; charset=utf-8');
         if (path === '/admin/app.js') return page(ADMIN_SCRIPT, 'text/javascript; charset=utf-8');
       }
-      let authenticated = false;
+      let authenticated = false,
+        keyAuthenticated = false;
+      let session: { token_hash: string } | null = null;
+      let keyId: string | null = null;
+      const keyRequest = request.headers.has('Authorization');
+      if (
+        keyRequest &&
+        !(
+          (request.method === 'GET' &&
+            ['/admin/config', '/admin/stats', '/admin/diagnostics'].includes(path)) ||
+          (request.method === 'PUT' && path === '/admin/config')
+        )
+      )
+        return json(
+          { error: 'key-scope-denied', message: 'Access Key 仅用于投放配置和指标接口。' },
+          403,
+        );
+      if (
+        keyRequest &&
+        request.headers.has('Origin') &&
+        request.headers.get('Origin') !== env.ADMIN_ORIGIN
+      )
+        return json({ error: 'origin-denied' }, 403);
       try {
-        authenticated = !!(await adAdminSession(request, env));
+        if (keyRequest) {
+          keyId = await adAccessKeyIdentity(request, env);
+          authenticated = keyAuthenticated = !!keyId;
+        } else authenticated = !!(session = await adAdminSession(request, env));
       } catch {
         return json({ error: 'unavailable', message: '暂时无法验证登录，请稍后重试。' }, 503);
       }
       if (!authenticated) {
+        if (keyRequest)
+          return json({ error: 'invalid-access-key', message: 'Access Key 无效或已撤销。' }, 401);
         if (path === '/admin/' && request.method === 'GET')
           return page(
             LOGIN_HTML.replace('__TURNSTILE_SITE_KEY__', loginSiteKey(env) ?? ''),
@@ -344,6 +374,14 @@ export const createHouseAdsWorker = (
             true,
           );
         return json({ error: 'login-required', message: '登录已失效，请重新登录。' }, 401);
+      }
+      if (path === '/admin/access-key') {
+        try {
+          const result = await adAccessKeyAction(request, env, session!);
+          return json(result.body, result.status);
+        } catch {
+          return json({ error: 'unavailable', message: '密钥操作未完成，请刷新状态后重试。' }, 503);
+        }
       }
       if (request.method === 'GET') {
         if (path === '/admin/') return page(ADMIN_HTML, 'text/html; charset=utf-8');
@@ -406,7 +444,7 @@ export const createHouseAdsWorker = (
       if (path !== '/admin/config' || request.method !== 'PUT')
         return json({ error: 'method-not-allowed' }, 405);
       if (
-        request.headers.get('Origin') !== url.origin ||
+        (!keyAuthenticated && request.headers.get('Origin') !== url.origin) ||
         request.headers.get('Content-Type')?.split(';')[0].trim() !== 'application/json'
       ) {
         return json({ error: 'request-denied', message: '请在管理页面内保存配置。' }, 403);
@@ -439,13 +477,15 @@ export const createHouseAdsWorker = (
       try {
         const settings = input.settings ?? (await config(env)).settings!;
         const result = await env.DB.prepare(
-          'UPDATE ad_config SET campaigns = ?, settings = ?, revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ?',
+          'UPDATE ad_config SET campaigns = ?, settings = ?, revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ? AND (?=0 OR EXISTS (SELECT 1 FROM ad_access_keys k JOIN ad_admin a ON a.id=1 AND a.version=k.version WHERE k.key_id=?))',
         )
           .bind(
             JSON.stringify(input.campaigns),
             JSON.stringify(settings),
             new Date().toISOString(),
             input.revision,
+            keyAuthenticated ? 1 : 0,
+            keyId ?? '',
           )
           .run();
         if (result.meta.changes !== 1)

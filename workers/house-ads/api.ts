@@ -47,7 +47,7 @@ export function houseAdsOpenApi(origin: string) {
       title: '青岚纪广告管理 API',
       version: '1.0.0',
       description:
-        '沿用后台账号密码与8小时Cookie会话。先读 /ads/api.md；仅执行操作者要求的改动，读取完整配置后按revision条件保存。文档公开，投放配置和指标仍需登录。',
+        'Agent使用账号持有者在后台生成的Access Key，通过Bearer直接管理广告，无需Cookie或Turnstile。浏览器沿用账号密码与8小时会话。先读 /ads/api.md，按revision保存，文档不含任何凭据。',
     },
     servers: [{ url: origin + '/ads' }],
     externalDocs: { description: '登录、编辑、冲突处理与调用示例', url: origin + '/ads/api.md' },
@@ -56,6 +56,7 @@ export function houseAdsOpenApi(origin: string) {
       '/admin/diagnostics': {
         get: {
           ...operation('getLoadDiagnostics', '只读查询匿名广告加载故障'),
+          security: [{ adminSession: [] }, { agentAccessKey: [] }],
           parameters: [
             {
               name: 'days',
@@ -146,6 +147,7 @@ export function houseAdsOpenApi(origin: string) {
       '/admin/config': {
         get: {
           ...operation('getConfig', '读取完整投放与Google配置'),
+          security: [{ adminSession: [] }, { agentAccessKey: [] }],
           responses: {
             '200': response('完整配置；保留未要求修改的内容', ref('Config')),
             ...errors,
@@ -153,6 +155,15 @@ export function houseAdsOpenApi(origin: string) {
         },
         put: {
           ...operation('replaceConfig', '以revision条件替换完整配置', ref('Config')),
+          security: [{ adminSession: [] }, { agentAccessKey: [] }],
+          parameters: [
+            {
+              ...writeOrigin,
+              required: false,
+              description:
+                'Cookie写请求必须发送本站Origin；Bearer机器请求可省略，存在时仍须本站Origin。',
+            },
+          ],
           description:
             '这是整体替换，不是PATCH。新增、修改、停用、删除都编辑campaigns后提交整个数组；settings可省略并保留现值。不要清空其他广告或擅自切换Google。所有非空图片保存前检查可访问的公开HTTPS响应、image类型及非空正文（总8秒）；失败400 invalid-image含id/field且不改配置。后台另用原生图片加载核验能否解析。成功revision加1；409不得直接用新revision重发旧正文。',
           responses: { '200': response('已保存的完整配置与新revision', ref('Config')), ...errors },
@@ -161,6 +172,7 @@ export function houseAdsOpenApi(origin: string) {
       '/admin/stats': {
         get: {
           ...operation('getStats', '只读查询投放指标'),
+          security: [{ adminSession: [] }, { agentAccessKey: [] }],
           parameters: [
             {
               name: 'days',
@@ -170,6 +182,51 @@ export function houseAdsOpenApi(origin: string) {
           ],
           responses: {
             '200': response('按北京时间、请求日归集；计数不是结算凭据', ref('Stats')),
+            ...errors,
+          },
+        },
+      },
+      '/admin/access-key': {
+        get: {
+          ...operation('getAccessKeyMetadata', '仅Cookie会话读取账号密钥标识；不返回密钥明文'),
+          responses: {
+            '200': response('当前密钥元数据或null', {
+              type: 'object',
+              properties: { key: ref('AccessKeyMetadata') },
+            }),
+            ...errors,
+          },
+        },
+        post: {
+          ...operation('manageAccessKey', '仅Cookie会话生成、更换或撤销账号Access Key', {
+            type: 'object',
+            additionalProperties: false,
+            required: ['currentId', 'revoke'],
+            properties: {
+              currentId: {
+                type: ['string', 'null'],
+                description: 'GET返回的key.id，尚未生成时null；旧页面不能覆盖新密钥。',
+              },
+              revoke: {
+                type: 'boolean',
+                description: 'false生成/更换，true撤销；更换与撤销使旧密钥即时失效。',
+              },
+            },
+          }),
+          description:
+            '必须是真实已登录Cookie及同源JSON，Bearer无权调用。每账号一把Key，32随机字节，只存SHA-256；accessKey仅生成响应返回一次，不记录、不打印、不放URL。改密同时撤销。网络失败先GET状态，不盲目重放。',
+          responses: {
+            '200': response('key元数据；仅生成响应附一次性accessKey', {
+              type: 'object',
+              properties: {
+                key: ref('AccessKeyMetadata'),
+                accessKey: {
+                  type: 'string',
+                  readOnly: true,
+                  description: '一次性明文，仅交付给操作者授权的agent。',
+                },
+              },
+            }),
             ...errors,
           },
         },
@@ -218,6 +275,13 @@ export function houseAdsOpenApi(origin: string) {
     },
     components: {
       securitySchemes: {
+        agentAccessKey: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'qlak_ + 64位十六进制随机字符',
+          description:
+            '账号持有者在后台「账号设置」生成；仅配置GET/PUT及stats/diagnostics GET，无需Cookie/Turnstile，无权改密或管理Key。不可写URL或日志。',
+        },
         adminSession: {
           type: 'apiKey',
           in: 'cookie',
@@ -226,6 +290,14 @@ export function houseAdsOpenApi(origin: string) {
         },
       },
       schemas: {
+        AccessKeyMetadata: {
+          type: ['object', 'null'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            prefix: { type: 'string' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
         Ok: { type: 'object', properties: { ok: { const: true } }, required: ['ok'] },
         Message: {
           type: 'object',
@@ -425,9 +497,27 @@ export const AD_API_GUIDE = String.raw`# 青岚纪广告管理 API
 服务基址：https://xiuxian.011203.xyz/ads
 机器契约：/ads/openapi.json（OpenAPI 3.1）。普通登录页面的head元数据可发现本说明；页面正文不展示agent提示。说明与契约公开，账号、会话、完整配置和指标不公开。
 
-## 登录与退出
+## Agent 使用 Access Key（推荐）
 
-复用现有后台账号密码，不需要API key、Cloudflare登录或新授权。凭据由操作者提供，不从页面、仓库或文档寻找。POST /admin/login，JSON正文为 {"username":"你的账号","password":"你的密码","cf-turnstile-response":"本次浏览器验证结果"}，总正文最多4096字节；请求应带明确的客户端标识，例如 User-Agent: Qinglan-Ad-Agent/1.0；所有POST/PUT必须发送 Origin: https://xiuxian.011203.xyz 和 Content-Type: application/json。成功返回 {"ok":true}，保存Set-Cookie到内存会话或私有cookie jar；后续管理请求发送该Cookie。会话有效期8小时，Secure/HttpOnly/SameSite=Strict；不支持跨站浏览器管理。新登录必须通过官方Turnstile组件；验证结果最多2048字符、5分钟有效且只能用一次，服务端核对ad_admin_login动作与本站精确hostname，网络或配置失败不会放行。登录失败或验证码过期须在原组件重新取得验证结果，不能重放旧结果。已有会话继续有效，后续配置/统计请求无需重复验证。移除全局100次/15分钟额度，只保留可信来源IP散列的10次/15分钟失败及并发名额；成功和服务故障释放名额，错误账号密码保留计数，不记录原始IP。不要将密码放URL、命令行参数、日志或工具输出，也不要打印Cookie。
+账号持有者在 /ads/admin/ 完成一次浏览器登录，展开「账号设置 / 账号与 Agent」，点击「生成 Access Key」并复制交给agent。无需让agent通过Turnstile，也不需要为agent取得Cookie。每账号一把Key，生成/更换后仅本次响应提供明文，服务端只存SHA-256；刷新后不能读回明文，可更换或撤销。不要输出、记录、写入URL、命令行参数或公开文件。更换、撤销或修改登录密码立即使旧Key失效。
+
+机器请求发送 Authorization: Bearer <Access Key>。允许 GET /admin/config、PUT /admin/config、GET /admin/stats、GET /admin/diagnostics；其余账号/Key管理接口不开放给Bearer。路径相对于上方 /ads 基址。无Cookie、无Origin的机器调用可用；主动发送Origin时必须为本站，不允许跨站浏览器。PUT仍须Content-Type: application/json并遵守revision、图片和完整配置校验。无效Bearer不会回落Cookie；401停止并让持有者提供有效Key，不循环登录。409重新读配置或密钥状态，不覆盖其他修改。密钥在图片检查期间撤销时，迟到写入也不会生效。
+
+下例仅只读验证，由环境变量提供Key；不打印Key或整个响应。编辑按下文读改写读流程操作，不盲目发送空配置。
+
+~~~python
+import json, os, urllib.request
+key = os.environ["QINGLAN_AD_ACCESS_KEY"]
+request = urllib.request.Request("https://xiuxian.011203.xyz/ads/admin/config",
+    headers={"Authorization": "Bearer " + key, "User-Agent": "Qinglan-Ad-Agent/1.0"})
+with urllib.request.urlopen(request, timeout=20) as response:
+    config = json.load(response)
+print({"revision": config["revision"], "campaigns": len(config["campaigns"])})
+~~~
+
+## 浏览器登录与退出
+
+浏览器管理复用现有后台账号密码，不需要Cloudflare登录；agent应优先使用上面的Access Key。凭据由操作者提供，不从页面、仓库或文档寻找。POST /admin/login，JSON正文为 {"username":"你的账号","password":"你的密码","cf-turnstile-response":"本次浏览器验证结果"}，总正文最多4096字节；请求应带明确的客户端标识，例如 User-Agent: Qinglan-Ad-Agent/1.0；所有Cookie会话POST/PUT必须发送 Origin: https://xiuxian.011203.xyz 和 Content-Type: application/json；Bearer机器PUT可省Origin。成功返回 {"ok":true}，保存Set-Cookie到内存会话或私有cookie jar；后续管理请求发送该Cookie。会话有效期8小时，Secure/HttpOnly/SameSite=Strict；不支持跨站浏览器管理。新登录必须通过官方Turnstile组件；验证结果最多2048字符、5分钟有效且只能用一次，服务端核对ad_admin_login动作与本站精确hostname，网络或配置失败不会放行。登录失败或验证码过期须在原组件重新取得验证结果，不能重放旧结果。已有会话继续有效，后续配置/统计请求无需重复验证。移除全局100次/15分钟额度，只保留可信来源IP散列的10次/15分钟失败及并发名额；成功和服务故障释放名额，错误账号密码保留计数，不记录原始IP。不要将密码放URL、命令行参数、日志或工具输出，也不要打印Cookie。
 
 结束调用POST /admin/logout，携带Cookie、上述两个标头，撤销当前会话。401停止操作，由操作者处理登录；429等待15分钟，不循环猜密码。修改密码仅在明确要求时调用POST /admin/password，正文password/newPassword，新密码12～128字符；它会撤销全部会话，普通投放编辑不调用。
 
@@ -458,9 +548,9 @@ GET /admin/diagnostics?days=1|7|30 复用管理登录，返回rows，按UTC日�
 
 验证投放可匿名GET /api/reward-content/creative?placement=revive&device=mobile&verification=1；device可为desktop/mobile，无投放ad=null。凭条签发使用Cloudflare边缘频控：同一CF-Connecting-IP在单机房每60秒约60张，自营和Google（/api/reward-content/config）所有位置、设备及verification请求共用额度。超限、缺可信边缘IP/绑定或限流异常时，仍200返回广告或settings，但不发receipt、不新增统计写入；已发凭条的事件继续按原规则处理。共享出口IP可能少记，机房之间独立且计数近似，不能作为全球严格配额或结算防作弊。不要携带管理Cookie，不调用游戏事件接口伪造展示、点击、看完或领取。图片预览直接读取HTTPS素材；指标只供参考，不用于结算。
 
-## agent与Python调用示例
+## Cookie会话与Python调用示例
 
-agent推荐通过正常浏览器在 /ads/admin/ 完成登录，然后在该浏览器的同源Cookie会话中调用JSON接口。纯HTTP的新登录同样需要合法前端取得的新Turnstile结果；下面示例不负责获取或绕过人机验证。标准库即可运行；账号密码与验证结果不会进入命令行；仅输出revision、条数及统计窗口，不输出凭据或完整配置。编辑时按上面的读改写读流程使用request("/admin/config", "PUT", edited_config)，不要直接构造空配置覆盖线上。
+以下为浏览器会话备选示例；agent自动调用请使用上方Access Key。操作者也可通过正常浏览器在 /ads/admin/ 完成登录，然后在同一Cookie会话中调用管理JSON接口。纯HTTP的新登录同样需要合法前端取得的新Turnstile结果；下面示例不负责获取或绕过人机验证。标准库即可运行；账号密码与验证结果不会进入命令行；仅输出revision、条数及统计窗口，不输出凭据或完整配置。编辑时按上面的读改写读流程使用request("/admin/config", "PUT", edited_config)，不要直接构造空配置覆盖线上。
 
 ~~~python
 import getpass, http.cookiejar, json, urllib.request
