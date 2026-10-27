@@ -23,6 +23,8 @@
 
 `public/icons/` 的 PNG 由 `python3 scripts/generate-icons.py` 生成（需要 Pillow），图案与 `public/favicon.svg` 同源同配色：manifest 用图保留圆角与透明角；maskable 满幅铺底并把画作缩进 76% 安全区，供系统圆形裁切；apple-touch-icon（180×180）满幅铺底，画作缩至 90%，避免 iOS 把透明角填黑。PNG 是 Web App Manifest 与苹果主屏幕的硬性格式要求，不经 `compress-assets.py` 转 WebP。调整标志时同步更新 `favicon.svg` 与脚本中的几何常量，再重跑脚本；`tests/pwa.test.ts` 校验 manifest 声明与图标文件尺寸一致。
 
+2026-10-27 起图案改为与 `favicon.svg` 同源的山门、玉月与远山；满幅版的门柱和远山延伸到画布底边，远山限制在门洞内。替换四张 PNG 经用户明确批准，新版散列登记在 `scripts/check-binaries.ts` 的 `EXPLICITLY_APPROVED_ART`，原基线 `approved-binaries.json` 未改动，旧版仍可通过以保证历史提交检查。
+
 ## 二进制资源与构建体积约束
 
 界面、战斗 Canvas 与留影可使用公共 `fonts.loli.net` / `gstatic.loli.net` 提供的 Noto Serif SC；样式异步加载且使用 `display=swap`，失败、被拦截或离线时立即使用设备上的系统字体。外部字体不写入仓库，不打包进构建，不纳入离线缓存，也不让游戏或留影等待字体请求。不维护字库生成脚本。

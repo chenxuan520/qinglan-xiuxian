@@ -13,12 +13,41 @@ export interface BinaryApproval {
 export type ApprovedBinaries = Record<string, BinaryApproval>;
 // 2026-10-19 用户明确批准的新增奇物九宫格（上限260,000字节）。
 // 原始素材基线仍不可改；仅此路径、长度和散列获准，不允许扩展名或目录豁免。
+// 2026-10-27 用户明确批准把四张 PWA 图标替换为与 favicon.svg 同源的山门图案
+// （由 scripts/generate-icons.py 生成）。基线中的旧版本仍然有效，历史提交照常通过；
+// 只额外接受下列路径的这一版内容，其他已批准素材仍按原基线严格比对。
 export const EXPLICITLY_APPROVED_ART: ApprovedBinaries = {
   'public/assets/curios.webp': {
     bytes: 208998,
     sha256: 'c44e16695c2fb792a2e19c09f2a663007685579bd5fc96c84788174c35ee185a',
   },
+  'public/icons/apple-touch-icon.png': {
+    bytes: 13719,
+    sha256: '44ea2857f069b2ef7d12d9e7866bb0b4a5b707bf86a48daa61193ba027045bb5',
+  },
+  'public/icons/icon-192.png': {
+    bytes: 16955,
+    sha256: '6195dcf914ad31700c3a56395f9ce2a81ae40e03d206a4974635f2d2640fd892',
+  },
+  'public/icons/icon-512.png': {
+    bytes: 32350,
+    sha256: '14499a0ae577a719f555efa6bd8013b964608d32cb25b8e7f1891cf4478dc647',
+  },
+  'public/icons/icon-maskable-512.png': {
+    bytes: 23261,
+    sha256: '719778588baa226739477835c694666ebc78941e7064fbf6bfe5be45be53c72b',
+  },
 };
+// 一个路径可匹配原基线或明确批准中的任一版本；两者都没有记录时按新增二进制处理。
+function approvalsFor(base: ApprovedBinaries, path: string) {
+  return [base[path], EXPLICITLY_APPROVED_ART[path]].filter(
+    (item): item is BinaryApproval => item !== undefined,
+  );
+}
+function matchesApproval(data: Uint8Array, approvals: BinaryApproval[]) {
+  const hash = createHash('sha256').update(data).digest('hex');
+  return approvals.some((item) => data.length === item.bytes && hash === item.sha256);
+}
 export interface RepositoryFile {
   path: string;
   data: Uint8Array;
@@ -46,13 +75,9 @@ export function binaryBreaches(files: RepositoryFile[], approved: ApprovedBinari
   const breaches: string[] = [];
   const present = new Set(files.map((file) => file.path));
   for (const { path, data } of files) {
-    const approval = approved[path] ?? EXPLICITLY_APPROVED_ART[path];
-    if (!approval && isBinary(data, path)) breaches.push(`禁止新增二进制文件：${path}`);
-    if (
-      approval &&
-      (data.length !== approval.bytes ||
-        createHash('sha256').update(data).digest('hex') !== approval.sha256)
-    )
+    const approvals = approvalsFor(approved, path);
+    if (!approvals.length && isBinary(data, path)) breaches.push(`禁止新增二进制文件：${path}`);
+    if (approvals.length && !matchesApproval(data, approvals))
       breaches.push(`已批准二进制素材被替换：${path}`);
   }
   const fonts = [...present].filter((path) => /\.(woff2?|ttf|otf|eot|ttc)$/i.test(path));
@@ -174,14 +199,10 @@ export function commitBinaryBreaches(
       .filter(Boolean);
     for (const path of new Set(added)) {
       const data = git(['show', `${commit}:${path}`]);
-      const approval = canonical[path] ?? EXPLICITLY_APPROVED_ART[path];
-      if (!approval && isBinary(data, path))
+      const approvals = approvalsFor(canonical, path);
+      if (!approvals.length && isBinary(data, path))
         breaches.push(`提交 ${commit.slice(0, 7)} 禁止新增二进制文件：${path}`);
-      if (
-        approval &&
-        (data.length !== approval.bytes ||
-          createHash('sha256').update(data).digest('hex') !== approval.sha256)
-      )
+      if (approvals.length && !matchesApproval(data, approvals))
         breaches.push(`提交 ${commit.slice(0, 7)} 替换了已批准二进制素材：${path}`);
     }
   }

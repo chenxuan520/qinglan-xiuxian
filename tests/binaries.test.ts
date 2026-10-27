@@ -292,3 +292,23 @@ test('仅用户明确批准的奇物图集可新增，错路径、大小或任�
     rmSync(r.cwd, { recursive: true, force: true });
   }
 });
+
+test('2026-10-27 批准的山门图标可替换基线旧版，旧版仍有效，其余基线素材和错字节仍拒绝', () => {
+  const path = 'public/icons/icon-512.png',
+    data = readFileSync(new URL('../public/icons/icon-512.png', import.meta.url));
+  const legacy = Buffer.from('legacy-sword-icon');
+  const baseline = { [path]: approval(legacy), 'public/assets/other.webp': approval(original) };
+  // 基线旧版与明确批准的新版都可通过，历史提交与当前文件树均不误报。
+  assert.deepEqual(binaryBreaches([{ path, data }], baseline), []);
+  assert.deepEqual(binaryBreaches([{ path, data: legacy }], baseline), []);
+  const damaged = Buffer.from(data);
+  damaged[damaged.length - 1] ^= 1;
+  assert.ok(binaryBreaches([{ path, data: damaged }], baseline).some((b) => b.includes('被替换')));
+  // 批准只针对这四个路径：同样内容放到其他基线路径仍视为替换。
+  assert.ok(
+    binaryBreaches([{ path: 'public/assets/other.webp', data }], baseline).some((b) =>
+      b.includes('被替换'),
+    ),
+  );
+  assert.ok(binaryBreaches([{ path: 'public/icons/icon-1024.png', data }], {}).length);
+});
