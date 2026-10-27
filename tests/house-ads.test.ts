@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Script } from 'node:vm';
+import { ADMIN_SCRIPT, LOGIN_SCRIPT, ADMIN_HTML, LOGIN_HTML } from '../workers/house-ads/admin.ts';
 import {
   houseAdUrl,
   validHouseAdConfig,
@@ -9,8 +11,13 @@ import {
 import { HouseAdClock, requestHouseAd } from '../src/ads-house.ts';
 import { watchAdPlacement, type RewardAdCallbacks, type RewardAdProvider } from '../src/ads.ts';
 import worker from '../workers/house-ads/index.ts';
-import { allowedAdAdmin } from '../workers/house-ads/access.ts';
-import { adAccessFixture, adStore, adEnv, exampleAd } from './helpers/house-ads.ts';
+import {
+  adSessionFixture,
+  adStore,
+  adEnv,
+  exampleAd,
+  LOCAL_AD_PASSWORD,
+} from './helpers/house-ads.ts';
 
 test('广告配置封闭校验HTTPS链接、20条上限、唯一身份与四个合法广告位', () => {
   const config = { revision: 0, campaigns: [structuredClone(exampleAd)] };
@@ -48,6 +55,53 @@ test('广告配置封闭校验HTTPS链接、20条上限、唯一身份与四个�
     assert.equal(validHouseAdConfig(value), false);
 });
 
+test('电脑和手机图片可分别配置，旧投放可读，手机地址沿用相同HTTPS安全校验', async (t) => {
+  const store = adStore(),
+    env = adEnv(store);
+  t.after(() => store.close());
+  new Script(ADMIN_SCRIPT);
+  new Script(LOGIN_SCRIPT);
+  // 脚本未加载时浏览器默认提交也不能把密码拼进 GET 查询串。
+  assert.match(LOGIN_HTML, /<form[^>]*method="post"[^>]*action="\/ads\/admin\/login"/);
+  assert.match(ADMIN_HTML, /<form[^>]*method="post"[^>]*action="\/ads\/admin\/password"/);
+  const mobileImageUrl = 'https://xiuxian.011203.xyz/assets/journey-map-mobile.webp';
+  const campaign = { ...exampleAd, mobileImageUrl };
+  assert.equal(validHouseAdConfig({ revision: 0, campaigns: [exampleAd] }), true);
+  assert.equal(validHouseAdConfig({ revision: 0, campaigns: [campaign] }), true);
+  for (const value of [
+    '',
+    null,
+    123,
+    'javascript:alert(1)',
+    'http://example.test/a',
+    'https://user:pass@example.test/a',
+  ])
+    assert.equal(
+      validHouseAdConfig({ revision: 0, campaigns: [{ ...exampleAd, mobileImageUrl: value }] }),
+      false,
+    );
+  await store.db
+    .prepare('UPDATE ad_config SET campaigns = ? WHERE id = 1')
+    .bind(JSON.stringify([campaign]))
+    .run();
+  for (const placement of HOUSE_AD_PLACEMENTS) {
+    const response = await worker.fetch(
+      new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=' + placement),
+      env,
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ad: {
+        id: campaign.id,
+        name: campaign.name,
+        imageUrl: campaign.imageUrl,
+        mobileImageUrl,
+        targetUrl: campaign.targetUrl,
+      },
+    });
+  }
+});
+
 test('有界JSON读取拒绝分块超限和损坏正文，不只信任Content-Length', async () => {
   const stream = new ReadableStream({
     start(c) {
@@ -61,71 +115,152 @@ test('有界JSON读取拒绝分块超限和损坏正文，不只信任Content-Le
   assert.deepEqual(await boundedAdJson(Response.json({ a: 1 }), 100), { a: 1 });
 });
 
-test('Access实际RSA签名同时核验身份、应用、签发方与期限，伪造邮箱标头不能登录', async () => {
-  const fixture = await adAccessFixture(),
-    store = adStore(),
-    env = adEnv(store);
-  const fetcher: typeof fetch = async (url) => {
-    assert.equal(String(url), 'https://review.cloudflareaccess.com/cdn-cgi/access/certs');
-    return Response.json(fixture.publicKeys);
-  };
-  const check = async (token: string) =>
-    allowedAdAdmin(
-      new Request(env.ADMIN_ORIGIN + '/admin/', { headers: { 'Cf-Access-Jwt-Assertion': token } }),
-      { ...env, ADMIN_EMAIL: env.ADMIN_EMAIL!, ACCESS_AUD: env.ACCESS_AUD! },
-      fetcher,
-    );
-  assert.equal(await check(await fixture.token()), true);
-  for (const patch of [
-    { email: 'other@example.test' },
-    { aud: ['other'] },
-    { iss: 'https://other.cloudflareaccess.com' },
-    { exp: 1 },
-    { iat: 9e12 },
-    { nbf: 9e12 },
-  ])
-    assert.equal(await check(await fixture.token(patch)), false);
-  assert.equal(await check(await fixture.token({}, { alg: 'HS256' })), false);
-  assert.equal(await check(await fixture.token({}, { kid: 'unknown' })), false);
-  const valid = await fixture.token();
-  assert.equal(await check(valid.slice(0, -20) + 'invalid'), false);
+test('正常入口直接显示账号密码登录，伪造身份、过期会话和其他来源均不能访问配置', async (t) => {
+  const store = adStore(),
+    env = adEnv(store),
+    fixture = await adSessionFixture(store),
+    token = await fixture.token();
+  t.after(() => store.close());
+  const page = await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/admin/'), env);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /广告管理登录/);
+  const get = (headers: HeadersInit = {}) =>
+    worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/admin/config', { headers }), env);
+  assert.equal((await get()).status, 401);
   assert.equal(
-    await allowedAdAdmin(
-      new Request(env.ADMIN_ORIGIN + '/admin/', {
-        headers: { 'Cf-Access-Authenticated-User-Email': 'owner@example.test' },
+    (
+      await get({
+        'Cf-Access-Authenticated-User-Email': 'owner@example.test',
+        'Cf-Access-Jwt-Assertion': 'forged',
+      })
+    ).status,
+    401,
+  );
+  assert.equal((await get({ Cookie: token })).status, 200);
+  assert.equal((await get({ Cookie: token + '; ' + token })).status, 401);
+  assert.equal((await get({ Cookie: token.slice(0, -5) + '12345' })).status, 401);
+  const other = await worker.fetch(
+    new Request('https://bypass.workers.dev/admin/config', { headers: { Cookie: token } }),
+    env,
+  );
+  assert.equal(other.status, 403);
+  await store.db.prepare('UPDATE ad_sessions SET expires = 1').run();
+  assert.equal((await get({ Cookie: token })).status, 401);
+});
+
+test('账号密码登录、退出撤销、修改密码撤销所有旧会话，失败不写投放配置', async (t) => {
+  const store = adStore(),
+    env = adEnv(store),
+    fixture = await adSessionFixture(store),
+    token = await fixture.token();
+  t.after(() => store.close());
+  const act = (path: string, data: unknown, cookie = token, origin = env.ADMIN_ORIGIN) =>
+    worker.fetch(
+      new Request(env.ADMIN_ORIGIN + '/ads/admin/' + path, {
+        method: 'POST',
+        headers: { Origin: origin, 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify(data),
       }),
-      { ...env, ADMIN_EMAIL: env.ADMIN_EMAIL!, ACCESS_AUD: env.ACCESS_AUD! },
-      fetcher,
-    ),
-    false,
+      env,
+    );
+  const login = { username: 'owner@example.test', password: LOCAL_AD_PASSWORD };
+  assert.equal((await act('login', { ...login, username: 'other' })).status, 401);
+  assert.equal((await act('login', { ...login, password: 'wrong' })).status, 401);
+  assert.equal((await act('login', login, '', 'https://other.test')).status, 403);
+  assert.equal(
+    (
+      await act(
+        'password',
+        { password: LOCAL_AD_PASSWORD, newPassword: 'New-local-password-2345' },
+        '',
+      )
+    ).status,
+    401,
   );
   assert.equal(
-    await allowedAdAdmin(
-      new Request(env.ADMIN_ORIGIN + '/admin/'),
-      { ...env, ADMIN_EMAIL: '', ACCESS_AUD: '' },
-      fetcher,
-    ),
-    false,
+    (await act('password', { password: 'wrong', newPassword: 'New-local-password-2345' })).status,
+    401,
   );
-  store.close();
+  assert.equal(
+    (await act('password', { password: LOCAL_AD_PASSWORD, newPassword: 'short' })).status,
+    400,
+  );
+  const second = await act('login', login),
+    secondCookie = second.headers.get('set-cookie')!.split(';')[0];
+  assert.equal(second.status, 200);
+  assert.match(
+    second.headers.get('set-cookie')!,
+    /HttpOnly; Secure; SameSite=Strict; Max-Age=28800/,
+  );
+  assert.equal((await act('logout', {})).status, 200);
+  const config = (cookie: string) =>
+    worker.fetch(
+      new Request(env.ADMIN_ORIGIN + '/ads/admin/config', { headers: { Cookie: cookie } }),
+      env,
+    );
+  assert.equal((await config(token)).status, 401);
+  assert.equal((await config(secondCookie)).status, 200);
+  const changed = await act(
+    'password',
+    { password: LOCAL_AD_PASSWORD, newPassword: 'New-local-password-2345' },
+    secondCookie,
+  );
+  assert.equal(changed.status, 200);
+  assert.match(changed.headers.get('set-cookie')!, /Max-Age=0/);
+  assert.equal((await config(secondCookie)).status, 401);
+  assert.equal((await act('login', login)).status, 401);
+  assert.equal((await act('login', { ...login, password: 'New-local-password-2345' })).status, 200);
+  assert.equal(store.value()!.revision, 0);
+});
+
+test('登录原子限流、正文上限、存储失败均拒绝访问，响应不泄露密码或数据库错误', async (t) => {
+  const store = adStore(),
+    env = adEnv(store);
+  await adSessionFixture(store);
+  t.after(() => store.close());
+  const login = (body: string) =>
+    worker.fetch(
+      new Request(env.ADMIN_ORIGIN + '/ads/admin/login', {
+        method: 'POST',
+        headers: {
+          Origin: env.ADMIN_ORIGIN,
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': '192.0.2.7',
+        },
+        body,
+      }),
+      env,
+    );
+  assert.equal((await login('x'.repeat(2100))).status, 400);
+  store.failures(false, true);
+  const failure = await login(
+    JSON.stringify({ username: 'owner@example.test', password: LOCAL_AD_PASSWORD }),
+  );
+  assert.equal(failure.status, 503);
+  assert.doesNotMatch(await failure.text(), /fixture|Local-only|password_hash/);
+  store.failures(false, false);
+  const results = await Promise.all(
+    Array.from({ length: 12 }, () =>
+      login(JSON.stringify({ username: 'owner@example.test', password: 'wrong' })),
+    ),
+  );
+  assert.equal(results.filter((r) => r.status === 401).length, 10);
+  assert.equal(results.filter((r) => r.status === 429).length, 2);
+  assert.equal(store.value()!.revision, 0);
 });
 
 test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用的图片广告', async (t) => {
-  const fixture = await adAccessFixture(),
-    store = adStore(),
+  const store = adStore(),
+    fixture = await adSessionFixture(store),
     env = adEnv(store),
     token = await fixture.token();
   t.after(() => store.close());
-  t.mock.method(globalThis, 'fetch', async (url: any) => {
-    assert.match(String(url), /\/cdn-cgi\/access\/certs$/);
-    return Response.json(fixture.publicKeys);
-  });
   const admin = (path: string, method = 'GET', body?: unknown, origin = env.ADMIN_ORIGIN) =>
     worker.fetch(
       new Request(env.ADMIN_ORIGIN + path, {
         method,
         headers: {
-          'Cf-Access-Jwt-Assertion': token,
+          Cookie: token,
           Origin: origin,
           'Content-Type': 'application/json',
         },
@@ -133,25 +268,28 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
       }),
       env,
     );
-  for (const path of ['/admin/', '/admin/app.js', '/admin/app.css', '/admin/config'])
+  for (const path of ['/ads/admin/config'])
     assert.equal((await worker.fetch(new Request(env.ADMIN_ORIGIN + path), env)).status, 401);
-  const html = await admin('/admin/');
+  const html = await admin('/ads/admin/');
   assert.equal(html.status, 200);
   assert.match(html.headers.get('Content-Security-Policy')!, /script-src 'self'/);
   assert.doesNotMatch(await html.text(), /owner@example|test-audience/);
-  assert.deepEqual(await (await admin('/admin/config')).json(), { revision: 0, campaigns: [] });
+  assert.deepEqual(await (await admin('/ads/admin/config')).json(), { revision: 0, campaigns: [] });
   const config = {
     revision: 0,
     campaigns: [exampleAd, { ...exampleAd, id: 'disabled', enabled: false }],
   };
-  assert.equal((await admin('/admin/config', 'PUT', config, 'https://evil.example')).status, 403);
+  assert.equal(
+    (await admin('/ads/admin/config', 'PUT', config, 'https://evil.example')).status,
+    403,
+  );
   assert.equal(store.value()!.revision, 0);
-  const saved = await admin('/admin/config', 'PUT', config);
+  const saved = await admin('/ads/admin/config', 'PUT', config);
   assert.equal(saved.status, 200);
   assert.equal(((await saved.json()) as any).revision, 1);
   for (const placement of HOUSE_AD_PLACEMENTS) {
     const result = await worker.fetch(
-      new Request(env.ADMIN_ORIGIN + '/v1/ad?placement=' + placement, {
+      new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=' + placement, {
         headers: { Origin: 'https://xiuxian.011203.xyz' },
       }),
       env,
@@ -169,13 +307,13 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
     });
   }
   assert.equal(
-    (await worker.fetch(new Request(env.ADMIN_ORIGIN + '/v1/ad?placement=other'), env)).status,
+    (await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=other'), env)).status,
     400,
   );
   assert.equal(
     (
       await worker.fetch(
-        new Request(env.ADMIN_ORIGIN + '/v1/ad?placement=revive', {
+        new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive', {
           headers: { Origin: 'https://evil.example' },
         }),
         env,
@@ -187,36 +325,35 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
     (
       await worker.fetch(
         new Request('https://bypass.workers.dev/admin/config', {
-          headers: { 'Cf-Access-Jwt-Assertion': token },
+          headers: { Cookie: token },
         }),
         env,
       )
     ).status,
-    401,
+    403,
   );
-  const turnedOff = await admin('/admin/config', 'PUT', { revision: 1, campaigns: [] });
+  const turnedOff = await admin('/ads/admin/config', 'PUT', { revision: 1, campaigns: [] });
   assert.equal(turnedOff.status, 200);
   assert.deepEqual(
     await (
-      await worker.fetch(new Request(env.ADMIN_ORIGIN + '/v1/ad?placement=revive'), env)
+      await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive'), env)
     ).json(),
     { ad: null },
   );
 });
 
 test('真实SQL并行保存只接受一个版本，失败与非法配置不部分改写', async (t) => {
-  const fixture = await adAccessFixture(),
-    store = adStore(),
+  const store = adStore(),
+    fixture = await adSessionFixture(store),
     env = adEnv(store),
     token = await fixture.token();
   t.after(() => store.close());
-  t.mock.method(globalThis, 'fetch', async () => Response.json(fixture.publicKeys));
   const save = (value: unknown) =>
     worker.fetch(
-      new Request(env.ADMIN_ORIGIN + '/admin/config', {
+      new Request(env.ADMIN_ORIGIN + '/ads/admin/config', {
         method: 'PUT',
         headers: {
-          'Cf-Access-Jwt-Assertion': token,
+          Cookie: token,
           Origin: env.ADMIN_ORIGIN,
           'Content-Type': 'application/json',
         },
@@ -238,7 +375,7 @@ test('真实SQL并行保存只接受一个版本，失败与非法配置不部�
   assert.deepEqual({ ...store.value() }, before);
   store.failures(true, false);
   assert.equal(
-    (await worker.fetch(new Request(env.ADMIN_ORIGIN + '/v1/ad?placement=revive'), env)).status,
+    (await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive'), env)).status,
     503,
   );
 });
@@ -335,6 +472,8 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
   );
   class Element {
     style = { cssText: '' };
+    complete = true;
+    naturalWidth = 300;
     onload: (() => void) | null = null;
     onerror: (() => void) | null = null;
     append() {}
@@ -348,10 +487,15 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
       return { top: -47, bottom: 54, left: 0, right: 300, width: 300, height: 101 };
     }
   }
+  let currentImage: Element;
   const document = Object.assign(new EventTarget(), {
     visibilityState: 'visible',
     hasFocus: () => true,
-    createElement: () => new Element(),
+    createElement: (tag: string) => {
+      const element = new Element();
+      if (tag === 'img') currentImage = element;
+      return element;
+    },
   });
   let intersect: (
     entries: Array<{ isIntersecting: boolean; intersectionRatio: number }>,
@@ -408,4 +552,26 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
   now += 10000;
   t.mock.timers.tick(10000);
   assert.equal(watched, 1);
+  // 首图已加载，换图后失败且没有 error 事件，不能一直停在不可领取状态。
+  let failures = 0;
+  disconnected = false;
+  await playHouseAd(
+    'revive',
+    { onWatched: () => watched++, onFailed: () => failures++ },
+    { host: host as unknown as HTMLElement, signal: new AbortController().signal, onProgress() {} },
+  );
+  currentImage!.complete = false;
+  currentImage!.naturalWidth = 0;
+  now += 100;
+  t.mock.timers.tick(100);
+  assert.equal(failures, 0, '仍在加载时继续等待');
+  currentImage!.complete = true;
+  now += 100;
+  t.mock.timers.tick(100);
+  assert.equal(failures, 1, '确定加载失败后回退且只回退一次');
+  assert.equal(watched, 1);
+  assert.equal(disconnected, true);
+  now += 10000;
+  t.mock.timers.tick(10000);
+  assert.equal(failures, 1);
 });

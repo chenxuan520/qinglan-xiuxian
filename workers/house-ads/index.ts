@@ -6,11 +6,11 @@ import {
   validHouseAdConfig,
   type HouseAdConfig,
 } from '../../src/house-ad-contract.ts';
-import { allowedAdAdmin } from './access.ts';
-import { ADMIN_HTML, ADMIN_SCRIPT, ADMIN_CSS } from './admin.ts';
+import { adAdminSession, adAuthAction } from './auth.ts';
+import { ADMIN_HTML, ADMIN_SCRIPT, ADMIN_CSS, LOGIN_HTML, LOGIN_SCRIPT } from './admin.ts';
 
-// 登录目标由部署环境维护，个人邮箱与应用标识不写入公开仓库。
-export type HouseAdsWorkerEnv = HouseAdsEnv & { ADMIN_EMAIL?: string; ACCESS_AUD?: string };
+// 登录账号与密码校验值由D1维护，不写入公开仓库。
+export type HouseAdsWorkerEnv = HouseAdsEnv;
 const headers = () =>
   new Headers({
     'Cache-Control': 'no-store',
@@ -67,7 +67,8 @@ function page(body: string, type: string) {
 export default {
   async fetch(request: Request, env: HouseAdsWorkerEnv): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === '/v1/ad') {
+    const path = url.pathname.replace(/^\/ads(?=\/)/, '');
+    if (path === '/v1/ad') {
       const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
       if (!extra) return json({ error: 'origin-denied' }, 403);
       if (!['GET', 'OPTIONS'].includes(request.method))
@@ -88,28 +89,48 @@ export default {
         return json({ error: 'unavailable', ad: null }, 503, extra);
       }
     }
-    if (url.pathname === '/' || url.pathname === '/admin') {
+    if (path === '/' || path === '/admin') {
       return new Response(null, {
         status: 302,
-        headers: { ...Object.fromEntries(headers()), Location: `${env.ADMIN_ORIGIN}/admin/` },
+        headers: { ...Object.fromEntries(headers()), Location: `${env.ADMIN_ORIGIN}/ads/admin/` },
       });
     }
-    if (!url.pathname.startsWith('/admin/')) return json({ error: 'not-found' }, 404);
+    if (!path.startsWith('/admin/')) return json({ error: 'not-found' }, 404);
+    if (url.origin !== env.ADMIN_ORIGIN) {
+      if (request.method === 'GET' && ['/admin/', '/admin/login'].includes(path))
+        return new Response(null, {
+          status: 302,
+          headers: { ...Object.fromEntries(headers()), Location: `${env.ADMIN_ORIGIN}/ads/admin/` },
+        });
+      return json({ error: 'origin-denied' }, 403);
+    }
     if (
-      url.origin !== env.ADMIN_ORIGIN ||
-      !(await allowedAdAdmin(request, {
-        ACCESS_TEAM_DOMAIN: env.ACCESS_TEAM_DOMAIN,
-        ACCESS_AUD: env.ACCESS_AUD ?? '',
-        ADMIN_EMAIL: env.ADMIN_EMAIL ?? '',
-      }))
+      ['/admin/login', '/admin/logout', '/admin/password'].includes(path) &&
+      request.method !== 'GET'
     )
-      return json({ error: 'login-required', message: '请从广告管理入口登录后继续。' }, 401);
+      return adAuthAction(request, env);
     if (request.method === 'GET') {
-      if (url.pathname === '/admin/') return page(ADMIN_HTML, 'text/html; charset=utf-8');
-      if (url.pathname === '/admin/app.js')
-        return page(ADMIN_SCRIPT, 'text/javascript; charset=utf-8');
-      if (url.pathname === '/admin/app.css') return page(ADMIN_CSS, 'text/css; charset=utf-8');
-      if (url.pathname === '/admin/config') {
+      if (path === '/admin/login') return page(LOGIN_HTML, 'text/html; charset=utf-8');
+      if (path === '/admin/login.js') return page(LOGIN_SCRIPT, 'text/javascript; charset=utf-8');
+      if (path === '/admin/app.css') return page(ADMIN_CSS, 'text/css; charset=utf-8');
+      if (path === '/admin/app.js') return page(ADMIN_SCRIPT, 'text/javascript; charset=utf-8');
+    }
+    let authenticated = false;
+    try {
+      authenticated = !!(await adAdminSession(request, env));
+    } catch {
+      return json({ error: 'unavailable', message: '暂时无法验证登录，请稍后重试。' }, 503);
+    }
+    if (!authenticated) {
+      if (path === '/admin/' && request.method === 'GET')
+        return page(LOGIN_HTML, 'text/html; charset=utf-8');
+      return json({ error: 'login-required', message: '登录已失效，请重新登录。' }, 401);
+    }
+    if (request.method === 'GET') {
+      if (path === '/admin/') return page(ADMIN_HTML, 'text/html; charset=utf-8');
+      if (path === '/admin/app.js') return page(ADMIN_SCRIPT, 'text/javascript; charset=utf-8');
+      if (path === '/admin/app.css') return page(ADMIN_CSS, 'text/css; charset=utf-8');
+      if (path === '/admin/config') {
         try {
           return json(await config(env));
         } catch {
@@ -118,7 +139,7 @@ export default {
       }
       return json({ error: 'not-found' }, 404);
     }
-    if (url.pathname !== '/admin/config' || request.method !== 'PUT')
+    if (path !== '/admin/config' || request.method !== 'PUT')
       return json({ error: 'method-not-allowed' }, 405);
     if (
       request.headers.get('Origin') !== url.origin ||

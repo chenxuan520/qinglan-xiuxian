@@ -10,6 +10,7 @@ export interface HouseAd {
   id: string;
   name: string;
   imageUrl: string;
+  mobileImageUrl?: string;
   targetUrl: string;
 }
 export interface HouseAdCampaign extends HouseAd {
@@ -47,6 +48,7 @@ export function validHouseAd(value: unknown): value is HouseAd {
     value.name.length <= 40 &&
     !/[\u0000-\u001f\u007f]/.test(value.name) &&
     houseAdUrl(value.imageUrl) &&
+    (value.mobileImageUrl === undefined || houseAdUrl(value.mobileImageUrl)) &&
     houseAdUrl(value.targetUrl)
   );
 }
@@ -64,7 +66,15 @@ export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
   return value.campaigns.every((ad) => {
     if (
       !record(ad) ||
-      !keys(ad, ['id', 'name', 'imageUrl', 'targetUrl', 'enabled', 'placements']) ||
+      !keys(ad, [
+        'id',
+        'name',
+        'imageUrl',
+        'targetUrl',
+        'enabled',
+        'placements',
+        ...(Object.hasOwn(ad, 'mobileImageUrl') ? ['mobileImageUrl'] : []),
+      ]) ||
       !validHouseAd(ad) ||
       typeof ad.enabled !== 'boolean' ||
       !Array.isArray(ad.placements) ||
@@ -79,7 +89,13 @@ export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
   });
 }
 export function publicHouseAd(ad: HouseAdCampaign): HouseAd {
-  return { id: ad.id, name: ad.name, imageUrl: ad.imageUrl, targetUrl: ad.targetUrl };
+  return {
+    id: ad.id,
+    name: ad.name,
+    imageUrl: ad.imageUrl,
+    targetUrl: ad.targetUrl,
+    ...(ad.mobileImageUrl ? { mobileImageUrl: ad.mobileImageUrl } : {}),
+  };
 }
 export async function boundedAdJson(
   source: Pick<Request, 'body'>,

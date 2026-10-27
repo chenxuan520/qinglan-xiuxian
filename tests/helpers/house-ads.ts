@@ -1,13 +1,21 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
+import worker from '../../workers/house-ads/index.ts';
+import { hashAdPassword } from '../../workers/house-ads/auth.ts';
 import type { HouseAdsWorkerEnv } from '../../workers/house-ads/index.ts';
 
-// 仅供测试：真实 SQLite 执行同一份迁移/SQL；Access 私钥只在本进程内，不能用于线上认证。
+// 仅供测试：真实 SQLite 执行同一份迁移/SQL；账号和密码是本地合成夹具，不能用于线上认证。
 export function adStore() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(
     readFileSync(
       new URL('../../workers/house-ads/migrations/0001_ad_config.sql', import.meta.url),
+      'utf8',
+    ),
+  );
+  sqlite.exec(
+    readFileSync(
+      new URL('../../workers/house-ads/migrations/0002_admin_login.sql', import.meta.url),
       'utf8',
     ),
   );
@@ -22,13 +30,17 @@ export function adStore() {
           return statement;
         },
         async first() {
-          if (failRead) throw Error('read fixture');
+          if (failRead || (failWrite && /^\s*(INSERT|UPDATE|DELETE)/i.test(sql)))
+            throw Error('read/write fixture');
           return sqlite.prepare(sql).get(...args) ?? null;
         },
         async run() {
           if (failWrite) throw Error('write fixture');
-          const result = sqlite.prepare(sql).run(...args);
-          return { success: true, meta: { changes: Number(result.changes) } };
+          const changes = () => Number(sqlite.prepare('SELECT total_changes() AS n').get()!.n);
+          const before = changes();
+          sqlite.prepare(sql).run(...args);
+          // D1 meta.changes 包含触发器的写入，不能只用 node:sqlite 的主语句 changes。
+          return { success: true, meta: { changes: changes() - before } };
         },
       };
       return statement;
@@ -48,56 +60,42 @@ export function adStore() {
     },
   };
 }
-export async function adAccessFixture() {
-  const keys = await crypto.subtle.generateKey(
-    {
-      name: 'RSASSA-PKCS1-v1_5',
-      modulusLength: 2048,
-      publicExponent: new Uint8Array([1, 0, 1]),
-      hash: 'SHA-256',
-    },
-    true,
-    ['sign', 'verify'],
+export const LOCAL_AD_PASSWORD = 'Local-only-password-1234';
+export async function seedAdAdmin(
+  store: ReturnType<typeof adStore>,
+  username = 'owner@example.test',
+  password = LOCAL_AD_PASSWORD,
+) {
+  const salt = 'local-test-salt-not-a-production-credential';
+  await store.db
+    .prepare('INSERT INTO ad_admin (id, username, salt, password_hash) VALUES (1, ?, ?, ?)')
+    .bind(username, salt, await hashAdPassword(password, salt))
+    .run();
+}
+export async function adSessionFixture(
+  store: ReturnType<typeof adStore>,
+  origin = 'https://xiuxian.011203.xyz',
+) {
+  await seedAdAdmin(store);
+  const response = await worker.fetch(
+    new Request(origin + '/ads/admin/login', {
+      method: 'POST',
+      headers: { Origin: origin, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'owner@example.test', password: LOCAL_AD_PASSWORD }),
+    }),
+    adEnv(store, origin),
   );
-  const key = {
-    ...(await crypto.subtle.exportKey('jwk', keys.publicKey)),
-    kid: 'test-key',
-    alg: 'RS256',
-  };
-  const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  if (response.status !== 200) throw Error('local login fixture failed: ' + response.status);
+  const cookie = response.headers.get('set-cookie')!.split(';')[0];
   return {
-    publicKeys: { keys: [key] },
-    async token(patch: Record<string, unknown> = {}, header: Record<string, unknown> = {}) {
-      const now = Math.floor(Date.now() / 1000);
-      const payload =
-        encode({ alg: 'RS256', kid: 'test-key', ...header }) +
-        '.' +
-        encode({
-          iss: 'https://review.cloudflareaccess.com',
-          aud: ['test-audience'],
-          email: 'owner@example.test',
-          iat: now - 1,
-          exp: now + 3600,
-          ...patch,
-        });
-      const signature = await crypto.subtle.sign(
-        'RSASSA-PKCS1-v1_5',
-        keys.privateKey,
-        new TextEncoder().encode(payload),
-      );
-      return payload + '.' + Buffer.from(signature).toString('base64url');
+    async token() {
+      return cookie;
     },
   };
 }
-export function adEnv(
-  store: ReturnType<typeof adStore>,
-  origin = 'https://qinglan-ads.011203.xyz',
-) {
+export function adEnv(store: ReturnType<typeof adStore>, origin = 'https://xiuxian.011203.xyz') {
   return {
     DB: store.db,
-    ACCESS_TEAM_DOMAIN: 'review.cloudflareaccess.com',
-    ACCESS_AUD: 'test-audience',
-    ADMIN_EMAIL: 'owner@example.test',
     ADMIN_ORIGIN: origin,
     ALLOWED_ORIGINS: 'https://xiuxian.011203.xyz,https://chenxuan520.github.io',
   } as unknown as HouseAdsWorkerEnv;

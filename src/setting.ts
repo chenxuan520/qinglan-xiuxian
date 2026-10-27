@@ -9,7 +9,7 @@ export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 export const ADS_SETTINGS = {
   // 谷歌正式投放另行启用；自营与占位不会加载谷歌 SDK。
   provider: 'house' as 'placeholder' | 'adsense' | 'house',
-  house: { endpoint: STANDALONE ? '' : 'https://qinglan-ads.011203.xyz/v1/ad' },
+  house: { endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/ads/v1/ad' },
   adsense: {
     // AdSense 审核通过后把 pub ID 填入此处；SDK 按需注入，失败全回退占位。
     client: 'ca-pub-9047842625721721',

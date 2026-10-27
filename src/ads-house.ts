@@ -101,7 +101,15 @@ export async function playHouseAd(
     const status = document.createElement('small');
     status.textContent = '正在加载广告图片…';
     status.style.cssText = 'font-size:12px;letter-spacing:0;line-height:1.6';
-    link.append(image);
+    const picture = document.createElement('picture');
+    if (ad.mobileImageUrl) {
+      const source = document.createElement('source');
+      source.media = '(max-width:700px)';
+      source.srcset = new URL(ad.mobileImageUrl).href.replace(/,/g, '%2C');
+      picture.append(source);
+    }
+    picture.append(image);
+    link.append(picture);
     content.append(label, link, status);
     host.replaceChildren(content);
     host.style.cssText =
@@ -127,13 +135,28 @@ export async function playHouseAd(
       return;
     }
     const clock = new HouseAdClock();
+    image.onerror = () => {
+      cleanup();
+      if (!signal.aborted && host.isConnected) callbacks.onFailed('图片广告暂不可用');
+    };
     sample = () => {
       if (stopped) return;
       if (signal.aborted || !host.isConnected) {
         cleanup();
         return;
       }
-      const visible = document.visibilityState === 'visible' && focused && imageVisible;
+      // picture 换源失败时可能没有派发 error，仍须回退，不能卡住观看。
+      if (image!.complete && image!.naturalWidth === 0) {
+        cleanup();
+        callbacks.onFailed('图片广告暂不可用');
+        return;
+      }
+      const visible =
+        document.visibilityState === 'visible' &&
+        focused &&
+        imageVisible &&
+        image!.complete &&
+        image!.naturalWidth > 0;
       const seconds = clock.sample(performance.now(), visible);
       context.onProgress(seconds);
       status.textContent = visible
