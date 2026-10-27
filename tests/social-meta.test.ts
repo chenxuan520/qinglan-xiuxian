@@ -52,7 +52,7 @@ test('入口页声明 canonical 与 Open Graph / Twitter 分享卡片', () => {
   expectMeta('name', 'twitter:description', description);
 });
 
-test('首页、README 与安装信息统一名称和宣传语，传承说明保留真实条件', () => {
+test('首页保留启程原文，README与安装信息仍遵守现有名称和宣传语', () => {
   const manifest = JSON.parse(read('public/manifest.webmanifest'));
   assert.equal(manifest.name, title);
   assert.equal(manifest.short_name, '叩仙门');
@@ -79,8 +79,8 @@ test('首页、README 与安装信息统一名称和宣传语，传承说明保�
     );
     assert.ok(home.includes(`aria-label="${title}"`));
     assert.ok(home.includes(slogan));
-    for (const word of ['岁月', '故人', '传承']) assert.ok(home.includes(word));
-    assert.match(home, /叩入仙门后可留一物传承/);
+    assert.match(home, /在青岚镇长大，十五岁踏上仙途。<br>为觅长生，为追寻大道，向山海深处去。/);
+    assert.doesNotMatch(home, /叩入仙门后可留一物传承/);
     assert.doesNotMatch(home, /御剑问长生|青岚入仙途|青岚仙途/);
   }
 });
