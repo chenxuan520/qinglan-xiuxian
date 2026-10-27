@@ -1,3 +1,4 @@
+import { validAdPlatformSettings, type AdPlatformSettings } from './ad-platform-contract.ts';
 // 自营广告只传图片与链接，不接受 HTML、脚本或游戏奖励配置。
 export const HOUSE_AD_PLACEMENTS = [
   'revive',
@@ -14,12 +15,14 @@ export interface HouseAd {
   targetUrl: string;
 }
 export interface HouseAdCampaign extends HouseAd {
+  weight?: number;
   enabled: boolean;
   placements: HouseAdPlacement[];
 }
 export interface HouseAdConfig {
   revision: number;
   campaigns: HouseAdCampaign[];
+  settings?: AdPlatformSettings;
 }
 export const HOUSE_AD_MAX_BYTES = 96_000;
 const record = (value: unknown): value is Record<string, unknown> =>
@@ -55,7 +58,12 @@ export function validHouseAd(value: unknown): value is HouseAd {
 export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
   if (
     !record(value) ||
-    !keys(value, ['revision', 'campaigns']) ||
+    !keys(value, [
+      'revision',
+      'campaigns',
+      ...(Object.hasOwn(value, 'settings') ? ['settings'] : []),
+    ]) ||
+    (value.settings !== undefined && !validAdPlatformSettings(value.settings)) ||
     !Number.isSafeInteger(value.revision) ||
     Number(value.revision) < 0 ||
     !Array.isArray(value.campaigns) ||
@@ -74,8 +82,11 @@ export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
         'enabled',
         'placements',
         ...(Object.hasOwn(ad, 'mobileImageUrl') ? ['mobileImageUrl'] : []),
+        ...(Object.hasOwn(ad, 'weight') ? ['weight'] : []),
       ]) ||
       !validHouseAd(ad) ||
+      (ad.weight !== undefined &&
+        (!Number.isInteger(ad.weight) || Number(ad.weight) < 1 || Number(ad.weight) > 1000)) ||
       typeof ad.enabled !== 'boolean' ||
       !Array.isArray(ad.placements) ||
       !ad.placements.length ||
@@ -87,6 +98,31 @@ export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
     ids.add(ad.id);
     return true;
   });
+}
+export function weightedHouseAd(
+  campaigns: HouseAdCampaign[],
+  placement: HouseAdPlacement,
+  ticket?: number,
+): HouseAdCampaign | null {
+  const available = campaigns.filter((a) => a.enabled && a.placements.includes(placement));
+  const total = available.reduce((n, a) => n + (a.weight ?? 1), 0);
+  if (!total) return null;
+  if (ticket === undefined) {
+    // 拒绝尾部余数，整数票严格等概率；不同位置只在各自已启用投放内抽取。
+    const bound = Math.floor(0x100000000 / total) * total;
+    let draw: number;
+    do {
+      draw = crypto.getRandomValues(new Uint32Array(1))[0];
+    } while (draw >= bound);
+    ticket = draw % total;
+  }
+  if (!Number.isInteger(ticket) || ticket < 0 || ticket >= total)
+    throw Error('invalid-weight-ticket');
+  for (const ad of available) {
+    ticket -= ad.weight ?? 1;
+    if (ticket < 0) return ad;
+  }
+  return null;
 }
 export function publicHouseAd(ad: HouseAdCampaign): HouseAd {
   return {

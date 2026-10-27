@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": { "lib": ["ES2022"], "types": [] },
-  "include": ["*.ts", "../../artifacts/house-ads-env.d.ts"]
+  "include": ["*.ts", "../ads-verify/index.ts", "../../artifacts/house-ads-env.d.ts"]
 }

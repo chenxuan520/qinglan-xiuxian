@@ -191,16 +191,20 @@ npm run deploy:cloudflare
 
 ### 根域 ads.txt 验证代理（qinglan-ads-verify）
 
-AdSense 站点注册认注册根域 `011203.xyz`，而根域默认重定向到个人主页（`www.chenxuanweb.top`）；Cloudflare 的 Redirect Rule 位于 Worker 之前执行，单靠 Worker 路由抢不出 `/ads.txt`，需要在重定向规则的表达式里排除 `/ads.txt`（在控制台手动改，不在本仓库脚本里）。Worker `qinglan-ads-verify`（`workers/ads-verify/`）经路由 `011203.xyz/ads.txt` 返回授权行 `google.com, pub-9047842625721721, DIRECT, f08c47fec0942fa0`，pub ID 与 `src/setting.ts` 的 `ADS_SETTINGS.adsense.client` 同源；换账号时三处一起改。部署：`npx wrangler deploy --config workers/ads-verify/wrangler.jsonc`。
+AdSense 站点注册认注册根域 `011203.xyz`，而根域默认重定向到个人主页（`www.chenxuanweb.top`）；Cloudflare 的 Redirect Rule 位于 Worker 之前执行，单靠 Worker 路由抢不出 `/ads.txt`，需要在重定向规则的表达式里排除 `/ads.txt`（在控制台手动改，不在本仓库脚本里）。Worker `qinglan-ads-verify`（`workers/ads-verify/`）经路由 `011203.xyz/ads.txt` 读取广告平台同一个 D1 配置生成授权行；官网 `xiuxian.011203.xyz/ads.txt` 则由广告 Worker 提供。发布商 ID 在广告管理后台统一修改，两处均即时读取、不缓存，不再编辑静态 `public/ads.txt` 或网页 meta。清空 ID 后返回空授权文件；数据库异常返回 503，不返回过期授权。GitHub Pages 仅作游戏备份站，不承载根域验证。部署：`npx wrangler deploy --config workers/ads-verify/wrangler.jsonc`，保留同一 D1 绑定。Google 站点所有权、审核及广告资格仍由站长在官方控制台确认，后台保存不代表通过审核。
 
 ## 自营图片广告 · 独立投放服务
 
 游戏与后台代码保留在同一仓库，`workers/house-ads/` 独立部署，通过官网 `https://xiuxian.011203.xyz/ads/admin/` 管理，不需要新增域名；不复用 NPC Worker、游戏存档或统计凭据。后台使用账号密码登录，不经过 Cloudflare Access 或邮箱验证码。D1只保存随机盐与PBKDF2-HMAC-SHA256（100000次）派生的密码校验值；会话为32字节随机值，只保存SHA-256散列，使用8小时有效的Secure、HttpOnly、SameSite=Strict Cookie。退出撤销当前会话，修改密码要求当前密码且撤销全部旧会话。登录使用D1原子限流，管理写操作要求同源JSON请求，伪造邮箱标头、旧Access令牌及workers.dev地址均不能绕过。
-后台支持最多 20 条广告，每条包含名称、电脑端HTTPS图片链接、选填手机端HTTPS图片链接、HTTPS点击跳转链接、启用开关及投放位置；不接受 HTML、脚本或奖励参数。电脑端和手机端可分别预览；屏幕宽度不超过700像素时使用手机图片，未填写则沿用电脑图片，转屏自动切换，共用跳转链接。填写后点击「保存投放」；修改、停用、移除均须保存才生效。无投放时列表为空，不内置示例广告。多窗口保存使用 D1 revision 条件更新；旧版本返回冲突并保留编辑内容，不能覆盖新版本。保存失败不会提示成功。图片由所填地址托管，不上传到游戏仓库；需确保有使用权且链接长期可访问。
+后台支持最多 20 条广告，每条包含名称、电脑端HTTPS图片链接、选填手机端HTTPS图片链接、HTTPS点击跳转链接、启用开关、1～1000 的整数权重及投放位置；旧投放未填权重按 1 计算。同一广告位内只对已启用广告按权重抽取；停用不参与抽取。不接受 HTML、脚本或奖励参数。电脑端和手机端可分别预览；屏幕宽度不超过700像素时使用手机图片，未填写则沿用电脑图片，转屏自动切换，共用跳转链接。填写后点击「保存投放」；修改、停用、移除均须保存才生效。无投放时列表为空，不内置示例广告。多窗口保存使用 D1 revision 条件更新；旧版本返回冲突并保留编辑内容，不能覆盖新版本。保存失败不会提示成功。图片由所填地址托管，不上传到游戏仓库；需确保有使用权且链接长期可访问。
 
-`GET /ads/v1/ad?placement=revive|reward-root|reward-supplies|lifespan` 只返回该位置随机一条已启用广告的名称、图片及跳转链接，或 `{ "ad": null }`。客户端明确打开现有广告面板时才按需加载；不在首页预取，不发送存档、管理身份或登录凭据，配置接口禁用缓存。图片加载成功、页面前台有焦点且至少半张图在视口内时才累计 5 秒观看；切后台、另开推广页或滚出图片暂停累计。点击图片仅另开推广页，完成观看后仍须回游戏主动领取；关闭、切换或导入后旧响应失效。加载或图片失败、无投放、断网沿用原 5 秒占位，不阻断游戏。自选灵根、物资、复活与借寿保留原奖励、限次和极限模式限制，领取均先写入存档再应用，写入失败可原位重试。
+`GET /ads/v1/ad?placement=revive|reward-root|reward-supplies|lifespan` 仅在自营模式下按权重返回该位置一条已启用广告的名称、图片及跳转链接，并附匿名统计凭条，或 `{ "ad": null }`。客户端明确打开现有广告面板时才按需加载；不在首页预取，不发送存档、管理身份或登录凭据，配置接口禁用缓存。电脑和手机均以覆盖整个游戏视口的广告层展示图片，按原宽高比完整显示、不裁边；图片占主要区域，倒计时和沿用原后果的放弃按钮在底部。完成有效5秒后自动收起覆盖层，返回原奖励页领取；中途取消、加载失败或切换均清理覆盖层并恢复原面板。图片加载成功、页面前台有焦点且至少半张图在视口内时才累计 5 秒观看；切后台、另开推广页或滚出图片暂停累计。点击图片仅另开推广页，完成观看后仍须回游戏主动领取；关闭、切换或导入后旧响应失效。加载或图片失败、无投放、断网沿用原 5 秒占位，不阻断游戏。自选灵根、物资、复活与借寿保留原奖励、限次和极限模式限制，领取均先写入存档再应用，写入失败可原位重试。
 
-默认 `ADS_SETTINGS.provider` 为 `house`；Google adapter 和 pub ID 仍保留但不启用，自营及占位均不加载 Google SDK。单机版编译时清空自营端点、不载入投放模块或发出请求，保留本地占位规则；离线缓存不保存外部广告图片。
+管理后台统一配置当前供给（自营图片 / Google AdSense / 占位）、Google 发布商 ID、测试模式及四个广告位名称；与投放列表一起保存，版本冲突时不覆盖。`GET /ads/v1/settings?placement=…` 仅在明确打开广告面板时读取，一次打开使用同一配置快照。默认保留自营模式，迁移只把原发布商 ID 和广告位名称转入 D1，不启用 Google；自营及占位不加载 Google SDK。修改供给或名称后下一次打开生效；同一页面的 Google SDK 已加载后若修改发布商 ID 或测试模式，须重新打开游戏，旧页面安全回退占位。`src/setting.ts` 只保留服务地址。单机版编译时清空平台和自营端点、不载入投放模块或发出请求，保留本地占位规则；离线缓存不保存外部广告图片。
+
+统计仅在已登录管理后台展示，可查看北京时间今天、近 7 天和近 30 天的各广告请求、展示、点击、看完、成功领取，以及点击率和完播率；删除广告仍保留已有统计，尚无数据的投放显示零。Google 点击和收入无法由 H5 SDK 可靠获得，点击与点击率显示「—」，收入以官方报表为准。统计查询失败保留旧数据显示失败状态，不能伪装为零。
+
+真实广告响应由服务端发放 24 小时有效的随机凭条，固定广告、供给、位置、请求日期和来源；`POST /ads/v1/event` 只接收凭条和累计事件位，同一打开的同类事件最多记录一次，重复和乱序上报均不重复计数。图片成功显示才记展示，前台有效观看完成才记看完，奖励实际保存成功后才记领取；点击不发奖。统计不上传存档、玩家身份或管理 Cookie，失败不阻断游戏。D1 触发器在凭条置位时原子汇总，过期凭条清理后保留日汇总。仅配置的官网、Pages 和管理来源记录；本机预览默认不计入。上线验证在请求设置和广告时附 `verification=1`，事件仍走真实接口但不进入运营汇总。浏览器上报可能被拦截，公开接口也不是防作弊系统，指标只供投放参考、不能作结算依据。
 
 ```bash
 npm run check:house-ads
@@ -208,7 +212,7 @@ npx wrangler d1 migrations apply qinglan-house-ads --remote --config workers/hou
 npm run deploy:house-ads
 ```
 
-首次部署先创建同名D1数据库，写入ID并应用迁移。`0002_admin_login.sql`只创建登录所需表，不写入公开默认账号或密码；管理账号和随机初始密码由部署工具在本地安全生成并单独交付，只将盐和校验值写入D1，不能提交Git或公开展示。密码可在后台修改，遗忘时由维护者更新D1校验值并撤销旧会话。官网只将`/ads/*`路由至广告Worker，不影响游戏页面、小说或其他后端；旧广告域名只保留已有客户端的公开接口和管理入口跳转。移除本广告原有Access应用，不修改其他Access应用、组织或环境授权。仓库配置仅声明管理来源及官网/Pages CORS；部署用`--keep-vars`，无管理身份或密码进入前端。先验证Worker真实密码登录，再发布游戏两站；隔离测试身份不用于线上登录。
+首次部署先创建同名D1数据库，写入ID并应用迁移。已有平台部署前应用 `0003_ad_platform.sql`，增加集中设置、凭条和日汇总；不改既有账号、会话、广告和 revision。根域验证 Worker 也须绑定同一 D1 并单独发布。`0002_admin_login.sql`只创建登录所需表，不写入公开默认账号或密码；管理账号和随机初始密码由部署工具在本地安全生成并单独交付，只将盐和校验值写入D1，不能提交Git或公开展示。密码可在后台修改，遗忘时由维护者更新D1校验值并撤销旧会话。官网只将`/ads/*`和`/ads.txt`路由至广告Worker，不影响游戏页面、小说或其他后端；旧广告域名只保留已有客户端的公开接口和管理入口跳转。移除本广告原有Access应用，不修改其他Access应用、组织或环境授权。仓库配置仅声明管理来源及官网/Pages CORS；部署用`--keep-vars`，无管理身份或密码进入前端。先验证Worker真实密码登录，再发布游戏两站；隔离测试身份不用于线上登录。
 
 ## NPC 对话 · Cloudflare Workers AI
 
@@ -386,19 +390,11 @@ node --experimental-strip-types scripts/standalone-check.ts artifacts/standalone
 
 四处广告位共用同一套 provider 接口（`src/ads.ts`）：复活（`showReviveAd`）、自选灵根与物资补给（`showRewardAd`）、借寿（`showLifespanAd`）。main.ts 只管界面与奖励判定；「算看完的时刻」由当前 provider 决定，任何 provider 不可用（未配置、SDK 加载失败、无库存、玩家中途关闭）都自动回退 5 秒占位倒计时，线上任何状态都能玩。
 
-- **provider 接口**：`RewardAdProvider`（`prepare()` 检测与 `play()` 回调 `onWatched` / `onFailed`）。接新平台（微信、巨量、其他 H5 激励平台）= 写一个实现并注册进 `src/ads.ts` 的 `PROVIDERS`，`setting.ts` 的 `ADS_SETTINGS.provider` 指名启用；main.ts 零改动。
-- **占位 provider（默认）**：保持当前线上语义——5 秒倒计时由 `adReadyAt` 判定完成，不发真实广告、不阻断游戏。provider 未切换时玩家看到的就是现在的行为。
-- **AdSense provider（`src/ads-adsense.ts`）**：Google H5 Placement API 的真实实现骨架。以下四步全是账号域事务，只能由本人完成：
-  1. 注册 AdSense 账号并添加 `xiuxian.011203.xyz`（后台 → 网站 → 添加网站）；通过域名所有权验证与内容审核。
-  2. 在 `public/` 放 `ads.txt`，内容为审核面板提供的 `google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0` 行；AdSense 要求它在域名根可达，即 `https://xiuxian.011203.xyz/ads.txt`（投 GitHub Pages 子路径只是备份站，官网挂牌在 Cloudflare 主站，两边部署链路都走 `public/`）。
-  3. 审核通过后把 `pub-…` 填进 `src/setting.ts` 的 `ADS_SETTINGS.adsense.client`，并把 `ADS_SETTINGS.provider` 改为 `'adsense'`。
-  4. 部署后回各家单元自检：复活看完 → 立即复活；中途关闭 → 按钮保持原地可走后置倒计时态，不给奖励。
-
-  SDK 代码按需注入（`<script>` + `preloadAdBreaks: 'auto'`），一次广告只看一次；库存为空、SDK 未加载、脚本被广告拦截器拦截或玩家中途关闭，全部回调 `onFailed` 走占位倒计时，线上不会出现"广告看不了、奖励也领不到"的死局。Placement name 固定为 `qinglan-revive` / `qinglan-reward-root` / `qinglan-reward-supplies` / `qinglan-lifespan`。
-
-- **奖励发放全部留在 main.ts 领取点**（`game.revive`、灵根洗练、`adSupplies(save.unlocked)`、借寿），SDK 只管判定。物资补给暂无每日次数限制，上线真实广告前需按数值定。
-
-`src/common-ui.ts` 收纳首页、洞府与战斗共用的纯展示片段，只按参数渲染 HTML，不读写全局游戏状态。新增同类片段时优先放这里，保持 `main.ts` 只做状态衔接与事件路由。
+- **provider 接口**：`RewardAdProvider` 的 `prepare({ placement, signal })` 与 `play()` 仍共用完成和失败回调。`ads-platform-source.ts` 按需加载平台模块，`ads-platform.ts` 读取后台供给快照并选择自营或 Google；取消后的迟到配置和 SDK 回调无效。新增平台需实现接口并同步平台协议、后台选项与校验。
+- **占位 provider**：无投放、配置或网络失败时沿用 5 秒占位倒计时，奖励规则不变。
+- **AdSense provider（`src/ads-adsense.ts`）**：按后台发布商 ID 注入官方 H5 SDK，测试模式通过 `data-adbreak-test` 设置，四个 placement name 使用后台值。默认名称为 `qinglan-revive` / `qinglan-reward-root` / `qinglan-reward-supplies` / `qinglan-lifespan`。SDK `beforeAd` 后接管观看时钟，仅 `adViewed` 算看完；无库存、脚本被拦截和未完成观看均回退占位。真实 Google 投放需本人先完成官方站点审核及 H5 游戏广告资格确认；本地受控 SDK 测试不能作为真实库存或审核通过证据。
+- **奖励发放**：仍在游戏原有领取点执行（复活、灵根洗练、`adSupplies(save.unlocked)`、借寿），SDK 不改游戏数值；统计领取回调只在原保存及应用完成后执行。物资补给暂无每日次数限制。
+  `src/common-ui.ts` 收纳首页、洞府与战斗共用的纯展示片段，只按参数渲染 HTML，不读写全局游戏状态。新增同类片段时优先放这里，保持 `main.ts` 只做状态衔接与事件路由。
 
 ## 开发时保护正在运行的游戏
 

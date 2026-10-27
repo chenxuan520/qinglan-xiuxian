@@ -161,6 +161,7 @@ export interface ActionShell {
   adElements: ElementId[];
   adReadyAt: number;
   adWatchEpoch: number;
+  adClaimReport?: (() => void) | null;
   adRoot: SpiritRootId;
   readonly adSupplies: typeof adSupplies;
   adTimer: number | undefined;
@@ -812,9 +813,11 @@ function handleLifeLimit(shell: ActionShell, action: string): boolean {
       years = restored ? restored.borrowLife() : shell.extendLifespan(next);
       if (years) shell.resolveActivity(next);
       if (!saveAdRun(shell, next, restored, !!shell.game)) return true;
+      reportAdClaim(shell);
     }
     shell.clearInterval(shell.adTimer);
     shell.adReadyAt = 0;
+    shell.adClaimReport = null;
     if (!claim) shell.persist();
     if (shell.lifespanInfo(shell.save).remaining === 0) shell.renderLifespanEnd();
     else if (shell.game) {
@@ -1422,6 +1425,7 @@ function handleRewardAd(shell: ActionShell, action: string, id?: string): boolea
       next.iron += supplies.iron;
     }
     if (!savePreparation(shell, next)) return true;
+    reportAdClaim(shell);
     if (kind === 'root') {
       shell.selectedTreasure = shell.save.starter;
       shell.treasurePage = Math.floor(
@@ -1484,6 +1488,7 @@ function handleRunOutcome(shell: ActionShell, action: string): boolean {
     const revived = shell.Game.restore(next, shell.game.snapshot());
     if (!revived || !revived.revive()) return true;
     if (!saveAdRun(shell, next, revived, true)) return true;
+    reportAdClaim(shell);
     shell.clearInterval(shell.adTimer);
     shell.adReadyAt = 0;
     shell.clearInput();
@@ -1502,6 +1507,15 @@ function handleRunOutcome(shell: ActionShell, action: string): boolean {
 }
 
 // 广告完成只解锁领取；领取仍须先成功写入，失败后保留本次观看资格以便原位重试。
+function reportAdClaim(shell: ActionShell) {
+  const report = shell.adClaimReport;
+  shell.adClaimReport = null;
+  try {
+    report?.();
+  } catch {
+    /* 统计不能改变成功领取的结果。 */
+  }
+}
 function saveAdRun(shell: ActionShell, next: SaveData, run: Game | null, active: boolean) {
   try {
     shell.syncHumanStories(next);

@@ -1,2 +1,0 @@
-# AdSense 授权卖家声明（审核与投放需要；AdSense 账号域归 maintenance 管理，改 pub ID 时同步 src/setting.ts 的 ADS_SETTINGS）。
-google.com, pub-9047842625721721, DIRECT, f08c47fec0942fa0

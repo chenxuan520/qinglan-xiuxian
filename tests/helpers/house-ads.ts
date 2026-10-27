@@ -19,6 +19,12 @@ export function adStore() {
       'utf8',
     ),
   );
+  sqlite.exec(
+    readFileSync(
+      new URL('../../workers/house-ads/migrations/0003_ad_platform.sql', import.meta.url),
+      'utf8',
+    ),
+  );
   let failRead = false,
     failWrite = false;
   const db = {
@@ -41,6 +47,10 @@ export function adStore() {
           sqlite.prepare(sql).run(...args);
           // D1 meta.changes 包含触发器的写入，不能只用 node:sqlite 的主语句 changes。
           return { success: true, meta: { changes: changes() - before } };
+        },
+        async all() {
+          if (failRead) throw Error('read fixture');
+          return { success: true, results: sqlite.prepare(sql).all(...args) };
         },
       };
       return statement;

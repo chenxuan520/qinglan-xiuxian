@@ -55,6 +55,7 @@ test('实际领取入口须广告结束，分档提示与到账一致，重复�
       saveLock: null,
       panel: 'reward-ad',
       rewardAd: 'supplies',
+      adClaimReport: null,
       game: null,
       pendingRun: null,
       inMortalWorld: false,

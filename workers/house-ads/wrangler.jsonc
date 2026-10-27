@@ -7,6 +7,7 @@
   "workers_dev": true,
   "routes": [
     { "pattern": "xiuxian.011203.xyz/ads/*", "zone_name": "011203.xyz" },
+    { "pattern": "xiuxian.011203.xyz/ads.txt", "zone_name": "011203.xyz" },
     { "pattern": "qinglan-ads.011203.xyz", "custom_domain": true },
   ],
   "d1_databases": [

@@ -402,6 +402,7 @@ let adWatchEpoch = 0;
 let adTimer: number | undefined;
 // 真实广告 SDK 看完回调置位；占位路径（倒计时走完）仍按 adReadyAt 判定。
 let adWatched = false;
+let adClaimReport: (() => void) | null = null;
 let victoryTimer: number | undefined;
 let rewardAd: 'root' | 'supplies' | null = null;
 let rewardReturn: PanelLocation | null = null;
@@ -1070,6 +1071,7 @@ function finishRun() {
   clearInterval(adTimer);
   adReadyAt = 0;
   adWatched = false;
+  adClaimReport = null;
   const next = structuredClone(save);
   const result = settleRun(next, {
     stage: game.stage,
@@ -1316,6 +1318,7 @@ function resetLifetime(
   window.clearTimeout(victoryTimer);
   adReadyAt = 0;
   adWatchEpoch++;
+  adClaimReport = null;
   rewardAd = null;
   pendingImport = null;
   clearInput();
@@ -1684,6 +1687,8 @@ function shellBindings(): ActionShell {
     get URL() { return URL; },
     get adWatched() { return adWatched; },
     set adWatched(next) { adWatched = next; },
+    get adClaimReport() { return adClaimReport; },
+    set adClaimReport(next) { adClaimReport = next; },
     get app() { return app; },
     get assetUrl() { return assetUrl; },
     get auctionContent() { return marketEventSource.current!.auctionContent; },

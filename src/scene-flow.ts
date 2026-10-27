@@ -628,6 +628,7 @@ export function startAdWatch(
 ) {
   if (isExtremeLife(shell.save)) return;
   shell.adWatched = false;
+  shell.adClaimReport = null;
   const epoch = (shell.adWatchEpoch = (shell.adWatchEpoch || 0) + 1);
   const provider = shell.getAdProvider();
   if (provider.name === 'placeholder') {
@@ -654,7 +655,10 @@ export function startAdWatch(
       waiting.disabled = true;
     },
     alive: () => shell.panel === watchPanel && shell.adWatchEpoch === epoch,
-    onWatched: () => shell.markAdWatched(action, label),
+    onWatched: (onClaim) => {
+      shell.adClaimReport = onClaim ?? null;
+      shell.markAdWatched(action, label);
+    },
     onFallback: () => {
       const host = shell.modal.querySelector<HTMLElement>('.revive-ad');
       if (host) {
@@ -752,6 +756,7 @@ export function showRewardAd(shell: ActionShell, kind: 'root' | 'supplies') {
 }
 
 export function closeRewardAd(shell: ActionShell) {
+  shell.adClaimReport = null;
   shell.clearInterval(shell.adTimer);
   shell.adReadyAt = 0;
   shell.rewardAd = null;

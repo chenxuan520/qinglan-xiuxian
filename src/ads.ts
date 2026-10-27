@@ -2,11 +2,8 @@ import { STANDALONE } from './build-mode.ts';
 // 激励广告供给层：复活、自选灵根、物资补给、借寿四个广告位共用一套 provider 接口。
 // main.ts 只管界面（占位倒计时与领取按钮），provider 决定「什么时刻算看完」：
 // 占位 provider 走 5 秒倒计时（无 SDK 的默认行为），真实 SDK provider 以看完回调解锁。
-// 接新平台（微信、巨量、其他 H5 激励平台）就是实现 RewardAdProvider 并注册进 PROVIDERS，
-// 再在 setting.ts 的 ADS_SETTINGS.provider 指名启用；任何 provider 不可用都回退占位。
-import { ADS_SETTINGS } from './setting.ts';
-import { adsenseProvider } from './ads-adsense.ts';
-import { houseAdProvider } from './ads-house-source.ts';
+// 供给由广告平台按需选择；新增适配器同步平台协议和后台配置，任何 provider 不可用都回退占位。
+import { platformAdProvider } from './ads-platform-source.ts';
 
 export { AD_DURATION_MS, AD_SECONDS } from './ad-rules.ts';
 // 接入次数限制时，按广告位区分单元与额度。
@@ -14,10 +11,10 @@ export type AdPlacement = 'revive' | 'reward-root' | 'reward-supplies' | 'lifesp
 export const AD_PLACEHOLDER_HTML = '<div class="revive-ad">广告位招租</div>';
 
 export interface RewardAdCallbacks {
-  // 仅自营图片在成功显示后接管可见观看计时，加载超时不包含后台停留。
+  // 自营成功显示或 Google 开始播放后接管观看时钟。
   onStarted?(): void;
   // 广告完整看完，解锁奖励；恰好回调一次。
-  onWatched(): void;
+  onWatched(onClaim?: () => void): void;
   // SDK 不可用、加载失败、无库存或被跳过——恰好回调一次，调用方回退占位倒计时。
   onFailed(reason: string): void;
 }
@@ -34,7 +31,11 @@ export interface RewardAdProvider {
   ownsPlaybackClock?: boolean;
   placementName(placement: AdPlacement): string;
   // 检测 SDK 可用性（未配置或加载失败返回 false）；false 时调用方走占位，不会调 play。
-  prepare(): Promise<boolean>;
+  prepare(context?: {
+    placement: AdPlacement;
+    signal: AbortSignal;
+    alive?: () => boolean;
+  }): Promise<boolean>;
   play(placement: AdPlacement, callbacks: RewardAdCallbacks, context?: RewardAdContext): void;
 }
 
@@ -54,15 +55,9 @@ const placeholderProvider: RewardAdProvider = {
   play: (_placement, callbacks) => callbacks.onFailed('占位模式，无真实广告'),
 };
 
-const PROVIDERS: Record<string, RewardAdProvider> = {
-  placeholder: placeholderProvider,
-  adsense: adsenseProvider,
-  house: houseAdProvider,
-};
-
 export function getAdProvider(): RewardAdProvider {
   if (STANDALONE) return placeholderProvider;
-  return PROVIDERS[ADS_SETTINGS.provider] ?? placeholderProvider;
+  return platformAdProvider();
 }
 
 // 广告播放质量上的超时：无回调等待阈值。任何外部广告库（尤其未过审的 AdSense）都可能完全静默、
@@ -74,7 +69,7 @@ export interface WatchPlacementOptions {
   placement: AdPlacement;
   // 面板仍存活检查（玩家可能中途关闭/切换面板）；不满足时本次播放结果完全作废。
   alive(): boolean;
-  onWatched(): void;
+  onWatched(onClaim?: () => void): void;
   onFallback(reason: string): void;
   timeoutMs?: number;
   host?: HTMLElement;
@@ -97,10 +92,10 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
     clearInterval(aliveTimer);
     controller.abort();
   };
-  const finishWatched = () => {
+  const finishWatched = (onClaim?: () => void) => {
     if (finished || !alive()) return;
     done();
-    onWatched();
+    onWatched(onClaim);
   };
   const finishFallback = (reason: string) => {
     if (finished || !alive()) return;
@@ -108,7 +103,7 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
     onFallback(reason);
   };
   provider
-    .prepare()
+    .prepare({ placement, signal: controller.signal, alive })
     .then((ready) => {
       if (finished) return;
       if (!alive()) return done();

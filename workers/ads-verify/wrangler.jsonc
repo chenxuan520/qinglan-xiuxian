@@ -4,4 +4,11 @@
   "compatibility_date": "2026-10-10",
   "compatibility_flags": ["nodejs_compat"],
   "routes": ["011203.xyz/ads.txt"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "qinglan-house-ads",
+      "database_id": "d18d2613-8f1f-45d8-ac1c-f4ed87e40f14",
+    },
+  ],
 }

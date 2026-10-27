@@ -23,7 +23,14 @@ const ast = ts.createSourceFile(
 );
 const flow = new Script(
   stripTypeScriptTypes(
-    ['savePreparation', 'saveAdRun', 'handleRewardAd', 'handleRunOutcome', 'handleLifeLimit']
+    [
+      'savePreparation',
+      'saveAdRun',
+      'reportAdClaim',
+      'handleRewardAd',
+      'handleRunOutcome',
+      'handleLifeLimit',
+    ]
       .map((name) => {
         const node = ast.statements.find(
           (n) => ts.isFunctionDeclaration(n) && n.name?.text === name,
@@ -76,6 +83,8 @@ function harness(kind: string, location = 'idle') {
     modal: { innerHTML: 'ad' },
     messages: [],
     writes: 0,
+    reports: 0,
+    adClaimReport: () => c.reports++,
     adCompleted: () => c.watched,
     syncHumanStories() {},
     resolveActivity() {},
@@ -131,6 +140,7 @@ for (const kind of ['root', 'supplies', 'revive', 'lifespan'])
         c.act();
         assert.equal(JSON.stringify(c.save), before);
         assert.equal(c.writes, 0);
+        assert.equal(c.reports, 0);
         c.watched = true;
         c.act();
         assert.equal(JSON.stringify(c.save), before);
@@ -138,13 +148,16 @@ for (const kind of ['root', 'supplies', 'revive', 'lifespan'])
         assert.equal(c.game ?? c.pendingRun, run);
         if (run) assert.equal(JSON.stringify(run.snapshot()), snapshot);
         assert.equal(c.writes, 0);
+        assert.equal(c.reports, 0, '保存失败不能上报领取');
         assert.ok(c.panel.endsWith('ad'));
         c.blocked = false;
         c.act();
         assert.equal(c.writes, 1);
+        assert.equal(c.reports, 1, '真实写入并应用后只上报一次');
         const after = c.stored;
         c.act();
         assert.equal(c.writes, 1);
+        assert.equal(c.reports, 1);
         assert.equal(c.stored, after);
         const read = JSON.parse(c.stored);
         assert.equal(read.spiritRoot, c.save.spiritRoot);

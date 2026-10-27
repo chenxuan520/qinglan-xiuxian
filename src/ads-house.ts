@@ -6,6 +6,8 @@ import {
 } from './ads.ts';
 import { ADS_SETTINGS } from './setting.ts';
 import { boundedAdJson, validHouseAd, type HouseAd } from './house-ad-contract.ts';
+import { adTracker } from './ad-metrics.ts';
+import { adReceiptId } from './ad-metrics-contract.ts';
 
 // 只累计图片已显示、前台有焦点且图片在视口内的时间；恢复后的长计时空洞不补算。
 export class HouseAdClock {
@@ -27,7 +29,7 @@ export async function requestHouseAd(
   placement: AdPlacement,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
-): Promise<HouseAd | null> {
+): Promise<(HouseAd & { receipt?: string }) | null> {
   if (
     !ADS_SETTINGS.house.endpoint ||
     signal.aborted ||
@@ -39,7 +41,59 @@ export async function requestHouseAd(
   const response = await fetcher(url, { signal, credentials: 'omit', cache: 'no-store' });
   if (!response.ok) return null;
   const body = await boundedAdJson(response, 16_000);
-  return body && typeof body === 'object' && 'ad' in body && validHouseAd(body.ad) ? body.ad : null;
+  return body && typeof body === 'object' && 'ad' in body && validHouseAd(body.ad)
+    ? {
+        ...body.ad,
+        ...('receipt' in body && adReceiptId(body.receipt) ? { receipt: body.receipt } : {}),
+      }
+    : null;
+}
+
+// 只在本次广告期间覆盖游戏；结束、取消或故障后释放焦点与原面板。
+function coverHouseAd(
+  host: HTMLElement,
+  content: HTMLElement,
+  link: HTMLAnchorElement,
+  picture: HTMLPictureElement,
+  image: HTMLImageElement,
+) {
+  const panel = host.closest<HTMLElement>('.result-panel');
+  const root = host.closest<HTMLElement>('#modal-root');
+  const cancel = panel?.querySelector<HTMLButtonElement>('.result-actions .secondary-button');
+  if (!panel || !root || !cancel) throw Error('ad-panel-unavailable');
+  const layer = document.createElement('section');
+  layer.className = 'house-ad-overlay';
+  layer.setAttribute('role', 'dialog');
+  layer.setAttribute('aria-modal', 'true');
+  layer.setAttribute('aria-label', '广告展示');
+  layer.style.cssText =
+    'position:fixed;inset:0;z-index:1200;box-sizing:border-box;width:100%;height:100vh;height:100dvh;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;background:#071b18;color:#f2ead0;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));text-align:center;overscroll-behavior:contain';
+  const styles = [content, link, picture, image].map((node) => node.style.cssText);
+  content.style.cssText =
+    'display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;min-width:0;min-height:0;line-height:1.6';
+  link.style.cssText = 'display:flex;min-width:0;min-height:0;overflow:hidden';
+  picture.style.cssText = 'display:flex;min-width:0;min-height:0;width:100%;height:100%';
+  image.style.cssText = 'display:block;width:100%;height:100%;min-height:0;object-fit:contain';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'secondary-button';
+  close.textContent = cancel.textContent;
+  close.dataset.action = cancel.dataset.action;
+  close.style.cssText = 'justify-self:center;max-width:100%;min-height:44px';
+  const visibility = panel.style.visibility,
+    inert = panel.inert;
+  panel.style.visibility = 'hidden';
+  panel.inert = true;
+  layer.append(content, close);
+  root.append(layer);
+  close.focus({ preventScroll: true });
+  return () => {
+    layer.remove();
+    panel.style.visibility = visibility;
+    panel.inert = inert;
+    [content, link, picture, image].forEach((node, i) => (node.style.cssText = styles[i]));
+    if (host.isConnected) host.replaceChildren(content);
+  };
 }
 
 export async function playHouseAd(
@@ -53,6 +107,8 @@ export async function playHouseAd(
   let image: HTMLImageElement | undefined;
   let imageVisible = false;
   let stopped = false;
+  let completed = false;
+  let uncover = () => {};
   let focused = typeof document !== 'undefined' && document.hasFocus();
   let sample = () => {};
   const focus = () => {
@@ -69,6 +125,7 @@ export async function playHouseAd(
     stopped = true;
     clearInterval(timer);
     observer?.disconnect();
+    uncover();
     signal.removeEventListener('abort', cleanup);
     document.removeEventListener('visibilitychange', sample);
     window.removeEventListener('focus', focus);
@@ -83,6 +140,7 @@ export async function playHouseAd(
       return;
     }
     if (!ad) throw Error('no-ad');
+    const track = adTracker(ad.receipt);
     const content = document.createElement('div');
     content.style.cssText = 'display:grid;gap:8px;width:100%;text-align:center';
     const label = document.createElement('small');
@@ -93,6 +151,15 @@ export async function playHouseAd(
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.setAttribute('aria-label', `打开推广页：${ad.name}`);
+    link.addEventListener('click', () => {
+      if (
+        (!signal.aborted || completed) &&
+        host.isConnected &&
+        image?.complete &&
+        image.naturalWidth > 0
+      )
+        track('clicked');
+    });
     image = document.createElement('img');
     image.alt = ad.name;
     image.referrerPolicy = 'no-referrer';
@@ -114,6 +181,7 @@ export async function playHouseAd(
     host.replaceChildren(content);
     host.style.cssText =
       'height:auto;min-height:0;margin:12px 0;padding:12px;font-size:14px;letter-spacing:normal';
+    uncover = coverHouseAd(host, content, link, picture, image);
     await new Promise<void>((resolve, reject) => {
       const abort = () => {
         image!.src = '';
@@ -158,14 +226,21 @@ export async function playHouseAd(
         image!.complete &&
         image!.naturalWidth > 0;
       const seconds = clock.sample(performance.now(), visible);
+      if (visible) track('shown');
       context.onProgress(seconds);
       status.textContent = visible
-        ? `观看 ${seconds} 秒后可领取；点击图片可另开推广页。`
+        ? `观看 ${seconds} 秒后返回奖励页；点击图片可另开推广页。`
         : '回到当前页面并显示图片后继续观看。';
       if (clock.remaining === 0) {
+        completed = true;
         status.textContent = '观看已完成，可领取奖励；点击图片可另开推广页。';
         cleanup();
-        callbacks.onWatched();
+        track('watched');
+        callbacks.onWatched(() => track('claimed'));
+        host
+          .closest('.result-panel')
+          ?.querySelector<HTMLButtonElement>('.primary-button')
+          ?.focus({ preventScroll: true });
       }
     };
     document.addEventListener('visibilitychange', sample);

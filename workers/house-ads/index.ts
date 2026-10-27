@@ -4,10 +4,13 @@ import {
   isHouseAdPlacement,
   publicHouseAd,
   validHouseAdConfig,
+  weightedHouseAd,
   type HouseAdConfig,
 } from '../../src/house-ad-contract.ts';
 import { adAdminSession, adAuthAction } from './auth.ts';
 import { ADMIN_HTML, ADMIN_SCRIPT, ADMIN_CSS, LOGIN_HTML, LOGIN_SCRIPT } from './admin.ts';
+import { adSellerLine } from '../../src/ad-platform-contract.ts';
+import { adMetrics, issueAdReceipt, recordAdMetrics, validAdMetricEvent } from './metrics.ts';
 
 // 登录账号与密码校验值由D1维护，不写入公开仓库。
 export type HouseAdsWorkerEnv = HouseAdsEnv;
@@ -21,7 +24,7 @@ const json = (body: unknown, status = 200, extra = headers()) => {
   extra.set('Content-Type', 'application/json; charset=utf-8');
   return new Response(JSON.stringify(body), { status, headers: extra });
 };
-function publicHeaders(request: Request, configured: string): Headers | null {
+function publicHeaders(request: Request, configured: string, methods = 'GET'): Headers | null {
   const result = headers(),
     origin = request.headers.get('Origin');
   if (origin) {
@@ -41,19 +44,53 @@ function publicHeaders(request: Request, configured: string): Headers | null {
     }
     result.set('Access-Control-Allow-Origin', origin);
     result.set('Vary', 'Origin');
-    result.set('Access-Control-Allow-Methods', 'GET');
+    result.set('Access-Control-Allow-Methods', methods);
+    result.set('Access-Control-Allow-Headers', 'Content-Type');
   }
   return result;
 }
 async function config(env: HouseAdsWorkerEnv): Promise<HouseAdConfig> {
-  const row = await env.DB.prepare('SELECT revision, campaigns FROM ad_config WHERE id = 1').first<{
+  const row = await env.DB.prepare(
+    'SELECT revision, campaigns, settings FROM ad_config WHERE id = 1',
+  ).first<{
     revision: number;
     campaigns: string;
+    settings: string;
   }>();
   if (!row) throw new Error('configuration-unavailable');
-  const value: unknown = { revision: row.revision, campaigns: JSON.parse(row.campaigns) };
+  const value: unknown = {
+    revision: row.revision,
+    campaigns: JSON.parse(row.campaigns),
+    settings: JSON.parse(row.settings),
+  };
   if (!validHouseAdConfig(value)) throw new Error('configuration-invalid');
   return value;
+}
+async function receiptFor(
+  request: Request,
+  env: HouseAdsWorkerEnv,
+  ad: { id: string; name: string },
+  provider: 'house' | 'adsense',
+  placement: Parameters<typeof issueAdReceipt>[3],
+) {
+  const url = new URL(request.url),
+    origin = request.headers.get('Origin') ?? url.origin;
+  // 本地/CI可读取公开投放，但不混入正式指标；隔离服务可显式配置自己的测试来源。
+  if (origin !== env.ADMIN_ORIGIN && !env.ALLOWED_ORIGINS.split(',').includes(origin))
+    return undefined;
+  try {
+    return await issueAdReceipt(
+      env.DB,
+      ad,
+      provider,
+      placement,
+      origin,
+      Date.now(),
+      url.searchParams.get('verification') === '1',
+    );
+  } catch {
+    return undefined;
+  }
 }
 function page(body: string, type: string) {
   const extra = headers();
@@ -68,6 +105,68 @@ export default {
   async fetch(request: Request, env: HouseAdsWorkerEnv): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\/ads(?=\/)/, '');
+    if (path === '/ads.txt') {
+      try {
+        const current = await config(env);
+        return new Response(adSellerLine(current.settings!), {
+          headers: {
+            ...Object.fromEntries(headers()),
+            'Content-Type': 'text/plain; charset=utf-8',
+          },
+        });
+      } catch {
+        return new Response('temporarily unavailable', { status: 503, headers: headers() });
+      }
+    }
+    if (path === '/v1/event') {
+      const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');
+      if (!extra || !request.headers.get('Origin')) return json({ error: 'origin-denied' }, 403);
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: extra });
+      if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405, extra);
+      if (
+        !['application/json', 'text/plain'].includes(
+          request.headers.get('Content-Type')?.split(';')[0].trim() ?? '',
+        )
+      )
+        return json({ error: 'invalid-body' }, 400, extra);
+      let body: unknown;
+      try {
+        body = await boundedAdJson(request, 512);
+      } catch {
+        return json({ error: 'invalid-body' }, 400, extra);
+      }
+      if (!validAdMetricEvent(body)) return json({ error: 'invalid-event' }, 400, extra);
+      try {
+        await recordAdMetrics(env.DB, body, request.headers.get('Origin')!);
+        return new Response(null, { status: 204, headers: extra });
+      } catch {
+        return json({ error: 'unavailable' }, 503, extra);
+      }
+    }
+    if (path === '/v1/settings') {
+      const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
+      if (!extra) return json({ error: 'origin-denied' }, 403);
+      if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405, extra);
+      const placement = url.searchParams.get('placement');
+      if (placement !== null && !isHouseAdPlacement(placement))
+        return json({ error: 'invalid-placement' }, 400, extra);
+      try {
+        const current = await config(env);
+        let receipt: string | undefined;
+        if (current.settings!.provider === 'adsense' && isHouseAdPlacement(placement)) {
+          receipt = await receiptFor(
+            request,
+            env,
+            { id: 'google-adsense', name: 'Google AdSense' },
+            'adsense',
+            placement,
+          );
+        }
+        return json({ settings: current.settings, ...(receipt ? { receipt } : {}) }, 200, extra);
+      } catch {
+        return json({ error: 'unavailable' }, 503, extra);
+      }
+    }
     if (path === '/v1/ad') {
       const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
       if (!extra) return json({ error: 'origin-denied' }, 403);
@@ -78,13 +177,19 @@ export default {
       if (!isHouseAdPlacement(placement)) return json({ error: 'invalid-placement' }, 400, extra);
       try {
         const current = await config(env);
-        const choices = current.campaigns.filter(
-          (ad) => ad.enabled && ad.placements.includes(placement),
+        const ad =
+          current.settings!.provider === 'house'
+            ? weightedHouseAd(current.campaigns, placement)
+            : null;
+        let receipt: string | undefined;
+        if (ad) {
+          receipt = await receiptFor(request, env, ad, 'house', placement);
+        }
+        return json(
+          { ad: ad ? publicHouseAd(ad) : null, ...(receipt ? { receipt } : {}) },
+          200,
+          extra,
         );
-        const ad = choices.length
-          ? choices[crypto.getRandomValues(new Uint32Array(1))[0] % choices.length]
-          : null;
-        return json({ ad: ad ? publicHouseAd(ad) : null }, 200, extra);
       } catch {
         return json({ error: 'unavailable', ad: null }, 503, extra);
       }
@@ -137,6 +242,39 @@ export default {
           return json({ error: 'unavailable', message: '暂时无法读取投放配置，请稍后重试。' }, 503);
         }
       }
+      if (path === '/admin/stats') {
+        const days = Number(url.searchParams.get('days') ?? '7');
+        if (![1, 7, 30].includes(days)) return json({ error: 'invalid-window' }, 400);
+        try {
+          const report = await adMetrics(env.DB, days),
+            current = await config(env);
+          const existing = new Set(
+            report.rows.filter((r) => r.provider === 'house').map((r) => r.id),
+          );
+          const active = new Map(current.campaigns.map((a) => [a.id, a.name]));
+          const rows = report.rows.map((r) => ({
+            ...r,
+            name: r.provider === 'house' ? (active.get(r.id) ?? r.name) : r.name,
+            archived: r.provider === 'house' && !active.has(r.id),
+          }));
+          for (const ad of current.campaigns)
+            if (!existing.has(ad.id))
+              rows.push({
+                id: ad.id,
+                provider: 'house',
+                name: ad.name,
+                requests: 0,
+                shown: 0,
+                clicked: 0,
+                watched: 0,
+                claimed: 0,
+                archived: false,
+              });
+          return json({ ...report, rows });
+        } catch {
+          return json({ error: 'unavailable', message: '暂时无法读取统计，请稍后重试。' }, 503);
+        }
+      }
       return json({ error: 'not-found' }, 404);
     }
     if (path !== '/admin/config' || request.method !== 'PUT')
@@ -163,10 +301,16 @@ export default {
         400,
       );
     try {
+      const settings = input.settings ?? (await config(env)).settings!;
       const result = await env.DB.prepare(
-        'UPDATE ad_config SET campaigns = ?, revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ?',
+        'UPDATE ad_config SET campaigns = ?, settings = ?, revision = revision + 1, updated_at = ? WHERE id = 1 AND revision = ?',
       )
-        .bind(JSON.stringify(input.campaigns), new Date().toISOString(), input.revision)
+        .bind(
+          JSON.stringify(input.campaigns),
+          JSON.stringify(settings),
+          new Date().toISOString(),
+          input.revision,
+        )
         .run();
       if (result.meta.changes !== 1)
         return json(
@@ -176,7 +320,7 @@ export default {
           },
           409,
         );
-      return json({ ...input, revision: input.revision + 1 });
+      return json({ ...input, settings, revision: input.revision + 1 });
     } catch {
       return json(
         { error: 'save-failed', message: '保存未成功，当前编辑内容仍保留，请稍后重试。' },

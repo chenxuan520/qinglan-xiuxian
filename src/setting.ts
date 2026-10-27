@@ -4,16 +4,11 @@ export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
 export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 
 // 激励广告供给。自营图片按需读取独立投放服务，无有效投放时沿用占位倒计时。
-// 接入真实 SDK 时新增对应 RewardAdProvider（src/ads.ts 接口），注册后在此指名启用。
+// 供给、Google参数和广告权重在广告管理后台配置；此处仅保留公开服务地址。
 // 任何 provider 不可用（未配置、SDK 加载失败、无库存）都自动回退占位倒计时，不影响游戏。
 export const ADS_SETTINGS = {
-  // 谷歌正式投放另行启用；自营与占位不会加载谷歌 SDK。
-  provider: 'house' as 'placeholder' | 'adsense' | 'house',
+  platform: { endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/ads/v1/settings' },
   house: { endpoint: STANDALONE ? '' : 'https://xiuxian.011203.xyz/ads/v1/ad' },
-  adsense: {
-    // AdSense 审核通过后把 pub ID 填入此处；SDK 按需注入，失败全回退占位。
-    client: 'ca-pub-9047842625721721',
-  },
 } as const;
 
 // NPC 相关常量集中在这里；改动后重新构建前端，并部署 npc-ai Worker。

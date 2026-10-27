@@ -9,6 +9,8 @@ import {
   HOUSE_AD_PLACEMENTS,
 } from '../src/house-ad-contract.ts';
 import { HouseAdClock, requestHouseAd } from '../src/ads-house.ts';
+import { adReceiptId } from '../src/ad-metrics-contract.ts';
+import { defaultAdPlatformSettings } from '../src/ad-platform-contract.ts';
 import { watchAdPlacement, type RewardAdCallbacks, type RewardAdProvider } from '../src/ads.ts';
 import worker from '../workers/house-ads/index.ts';
 import {
@@ -90,7 +92,10 @@ test('电脑和手机图片可分别配置，旧投放可读，手机地址沿�
       env,
     );
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
+    const delivery = (await response.json()) as { ad: unknown; receipt: string };
+    assert.equal(adReceiptId(delivery.receipt), true);
+    assert.deepEqual(delivery, {
+      receipt: delivery.receipt,
       ad: {
         id: campaign.id,
         name: campaign.name,
@@ -274,7 +279,18 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
   assert.equal(html.status, 200);
   assert.match(html.headers.get('Content-Security-Policy')!, /script-src 'self'/);
   assert.doesNotMatch(await html.text(), /owner@example|test-audience/);
-  assert.deepEqual(await (await admin('/ads/admin/config')).json(), { revision: 0, campaigns: [] });
+  const initial = (await (await admin('/ads/admin/config')).json()) as any;
+  assert.deepEqual(initial, {
+    revision: 0,
+    campaigns: [],
+    settings: {
+      ...defaultAdPlatformSettings(),
+      adsense: {
+        ...defaultAdPlatformSettings().adsense,
+        client: JSON.parse(store.value()!.settings as string).adsense.client,
+      },
+    },
+  });
   const config = {
     revision: 0,
     campaigns: [exampleAd, { ...exampleAd, id: 'disabled', enabled: false }],
@@ -297,7 +313,10 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
     assert.equal(result.status, 200);
     assert.equal(result.headers.get('Access-Control-Allow-Origin'), 'https://xiuxian.011203.xyz');
     assert.equal(result.headers.get('Cache-Control'), 'no-store');
-    assert.deepEqual(await result.json(), {
+    const delivery = (await result.json()) as { ad: unknown; receipt: string };
+    assert.equal(adReceiptId(delivery.receipt), true);
+    assert.deepEqual(delivery, {
+      receipt: delivery.receipt,
       ad: {
         id: exampleAd.id,
         name: exampleAd.name,
@@ -470,15 +489,36 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
       else delete (globalThis as any)[name];
     }),
   );
-  class Element {
-    style = { cssText: '' };
+  class Element extends EventTarget {
+    style = { cssText: '', visibility: '' };
+    inert = false;
+    dataset: Record<string, string> = {};
+    attributes: Record<string, string> = {};
+    children: Element[] = [];
+    removed = false;
     complete = true;
     naturalWidth = 300;
     onload: (() => void) | null = null;
     onerror: (() => void) | null = null;
-    append() {}
-    setAttribute() {}
-    replaceChildren() {}
+    append(...nodes: Element[]) {
+      this.children.push(...nodes);
+    }
+    setAttribute(name: string, value: string) {
+      this.attributes[name] = value;
+    }
+    replaceChildren(...nodes: Element[]) {
+      this.children = nodes;
+    }
+    remove() {
+      this.removed = true;
+    }
+    focus() {}
+    closest(selector: string) {
+      return selector === '.result-panel' ? panel : root;
+    }
+    querySelector(selector: string) {
+      return selector.includes('secondary-button') ? cancel : null;
+    }
     set src(_value: string) {
       queueMicrotask(() => this.onload?.());
     }
@@ -487,6 +527,10 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
       return { top: -47, bottom: 54, left: 0, right: 300, width: 300, height: 101 };
     }
   }
+  const panel = new Element(),
+    root = new Element(),
+    cancel = new Element();
+  cancel.dataset.action = 'finish-run';
   let currentImage: Element;
   const document = Object.assign(new EventTarget(), {
     visibilityState: 'visible',
@@ -535,12 +579,18 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
     },
   );
   assert.equal(observed, true);
+  const layer = root.children[0];
+  assert.equal(layer.attributes['aria-modal'], 'true');
+  assert.match(layer.style.cssText, /position:fixed;inset:0/);
+  assert.match(currentImage!.style.cssText, /object-fit:contain/);
+  assert.equal(panel.inert, true, '覆盖期间原奖励页不可操作');
   intersect([{ isIntersecting: true, intersectionRatio: 0.42 }]);
   for (let i = 0; i < 60; i++) {
     now += 100;
     t.mock.timers.tick(100);
   }
   assert.equal(watched, 0);
+  assert.equal(layer.removed, false, '未完成有效观看不能提前收起');
   intersect([{ isIntersecting: true, intersectionRatio: 0.8 }]);
   for (let i = 0; i < 50; i++) {
     now += 100;
@@ -548,6 +598,9 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
   }
   assert.equal(watched, 1);
   assert.equal(disconnected, true);
+  assert.equal(layer.removed, true, '完成5秒有效观看后自动移除覆盖层');
+  assert.equal(panel.inert, false);
+  assert.equal(panel.style.visibility, '');
   intersect([{ isIntersecting: false, intersectionRatio: 0 }]);
   now += 10000;
   t.mock.timers.tick(10000);

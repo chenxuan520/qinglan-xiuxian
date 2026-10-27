@@ -65,12 +65,13 @@ function playOnce(placement: 'revive' | 'reward-root' | 'reward-supplies' | 'lif
 }
 
 test('配置层指向注册过的 provider；占位 provider 恒可用作回退', async () => {
-  // 正式 provider 由 ADS_SETTINGS.provider 决定（上线后为 adsense）；占位恒在此接住失败路径。
+  // 联网供给由后台配置选择；占位恒在此接住失败路径。
   const active = getAdProvider();
   assert.ok(
-    ['adsense', 'placeholder', 'house'].includes(active.name),
+    ['platform', 'adsense', 'placeholder', 'house'].includes(active.name),
     `未知 provider：${active.name}`,
   );
+  assert.equal(active.name, 'platform', '联网版在实际打开广告后才读取平台选择');
   if (active.name === 'placeholder') {
     assert.equal(await active.prepare(), false);
     let failed: string | null = null;
