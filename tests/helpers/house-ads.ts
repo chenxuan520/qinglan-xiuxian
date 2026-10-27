@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
-import worker from '../../workers/house-ads/index.ts';
+import { createHouseAdsWorker } from '../../workers/house-ads/index.ts';
 import { hashAdPassword } from '../../workers/house-ads/auth.ts';
 import type { HouseAdsWorkerEnv } from '../../workers/house-ads/index.ts';
 
@@ -87,7 +87,7 @@ export async function adSessionFixture(
   origin = 'https://xiuxian.011203.xyz',
 ) {
   await seedAdAdmin(store);
-  const response = await worker.fetch(
+  const response = await adWorker.fetch(
     new Request(origin + '/ads/admin/login', {
       method: 'POST',
       headers: { Origin: origin, 'Content-Type': 'application/json' },
@@ -118,3 +118,9 @@ export const exampleAd = {
   enabled: true,
   placements: ['revive', 'reward-root', 'reward-supplies', 'lifespan'] as const,
 };
+
+// 既有SQL/鉴权用例不访问公网；新图片校验另有HTTP成功/失败/重定向/超时用例。
+export const adWorker = createHouseAdsWorker(
+  async () =>
+    new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } }),
+);

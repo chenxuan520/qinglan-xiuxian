@@ -7,7 +7,7 @@ import { adReceiptId } from '../src/ad-metrics-contract.ts';
 import { adTracker } from '../src/ad-metrics.ts';
 import { adMetrics, adDay, issueAdReceipt, recordAdMetrics } from '../workers/house-ads/metrics.ts';
 import { configuredAdProvider } from '../src/ads-platform.ts';
-import worker from '../workers/house-ads/index.ts';
+import { adWorker as worker } from './helpers/house-ads.ts';
 import seller from '../workers/ads-verify/index.ts';
 import { ADMIN_HTML, LOGIN_HTML, ADMIN_SCRIPT } from '../workers/house-ads/admin.ts';
 import { adStore, adEnv, adSessionFixture, exampleAd } from './helpers/house-ads.ts';

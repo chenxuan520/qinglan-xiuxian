@@ -12,7 +12,7 @@ import { HouseAdClock, requestHouseAd } from '../src/ads-house.ts';
 import { adReceiptId } from '../src/ad-metrics-contract.ts';
 import { defaultAdPlatformSettings } from '../src/ad-platform-contract.ts';
 import { watchAdPlacement, type RewardAdCallbacks, type RewardAdProvider } from '../src/ads.ts';
-import worker from '../workers/house-ads/index.ts';
+import { adWorker as worker } from './helpers/house-ads.ts';
 import {
   adSessionFixture,
   adStore,

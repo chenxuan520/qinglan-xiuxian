@@ -10,7 +10,7 @@ import {
   type HouseAdCampaign,
 } from '../src/house-ad-contract.ts';
 import { currentHouseAdDevice, requestHouseAd } from '../src/ads-house.ts';
-import worker from '../workers/house-ads/index.ts';
+import { adWorker as worker } from './helpers/house-ads.ts';
 import { adStore, adEnv, adSessionFixture, exampleAd } from './helpers/house-ads.ts';
 const mobileImageUrl = 'https://example.test/mobile.webp';
 const deviceAd = { ...exampleAd, desktopWeight: 2, mobileWeight: 3, mobileImageUrl };

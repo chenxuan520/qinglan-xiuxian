@@ -14,6 +14,7 @@ import { spiritPower } from '../src/spirit-power.ts';
 import { formatNumber } from '../src/number-format.ts';
 import { JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../src/setting.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
+import { UI_AD_FIXTURE } from './ui-ad-fixture.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
 assertLocalPage(baseUrl);
@@ -149,7 +150,7 @@ async function open(viewport: string, save: SaveData, testInitScript = '') {
   await browser.call('navigate_page', {
     pageId,
     url: baseUrl,
-    initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(save))});${testInitScript}`,
+    initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(save))});${UI_AD_FIXTURE}${testInitScript}`,
   });
   await wait('() => !!document.querySelector("[data-action=settings]")');
 }
