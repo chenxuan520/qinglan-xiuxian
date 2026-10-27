@@ -469,7 +469,7 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
     npc.realmIndex < playerRealm ? '前辈' : npc.realmIndex === playerRealm ? '道友' : '小友';
   const riskQuestion = /骗|险|劫|机缘|邀|赴约|真假|核验|凭据|可信|信任/.test(input.message);
   if (context?.risk?.inspection === 'fraud-exposed' && riskQuestion)
-    return `${address}，你已当面查出这桩机缘的破绽，别再为好听话垫款。普通拍卖、互换照各自明示规则，不与这桩私下邀约混为一谈。`;
+    return `${address}，你已当面查出这桩机缘的破绽，别再为好听话垫款。`;
   if (context?.risk?.kind === 'invitation' && !context.risk.resolved && riskQuestion)
     return `${address}，坊外少人照应，若翻了脸，可就是性命相搏。凭据、同行的人、回来的路，都先问清楚，莫为一件宝物轻易赴险。`;
   if (context?.risk && riskQuestion) {
@@ -480,7 +480,7 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
     if (context.risk.kind === 'deposit')
       return `${address}，收货凭据尚未拿出，却先要你垫路费。尚未核验便先付钱，风险要自己担；可核实接应者与凭据，也可婉拒。`;
     if (context.risk.kind === 'haggle')
-      return `${address}，这份凡品的卖价高于药铺明示参考价，价差摆在眼前。是否成交由你自己取舍，闲聊不扣灵石，也不替你买药。`;
+      return `${address}，这份凡品的卖价高于药铺明示参考价，价差摆在眼前。是否成交由你自己取舍。`;
   }
   const trade = context?.trade;
   if (

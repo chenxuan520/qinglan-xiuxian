@@ -16,7 +16,7 @@ function harness() {
   return { state, settings, events };
 }
 
-test('声音开关更新后同步输出，再持久化；只有首页显式开声才带选择音效', () => {
+test('声音开关先成功持久化再同步输出；只有首页显式开声才带选择音效', () => {
   const { state, settings, events } = harness();
   assert.deepEqual(events, []);
   settings.setEnabled(true, true);
@@ -25,13 +25,13 @@ test('声音开关更新后同步输出，再持久化；只有首页显式开�
   assert.equal(state.sound, true);
   assert.equal(state.volume, 0.37);
   assert.deepEqual(events, [
+    'persist',
     { sound: true, volume: 0.37 },
     'select',
     'persist',
     { sound: false, volume: 0.37 },
     'persist',
     { sound: true, volume: 0.37 },
-    'persist',
   ]);
 });
 
@@ -56,5 +56,5 @@ test('存档在原对象中替换后读取最新音量和开关，不使用构�
   Object.assign(state, { sound: true, volume: 0.71 });
   settings.toggle();
   assert.deepEqual(state, { sound: false, volume: 0.71 });
-  assert.deepEqual(events, [{ sound: false, volume: 0.71 }, 'persist']);
+  assert.deepEqual(events, ['persist', { sound: false, volume: 0.71 }]);
 });

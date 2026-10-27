@@ -601,3 +601,29 @@ test('本批劫修死亡不重排寄售拍品，结拍索引和读档保持，�
   assert.equal(sold.outcome, 'sold');
   assert.notEqual(sold.bidder, id);
 });
+
+test('委托数量错误按玄铁和丹药的真实范围提示，合法边界仍可办理', () => {
+  const save = fixture();
+  save.iron = 20000;
+  save.medicine.bag.heqi = 200;
+  const visit = save.mortal.sectMarket!.visit;
+  const iron = { kind: 'iron', id: 'iron', quantity: 150, forgeLevel: 0 } as const;
+  const medicine = { kind: 'medicine', id: 'heqi', quantity: 99, forgeLevel: 0 } as const;
+  const before = JSON.stringify(save);
+  for (const quantity of [0, 10000, 1.5, NaN])
+    assert.equal(
+      auctionSellReason(save, { ...iron, quantity }, visit),
+      '玄铁每批可委托150至9999枚',
+    );
+  for (const quantity of [150, 9999])
+    assert.equal(auctionSellReason(save, { ...iron, quantity }, visit), '');
+  assert.equal(auctionSellReason(save, { ...iron, quantity: 149 }, visit), '玄铁每批至少150枚');
+  for (const quantity of [0, 100, 1.5, NaN])
+    assert.equal(
+      auctionSellReason(save, { ...medicine, quantity }, visit),
+      '每次可委托一至九十九份',
+    );
+  for (const quantity of [1, 99])
+    assert.equal(auctionSellReason(save, { ...medicine, quantity }, visit), '');
+  assert.equal(JSON.stringify(save), before);
+});

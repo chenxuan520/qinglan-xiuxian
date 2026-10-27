@@ -120,6 +120,7 @@ function harness(t: TestContext, firstStory = false) {
     chronicleSource: { observe() {} },
     hideAchievementNotice() {},
     dispatchAction,
+    structuredClone,
     save,
     modal,
     writes,

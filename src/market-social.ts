@@ -677,34 +677,40 @@ export function settleMarketAmbush(save: SaveData, outcome: 'victory' | 'escaped
       `你倒在${a.npc.name}的刃下，坊外的归路沉入夜色。此世的行迹与旧物，仍可留作一纸记载。`,
     );
   }
+  const received = a.loot.map((item) => ({
+    ...item,
+    quantity:
+      item.kind === 'medicine'
+        ? Math.min(item.quantity, Number.MAX_SAFE_INTEGER - (save.medicine.bag[item.id] ?? 0))
+        : item.quantity,
+  }));
   if (outcome === 'victory') {
-    if (
-      !Number.isSafeInteger(save.stones + a.held) ||
-      a.loot.some(
-        (l) =>
-          l.kind === 'medicine' &&
-          !Number.isSafeInteger((save.medicine.bag[l.id] || 0) + l.quantity),
-      )
-    )
-      return undefined;
+    if (!Number.isSafeInteger(save.stones + a.held)) return undefined;
     save.stones += a.held;
-    for (const item of a.loot) receiveMarketItem(save, item);
+    for (const item of received) if (item.quantity > 0) receiveMarketItem(save, item);
     recordCollectionAchievement(save);
   }
   rememberMarketAmbush(save, a.npcId, outcome);
   save.mortal.marketSocial!.ambush = null;
-  const lootText = a.loot
+  const lootText = received
+    .filter((item) => item.quantity > 0)
     .map(
       (l) =>
         `${l.kind === 'medicine' ? medicineInfo(l.id)!.name : treasure(l.id).name}${l.kind === 'artifact' ? `（炼器${l.forgeLevel}阶）` : ''} ×${l.quantity}`,
     )
     .join('、');
+  const uncollected = a.loot
+    .map((item, index) => ({ ...item, quantity: item.quantity - received[index].quantity }))
+    .filter((item) => item.quantity > 0);
+  const overflowText = uncollected.length
+    ? `丹囊数量已满，${uncollected.map((item) => `${medicineInfo(item.id)!.name} ×${item.quantity}`).join('、')}未能收取，留在战场。`
+    : '';
   const result = log(
     save,
     a.npcId,
     outcome,
     outcome === 'victory'
-      ? `你击杀劫修${a.npc.name}，取回暂扣的${a.held}灵石，并从其随身行囊取得${lootText}，已收入收藏与丹囊。此人不会再出现在坊市。`
+      ? `你击杀劫修${a.npc.name}，取回暂扣的${a.held}灵石${lootText ? `，并从其随身行囊取得${lootText}，已收入收藏与丹囊。` : '。'}${overflowText}此人不会再出现在坊市。`
       : `你甩开${a.npc.name}的追击，从退路回到坊市。损失暂扣的${a.held}灵石，法宝与丹药仍在行囊；对方记下这段旧怨。`,
   );
   if (outcome === 'victory')

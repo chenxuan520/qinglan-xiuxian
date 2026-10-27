@@ -236,14 +236,21 @@ test('快照未终局拒绝任意结算；胜利自动战利品只一次，炼�
       }
   }
 });
-test('掉落数量溢出保存完整胜利待处理，不先退钱或丢遭遇；全境界掉落符合携带资格', () => {
+test('掉落数量溢出只留超额丹药，胜利与其他收益正常结算；全境界掉落符合携带资格', () => {
   const { s, a } = ambush();
   const item = a.loot.find((l) => l.kind === 'medicine')!;
   s.medicine.bag[item.id] = Number.MAX_SAFE_INTEGER;
   outcome(s, 'victory');
-  const before = structuredClone(s);
+  const stones = s.stones;
+  const result = settleMarketAmbush(s, 'victory');
+  assert.ok(result);
+  assert.match(result.text, /未能收取，留在战场/);
+  assert.equal(s.stones, stones + a.held);
+  assert.equal(s.medicine.bag[item.id], Number.MAX_SAFE_INTEGER);
+  assert.equal(s.mortal.marketSocial!.ambush, null);
+  assert.deepEqual(readSave(JSON.stringify(s)).save.medicine, s.medicine);
   assert.equal(settleMarketAmbush(s, 'victory'), undefined);
-  assert.deepEqual(s, before);
+  assert.equal(s.stones, stones + a.held);
   let artifact = 0;
   for (let seed = 1; seed <= 300; seed++) {
     const q = fixture(seed),

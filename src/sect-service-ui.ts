@@ -46,7 +46,7 @@ export function sectServiceContent(save: SaveData, unfinished = false, selected 
       : q.seek
         ? `${icon(q.seek)}${treasure(q.seek).name}`
         : q.receive
-          ? `${medicineInfo(q.receive)!.name} ×1`
+          ? `${medicineInfo(q.receive)!.name} ×${q.receiveCount ?? 1}`
           : q.recipe
             ? `${medicineInfo(q.recipe)!.name}丹方 · 样丹保留`
             : q.study

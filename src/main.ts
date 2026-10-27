@@ -411,6 +411,7 @@ let rewardReturn: PanelLocation | null = null;
 let adRoot: SpiritRootId = 'heaven';
 let adElements: ElementId[] = [];
 let pendingImport: ReturnType<typeof importSave> | null = null;
+let importReadEpoch = 0;
 let settlementRetryAt = 0;
 setResourceRefreshWarning(() =>
   isExtremeLife(save) && ((game && !settled) || pendingRun || save.mortal.marketSocial?.ambush)
@@ -897,7 +898,7 @@ function showTeaStory() {
   const story = teaStoryPanel();
   panelFrame(...story);
   void mountTeaStory(modal.querySelector<HTMLElement>('.tea-story')!, save, () => {
-    soundSettings.enableNarration();
+    return soundSettings.enableNarration();
   });
 }
 function renderMortal(enter = false) {
@@ -1879,6 +1880,7 @@ document.addEventListener('input', (event) => {
   const input = event.target as HTMLInputElement;
   if (!input.matches('input[data-volume]')) return;
   soundSettings.setVolume(Number(input.value) / 100);
+  input.value = String(save.volume * 100);
   input.parentElement!.querySelector('output')!.textContent = `${input.value}%`;
   const settingsNote = modal.querySelector<HTMLElement>('[data-settings-sound-note]');
   if (settingsNote) settingsNote.textContent = settingsSoundNote(save);
@@ -1939,17 +1941,22 @@ document.addEventListener('change', async (event) => {
   }
   if (
     input.id !== 'save-import' ||
+    saveLock ||
     game ||
     panel !== 'cultivation' ||
     (isExtremeLife(save) && (pendingRun || save.mortal.marketSocial?.ambush))
   )
     return;
+  const readEpoch = ++importReadEpoch;
+  const current = () => readEpoch === importReadEpoch && input.isConnected && !saveLock;
   const file = input.files?.[0];
   input.value = '';
   if (!file) return;
   try {
     if (file.size > MAX_SAVE_FILE_BYTES) throw new Error('存档文件过大，请选择 10 MB 以内的文件');
-    const candidate = importSave(await file.text());
+    const text = await file.text();
+    if (!current()) return;
+    const candidate = importSave(text);
     if (
       game ||
       panel !== 'cultivation' ||
@@ -1961,7 +1968,7 @@ document.addEventListener('change', async (event) => {
 
     panelFrame(...importConfirmPanel(candidate));
   } catch (error) {
-    if (!game && panel === 'cultivation')
+    if (current() && !game && panel === 'cultivation')
       toast(error instanceof Error ? error.message : '存档读取失败，当前进度未更改');
   }
 });

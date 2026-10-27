@@ -66,8 +66,8 @@ test('15版已通终关的旧档仅补足真实修为缺口，保留原成仙年
       assert.equal(upgraded.cultivation, IMMORTAL_CULTIVATION);
       assert.equal(upgraded.chronicle.milestones['realm-24'], recordedAge);
       const records = upgraded.chronicle.entries.filter((entry) => entry.title === '通关成仙补录');
-      assert.equal(records.length, 1);
-      assert.match(records[0].detail, /补足成仙修为 17/);
+      assert.equal(records.length, 0);
+      assert.deepEqual(upgraded.chronicle.entries, old.chronicle.entries);
       for (const key of ['age', 'stones', 'iron', 'runs', 'bestKills'] as const)
         assert.equal(upgraded[key], old[key]);
       assert.equal(upgraded.mortal.marketFellow, undefined);

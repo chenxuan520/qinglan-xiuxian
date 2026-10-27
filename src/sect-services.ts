@@ -172,7 +172,9 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
       study.years * (id === 'haste' ? [0.6, 0.5, 0.4][tier] : id === 'spirit' ? 2 : 1.2),
     );
     if (!study.eligible)
-      q.reason = study.level >= MAX_MASTERY ? '本门精研已满' : `精研需${study.requiredRealm}`;
+      q.reason =
+        study.reason ||
+        (study.level >= MAX_MASTERY ? '本门精研已满' : `精研需${study.requiredRealm}`);
     if (id === 'bone') {
       q.give = [gear(save, choice)];
       const credit = Math.floor(auctionValue(q.give[0]) * [0.8, 0.85, 0.9][tier]);
@@ -277,7 +279,7 @@ export function sectServiceQuote(save: SaveData, choice: string, unfinished = fa
         masteryRewardPool(n).some((m) => !Number.isSafeInteger((save.medicine.bag[m.id] || 0) + 1)),
       )
     )
-      q.reason ||= '丹囊数量已达上限，无法领取精研赐丹';
+      q.reason ||= '丹囊数量已达上限，请先腾出赐丹空间';
   }
   const last = save.mortal.sectServices?.lastAt;
   q.reason ||=

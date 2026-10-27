@@ -330,7 +330,11 @@ export function closeNpcChat() {
   clearStoryImage();
 }
 
-export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSound: () => void) {
+export async function mountTeaStory(
+  host: HTMLElement,
+  save: SaveData,
+  enableSound: () => boolean | void,
+) {
   closeNpcChat();
   const controller = new AbortController();
   activeRequest = controller;
@@ -407,7 +411,7 @@ export async function mountTeaStory(host: HTMLElement, save: SaveData, enableSou
   if (!reader.supported) status.textContent = '此设备暂不支持朗读，可阅读故事。';
   play.textContent = save.sound && save.volume > 0 ? '朗读故事' : '开启声音并朗读';
   play.onclick = () => {
-    if (!save.sound || save.volume === 0) enableSound();
+    if ((!save.sound || save.volume === 0) && enableSound() === false) return;
     play.textContent = '朗读故事';
     reader.play(displayedReply, save.volume);
   };
@@ -554,8 +558,11 @@ export function mountNpcChat(
     const reply = await requestNpcDialogue(request, controller.signal);
     if (controller.signal.aborted || !host.isConnected || activeRequest !== controller) return;
     activeRequest = null;
-    const localReply = market ? marketDialogueLocalReply(request) : fallback;
-    const answer: NpcMessage = { role: 'assistant', content: reply ?? localReply };
+    const currentRequest = market ? makeRequest(message, history) : request;
+    const currentReply =
+      market && JSON.stringify(currentRequest) !== JSON.stringify(request) ? null : reply;
+    const localReply = market ? marketDialogueLocalReply(currentRequest) : fallback;
+    const answer: NpcMessage = { role: 'assistant', content: currentReply ?? localReply };
     if (greeting) conversation.greeting = answer;
     messages.push(answer);
     messages.splice(0, Math.max(0, messages.length - NPC_AI_SETTINGS.maxHistoryMessages));
@@ -563,7 +570,7 @@ export function mountNpcChat(
     button.disabled = input.disabled = false;
     log.setAttribute('aria-busy', 'false');
     status.textContent = market
-      ? reply
+      ? currentReply
         ? '坊间闲谈 · 同道往来'
         : '坊间闲谈 · 随口聊聊'
       : townId

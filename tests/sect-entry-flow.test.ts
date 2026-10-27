@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
-import { freshSave, SAVE_KEY, tribulationDue } from '../src/progress.ts';
+import { freshSave, realmCost, SAVE_KEY, tribulationDue } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
 import { TREASURES } from '../src/data.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
@@ -186,5 +186,29 @@ test('丹囊容量满明确提示且不扣费；缺钱、路线冲突及非人�
     assert.equal(h.writes, 0);
     assert.equal(h.renders, 0);
     if (reason === 'full') assert.match(h.messages.at(-1)!, /凡品数量已达上限/);
+  }
+});
+
+test('入宗消息按实际精研区分首次入门与有加成的重返，不改变费用和赠药', () => {
+  for (const [level, step, effective] of [
+    [0, 9, false],
+    [3, 9, true],
+    [3, 0, false],
+  ] as const) {
+    const h = harness();
+    h.save.mortal.mastery.power = level;
+    h.save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    h.context.handleAction('mortal-join', 'power');
+    assert.equal(h.writes, 1);
+    assert.equal(h.save.stones, 1000 - entryCost(h.save));
+    assert.equal(
+      Object.values(h.save.medicine.bag).reduce((sum, count) => sum + count, 0),
+      1,
+    );
+    assert.equal(JSON.parse(h.stored).mortal.events[0].includes('本门精研加成已生效'), effective);
+    assert.equal(JSON.parse(h.stored).mortal.mastery.power, level);
   }
 });

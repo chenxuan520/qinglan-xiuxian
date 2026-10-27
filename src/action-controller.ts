@@ -841,10 +841,17 @@ function handleMortalEntry(shell: ActionShell, action: string): boolean {
   if (shell.panel === 'sect-dues') {
     if (action === 'dues-ad') shell.showRewardAd('supplies');
     else if (action === 'dues-pay' || action === 'dues-decline') {
-      if (!shell.settleSectDues(shell.save, action === 'dues-decline')) return true;
+      const next = shell.structuredClone(shell.save);
+      if (!shell.settleSectDues(next, action === 'dues-decline')) return true;
+      try {
+        shell.writeSave(next, shell.pendingRun);
+      } catch {
+        if (!shell.saveLock) shell.toast('供奉处理尚未保存，请重试');
+        return true;
+      }
+      Object.assign(shell.save, next);
       shell.panel = '';
       shell.modal.innerHTML = '';
-      shell.persist();
       if (shell.inMortalWorld) shell.syncMortalChange();
       else shell.renderLobby();
       shell.toast(action === 'dues-pay' ? '供奉已补缴，继续游历' : '已离宗，精研成果仍保留');
@@ -1576,11 +1583,18 @@ function handleReincarnate(shell: ActionShell, action: string): boolean {
 // 自动历练与声音开关。
 function handleToggles(shell: ActionShell, action: string): boolean {
   if (action === 'autoplay') {
-    shell.save.autoplay = !shell.save.autoplay;
+    const next = shell.structuredClone(shell.save);
+    next.autoplay = !shell.save.autoplay;
+    try {
+      shell.writeSave(next, shell.game && !shell.settled ? shell.game : shell.pendingRun);
+    } catch {
+      if (!shell.saveLock) shell.toast('自动历练设置尚未保存，请重试');
+      return true;
+    }
+    shell.save.autoplay = next.autoplay;
     shell.clearInput();
     shell.aiChoiceTime = 0;
     shell.nextAiMove = 0;
-    shell.persist();
     if (shell.game) {
       shell.renderHud();
       if (shell.game.state === 'upgrade') shell.renderChoices();
@@ -1593,8 +1607,8 @@ function handleToggles(shell: ActionShell, action: string): boolean {
     return true;
   }
   if (action === 'sound' || action === 'mute') {
+    if (!shell.soundSettings.setEnabled(action === 'sound', true)) return true;
     shell.volumeOpen = action === 'sound' && !shell.volumeOpen;
-    shell.soundSettings.setEnabled(action === 'sound', true);
     if (shell.game) shell.renderHud();
     else shell.renderLobby();
     return true;
@@ -1647,6 +1661,7 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
       shell.panel = '';
       shell.renderPause();
     } else if (shell.game?.state === 'paused') {
+      shell.abandonConfirm = false;
       shell.game.resume();
       shell.modal.innerHTML = '';
     } else {
@@ -1967,6 +1982,7 @@ function handleRun(shell: ActionShell, action: string, id?: string) {
   }
   if (action === 'return') shell.returnLobby();
   if (action === 'pause' && shell.game) {
+    shell.abandonConfirm = false;
     shell.clearInput();
     shell.panel = '';
     shell.game.pause();
@@ -1974,6 +1990,7 @@ function handleRun(shell: ActionShell, action: string, id?: string) {
     shell.persist();
   }
   if (action === 'resume' && shell.game) {
+    shell.abandonConfirm = false;
     shell.clearInput();
     shell.panel = '';
     shell.game.resume();

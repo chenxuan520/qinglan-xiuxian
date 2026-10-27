@@ -459,7 +459,7 @@ test('献物全程预检余额、供奉、寿元、天劫、续局、旧报价�
     capped.medicine.bag[medicine.id] = Number.MAX_SAFE_INTEGER;
     const quote = sectServiceQuote(capped, item);
     if (medicine.years > 0 && medicine.tier !== '凡品') {
-      assert.match(quote.reason, /无法领取精研赐丹/, medicine.name);
+      assert.equal(quote.reason, '丹囊数量已达上限，请先腾出赐丹空间', medicine.name);
       const raw = JSON.stringify(capped);
       assert.equal(executeSectService(capped, item, sectServiceStamp(capped)), undefined);
       assert.equal(JSON.stringify(capped), raw);

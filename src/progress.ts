@@ -529,11 +529,6 @@ export function readSave(
     if (upgrading && ascensionCultivation > 0) {
       // 旧记录无法证明当年通关的灵根、难度和年岁，不补造相关成就。
       base.chronicle.milestones['realm-24'] ??= null;
-      recordChronicle(
-        base,
-        '通关成仙补录',
-        `已有第七境通关记录，补足成仙修为 ${ascensionCultivation}。原通关年岁沿用已有记录。`,
-      );
     }
     syncHumanStories(base);
     claimArtifacts(base);

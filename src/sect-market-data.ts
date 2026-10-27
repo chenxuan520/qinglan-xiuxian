@@ -310,11 +310,11 @@ export function marketLocalReply(npc: MarketCultivator, message: string, playerR
   if (npc.roaming && /论道|丹|药|换|求购/.test(message))
     return '今日只来逛市访友，若要论道或互换，可去丹药铺、法器阁和散修小院找设摊的道友。';
   if (/论道|请教|指点/.test(message))
-    return '论道需静心一年；普通交流、抄录、互授与讲法共用十年一次机会，本次择一。可交流御器心得、抄录或互授丹方；是否赠药，还看故交情分。';
+    return '论道需静心一年。可交流御器心得、抄录或互授丹方；是否赠药，还看故交情分。';
   if (/委托|求购/.test(message))
     return '求购有明示的物品和报酬，当面交货，半年便结清。若有人催你先垫路费，或邀你去僻处，先核验再决定。';
   if (/骗|险|劫|机缘/.test(message))
-    return '话说得好听，未必有真货。看封签，问凭据，辨来路；私下机缘可核验或作别。普通拍卖照明示规则，闲聊不扣物资。';
+    return '话说得好听，未必有真货。看封签，问凭据，辨来路；私下机缘可核验或作别。';
   if (/拍卖|竞拍|买|卖/.test(message))
     return '坊市中央有拍卖行，丹药法宝都可竞买，余物也可托人寄售。入席前，先问清价钱与佣钱。';
   if (/丹|药|换/.test(message))

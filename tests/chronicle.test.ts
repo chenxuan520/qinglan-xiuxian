@@ -245,3 +245,25 @@ test('灵威纯计算不修改存档，真实成长提高评估，未装备法�
   high.completed = [6];
   assert.ok(spiritPower(high).score > pending);
 });
+
+test('年表不展示既存迁移技术记录，真实经历、成就年岁和同版往返完整保留', () => {
+  const save = freshSave();
+  save.age = 45;
+  save.chronicle.milestones['realm-24'] = 42;
+  save.chronicle.entries.push(
+    {
+      age: 45,
+      title: '通关成仙补录',
+      detail: '已有第七境通关记录，补足成仙修为 17。原通关年岁沿用已有记录。',
+    },
+    { age: 42, title: '叩入仙门', detail: '此身已越重山。' },
+  );
+  const before = JSON.stringify(save);
+  const html = chronicleContent(save);
+  assert.doesNotMatch(html, /通关成仙补录|补足成仙修为|原通关年岁/);
+  assert.match(html, /叩入仙门/);
+  assert.match(html, /此身已越重山/);
+  assert.match(html, /42 岁/);
+  assert.equal(JSON.stringify(save), before);
+  assert.deepEqual(importSave(exportSave(save, null)).save.chronicle, save.chronicle);
+});

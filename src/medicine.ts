@@ -15,7 +15,8 @@ import {
   tribulationDue,
   type SaveData,
 } from './progress.ts';
-import { advanceMortal, sectDues, sectDuesPending } from './mortal.ts';
+import { serviceDues } from './service-preflight.ts';
+import { advanceMortal, sectDuesPending } from './mortal.ts';
 import {
   activeMedicines,
   grantMedicine,
@@ -165,16 +166,8 @@ export function medicineCraftReason(save: SaveData, id: string, unfinished = fal
     )
   )
     return '配方所需丹药不足';
-  const dues = save.mortal.member?.dues ? save.mortal.member : null;
-  // 开炉前预留其间到期的供奉，保证炼制一次结清，不产生现实等待。
-  let reserve = 0;
-  if (dues && dues.dueAt <= save.mortal.years + brew.years) {
-    const next = sectDues(save);
-    if (next.stones > 0)
-      reserve =
-        Math.min(dues.dues, next.stones) +
-        Math.floor((save.mortal.years + brew.years - dues.dueAt) / next.years) * next.stones;
-  }
+  // 与人间结算共用账期容差，开炉前预留全部到期供奉。
+  const reserve = serviceDues(save, brew.years);
   if (save.stones < medicineCraftStones(id) + reserve)
     return reserve ? '灵石不足以支付炼制和期间供奉' : '炼制灵石不足';
   return '';

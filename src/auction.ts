@@ -174,7 +174,9 @@ export function auctionSellReason(
     item.quantity < 1 ||
     item.quantity > (item.kind === 'iron' ? 9999 : 99)
   )
-    return '每次可委托一至九十九份';
+    return item.kind === 'iron'
+      ? `玄铁每批可委托${AUCTION_IRON_MIN}至9999枚`
+      : '每次可委托一至九十九份';
   if (item.kind === 'iron') {
     if (item.quantity < AUCTION_IRON_MIN) return `玄铁每批至少${AUCTION_IRON_MIN}枚`;
     if (item.id !== 'iron' || item.forgeLevel !== 0 || save.iron < item.quantity)

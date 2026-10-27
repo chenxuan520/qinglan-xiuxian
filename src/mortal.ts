@@ -70,10 +70,14 @@ export function studyPlan(save: SaveData, withCurio = true) {
   const level = id ? save.mortal.mastery[id] || 0 : 0;
   const limit = masteryLimit(save);
   const years = Math.round(((1 + level * 0.4) / spiritRootInfo(save.spiritRoot).rate) * 10) / 10;
+  const rewardBlocked = masteryRewardPool(level + 1).some(
+    (m) => !Number.isSafeInteger((save.medicine.bag[m.id] ?? 0) + 1),
+  );
   return {
     level,
     limit,
-    eligible: level < limit,
+    reason: rewardBlocked ? '丹囊数量已达上限，请先腾出赐丹空间' : '',
+    eligible: level < limit && !rewardBlocked,
     requiredRealm: MASTERY_REALMS[level]?.name ?? '',
     stones: curioTrainingCost(withCurio ? save : undefined, 30 + level * 20),
     years: withCurio ? curioTrainingYears(save, years) : years,
@@ -135,7 +139,10 @@ export function joinSect(
     dues: dues.stones,
   };
   const medicine = grantMedicine(save.medicine, gift.id);
-  log(save, `拜入${sect.name}，获赠${medicine}一枚，已收入丹囊；本门精研加成已生效。`);
+  log(
+    save,
+    `拜入${sect.name}，获赠${medicine}一枚，已收入丹囊${masteryBonus(save, id) > 0 ? '；本门精研加成已生效' : ''}。`,
+  );
   if (!Object.hasOwn(save.chronicle.milestones, 'sect')) save.chronicle.milestones.sect = save.age;
   return true;
 }

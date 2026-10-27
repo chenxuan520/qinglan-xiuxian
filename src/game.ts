@@ -523,11 +523,13 @@ export class Game {
       player: { ...this.player },
       weapons: this.weapons.map((w) => ({ ...w })),
       passives: { ...this.passives },
-      enemies: this.enemies.map((e) => ({
-        ...e,
-        ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
-        ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
-      })),
+      enemies: this.enemies
+        .filter((e) => !e.dead || !e.bossSummon)
+        .map((e) => ({
+          ...e,
+          ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+          ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
+        })),
       bossVolleys: bossVolleys.map((v) => ({ weapon: v.weapon, hitBosses: [...v.hitBosses] })),
       shots: this.shots.map(({ bossAttack, ...s }) => ({
         ...s,

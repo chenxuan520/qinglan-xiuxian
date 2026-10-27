@@ -817,6 +817,7 @@ export function ensureScene(
   tribulation = false,
   combat = false,
 ) {
+  if (shell.saveLock) return false;
   const extra =
     run?.enemies.map((e) =>
       e.boss ? shell.STAGES[e.bossStage ?? run.stage].sprite : shell.ENEMIES[e.type].sprite,
@@ -865,13 +866,19 @@ export function ensureScene(
       loading.remove();
       shell.sceneLoading = false;
       shell.assetsReady = true;
-      next();
+      if (!shell.saveLock) next();
     })
     .catch(() => {
+      if (shell.saveLock) {
+        loading.remove();
+        shell.sceneLoading = false;
+        return;
+      }
       failed = true;
       loading.innerHTML = `<section><div class="eyebrow">叩仙门：青岚纪</div><h2>${isTribulation ? '天劫将至' : shell.STAGES[stage].name}</h2>${resourceFailureContent('', '素材加载失败，请检查网络后重试。尚未进入场景。', '重新加载', false)}</section>`;
       const retry = loading.querySelector<HTMLButtonElement>('[data-resource-retry]')!;
       retry.onclick = () => {
+        if (shell.saveLock) return;
         loading.remove();
         shell.sceneLoading = false;
         shell.ensureScene(stage, next, run, tribulation, combat);
