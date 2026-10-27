@@ -7,6 +7,14 @@ export const HOUSE_AD_PLACEMENTS = [
   'lifespan',
 ] as const;
 export type HouseAdPlacement = (typeof HOUSE_AD_PLACEMENTS)[number];
+export type HouseAdDevice = 'desktop' | 'mobile';
+export const isHouseAdDevice = (value: unknown): value is HouseAdDevice =>
+  value === 'desktop' || value === 'mobile';
+export const houseAdDeviceFromUserAgent = (
+  userAgent: string,
+  mobileHint?: string | null,
+): HouseAdDevice =>
+  mobileHint === '?1' || /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent) ? 'mobile' : 'desktop';
 export interface HouseAd {
   id: string;
   name: string;
@@ -16,6 +24,8 @@ export interface HouseAd {
 }
 export interface HouseAdCampaign extends HouseAd {
   weight?: number;
+  desktopWeight?: number;
+  mobileWeight?: number;
   enabled: boolean;
   placements: HouseAdPlacement[];
 }
@@ -41,7 +51,9 @@ export function houseAdUrl(value: unknown): value is string {
 }
 export const isHouseAdPlacement = (value: unknown): value is HouseAdPlacement =>
   typeof value === 'string' && (HOUSE_AD_PLACEMENTS as readonly string[]).includes(value);
-export function validHouseAd(value: unknown): value is HouseAd {
+function validHouseAdIdentity(
+  value: unknown,
+): value is Record<string, unknown> & Pick<HouseAd, 'id' | 'name'> {
   return (
     record(value) &&
     typeof value.id === 'string' &&
@@ -49,10 +61,29 @@ export function validHouseAd(value: unknown): value is HouseAd {
     typeof value.name === 'string' &&
     value.name.trim().length > 0 &&
     value.name.length <= 40 &&
-    !/[\u0000-\u001f\u007f]/.test(value.name) &&
+    !/[\u0000-\u001f\u007f]/.test(value.name)
+  );
+}
+export function validHouseAd(value: unknown): value is HouseAd {
+  return (
+    validHouseAdIdentity(value) &&
     houseAdUrl(value.imageUrl) &&
     (value.mobileImageUrl === undefined || houseAdUrl(value.mobileImageUrl)) &&
     houseAdUrl(value.targetUrl)
+  );
+}
+function validCampaignLinks(ad: Record<string, unknown>) {
+  const desktop = Number(ad.desktopWeight ?? ad.weight ?? 1),
+    mobile = Number(ad.mobileWeight ?? ad.weight ?? 1);
+  const legacy = ad.desktopWeight === undefined && ad.mobileWeight === undefined;
+  const mobileImage = legacy && ad.mobileImageUrl === undefined ? ad.imageUrl : ad.mobileImageUrl;
+  return (
+    typeof ad.imageUrl === 'string' &&
+    (ad.imageUrl === '' ? desktop === 0 : houseAdUrl(ad.imageUrl)) &&
+    (ad.mobileImageUrl === undefined ||
+      (ad.mobileImageUrl === '' ? mobile === 0 : houseAdUrl(ad.mobileImageUrl))) &&
+    (mobile === 0 || houseAdUrl(mobileImage)) &&
+    (ad.targetUrl === '' ? desktop === 0 && mobile === 0 : houseAdUrl(ad.targetUrl))
   );
 }
 export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
@@ -83,10 +114,18 @@ export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
         'placements',
         ...(Object.hasOwn(ad, 'mobileImageUrl') ? ['mobileImageUrl'] : []),
         ...(Object.hasOwn(ad, 'weight') ? ['weight'] : []),
+        ...(Object.hasOwn(ad, 'desktopWeight') ? ['desktopWeight'] : []),
+        ...(Object.hasOwn(ad, 'mobileWeight') ? ['mobileWeight'] : []),
       ]) ||
-      !validHouseAd(ad) ||
+      !validHouseAdIdentity(ad) ||
       (ad.weight !== undefined &&
         (!Number.isInteger(ad.weight) || Number(ad.weight) < 1 || Number(ad.weight) > 1000)) ||
+      ['desktopWeight', 'mobileWeight'].some(
+        (key) =>
+          ad[key] !== undefined &&
+          (!Number.isInteger(ad[key]) || Number(ad[key]) < 0 || Number(ad[key]) > 1000),
+      ) ||
+      !validCampaignLinks(ad) ||
       typeof ad.enabled !== 'boolean' ||
       !Array.isArray(ad.placements) ||
       !ad.placements.length ||
@@ -99,13 +138,18 @@ export function validHouseAdConfig(value: unknown): value is HouseAdConfig {
     return true;
   });
 }
+export const houseAdWeight = (ad: HouseAdCampaign, device: HouseAdDevice) =>
+  (device === 'mobile' ? ad.mobileWeight : ad.desktopWeight) ?? ad.weight ?? 1;
 export function weightedHouseAd(
   campaigns: HouseAdCampaign[],
   placement: HouseAdPlacement,
   ticket?: number,
+  device: HouseAdDevice = 'desktop',
 ): HouseAdCampaign | null {
-  const available = campaigns.filter((a) => a.enabled && a.placements.includes(placement));
-  const total = available.reduce((n, a) => n + (a.weight ?? 1), 0);
+  const available = campaigns.filter(
+    (a) => a.enabled && a.placements.includes(placement) && houseAdWeight(a, device) > 0,
+  );
+  const total = available.reduce((n, a) => n + houseAdWeight(a, device), 0);
   if (!total) return null;
   if (ticket === undefined) {
     // 拒绝尾部余数，整数票严格等概率；不同位置只在各自已启用投放内抽取。
@@ -119,16 +163,16 @@ export function weightedHouseAd(
   if (!Number.isInteger(ticket) || ticket < 0 || ticket >= total)
     throw Error('invalid-weight-ticket');
   for (const ad of available) {
-    ticket -= ad.weight ?? 1;
+    ticket -= houseAdWeight(ad, device);
     if (ticket < 0) return ad;
   }
   return null;
 }
-export function publicHouseAd(ad: HouseAdCampaign): HouseAd {
+export function publicHouseAd(ad: HouseAdCampaign, device: HouseAdDevice = 'desktop'): HouseAd {
   return {
     id: ad.id,
     name: ad.name,
-    imageUrl: ad.imageUrl,
+    imageUrl: device === 'mobile' ? ad.mobileImageUrl || ad.imageUrl : ad.imageUrl,
     targetUrl: ad.targetUrl,
     ...(ad.mobileImageUrl ? { mobileImageUrl: ad.mobileImageUrl } : {}),
   };

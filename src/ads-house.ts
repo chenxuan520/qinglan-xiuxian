@@ -5,7 +5,13 @@ import {
   type RewardAdContext,
 } from './ads.ts';
 import { ADS_SETTINGS } from './setting.ts';
-import { boundedAdJson, validHouseAd, type HouseAd } from './house-ad-contract.ts';
+import {
+  boundedAdJson,
+  validHouseAd,
+  houseAdDeviceFromUserAgent,
+  type HouseAd,
+  type HouseAdDevice,
+} from './house-ad-contract.ts';
 import { adTracker } from './ad-metrics.ts';
 import { adReceiptId } from './ad-metrics-contract.ts';
 
@@ -25,11 +31,25 @@ export class HouseAdClock {
     return Math.ceil(this.remaining / 1000);
   }
 }
+export function currentHouseAdDevice(): HouseAdDevice {
+  if (typeof navigator === 'undefined') return 'desktop';
+  const mobile = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData
+    ?.mobile;
+  if (houseAdDeviceFromUserAgent(navigator.userAgent, mobile ? '?1' : undefined) === 'mobile')
+    return 'mobile';
+  // iPad桌面UA及触屏模拟仍按手机渠道；桌面缩窄窗口、手机转屏均不改变渠道。
+  return navigator.maxTouchPoints > 0 &&
+    (/Macintosh/i.test(navigator.userAgent) ||
+      (typeof window !== 'undefined' && window.matchMedia?.('(pointer:coarse)').matches))
+    ? 'mobile'
+    : 'desktop';
+}
 export async function requestHouseAd(
   placement: AdPlacement,
   signal: AbortSignal,
   fetcher: typeof fetch = fetch,
-): Promise<(HouseAd & { receipt?: string }) | null> {
+  device = currentHouseAdDevice(),
+): Promise<(HouseAd & { receipt?: string; device: HouseAdDevice }) | null> {
   if (
     !ADS_SETTINGS.house.endpoint ||
     signal.aborted ||
@@ -38,12 +58,14 @@ export async function requestHouseAd(
     return null;
   const url = new URL(ADS_SETTINGS.house.endpoint);
   url.searchParams.set('placement', placement);
+  url.searchParams.set('device', device);
   const response = await fetcher(url, { signal, credentials: 'omit', cache: 'no-store' });
   if (!response.ok) return null;
   const body = await boundedAdJson(response, 16_000);
   return body && typeof body === 'object' && 'ad' in body && validHouseAd(body.ad)
     ? {
         ...body.ad,
+        device,
         ...('receipt' in body && adReceiptId(body.receipt) ? { receipt: body.receipt } : {}),
       }
     : null;
@@ -169,12 +191,6 @@ export async function playHouseAd(
     status.textContent = '正在加载广告图片…';
     status.style.cssText = 'font-size:12px;letter-spacing:0;line-height:1.6';
     const picture = document.createElement('picture');
-    if (ad.mobileImageUrl) {
-      const source = document.createElement('source');
-      source.media = '(max-width:700px)';
-      source.srcset = new URL(ad.mobileImageUrl).href.replace(/,/g, '%2C');
-      picture.append(source);
-    }
     picture.append(image);
     link.append(picture);
     content.append(label, link, status);
@@ -196,7 +212,7 @@ export async function playHouseAd(
       image!.onload = () => done();
       image!.onerror = () => done(new Error('image-unavailable'));
       signal.addEventListener('abort', abort, { once: true });
-      image!.src = ad.imageUrl;
+      image!.src = ad.device === 'mobile' ? (ad.mobileImageUrl ?? ad.imageUrl) : ad.imageUrl;
     });
     if (signal.aborted || !host.isConnected) {
       cleanup();

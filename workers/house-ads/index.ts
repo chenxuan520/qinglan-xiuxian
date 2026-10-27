@@ -2,6 +2,8 @@ import {
   boundedAdJson,
   HOUSE_AD_MAX_BYTES,
   isHouseAdPlacement,
+  isHouseAdDevice,
+  houseAdDeviceFromUserAgent,
   publicHouseAd,
   validHouseAdConfig,
   weightedHouseAd,
@@ -175,18 +177,27 @@ export default {
       if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: extra });
       const placement = url.searchParams.get('placement');
       if (!isHouseAdPlacement(placement)) return json({ error: 'invalid-placement' }, 400, extra);
+      const requestedDevice = url.searchParams.get('device');
+      if (requestedDevice !== null && !isHouseAdDevice(requestedDevice))
+        return json({ error: 'invalid-device' }, 400, extra);
+      const device =
+        requestedDevice ??
+        houseAdDeviceFromUserAgent(
+          request.headers.get('User-Agent') ?? '',
+          request.headers.get('Sec-CH-UA-Mobile'),
+        );
       try {
         const current = await config(env);
         const ad =
           current.settings!.provider === 'house'
-            ? weightedHouseAd(current.campaigns, placement)
+            ? weightedHouseAd(current.campaigns, placement, undefined, device)
             : null;
         let receipt: string | undefined;
         if (ad) {
           receipt = await receiptFor(request, env, ad, 'house', placement);
         }
         return json(
-          { ad: ad ? publicHouseAd(ad) : null, ...(receipt ? { receipt } : {}) },
+          { ad: ad ? publicHouseAd(ad, device) : null, ...(receipt ? { receipt } : {}) },
           200,
           extra,
         );
