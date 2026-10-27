@@ -73,8 +73,8 @@ export async function requestHouseAd(
   const body = await adLoadJson(url, signal, 16_000, fetcher, trace);
   if (trace && body && typeof body === 'object' && 'ad' in body) {
     if (body.ad === null) trace.empty = true;
-    else if (!validHouseAd(body.ad)) trace.code = 'invalid';
-  } else if (trace && body) trace.code = 'invalid';
+    else if (!validHouseAd(body.ad)) trace.code = 'schema';
+  } else if (trace && body) trace.code = 'schema';
   return body && typeof body === 'object' && 'ad' in body && validHouseAd(body.ad)
     ? {
         ...body.ad,
@@ -213,7 +213,8 @@ export async function playHouseAd(
               context.trace.at('creative');
               context.trace.code = receiptTrace.code;
               context.trace.status = receiptTrace.status;
-              context.trace.empty = receiptTrace.empty || !!fresh;
+              context.trace.empty = receiptTrace.empty;
+              context.trace.silent = !!fresh;
             }
             cleanup();
             callbacks.onFailed('广告投放已更新');

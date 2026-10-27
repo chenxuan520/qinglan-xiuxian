@@ -10,6 +10,7 @@ export class AdLoadTrace {
   code: AdLoadDiagnostic['code'] = 'unavailable';
   status = 0;
   empty = false;
+  silent = false;
   private readonly started = performance.now();
   private reported = false;
   at(stage: AdLoadDiagnostic['stage']) {
@@ -21,6 +22,7 @@ export class AdLoadTrace {
     if (
       this.reported ||
       this.empty ||
+      this.silent ||
       STANDALONE ||
       typeof window === 'undefined' ||
       typeof navigator === 'undefined' ||

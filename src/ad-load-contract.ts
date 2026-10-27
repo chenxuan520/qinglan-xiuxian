@@ -13,7 +13,19 @@ export const AD_LOAD_STAGES = [
   'image',
   'sdk',
 ] as const;
-export const AD_LOAD_ERRORS = ['timeout', 'network', 'http', 'invalid', 'unavailable'] as const;
+export const AD_LOAD_ERRORS = [
+  'timeout',
+  'network',
+  'http',
+  'invalid',
+  'unavailable',
+  'body-read',
+  'empty',
+  'html',
+  'json',
+  'schema',
+  'too-large',
+] as const;
 export const AD_LOAD_BROWSERS = ['via', 'chromium', 'safari', 'firefox', 'other'] as const;
 export interface AdLoadDiagnostic {
   version: string;

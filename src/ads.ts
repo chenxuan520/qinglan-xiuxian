@@ -74,7 +74,7 @@ export interface WatchPlacementOptions {
   // 面板仍存活检查（玩家可能中途关闭/切换面板）；不满足时本次播放结果完全作废。
   alive(): boolean;
   onWatched(onClaim?: () => void): void;
-  onFallback(reason: string): void;
+  onFallback(reason: string, noInventory: boolean): void;
   timeoutMs?: number;
   host?: HTMLElement;
   onProgress?(seconds: number): void;
@@ -109,7 +109,7 @@ export function watchAdPlacement(options: WatchPlacementOptions): void {
     if (finished || !alive()) return;
     trace.report(placement);
     done();
-    onFallback(reason);
+    onFallback(reason, trace.empty);
   };
   provider
     .prepare({ placement, signal: controller.signal, alive, trace })

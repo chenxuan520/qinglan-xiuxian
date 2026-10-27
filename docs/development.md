@@ -465,3 +465,9 @@ MobileDisplay在明确入场或方向选择时请求全屏，再通过按需模�
 移除登录共享global100次/15分钟额度；按可信CF-Connecting-IP散列原子保留最多10个失败/校验中名额，成功和服务故障释放，错误账号密码保留至原15分钟窗口结束。原会话、退出撤销、改密撤销与revision保护不变。验证码仅用于新登录，普通玩家与广告投放不新增验证；广告凭条60/60及加载诊断30/60限流不改。agent新登录也必须正常验证，随后在该浏览器会话使用JSON接口，不增加API key或免验证入口；接口文档与Python调用示例同步。
 
 现有qinglan-house-ads Worker的`TURNSTILE_SECRET`和公开组件标识`TURNSTILE_SITE_KEY`都由平台secret绑定管理，wrangler只声明必需名称，不存真实值；sitekey按设计渲染到登录页，secret永不进入HTML/日志/仓库。组件域名限定官网、localhost和127.0.0.1，生产后端仍只认可官网精确hostname。部署保留原secret绑定，不重置管理账号、不重新授权Cloudflare；先经官方Siteverify验证新组件secret有效，再写现有Worker的secret store，随后发布已审查代码。正式组件需实际浏览器登录成功及同token重放拒绝；自动化中的官方测试组件/受控Siteverify夹具均须与正式验收区分。
+
+### 广告小JSON的手机兼容读取与诊断
+
+广告公开小JSON保留fetch(credentials:omit)、单次含正文6秒、瞬时故障一次重试和整轮30秒，不改为会在同源自动带Cookie的XHR。响应流和TextDecoder齐全时仍逐块限制；缺能力时用原生Response.text读取，已知Content-Length先检查，完成后按UTF-8字节检查上限再解析。兼容回退的大小检查发生在原生读取后，不能声称能够逐块截断；Worker请求正文及Siteverify仍用原有严格流式上限，不采用此客户端回退。控制器取消仍覆盖正文读取，取消后迟到数据不生效。
+
+诊断记录实际收到的HTTP状态，0仅用于尚未取得响应；有限错误类型区分body-read、empty、html、json、schema、too-large，保留旧invalid以接收旧版，仍不上传响应正文、异常原文、完整UA、链接、Cookie、存档或凭据。真实无投放继续显示“广告位招租”；读取或播放故障显示简短失败状态与“重新加载”，原位重试新建观看轮次、旧轮次失效，原奖励、占位5秒兜底和极限禁用规则保持。

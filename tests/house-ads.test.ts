@@ -642,4 +642,26 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
   now += 10000;
   t.mock.timers.tick(10000);
   assert.equal(failures, 1);
+  // 预备广告在后台核验时变为另一条合法素材/跳转，不能当作没有库存。
+  const { storePreparedAd } = await import('../src/ad-preload-cache.ts');
+  const { AdLoadTrace } = await import('../src/ad-load-diagnostics.ts');
+  const trace = new AdLoadTrace();
+  storePreparedAd('revive', 'desktop', exampleAd);
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ ad: { ...exampleAd, targetUrl: 'https://example.test/changed' } }),
+  );
+  await playHouseAd(
+    'revive',
+    { onWatched: () => assert.fail('变化后不能沿用旧观看'), onFailed: () => failures++ },
+    {
+      host: host as unknown as HTMLElement,
+      signal: new AbortController().signal,
+      onProgress() {},
+      trace,
+    },
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(failures, 2);
+  assert.equal(trace.empty, false, '合法投放变化仍有库存');
+  assert.equal(trace.silent, true, '正常投放变化不伪造加载故障');
 });

@@ -41,7 +41,7 @@ export async function configuredAdProvider(
     !validAdPlatformSettings(body.settings) ||
     signal.aborted
   ) {
-    if (body && trace) trace.code = 'invalid';
+    if (body && trace) trace.code = 'schema';
     return null;
   }
   if (body.settings.provider === 'house') return houseAdProvider;

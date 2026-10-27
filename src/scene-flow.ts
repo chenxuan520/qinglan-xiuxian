@@ -665,12 +665,24 @@ export function startAdWatch(
       shell.adClaimReport = onClaim ?? null;
       shell.markAdWatched(action, label);
     },
-    onFallback: () => {
+    onFallback: (_reason, noInventory) => {
       const host = shell.modal.querySelector<HTMLElement>('.revive-ad');
       if (host) {
         host.hidden = false;
         host.removeAttribute('style');
-        host.textContent = '广告位招租';
+        host.textContent = noInventory ? '广告位招租' : '广告加载失败';
+        if (!noInventory) {
+          const retry = shell.document.createElement('button');
+          retry.type = 'button';
+          retry.className = 'secondary-button';
+          retry.textContent = '重新加载';
+          retry.onclick = () => {
+            if (shell.panel !== watchPanel || shell.adWatchEpoch !== epoch) return;
+            shell.clearInterval(shell.adTimer);
+            shell.startAdWatch(action, label, placement);
+          };
+          host.append(retry);
+        }
       }
       shell.startAdCountdown(action, label);
     },
