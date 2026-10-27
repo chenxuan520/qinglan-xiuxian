@@ -19,6 +19,7 @@ import {
   adEnv,
   exampleAd,
   LOCAL_AD_PASSWORD,
+  LOCAL_AD_CAPTCHA,
 } from './helpers/house-ads.ts';
 
 test('广告配置封闭校验HTTPS链接、20条上限、唯一身份与四个合法广告位', () => {
@@ -164,7 +165,11 @@ test('账号密码登录、退出撤销、修改密码撤销所有旧会话，�
       new Request(env.ADMIN_ORIGIN + '/ads/admin/' + path, {
         method: 'POST',
         headers: { Origin: origin, 'Content-Type': 'application/json', Cookie: cookie },
-        body: JSON.stringify(data),
+        body: JSON.stringify(
+          path === 'login'
+            ? { ...(data as object), 'cf-turnstile-response': LOCAL_AD_CAPTCHA }
+            : data,
+        ),
       }),
       env,
     );
@@ -239,14 +244,24 @@ test('登录原子限流、正文上限、存储失败均拒绝访问，响应�
   assert.equal((await login('x'.repeat(2100))).status, 400);
   store.failures(false, true);
   const failure = await login(
-    JSON.stringify({ username: 'owner@example.test', password: LOCAL_AD_PASSWORD }),
+    JSON.stringify({
+      username: 'owner@example.test',
+      password: LOCAL_AD_PASSWORD,
+      'cf-turnstile-response': LOCAL_AD_CAPTCHA,
+    }),
   );
   assert.equal(failure.status, 503);
   assert.doesNotMatch(await failure.text(), /fixture|Local-only|password_hash/);
   store.failures(false, false);
   const results = await Promise.all(
     Array.from({ length: 12 }, () =>
-      login(JSON.stringify({ username: 'owner@example.test', password: 'wrong' })),
+      login(
+        JSON.stringify({
+          username: 'owner@example.test',
+          password: 'wrong',
+          'cf-turnstile-response': LOCAL_AD_CAPTCHA,
+        }),
+      ),
     ),
   );
   assert.equal(results.filter((r) => r.status === 401).length, 10);

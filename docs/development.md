@@ -195,8 +195,8 @@ AdSense 站点注册认注册根域 `011203.xyz`，而根域默认重定向到�
 
 ## 自营图片广告 · 独立投放服务
 
-游戏与后台代码保留在同一仓库，`workers/house-ads/` 独立部署，通过官网 `https://xiuxian.011203.xyz/ads/admin/` 管理，不需要新增域名；不复用 NPC Worker、游戏存档或统计凭据。后台使用账号密码登录，不经过 Cloudflare Access 或邮箱验证码。D1只保存随机盐与PBKDF2-HMAC-SHA256（100000次）派生的密码校验值；会话为32字节随机值，只保存SHA-256散列，使用8小时有效的Secure、HttpOnly、SameSite=Strict Cookie。退出撤销当前会话，修改密码要求当前密码且撤销全部旧会话。登录使用D1原子限流，管理写操作要求同源JSON请求，伪造邮箱标头、旧Access令牌及workers.dev地址均不能绕过。
-Agent可直接复用同一JSON管理API，无须操作浏览器表单：公开[调用说明](https://xiuxian.011203.xyz/ads/api.md)和[OpenAPI 3.1](https://xiuxian.011203.xyz/ads/openapi.json)由广告Worker提供，登录页head中的`ai-agent-instructions`及`service-desc`/`service-doc`负责发现，正文不显示agent提示。说明只含静态接口契约，不读取账号或投放数据。账号密码登录取得8小时Cookie后，读取/按revision整体替换配置及查询1/7/30天指标；所有写请求仍须规范Origin和JSON，409先重读合并，不放宽鉴权、不新建API key。示例只读且退出会话，验证投放带`verification=1`，不伪造指标；不得打印密码或Cookie。
+游戏与后台代码保留在同一仓库，`workers/house-ads/` 独立部署，通过官网 `https://xiuxian.011203.xyz/ads/admin/` 管理，不需要新增域名；不复用 NPC Worker、游戏存档或统计凭据。后台使用账号密码与Turnstile登录，不经过 Cloudflare Access 或邮箱验证码。D1只保存随机盐与PBKDF2-HMAC-SHA256（100000次）派生的密码校验值；会话为32字节随机值，只保存SHA-256散列，使用8小时有效的Secure、HttpOnly、SameSite=Strict Cookie。退出撤销当前会话，修改密码要求当前密码且撤销全部旧会话。登录仅保留按可信来源的D1原子失败/并发限制，不设全局总额；管理写操作要求同源JSON请求，伪造邮箱标头、旧Access令牌及workers.dev地址均不能绕过。
+Agent正常通过浏览器Turnstile登录后，可复用同一会话调用JSON管理API：公开[调用说明](https://xiuxian.011203.xyz/ads/api.md)和[OpenAPI 3.1](https://xiuxian.011203.xyz/ads/openapi.json)由广告Worker提供，登录页head中的`ai-agent-instructions`及`service-desc`/`service-doc`负责发现，正文不显示agent提示。说明只含静态接口契约，不读取账号或投放数据。账号密码与有效人机验证结果登录取得8小时Cookie后，读取/按revision整体替换配置及查询1/7/30天指标；所有写请求仍须规范Origin和JSON，409先重读合并，不放宽鉴权、不新建API key。示例只读且退出会话，验证投放带`verification=1`，不伪造指标；不得打印密码或Cookie。
 
 后台将「当前投放方式」与「Google AdSense 设置」分为独立区域；上方选择整个游戏使用的广告来源，下面的 Google 参数可先填写用于审核验证，保存参数不等于启用 Google 或通过审核。
 后台支持最多20条自营广告，每条包含名称、电脑/手机图片链接、共用HTTPS点击跳转链接、启用总开关、两端各自0～1000的整数权重及四个既有投放位置。同一广告位中，两端分别在本端权重大于0且已启用的广告中按权重比例抽取；某端0即不投放该端，两端0则都不投放。某端权重大于0时必须填写本端HTTPS图片；任一端大于0时共用跳转链接也必填，两端0时链接可留空，非空链接始终须合法HTTPS。不接受HTML、脚本或奖励参数。
@@ -457,3 +457,11 @@ MobileDisplay在明确入场或方向选择时请求全屏，再通过按需模�
 首页空闲预热自营供给类型（最多15秒）与当前端最多4张有效图片，不申请凭条或计曝光，省流量模式跳过。图片加载成功后为各位置备一条短期创意（15秒且一次性），打开立即展示并后台核验当前投放、申请凭条；核验失效立即停止，未核验成功不解锁，未预备或过期即时抽取；配置及创意请求各次含正文6秒，网络/超时/5xx最多重试一次，整轮30秒，取消立即失效。播放页只保留广告标记、完整图片、底部倒计时和关闭；看完后收起图片再领取，五秒有效观看和奖励规则不变。
 
 新增迁移`workers/house-ads/migrations/0004_ad_load_diagnostics.sql`，先应用再部署Worker。绑定`AD_DIAGNOSTIC_LIMITER`为原生频控30/60，与统计凭条频控独立；官网`/api/client-status`路由同一Worker。匿名加载故障每轮最多一次，封闭枚举及有限版本号、512字节，不携带Cookie、不收原始IP/完整UA/链接/异常原文/存档/账号信息；按UTC日聚合，约30天清理，最多500行只在原管理会话下通过`GET /ads/admin/diagnostics?days=1|7|30`查询。不要向正式服务注入故障测试数据；使用隔离D1及测试入口路由。`network`只说明该阶段未成功，不能据此断言Via拦截或服务缺陷。图片预热接口`/ads/v1/preload?device=mobile|desktop`不签发凭条、不写运营指标，契约见`/ads/api.md`。
+
+### 广告后台登录 Turnstile
+
+广告管理登录保留原账号密码和8小时Cookie，在`/ads/admin/login`强制Cloudflare Turnstile：前端显式渲染`ad_admin_login`动作，320px窄屏用compact，其余flexible，失败/过期/超时可重试；每次提交后换新验证结果，缺结果时按钮禁用。服务端只向官方Siteverify发送验证数据，要求success严格为true、action完全一致、hostname等于当前ADMIN_ORIGIN的hostname；生产只接受xiuxian.011203.xyz，不能因组件也登记本机域名而放宽。验证最长8秒、有界4096字节响应，失败在D1及密码校验前拒绝，不把网络或缺配置当成功。登录正文最多4096字节以容纳最长2048字符验证结果，改密仍2048字节。
+
+移除登录共享global100次/15分钟额度；按可信CF-Connecting-IP散列原子保留最多10个失败/校验中名额，成功和服务故障释放，错误账号密码保留至原15分钟窗口结束。原会话、退出撤销、改密撤销与revision保护不变。验证码仅用于新登录，普通玩家与广告投放不新增验证；广告凭条60/60及加载诊断30/60限流不改。agent新登录也必须正常验证，随后在该浏览器会话使用JSON接口，不增加API key或免验证入口；接口文档与Python调用示例同步。
+
+现有qinglan-house-ads Worker的`TURNSTILE_SECRET`和公开组件标识`TURNSTILE_SITE_KEY`都由平台secret绑定管理，wrangler只声明必需名称，不存真实值；sitekey按设计渲染到登录页，secret永不进入HTML/日志/仓库。组件域名限定官网、localhost和127.0.0.1，生产后端仍只认可官网精确hostname。部署保留原secret绑定，不重置管理账号、不重新授权Cloudflare；先经官方Siteverify验证新组件secret有效，再写现有Worker的secret store，随后发布已审查代码。正式组件需实际浏览器登录成功及同token重放拒绝；自动化中的官方测试组件/受控Siteverify夹具均须与正式验收区分。

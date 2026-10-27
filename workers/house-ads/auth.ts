@@ -1,6 +1,7 @@
 import { boundedAdJson } from '../../src/house-ad-contract.ts';
+import { verifyAdLogin, type TurnstileEnv } from './turnstile.ts';
 
-type AuthEnv = Pick<HouseAdsEnv, 'DB' | 'ADMIN_ORIGIN'>;
+type AuthEnv = Pick<HouseAdsEnv, 'DB' | 'ADMIN_ORIGIN'> & TurnstileEnv;
 const COOKIE = '__Host-qinglan-ad-session';
 const SESSION_SECONDS = 8 * 60 * 60;
 const hex = (bytes: ArrayBuffer | Uint8Array) =>
@@ -75,21 +76,20 @@ const reply = (body: unknown, status = 200, sessionCookie?: string) =>
   });
 async function reserveAttempt(request: Request, env: AuthEnv, now: number) {
   await env.DB.prepare('DELETE FROM ad_login_limits WHERE resets <= ?').bind(now).run();
-  // 全局先限流，使随机地址不能无限增长存储；地址仅保存散列，不记录账号或密码。
-  for (const [id, limit] of [
-    ['global', 100],
-    [await digest(request.headers.get('CF-Connecting-IP') ?? 'unknown'), 10],
-  ] as const) {
-    const row = await env.DB.prepare(
-      'INSERT INTO ad_login_limits (id, attempts, resets) VALUES (?, 1, ?) ON CONFLICT(id) DO UPDATE SET attempts = attempts + 1 RETURNING attempts',
-    )
-      .bind(id, now + 900)
-      .first<{ attempts: number }>();
-    if (!row || row.attempts > limit) return false;
-  }
-  return true;
+  // 仅按可信地址散列保留失败/正在校验的名额，不设全局总额；成功与服务故障释放。
+  const id = await digest(request.headers.get('CF-Connecting-IP') ?? 'unknown');
+  const row = await env.DB.prepare(
+    'INSERT INTO ad_login_limits (id, attempts, resets) VALUES (?, 1, ?) ON CONFLICT(id) DO UPDATE SET attempts=attempts+1 WHERE attempts<10 RETURNING resets',
+  )
+    .bind(id, now + 900)
+    .first<{ resets: number }>();
+  return row ? { id, resets: row.resets } : null;
 }
-export async function adAuthAction(request: Request, env: AuthEnv): Promise<Response> {
+export async function adAuthAction(
+  request: Request,
+  env: AuthEnv,
+  verifyFetch: typeof fetch = fetch,
+): Promise<Response> {
   const path = new URL(request.url).pathname.replace(/^\/ads(?=\/)/, '');
   if (request.method !== 'POST') return reply({ message: '请在管理页面内操作。' }, 405);
   if (
@@ -99,6 +99,8 @@ export async function adAuthAction(request: Request, env: AuthEnv): Promise<Resp
   )
     return reply({ message: '请在管理页面内操作。' }, 403);
   const now = Math.floor(Date.now() / 1000);
+  let reservation: { id: string; resets: number } | null = null;
+  let wrongCredentials = false;
   try {
     if (path === '/admin/logout') {
       const token = sessionToken(request);
@@ -113,7 +115,7 @@ export async function adAuthAction(request: Request, env: AuthEnv): Promise<Resp
       return reply({ message: '登录已失效，请重新登录。' }, 401);
     let input: unknown;
     try {
-      input = await boundedAdJson(request, 2048);
+      input = await boundedAdJson(request, path === '/admin/login' ? 4096 : 2048);
     } catch {
       return reply({ message: '请检查填写内容。' }, 400);
     }
@@ -134,8 +136,26 @@ export async function adAuthAction(request: Request, env: AuthEnv): Promise<Resp
         body.newPassword.length > 128)
     )
       return reply({ message: '新密码请使用12至128个字符。' }, 400);
-    if (!(await reserveAttempt(request, env, now)))
-      return reply({ message: '尝试次数过多，请15分钟后再试。' }, 429);
+    if (path === '/admin/login') {
+      const verification = await verifyAdLogin(
+        request,
+        env,
+        body['cf-turnstile-response'],
+        verifyFetch,
+      );
+      if (verification !== 'valid')
+        return reply(
+          {
+            message:
+              verification === 'invalid'
+                ? '请重新完成人机验证。'
+                : '人机验证暂不可用，请稍后重试。',
+          },
+          verification === 'invalid' ? 403 : 503,
+        );
+    }
+    reservation = await reserveAttempt(request, env, now);
+    if (!reservation) return reply({ message: '尝试次数过多，请15分钟后再试。' }, 429);
     const admin = await env.DB.prepare(
       'SELECT username, salt, password_hash, version FROM ad_admin WHERE id = 1',
     ).first<Admin>();
@@ -145,11 +165,13 @@ export async function adAuthAction(request: Request, env: AuthEnv): Promise<Resp
       !correct ||
       (path === '/admin/login' &&
         (body.username as string).trim().toLowerCase() !== admin.username.toLowerCase())
-    )
+    ) {
+      wrongCredentials = true;
       return reply(
         { message: path === '/admin/login' ? '账号或密码不正确。' : '当前密码不正确。' },
         401,
       );
+    }
     if (path === '/admin/password') {
       const salt = adRandomToken();
       const result = await env.DB.prepare(
@@ -178,5 +200,17 @@ export async function adAuthAction(request: Request, env: AuthEnv): Promise<Resp
     return reply({ ok: true }, 200, cookie(token));
   } catch {
     return reply({ message: '暂时无法完成操作，请稍后重试。' }, 503);
+  } finally {
+    if (reservation && !wrongCredentials) {
+      try {
+        await env.DB.prepare(
+          'UPDATE ad_login_limits SET attempts=attempts-1 WHERE id=? AND resets=? AND attempts>0',
+        )
+          .bind(reservation.id, reservation.resets)
+          .run();
+      } catch {
+        /* 释放失败时保守保留名额，最多原15分钟，不伪造认证成功。 */
+      }
+    }
   }
 }

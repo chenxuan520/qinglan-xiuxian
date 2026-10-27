@@ -5,7 +5,15 @@ import { createHouseAdsWorker } from '../workers/house-ads/index.ts';
 import { validateCampaignImages } from '../workers/house-ads/images.ts';
 import { ADMIN_SCRIPT, LOGIN_HTML } from '../workers/house-ads/admin.ts';
 import { HOUSE_AD_PLACEMENTS } from '../src/house-ad-contract.ts';
-import { adEnv, adStore, seedAdAdmin, LOCAL_AD_PASSWORD, exampleAd } from './helpers/house-ads.ts';
+import {
+  adEnv,
+  adStore,
+  seedAdAdmin,
+  LOCAL_AD_PASSWORD,
+  LOCAL_AD_CAPTCHA,
+  localAdVerification,
+  exampleAd,
+} from './helpers/house-ads.ts';
 
 const image = () =>
   new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } });
@@ -43,7 +51,7 @@ test('公开机器说明在D1不可用时仍可发现，登录提示不进入可
   assert.match(login, /name="ai-agent-instructions"/);
   assert.match(login, /rel="service-desc"[^>]*href="\/ads\/openapi.json"/);
   assert.match(login, /rel="service-doc"[^>]*href="\/ads\/api.md"/);
-  assert.equal(login, LOGIN_HTML);
+  assert.equal(login, LOGIN_HTML.replace('__TURNSTILE_SITE_KEY__', env.TURNSTILE_SITE_KEY));
   assert.doesNotMatch(login.split('<body>')[1], /agent|openapi|api\.md/i);
   new Script(ADMIN_SCRIPT);
 });
@@ -63,7 +71,7 @@ test('agent按文档登录读改写读及统计退出，图片无效、冲突和
     return valid
       ? image()
       : new Response('<html>missing</html>', { headers: { 'Content-Type': 'text/html' } });
-  });
+  }, localAdVerification);
   let cookie = '';
   const request = (path: string, method = 'GET', data?: unknown, origin = env.ADMIN_ORIGIN) =>
     worker.fetch(
@@ -79,6 +87,7 @@ test('agent按文档登录读改写读及统计退出，图片无效、冲突和
   const login = await request('/admin/login', 'POST', {
     username: 'owner@example.test',
     password: LOCAL_AD_PASSWORD,
+    'cf-turnstile-response': LOCAL_AD_CAPTCHA,
   });
   assert.equal(login.status, 200);
   cookie = login.headers.get('Set-Cookie')!.split(';')[0];

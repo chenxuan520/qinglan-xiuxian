@@ -18,6 +18,7 @@ import { adMetrics, issueAdReceipt, recordAdMetrics, validAdMetricEvent } from '
 import { AD_API_GUIDE, houseAdsOpenApi } from './api.ts';
 import { validateCampaignImages } from './images.ts';
 import { recordAdLoadDiagnostic, adLoadDiagnostics } from './diagnostics.ts';
+import { loginSiteKey } from './turnstile.ts';
 
 // 登录账号与密码校验值由D1维护，不写入公开仓库。
 export type HouseAdsWorkerEnv = HouseAdsEnv;
@@ -110,16 +111,21 @@ async function receiptFor(
     return undefined;
   }
 }
-function page(body: string, type: string) {
+function page(body: string, type: string, login = false) {
   const extra = headers();
   extra.set('Content-Type', type);
   extra.set(
     'Content-Security-Policy',
-    "default-src 'none'; script-src 'self'; style-src 'self'; img-src https:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    login
+      ? "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self'; img-src https:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+      : "default-src 'none'; script-src 'self'; style-src 'self'; img-src https:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
   );
   return new Response(body, { headers: extra });
 }
-export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
+export const createHouseAdsWorker = (
+  fetchImage: typeof fetch = fetch,
+  verifyFetch: typeof fetch = fetch,
+) =>
   ({
     async fetch(request: Request, env: HouseAdsWorkerEnv): Promise<Response> {
       const url = new URL(request.url);
@@ -306,9 +312,14 @@ export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
         ['/admin/login', '/admin/logout', '/admin/password'].includes(path) &&
         request.method !== 'GET'
       )
-        return adAuthAction(request, env);
+        return adAuthAction(request, env, verifyFetch);
       if (request.method === 'GET') {
-        if (path === '/admin/login') return page(LOGIN_HTML, 'text/html; charset=utf-8');
+        if (path === '/admin/login')
+          return page(
+            LOGIN_HTML.replace('__TURNSTILE_SITE_KEY__', loginSiteKey(env) ?? ''),
+            'text/html; charset=utf-8',
+            true,
+          );
         if (path === '/admin/login.js') return page(LOGIN_SCRIPT, 'text/javascript; charset=utf-8');
         if (path === '/admin/app.css') return page(ADMIN_CSS, 'text/css; charset=utf-8');
         if (path === '/admin/app.js') return page(ADMIN_SCRIPT, 'text/javascript; charset=utf-8');
@@ -321,7 +332,11 @@ export const createHouseAdsWorker = (fetchImage: typeof fetch = fetch) =>
       }
       if (!authenticated) {
         if (path === '/admin/' && request.method === 'GET')
-          return page(LOGIN_HTML, 'text/html; charset=utf-8');
+          return page(
+            LOGIN_HTML.replace('__TURNSTILE_SITE_KEY__', loginSiteKey(env) ?? ''),
+            'text/html; charset=utf-8',
+            true,
+          );
         return json({ error: 'login-required', message: '登录已失效，请重新登录。' }, 401);
       }
       if (request.method === 'GET') {

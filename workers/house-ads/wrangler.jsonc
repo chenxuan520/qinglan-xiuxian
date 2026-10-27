@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-26",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "secrets": { "required": ["TURNSTILE_SITE_KEY", "TURNSTILE_SECRET"] },
   "ratelimits": [
     {
       "name": "AD_DIAGNOSTIC_LIMITER",

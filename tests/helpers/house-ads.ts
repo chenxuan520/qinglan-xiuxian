@@ -77,6 +77,16 @@ export function adStore() {
   };
 }
 export const LOCAL_AD_PASSWORD = 'Local-only-password-1234';
+export const LOCAL_AD_CAPTCHA = 'local-synthetic-turnstile-response';
+// 仅SQL/鉴权单测的外部验证依赖；正式Worker始终调用Cloudflare Siteverify。
+export const localAdVerification: typeof fetch = async (_input, init) => {
+  const body = new URLSearchParams(String(init?.body));
+  return Response.json({
+    success: body.get('response') === LOCAL_AD_CAPTCHA,
+    hostname: 'xiuxian.011203.xyz',
+    action: 'ad_admin_login',
+  });
+};
 export async function seedAdAdmin(
   store: ReturnType<typeof adStore>,
   username = 'owner@example.test',
@@ -97,7 +107,11 @@ export async function adSessionFixture(
     new Request(origin + '/ads/admin/login', {
       method: 'POST',
       headers: { Origin: origin, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'owner@example.test', password: LOCAL_AD_PASSWORD }),
+      body: JSON.stringify({
+        username: 'owner@example.test',
+        password: LOCAL_AD_PASSWORD,
+        'cf-turnstile-response': LOCAL_AD_CAPTCHA,
+      }),
     }),
     adEnv(store, origin),
   );
@@ -113,6 +127,8 @@ export function adEnv(store: ReturnType<typeof adStore>, origin = 'https://xiuxi
   return {
     DB: store.db,
     ADMIN_ORIGIN: origin,
+    TURNSTILE_SITE_KEY: '0x4SyntheticLocalSiteKey',
+    TURNSTILE_SECRET: 'synthetic-local-verifier-secret',
     ALLOWED_ORIGINS: 'https://xiuxian.011203.xyz,https://chenxuan520.github.io',
     AD_RECEIPT_LIMITER: {
       async limit() {
@@ -139,6 +155,7 @@ export const exampleAd = {
 const sqlWorker = createHouseAdsWorker(
   async () =>
     new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'Content-Type': 'image/png' } }),
+  localAdVerification,
 );
 // 模块级SQL用例没有真实Cloudflare边缘，显式补合成地址和允许的频控绑定。
 // 真实限流、缺地址、拒绝与异常由ad-receipt-rate-limit.test.ts及本地原生绑定验证。

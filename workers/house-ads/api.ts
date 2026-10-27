@@ -14,10 +14,10 @@ export function houseAdsOpenApi(origin: string) {
   const errors = {
     '400': response('正文或参数无效；配置最大' + HOUSE_AD_MAX_BYTES + '字节'),
     '401': response('登录失效或账号密码不正确；停止写入，交由操作者处理'),
-    '403': response('来源或Content-Type不符；不会保存'),
+    '403': response('来源、Content-Type不符或登录人机验证未通过；不会保存'),
     '405': response('不支持此HTTP方法'),
     '409': response('版本冲突；重新读取并核对差异，不得盲目重放旧配置'),
-    '429': response('登录限流；15分钟后再试，不循环认证'),
+    '429': response('当前来源登录失败尝试过多；15分钟后再试，不循环认证'),
     '503': response('服务暂不可用；写入结果不确定时先重新读取配置核对'),
   };
   const writeOrigin = {
@@ -104,15 +104,22 @@ export function houseAdsOpenApi(origin: string) {
         post: {
           ...operation('login', '账号密码登录，保存Set-Cookie', {
             type: 'object',
-            required: ['username', 'password'],
+            required: ['username', 'password', 'cf-turnstile-response'],
             properties: {
               username: { type: 'string', maxLength: 254 },
               password: { type: 'string', minLength: 1, maxLength: 128, writeOnly: true },
+              'cf-turnstile-response': {
+                type: 'string',
+                minLength: 1,
+                maxLength: 2048,
+                writeOnly: true,
+                description: '正常浏览器登录组件取得的新验证结果，5分钟有效且只能用一次。',
+              },
             },
           }),
           security: [],
           description:
-            'JSON正文最大2048字节。账号密码由操作者提供，不在说明中。不要输出Set-Cookie。',
+            'JSON正文最大4096字节。必须同时提交账号密码和新的Turnstile验证结果；服务端核验success===true、action=ad_admin_login及本站精确hostname。agent可在正常浏览器登录后，在同一浏览器会话调用管理JSON API，原8小时会话不需要重复验证码。没有免验证的密码登录接口。不要输出密码、验证结果或Set-Cookie。',
         },
       },
       '/admin/logout': {
@@ -367,7 +374,7 @@ export const AD_API_GUIDE = String.raw`# 青岚纪广告管理 API
 
 ## 登录与退出
 
-复用现有后台账号密码，不需要API key、Cloudflare登录或新授权。凭据由操作者提供，不从页面、仓库或文档寻找。POST /admin/login，JSON正文为 {"username":"你的账号","password":"你的密码"}；请求应带明确的客户端标识，例如 User-Agent: Qinglan-Ad-Agent/1.0；所有POST/PUT必须发送 Origin: https://xiuxian.011203.xyz 和 Content-Type: application/json。成功返回 {"ok":true}，保存Set-Cookie到内存会话或私有cookie jar；后续管理请求发送该Cookie。有效期8小时，Secure/HttpOnly/SameSite=Strict；不支持跨站浏览器管理。不要将密码放URL、命令行参数、日志或工具输出，也不要打印Cookie。
+复用现有后台账号密码，不需要API key、Cloudflare登录或新授权。凭据由操作者提供，不从页面、仓库或文档寻找。POST /admin/login，JSON正文为 {"username":"你的账号","password":"你的密码","cf-turnstile-response":"本次浏览器验证结果"}，总正文最多4096字节；请求应带明确的客户端标识，例如 User-Agent: Qinglan-Ad-Agent/1.0；所有POST/PUT必须发送 Origin: https://xiuxian.011203.xyz 和 Content-Type: application/json。成功返回 {"ok":true}，保存Set-Cookie到内存会话或私有cookie jar；后续管理请求发送该Cookie。会话有效期8小时，Secure/HttpOnly/SameSite=Strict；不支持跨站浏览器管理。新登录必须通过官方Turnstile组件；验证结果最多2048字符、5分钟有效且只能用一次，服务端核对ad_admin_login动作与本站精确hostname，网络或配置失败不会放行。登录失败或验证码过期须在原组件重新取得验证结果，不能重放旧结果。已有会话继续有效，后续配置/统计请求无需重复验证。移除全局100次/15分钟额度，只保留可信来源IP散列的10次/15分钟失败及并发名额；成功和服务故障释放名额，错误账号密码保留计数，不记录原始IP。不要将密码放URL、命令行参数、日志或工具输出，也不要打印Cookie。
 
 结束调用POST /admin/logout，携带Cookie、上述两个标头，撤销当前会话。401停止操作，由操作者处理登录；429等待15分钟，不循环猜密码。修改密码仅在明确要求时调用POST /admin/password，正文password/newPassword，新密码12～128字符；它会撤销全部会话，普通投放编辑不调用。
 
@@ -396,9 +403,9 @@ GET /admin/diagnostics?days=1|7|30 复用管理登录，返回rows，按UTC日�
 
 验证投放可匿名GET /v1/ad?placement=revive&device=mobile&verification=1；device可为desktop/mobile，无投放ad=null。凭条签发使用Cloudflare边缘频控：同一CF-Connecting-IP在单机房每60秒约60张，自营和Google（/v1/settings）所有位置、设备及verification请求共用额度。超限、缺可信边缘IP/绑定或限流异常时，仍200返回广告或settings，但不发receipt、不新增统计写入；已发凭条的事件继续按原规则处理。共享出口IP可能少记，机房之间独立且计数近似，不能作为全球严格配额或结算防作弊。不要携带管理Cookie，不调用游戏事件接口伪造展示、点击、看完或领取。图片预览直接读取HTTPS素材；指标只供参考，不用于结算。
 
-## Python示例：只读登录、配置、指标、退出
+## agent与Python调用示例
 
-标准库即可运行。输入账号密码不会进入命令行；仅输出revision、条数及统计窗口，不输出凭据或完整配置。编辑时按上面的读改写读流程使用request("/admin/config", "PUT", edited_config)，不要直接构造空配置覆盖线上。
+agent推荐通过正常浏览器在 /ads/admin/ 完成登录，然后在该浏览器的同源Cookie会话中调用JSON接口。纯HTTP的新登录同样需要合法前端取得的新Turnstile结果；下面示例不负责获取或绕过人机验证。标准库即可运行；账号密码与验证结果不会进入命令行；仅输出revision、条数及统计窗口，不输出凭据或完整配置。编辑时按上面的读改写读流程使用request("/admin/config", "PUT", edited_config)，不要直接构造空配置覆盖线上。
 
 ~~~python
 import getpass, http.cookiejar, json, urllib.request
@@ -419,8 +426,10 @@ def request(path, method="GET", data=None):
 
 username = input("账号: ")
 password = getpass.getpass("密码: ")
-request("/admin/login", "POST", {"username": username, "password": password})
-del password
+captcha_response = getpass.getpass("本次浏览器验证结果: ")
+request("/admin/login", "POST", {"username": username, "password": password,
+                                 "cf-turnstile-response": captcha_response})
+del password, captcha_response
 try:
     config = request("/admin/config")
     stats = request("/admin/stats?days=7")
