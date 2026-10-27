@@ -125,9 +125,11 @@ test('同一配置源驱动管理端、Google选择和两份ads.txt，旧格式�
     ).status,
     200,
   );
-  const pub = await (await api(env, '/ads/v1/settings')).json();
+  const pub = await (await api(env, '/api/reward-content/config')).json();
   assert.deepEqual(pub, { settings: s });
-  assert.deepEqual(await (await api(env, '/ads/v1/ad?placement=revive')).json(), { ad: null });
+  assert.deepEqual(await (await api(env, '/api/reward-content/creative?placement=revive')).json(), {
+    ad: null,
+  });
   const line = 'google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n';
   assert.equal(await (await api(env, '/ads.txt')).text(), line);
   assert.equal(
@@ -163,7 +165,9 @@ test('真实SQLite凭条固定广告归属，并发乱序重放仅累计一次�
   t.after(() => store.close());
   await seed(store);
   assert.equal((await api(env, '/ads/admin/stats')).status, 401);
-  const delivery = (await (await api(env, '/ads/v1/ad?placement=revive')).json()) as any;
+  const delivery = (await (
+    await api(env, '/api/reward-content/creative?placement=revive')
+  ).json()) as any;
   assert.ok(adReceiptId(delivery.receipt));
   assert.deepEqual(Object.keys(delivery).sort(), ['ad', 'receipt']);
   assert.equal(delivery.ad.weight, undefined);
@@ -172,7 +176,7 @@ test('真实SQLite凭条固定广告归属，并发乱序重放仅累计一次�
   assert.equal(before.rows[0].shown, 0);
   const calls = await Promise.all(
     [13, 1, 3, 5, 15, 3, 15, 13].map((flags) =>
-      api(env, '/ads/v1/event', '', 'POST', { receipt: delivery.receipt, flags }),
+      api(env, '/api/reward-content/event', '', 'POST', { receipt: delivery.receipt, flags }),
     ),
   );
   assert.ok(calls.every((r) => r.status === 204));
@@ -196,12 +200,12 @@ test('真实SQLite凭条固定广告归属，并发乱序重放仅累计一次�
     { receipt: delivery.receipt, flags: 1, ad_id: 'other' },
     { receipt: 'bad', flags: 1 },
   ])
-    assert.equal((await api(env, '/ads/v1/event', '', 'POST', body)).status, 400);
+    assert.equal((await api(env, '/api/reward-content/event', '', 'POST', body)).status, 400);
   assert.equal(
     (
       await api(
         env,
-        '/ads/v1/event',
+        '/api/reward-content/event',
         '',
         'POST',
         { receipt: delivery.receipt, flags: 15 },
@@ -289,17 +293,26 @@ test('预览来源不污染正式统计，统计写故障不阻止返回真实�
   t.after(() => store.close());
   await seed(store);
   const local = (await (
-    await api(env, '/ads/v1/ad?placement=revive', '', 'GET', undefined, 'http://localhost:5173')
+    await api(
+      env,
+      '/api/reward-content/creative?placement=revive',
+      '',
+      'GET',
+      undefined,
+      'http://localhost:5173',
+    )
   ).json()) as any;
   assert.equal(local.ad.id, exampleAd.id);
   assert.equal(local.receipt, undefined);
   const verification = (await (
-    await api(env, '/ads/v1/ad?placement=revive&verification=1')
+    await api(env, '/api/reward-content/creative?placement=revive&verification=1')
   ).json()) as any;
   assert.ok(adReceiptId(verification.receipt));
   assert.equal((await adMetrics(env.DB, 7)).rows.length, 0);
   store.failures(false, true);
-  const fallback = (await (await api(env, '/ads/v1/ad?placement=revive')).json()) as any;
+  const fallback = (await (
+    await api(env, '/api/reward-content/creative?placement=revive')
+  ).json()) as any;
   assert.equal(fallback.ad.id, exampleAd.id);
   assert.equal(fallback.receipt, undefined);
 });

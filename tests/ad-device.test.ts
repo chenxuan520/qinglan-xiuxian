@@ -115,7 +115,9 @@ test('实际Worker+SQLite按渠道筛选四广告位、0不下发凭条；缺dev
   assert.equal((await put(0, [phone, desktop])).status, 200);
   for (const placement of HOUSE_AD_PLACEMENTS)
     for (const channel of ['desktop', 'mobile']) {
-      const r = await call('/ads/v1/ad?placement=' + placement + '&device=' + channel);
+      const r = await call(
+        '/api/reward-content/creative?placement=' + placement + '&device=' + channel,
+      );
       assert.equal(r.status, 200);
       const body = (await r.json()) as any;
       assert.equal(body.ad.id, channel === 'mobile' ? phone.id : desktop.id);
@@ -130,19 +132,28 @@ test('实际Worker+SQLite按渠道筛选四广告位、0不下发凭条；缺dev
     { 'User-Agent': 'Linux Chrome', 'Sec-CH-UA-Mobile': '?1' },
   ])
     assert.equal(
-      ((await (await call('/ads/v1/ad?placement=revive', { headers })).json()) as any).ad.id,
+      (
+        (await (
+          await call('/api/reward-content/creative?placement=revive', { headers })
+        ).json()) as any
+      ).ad.id,
       phone.id,
     );
   assert.equal(
     (
       (await (
-        await call('/ads/v1/ad?placement=revive', { headers: { 'User-Agent': 'Windows Chrome' } })
+        await call('/api/reward-content/creative?placement=revive', {
+          headers: { 'User-Agent': 'Windows Chrome' },
+        })
       ).json()) as any
     ).ad.id,
     desktop.id,
   );
   for (const device of ['', 'phone', 'all', 'Desktop'])
-    assert.equal((await call('/ads/v1/ad?placement=revive&device=' + device)).status, 400);
+    assert.equal(
+      (await call('/api/reward-content/creative?placement=revive&device=' + device)).status,
+      400,
+    );
   assert.equal(
     (await put(1, [{ ...phone, desktopWeight: 1 }])).status,
     400,
@@ -165,9 +176,12 @@ test('实际Worker+SQLite按渠道筛选四广告位、0不下发凭条；缺dev
     200,
   );
   for (const channel of ['desktop', 'mobile'])
-    assert.deepEqual(await (await call('/ads/v1/ad?placement=revive&device=' + channel)).json(), {
-      ad: null,
-    });
+    assert.deepEqual(
+      await (await call('/api/reward-content/creative?placement=revive&device=' + channel)).json(),
+      {
+        ad: null,
+      },
+    );
 });
 
 test('手机横屏和桌面窄窗不按宽度互换渠道，iPad桌面UA归手机', (t) => {

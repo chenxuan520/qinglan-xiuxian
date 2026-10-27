@@ -131,18 +131,11 @@ export const createHouseAdsWorker = (
   ({
     async fetch(request: Request, env: HouseAdsWorkerEnv): Promise<Response> {
       const url = new URL(request.url);
-      let path = url.pathname.replace(/^\/ads(?=\/)/, '');
-      if (url.pathname.startsWith('/api/reward-content/')) {
-        // 仅四个公开玩家接口，不能将管理或认证路由挂到这个入口。
-        const route = new Map([
-          ['/api/reward-content/config', '/v1/settings'],
-          ['/api/reward-content/creative', '/v1/ad'],
-          ['/api/reward-content/preload', '/v1/preload'],
-          ['/api/reward-content/event', '/v1/event'],
-        ]).get(url.pathname);
-        if (!route) return json({ error: 'not-found' }, 404);
-        path = route;
-      }
+      const path =
+        url.pathname.startsWith('/ads/admin/') ||
+        ['/ads/admin', '/ads/openapi.json', '/ads/api.md'].includes(url.pathname)
+          ? url.pathname.slice(4)
+          : url.pathname;
       if (path === '/api/client-status') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');
         if (!extra || !request.headers.get('Origin')) return json({ error: 'origin-denied' }, 403);
@@ -157,7 +150,7 @@ export const createHouseAdsWorker = (
           await recordAdLoadDiagnostic(request, env);
         return new Response(null, { status: 204, headers: extra });
       }
-      if (path === '/v1/preload') {
+      if (path === '/api/reward-content/preload') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
         if (!extra) return json({ error: 'origin-denied' }, 403);
         if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405, extra);
@@ -205,7 +198,7 @@ export const createHouseAdsWorker = (
           return new Response('temporarily unavailable', { status: 503, headers: headers() });
         }
       }
-      if (path === '/v1/event') {
+      if (path === '/api/reward-content/event') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');
         if (!extra || !request.headers.get('Origin')) return json({ error: 'origin-denied' }, 403);
         if (request.method === 'OPTIONS')
@@ -231,7 +224,7 @@ export const createHouseAdsWorker = (
           return json({ error: 'unavailable' }, 503, extra);
         }
       }
-      if (path === '/v1/settings') {
+      if (path === '/api/reward-content/config') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
         if (!extra) return json({ error: 'origin-denied' }, 403);
         if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405, extra);
@@ -255,7 +248,7 @@ export const createHouseAdsWorker = (
           return json({ error: 'unavailable' }, 503, extra);
         }
       }
-      if (path === '/v1/ad') {
+      if (path === '/api/reward-content/creative') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS);
         if (!extra) return json({ error: 'origin-denied' }, 403);
         if (!['GET', 'OPTIONS'].includes(request.method))

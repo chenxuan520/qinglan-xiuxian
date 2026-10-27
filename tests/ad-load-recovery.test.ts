@@ -52,7 +52,7 @@ test('慢配置超过原3秒仍进入真实自营provider，不提前回退；�
 
 test('网络和5xx只重试一次，4xx/坏JSON不重试；取消或超时都有界且不复活旧请求', async (t) => {
   const signal = new AbortController().signal,
-    url = new URL(origin + '/ads/v1/settings');
+    url = new URL(origin + '/api/reward-content/config');
   let calls = 0;
   assert.deepEqual(
     await adLoadJson(url, signal, 512, async () => {
@@ -225,7 +225,9 @@ test('预热接口按端正权重/启用状态返回图片，Google不返回，�
       .run();
     const preload = async (device: string) =>
       adWorker.fetch(
-        new Request(origin + '/ads/v1/preload?device=' + device, { headers: { Origin: origin } }),
+        new Request(origin + '/api/reward-content/preload?device=' + device, {
+          headers: { Origin: origin },
+        }),
         env,
       );
     const mobile = (await (await preload('mobile')).json()) as any;
@@ -252,14 +254,14 @@ test('预热接口按端正权重/启用状态返回图片，Google不返回，�
   }
 });
 
-test('成功预备的一条广告按位置/端隔离、15秒过期且只消费一次，打开不等新的统计请求', async (t) => {
+test('成功预备的一条广告按位置/端隔离、两分钟过期且只消费一次，打开不等新的统计请求', async (t) => {
   storePreparedAd('reward-supplies', 'mobile', exampleAd, 100);
   assert.equal(takePreparedAd('reward-root', 'mobile', 101), null);
   assert.equal(takePreparedAd('reward-supplies', 'desktop', 101), null);
   assert.equal(takePreparedAd('reward-supplies', 'mobile', 101)?.id, exampleAd.id);
   assert.equal(takePreparedAd('reward-supplies', 'mobile', 102), null);
   storePreparedAd('reward-supplies', 'mobile', exampleAd, 100);
-  assert.equal(takePreparedAd('reward-supplies', 'mobile', 15_100), null);
+  assert.equal(takePreparedAd('reward-supplies', 'mobile', 120_100), null);
   storePreparedAd('reward-supplies', 'desktop', exampleAd);
   t.mock.method(globalThis, 'fetch', async () =>
     assert.fail('prepared creative must not wait for fetch'),
@@ -293,7 +295,7 @@ test('后台统计凭条仅为当前有效缓存创意签发，不能用campaign
       adWorker.fetch(
         new Request(
           origin +
-            '/ads/v1/ad?placement=' +
+            '/api/reward-content/creative?placement=' +
             placement +
             '&device=' +
             device +

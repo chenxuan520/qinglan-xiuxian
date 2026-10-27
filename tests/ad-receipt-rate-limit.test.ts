@@ -32,7 +32,7 @@ async function fixture(t: { after(fn: () => void): void }, maximum = 2) {
     base = env.ADMIN_ORIGIN,
   ) =>
     worker.fetch(
-      new Request(base + '/ads' + path, {
+      new Request(base + path, {
         method,
         headers: { Origin: env.ADMIN_ORIGIN, 'CF-Connecting-IP': '198.51.100.8', ...headers },
         body: body === undefined ? undefined : JSON.stringify(body),
@@ -47,21 +47,23 @@ async function fixture(t: { after(fn: () => void): void }, maximum = 2) {
   return { store, env, keys, request, provider };
 }
 
-test('同一IP的自营/Google、四广告位、两端、验证及旧域名请求共用签发额度，超限仍200返回供给', async (t) => {
+test('同一IP的自营/Google、四广告位、两端、验证及不同域名请求共用签发额度，超限仍200返回供给', async (t) => {
   const { store, request, provider, keys } = await fixture(t);
-  const first = await request('/v1/ad?placement=revive&device=desktop');
+  const first = await request('/api/reward-content/creative?placement=revive&device=desktop');
   assert.equal(first.status, 200);
   const house = (await first.json()) as any;
   assert.equal(house.ad.id, exampleAd.id);
   assert.ok(house.receipt);
   await provider('adsense');
-  const second = await request('/v1/settings?placement=reward-root');
+  const second = await request('/api/reward-content/config?placement=reward-root');
   assert.equal(second.status, 200);
   const google = (await second.json()) as any;
   assert.equal(google.settings.provider, 'adsense');
   assert.ok(google.receipt);
   for (const placement of HOUSE_AD_PLACEMENTS) {
-    const limited = await request('/v1/settings?placement=' + placement + '&verification=1');
+    const limited = await request(
+      '/api/reward-content/config?placement=' + placement + '&verification=1',
+    );
     assert.equal(limited.status, 200);
     assert.deepEqual(await limited.json(), { settings: google.settings });
   }
@@ -69,7 +71,11 @@ test('同一IP的自营/Google、四广告位、两端、验证及旧域名请�
   for (const placement of HOUSE_AD_PLACEMENTS)
     for (const device of ['desktop', 'mobile']) {
       const limited = await request(
-        '/v1/ad?placement=' + placement + '&device=' + device + '&verification=1',
+        '/api/reward-content/creative?placement=' +
+          placement +
+          '&device=' +
+          device +
+          '&verification=1',
         {},
         'GET',
         undefined,
@@ -90,11 +96,16 @@ test('同一IP的自营/Google、四广告位、两端、验证及旧域名请�
 
 test('只按边缘IP区分额度，不信任X-Forwarded-For；来源拒绝和无实际供给不消耗签发额度', async (t) => {
   const { request, provider, keys } = await fixture(t, 1);
-  assert.ok(((await (await request('/v1/ad?placement=revive')).json()) as any).receipt);
+  assert.ok(
+    ((await (await request('/api/reward-content/creative?placement=revive')).json()) as any)
+      .receipt,
+  );
   assert.equal(
     (
       (await (
-        await request('/v1/ad?placement=revive', { 'X-Forwarded-For': '203.0.113.9' })
+        await request('/api/reward-content/creative?placement=revive', {
+          'X-Forwarded-For': '203.0.113.9',
+        })
       ).json()) as any
     ).receipt,
     undefined,
@@ -102,20 +113,28 @@ test('只按边缘IP区分额度，不信任X-Forwarded-For；来源拒绝和无
   assert.ok(
     (
       (await (
-        await request('/v1/ad?placement=revive', { 'CF-Connecting-IP': '203.0.113.9' })
+        await request('/api/reward-content/creative?placement=revive', {
+          'CF-Connecting-IP': '203.0.113.9',
+        })
       ).json()) as any
     ).receipt,
   );
   assert.equal(new Set(keys).size, 2);
   const count = keys.length;
   assert.equal(
-    (await request('/v1/ad?placement=revive', { Origin: 'https://untrusted.example' })).status,
+    (
+      await request('/api/reward-content/creative?placement=revive', {
+        Origin: 'https://untrusted.example',
+      })
+    ).status,
     403,
   );
   await provider('placeholder');
-  assert.deepEqual(await (await request('/v1/ad?placement=revive')).json(), { ad: null });
+  assert.deepEqual(await (await request('/api/reward-content/creative?placement=revive')).json(), {
+    ad: null,
+  });
   await provider('adsense');
-  assert.equal((await request('/v1/settings')).status, 200);
+  assert.equal((await request('/api/reward-content/config')).status, 200);
   assert.equal(keys.length, count);
 });
 
@@ -140,7 +159,7 @@ test('频控拒绝、缺可信IP/绑定及异常均不新增任何D1写入，广
       headers['CF-Connecting-IP'] =
         mode === 'empty-ip' ? '' : mode === 'long-ip' ? 'a'.repeat(65) : '198.51.100.8';
     const result = await worker.fetch(
-      new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive', { headers }),
+      new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=revive', { headers }),
       env,
     );
     assert.equal(result.status, 200);
@@ -151,7 +170,7 @@ test('频控拒绝、缺可信IP/绑定及异常均不新增任何D1写入，广
   assert.equal(writes, 0);
   await provider('adsense');
   writes = 0;
-  const google = await request('/v1/settings?placement=revive');
+  const google = await request('/api/reward-content/config?placement=revive');
   assert.equal(google.status, 200);
   const settings = (await google.json()) as any;
   assert.equal(settings.settings.provider, 'adsense');
@@ -161,17 +180,25 @@ test('频控拒绝、缺可信IP/绑定及异常均不新增任何D1写入，广
 
 test('已签发凭条在触发限流后仍接受真实事件，重放不重复累计且无需重新签发', async (t) => {
   const { store, request } = await fixture(t, 1);
-  const delivery = (await (await request('/v1/ad?placement=revive')).json()) as any;
+  const delivery = (await (
+    await request('/api/reward-content/creative?placement=revive')
+  ).json()) as any;
   assert.ok(delivery.receipt);
   assert.equal(
-    ((await (await request('/v1/ad?placement=revive')).json()) as any).receipt,
+    ((await (await request('/api/reward-content/creative?placement=revive')).json()) as any)
+      .receipt,
     undefined,
   );
   for (const flags of [1, 5, 13, 13]) {
-    const event = await request('/v1/event', { 'Content-Type': 'application/json' }, 'POST', {
-      receipt: delivery.receipt,
-      flags,
-    });
+    const event = await request(
+      '/api/reward-content/event',
+      { 'Content-Type': 'application/json' },
+      'POST',
+      {
+        receipt: delivery.receipt,
+        flags,
+      },
+    );
     assert.equal(event.status, 204);
   }
   assert.deepEqual(
@@ -194,7 +221,9 @@ test('已签发凭条在触发限流后仍接受真实事件，重放不重复�
 test('并发签发全部先等待同一频控决策；验证请求也使用额度但不进入运营汇总', async (t) => {
   const { store, request, keys } = await fixture(t, 2);
   const responses = await Promise.all(
-    Array.from({ length: 12 }, () => request('/v1/ad?placement=revive&verification=1')),
+    Array.from({ length: 12 }, () =>
+      request('/api/reward-content/creative?placement=revive&verification=1'),
+    ),
   );
   assert.ok(responses.every((r) => r.status === 200));
   const bodies = (await Promise.all(responses.map((r) => r.json()))) as any[];

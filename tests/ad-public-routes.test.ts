@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { defaultAdPlatformSettings } from '../src/ad-platform-contract.ts';
 import { ADS_SETTINGS } from '../src/setting.ts';
 import { adLoadJson } from '../src/ad-load-request.ts';
 import { AdLoadTrace } from '../src/ad-load-diagnostics.ts';
@@ -10,12 +11,12 @@ import { adEnv, adStore, adWorker, exampleAd } from './helpers/house-ads.ts';
 const origin = 'https://xiuxian.011203.xyz';
 const prefix = '/api/reward-content/';
 
-test('公开新旧地址共用真实配置、分端素材、凭条和幂等事件，不开放管理入口', async (t) => {
+test('统一公开地址返回真实配置、分端素材、凭条和幂等事件，不开放管理入口', async (t) => {
   const store = adStore(),
     env = adEnv(store);
   t.after(() => store.close());
   await store.db
-    .prepare('UPDATE ad_config SET campaigns = ? WHERE id = 1')
+    .prepare('UPDATE ad_config SET campaigns = ?, settings = ? WHERE id = 1')
     .bind(
       JSON.stringify([
         {
@@ -25,6 +26,7 @@ test('公开新旧地址共用真实配置、分端素材、凭条和幂等事�
           mobileImageUrl: origin + '/mobile.webp',
         },
       ]),
+      JSON.stringify(defaultAdPlatformSettings()),
     )
     .run();
   const call = (path: string, method = 'GET', body?: unknown, source = origin) =>
@@ -36,18 +38,23 @@ test('公开新旧地址共用真实配置、分端素材、凭条和幂等事�
       }),
       env,
     );
-  for (const [canonical, legacy] of [
-    ['config', 'settings'],
-    ['preload', 'preload'],
-  ]) {
+  for (const canonical of ['config', 'preload']) {
     const query = canonical === 'preload' ? '?device=mobile' : '?placement=reward-root';
     const response = await call(prefix + canonical + query);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('X-Qinglan-Content'), 'reward-content-v1');
     assert.equal(response.headers.get('Access-Control-Expose-Headers'), 'X-Qinglan-Content');
-    assert.deepEqual(await response.json(), await (await call('/ads/v1/' + legacy + query)).json());
+    const body: any = await response.json();
+    if (canonical === 'config') assert.deepEqual(body, { settings: defaultAdPlatformSettings() });
+    else {
+      assert.deepEqual(body.images, [origin + '/mobile.webp']);
+      assert.equal(Object.keys(body.ads).length, 4);
+      assert.ok(
+        Object.values(body.ads).every((ad: any) => ad.imageUrl === origin + '/mobile.webp'),
+      );
+    }
   }
-  for (const route of [prefix + 'creative', '/ads/v1/ad']) {
+  for (const route of [prefix + 'creative']) {
     const mobile = await call(route + '?placement=reward-root&device=mobile&verification=1');
     const delivery: any = await mobile.json();
     assert.equal(delivery.ad.imageUrl, origin + '/mobile.webp');
@@ -55,7 +62,7 @@ test('公开新旧地址共用真实配置、分端素材、凭条和幂等事�
     assert.deepEqual(await (await call(route + '?placement=reward-root&device=desktop')).json(), {
       ad: null,
     });
-    for (const event of [prefix + 'event', '/ads/v1/event'])
+    for (const event of [prefix + 'event', prefix + 'event'])
       assert.equal(
         (await call(event, 'POST', { receipt: delivery.receipt, flags: 13 })).status,
         204,
@@ -88,9 +95,13 @@ test('公开新旧地址共用真实配置、分端素材、凭条和幂等事�
     204,
   );
   assert.equal((await call('/ads/admin/config')).status, 401);
+  for (const path of ['/v1/settings', '/v1/ad', '/v1/preload', '/v1/event'])
+    for (const prefix of ['', '/ads'])
+      for (const method of ['GET', 'POST'])
+        assert.equal((await call(prefix + path, method)).status, 404);
 });
 
-test('交替新旧公开地址不能绕过原有共享签发频控', async (t) => {
+test('切换位置和设备仍使用同一公开签发频控', async (t) => {
   const store = adStore(),
     env = adEnv(store),
     keys: string[] = [];
@@ -105,10 +116,11 @@ test('交替新旧公开地址不能绕过原有共享签发频控', async (t) =
       return { success: keys.length === 1 };
     },
   };
-  for (const [index, route] of [prefix + 'creative', '/ads/v1/ad'].entries()) {
-    const result: any = await (
-      await adWorker.fetch(new Request(origin + route + '?placement=revive&device=mobile'), env)
-    ).json();
+  for (const [index, route] of [
+    prefix + 'creative?placement=revive&device=mobile',
+    prefix + 'creative?placement=reward-root&device=desktop',
+  ].entries()) {
+    const result: any = await (await adWorker.fetch(new Request(origin + route), env)).json();
     assert.equal(result.ad.id, exampleAd.id);
     assert.equal(typeof result.receipt, index === 0 ? 'string' : 'undefined');
   }

@@ -16,6 +16,7 @@ import { adReceiptId } from './ad-metrics-contract.ts';
 import { adLoadJson } from './ad-load-request.ts';
 import { AdLoadTrace } from './ad-load-diagnostics.ts';
 import { takePreparedAd } from './ad-preload-cache.ts';
+import { preloadRewardAds } from './ads-platform-source.ts';
 
 // 只累计图片已显示、前台有焦点且图片在视口内的时间；恢复后的长计时空洞不补算。
 export class HouseAdClock {
@@ -91,6 +92,7 @@ function coverHouseAd(
   link: HTMLAnchorElement,
   picture: HTMLPictureElement,
   image: HTMLImageElement,
+  onClose: () => void,
 ) {
   const panel = host.closest<HTMLElement>('.result-panel');
   const root = host.closest<HTMLElement>('#modal-root');
@@ -113,23 +115,39 @@ function coverHouseAd(
   close.type = 'button';
   close.className = 'secondary-button';
   close.textContent = '×';
-  close.setAttribute('aria-label', cancel.textContent ?? '关闭广告');
-  close.dataset.action = cancel.dataset.action;
+  close.disabled = true;
+  close.setAttribute('aria-label', '观看满5秒后可关闭');
+  close.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!close.disabled) onClose();
+  });
+  const keydown = (event: KeyboardEvent) => {
+    if (!['Escape', 'p', 'P'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!close.disabled) onClose();
+  };
+  document.addEventListener('keydown', keydown, true);
   close.style.cssText =
-    'position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:44px;height:44px;min-height:44px;padding:0;font:24px system-ui;border-radius:50%';
+    'position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:44px;height:44px;min-height:44px;padding:0;font:24px system-ui;border-radius:50%;opacity:.35';
   const visibility = panel.style.visibility,
     inert = panel.inert;
   panel.style.visibility = 'hidden';
   panel.inert = true;
   layer.append(content, close);
   root.append(layer);
-  close.focus({ preventScroll: true });
-  return () => {
-    layer.remove();
-    panel.style.visibility = visibility;
-    panel.inert = inert;
-    [content, link, picture, image].forEach((node, i) => (node.style.cssText = styles[i]));
-    if (host.isConnected) host.replaceChildren(content);
+  layer.tabIndex = -1;
+  layer.focus({ preventScroll: true });
+  return {
+    close,
+    remove: () => {
+      document.removeEventListener('keydown', keydown, true);
+      layer.remove();
+      panel.style.visibility = visibility;
+      panel.inert = inert;
+      [content, link, picture, image].forEach((node, i) => (node.style.cssText = styles[i]));
+      if (host.isConnected) host.replaceChildren(content);
+    },
   };
 }
 
@@ -261,7 +279,19 @@ export async function playHouseAd(
     host.replaceChildren(content);
     host.style.cssText =
       'height:auto;min-height:0;margin:12px 0;padding:12px;font-size:14px;letter-spacing:normal';
-    uncover = coverHouseAd(host, content, link, picture, image);
+    const cover = coverHouseAd(host, content, link, picture, image, () => {
+      if (!completed || stopped || signal.aborted || !host.isConnected) return;
+      cleanup();
+      host.replaceChildren();
+      host.hidden = true;
+      host.style.display = 'none';
+      callbacks.onWatched(() => track('claimed'));
+      host
+        .closest('.result-panel')
+        ?.querySelector<HTMLButtonElement>('.primary-button')
+        ?.focus({ preventScroll: true });
+    });
+    uncover = cover.remove;
     context.trace?.at('image');
     await new Promise<void>((resolve, reject) => {
       const abort = () => {
@@ -295,6 +325,7 @@ export async function playHouseAd(
         cleanup();
         return;
       }
+      if (completed) return;
       // picture 换源失败时可能没有派发 error，仍须回退，不能卡住观看。
       if (image!.complete && image!.naturalWidth === 0) {
         if (context.trace) context.trace.code = 'invalid';
@@ -311,19 +342,17 @@ export async function playHouseAd(
       const seconds = clock.sample(performance.now(), visible);
       if (visible) track('shown');
       context.onProgress(seconds);
-      status.textContent = visible ? `${seconds} 秒` : '已暂停';
+      status.textContent = visible ? `${seconds} 秒后可关闭` : '已暂停';
       if (clock.remaining === 0 && verified) {
         completed = true;
-        cleanup();
-        host.replaceChildren();
-        host.hidden = true;
-        host.style.display = 'none';
+        clearInterval(timer);
+        observer?.disconnect();
         track('watched');
-        callbacks.onWatched(() => track('claimed'));
-        host
-          .closest('.result-panel')
-          ?.querySelector<HTMLButtonElement>('.primary-button')
-          ?.focus({ preventScroll: true });
+        status.textContent = '观看完成';
+        cover.close.disabled = false;
+        cover.close.style.opacity = '1';
+        cover.close.setAttribute('aria-label', '关闭广告，返回领取');
+        preloadRewardAds();
       }
     };
     document.addEventListener('visibilitychange', sample);
@@ -340,7 +369,7 @@ export async function playHouseAd(
     observer.observe(image);
     callbacks.onStarted?.();
     sample();
-    if (!stopped) timer = setInterval(sample, 100);
+    if (!stopped && !completed) timer = setInterval(sample, 100);
   } catch {
     if (context.trace?.stage === 'image') context.trace.code = 'network';
     cleanup();

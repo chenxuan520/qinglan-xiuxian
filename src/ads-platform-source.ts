@@ -6,32 +6,71 @@ const source = STANDALONE
   : new ModuleSource<typeof import('./ads-platform.ts')>((attempt) =>
       attempt ? retryModule('ads-platform', 'ad-platform', attempt) : import('./ads-platform.ts'),
     );
-export function preloadRewardAds() {
-  if (!source || typeof window === 'undefined') return;
+let warming: AbortController | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+let listening = false,
+  pageActive = true,
+  refill = false;
+function canPreload() {
+  return (
+    pageActive &&
+    !document.hidden &&
+    navigator.onLine !== false &&
+    !(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
+  );
+}
+function warmNextAd() {
+  clearTimeout(refreshTimer);
+  if (!source || !canPreload()) {
+    warming?.abort();
+    return;
+  }
+  if (warming) {
+    refill = true;
+    return;
+  }
+  const controller = (warming = new AbortController());
+  const timeout = setTimeout(() => controller.abort(), 15_000);
   const start = () => {
-    if (
-      document.hidden ||
-      navigator.onLine === false ||
-      (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
-    )
-      return;
-    const controller = new AbortController();
-    const cancel = () => controller.abort();
-    window.addEventListener('pagehide', cancel, { once: true });
-    const timer = setTimeout(cancel, 15_000);
-    void source
-      .load()
-      .then((module) => {
-        if (!controller.signal.aborted) return module.warmAdPlatform(controller.signal);
-      })
+    void (async () => {
+      if (controller.signal.aborted || !canPreload()) return;
+      const module = await source.load();
+      if (!controller.signal.aborted && canPreload())
+        await module.warmAdPlatform(controller.signal);
+    })()
       .catch(() => {})
       .finally(() => {
-        clearTimeout(timer);
-        window.removeEventListener('pagehide', cancel);
+        clearTimeout(timeout);
+        warming = null;
+        if (!canPreload()) {
+          refill = false;
+          return;
+        }
+        const delay = refill ? 0 : 60_000;
+        refill = false;
+        refreshTimer = setTimeout(warmNextAd, delay);
       });
   };
-  if (window.requestIdleCallback) window.requestIdleCallback(start, { timeout: 5000 });
-  else window.setTimeout(start, 1500);
+  if (window.requestIdleCallback) window.requestIdleCallback(start, { timeout: 1000 });
+  else window.setTimeout(start, 0);
+}
+export function preloadRewardAds() {
+  if (!source || typeof window === 'undefined') return;
+  if (!listening) {
+    listening = true;
+    document.addEventListener('visibilitychange', warmNextAd);
+    window.addEventListener('online', warmNextAd);
+    window.addEventListener('offline', warmNextAd);
+    window.addEventListener('pagehide', () => {
+      pageActive = false;
+      warmNextAd();
+    });
+    window.addEventListener('pageshow', () => {
+      pageActive = true;
+      warmNextAd();
+    });
+  }
+  warmNextAd();
 }
 export function platformAdProvider(): RewardAdProvider {
   let selected: RewardAdProvider | null = null;

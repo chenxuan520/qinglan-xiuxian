@@ -48,6 +48,8 @@ test('公开机器说明在D1不可用时仍可发现，登录提示不进入可
     assert.deepEqual(path[method].security, []);
   }
   assert.equal(spec.paths['/api/reward-content/admin/config'], undefined);
+  assert.equal(spec.paths['/v1/ad'], undefined);
+  assert.equal(spec.paths['/v1/preload'], undefined);
   const ids = Object.values(spec.paths).flatMap((path: any) =>
     Object.values(path)
       .filter((op: any) => op.operationId)

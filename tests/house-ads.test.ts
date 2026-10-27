@@ -89,7 +89,7 @@ test('电脑和手机图片可分别配置，旧投放可读，手机地址沿�
     .run();
   for (const placement of HOUSE_AD_PLACEMENTS) {
     const response = await worker.fetch(
-      new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=' + placement),
+      new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=' + placement),
       env,
     );
     assert.equal(response.status, 200);
@@ -320,7 +320,7 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
   assert.equal(((await saved.json()) as any).revision, 1);
   for (const placement of HOUSE_AD_PLACEMENTS) {
     const result = await worker.fetch(
-      new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=' + placement, {
+      new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=' + placement, {
         headers: { Origin: 'https://xiuxian.011203.xyz' },
       }),
       env,
@@ -341,13 +341,18 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
     });
   }
   assert.equal(
-    (await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=other'), env)).status,
+    (
+      await worker.fetch(
+        new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=other'),
+        env,
+      )
+    ).status,
     400,
   );
   assert.equal(
     (
       await worker.fetch(
-        new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive', {
+        new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=revive', {
           headers: { Origin: 'https://evil.example' },
         }),
         env,
@@ -370,7 +375,10 @@ test('真实Worker+SQLite保存投放，公开接口只返回该位置已启用�
   assert.equal(turnedOff.status, 200);
   assert.deepEqual(
     await (
-      await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive'), env)
+      await worker.fetch(
+        new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=revive'),
+        env,
+      )
     ).json(),
     { ad: null },
   );
@@ -409,7 +417,12 @@ test('真实SQL并行保存只接受一个版本，失败与非法配置不部�
   assert.deepEqual({ ...store.value() }, before);
   store.failures(true, false);
   assert.equal(
-    (await worker.fetch(new Request(env.ADMIN_ORIGIN + '/ads/v1/ad?placement=revive'), env)).status,
+    (
+      await worker.fetch(
+        new Request(env.ADMIN_ORIGIN + '/api/reward-content/creative?placement=revive'),
+        env,
+      )
+    ).status,
     503,
   );
 });
@@ -496,7 +509,7 @@ test('自营图片成功显示后使用自己的观看时钟，加载超时与�
 
 test('图片被滚动面板裁掉过半时不累计观看，重新显示后才能完成且释放观察器', async (t) => {
   const { playHouseAd } = await import('../src/ads-house.ts');
-  const globals = ['document', 'window', 'IntersectionObserver'] as const;
+  const globals = ['document', 'window', 'IntersectionObserver', 'navigator'] as const;
   const previous = globals.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
   t.after(() =>
     globals.forEach((name, i) => {
@@ -576,6 +589,11 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
   }
   Object.defineProperty(globalThis, 'document', { configurable: true, value: document });
   Object.defineProperty(globalThis, 'window', { configurable: true, value: new EventTarget() });
+  // 播放单测只造DOM/时钟；省流量夹具禁止另开真实后台预热。
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { userAgent: 'Node fixture', onLine: true, connection: { saveData: true } },
+  });
   Object.defineProperty(globalThis, 'IntersectionObserver', {
     configurable: true,
     value: Observer,
@@ -599,6 +617,14 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
   assert.match(layer.style.cssText, /position:fixed;inset:0/);
   assert.match(currentImage!.style.cssText, /object-fit:contain/);
   assert.equal(panel.inert, true, '覆盖期间原奖励页不可操作');
+  const close = layer.children[1];
+  assert.equal((close as any).disabled, true);
+  close.dispatchEvent(new Event('click'));
+  const escape = Object.assign(new Event('keydown', { cancelable: true }), { key: 'Escape' });
+  document.dispatchEvent(escape);
+  assert.equal(escape.defaultPrevented, true);
+  assert.equal(layer.removed, false);
+  assert.equal(watched, 0);
   intersect([{ isIntersecting: true, intersectionRatio: 0.42 }]);
   for (let i = 0; i < 60; i++) {
     now += 100;
@@ -611,9 +637,16 @@ test('图片被滚动面板裁掉过半时不累计观看，重新显示后才�
     now += 100;
     t.mock.timers.tick(100);
   }
+  assert.equal(watched, 0, '满5秒仍须主动关闭，不提前解锁');
+  assert.equal((close as any).disabled, false);
+  assert.equal(layer.removed, false, '满5秒保留画面等待关闭');
+  assert.equal(panel.inert, true);
+  close.dispatchEvent(new Event('click'));
   assert.equal(watched, 1);
   assert.equal(disconnected, true);
-  assert.equal(layer.removed, true, '完成5秒有效观看后自动移除覆盖层');
+  assert.equal(layer.removed, true, '点击关闭后移除覆盖层');
+  close.dispatchEvent(new Event('click'));
+  assert.equal(watched, 1, '重复关闭不重复回调');
   assert.equal(panel.inert, false);
   assert.equal(panel.style.visibility, '');
   intersect([{ isIntersecting: false, intersectionRatio: 0 }]);

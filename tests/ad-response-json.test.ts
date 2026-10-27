@@ -88,7 +88,7 @@ test('流读取仍逐块拒绝超限；无流时已知长度提前拒绝，未�
 test('真实HTTP状态与HTML、坏JSON、空正文、读取异常和schema失败分开记录，不记录响应原文', async () => {
   for (const [response, code] of [
     [new Response('<html>not json</html>', { headers: { 'Content-Type': 'text/html' } }), 'html'],
-    [new Response('{bad'), 'json'],
+    [new Response('{bad', { headers: { 'X-Qinglan-Content': 'reward-content-v1' } }), 'json'],
     [withoutStream(new Response('')), 'empty'],
     [
       new Proxy(withoutStream(new Response('{}')), {
@@ -106,7 +106,7 @@ test('真实HTTP状态与HTML、坏JSON、空正文、读取异常和schema失�
     const trace = new AdLoadTrace();
     assert.equal(
       await adLoadJson(
-        new URL('https://xiuxian.011203.xyz/ads/v1/settings'),
+        new URL('https://xiuxian.011203.xyz/api/reward-content/config'),
         new AbortController().signal,
         512,
         async () => response,
@@ -142,7 +142,7 @@ test('无流兼容正文即使忽略AbortSignal仍按6秒取消，仅瞬时超�
       },
     });
   const result = adLoadJson(
-    new URL('https://xiuxian.011203.xyz/ads/v1/settings'),
+    new URL('https://xiuxian.011203.xyz/api/reward-content/config'),
     new AbortController().signal,
     512,
     async () => {
@@ -161,7 +161,7 @@ test('无流兼容正文即使忽略AbortSignal仍按6秒取消，仅瞬时超�
   assert.equal(trace.status, 200, '已取得200响应的正文超时仍保留真实HTTP状态');
   const controller = new AbortController();
   const cancelled = adLoadJson(
-    new URL('https://xiuxian.011203.xyz/ads/v1/settings'),
+    new URL('https://xiuxian.011203.xyz/api/reward-content/config'),
     controller.signal,
     512,
     async () => response(),

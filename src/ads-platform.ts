@@ -4,6 +4,7 @@ import type { AdLoadTrace } from './ad-load-diagnostics.ts';
 import { validAdPlatformSettings } from './ad-platform-contract.ts';
 import { houseAdProvider } from './ads-house-source.ts';
 import { createAdsenseProvider } from './ads-adsense.ts';
+import { AD_PRELOAD_TTL_MS, clearPreparedAds } from './ad-preload-cache.ts';
 import type { AdPlacement, RewardAdProvider } from './ads.ts';
 let warmedHouseUntil = 0;
 export async function warmAdPlatform(signal: AbortSignal) {
@@ -13,10 +14,14 @@ export async function warmAdPlatform(signal: AbortSignal) {
     body &&
     typeof body === 'object' &&
     'settings' in body &&
-    validAdPlatformSettings(body.settings) &&
-    body.settings.provider === 'house'
+    validAdPlatformSettings(body.settings)
   ) {
-    warmedHouseUntil = performance.now() + 15_000;
+    if (body.settings.provider !== 'house') {
+      warmedHouseUntil = 0;
+      clearPreparedAds();
+      return;
+    }
+    warmedHouseUntil = performance.now() + AD_PRELOAD_TTL_MS;
     const module = await import('./ads-preload.ts');
     if (!signal.aborted) await module.preloadAdImages(signal);
   }

@@ -75,9 +75,10 @@ export function houseAdsOpenApi(origin: string) {
           },
         },
       },
-      '/v1/preload': {
+      '/api/reward-content/preload': {
+        servers: [{ url: origin }],
         get: {
-          operationId: 'preloadImages',
+          operationId: 'preloadPlayerContent',
           summary: '预加载当前端最多4张已启用素材，不签发凭条或累计指标',
           security: [],
           parameters: [
@@ -173,9 +174,10 @@ export function houseAdsOpenApi(origin: string) {
           },
         },
       },
-      '/v1/ad': {
+      '/api/reward-content/creative': {
+        servers: [{ url: origin }],
         get: {
-          operationId: 'previewAd',
+          operationId: 'getPlayerCreative',
           summary: '只读抽取该端与广告位的一条当前广告',
           security: [],
           description:
@@ -373,7 +375,7 @@ export function houseAdsOpenApi(origin: string) {
         operationId: 'getPlayerContentConfig',
         summary: '匿名读取当前供给配置',
         security: [],
-        parameters: document.paths['/v1/ad'].get.parameters
+        parameters: document.paths['/api/reward-content/creative'].get.parameters
           .filter((p) => ['placement', 'verification'].includes(p.name))
           .map((p) => ({ ...p, required: false })),
         responses: {
@@ -388,14 +390,6 @@ export function houseAdsOpenApi(origin: string) {
           ...errors,
         },
       },
-    },
-    '/api/reward-content/creative': {
-      servers: [{ url: origin }],
-      get: { ...document.paths['/v1/ad'].get, operationId: 'getPlayerCreative' },
-    },
-    '/api/reward-content/preload': {
-      servers: [{ url: origin }],
-      get: { ...document.paths['/v1/preload'].get, operationId: 'preloadPlayerContent' },
     },
     '/api/reward-content/event': {
       servers: [{ url: origin }],
@@ -454,15 +448,15 @@ settings结构见OpenAPI；保留未要求更改的Google参数和provider。自
 
 ## 指标与验证
 
-玩家端正式地址为官网根路径 GET /api/reward-content/config、GET /api/reward-content/creative、GET /api/reward-content/preload、POST /api/reward-content/event，分别对应旧 /ads/v1/settings、/ads/v1/ad、/ads/v1/preload、/ads/v1/event；参数、响应、来源白名单、凭条和频控共用原实现，旧地址保留。以下旧路径相对于上方管理基址；新路径相对于官网根域，不拼接 /ads。只有这四个精确公开地址，管理和登录仍位于 /ads/admin/，新前缀不提供管理别名。公开响应带 X-Qinglan-Content: reward-content-v1 并对允许的跨域来源暴露；这是响应来源诊断标记，不是鉴权或完整性保证。新路径非JSON且缺此标记时记录 unexpected-response，仍不收集响应正文，不能仅凭此断言具体拦截规则。
+玩家端统一使用官网根路径 GET /api/reward-content/config、GET /api/reward-content/creative、GET /api/reward-content/preload、POST /api/reward-content/event，不拼接 /ads，不提供旧 /v1/ 或 /ads/v1/ 兼容接口。四个精确公开地址共用来源白名单、凭条和签发频控；管理和登录仍位于 /ads/admin/，新前缀不提供管理入口。公开响应带 X-Qinglan-Content: reward-content-v1 并对允许的跨域来源暴露；这是响应来源诊断标记，不是鉴权或完整性保证。新路径非JSON且缺此标记时记录 unexpected-response，仍不收集响应正文，不能仅凭此断言具体拦截规则。下文公开完整路径以官网根域为基址，管理路径仍相对于上方管理基址。
 
 GET /admin/stats?days=1|7|30，默认7。返回from/to/timezone/rows，按北京时间及请求日归集。每行含id/name/provider/archived及requests/shown/clicked/watched/claimed；零分母比率不应当作0%，Google点击与收入以官方报表为准。统计失败不能伪装零数据。
 
-GET /v1/preload?device=mobile|desktop，匿名按四广告位及当前端正权重分别抽取一条创意，返回ads及最多4张去重图片；不签发receipt、不计请求或曝光。首页空闲时预加载模块、配置和图片，自营类型最多复用15秒，图片成功加载后仅为对应位置缓存15秒且一次消费；打开立即显示预备素材，后台GET /v1/ad携带campaign=id核验当前启用、位置、端权重并申请新凭条。失效或已改素材立即停止并回退，不继续观看或解锁；未核验成功不能完成。未预备或已过期走原即时抽取；不提前播放或启动观看时钟，省流量模式不预热。
+GET /api/reward-content/preload?device=mobile|desktop，匿名按四广告位及当前端正权重分别抽取一条创意，返回ads及最多4张去重图片；不签发receipt、不计请求或曝光。首页空闲时预加载模块、配置和图片，自营类型与成功图片预备最多保留两分钟且一次消费；前台联网且非省流量时每分钟续备，完整观看后即补下一条，并发合并。切后台、断网或页面退出取消预热，返回前台或恢复联网重新准备；打开立即显示预备素材，后台GET /api/reward-content/creative携带campaign=id核验当前启用、位置、端权重并申请新凭条。失效或已改素材立即停止并回退，不继续观看或解锁；未核验成功不能完成。未预备或已过期走原即时抽取；不提前播放或启动观看时钟，省流量模式不预热。实际播放仍须有效观看满5秒后才能关闭，满5秒保留画面，主动关闭才回奖励页领取。
 
 GET /admin/diagnostics?days=1|7|30 复用管理登录，返回rows，按UTC日聚合加载故障，最多500行。字段为day/version/placement/device/browser/stage/code/status/count/elapsed_total/last_seen；stage为platform-module/settings/house-module/creative/image/sdk，code为timeout/network/http/invalid/unavailable/body-read/empty/html/json/schema/too-large/unexpected-response；status为实际收到的HTTP状态，未取得响应时为0。仅故障上报，不把无投放或玩家关闭视为故障；Via仅在UA声明Via时识别，否则记录实际可识别的浏览器族，不能据此排除Via。故障上报独立入口 POST https://xiuxian.011203.xyz/api/client-status，Origin白名单、512字节封闭字段校验、每IP单机房每分钟约30次的独立边缘频控，故障静默丢弃，不影响游戏；保留最近约30天。不会保存原始IP、完整UA、链接、异常原文、存档或任何账号凭据。此聚合只供诊断，不能单凭network类别断言被浏览器拦截。机器验证不要向正式入口造故障数据。
 
-验证投放可匿名GET /v1/ad?placement=revive&device=mobile&verification=1；device可为desktop/mobile，无投放ad=null。凭条签发使用Cloudflare边缘频控：同一CF-Connecting-IP在单机房每60秒约60张，自营和Google（/v1/settings）所有位置、设备及verification请求共用额度。超限、缺可信边缘IP/绑定或限流异常时，仍200返回广告或settings，但不发receipt、不新增统计写入；已发凭条的事件继续按原规则处理。共享出口IP可能少记，机房之间独立且计数近似，不能作为全球严格配额或结算防作弊。不要携带管理Cookie，不调用游戏事件接口伪造展示、点击、看完或领取。图片预览直接读取HTTPS素材；指标只供参考，不用于结算。
+验证投放可匿名GET /api/reward-content/creative?placement=revive&device=mobile&verification=1；device可为desktop/mobile，无投放ad=null。凭条签发使用Cloudflare边缘频控：同一CF-Connecting-IP在单机房每60秒约60张，自营和Google（/api/reward-content/config）所有位置、设备及verification请求共用额度。超限、缺可信边缘IP/绑定或限流异常时，仍200返回广告或settings，但不发receipt、不新增统计写入；已发凭条的事件继续按原规则处理。共享出口IP可能少记，机房之间独立且计数近似，不能作为全球严格配额或结算防作弊。不要携带管理Cookie，不调用游戏事件接口伪造展示、点击、看完或领取。图片预览直接读取HTTPS素材；指标只供参考，不用于结算。
 
 ## agent与Python调用示例
 

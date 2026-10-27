@@ -1,14 +1,18 @@
 import type { HouseAd, HouseAdDevice, HouseAdPlacement } from './house-ad-contract.ts';
 
 const ready = new Map<string, { ad: HouseAd; until: number }>();
-// 一次性、15秒短缓存；只放已成功加载的素材，不复用统计凭条。
+export const AD_PRELOAD_TTL_MS = 120_000;
+// 一次性预备素材；后台定期续备，打开时仍核验投放，不复用统计凭条。
 export function storePreparedAd(
   placement: HouseAdPlacement,
   device: HouseAdDevice,
   ad: HouseAd,
   now = performance.now(),
 ) {
-  ready.set(placement + ':' + device, { ad, until: now + 15_000 });
+  ready.set(placement + ':' + device, { ad, until: now + AD_PRELOAD_TTL_MS });
+}
+export function clearPreparedAds() {
+  ready.clear();
 }
 export function takePreparedAd(
   placement: HouseAdPlacement,
