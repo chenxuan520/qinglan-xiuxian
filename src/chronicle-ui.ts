@@ -2,6 +2,7 @@ import { spiritPower } from './spirit-power.ts';
 import { formatNumber } from './number-format.ts';
 import type { SaveData } from './progress.ts';
 import { smallIcon } from './icons.ts';
+import { chronicleAchievements } from './chronicle-achievements.ts';
 
 export function chronicleEntrance(save: SaveData) {
   const power = spiritPower(save);
@@ -9,5 +10,7 @@ export function chronicleEntrance(save: SaveData) {
 }
 
 export function cultivationChronicleEntrance(save: SaveData) {
-  return `<button class="cultivation-chronicle" data-action="chronicle"><span><strong>仙途履历</strong><small>此世年表 · 修行成就</small></span><span class="cultivation-chronicle-count">${save.chronicle.entries.length} 条履历</span>${smallIcon('arrow')}</button>`;
+  const achievements = chronicleAchievements(save);
+  const achieved = achievements.filter((item) => item.achieved).length;
+  return `<button class="cultivation-chronicle" data-action="chronicle"><span><strong>仙途履历</strong><small>此世年表 · 修行成就</small></span><span class="cultivation-chronicle-count">成就 ${achieved}/${achievements.length}</span>${smallIcon('arrow')}</button>`;
 }

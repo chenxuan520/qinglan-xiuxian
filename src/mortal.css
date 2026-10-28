@@ -1055,13 +1055,14 @@
 .mortal-study small {
   line-height: 1.8;
 }
-.mortal-leave {
-  font-size: 12px;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  color: #ce9d94;
-  padding: 8px;
-  align-self: flex-end;
+.secondary-button.mortal-leave {
+  color: #e6b3a8;
+  background: #c4625214;
+  border-color: #d2877a66;
+}
+.secondary-button.mortal-leave:not(:disabled):hover {
+  background: #c4625229;
+  border-color: #d2877aa8;
 }
 .mortal-main .section-heading {
   flex-wrap: wrap;
