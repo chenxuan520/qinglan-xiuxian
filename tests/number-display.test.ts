@@ -151,7 +151,7 @@ test('共享数字格式保留小整数，万、亿、万亿最多一位小数�
   }
 });
 
-test('履历灵威、气血与伤害简写，人间灵石与履历年岁精度不变且不改存档', () => {
+test('履历灵威、气血与伤害简写，闲游整岁而离城与履历保留精度且不改存档', () => {
   const save = freshSave();
   save.stones = 18421;
   save.age = 17421.26;
@@ -162,8 +162,9 @@ test('履历灵威、气血与伤害简写，人间灵石与履历年岁精度�
   const power = spiritPower(save);
   assert.ok(power.score >= 10000);
   assert.match(townStatus(save), /灵石 18421 ·/);
-  assert.match(townStatus(save), /年岁 17421\.26 /);
+  assert.match(townStatus(save), /年岁 17421 /);
   assert.match(mortalPage(save, 'town', 'all'), /灵石 18421 ·/);
+  assert.match(mortalPage(save, 'town', 'all'), /17421\.26 <em>/);
   assert.ok(chronicleEntrance(save).includes(`灵威 ${formatNumber(power.score)} ·`));
   const chronicle = chronicleContent(save);
   assert.ok(chronicle.includes(`<strong>${formatNumber(power.score)}</strong>`));
