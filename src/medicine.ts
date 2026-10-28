@@ -9,6 +9,7 @@ import {
 import {
   gainCultivation,
   lifespanInfo,
+  normalizeAdUsage,
   realmCost,
   realmInfo,
   syncTribulationClock,
@@ -93,6 +94,7 @@ export function useMedicine(
       random,
     );
     save.spiritRoot = root;
+    save.adUsage = normalizeAdUsage(save.adUsage, root);
     message = `补天有成 · ${spiritRootInfo(root).name} · ${save.rootElements.map((e) => elementInfo(e).name).join('、')}灵根`;
   } else if (id === 'huiyang') {
     const years = Math.round(lifespanInfo(save).base * 0.3);

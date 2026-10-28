@@ -372,6 +372,9 @@
   border: 1px solid #b6bf8e55;
   background: #254a3c;
 }
+.chronicle-score {
+  margin-top: 16px;
+}
 .chronicle-power p,
 .chronicle-power details {
   font-size: 13px;

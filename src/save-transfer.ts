@@ -16,6 +16,7 @@ import {
   SAVE_SCHEMA,
   lifespanInfo,
   validBirthInheritance,
+  validAdUsage,
   type SaveData,
 } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
@@ -158,6 +159,7 @@ export function importSave(text: string) {
     !TREASURES.some((t) => t.id === data.starter) ||
     (data.path !== undefined && !isCultivationPath(data.path)) ||
     (data.spiritRoot !== undefined && !SPIRIT_ROOTS.some((r) => r.id === data.spiritRoot)) ||
+    (data.adUsage !== undefined && !validAdUsage(data.adUsage)) ||
     (data.artifacts !== undefined && !artifactIds(data.artifacts)) ||
     (data.artifactDrops !== undefined && !artifactIds(data.artifactDrops)) ||
     (data.autoplayBuild !== undefined && !validAutoplayBuild(data.autoplayBuild)) ||

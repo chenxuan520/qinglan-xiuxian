@@ -163,6 +163,7 @@ export function ambushAction(shell: ActionShell, action: string) {
     if (!duel.revive()) return;
     active.snapshot = duel.snapshot();
     active.revivesUsed++;
+    next.adUsage.revive++;
     if (!commit(shell, next)) {
       if (!shell.saveLock) shell.toast('复活尚未保存，次数未消耗，请重试');
       return;

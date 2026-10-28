@@ -30,6 +30,7 @@ import { playerSpriteFrame } from './player-appearance.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import { GAME_SITE_URL } from './setting.ts';
 import { JOURNEY_SHARE_URL } from './sharing.ts';
+import { journeyScore } from './journey-score.ts';
 import { spiritPower } from './spirit-power.ts';
 import { formatNumber } from './number-format.ts';
 export { mountJourneyCardActions } from './journey-card-actions.ts';
@@ -325,6 +326,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
   if (save.chronicle.milestones.departure === 15)
     memories.push({ title: '十五岁启程', detail: '从青岚镇出发，向山海外求道' });
   const deepest = Math.max(-1, ...save.completed);
+  const score = journeyScore(save);
   return {
     realm: realm.name,
     realmIndex: realm.index,
@@ -351,6 +353,12 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
       forge: save.forge[weapon.id] ?? 0,
     },
     power: spiritPower(save).score,
+    score: {
+      total: score.total,
+      tier: score.tier,
+      grade: score.grade,
+      clarityFactor: score.clarityFactor,
+    },
     identity: `${pathInfo(save.path).name} · ${sect ? `${sect.name} · ${sectRole(save)}` : '散修'}`,
     ending: state,
     ended: save.journeyEnded && realm.max,
@@ -549,7 +557,9 @@ export async function createJourneyCard(
     c.save();
     c.textAlign = 'center';
     text(
-      `踏破 ${card.progress.count} / 7 境${card.progress.deepest ? ` · 最深 ${card.progress.deepest}` : ' · 尚未踏破秘境'}`,
+      card.ending === 'immortal' || card.progress.deepest === STAGES[FINAL_TRIAL_STAGE].name
+        ? `此世道果 ${card.score.total}（${card.score.tier}）`
+        : `此世道果 ${card.score.total}（${card.score.tier}） · ${card.progress.deepest ?? '尚未踏破秘境'}`,
       540,
       1092,
       30,

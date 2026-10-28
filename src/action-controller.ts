@@ -811,7 +811,10 @@ function handleLifeLimit(shell: ActionShell, action: string): boolean {
         return true;
       }
       years = restored ? restored.borrowLife() : shell.extendLifespan(next);
-      if (years) shell.resolveActivity(next);
+      if (years) {
+        next.adUsage.lifespan++;
+        shell.resolveActivity(next);
+      }
       if (!saveAdRun(shell, next, restored, !!shell.game)) return true;
       reportAdClaim(shell);
     }
@@ -1439,9 +1442,11 @@ function handleRewardAd(shell: ActionShell, action: string, id?: string): boolea
     const next = shell.structuredClone(shell.save);
     if (kind === 'root') {
       if (!shell.attuneSpiritRoot(next, shell.adRoot, shell.adElements)) return true;
+      next.adUsage.root++;
     } else {
       next.stones += supplies.stones;
       next.iron += supplies.iron;
+      next.adUsage.supplies++;
     }
     if (!savePreparation(shell, next)) return true;
     reportAdClaim(shell);
@@ -1506,6 +1511,7 @@ function handleRunOutcome(shell: ActionShell, action: string): boolean {
     const next = shell.structuredClone(shell.save);
     const revived = shell.Game.restore(next, shell.game.snapshot());
     if (!revived || !revived.revive()) return true;
+    next.adUsage.revive++;
     if (!saveAdRun(shell, next, revived, true)) return true;
     reportAdClaim(shell);
     shell.clearInterval(shell.adTimer);

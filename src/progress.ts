@@ -64,6 +64,15 @@ import {
   realmTitle,
   type Chronicle,
 } from './chronicle.ts';
+import {
+  easierSpiritRoot,
+  freshAdUsage,
+  normalizeAdUsage,
+  validAdUsage,
+  type AdUsage,
+} from './journey-score.ts';
+export type { AdUsage } from './journey-score.ts';
+export { easierSpiritRoot, freshAdUsage, normalizeAdUsage, validAdUsage } from './journey-score.ts';
 
 export type BirthInheritance =
   | { kind: 'artifact'; id: string; level: number }
@@ -108,10 +117,11 @@ export interface SaveData {
   tribulationReturn: unknown | null;
   mortal: MortalState;
   chronicle: Chronicle;
+  adUsage: AdUsage;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 33;
+export const SAVE_SCHEMA = 34;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -198,6 +208,7 @@ export function freshSave(
     path,
     spiritRoot,
     rootElements: [...rootElements],
+    adUsage: freshAdUsage(spiritRoot),
   };
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
@@ -444,6 +455,9 @@ export function readSave(
     base.tribulationReturn = upgrading ? null : (s.tribulationReturn ?? null);
     base.spiritRoot = SPIRIT_ROOTS.find((root) => root.id === s.spiritRoot)?.id ?? 'heaven';
     base.rootElements = rootElementsFor(base.spiritRoot, s.rootElements, random);
+    if (s.adUsage !== undefined && !validAdUsage(s.adUsage))
+      return { save: base, status: newer ? 'newer' : 'unreadable' };
+    base.adUsage = normalizeAdUsage(s.adUsage, base.spiritRoot);
     for (const key of ['stones', 'iron', 'cultivation', 'bestKills', 'runs'] as const)
       base[key] = int(s[key]);
     base.unlocked = int(s.unlocked, STAGES.length - 1);
@@ -593,8 +607,10 @@ export function attuneSpiritRoot(
   )
     return false;
   const starter = initialStarter(elements, save.path, random);
+  const bestRoot = easierSpiritRoot(save.spiritRoot, root);
   save.rootElements = [...elements];
   save.spiritRoot = root;
+  save.adUsage = normalizeAdUsage(save.adUsage, bestRoot);
   grantRootArtifacts(save, starter);
   save.artifactDrops = save.artifactDrops.filter((id) => !save.artifacts.includes(id));
   save.starter = starter;
