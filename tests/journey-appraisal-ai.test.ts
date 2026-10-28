@@ -469,3 +469,116 @@ test('极限身陨评语不接纳仍然活着的断言', () => {
   }
   assert.equal(validJourneyAppraisal(localJourneyAppraisal(input), input), true);
 });
+
+test('评语输出拒绝日志记录同一固定原因，不泄露模型正文或此世摘要，也不混入后续请求', async (t) => {
+  const warning = t.mock.method(console, 'warn', () => {});
+  const ray = '1234567890abcdef-SJC';
+  const privateText = 'private-model-output-do-not-log';
+  const input = facts(94);
+  const original = JSON.stringify(input);
+  const cases = [
+    [{ response: JSON.stringify({ ...aiParts, extra: privateText }) }, 'fields'],
+    [{ response: privateText }, 'json'],
+    [
+      { response: JSON.stringify({ ...aiParts, ties: '未经确认的人间故事。' }) },
+      'section-ties-unexpected',
+    ],
+    [
+      {
+        response: JSON.stringify({
+          ...aiParts,
+          ending: '已叩入仙门，此世圆满，昔日求道的心愿终于有了归处。',
+        }),
+      },
+      'facts',
+    ],
+    [{ choices: [{ finish_reason: 'length', message: { content: privateText } }] }, 'truncated'],
+  ] as const;
+  for (const [output, issue] of cases) {
+    const req = request(input);
+    req.headers.set('CF-Ray', ray);
+    const response = await worker.fetch(
+      req,
+      env(async () => output),
+    );
+    assert.equal(response.status, 502);
+    const body = await response.clone().json();
+    assert.equal(body.error, 'invalid-appraisal-output');
+    assert.equal(body.outputIssue, issue);
+    assert.equal(body.fallback, true);
+    assert.equal(body.requestId, ray);
+    assert.equal(body.retryable, true);
+    let clientFetches = 0;
+    assert.deepEqual(
+      await resolveJourneyAppraisal(input, new AbortController().signal, {
+        origin,
+        fetcher: async () => {
+          clientFetches++;
+          return response.clone();
+        },
+      }),
+      localJourneyAppraisal(input),
+    );
+    assert.equal(clientFetches, 1);
+    const raw = warning.mock.calls.at(-1)!.arguments[0];
+    const log = JSON.parse(raw);
+    assert.equal(log.outputIssue, issue);
+    assert.equal(log.requestId, body.requestId);
+    assert.equal(log.stage, 'output');
+    assert.equal(log.path, '/journey-appraisal');
+    assert.equal(log.mode, 'journey-appraisal');
+    assert.equal(log.error, body.error);
+    assert.equal(log.status, 502);
+    assert.equal('appraisal' in log, false);
+    assert.equal('facts' in log, false);
+    assert.equal('response' in log, false);
+    assert.equal('prompt' in log, false);
+    assert.ok(!raw.includes(privateText));
+    assert.ok(!raw.includes(JSON.stringify(output)));
+    assert.ok(!raw.includes(original));
+    assert.equal(JSON.stringify(input), original);
+  }
+  assert.equal(warning.mock.callCount(), cases.length);
+  await worker.fetch(
+    request(),
+    env(async () => {
+      throw new Error(privateText);
+    }),
+  );
+  const next = JSON.parse(warning.mock.calls.at(-1)!.arguments[0]);
+  assert.equal(next.error, 'inference-failed');
+  assert.equal('outputIssue' in next, false);
+  assert.ok(!warning.mock.calls.at(-1)!.arguments[0].includes(privateText));
+  assert.equal((await worker.fetch(request(), env())).status, 200);
+  assert.equal(warning.mock.callCount(), cases.length + 1);
+});
+
+test('并发评语失败各自保留拒绝原因和请求编号', async (t) => {
+  const warning = t.mock.method(console, 'warn', () => {});
+  const cases = [
+    ['1111111111111111-SJC', { response: '{}' }, 'fields'],
+    ['2222222222222222-SJC', { response: 'not-json' }, 'json'],
+  ] as const;
+  const responses = await Promise.all(
+    cases.map(async ([ray, output]) => {
+      const req = request();
+      req.headers.set('CF-Ray', ray);
+      return worker.fetch(
+        req,
+        env(async () => output),
+      );
+    }),
+  );
+  for (const [index, response] of responses.entries()) {
+    assert.equal(response.status, 502);
+    const body = await response.json();
+    const [ray, , issue] = cases[index];
+    assert.equal(body.requestId, ray);
+    assert.equal(body.outputIssue, issue);
+    const log = warning.mock.calls
+      .map((call) => JSON.parse(call.arguments[0]))
+      .find((entry) => entry.requestId === ray);
+    assert.equal(log.outputIssue, issue);
+  }
+  assert.equal(warning.mock.callCount(), cases.length);
+});

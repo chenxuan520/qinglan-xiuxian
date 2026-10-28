@@ -464,6 +464,7 @@ export default {
           ? 'journey-appraisal'
           : 'dialogue';
     let stage = 'request';
+    let outputIssue = '';
     const fail = (
       error: string,
       status: number,
@@ -497,6 +498,7 @@ export default {
             elapsedMs: Date.now() - startedAt,
             error,
             status,
+            outputIssue: error === 'invalid-appraisal-output' ? outputIssue : undefined,
             errorName: cause === undefined ? undefined : errorName,
             upstreamCode: Number.isSafeInteger(detail.code) ? detail.code : undefined,
             upstreamStatus:
@@ -600,7 +602,6 @@ export default {
             ),
         );
         stage = 'output';
-        let outputIssue = '';
         const appraisal = extractJourneyAppraisal(output, input, (reason) => {
           outputIssue = reason;
         });
