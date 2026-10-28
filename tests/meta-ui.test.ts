@@ -6,9 +6,15 @@ import { GAME_SITE_URL, SUPPORT_CODE_IMAGE } from '../src/setting.ts';
 import { freshSave, realmCost, realmInfo } from '../src/progress.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { chronicleContent } from '../src/chronicle-content.ts';
-import { autoplayButton, choiceCard, controls } from '../src/common-ui.ts';
+import { autoplayButton, choiceCard, controls, realmVerse } from '../src/common-ui.ts';
 import { Game } from '../src/game.ts';
 import { formatNumber } from '../src/number-format.ts';
+import { lobbyView } from '../src/lobby-ui.ts';
+import { settingsContent } from '../src/settings-ui.ts';
+import { mortalTabContent } from '../src/mortal-ui.ts';
+import { SECTS, MAX_MASTERY } from '../src/mortal-data.ts';
+import { joinSect, studyPlan } from '../src/mortal.ts';
+import { cultivationPanel } from '../src/cultivation-ui.ts';
 
 const source = [
   'main.ts',
@@ -20,6 +26,7 @@ const source = [
   'bestiary-ui.ts',
   'opening-ui.ts',
   'lobby-ui.ts',
+  'settings-ui.ts',
 ]
   .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
   .join('\n');
@@ -30,8 +37,8 @@ const styles = [...styleEntry.matchAll(/import '\.\/([^']+\.css)'/g)]
   .map((file) => readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8'))
   .join('\n');
 
-test('境界展示直接给出气血与本命伤害，指南示例与实际入场一致', () => {
-  assert.match(source, /当前入场气血/);
+test('境界展示本命伤害与突破收益，指南示例与实际入场一致', () => {
+  assert.doesNotMatch(cultivationPanel(freshSave(), 0).body, /当前入场气血/);
   assert.match(source, /下次突破后/);
   assert.doesNotMatch(source, /境界独立倍率|当前境界加成/);
   const guide = guideContent('cultivation');
@@ -98,7 +105,7 @@ test('关于面板与离界传承确认放置微信赞赏码，终章正文不�
   assert.doesNotMatch(support, /data-action/);
 });
 
-test('洞府使用此世存档文案并保留原导入导出动作', () => {
+test('此世存档使用原文案并保留原导入导出动作', () => {
   assert.match(source, /class="save-record"/);
   assert.match(source, /<h3>此世存档<\/h3>/);
   assert.match(source, /把这一世的修为与旧事收进行囊/);
@@ -107,9 +114,29 @@ test('洞府使用此世存档文案并保留原导入导出动作', () => {
   assert.match(source, /data-action="export-save">导出此世<\/button>/);
   assert.match(source, /data-action="import-save">导入旧档<\/button>/);
   const guide = guideContent('basics');
-  assert.match(guide, /洞府底部「此世存档」可用「导出此世」保存存档文件/);
+  assert.match(guide, /设置中「此世存档」可用「导出此世」保存存档文件/);
   assert.match(guide, /点「导入旧档」/);
   assert.doesNotMatch(guide, /「存档备份」|「导入存档」/);
+});
+
+test('存档区完整移到设置首部，洞府不再保留重复入口', () => {
+  const save = freshSave();
+  const before = JSON.stringify(save);
+  const settings = settingsContent(save);
+  const cultivation = cultivationPanel(save, 0).body;
+  assert.doesNotMatch(cultivation, /save-record|export-save|import-save|save-import/);
+  for (const action of ['export-save', 'import-save']) {
+    assert.equal([...settings.matchAll(new RegExp(`data-action="${action}"`, 'g'))].length, 1);
+  }
+  assert.match(
+    settings,
+    /<input id="save-import" type="file" accept="\.json,application\/json" hidden>/,
+  );
+  assert.ok(
+    settings.indexOf('class="save-record"') < settings.indexOf('class="settings-autoplay"'),
+  );
+  assert.match(settings, /普通模式可续未尽历练；极限未完战斗重开将身陨/);
+  assert.equal(JSON.stringify(save), before);
 });
 
 test('完整重开使用游戏风格的自绘复选框', () => {
@@ -199,4 +226,61 @@ test('升级卡片写出伤害倍率，觉醒卡片说明觉醒一击', () => {
   assert.match(upgrade, /伤害 ×1\.32 → ×1\.64/);
   const fresh = choiceCard(game, save, { type: 'weapon', id: 'nail', level: 1 }, 2);
   assert.match(fresh, /配方齐备后，升级可选仙器觉醒/);
+});
+
+test('洞府去除重复灵根盘，寿元、根基与闭关仍完整展示', () => {
+  const save = freshSave();
+  const before = JSON.stringify(save);
+  const panel = cultivationPanel(save, 0).body;
+  assert.doesNotMatch(
+    panel,
+    /root-pentagon|spirit-root-summary|data-action="root-guide"|data-action="reincarnate"/,
+  );
+  for (const marker of ['lifespan-summary', 'realm-road', 'training-grid', 'data-action="retreat"'])
+    assert.ok(panel.includes(marker), marker);
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('境界题句保留原字句，八字短句单列、较长凡人题句按语义分列', () => {
+  for (const cultivation of [0, 1, 352, 10000, 100000]) {
+    const save = freshSave();
+    save.cultivation = cultivation;
+    const text = realmVerse(realmInfo(cultivation));
+    const html = lobbyView(
+      save,
+      0,
+      0,
+      false,
+      { available: false, active: false },
+      null,
+      true,
+      true,
+      false,
+    );
+    const poem = html.match(/class="vertical-poem[^"]*">([^]*?)<\/span>/)![1];
+    assert.equal(poem.replace(/<br>/g, ''), text);
+    assert.equal(poem.includes('<br>'), text.replace(/[，。·\s]/g, '').length > 8);
+  }
+});
+
+test('仙门先列三项所得，报价对照实际研习，满阶不展示不存在的下一阶价格', () => {
+  const save = freshSave();
+  save.stones = 100000;
+  joinSect(save, SECTS[0].id);
+  const plan = studyPlan(save);
+  const html = mortalTabContent(save, 'sects', 'all');
+  assert.ok(
+    html.indexOf('data-sect-benefit="manual"') < html.indexOf('data-sect-benefit="medicine"'),
+  );
+  assert.ok(
+    html.indexOf('data-sect-benefit="medicine"') < html.indexOf('data-sect-benefit="mastery"'),
+  );
+  assert.match(
+    html,
+    new RegExp(`<strong>${plan.stones} 灵石</strong><span>${plan.years} 年岁</span>`),
+  );
+  save.mortal.mastery[SECTS[0].id] = MAX_MASTERY;
+  const full = mortalTabContent(save, 'sects', 'all');
+  assert.doesNotMatch(full, /class="sect-study-quote"/);
+  assert.match(full, /本门精研已满/);
 });

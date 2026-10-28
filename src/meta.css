@@ -164,6 +164,9 @@
   display: grid;
   gap: 18px;
 }
+.settings-copy .save-record {
+  margin-top: 0;
+}
 .settings-section-heading {
   display: flex;
   align-items: center;
@@ -505,4 +508,24 @@
   min-height: 0;
   padding: 0;
   text-align: left;
+}
+
+.chronicle-link {
+  position: relative;
+}
+.chronicle-link[data-unread-achievement]::after,
+.cultivation-chronicle[data-unread-achievement]::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: -6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e57763;
+  box-shadow: 0 0 0 2px #173a31;
+}
+.cultivation-chronicle[data-unread-achievement]::after {
+  top: 14px;
+  right: 18px;
 }

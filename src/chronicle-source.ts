@@ -14,8 +14,15 @@ export class ChronicleSource extends ModuleSource<ChronicleModule> {
   #epoch = 0;
   #notices: InstanceType<ChronicleModule['AchievementNotices']> | null = null;
   #fallback = false;
+  #unread = false;
   constructor(fetchModule = fetchChronicle) {
     super(fetchModule);
+  }
+  get unread() {
+    return this.#unread;
+  }
+  markRead() {
+    this.#unread = false;
   }
   // 只由成功写档调用；读档、导入与轮回建立基线，不补弹历史成就。
   observe(save: SaveData, reset = false) {
@@ -23,12 +30,14 @@ export class ChronicleSource extends ModuleSource<ChronicleModule> {
     const ids = [...ACHIEVEMENT_IDS, 'peerless'].filter((id) => id in next && !(id in this.#seen));
     this.#seen = { ...next };
     if (reset) {
+      this.#unread = false;
       this.#epoch++;
       this.#notices?.clear();
       this.#fallback = false;
       return;
     }
     if (!ids.length) return;
+    this.#unread = true;
     const epoch = this.#epoch;
     void this.load()
       .then(({ AchievementNotices }) => {

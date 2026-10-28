@@ -166,7 +166,7 @@ function importHarness() {
     game: null,
     pendingRun: null,
     saveLock: null,
-    panel: 'cultivation',
+    panel: 'settings',
     pendingImport: null,
     importReadEpoch: 0,
     isExtremeLife,
@@ -219,7 +219,7 @@ test('导入A后改选B，A先返回也不能成为确认对象；迟到失败�
     if (failFirst) a.reject(Error('old file failed'));
     else a.release();
     await first;
-    assert.equal(h.context.panel, 'cultivation');
+    assert.equal(h.context.panel, 'settings');
     assert.equal(h.context.pendingImport, null);
     b.release();
     await second;
@@ -239,7 +239,7 @@ test('关闭重开导入后，旧节点迟到读取和存档锁定均不能恢�
     old.release();
     await pending;
     assert.equal(h.context.pendingImport, null);
-    assert.equal(h.context.panel, 'cultivation');
+    assert.equal(h.context.panel, 'settings');
     if (!lock) {
       const fresh = h.input(222),
         next = fresh.run();

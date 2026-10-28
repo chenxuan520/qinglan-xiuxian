@@ -42,6 +42,7 @@ test('炼器保存失败保持资源、阶数和可重试界面，成功后才�
   assert.equal(JSON.stringify(save), before);
   assert.equal(stored, before);
   assert.equal(renders, 0);
+  assert.equal(source.unread, false, '失败写入不能出现新成就红点');
   assert.deepEqual(messages, ['炼器未保存，请重试']);
   const view = {
     panel: 'treasure-detail' as const,
@@ -57,6 +58,7 @@ test('炼器保存失败保持资源、阶数和可重试界面，成功后才�
   await drain();
   source.flush(true, (text) => messages.push(text));
   assert.equal(save.forge[save.starter], 10);
+  assert.equal(source.unread, true, '成功保存新成就后显示红点');
   assert.equal(JSON.stringify(save), stored);
   assert.equal(renders, 1);
   assert.match(catalogPanel(save, view).body, /data-action="forge"[^>]*disabled/);
@@ -67,6 +69,32 @@ test('炼器保存失败保持资源、阶数和可重试界面，成功后才�
   assert.equal(stored, success);
   assert.equal(renders, 1);
   assert.equal(messages.filter((text) => text.includes('仙途成就')).length, 1);
+});
+
+test('成就未读只在当前实例内，打开后清除，导入轮回与刷新不恢复历史红点', async () => {
+  const save = freshSave();
+  save.chronicle.milestones.story = 15;
+  const source = new ChronicleSource(async () => content);
+  source.observe(save, true);
+  assert.equal(source.unread, false);
+  const baseline = JSON.stringify(save);
+  source.observe(save);
+  assert.equal(source.unread, false);
+  recordChronicle(save, '炉火纯青', '实际新增', 'forge');
+  const achieved = JSON.stringify(save);
+  source.observe(save);
+  assert.equal(source.unread, true);
+  source.markRead();
+  source.observe(save);
+  await drain();
+  assert.equal(source.unread, false, '迟到模块和重复保存不能恢复已读红点');
+  assert.equal(JSON.stringify(save), achieved, '读取与清除未读状态不修改存档');
+  const refreshed = new ChronicleSource(async () => content);
+  refreshed.observe(save, true);
+  assert.equal(refreshed.unread, false);
+  source.observe(freshSave(), true);
+  assert.equal(source.unread, false);
+  assert.notEqual(achieved, baseline);
 });
 test('同批成就合并原提示，战斗/已有提示期间不消耗队列，显示后不重弹', () => {
   const save = freshSave(),

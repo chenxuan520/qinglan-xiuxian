@@ -33,6 +33,7 @@ import { JOURNEY_SHARE_URL } from './sharing.ts';
 import { journeyScore } from './journey-score.ts';
 import { spiritPower } from './spirit-power.ts';
 import { formatNumber } from './number-format.ts';
+import { isExtremeLife } from './life-mode.ts';
 export { mountJourneyCardActions } from './journey-card-actions.ts';
 
 export const JOURNEY_CARD_QR = encode(JOURNEY_SHARE_URL, { ecc: 'M', border: 4 });
@@ -361,6 +362,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     },
     identity: `${pathInfo(save.path).name} · ${sect ? `${sect.name} · ${sectRole(save)}` : '散修'}`,
     ending: state,
+    extreme: isExtremeLife(save),
     ended: save.journeyEnded && realm.max,
     progress: { count: save.completed.length, deepest: deepest < 0 ? null : STAGES[deepest].name },
     appraisal: localJourneyAppraisal(journeyAppraisalFacts(save, state)),
@@ -513,6 +515,19 @@ export async function createJourneyCard(
     c.strokeRect(904, 94, 68, 116);
     text('此世', 913, 138, 24, '#efdfbd', 58);
     text(state[0], 913, 182, 24, '#efdfbd', 58);
+    if (card.extreme) {
+      c.save();
+      c.fillStyle = '#102b28cc';
+      c.fillRect(786, 86, 84, 132);
+      c.strokeStyle = '#dbc378';
+      c.lineWidth = 2;
+      c.strokeRect(786, 86, 84, 132);
+      c.strokeRect(794, 94, 68, 116);
+      c.textAlign = 'center';
+      text('一命', 828, 138, 24, '#efd48a', 58);
+      text('问道', 828, 182, 24, '#efd48a', 58);
+      c.restore();
+    }
     c.save();
     c.textAlign = 'center';
     text(card.realm, 540, 248, 50, '#eee8cf', 720);

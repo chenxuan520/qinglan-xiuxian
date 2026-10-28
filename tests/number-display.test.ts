@@ -281,7 +281,7 @@ test('洞府当前与突破预览沿用入场 helper，气血、伤害及增量�
     const html = cultivationPanel(save, 0).body;
     const current = spiritPower(save);
     assert.equal(current.hp, new Game({ ...save }, 0, 0, () => 0.5).player.maxHp);
-    assert.ok(html.includes(`当前入场气血 ${formatNumber(current.hp)}</strong>`));
+    assert.doesNotMatch(html, /当前入场气血/);
     assert.ok(
       html.includes(
         `${current.weapon}基础伤害约 ${formatNumber(Math.round(current.weaponDamage))}`,

@@ -44,4 +44,4 @@ npx wrangler pages deployment list --project-name qinglan-xiuxian --json
 
 发布命令只含类型检查、构建和 Wrangler 上传；Balance gate 等门禁在 GitHub CI 每次 push 时已跑，不在本地部署链路里重复。GitHub push **不会自动发布 Cloudflare**；游戏发布需同步 Cloudflare 主站，不能只以 GitHub Pages 成功作为上线完成。部署后使用 MCP 检查正式域名的新版本、素材及关键功能。
 
-localhost、GitHub Pages、Cloudflare 各网址的存档相互独立。迁移使用洞府「此世存档」中的「导出此世 / 导入旧档」，不要暗中复制用户浏览器数据。
+localhost、GitHub Pages、Cloudflare 各网址的存档相互独立。迁移使用设置「此世存档」中的「导出此世 / 导入旧档」，不要暗中复制用户浏览器数据。

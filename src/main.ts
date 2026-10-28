@@ -629,6 +629,7 @@ function renderLobby(returnYears?: number) {
     window.matchMedia('(max-width: 640px)').matches,
   );
   ui.querySelector('.journey-actions [data-action="arsenal"]')?.remove();
+  syncChronicleIndicators();
   if (sectDuesPending(save)) renderSectDues();
   else if (returnYears !== undefined && returnYears > 0)
     toast(
@@ -1045,8 +1046,21 @@ async function renderJourneyCard() {
             : undefined,
   );
 }
+let lastChronicleUnread = false;
+function syncChronicleIndicators(force = true) {
+  if (!force && lastChronicleUnread === chronicleSource.unread) return;
+  lastChronicleUnread = chronicleSource.unread;
+  document.querySelectorAll<HTMLElement>('[data-action="chronicle"]').forEach((entry) => {
+    entry.toggleAttribute('data-unread-achievement', chronicleSource.unread);
+    if (chronicleSource.unread) entry.setAttribute('aria-description', '有新成就');
+    else entry.removeAttribute('aria-description');
+  });
+}
 function renderPanel() {
-  return sceneFlow.renderPanel(shellBindings());
+  sceneFlow.renderPanel(shellBindings());
+  if (panel === 'chronicle' && modal.querySelector('.chronicle-achievements'))
+    chronicleSource.markRead();
+  syncChronicleIndicators();
 }
 function renderHud() {
   return sceneFlow.renderHud(shellBindings());
@@ -1955,7 +1969,7 @@ document.addEventListener('change', async (event) => {
     input.id !== 'save-import' ||
     saveLock ||
     game ||
-    panel !== 'cultivation' ||
+    panel !== 'settings' ||
     (isExtremeLife(save) && (pendingRun || save.mortal.marketSocial?.ambush))
   )
     return;
@@ -1971,7 +1985,7 @@ document.addEventListener('change', async (event) => {
     const candidate = importSave(text);
     if (
       game ||
-      panel !== 'cultivation' ||
+      panel !== 'settings' ||
       (isExtremeLife(save) && (pendingRun || save.mortal.marketSocial?.ambush))
     )
       return;
@@ -1980,7 +1994,7 @@ document.addEventListener('change', async (event) => {
 
     panelFrame(...importConfirmPanel(candidate));
   } catch (error) {
-    if (current() && !game && panel === 'cultivation')
+    if (current() && !game && panel === 'settings')
       toast(error instanceof Error ? error.message : '存档读取失败，当前进度未更改');
   }
 });
@@ -2267,6 +2281,7 @@ function tick(now: number, draw: boolean) {
   }
 }
 function frame(now: number) {
+  syncChronicleIndicators(false);
   // 先续接下一帧，避免切屏时一次临时绘图异常让整个循环永久停止。
   requestAnimationFrame(frame);
   const blocked =

@@ -12,11 +12,15 @@ function platform(
   } = {},
 ) {
   const images: any[] = [];
+  const texts: Array<{ value: string; x: number; y: number; color: string }> = [];
   const context = new Proxy<Record<string, any>>(
     {},
     {
       get(target, key: string) {
         if (key in target) return target[key];
+        if (key === 'fillText')
+          return (value: string, x: number, y: number) =>
+            texts.push({ value, x, y, color: target.fillStyle });
         if (key === 'measureText') return (value: string) => ({ width: value.length * 26 });
         if (key.startsWith('create')) return () => ({ addColorStop() {} });
         return () => {};
@@ -62,8 +66,34 @@ function platform(
         : Reflect.deleteProperty(globalThis, name),
     );
   }
-  return { canvas, images };
+  return { canvas, images, texts };
 }
+
+test('仅极限模式在留影右上绘入金色一命问道印记，适用于所有结局且不改存档', async (t) => {
+  const p = platform(t);
+  for (const lifeMode of ['normal', 'extreme'] as const) {
+    const save = freshSave();
+    save.lifeMode = lifeMode;
+    const before = JSON.stringify(save);
+    for (const ending of [
+      'ongoing',
+      'lifespan',
+      'tribulation',
+      'ambush',
+      'extreme',
+      'immortal',
+    ] as const) {
+      p.texts.length = 0;
+      await createJourneyCard(save, ending);
+      const seal = p.texts.filter(
+        (text) => text.x > 750 && text.y < 220 && ['一命', '问道'].includes(text.value),
+      );
+      assert.equal(seal.length, lifeMode === 'extreme' ? 2 : 0, `${lifeMode}/${ending}`);
+      assert.ok(seal.every((text) => text.color === '#efd48a'));
+      assert.equal(JSON.stringify(save), before);
+    }
+  }
+});
 
 test('PNG直接返回Blob，成功及编码失败均释放Canvas像素', async (t) => {
   const p = platform(t);

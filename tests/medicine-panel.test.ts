@@ -2,6 +2,58 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave } from '../src/progress.ts';
 import { MedicinePanel } from '../src/medicine-panel.ts';
+import { medicineContent } from '../src/medicine-ui.ts';
+import { MEDICINES } from '../src/medicine-data.ts';
+
+function medicineCards(html: string) {
+  return [...html.matchAll(/<article class="([^"]*medicine-card[^"]*)">([^]*?)<\/article>/g)];
+}
+
+test('丹囊按实际库存区分黑白卡片，炼丹、药方与药铺不因未持有置灰', () => {
+  const save = freshSave('heaven', ['metal'], 'dual', () => 0.5);
+  MEDICINES.forEach((m, index) => (save.medicine.bag[m.id] = index % 2 ? 0 : 3));
+  save.medicine.shop = { ids: ['huanglong', 'jinsui', 'bigu'], refreshAt: 25, bought: {} };
+  const before = JSON.stringify(save);
+  for (const unfinished of [false, true]) {
+    const cards = medicineCards(medicineContent(save, 0, 'bag', unfinished, false));
+    assert.equal(cards.length, MEDICINES.length);
+    for (const m of MEDICINES) {
+      const card = cards.find((c) => c[2].includes(`<h3>${m.name}</h3>`))!;
+      assert.ok(card, m.id);
+      assert.equal(
+        card[1].split(/\s+/).includes('is-unowned'),
+        save.medicine.bag[m.id] === 0,
+        m.id,
+      );
+      assert.ok(card[2].includes(`持有 ${save.medicine.bag[m.id]} 份`));
+    }
+  }
+  for (const view of ['craft', 'recipes', 'shop'] as const) {
+    const cards = medicineCards(medicineContent(save, 0, view, false, true));
+    assert.ok(cards.length);
+    assert.ok(
+      cards.every((c) => !c[1].split(/\s+/).includes('is-unowned')),
+      view,
+    );
+  }
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('丹囊最后一份服用成功后置灰，有药效但无库存仍置灰', () => {
+  const { save, panel, context } = fixture();
+  save.medicine.bag.huanglong = 2;
+  const card = () =>
+    medicineCards(panel.content(0, false, false)).find((c) => c[2].includes('<h3>黄龙丹</h3>'))!;
+  assert.ok(!card()[1].includes('is-unowned'));
+  panel.handle('medicine-use', 'huanglong', context);
+  assert.equal(save.medicine.bag.huanglong, 0);
+  assert.ok(save.medicine.active.huanglong > save.age);
+  assert.ok(card()[1].includes('is-unowned'));
+  assert.match(card()[2], /持有 0 份/);
+  assert.match(card()[2], /data-action="medicine-use"[^>]*disabled/);
+  save.medicine.bag.huanglong = 1;
+  assert.ok(!card()[1].includes('is-unowned'));
+});
 
 function fixture() {
   const save = freshSave('heaven', ['metal'], 'dual', () => 0.5);

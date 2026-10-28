@@ -925,9 +925,9 @@ async function checkHomePanels(name: string) {
       );
       assert.ok(
         await evaluate(
-          '()=>{const panel=document.querySelector(".panel"),nodes=[...panel.children];return nodes.indexOf(panel.querySelector(".cultivation-overview"))<nodes.indexOf(panel.querySelector(".spirit-root-summary"))&&nodes.indexOf(panel.querySelector(".realm-road"))<nodes.indexOf(panel.querySelector(".training-grid"));}',
+          '()=>{const panel=document.querySelector(".panel"),nodes=[...panel.children];return nodes.indexOf(panel.querySelector(".cultivation-overview"))<nodes.indexOf(panel.querySelector(".lifespan-summary"))&&nodes.indexOf(panel.querySelector(".realm-road"))<nodes.indexOf(panel.querySelector(".training-grid"));}',
         ),
-        '洞府沿用完整境界展示、灵根寿元、境界路标、根基修炼顺序',
+        '洞府沿用完整境界展示、寿元、境界路标、根基修炼顺序',
       );
     }
     if (panel === 'arsenal') {

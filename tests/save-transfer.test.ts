@@ -127,7 +127,7 @@ test('导入摘要仅对已叩门终章档明确提示不能继续此世，保�
     const ended = importConfirmPanel(importSave(exportSave(save, null)))[2];
     assert.match(ended, /已叩入仙门.*导入后将进入终章，不能返回此世继续修行/);
     assert.match(ended, /导入会替换此网址的全部进度和续局/);
-    for (const action of ['export-save', 'cultivation', 'confirm-import'])
+    for (const action of ['export-save', 'settings', 'confirm-import'])
       assert.match(ended, new RegExp(`data-action="${action}"`));
   }
   const running = freshSave();

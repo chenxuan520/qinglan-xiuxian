@@ -321,11 +321,12 @@
 .cultivation-overview {
   display: flex;
   align-items: center;
-  gap: 40px;
-  padding: 18px 10px 32px;
+  gap: 28px;
+  padding: 18px 0 32px;
 }
 .cultivation-progress {
   flex: 1;
+  min-width: 0;
 }
 .cultivation-progress h3 {
   display: flex;
@@ -351,6 +352,26 @@
 .cultivation-progress p {
   font-size: 12px;
   color: #c5c7a9;
+}
+.cultivation-overview .cultivation-progress p {
+  line-height: 1.9;
+  margin-block: 12px;
+}
+@media (max-width: 650px) {
+  .cultivation-overview {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .cultivation-overview > .realm-circle {
+    align-self: center;
+  }
+  .cultivation-overview .cultivation-progress p {
+    font-size: 11px;
+  }
+  .cultivation-overview .cultivation-progress > small {
+    font-size: 10px;
+    line-height: 1.9;
+  }
 }
 .cultivation-progress .realm-verse {
   margin: 8px 0 0;
@@ -626,4 +647,41 @@
 }
 .guide-steps + .primary-button {
   width: 100%;
+}
+
+.cultivation-chronicle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin: 20px 0 26px;
+  padding: 18px 20px;
+  border: 1px solid #d4c38a77;
+  background: linear-gradient(110deg, #d4c38a14, #d4c38a04);
+  text-align: left;
+  color: var(--gold);
+}
+.cultivation-chronicle > span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.cultivation-chronicle strong {
+  display: block;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 2px;
+}
+.cultivation-chronicle small {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.cultivation-chronicle-count {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.cultivation-chronicle .small-icon {
+  flex-shrink: 0;
 }

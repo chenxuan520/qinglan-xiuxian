@@ -954,7 +954,8 @@
   color: var(--muted);
 }
 .mortal-membership {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
   justify-content: space-between;
   gap: 30px;
   padding: 28px;
@@ -963,7 +964,61 @@
   background: #20443880;
 }
 .mortal-membership > div:first-child {
-  flex: 1;
+  grid-column: 1 / -1;
+}
+.mortal-membership h3 {
+  margin: 0 0 16px;
+  font-size: 17px;
+  color: var(--gold);
+  font-weight: 500;
+}
+.sect-benefits ol {
+  display: grid;
+  gap: 20px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sect-benefits li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+}
+.sect-benefits li > b {
+  color: var(--gold);
+  font-weight: 400;
+  font-size: 18px;
+}
+.sect-benefits strong {
+  color: #e0d7af;
+  font-size: 15px;
+  font-weight: 500;
+}
+.sect-benefits p,
+.sect-costs p {
+  margin: 8px 0 0;
+}
+.sect-study-quote {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  color: var(--gold);
+}
+.sect-study-quote strong {
+  font-size: 22px;
+  font-weight: 500;
+}
+.sect-study-quote span {
+  font-size: 14px;
+}
+.sect-study-rules {
+  grid-column: 1 / -1;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.sect-dues-details {
+  padding-top: 18px;
 }
 .mortal-membership h2,
 .mortal-rules h2,
@@ -1262,7 +1317,7 @@
     font-size: 10px;
   }
   .mortal-membership {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     padding: 20px;
     gap: 20px;
   }
@@ -1400,16 +1455,15 @@
     min-height: 40px;
   }
   .town-scene-actions.settlement-actions {
-    display: grid;
-    grid-template-columns: repeat(2, max-content);
-    flex-shrink: 0;
+    flex-wrap: wrap-reverse;
+    justify-content: flex-end;
   }
   .town-scene-actions.settlement-actions .secondary-button {
     min-height: 44px;
+    flex-shrink: 0;
   }
   .settlement-actions .fullscreen-button {
-    grid-column: 1 / -1;
-    justify-self: end;
+    order: 1;
   }
   .town-scene-controls .primary-button {
     padding: 10px 12px;

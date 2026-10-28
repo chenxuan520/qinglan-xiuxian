@@ -93,7 +93,10 @@ export function lobbyView(
 ): string {
   const stage = STAGES[selectedStage],
     realm = currentRealm(save),
-    completed = save.completed.includes(FINAL_TRIAL_STAGE);
+    completed = save.completed.includes(FINAL_TRIAL_STAGE),
+    verse = realmVerse(realm),
+    shortVerse = verse.replace(/[，。·\s]/g, '').length <= 8,
+    verticalVerse = shortVerse ? verse : verse.replace('，', '，<br>').replace(' · ', '<br>');
   return `
     <header class="lobby-header">
       <a class="brand" href="#" data-action="home" aria-label="叩仙门：青岚纪首页"><span class="brand-emblem">${icon('sword')}</span><span class="brand-title">叩仙门<small>青岚纪</small></span><span class="seal">${completed ? '圆满' : '问道'}</span></a>
@@ -108,7 +111,7 @@ export function lobbyView(
         <div class="hero-copy"><div class="eyebrow"><span></span>青岚少年 · 觅长生 · 寻大道</div><h1>御剑问长生<span>青岚入仙途</span></h1><p>在青岚镇长大，十五岁踏上仙途。<br>为觅长生，为追寻大道，向山海深处去。</p>
           <div class="hero-features"><span>一世修行，叩问仙门</span>${isExtremeLife(save) ? '<span class="life-mode-badge">极限模式 · 一命问道</span>' : ''}</div>
         </div>
-        <button class="realm-preview" data-action="cultivation"><span class="vertical-poem">${realmVerse(realm).replace('，', '，<br>').replace(' · ', '<br>')}</span><span class="realm-circle"><small>当前境界</small><strong>${save.cultivation === 0 ? '凡人' : realm.ascending ? '渡劫' : REALMS[realm.index]}</strong><span>${save.cultivation === 0 ? '尚未入道' : realm.ascending ? '待破七境' : ['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>
+        <button class="realm-preview" data-action="cultivation"><span class="vertical-poem${shortVerse ? ' is-short' : ''}">${verticalVerse}</span><span class="realm-circle"><small>当前境界</small><strong>${save.cultivation === 0 ? '凡人' : realm.ascending ? '渡劫' : REALMS[realm.index]}</strong><span>${save.cultivation === 0 ? '尚未入道' : realm.ascending ? '待破七境' : ['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>
       </section>`
       }
       ${spiritRootSummary(save, true)}
@@ -269,6 +272,6 @@ export function importConfirmPanel(candidate: {
   return [
     '导入修行存档',
     '确认后覆盖当前进度',
-    `<p class="pause-description">${realm.name} · 累计修为 ${imported.cultivation.toLocaleString('zh-CN', { useGrouping: false })}<br>${isExtremeLife(imported) ? '极限模式' : '普通模式'}${imported.pendingReincarnation ? ' · 此世已落幕' : ''}<br>${spiritRootInfo(imported.spiritRoot).name} · 年岁 ${imported.age.toFixed(1)}<br>${imported.stones} 灵石 · ${imported.iron} 玄铁<br>收藏法宝 ${imported.artifacts.length} 件 · 已通关 ${imported.completed.length} 境<br>奇物珍藏 ${curios} 件<br>丹囊 ${Object.values(imported.medicine.bag).reduce((total, count) => total + count, 0)} 份 · 已购药方 ${imported.medicine.recipes.length} 张 · 生效药效 ${activeMedicines(imported.medicine, imported.age).length} 种<br>人间缘簿 ${Object.keys(imported.mortal.humanStories ?? {}).length} 段 · 旧信与信物已备份<br>仙途履历 ${imported.chronicle.entries.length} 条 · ${imported.mortal.member ? '宗门身份与精研已备份' : '散修'}${imported.mortal.immortal?.claimed ? '<br>人间游历奇遇与领取记录已备份' : ''}${candidate.run ? `<br>未完成历练：${STAGES[candidate.run.stage].name} · ${formatTime(candidate.run.time)} · LV.${candidate.run.level}` : '<br>无未完成历练'}</p>${endedNotice}<p class="panel-note">导入会替换此网址的全部进度和续局。可先导出当前存档备份，取消不会更改进度。</p><div class="save-actions"><button class="secondary-button" data-action="export-save">备份当前存档</button><button class="secondary-button" data-action="cultivation">取消导入</button><button class="primary-button" data-action="confirm-import">确认覆盖并导入</button></div>`,
+    `<p class="pause-description">${realm.name} · 累计修为 ${imported.cultivation.toLocaleString('zh-CN', { useGrouping: false })}<br>${isExtremeLife(imported) ? '极限模式' : '普通模式'}${imported.pendingReincarnation ? ' · 此世已落幕' : ''}<br>${spiritRootInfo(imported.spiritRoot).name} · 年岁 ${imported.age.toFixed(1)}<br>${imported.stones} 灵石 · ${imported.iron} 玄铁<br>收藏法宝 ${imported.artifacts.length} 件 · 已通关 ${imported.completed.length} 境<br>奇物珍藏 ${curios} 件<br>丹囊 ${Object.values(imported.medicine.bag).reduce((total, count) => total + count, 0)} 份 · 已购药方 ${imported.medicine.recipes.length} 张 · 生效药效 ${activeMedicines(imported.medicine, imported.age).length} 种<br>人间缘簿 ${Object.keys(imported.mortal.humanStories ?? {}).length} 段 · 旧信与信物已备份<br>仙途履历 ${imported.chronicle.entries.length} 条 · ${imported.mortal.member ? '宗门身份与精研已备份' : '散修'}${imported.mortal.immortal?.claimed ? '<br>人间游历奇遇与领取记录已备份' : ''}${candidate.run ? `<br>未完成历练：${STAGES[candidate.run.stage].name} · ${formatTime(candidate.run.time)} · LV.${candidate.run.level}` : '<br>无未完成历练'}</p>${endedNotice}<p class="panel-note">导入会替换此网址的全部进度和续局。可先导出当前存档备份，取消不会更改进度。</p><div class="save-actions"><button class="secondary-button" data-action="export-save">备份当前存档</button><button class="secondary-button" data-action="settings">取消导入</button><button class="primary-button" data-action="confirm-import">确认覆盖并导入</button></div>`,
   ];
 }

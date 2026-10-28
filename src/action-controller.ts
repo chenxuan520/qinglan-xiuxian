@@ -1336,7 +1336,7 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
     shell.toast('已导出存档，请妥善保留下载的存档文件');
     return true;
   }
-  if (action === 'import-save' && !shell.game && shell.panel === 'cultivation') {
+  if (action === 'import-save' && !shell.game && shell.panel === 'settings') {
     shell.document.querySelector<HTMLInputElement>('#save-import')?.click();
     return true;
   }
@@ -1393,7 +1393,10 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
     shell.toast('存档已导入，修行进度已恢复');
     return true;
   }
-  if (shell.panel === 'import-confirm' && ['close', 'cultivation', 'home'].includes(action))
+  if (
+    shell.panel === 'import-confirm' &&
+    ['close', 'settings', 'cultivation', 'home'].includes(action)
+  )
     shell.pendingImport = null;
   return false;
 }

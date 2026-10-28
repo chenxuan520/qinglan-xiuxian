@@ -134,26 +134,29 @@ export function mortalTabContent(
   const plan = studyPlan(save);
   const dues = sectDues(save);
   const effectiveLevel = Math.min(plan.level, plan.limit);
-  return `${sectMarketEntrance(save)}${settlementDirectoryEntrance(true)}<section class="mortal-membership"><div><small>我的仙门 · ${sectRole(save)}</small><h2>${member?.name ?? '尚未拜入宗门'}</h2><p>${member ? `${passive(member.id).name} · 精研 ${plan.level} / ${MAX_MASTERY} 阶 · 当前生效 ${effectiveLevel} 阶 · 正向效果 +${effectiveLevel * 3}%` : '同时只能加入一个宗门；入宗锁定本门正魔路线，不能兼修。开局赠本门功法一重，退宗后可重新选择路线。'}</p><p>入宗后锁定本门路线，不能兼修；退宗才可换道或改投他门。精研每阶增强本门功法正向效果 3%，满阶 30%；离宗保留成果，加成暂停。新历练自动获本门功法一重，占 4 个功法槽之一；局内修满五重才能参与仙器觉醒。</p></div>${member ? `<div class="mortal-study"><button class="primary-button" data-action="mortal-activity" data-id="study" data-cost-stones="${plan.stones}" ${world.activity || !plan.eligible ? 'disabled' : ''}>${plan.level >= MAX_MASTERY ? '本门精研已满' : plan.reason ? plan.reason : !plan.eligible ? `需${plan.requiredRealm}解锁` : world.activity ? '有事项待结算' : `精研下一阶 · ${plan.stones} 灵石 / ${plan.years} 年`}</button><small>当前境界可精研至 ${plan.limit} 阶${plan.requiredRealm ? ` · 下一阶需${plan.requiredRealm}` : ''}<br>境界只作门槛，不消耗修为；精研效果随境界逐步生效。<br>${spiritRootInfo(save.spiritRoot).name} · 消耗 ${plan.years} 年<br>点击即扣灵石与年岁，立即精研；遇供奉、寿尽或天劫时先处理，未完成时退宗不退费。精研五阶赠随机灵品丹药一颗，十阶赠随机限时珍品丹药一颗；每门各一次，自动收入丹囊。</small><button class="secondary-button" data-action="sect-service-open">本门专长 · ${SECT_SPECIALTIES[member.id].title}</button><button class="mortal-leave" data-action="mortal-leave">退出宗门</button></div>` : ''}</section>    <section class="mortal-sects"><div class="section-heading"><div><span class="section-number">仙门</span><h2>各宗门庭，各有其道</h2></div><div class="mortal-filters" role="group" aria-label="宗门流派">${[
-    ['all', '全部'],
-    ['orthodox', '正道'],
-    ['demonic', '魔道'],
-  ]
-    .map(
-      ([id, label]) =>
-        `<button data-action="mortal-filter" data-id="${id}" aria-pressed="${filter === id}" class="${filter === id ? 'active' : ''}">${label}</button>`,
+  return `${sectMarketEntrance(save)}${settlementDirectoryEntrance(true)}<section class="mortal-membership"><div class="sect-membership-heading"><small>我的仙门 · ${sectRole(save)}</small><h2>${member?.name ?? '尚未拜入宗门'}</h2>${member ? `<p class="sect-mastery-status">${passive(member.id).name} · 精研 ${plan.level} / ${MAX_MASTERY} 阶 · 当前生效 ${effectiveLevel} 阶 · 正向效果 +${effectiveLevel * 3}%</p>` : ''}</div>
+    <div class="sect-benefits"><h3>入宗所得</h3><ol><li data-sect-benefit="manual"><b>一</b><div><strong>${member ? passive(member.id).name : '本门功法'}</strong><p>每次新历练自带本门功法一重，占一个功法槽；局内修满五重可参与仙器觉醒。</p></div></li><li data-sect-benefit="medicine"><b>二</b><div><strong>宗门赠丹</strong><p>每次付费拜入赠一枚随机凡品丹药。</p><p>精研五阶赠灵品一颗，十阶赠限时珍品一颗；两项每门各一次，随机赠予，收入丹囊而不自动服用。</p></div></li><li data-sect-benefit="mastery"><b>三</b><div><strong>精研强化</strong><p>每阶精研增强本门功法正向效果 3%，满阶 30%；退宗保留进度，在籍时生效。</p></div></li></ol></div>
+    <div class="mortal-study sect-costs"><h3>花费与限制</h3><p>入宗后锁定本门路线，不能兼修；退宗才可换道或改投他门。</p>${member ? `${plan.level < MAX_MASTERY ? `<div class="sect-study-quote"><strong>${plan.stones} 灵石</strong><span>${plan.years} 年岁</span></div>` : ''}<button class="primary-button" data-action="mortal-activity" data-id="study" data-cost-stones="${plan.stones}" ${world.activity || !plan.eligible ? 'disabled' : ''}>${plan.level >= MAX_MASTERY ? '本门精研已满' : plan.reason ? plan.reason : !plan.eligible ? `需${plan.requiredRealm}解锁` : world.activity ? '有事项待结算' : '精研下一阶'}</button><small>当前境界可精研至 ${plan.limit} 阶${plan.level < MAX_MASTERY && plan.requiredRealm ? ` · 下一阶需${plan.requiredRealm}` : ''}${plan.level < MAX_MASTERY ? `<br>${spiritRootInfo(save.spiritRoot).name} · 消耗 ${plan.years} 年` : ''}</small><button class="secondary-button" data-action="sect-service-open">本门专长 · ${SECT_SPECIALTIES[member.id].title}</button><button class="mortal-leave" data-action="mortal-leave">退出宗门</button>` : `<strong class="sect-entry-price">入门礼 ${entryCost(save)} 灵石</strong>`}</div>
+    <details class="disclosure sect-study-rules" data-disclosure="sect-study-rules"><summary>精研门槛与中断规则</summary>${!member ? '<p>同时只能加入一个宗门；入宗锁定本门正魔路线，不能兼修。开局赠本门功法一重，退宗后可重新选择路线。</p>' : ''}<p>境界只作门槛，不消耗修为；精研效果随境界逐步生效。</p><p>点击即扣灵石与年岁，立即精研；遇供奉、寿尽或天劫时先处理，未完成时退宗不退费。</p></details></section>    <section class="mortal-sects"><div class="section-heading"><div><span class="section-number">仙门</span><h2>各宗门庭，各有其道</h2></div><div class="mortal-filters" role="group" aria-label="宗门流派">${[
+      ['all', '全部'],
+      ['orthodox', '正道'],
+      ['demonic', '魔道'],
+    ]
+      .map(
+        ([id, label]) =>
+          `<button data-action="mortal-filter" data-id="${id}" aria-pressed="${filter === id}" class="${filter === id ? 'active' : ''}">${label}</button>`,
+      )
+      .join(
+        '',
+      )}</div></div><p class="mortal-sect-note">${spiritRootInfo(save.spiritRoot).name}入门礼：${entryCost(save)} 灵石。${dues.stones ? `当前境界新账期每 ${dues.years} 年缴 ${dues.stones} 灵石。` : '真仙免供奉。'}不论在哪一门，入门礼与供奉标准相同。城镇游历及人间办事消耗的年岁计入账期；浏览宗门页签、秘境、闭关不计入。${unfinishedPath ? '尚有未结束的历练：只能拜入相同路线的宗门；兼修历练须结束后再入宗。' : ''}</p><div class="sect-grid">${SECTS.filter(
+      (s) => filter === 'all' || s.school === filter,
     )
-    .join(
-      '',
-    )}</div></div><p class="mortal-sect-note">${spiritRootInfo(save.spiritRoot).name}入门礼：${entryCost(save)} 灵石。${dues.stones ? `当前境界新账期每 ${dues.years} 年缴 ${dues.stones} 灵石。` : '真仙免供奉。'}不论在哪一门，入门礼与供奉标准相同。成功拜入后随机赠一枚凡品丹药，收入丹囊，不自动服用；退宗后再次付费拜入仍可获赠。城镇游历及人间办事消耗的年岁计入账期；浏览宗门页签、秘境、闭关不计入。${unfinishedPath ? '尚有未结束的历练：只能拜入相同路线的宗门；兼修历练须结束后再入宗。' : ''}</p><div class="sect-grid">${SECTS.filter(
-    (s) => filter === 'all' || s.school === filter,
-  )
-    .map((s) => {
-      const manual = passive(s.id);
-      return `<article class="sect-card ${s.school} ${member?.id === s.id ? 'joined' : ''}">${sectArt(s)}<div class="sect-copy"><span class="sect-school">${s.school === 'orthodox' ? '正道' : '魔道'}仙门${member?.id === s.id ? ` · 本门${sectRole(save)}` : ''}</span><h3>${s.name}</h3><p class="sect-motto">${s.motto}</p><p class="sect-specialty-note"><strong>${SECT_SPECIALTIES[s.id].title}</strong> · ${SECT_SPECIALTIES[s.id].text}<small>筑基开放 · 各门优惠以专长报价为准</small></p><div class="sect-manual">${icon(manual.id, manual.color)}<strong>${manual.name}<small>本门专修功法</small></strong></div><p>${manual.desc}</p><small class="sect-mastery">精研 ${world.mastery[s.id] || 0} / ${MAX_MASTERY} 阶${world.mastery[s.id] ? ` · ${member?.id === s.id ? `当前生效 ${Math.min(world.mastery[s.id], plan.limit)} 阶` : '成果保留，待入本门'}` : ''}</small><button class="secondary-button" data-action="mortal-join" data-id="${s.id}" data-cost-stones="${entryCost(save)}" ${member || (unfinishedPath && unfinishedPath !== s.school) ? 'disabled' : ''}>${member?.id === s.id ? '已拜入本门' : member ? '需先退出当前宗门' : unfinishedPath && unfinishedPath !== s.school ? '需先结束不同路线的历练' : `拜入山门 · ${entryCost(save)} 灵石`}</button></div></article>`;
-    })
-    .join('')}</div></section>
-    <section class="mortal-rules"><h2>入世须知</h2><p>炼气至合体每隔寿元上限的 1/5 缴纳一次，借寿也计入下一账期；大乘每 5000 年一次，真仙免供奉。每次供奉最多 ${MAX_SECT_DUES} 灵石。入门礼不抵供奉。突破或借寿后，当前账期按原约定结清，下一账期更新；进入真仙立即免除供奉。余额不足时暂停等待补缴，补缴后保留宗门身份与精研；明确放弃补缴才会被清退。</p><div class="dues-grid">${SECT_DUES.map((d, i) => `<span>${REALMS[i]} · ${SECT_ROLES[i]}<b>${d.stones ? `${d.years} 年 / ${d.stones} 灵石` : '免供奉'}</b></span>`).join('')}</div><small>职务随境界自动晋升，重新入宗按当前境界授职；未突破真仙时不会提前成为开宗老祖。表中为未借寿的标准间隔。未完成的委托和研习可离开后继续，不会自动重复；退宗与轮回会影响宗门成果，轮回清空本世全部精研。</small></section>`;
+      .map((s) => {
+        const manual = passive(s.id);
+        return `<article class="sect-card ${s.school} ${member?.id === s.id ? 'joined' : ''}">${sectArt(s)}<div class="sect-copy"><span class="sect-school">${s.school === 'orthodox' ? '正道' : '魔道'}仙门${member?.id === s.id ? ` · 本门${sectRole(save)}` : ''}</span><h3>${s.name}</h3><p class="sect-motto">${s.motto}</p><p class="sect-specialty-note"><strong>${SECT_SPECIALTIES[s.id].title}</strong> · ${SECT_SPECIALTIES[s.id].text}<small>筑基开放 · 各门优惠以专长报价为准</small></p><div class="sect-manual">${icon(manual.id, manual.color)}<strong>${manual.name}<small>本门专修功法</small></strong></div><p>${manual.desc}</p><small class="sect-mastery">精研 ${world.mastery[s.id] || 0} / ${MAX_MASTERY} 阶${world.mastery[s.id] ? ` · ${member?.id === s.id ? `当前生效 ${Math.min(world.mastery[s.id], plan.limit)} 阶` : '成果保留，待入本门'}` : ''}</small><button class="secondary-button" data-action="mortal-join" data-id="${s.id}" data-cost-stones="${entryCost(save)}" ${member || (unfinishedPath && unfinishedPath !== s.school) ? 'disabled' : ''}>${member?.id === s.id ? '已拜入本门' : member ? '需先退出当前宗门' : unfinishedPath && unfinishedPath !== s.school ? '需先结束不同路线的历练' : `拜入山门 · ${entryCost(save)} 灵石`}</button></div></article>`;
+      })
+      .join('')}</div></section>
+    <details class="mortal-rules disclosure" data-disclosure="sect-dues"><summary>入世须知</summary><div class="sect-dues-details"><p>炼气至合体每隔寿元上限的 1/5 缴纳一次，借寿也计入下一账期；大乘每 5000 年一次，真仙免供奉。每次供奉最多 ${MAX_SECT_DUES} 灵石。入门礼不抵供奉。突破或借寿后，当前账期按原约定结清，下一账期更新；进入真仙立即免除供奉。余额不足时暂停等待补缴，补缴后保留宗门身份与精研；明确放弃补缴才会被清退。</p><div class="dues-grid">${SECT_DUES.map((d, i) => `<span>${REALMS[i]} · ${SECT_ROLES[i]}<b>${d.stones ? `${d.years} 年 / ${d.stones} 灵石` : '免供奉'}</b></span>`).join('')}</div><small>职务随境界自动晋升，重新入宗按当前境界授职；未突破真仙时不会提前成为开宗老祖。表中为未借寿的标准间隔。未完成的委托和研习可离开后继续，不会自动重复；退宗与轮回会影响宗门成果，轮回清空本世全部精研。</small></div></details>`;
 }
 
 export function townEventContent(save: SaveData, npc: TownResident) {

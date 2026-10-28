@@ -231,6 +231,9 @@ h1 span {
   font-size: 11px;
   color: #bacab28a;
 }
+.vertical-poem.is-short {
+  white-space: nowrap;
+}
 .realm-circle {
   width: 132px;
   height: 132px;
