@@ -1,4 +1,6 @@
 import type { ActionShell } from './action-controller.ts';
+import { FIRST_TOUR_KEY, markFirstTourSeen } from './first-run-tour-state.ts';
+export { FIRST_TOUR_KEY, markFirstTourSeen } from './first-run-tour-state.ts';
 
 type TourHost = Pick<
   ActionShell,
@@ -16,16 +18,6 @@ type TourHost = Pick<
   | 'guideSource'
   | 'toast'
 >;
-export const FIRST_TOUR_KEY = 'qinglan-first-tour';
-export function markFirstTourSeen(storage?: Pick<Storage, 'setItem'>) {
-  try {
-    (storage ?? localStorage).setItem(FIRST_TOUR_KEY, 'seen');
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // 单独保存设备上的首次引导状态，不改变存档格式或轮回规则。
 export function queueFirstRunTour(
   host: TourHost,
@@ -35,7 +27,7 @@ export function queueFirstRunTour(
     setTimeout(callback, 200);
   },
 ) {
-  const seed = String(host.save.medicine.recipeSeed);
+  let seed = String(host.save.medicine.recipeSeed);
   let marker = '';
   try {
     marker = storage.getItem(FIRST_TOUR_KEY) ?? '';
@@ -54,7 +46,10 @@ export function queueFirstRunTour(
   };
   const pending = () => {
     try {
-      return storage.getItem(FIRST_TOUR_KEY) === seed;
+      const marker = storage.getItem(FIRST_TOUR_KEY);
+      // 重抽会由成功写档路径同步转交标记；导入或轮回不会转交。
+      if (marker === String(host.save.medicine.recipeSeed)) seed = marker;
+      return marker === seed;
     } catch {
       return false;
     }

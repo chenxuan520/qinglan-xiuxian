@@ -42,6 +42,7 @@ import * as openingUi from '../src/opening-ui.ts';
 import * as lobbyUi from '../src/lobby-ui.ts';
 import * as townHost from '../src/town-host.ts';
 import { dispatchAction } from '../src/action-controller.ts';
+import { FIRST_TOUR_KEY, retargetPendingFirstTour } from '../src/first-run-tour-state.ts';
 
 // 执行实际函数和调用入口，不导入 main 的游戏、音频、Worker 与页面初始化。
 const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
@@ -103,6 +104,7 @@ function harness(save: SaveData) {
   const rootFrame = { ...element, scrollTop: 0 };
   const rootLayout = { innerHTML: '' };
   let rolls = 0;
+  const firstTourValues = new Map<string, string>();
   const context = createContext({
     battleHud: { reset: noop },
     // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
@@ -141,10 +143,18 @@ function harness(save: SaveData) {
     AD_SECONDS,
     SUPPORT_CODE_IMAGE,
     structuredClone,
+    firstTourValues,
+    retargetPendingFirstTour: (previous: number, next: number) =>
+      retargetPendingFirstTour(previous, next, context.localStorage),
     AbortController,
     localStorage: {
-      getItem: () => writes.at(-1) ?? null,
+      getItem: (key: string) =>
+        key === FIRST_TOUR_KEY ? (firstTourValues.get(key) ?? null) : (writes.at(-1) ?? null),
       setItem(key: string, value: string) {
+        if (key === FIRST_TOUR_KEY) {
+          firstTourValues.set(key, value);
+          return;
+        }
         assert.equal(key, SAVE_KEY);
         writes.push(value);
       },
@@ -395,6 +405,7 @@ test('命盘连续重抽只更新结果，保留弹窗与滚动，不经过故�
   save.prologueSeen = true;
   departHometown(save);
   const context = harness(save);
+  context.firstTourValues.set(FIRST_TOUR_KEY, String(save.medicine.recipeSeed));
   context.renderLobby();
   assert.equal(context.panel, 'root-reveal');
   context.routes.length = 0;
@@ -414,10 +425,43 @@ test('命盘连续重抽只更新结果，保留弹窗与滚动，不经过故�
     assert.equal(context.modal.innerHTML, '保留命盘外框、说明、遗物与按钮');
     assert.equal(context.ui.innerHTML, '保留背景首页');
     assert.match(layout.innerHTML, new RegExp(data.spiritRootInfo(root).name));
+    assert.equal(context.firstTourValues.get(FIRST_TOUR_KEY), String(save.medicine.recipeSeed));
+    assert.equal(
+      readSave(context.writes.at(-1)).save.medicine.recipeSeed,
+      save.medicine.recipeSeed,
+    );
   }
   assert.deepEqual(context.routes, []);
   assert.equal(context.writes.length, 4);
   assert.deepEqual(context.tracked, []);
+});
+
+test('命盘重抽保存失败不转交首次导览标记，重试成功才转交；轮回不会恢复资格', () => {
+  const save = freshSave('heaven', ['fire'], 'orthodox', () => 0.9);
+  save.prologueSeen = true;
+  departHometown(save);
+  const context = harness(save);
+  context.renderLobby();
+  const previous = save.medicine.recipeSeed;
+  context.firstTourValues.set(FIRST_TOUR_KEY, String(previous));
+  const setItem = context.localStorage.setItem;
+  context.localStorage.setItem = () => {
+    throw new DOMException('quota', 'QuotaExceededError');
+  };
+  context.handleAction('reroll-root');
+  assert.equal(save.medicine.recipeSeed, previous);
+  assert.equal(context.firstTourValues.get(FIRST_TOUR_KEY), String(previous));
+  context.localStorage.setItem = setItem;
+  context.handleAction('reroll-root');
+  assert.notEqual(save.medicine.recipeSeed, previous);
+  assert.equal(context.firstTourValues.get(FIRST_TOUR_KEY), String(save.medicine.recipeSeed));
+
+  for (const marker of ['seen', String(save.medicine.recipeSeed)]) {
+    context.firstTourValues.set(FIRST_TOUR_KEY, marker);
+    context.panel = 'reincarnate';
+    assert.equal(context.resetLifetime(), true);
+    assert.equal(context.firstTourValues.get(FIRST_TOUR_KEY), marker);
+  }
 });
 
 test('重抽或确认轮回时发现另一窗口更新存档，保留存档锁提示且不覆盖存档', () => {

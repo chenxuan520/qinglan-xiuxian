@@ -1,6 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FrameRate } from '../src/frame-rate.ts';
+import { Game } from '../src/game.ts';
+import { freshSave } from '../src/progress.ts';
+import { pausePanel } from '../src/lobby-ui.ts';
+
+test('暂停尚无有效读数时不显示采样提示，有真实读数时仍显示 FPS', () => {
+  const save = freshSave();
+  const game = new Game(save, 0, 0);
+  const meter = new FrameRate();
+  const content = pausePanel(game, save, meter.value, false).join('');
+  assert.doesNotMatch(content, /帧率采样中|pause-frame-rate|\bFPS\b/);
+  assert.match(content, /data-action="resume"/);
+  for (const fps of [0, 20, 30, 60, 120]) {
+    const content = pausePanel(game, save, fps, false).join('');
+    assert.match(content, new RegExp(`>${fps} FPS<`));
+    assert.match(content, /title="暂停前最近一秒的平均帧率"/);
+    assert.doesNotMatch(content, /帧率采样中/);
+  }
+});
 
 test('帧率按真实帧间隔采样，不假设屏幕为 60 Hz', () => {
   for (const fps of [20, 30, 60, 120]) {

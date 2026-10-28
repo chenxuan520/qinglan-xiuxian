@@ -1,4 +1,5 @@
 import { bindSettlementDirectory } from './settlement-directory-source.ts';
+import { retargetPendingFirstTour } from './first-run-tour-state.ts';
 import { STANDALONE } from './build-mode.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
@@ -1324,6 +1325,7 @@ function resetLifetime(
     if (!saveLock) toast('轮回尚未保存，旧世进度保留，请重试');
     return false;
   }
+  if (rerolling) retargetPendingFirstTour(save.medicine.recipeSeed, next.medicine.recipeSeed);
   Object.assign(save, next);
   shownHumanLetters.clear();
   clearInterval(adTimer);

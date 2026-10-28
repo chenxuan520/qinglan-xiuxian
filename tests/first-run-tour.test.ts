@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave } from '../src/progress.ts';
 import { queueFirstRunTour, FIRST_TOUR_KEY, markFirstTourSeen } from '../src/first-run-tour.ts';
+import { retargetPendingFirstTour } from '../src/first-run-tour-state.ts';
 
 type Host = Parameters<typeof queueFirstRunTour>[0];
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -155,6 +156,64 @@ test('加载期间换面板或首页节点，不覆盖新界面，返回首页�
   h.host.panel = '';
   await h.tick();
   assert.equal(h.state.starts, 1);
+});
+
+test('首次命盘连续重抽仍待导览，接受命盘后仅开启一次且不改真实资源', async () => {
+  const h = harness();
+  h.host.panel = 'root-reveal';
+  h.queue();
+  for (let i = 0; i < 3; i++) {
+    const previous = h.host.save.medicine.recipeSeed;
+    h.host.save.medicine.recipeSeed++;
+    retargetPendingFirstTour(previous, h.host.save.medicine.recipeSeed, h.storage);
+    await h.tick();
+    assert.equal(h.state.starts, 0);
+    assert.equal(h.values.get(FIRST_TOUR_KEY), String(h.host.save.medicine.recipeSeed));
+  }
+  const before = structuredClone(h.host.save);
+  h.host.panel = '';
+  await h.tick();
+  assert.equal(h.state.starts, 1);
+  assert.equal(h.values.get(FIRST_TOUR_KEY), 'seen');
+  assert.deepEqual(h.host.save, before);
+});
+
+test('重抽后刷新仍保留首次资格，已看过、旧档及异世标记不恢复', async () => {
+  const h = harness();
+  h.values.set(FIRST_TOUR_KEY, String(h.host.save.medicine.recipeSeed));
+  const previous = h.host.save.medicine.recipeSeed++;
+  retargetPendingFirstTour(previous, h.host.save.medicine.recipeSeed, h.storage);
+  h.queue(false);
+  await flush();
+  assert.equal(h.state.starts, 1);
+  for (const marker of [undefined, 'seen', String(previous - 1)]) {
+    const h = harness();
+    if (marker !== undefined) h.values.set(FIRST_TOUR_KEY, marker);
+    const previous = h.host.save.medicine.recipeSeed++;
+    retargetPendingFirstTour(previous, h.host.save.medicine.recipeSeed, h.storage);
+    h.queue(false);
+    await flush();
+    assert.equal(h.state.starts, 0);
+    assert.equal(h.values.get(FIRST_TOUR_KEY), marker);
+  }
+});
+
+test('导览加载期间重抽并重绘首页，迟到模块仅对最新命盘开启一次', async () => {
+  const h = harness();
+  const pending = Promise.withResolvers<typeof h.module>();
+  h.host.guideSource.load = (() => pending.promise) as Host['guideSource']['load'];
+  h.queue();
+  h.host.panel = 'root-reveal';
+  const previous = h.host.save.medicine.recipeSeed++;
+  retargetPendingFirstTour(previous, h.host.save.medicine.recipeSeed, h.storage);
+  h.host.ui.firstElementChild = {} as Element;
+  pending.resolve(h.module);
+  await flush();
+  assert.equal(h.state.starts, 0);
+  h.host.panel = '';
+  await h.tick();
+  assert.equal(h.state.starts, 1);
+  assert.equal(h.values.get(FIRST_TOUR_KEY), 'seen');
 });
 
 test('轮回/导入换世、开始战斗或另一页已看过，不触发迟到自动教程', async () => {
