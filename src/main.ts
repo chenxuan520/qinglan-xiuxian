@@ -157,6 +157,7 @@ import { ScreenAwake } from './screen-awake.ts';
 import { FrameRate } from './frame-rate.ts';
 import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
+import { commitSaveAction } from './save-action.ts';
 import type { TownScene } from './town-scene.ts';
 import { TownSource } from './town-source.ts';
 import type { SectMarketScene } from './sect-market-scene.ts';
@@ -239,8 +240,6 @@ let lastSaveText = raw;
 const save = saveRead.status === 'unreadable' ? parseSave(null) : saveRead.save;
 // 每次进入先静音，保留音量，只有明确开启声音后才播放。
 save.sound = false;
-if (!save.journeyEnded && !save.pendingReincarnation && !save.mortal.marketSocial?.ambush)
-  resolveActivity(save);
 const telemetry = createTelemetry({
   origin: location.origin,
   endpoint: `${NPC_AI_BASE}${TELEMETRY_SETTINGS.path}`,
@@ -445,7 +444,8 @@ function persist() {
     (game?.state === 'won' && !settled)
   )
     return false;
-  syncHumanStories(save);
+  if (!save.journeyEnded && !save.pendingReincarnation && !save.mortal.marketSocial?.ambush)
+    syncHumanStories(save);
   const active = game && !settled ? game : pendingRun;
   try {
     writeSave(save, active);
@@ -901,12 +901,22 @@ function showTeaStory() {
     return soundSettings.enableNarration();
   });
 }
+function syncMortalSave(enter = false) {
+  if (save.journeyEnded || save.pendingReincarnation || save.mortal.marketSocial?.ambush)
+    return true;
+  const changed = commitSaveAction(
+    { save, game, settled, pendingRun, saveLock, writeSave, toast },
+    (next) => {
+      const resolved = enter && resolveActivity(next);
+      return syncHumanStories(next) || resolved;
+    },
+  );
+  if (changed === false) return false;
+  if (changed && pendingRun) pendingRun = Game.restore(save, pendingRun.snapshot());
+  return true;
+}
 function renderMortal(enter = false) {
-  if (syncHumanStories(save)) persist();
-  if (enter && resolveActivity(save)) {
-    if (pendingRun) pendingRun = Game.restore(save, pendingRun.snapshot());
-    persist();
-  }
+  if (!syncMortalSave(enter)) return;
   releaseTownScene();
   const scroll = enter ? 0 : ui.scrollTop;
   if (enter) {
@@ -1215,8 +1225,8 @@ function ensureScene(
 ) {
   return sceneFlow.ensureScene(shellBindings(), stage, next, run, tribulation, combat);
 }
-function startRun() {
-  return sceneFlow.startRun(shellBindings());
+function startRun(replacePending = false) {
+  return sceneFlow.startRun(shellBindings(), replacePending);
 }
 function restoreRun() {
   return sceneFlow.restoreRun(shellBindings());
@@ -2311,6 +2321,7 @@ backgroundClock.onmessage = () => {
     }
   }
 };
+syncMortalSave(true);
 initOffline();
 renderLobby();
 if (save.pendingReincarnation) renderJourneyFarewell(save.pendingReincarnation);

@@ -139,10 +139,14 @@ export const createHouseAdsWorker = (
           : url.pathname;
       if (path === '/api/client-status') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');
-        if (!extra || !request.headers.get('Origin')) return json({ error: 'origin-denied' }, 403);
+        const origin = request.headers.get('Origin');
+        if (!extra || !origin || !env.ALLOWED_ORIGINS.split(',').includes(origin))
+          return json({ error: 'origin-denied' }, 403);
         if (request.method === 'OPTIONS')
           return new Response(null, { status: 204, headers: extra });
         if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405, extra);
+        if (url.searchParams.get('verification') === '1')
+          return new Response(null, { status: 204, headers: extra });
         if (
           ['text/plain', 'application/json'].includes(
             request.headers.get('Content-Type')?.split(';')[0].trim() ?? '',

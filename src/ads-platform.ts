@@ -4,9 +4,8 @@ import type { AdLoadTrace } from './ad-load-diagnostics.ts';
 import { validAdPlatformSettings } from './ad-platform-contract.ts';
 import { houseAdProvider } from './ads-house-source.ts';
 import { createAdsenseProvider } from './ads-adsense.ts';
-import { AD_PRELOAD_TTL_MS, clearPreparedAds } from './ad-preload-cache.ts';
+import { clearPreparedAds } from './ad-preload-cache.ts';
 import type { AdPlacement, RewardAdProvider } from './ads.ts';
-let warmedHouseUntil = 0;
 export async function warmAdPlatform(signal: AbortSignal) {
   const body = await adLoadJson(new URL(ADS_SETTINGS.platform.endpoint), signal, 8000, fetch);
   if (
@@ -17,11 +16,9 @@ export async function warmAdPlatform(signal: AbortSignal) {
     validAdPlatformSettings(body.settings)
   ) {
     if (body.settings.provider !== 'house') {
-      warmedHouseUntil = 0;
       clearPreparedAds();
       return;
     }
-    warmedHouseUntil = performance.now() + AD_PRELOAD_TTL_MS;
     const module = await import('./ads-preload.ts');
     if (!signal.aborted) await module.preloadAdImages(signal);
   }
@@ -33,8 +30,6 @@ export async function configuredAdProvider(
   trace?: AdLoadTrace,
 ): Promise<RewardAdProvider | null> {
   if (!ADS_SETTINGS.platform.endpoint || signal.aborted) return null;
-  // 仅短期复用自营供给类型；实际创意仍重新抽取并校验最新权重/开关。
-  if (fetcher === fetch && performance.now() < warmedHouseUntil) return houseAdProvider;
   const url = new URL(ADS_SETTINGS.platform.endpoint);
   url.searchParams.set('placement', placement);
   trace?.at('settings');
@@ -50,6 +45,8 @@ export async function configuredAdProvider(
     return null;
   }
   if (body.settings.provider === 'house') return houseAdProvider;
+  // 图片仍提前备好；每次打开重新确认供给，切换后不再消费旧的自营素材。
+  clearPreparedAds();
   if (body.settings.provider === 'adsense')
     return createAdsenseProvider(
       body.settings.adsense,

@@ -13,6 +13,7 @@ import {
   completeTribulation,
 } from '../src/progress.ts';
 import { resolveActivity } from '../src/mortal.ts';
+import { syncHumanStories } from '../src/human-stories.ts';
 import { Game } from '../src/game.ts';
 import { importSave, exportSave, restoreSavedRun } from '../src/save-transfer.ts';
 import {
@@ -234,7 +235,8 @@ test('极限天劫后待续原局仍禁止退场、导入、主动轮回；普�
     assert.ok(shell.pendingRun, action);
   }
   const save = freshSave();
-  let rendered = 0;
+  let rendered = 0,
+    writes = 0;
   const shell: any = {
     save,
     assetsReady: true,
@@ -254,6 +256,10 @@ test('极限天劫后待续原局仍禁止退场、导入、主动轮回；普�
     frameRate: { reset() {} },
     telemetry: { track() {} },
     lifeStats: () => ({}),
+    writeSave(_next: unknown, run: Game) {
+      assert.ok(run instanceof Game);
+      writes++;
+    },
     renderHud() {
       rendered++;
     },
@@ -264,6 +270,7 @@ test('极限天劫后待续原局仍禁止退场、导入、主动轮回；普�
   assert.equal(shell.game.state, 'playing');
   assert.equal(shell.settled, false);
   assert.equal(rendered, 1);
+  assert.equal(writes, 1);
 });
 
 test('极限周期天劫先保存入场，胜后原子保留原历练；保存失败可重试且刷新仍判中断', () => {
@@ -287,6 +294,7 @@ test('极限周期天劫先保存入场，胜后原子保留原历练；保存�
     tribulationDue,
     completeTribulation,
     resolveActivity,
+    syncHumanStories,
     ensureScene: () => true,
     writeSave(next: typeof save, run: Game | null) {
       if (blocked) throw Error('quota');

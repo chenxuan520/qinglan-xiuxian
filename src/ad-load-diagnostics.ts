@@ -1,5 +1,5 @@
 import { STANDALONE } from './build-mode.ts';
-import { ADS_SETTINGS } from './setting.ts';
+import { ADS_SETTINGS, TELEMETRY_SETTINGS } from './setting.ts';
 import { GAME_VERSION } from './version.ts';
 import { houseAdDeviceFromUserAgent, type HouseAdPlacement } from './house-ad-contract.ts';
 import { validAdLoadDiagnostic, type AdLoadDiagnostic } from './ad-load-contract.ts';
@@ -26,6 +26,10 @@ export class AdLoadTrace {
       STANDALONE ||
       typeof window === 'undefined' ||
       typeof navigator === 'undefined' ||
+      !TELEMETRY_SETTINGS.origins.some((origin) => origin === window.location?.origin) ||
+      new URLSearchParams(window.location.search).get('verification') === '1' ||
+      GAME_VERSION === 'dev' ||
+      GAME_VERSION.endsWith('-dirty') ||
       !ADS_SETTINGS.house.endpoint
     )
       return;

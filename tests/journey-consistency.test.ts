@@ -36,6 +36,7 @@ import { beginSectMarketVisit } from '../src/sect-market.ts';
 import { importSave, exportSave, restoreSavedRun } from '../src/save-transfer.ts';
 import worker from '../workers/npc-ai/index.ts';
 import { GAME_SITE_URL } from '../src/setting.ts';
+import { syncHumanStories } from '../src/human-stories.ts';
 
 function extract(file: string, name: string) {
   const text = readFileSync(new URL(file, import.meta.url), 'utf8');
@@ -333,6 +334,8 @@ test('实际导入较早低阶存档后只剔除越界的旧回复，合法聊�
     game: null,
     panel: 'import-confirm',
     pendingImport: importSave(backup),
+    structuredClone,
+    syncHumanStories,
     writeSave() {},
     resolveActivity() {},
     Game,

@@ -10,6 +10,7 @@ import {
   commitBinaryBreaches,
   isBinary,
   PUBLIC_FONT_CSS,
+  EXPLICITLY_APPROVED_ART,
 } from '../scripts/check-binaries.ts';
 
 const original = Buffer.from([0, 1, 2]);
@@ -42,6 +43,7 @@ function repository(withLegacyCommit = false) {
   const approved = { 'approved.bin': approval(original) };
   write('approved.bin', original);
   write('scripts/approved-binaries.json', JSON.stringify(approved));
+  write('scripts/approved-art.json', JSON.stringify(EXPLICITLY_APPROVED_ART));
   const before = commit();
   const check = (eventName = 'push', missingBase = false) => {
     const after = git('rev-parse', 'HEAD'),
@@ -312,3 +314,60 @@ test('2026-10-27 批准的山门图标可替换基线旧版，旧版仍有效，
   );
   assert.ok(binaryBreaches([{ path: 'public/icons/icon-1024.png', data }], {}).length);
 });
+
+for (const attack of ['manifest', 'inline']) {
+  test(`同提交新增素材并扩大${attack}白名单仍被CLI及逐提交门禁拒绝`, () => {
+    const r = repository();
+    try {
+      const checker = readFileSync(
+        new URL('../scripts/check-binaries.ts', import.meta.url),
+        'utf8',
+      );
+      r.write('scripts/check-binaries.ts', checker);
+      const before = r.commit();
+      const path = 'unapproved.webp';
+      r.write(path, original);
+      if (attack === 'manifest')
+        r.write(
+          'scripts/approved-art.json',
+          JSON.stringify({ ...EXPLICITLY_APPROVED_ART, [path]: approval(original) }),
+        );
+      else
+        r.write(
+          'scripts/check-binaries.ts',
+          checker.replace(
+            '// 一个路径可匹配',
+            `EXPLICITLY_APPROVED_ART[${JSON.stringify(path)}] = ${JSON.stringify(approval(original))};\n// 一个路径可匹配`,
+          ),
+        );
+      const after = r.commit();
+      if (attack === 'manifest') assert.ok(r.check().some((s) => s.includes('补充素材授权基线')));
+      r.write('event.json', JSON.stringify({ before, after }));
+      let output = '';
+      try {
+        execFileSync(process.execPath, ['scripts/check-binaries.ts'], {
+          cwd: r.cwd,
+          env: {
+            ...process.env,
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_EVENT_PATH: join(r.cwd, 'event.json'),
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+        assert.fail('expanded allowlist must fail');
+      } catch (error: any) {
+        assert.equal(error.status, 1);
+        output = String(error.stderr);
+      }
+      assert.match(output, /补充素材授权基线/);
+      // 恢复最终文件仍不能掩盖中间提交改过授权基线。
+      if (attack === 'manifest') {
+        r.write('scripts/approved-art.json', JSON.stringify(EXPLICITLY_APPROVED_ART));
+        r.commit();
+        assert.ok(r.check().some((s) => s.includes('补充素材授权基线')));
+      }
+    } finally {
+      rmSync(r.cwd, { recursive: true, force: true });
+    }
+  });
+}

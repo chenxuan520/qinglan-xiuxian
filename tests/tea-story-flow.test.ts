@@ -16,6 +16,7 @@ import { AD_SECONDS } from '../src/ads.ts';
 import { MedicinePanel } from '../src/medicine-panel.ts';
 import { executeMortalAction, teaStoryPanel } from '../src/town-host.ts';
 import { dispatchAction } from '../src/action-controller.ts';
+import { commitSaveAction } from '../src/save-action.ts';
 import { lifespanEndPanel, tribulationPendingPanel } from '../src/opening-ui.ts';
 import { sectDuesModal } from '../src/lobby-ui.ts';
 import { removeNumberGrouping } from '../src/number-format.ts';
@@ -33,6 +34,7 @@ const flow = new Script(
           'syncMortalChange',
           'persist',
           'writeSave',
+          'syncMortalSave',
           'renderMortal',
           'renderLifespanEnd',
           'renderTribulationPending',
@@ -120,6 +122,7 @@ function harness(t: TestContext, firstStory = false) {
     chronicleSource: { observe() {} },
     hideAchievementNotice() {},
     dispatchAction,
+    commitSaveAction,
     structuredClone,
     save,
     modal,
@@ -157,6 +160,7 @@ function harness(t: TestContext, firstStory = false) {
     sectDuesModal,
     AbortController,
     game: null,
+    settled: false,
     pendingRun: null,
     panel: 'town-event',
     inTown: true,

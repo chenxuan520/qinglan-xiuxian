@@ -1,6 +1,7 @@
 import { STANDALONE } from './build-mode.ts';
 import { isExtremeLife, difficultyAllowed, rewardDisabled } from './life-mode.ts';
 import { resourceFailureContent } from './resource-panel.ts';
+import { commitSaveAction } from './save-action.ts';
 import type { ActionShell } from './action-controller.ts';
 import type { ParentId } from './hometown.ts';
 import type { TownResident } from './town-population.ts';
@@ -197,13 +198,13 @@ export function showHometown(shell: ActionShell, parent?: ParentId) {
   const parents = shell.hometownParents(home, shell.save.age);
   if (parent && !parents.some((p: { id: ParentId; alive: boolean }) => p.id === parent && p.alive))
     return;
-  shell.closeNpcChat();
   const content = shell.hometownContent(shell.save, parent);
   if (
     (parent || parents.every((p: { alive: boolean }) => !p.alive)) &&
-    shell.visitHometown(shell.save, parent)
+    commitSaveAction(shell, (next) => shell.visitHometown(next, parent)) === false
   )
-    shell.persist();
+    return;
+  shell.closeNpcChat();
   shell.panel = 'hometown-home';
   shell.panelFrame(
     parent ? parents.find((p: { id: ParentId; name: string }) => p.id === parent)!.name : '故居',
@@ -220,11 +221,8 @@ export function showHometown(shell: ActionShell, parent?: ParentId) {
 
 export function showTownEvent(shell: ActionShell, npc: TownResident) {
   if (!shell.inTown || shell.townScene?.nearbyNpc?.id !== npc.id) return;
-  shell.townNpc = npc;
-  shell.panel = 'town-event';
   const visitor = shell.save.mortal.immortal;
   if (visitor?.npcId === npc.id && !shell.save.journeyEnded) {
-    shell.closeNpcChat();
     const next = shell.structuredClone(shell.save);
     const granted = shell.meetTownImmortal(next, npc.id, npc.name, shell.pendingRun?.loot.curios);
     if (granted) {
@@ -232,7 +230,6 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
         shell.writeSave(next, shell.pendingRun);
       } catch {
         if (!shell.saveLock) {
-          shell.panel = '';
           shell.toast('这场相逢未能保存，请再与前辈交谈');
         }
         return;
@@ -240,6 +237,9 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
       Object.assign(shell.save, next);
     }
 
+    shell.closeNpcChat();
+    shell.townNpc = npc;
+    shell.panel = 'town-event';
     shell.panelFrame(
       ...shell.immortalEncounterPanel(shell.save, npc, granted, shell.pendingRun?.loot.curios),
     );
@@ -248,10 +248,17 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   const storyId = Object.keys(shell.HUMAN_STORIES).find(
     (id) => shell.isHumanStoryId(id) && shell.HUMAN_STORIES[id].npcId === npc.id,
   );
-  const changed = shell.syncHumanStories(shell.save);
-  const read =
-    storyId && shell.isHumanStoryId(storyId) && shell.chooseHumanStory(shell.save, storyId, 'read');
-  if (changed || read) shell.persist();
+  if (
+    commitSaveAction(shell, (next) => {
+      const changed = shell.syncHumanStories(next);
+      const read =
+        storyId && shell.isHumanStoryId(storyId) && shell.chooseHumanStory(next, storyId, 'read');
+      return changed || !!read;
+    }) === false
+  )
+    return;
+  shell.townNpc = npc;
+  shell.panel = 'town-event';
   shell.panelFrame(npc.name, `${npc.place} · ${npc.role}`, shell.townEventContent(shell.save, npc));
   shell.mountNpcChat(shell.modal.querySelector<HTMLElement>('.npc-dialogue')!, shell.save, npc);
 }
@@ -888,7 +895,7 @@ export function ensureScene(
   return false;
 }
 
-export function startRun(shell: ActionShell) {
+export function startRun(shell: ActionShell, replacePending = false) {
   if (
     !shell.assetsReady ||
     (shell.game && !shell.settled) ||
@@ -901,7 +908,7 @@ export function startRun(shell: ActionShell) {
     shell.renderTribulationPending();
     return;
   }
-  if (shell.pendingRun) {
+  if (shell.pendingRun && (!replacePending || isExtremeLife(shell.save))) {
     if (isExtremeLife(shell.save)) {
       shell.restoreRun();
       return;
@@ -911,22 +918,22 @@ export function startRun(shell: ActionShell) {
     shell.panelFrame(...shell.restartRunPanel());
     return;
   }
-  if (!shell.ensureScene(shell.selectedStage, shell.startRun, null, false, true)) {
+  if (
+    !shell.ensureScene(shell.selectedStage, () => shell.startRun(replacePending), null, false, true)
+  ) {
     return;
   }
-  let entering: Game | null = null;
-  if (isExtremeLife(shell.save)) {
-    const next = structuredClone(shell.save);
-    entering = new shell.Game(next, shell.selectedStage, shell.difficulty);
-    try {
-      shell.writeSave(next, entering);
-    } catch {
-      if (!shell.saveLock) shell.toast('尚未进入秘境，未能保存入场，请重试');
-      return;
-    }
-    Object.assign(shell.save, next);
-    entering.save = shell.save;
+  const next = structuredClone(shell.save);
+  const entering = new shell.Game(next, shell.selectedStage, shell.difficulty);
+  try {
+    shell.writeSave(next, entering);
+  } catch {
+    if (!shell.saveLock) shell.toast('尚未进入秘境，未能保存入场，请重试');
+    return;
   }
+  Object.assign(shell.save, next);
+  entering.save = shell.save;
+  shell.pendingRun = null;
   shell.clearInput();
   shell.panel = '';
   shell.modal.innerHTML = '';
@@ -934,7 +941,7 @@ export function startRun(shell: ActionShell) {
   shell.settled = false;
   shell.rewards = null;
   shell.abandonConfirm = false;
-  shell.game = entering ?? new shell.Game(shell.save, shell.selectedStage, shell.difficulty);
+  shell.game = entering;
   shell.frameRate.reset();
   shell.game.onEvent = shell.gameEvent;
   shell.telemetry.track({
@@ -950,7 +957,6 @@ export function startRun(shell: ActionShell) {
   ).name;
   shell.renderHud();
   if (shell.save.sound) shell.gameAudio.sync();
-  shell.persist();
 }
 
 export function restoreRun(shell: ActionShell) {
@@ -1005,23 +1011,18 @@ export function beginTribulation(shell: ActionShell) {
     return;
   }
   const source = shell.game && !shell.settled ? shell.game : shell.pendingRun;
-  if (isExtremeLife(shell.save)) {
-    const next = structuredClone(shell.save);
-    next.tribulationReturn = source?.snapshot() ?? null;
-    const entering = shell.Game.createTribulation(next, source);
-    try {
-      shell.writeSave(next, entering);
-    } catch {
-      if (!shell.saveLock) shell.toast('尚未迎劫，未能保存入场，请重试');
-      return;
-    }
-    Object.assign(shell.save, next);
-    entering.save = shell.save;
-    shell.game = entering;
-  } else {
-    shell.save.tribulationReturn = source?.snapshot() ?? null;
-    shell.game = shell.Game.createTribulation(shell.save, source);
+  const next = structuredClone(shell.save);
+  next.tribulationReturn = source?.snapshot() ?? null;
+  const entering = shell.Game.createTribulation(next, source);
+  try {
+    shell.writeSave(next, entering);
+  } catch {
+    if (!shell.saveLock) shell.toast('尚未迎劫，未能保存入场，请重试');
+    return;
   }
+  Object.assign(shell.save, next);
+  entering.save = shell.save;
+  shell.game = entering;
   shell.frameRate.reset();
   shell.pendingRun = null;
   shell.settled = false;
@@ -1039,52 +1040,33 @@ export function beginTribulation(shell: ActionShell) {
   });
   shell.renderHud();
   shell.lastFrame = shell.performance.now();
-  shell.persist();
 }
 
 export function finishTribulation(shell: ActionShell) {
   if (!shell.game?.tribulation || shell.game.state !== 'won') return;
   const report = shell.damageReport(shell.game);
-  if (isExtremeLife(shell.save)) {
-    const next = structuredClone(shell.save);
-    if (!shell.completeTribulation(next, shell.game.tribulation)) return;
-    shell.resolveActivity(next);
-    const original = shell.Game.restore(next, next.tribulationReturn);
-    next.tribulationReturn = null;
-    try {
-      shell.writeSave(next, original);
-    } catch {
-      if (!shell.saveLock) {
-        shell.panel = 'settlement-retry';
-        shell.panelFrame(
-          '此行未结',
-          '劫后收心',
-          '<p>尚未保存渡劫结果，请暂留此页重试。</p><button class="primary-button" data-action="finish-run">重试保存收获</button>',
-        );
-        shell.modal.querySelector('[data-action="close"]')?.remove();
-      }
-      return;
+  const next = structuredClone(shell.save);
+  if (!shell.completeTribulation(next, shell.game.tribulation)) return;
+  shell.resolveActivity(next);
+  shell.syncHumanStories(next);
+  const original = shell.Game.restore(next, next.tribulationReturn);
+  next.tribulationReturn = null;
+  try {
+    shell.writeSave(next, original);
+  } catch {
+    if (!shell.saveLock) {
+      shell.panel = 'settlement-retry';
+      shell.panelFrame(
+        '此行未结',
+        '劫后收心',
+        '<p>尚未保存渡劫结果，请暂留此页重试。</p><button class="primary-button" data-action="finish-run">重试保存收获</button>',
+      );
+      shell.modal.querySelector('[data-action="close"]')?.remove();
     }
-    Object.assign(shell.save, next);
-    if (original) original.save = shell.save;
-    shell.telemetry.track({
-      type: 'run-end',
-      ...shell.lifeStats(),
-      result: 'won',
-      tribulation: shell.save.tribulations,
-      seconds: Math.round(shell.game.time),
-    });
-    shell.telemetry.flush();
-    shell.pendingRun = original;
-    shell.game = null;
-    shell.settled = false;
-    shell.clearInput();
-    shell.renderLobby();
-    shell.panel = 'tribulation-won';
-    shell.panelFrame(...shell.tribulationWonPanel(shell.save, report, !!shell.pendingRun));
     return;
   }
-  if (!shell.completeTribulation(shell.save, shell.game.tribulation)) return;
+  Object.assign(shell.save, next);
+  if (original) original.save = shell.save;
   shell.telemetry.track({
     type: 'run-end',
     ...shell.lifeStats(),
@@ -1093,17 +1075,12 @@ export function finishTribulation(shell: ActionShell) {
     seconds: Math.round(shell.game.time),
   });
   shell.telemetry.flush();
-  shell.resolveActivity(shell.save);
-  const original = shell.save.tribulationReturn;
-  shell.save.tribulationReturn = null;
-  shell.pendingRun = shell.Game.restore(shell.save, original);
+  shell.pendingRun = original;
   shell.game = null;
   shell.settled = false;
   shell.clearInput();
-  shell.persist();
   shell.renderLobby();
   shell.panel = 'tribulation-won';
-
   shell.panelFrame(...shell.tribulationWonPanel(shell.save, report, !!shell.pendingRun));
 }
 

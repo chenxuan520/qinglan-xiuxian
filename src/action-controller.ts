@@ -58,6 +58,7 @@ import type {
 import type { executeMarketSocial } from './market-social-actions.ts';
 import type { isImmortalSuccessor } from './inheritance-ui.ts';
 import type { AD_SECONDS, AdPlacement, getAdProvider, watchAdPlacement } from './ads.ts';
+import { commitSaveAction } from './save-action.ts';
 import type { GAME_VERSION } from './version.ts';
 import type {
   damageReport,
@@ -334,7 +335,7 @@ export interface ActionShell {
   readonly showTownEvent: (npc: TownResident) => void;
   readonly soundSettings: SoundSettings;
   readonly spiritRootInfo: typeof spiritRootInfo;
-  readonly startRun: () => void;
+  readonly startRun: (replacePending?: boolean) => void;
   storageAvailable: boolean;
   readonly structuredClone: typeof structuredClone;
   readonly syncHumanStories: typeof syncHumanStories;
@@ -680,7 +681,7 @@ function handleOpening(shell: ActionShell, action: string, id?: string): boolean
     shell.save.mortal.hometown?.letterFoundAt != null &&
     ['hometown-home', 'human-journal', 'human-memory', ''].includes(shell.panel)
   ) {
-    if (shell.readHometownLetter(shell.save)) shell.persist();
+    if (commitSaveAction(shell, (next) => shell.readHometownLetter(next)) === false) return true;
     shell.panel = 'human-memory';
     shell.panelFrame('故居家书', '人间缘簿 · 家中旧字', shell.hometownLetterContent(shell.save));
     return true;
@@ -867,7 +868,6 @@ function handleMortalEntry(shell: ActionShell, action: string): boolean {
       return true;
     }
     shell.renderMortal(true);
-    shell.persist();
     return true;
   }
   return false;
@@ -1108,9 +1108,8 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
   ) {
     if (
       shell.townScene?.nearbyNpc?.id === 'smith' &&
-      shell.chooseSmithStory(shell.save, id ?? '')
+      commitSaveAction(shell, (next) => shell.chooseSmithStory(next, id ?? '')) === true
     ) {
-      shell.persist();
       shell.showTownEvent(shell.townNpc);
       shell.toast(shell.save.mortal.events[0]);
     }
@@ -1125,9 +1124,13 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
     shell.isHumanStoryId(id) &&
     shell.save.mortal.humanStories?.[id]
   ) {
-    shell.syncHumanStories(shell.save);
-    shell.chooseHumanStory(shell.save, id, 'read');
-    shell.persist();
+    if (
+      commitSaveAction(shell, (next) => {
+        const synced = shell.syncHumanStories(next);
+        return shell.chooseHumanStory(next, id, 'read') || synced;
+      }) === false
+    )
+      return true;
     shell.panel = 'human-memory';
     shell.panelFrame(
       shell.HUMAN_STORIES[id].title,
@@ -1144,8 +1147,10 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
       shell.inTown &&
       shell.townNpc?.id === shell.HUMAN_STORIES[storyId].npcId &&
       shell.townScene?.nearbyNpc?.id === shell.townNpc.id;
-    if (atNpc && shell.chooseHumanStory(shell.save, storyId, choice)) {
-      shell.persist();
+    if (
+      atNpc &&
+      commitSaveAction(shell, (next) => shell.chooseHumanStory(next, storyId, choice)) === true
+    ) {
       shell.showTownEvent(shell.townNpc!);
     }
     return true;
@@ -1342,24 +1347,23 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
     shell.pendingImport
   ) {
     const candidate = shell.pendingImport;
+    const next = shell.structuredClone(candidate.save);
+    next.sound = shell.save.sound;
+    if (!next.journeyEnded && !next.pendingReincarnation && !next.mortal.marketSocial?.ambush) {
+      shell.resolveActivity(next);
+      shell.syncHumanStories(next);
+    }
+    const run = candidate.run ? shell.Game.restore(next, candidate.run.snapshot()) : null;
     try {
-      shell.writeSave(candidate.save, candidate.run, true);
+      shell.writeSave(next, run, true);
     } catch {
       if (!shell.saveLock) shell.toast('浏览器无法写入存档，当前进度未更改');
       return true;
     }
-    Object.assign(shell.save, candidate.save, { sound: shell.save.sound });
-    if (
-      !shell.save.journeyEnded &&
-      !shell.save.pendingReincarnation &&
-      !shell.save.mortal.marketSocial?.ambush
-    )
-      shell.resolveActivity(shell.save);
-    shell.pendingRun = candidate.run
-      ? shell.Game.restore(shell.save, candidate.run.snapshot())
-      : null;
+    Object.assign(shell.save, next);
+    shell.pendingRun = run;
+    if (run) run.save = shell.save;
     shell.storageAvailable = true;
-    shell.persist();
     shell.pendingImport = null;
     shell.selectedStage = shell.save.unlocked;
     shell.selectedTreasure = shell.save.starter;
@@ -1866,15 +1870,23 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
     !shell.save.mortal.member &&
     shell.isCultivationPath(id)
   ) {
-    shell.save.path = id;
-    if (shell.alignStarterWithPath(shell.save)) {
+    let aligned = false;
+    if (
+      commitSaveAction(shell, (next) => {
+        if (next.path === id) return false;
+        next.path = id;
+        aligned = shell.alignStarterWithPath(next);
+        return true;
+      }) !== true
+    )
+      return true;
+    if (aligned) {
       shell.selectedTreasure = shell.save.starter;
       shell.treasurePage = Math.floor(
         shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
       );
       shell.schoolFilter = 'all';
     }
-    shell.persist();
     shell.renderLobby();
   }
   if (action === 'treasure-page') {
@@ -1979,14 +1991,13 @@ function handleRun(shell: ActionShell, action: string, id?: string) {
     shell.restoreRun();
   }
   if (action === 'new-run') {
-    shell.pendingRun = null;
     if (
       shell.assetsReady &&
       shell.selectedStage <= shell.save.unlocked &&
       !shell.tribulationDue(shell.save)
     )
       void shell.mobileDisplay.enter();
-    shell.startRun();
+    shell.startRun(true);
   }
   if (action === 'next' && shell.game) {
     shell.selectedStage = Math.min(shell.STAGES.length - 1, shell.game.stage + 1);

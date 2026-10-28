@@ -16,33 +16,12 @@ export type ApprovedBinaries = Record<string, BinaryApproval>;
 // 2026-10-27 用户明确批准把四张 PWA 图标替换为与 favicon.svg 同源的山门图案
 // （由 scripts/generate-icons.py 生成）。基线中的旧版本仍然有效，历史提交照常通过；
 // 只额外接受下列路径的这一版内容，其他已批准素材仍按原基线严格比对。
-export const EXPLICITLY_APPROVED_ART: ApprovedBinaries = {
-  'public/assets/curios.webp': {
-    bytes: 208998,
-    sha256: 'c44e16695c2fb792a2e19c09f2a663007685579bd5fc96c84788174c35ee185a',
-  },
-  'public/icons/apple-touch-icon.png': {
-    bytes: 13719,
-    sha256: '44ea2857f069b2ef7d12d9e7866bb0b4a5b707bf86a48daa61193ba027045bb5',
-  },
-  'public/icons/icon-192.png': {
-    bytes: 16955,
-    sha256: '6195dcf914ad31700c3a56395f9ce2a81ae40e03d206a4974635f2d2640fd892',
-  },
-  'public/icons/icon-512.png': {
-    bytes: 32350,
-    sha256: '14499a0ae577a719f555efa6bd8013b964608d32cb25b8e7f1891cf4478dc647',
-  },
-  'public/icons/icon-maskable-512.png': {
-    bytes: 23261,
-    sha256: '719778588baa226739477835c694666ebc78941e7064fbf6bfe5be45be53c72b',
-  },
-};
+export const EXPLICITLY_APPROVED_ART: ApprovedBinaries = JSON.parse(
+  readFileSync(new URL('./approved-art.json', import.meta.url), 'utf8'),
+);
 // 一个路径可匹配原基线或明确批准中的任一版本；两者都没有记录时按新增二进制处理。
-function approvalsFor(base: ApprovedBinaries, path: string) {
-  return [base[path], EXPLICITLY_APPROVED_ART[path]].filter(
-    (item): item is BinaryApproval => item !== undefined,
-  );
+function approvalsFor(base: ApprovedBinaries, path: string, art = EXPLICITLY_APPROVED_ART) {
+  return [base[path], art[path]].filter((item): item is BinaryApproval => item !== undefined);
 }
 function matchesApproval(data: Uint8Array, approvals: BinaryApproval[]) {
   const hash = createHash('sha256').update(data).digest('hex');
@@ -129,6 +108,18 @@ export function commitBinaryBreaches(
     .split('\n')[0];
   if (!bootstrap) return []; // 首次提交前由文件树检查；提交后基线不可增补或删除。
   const canonical = JSON.parse(git(['show', `${bootstrap}:${policyPath}`]).toString());
+  const artPath = 'scripts/approved-art.json';
+  const artBootstrap = git(['log', '--reverse', '--format=%H', 'HEAD', '--', artPath])
+    .toString()
+    .trim()
+    .split('\n')[0];
+  // 此次建立的补充基线只收录原有五项授权；建立后与原始基线一样冻结。
+  const canonicalArt = artBootstrap
+    ? JSON.parse(git(['show', `${artBootstrap}:${artPath}`]).toString())
+    : EXPLICITLY_APPROVED_ART;
+  const sameArt = (value: ApprovedBinaries) =>
+    JSON.stringify(Object.entries(value).sort()) ===
+    JSON.stringify(Object.entries(canonicalArt).sort());
   const sameApproval = (value: ApprovedBinaries) =>
     JSON.stringify(Object.entries(value).sort()) ===
     JSON.stringify(Object.entries(canonical).sort());
@@ -151,6 +142,15 @@ export function commitBinaryBreaches(
     .filter(Boolean);
   const breaches: string[] = [];
   if (!sameApproval(approved)) breaches.push('禁止修改已批准二进制基线来放行新增素材');
+  if (!sameArt(EXPLICITLY_APPROVED_ART)) breaches.push('禁止修改补充素材授权基线来放行新增素材');
+  if (artBootstrap) {
+    try {
+      if (!sameArt(JSON.parse(readFileSync(resolve(cwd, artPath), 'utf8'))))
+        breaches.push('禁止修改补充素材授权基线来放行新增素材');
+    } catch {
+      breaches.push('禁止删除或损坏补充素材授权基线');
+    }
+  }
   for (const commit of commits) {
     // 只豁免基线建立时已经存在的历史。旧提交分出的新侧支也必须逐提交检查。
     if (commit !== bootstrap) {
@@ -182,6 +182,19 @@ export function commitBinaryBreaches(
         breaches.push(`提交 ${commit.slice(0, 7)} 删除或损坏了二进制基线`);
       }
     }
+    if (artBootstrap) {
+      try {
+        git(['merge-base', '--is-ancestor', artBootstrap, commit]);
+        try {
+          if (!sameArt(JSON.parse(git(['show', `${commit}:${artPath}`]).toString())))
+            breaches.push(`提交 ${commit.slice(0, 7)} 禁止修改补充素材授权基线`);
+        } catch {
+          breaches.push(`提交 ${commit.slice(0, 7)} 删除或损坏了补充素材授权基线`);
+        }
+      } catch {
+        // 补充基线建立前的已授权历史仍按原有路径、大小及散列检查。
+      }
+    }
     const added = git([
       'diff-tree',
       '--root',
@@ -199,7 +212,7 @@ export function commitBinaryBreaches(
       .filter(Boolean);
     for (const path of new Set(added)) {
       const data = git(['show', `${commit}:${path}`]);
-      const approvals = approvalsFor(canonical, path);
+      const approvals = approvalsFor(canonical, path, canonicalArt);
       if (!approvals.length && isBinary(data, path))
         breaches.push(`提交 ${commit.slice(0, 7)} 禁止新增二进制文件：${path}`);
       if (approvals.length && !matchesApproval(data, approvals))

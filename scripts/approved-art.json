@@ -1,0 +1,22 @@
+{
+  "public/assets/curios.webp": {
+    "bytes": 208998,
+    "sha256": "c44e16695c2fb792a2e19c09f2a663007685579bd5fc96c84788174c35ee185a"
+  },
+  "public/icons/apple-touch-icon.png": {
+    "bytes": 13719,
+    "sha256": "44ea2857f069b2ef7d12d9e7866bb0b4a5b707bf86a48daa61193ba027045bb5"
+  },
+  "public/icons/icon-192.png": {
+    "bytes": 16955,
+    "sha256": "6195dcf914ad31700c3a56395f9ce2a81ae40e03d206a4974635f2d2640fd892"
+  },
+  "public/icons/icon-512.png": {
+    "bytes": 32350,
+    "sha256": "14499a0ae577a719f555efa6bd8013b964608d32cb25b8e7f1891cf4478dc647"
+  },
+  "public/icons/icon-maskable-512.png": {
+    "bytes": 23261,
+    "sha256": "719778588baa226739477835c694666ebc78941e7064fbf6bfe5be45be53c72b"
+  }
+}
