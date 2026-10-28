@@ -85,7 +85,7 @@ export function townStatus(save: SaveData) {
     life.remaining > 0 && life.remaining < 0.01 ? '不足 0.01' : life.remaining.toFixed(2);
   const activity = save.mortal.activity;
   const study = activity?.kind === 'study' ? studyPlan(save) : null;
-  return `<strong>年岁 ${age} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong>${nearEnd ? `<span>余寿 ${remaining} 年</span>` : ''}<span>灵石 ${save.stones.toLocaleString('zh-CN', { useGrouping: false })} · 玄铁 ${save.iron}</span>${activity ? `<span>${activity.kind === 'study' ? study!.reason || (study!.eligible ? '功法研习' : `研习暂停 · 需${study!.requiredRealm}`) : TOWN_JOBS[activity.kind].name} · 尚需消耗 ${activity.remaining.toFixed(2)} 年</span>` : ''}`;
+  return `<strong>年岁 ${age} <em>/ ${Number.isFinite(life.limit) ? life.limit : '长生'}</em></strong>${nearEnd ? `<span>余寿 ${remaining} 年</span>` : ''}<span class="town-resources"><span>灵石 ${save.stones.toLocaleString('zh-CN', { useGrouping: false })}</span><span>玄铁 ${save.iron}</span></span>${activity ? `<span>${activity.kind === 'study' ? study!.reason || (study!.eligible ? '功法研习' : `研习暂停 · 需${study!.requiredRealm}`) : TOWN_JOBS[activity.kind].name} · 尚需消耗 ${activity.remaining.toFixed(2)} 年</span>` : ''}`;
 }
 export function townPage(save: SaveData, fullscreenButton: string) {
   if (save.mortal.hometown && save.mortal.hometown.stage !== 'departed')

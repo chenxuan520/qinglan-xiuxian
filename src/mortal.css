@@ -221,6 +221,14 @@
 #town-status span {
   display: block;
 }
+#town-status .town-resources {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.6em;
+}
+#town-status .town-resources > span {
+  white-space: nowrap;
+}
 .town-scene-actions {
   display: flex;
   gap: 8px;
@@ -1176,6 +1184,13 @@
   margin-top: 36px;
   padding-top: 24px;
 }
+.sect-market-entrance + .settlement-directory {
+  border-top: 0;
+  border-bottom: 1px solid var(--border);
+  margin-top: 0;
+  margin-bottom: 28px;
+  padding: 0 0 20px;
+}
 .dues-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1455,6 +1470,8 @@
     min-height: 40px;
   }
   .town-scene-actions.settlement-actions {
+    flex-shrink: 0;
+    max-width: calc(100% - 120px);
     flex-wrap: wrap-reverse;
     justify-content: flex-end;
   }

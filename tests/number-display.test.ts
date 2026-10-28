@@ -161,7 +161,7 @@ test('履历灵威、气血与伤害简写，闲游整岁而离城与履历保�
   const before = JSON.stringify(save);
   const power = spiritPower(save);
   assert.ok(power.score >= 10000);
-  assert.match(townStatus(save), /灵石 18421 ·/);
+  assert.match(townStatus(save), /<span>灵石 18421<\/span>/);
   assert.match(townStatus(save), /年岁 17421 /);
   assert.match(mortalPage(save, 'town', 'all'), /灵石 18421 ·/);
   assert.match(mortalPage(save, 'town', 'all'), /17421\.26 <em>/);
