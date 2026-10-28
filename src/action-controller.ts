@@ -1279,15 +1279,27 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
       shell.renderMortal();
       shell.toast(message);
     } else {
-      const changed = shell.executeMortalAction(shell.save, action, id, shell.pendingRun?.path);
+      const next = shell.structuredClone(shell.save);
+      const changed = shell.executeMortalAction(next, action, id, shell.pendingRun?.path);
       if (changed) {
+        shell.resolveActivity(next);
+        shell.syncHumanStories(next);
+        try {
+          shell.writeSave(next, shell.pendingRun);
+        } catch {
+          if (!shell.saveLock) shell.toast('人间行程尚未保存，请重试');
+          return true;
+        }
+        Object.assign(shell.save, next);
         const fromTown = shell.panel === 'town-event' || shell.panel === 'tea-story';
         if (fromTown) {
           shell.closeNpcChat();
           shell.panel = '';
           shell.modal.innerHTML = '';
         }
-        shell.syncMortalChange();
+        if (shell.pendingRun)
+          shell.pendingRun = shell.Game.restore(shell.save, shell.pendingRun.snapshot());
+        shell.renderMortal();
         if (
           fromTown &&
           action === 'mortal-activity' &&
