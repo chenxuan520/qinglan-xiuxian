@@ -122,7 +122,7 @@ export function visitHometown(save: SaveData, parent?: ParentId): boolean {
       recordChronicle(
         save,
         '归乡闻讯',
-        `你在${save.age.toFixed(1)}岁归乡时得知，${person.id === 'father' ? '父亲' : '母亲'}已在你${15 + p.diesAt - p.ageAtStart}岁那年去世，享年${p.diesAt}岁。`,
+        `你${save.age.toFixed(1)}岁归乡，才知道${person.id === 'father' ? '父亲' : '母亲'}早在你${15 + p.diesAt - p.ageAtStart}岁那年离世，享年${p.diesAt}岁。`,
         milestone,
       );
       changed = true;

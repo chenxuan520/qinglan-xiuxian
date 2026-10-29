@@ -92,12 +92,12 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
     return false;
   if (
     facts.ending !== 'tribulation' &&
-    /此身止于天劫|此世止于天劫|殒于天劫|天劫殒命|雷声为此世收笔|未能渡过此劫/.test(text)
+    /此身止于天劫|此世止于天劫|殒于天劫|天劫殒命|雷声为此世收笔|未能渡过此劫|随最后一道雷光(?:远去|而去)|落在了雷光里/.test(text)
   )
     return false;
   if (
     facts.ending !== 'ambush' &&
-    /殒于劫修|劫杀身陨|身陨坊外|止于劫杀|止于一场劫杀|劫修(?:夺去|断送).{0,6}(?:性命|此生)|坊外刀光为此世收笔/.test(
+    /殒于劫修|劫杀身陨|身陨坊外|止于劫杀|止于一场劫杀|一场劫杀|劫修(?:夺去|断送).{0,6}(?:性命|此生)|坊外刀光/.test(
       text,
     )
   )

@@ -140,7 +140,7 @@ export class BattleHud {
             ? '妖王现身 · 决战之时'
             : [
                 '初入秘境 · 稳固道心',
-                '第二批妖物 · 突袭来袭',
+                '第二批妖物 · 妖影突袭',
                 '第三批妖物 · 强敌压境',
                 '最后一批 · 妖潮汹涌',
               ][enemyWave(game.stage, game.time)],
