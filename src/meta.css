@@ -378,6 +378,10 @@
 .chronicle-score {
   margin-top: 16px;
 }
+.chronicle-score-tier {
+  display: inline-block;
+  white-space: nowrap;
+}
 .chronicle-power p,
 .chronicle-power details {
   font-size: 13px;

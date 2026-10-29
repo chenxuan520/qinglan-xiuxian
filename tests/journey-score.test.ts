@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   journeyScore,
+  journeyScoreTier,
   AD_PENALTIES,
   CLARITY_FULL_BONUS,
+  EXTREME_SCORE_FACTOR,
   CLARITY_MIN_FACTOR,
   easierSpiritRoot,
 } from '../src/journey-score.ts';
@@ -158,4 +160,76 @@ test('仙途履历与留影数据同步展示此世评分、定品与道心澄�
     supplies: 0,
     bestRoot: 'quad',
   });
+});
+
+test('极限道果在原完整评分之后增加15%，明细不把模式加成混入道心澄明', () => {
+  for (const cultivation of [0, 1, 100, 6000, 30000, IMMORTAL_CULTIVATION]) {
+    const normal = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+    normal.cultivation = cultivation;
+    const extreme = structuredClone(normal);
+    extreme.lifeMode = 'extreme';
+    const before = JSON.stringify(extreme);
+    const n = journeyScore(normal),
+      e = journeyScore(extreme);
+    assert.equal(n.modeFactor, 1);
+    assert.equal(n.modeDelta, 0);
+    assert.equal(e.modeFactor, EXTREME_SCORE_FACTOR);
+    assert.equal(e.permanentPower, n.permanentPower);
+    assert.equal(e.rawScore, n.rawScore);
+    assert.equal(e.clarityTotal, n.total);
+    assert.equal(e.clarityDelta, n.clarityDelta);
+    assert.equal(e.total, Math.round(n.total * 1.15));
+    assert.equal(e.modeDelta, e.total - n.total);
+    assert.equal(e.rawScore + e.clarityDelta + e.modeDelta, e.total);
+    assert.equal(JSON.stringify(extreme), before, '计算评分不修改本世状态');
+  }
+});
+
+test('极限加成在履历单独说明、与留影一致，导入导出不重复叠加', () => {
+  const save = freshSave('none', [], 'orthodox', () => 0.5);
+  save.lifeMode = 'extreme';
+  save.cultivation = IMMORTAL_CULTIVATION;
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  const score = journeyScore(save);
+  const html = chronicleContent(save);
+  assert.match(html, /data-score-mode>一命问道 ×1.15/);
+  assert.ok(html.includes(`加成前道果 ${score.clarityTotal}`));
+  assert.ok(html.includes(`+${score.modeDelta}（×1.15）`));
+  assert.equal(journeyCardData(save).score.total, score.total);
+  assert.equal(journeyCardData(save).extreme, true);
+  const restored = importSave(exportSave(save, null)).save;
+  assert.deepEqual(journeyScore(restored), score);
+  assert.equal(journeyScore(restored).total, score.total);
+  restored.lifeMode = 'normal';
+  assert.ok(!chronicleContent(restored).includes('data-score-mode'));
+  assert.equal(journeyScore(restored).total, score.clarityTotal);
+});
+
+test('八档道果按最终分数定品，仙品与帝品边界明确且总分不封顶', () => {
+  const cases = [
+    [0, '下品'],
+    [99, '下品'],
+    [100, '中下品'],
+    [249, '中下品'],
+    [250, '中品'],
+    [449, '中品'],
+    [450, '中上品'],
+    [999, '中上品'],
+    [1000, '上品'],
+    [1499, '上品'],
+    [1500, '极品'],
+    [1999, '极品'],
+    [2000, '仙品'],
+    [2499, '仙品'],
+    [2500, '帝品'],
+    [100000, '帝品'],
+  ] as const;
+  for (const [score, grade] of cases)
+    assert.equal(journeyScoreTier(score).grade, grade, String(score));
+});
+
+test('上品及仙帝品称号遵守确认后的对应关系', () => {
+  assert.equal(journeyScoreTier(1000).title, '道行通玄');
+  assert.equal(journeyScoreTier(2000).title, '道参造化');
+  assert.equal(journeyScoreTier(2500).title, '万古绝尘');
 });

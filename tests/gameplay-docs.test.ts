@@ -1,3 +1,4 @@
+import { JOURNEY_SCORE_TIERS, EXTREME_SCORE_FACTOR } from '../src/journey-score.ts';
 // 文档表格与实际规则逐项对照；不要用另一份手填数值作期望值。
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -521,4 +522,20 @@ test('坊中小铺帮助覆盖真实换丹、拆解与游商求购指路', async
   assert.equal(MARKET_SHOP_COOLDOWN, 10);
   assert.equal(SALVAGE_RATE, 0.4);
   assert.ok(marketShopQuote(save, 'caravan' as never, '0').reason);
+});
+
+test('道果品第表对照实际计分档位，普通与极限说明同步', () => {
+  const rows = table(gameplay, '道果品第');
+  assert.equal(rows.length, JOURNEY_SCORE_TIERS.length);
+  const guide = guideContent('cultivation');
+  for (const tier of JOURNEY_SCORE_TIERS) {
+    const row = rows.find((r) => r[0] === tier.grade);
+    assert.ok(row, tier.grade);
+    assert.equal(Number(row[1]), tier.min);
+    assert.equal(row[2], tier.title);
+    assert.ok(guide.includes(`<th scope="row">${tier.grade}</th><td>${tier.min}`));
+    assert.ok(guide.includes(`<td>${tier.title}</td>`));
+  }
+  assert.ok(gameplay.includes(`**${EXTREME_SCORE_FACTOR}**`));
+  assert.ok(guide.includes(`一命问道 ×${EXTREME_SCORE_FACTOR}`));
 });

@@ -1,3 +1,4 @@
+import { journeyScore } from '../src/journey-score.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createJourneyCard } from '../src/journey-card.ts';
@@ -159,4 +160,18 @@ test('素材两次失败取消其他图片；主动关闭不继续重试', async
   await assert.rejects(pending, { name: 'AbortError' });
   assert.equal(p.images.length, 7);
   assert.ok(p.images.every((image) => image.src === ''));
+});
+
+test('真实绘制的道果行包含同一评分函数的分数、品第与称号', async (t) => {
+  const p = platform(t);
+  for (const lifeMode of ['normal', 'extreme'] as const) {
+    const save = freshSave();
+    save.lifeMode = lifeMode;
+    const score = journeyScore(save);
+    p.texts.length = 0;
+    await createJourneyCard(save, 'ongoing');
+    const label = p.texts.find((text) => text.y === 1092);
+    assert.ok(label);
+    assert.ok(label.value.startsWith(`此世道果 ${score.total}（${score.grade}·${score.tier}）`));
+  }
 });

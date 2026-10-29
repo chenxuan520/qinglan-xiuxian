@@ -1,3 +1,4 @@
+import { isExtremeLife } from './life-mode.ts';
 import { chronicleAchievements } from './chronicle-achievements.ts';
 import { SPIRIT_ROOTS, STAGES, spiritRootInfo, type SpiritRootId } from './data.ts';
 import type { SaveData } from './progress.ts';
@@ -49,18 +50,27 @@ export const ACHIEVEMENT_SCORES: Record<string, number> = {
 export const STAGE_CLEAR_SCORE = 10;
 export const BASE_POWER_ANCHOR = 480;
 export const CLARITY_FULL_BONUS = 1.1;
+export const EXTREME_SCORE_FACTOR = 1.15;
 export const CLARITY_STEP_DECAY = 0.03;
 export const CLARITY_MIN_FACTOR = 0.7;
 
 export const JOURNEY_SCORE_TIERS = [
-  { min: 1200, title: '万古绝尘', grade: '绝世' },
-  { min: 950, title: '震古烁今', grade: '极品' },
-  { min: 700, title: '大道金仙', grade: '上品' },
+  { min: 2500, title: '万古绝尘', grade: '帝品' },
+  { min: 2000, title: '道参造化', grade: '仙品' },
+  { min: 1500, title: '震古烁今', grade: '极品' },
+  { min: 1000, title: '道行通玄', grade: '上品' },
   { min: 450, title: '一方真人', grade: '中上品' },
   { min: 250, title: '道基渐成', grade: '中品' },
   { min: 100, title: '山海寻道', grade: '中下品' },
   { min: 0, title: '凡尘初涉', grade: '下品' },
 ] as const;
+
+export function journeyScoreTier(total: number) {
+  return (
+    JOURNEY_SCORE_TIERS.find((item) => total >= item.min) ??
+    JOURNEY_SCORE_TIERS[JOURNEY_SCORE_TIERS.length - 1]
+  );
+}
 
 export function easierSpiritRoot(a: SpiritRootId, b: SpiritRootId): SpiritRootId {
   return spiritRootInfo(a).rate >= spiritRootInfo(b).rate ? a : b;
@@ -135,11 +145,12 @@ export function journeyScore(save: SaveData) {
     adCount === 0
       ? CLARITY_FULL_BONUS
       : Math.max(CLARITY_MIN_FACTOR, Number((1 - adCount * CLARITY_STEP_DECAY).toFixed(2)));
-  const total = Math.round(rawScore * clarityFactor);
-  const clarityDelta = total - rawScore;
-  const tier =
-    JOURNEY_SCORE_TIERS.find((item) => total >= item.min) ??
-    JOURNEY_SCORE_TIERS[JOURNEY_SCORE_TIERS.length - 1];
+  const clarityTotal = Math.round(rawScore * clarityFactor);
+  const clarityDelta = clarityTotal - rawScore;
+  const modeFactor = isExtremeLife(save) ? EXTREME_SCORE_FACTOR : 1;
+  const total = Math.round(clarityTotal * modeFactor);
+  const modeDelta = total - clarityTotal;
+  const tier = journeyScoreTier(total);
 
   return {
     total,
@@ -161,5 +172,8 @@ export function journeyScore(save: SaveData) {
     adPenalty,
     clarityFactor,
     clarityDelta,
+    clarityTotal,
+    modeFactor,
+    modeDelta,
   };
 }

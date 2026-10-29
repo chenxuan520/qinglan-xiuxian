@@ -573,8 +573,8 @@ export async function createJourneyCard(
     c.textAlign = 'center';
     text(
       card.ending === 'immortal' || card.progress.deepest === STAGES[FINAL_TRIAL_STAGE].name
-        ? `此世道果 ${card.score.total}（${card.score.tier}）`
-        : `此世道果 ${card.score.total}（${card.score.tier}） · ${card.progress.deepest ?? '尚未踏破秘境'}`,
+        ? `此世道果 ${card.score.total}（${card.score.grade}·${card.score.tier}）`
+        : `此世道果 ${card.score.total}（${card.score.grade}·${card.score.tier}） · ${card.progress.deepest ?? '尚未踏破秘境'}`,
       540,
       1092,
       30,
