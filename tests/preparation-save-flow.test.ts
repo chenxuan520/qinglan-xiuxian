@@ -1,3 +1,4 @@
+import { notificationLeaves } from './helpers/notification-leaves.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -61,6 +62,7 @@ function harness(pending: boolean) {
   const toasts: string[] = [],
     panels: string[] = [];
   const context = createContext({
+    ...notificationLeaves(),
     save,
     SAVE_KEY,
     Game,

@@ -1,4 +1,4 @@
-// 渲染实测：真实 Chrome 无头恢复一场第六境后期高压对局，采样 60 秒 rAF 帧间隔与长任务。
+// 渲染实测：自然推进至终关仙尊的真实续局，只采样playing时段的rAF和长任务。
 // 只生成报告（artifacts/perf-render/），不因机器慢而失败；仅当浏览器/页面流程出错时非零退出。
 // 本地运行需 CHROME_PATH 指向 Chrome/Chrome for Testing；CI 的 ubuntu-latest 自带 google-chrome。
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
@@ -6,33 +6,134 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Game } from '../src/game.ts';
-import { freshSave, realmCost, SAVE_KEY } from '../src/progress.ts';
-import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
-import { TREASURES, PASSIVES } from '../src/data.ts';
-import { seeded } from './balance-policy.ts';
-import { percentile } from './perf-sim.ts';
+import { SAVE_KEY } from '../src/progress.ts';
+import { FINAL_TRIAL_STAGE, STAGES } from '../src/data.ts';
+import {
+  percentile,
+  createScenarioGame,
+  advanceScenarioStep,
+  FINAL_TRIAL_SCENARIO,
+  FINAL_TRIAL_SEED,
+} from './perf-sim.ts';
 
 export interface RenderSummary {
   samples: number;
   meanFps: number;
+  meanFpsMethod: 'interval-count-over-total-ms';
   p5Fps: number;
   maxGapMs: number;
   longTasks: number;
   longestTaskMs: number;
+  invalidSamples: number;
+  invalidTasks: number;
 }
 // gaps 为相邻 rAF 间隔毫秒；tasks 为长任务时长毫秒。
 export function summarizeRender(gaps: number[], tasks: number[]): RenderSummary {
-  const fps = gaps.filter((gap) => gap > 0).map((gap) => 1000 / gap);
+  const validGaps = gaps.filter(
+    (gap) => Number.isFinite(gap) && gap > 0 && Number.isFinite(1000 / gap),
+  );
+  const validTasks = tasks.filter((task) => Number.isFinite(task) && task > 0);
+  const elapsed = validGaps.reduce((sum, gap) => sum + gap, 0);
+  const fps = validGaps.map((gap) => 1000 / gap);
   fps.sort((a, b) => a - b);
   return {
-    samples: gaps.length,
-    meanFps: fps.length ? fps.reduce((sum, value) => sum + value, 0) / fps.length : NaN,
+    samples: validGaps.length,
+    meanFps:
+      validGaps.length && Number.isFinite(elapsed) ? (validGaps.length * 1000) / elapsed : NaN,
+    meanFpsMethod: 'interval-count-over-total-ms',
     p5Fps: percentile(fps, 5),
-    maxGapMs: gaps.length ? Math.max(...gaps) : NaN,
-    longTasks: tasks.length,
-    longestTaskMs: tasks.length ? Math.max(...tasks) : NaN,
+    maxGapMs: validGaps.length ? Math.max(...validGaps) : NaN,
+    longTasks: validTasks.length,
+    longestTaskMs: validTasks.length ? Math.max(...validTasks) : NaN,
+    invalidSamples: gaps.length - validGaps.length,
+    invalidTasks: tasks.length - validTasks.length,
   };
+}
+
+export interface RenderFrames {
+  gaps: number[];
+  activeFrames: number;
+  skippedFrames: number;
+  activeMs: number;
+  lastAt: number | null;
+  lastPlaying: boolean;
+  firstGameTime: number | null;
+  lastGameTime: number | null;
+  windows: { start: number; end: number }[];
+}
+
+export function renderCoverageMinimum(seconds: number): number {
+  if (!Number.isFinite(seconds) || seconds < 2)
+    throw new RangeError('渲染采样秒数必须为至少2秒的有限值');
+  // 短采样容忍首尾rAF与整秒HUD读数的最多1秒量化差；正式60秒仍要求至少30秒。
+  return Math.min(30, seconds - 1);
+}
+
+export function renderCoverageBreaches(
+  data: Pick<RenderFrames, 'gaps' | 'activeMs' | 'firstGameTime' | 'lastGameTime'> & {
+    finalBossNameSeen: boolean;
+  },
+  seconds: number,
+): string[] {
+  const minimum = renderCoverageMinimum(seconds);
+  const breaches: string[] = [];
+  if (!data.gaps.some((gap) => Number.isFinite(gap) && gap > 0))
+    breaches.push('没有有效战斗帧间隔');
+  if (!Number.isFinite(data.activeMs) || data.activeMs < minimum * 1000)
+    breaches.push(`有效playing区间不足${minimum}秒，不能用暂停或结算页补足采样`);
+  if (
+    data.firstGameTime === null ||
+    data.lastGameTime === null ||
+    !Number.isFinite(data.firstGameTime) ||
+    !Number.isFinite(data.lastGameTime) ||
+    data.lastGameTime - data.firstGameTime < minimum
+  )
+    breaches.push(`HUD战斗时钟推进不足${minimum}秒`);
+  if (!data.finalBossNameSeen) breaches.push('有效战斗采样期间没有可见仙尊覆盖');
+  return breaches;
+}
+
+// 同一rAF循环也会在暂停、升级或结算页继续运行；只保留连续playing帧之间的间隔。
+export function recordRenderFrame(
+  data: RenderFrames,
+  now: number,
+  playing: boolean,
+  gameTime: number | null,
+) {
+  if (playing) {
+    data.activeFrames++;
+    if (gameTime !== null && Number.isFinite(gameTime)) {
+      data.firstGameTime ??= gameTime;
+      data.lastGameTime = gameTime;
+    }
+    if (data.lastPlaying && data.lastAt !== null && now > data.lastAt) {
+      const gap = now - data.lastAt;
+      data.gaps.push(gap);
+      data.activeMs += gap;
+      data.windows[data.windows.length - 1].end = now;
+    } else data.windows.push({ start: now, end: now });
+  } else data.skippedFrames++;
+  data.lastAt = now;
+  data.lastPlaying = playing;
+}
+
+export function renderSamplingSource() {
+  return `(() => { const data = { gaps: [], activeFrames: 0, skippedFrames: 0, activeMs: 0, lastAt: null, lastPlaying: false, firstGameTime: null, lastGameTime: null, windows: [], tasks: [], finalBossNameSeen: false };
+    const record = ${recordRenderFrame.toString()};
+    const observer = new PerformanceObserver((list) => list.getEntries().forEach((e) => data.tasks.push({ start: e.startTime, duration: e.duration })));
+    observer.observe({ type: 'longtask' });
+    const tick = (now) => {
+      const playing = document.body.classList.contains('in-game') && !document.hidden && document.hasFocus() && !!document.querySelector('.game-hud') && !document.querySelector('.scene-loading') && !document.querySelector('#modal-root')?.childElementCount;
+      const match = document.querySelector('#time')?.textContent?.match(/^(\\d+):(\\d+)$/);
+      record(data, now, playing, match ? Number(match[1]) * 60 + Number(match[2]) : null);
+      const boss = document.querySelector('#boss-bar');
+      if (playing && boss && !boss.hidden && boss.textContent?.includes(${JSON.stringify(STAGES[FINAL_TRIAL_STAGE].boss)})) data.finalBossNameSeen = true;
+      data.animation = requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    data.observer = observer;
+    window.__perf = data;
+    return true; })()`;
 }
 
 function findChrome(): string {
@@ -48,39 +149,46 @@ function findChrome(): string {
   throw new Error('未找到 Chrome，可设置 CHROME_PATH 指向浏览器可执行文件');
 }
 
-// 离线生成可恢复存档：第六境后期、满配、场上已有真实敌人与弹丸，恢复即进入高压渲染。
-export function perfSaveFixture(): string {
-  const save = freshSave('heaven', ['metal'], 'dual', seeded(20261011));
-  save.unlocked = 5;
-  save.cultivation = Array.from({ length: 15 }, (_, step) => realmCost(step)).reduce(
-    (sum, cost) => sum + cost,
-    0,
-  );
-  save.prologueSeen = true;
-  save.autoplay = true;
-  const game = new Game(save, 5, 0, seeded(20261010));
-  game.weapons = TREASURES.slice(0, 6).map((t) => ({
-    id: t.id,
-    level: 6,
-    evolved: true,
-    timer: 0,
-  }));
-  game.passives = Object.fromEntries(PASSIVES.slice(0, 4).map((p) => [p.id, 5]));
-  game.time = game.stageDuration * 0.8;
-  for (let frame = 0; frame < 30 * 10; frame += 1) {
-    if (game.state === 'upgrade') game.choose(autoplayChoice(game)!.index);
-    if (frame % 4 === 0) game.input = autoplayInput(game);
-    game.update(1 / 30);
+// 从0秒自然推进，必须真正走到七王排程中的仙尊，不手动生怪、跳时或锁血。
+export function prepareRenderFixture() {
+  const game = createScenarioGame(FINAL_TRIAL_SCENARIO, FINAL_TRIAL_SEED);
+  game.save.autoplay = true;
+  let frames = 0;
+  for (; frames < 600 * 30; frames += 1) {
+    if (game.enemies.some((enemy) => enemy.boss && enemy.bossStage === FINAL_TRIAL_STAGE)) break;
+    const step = advanceScenarioStep(game, frames);
+    if (!step?.advanced) throw new Error(`自然暖场未到仙尊：time=${game.time} state=${game.state}`);
   }
+  if (
+    frames === 600 * 30 ||
+    !game.enemies.some((enemy) => enemy.boss && enemy.bossStage === FINAL_TRIAL_STAGE)
+  )
+    throw new Error('自然暖场600秒内没有实际出现仙尊');
   game.pause();
   if (game.state !== 'paused' || !game.enemies.length)
     throw new Error(`性能夹具生成失败：state=${game.state} enemies=${game.enemies.length}`);
-  return JSON.stringify({
-    ...save,
-    activeRun: game.snapshot(),
-    version: save.version,
-    schema: save.schema,
-  });
+  return {
+    save: JSON.stringify({ ...game.save, activeRun: game.snapshot() }),
+    coverage: {
+      input: FINAL_TRIAL_SCENARIO,
+      seed: FINAL_TRIAL_SEED,
+      stage: game.stage,
+      naturalWarmupFrames: frames,
+      gameTime: game.time,
+      state: game.state,
+      bossesSpawned: game.trialBossesSpawned,
+      bossesDefeated: game.trialBossesDefeated,
+      bossStages: game.enemies.filter((enemy) => enemy.boss).map((enemy) => enemy.bossStage),
+      enemies: game.enemies.length,
+      shots: game.shots.length,
+      zones: game.zones.length,
+      effectsBeforeSnapshot: game.effects.length,
+    },
+  };
+}
+
+export function perfSaveFixture(): string {
+  return prepareRenderFixture().save;
 }
 
 async function waitForServer(url: string, server: ChildProcess) {
@@ -245,6 +353,8 @@ export async function stopRenderProcess(child: ChildProcess | undefined): Promis
 
 export async function collectRenderSample(options?: { seconds?: number }) {
   const seconds = options?.seconds ?? 60;
+  const minimumCoverageSeconds = renderCoverageMinimum(seconds);
+  const fixture = prepareRenderFixture();
   const outDir = 'artifacts/perf-render';
   mkdirSync(outDir, { recursive: true });
   rmSync(`${outDir}/frame.png`, { force: true });
@@ -275,6 +385,9 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     session = await CdpSession.connect(page.webSocketDebuggerUrl);
     await session.send('Page.enable');
     await session.send('Runtime.enable');
+    await session.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `localStorage.setItem('qinglan-telemetry-off', '1');localStorage.setItem('qinglan-damage-numbers-v1', '1');localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(fixture.save)});`,
+    });
     await session.send('Emulation.setDeviceMetricsOverride', {
       width: 1365,
       height: 900,
@@ -284,32 +397,34 @@ export async function collectRenderSample(options?: { seconds?: number }) {
     const firstLoad = session.nextEvent('Page.loadEventFired');
     await session.send('Page.navigate', { url: 'http://localhost:5199/' });
     await firstLoad;
-    await evalJs(
-      session,
-      `localStorage.setItem(${JSON.stringify(SAVE_KEY)}, ${JSON.stringify(perfSaveFixture())})`,
-    );
-    const reloaded = session.nextEvent('Page.loadEventFired');
-    await session.send('Page.navigate', { url: 'http://localhost:5199/' });
-    await reloaded;
+    await session.send('Page.bringToFront');
     await clickAction(session, 'restore');
     await clickAction(session, 'resume');
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 8000));
-    await evalJs(
-      session,
-      `(() => { const gaps = []; const tasks = [];
-      new PerformanceObserver((list) => list.getEntries().forEach((e) => tasks.push(e.duration))).observe({ type: 'longtask' });
-      let last = performance.now();
-      const tick = (now) => { gaps.push(now - last); last = now; requestAnimationFrame(tick); };
-      requestAnimationFrame(tick);
-      window.__perf = { gaps, tasks };
-      return true; })()`,
-    );
+    await evalJs(session, renderSamplingSource());
     await new Promise((resolveDelay) => setTimeout(resolveDelay, seconds * 1000));
-    const data = await evalJs<{ gaps: number[]; tasks: number[] }>(
+    const data = await evalJs<RenderFrames & { tasks: number[]; finalBossNameSeen: boolean }>(
       session,
-      '(() => ({ gaps: window.__perf.gaps, tasks: window.__perf.tasks }))()',
+      `(() => { const data = window.__perf; cancelAnimationFrame(data.animation); data.observer.disconnect();
+      return { ...data, observer: undefined, tasks: data.tasks.filter(t => data.windows.some(w => t.start < w.end && t.start + t.duration > w.start)).map(t => t.duration) }; })()`,
     );
-    return summarizeRender(data.gaps, data.tasks);
+    const breaches = renderCoverageBreaches(data, seconds);
+    if (breaches.length) throw new Error(breaches.join('；'));
+    return {
+      ...summarizeRender(data.gaps, data.tasks),
+      coverage: {
+        fixture: fixture.coverage,
+        requestedWallSeconds: seconds,
+        minimumCoverageSeconds,
+        playingWallSeconds: data.activeMs / 1000,
+        activeFrames: data.activeFrames,
+        skippedFrames: data.skippedFrames,
+        gameTimeStart: data.firstGameTime,
+        gameTimeEnd: data.lastGameTime,
+        finalBossNameSeen: data.finalBossNameSeen,
+        note: '战斗时钟来自正常HUD整秒读数；activeFrames为playing rAF观测数，不冒充Game更新步数。',
+      },
+    };
   } finally {
     session?.close();
     try {
@@ -344,7 +459,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       writeFileSync('artifacts/perf-render/report.json', JSON.stringify(report, null, 2));
       writeFileSync(
         'artifacts/perf-render/summary.md',
-        `# 渲染实测（无头 Chrome，第六境后期满配 60 秒）\n\n平均帧率 ${summary.meanFps.toFixed(1)} fps · 5 分位帧率 ${summary.p5Fps.toFixed(1)} fps · 最差帧间隔 ${summary.maxGapMs.toFixed(0)}ms · 长任务 ${summary.longTasks} 个（最久 ${Number.isFinite(summary.longestTaskMs) ? `${summary.longestTaskMs.toFixed(0)}ms` : '—'}）· 采样 ${summary.samples} 帧。\n\n仅作日报观测，不因无头环境速度设门槛。\n`,
+        `# 渲染实测（无头 Chrome，终关仙尊自然续局）\n\n平均帧率 ${summary.meanFps.toFixed(1)} fps · 5 分位帧率 ${summary.p5Fps.toFixed(1)} fps · 最差帧间隔 ${summary.maxGapMs.toFixed(0)}ms · 长任务 ${summary.longTasks} 个（最久 ${Number.isFinite(summary.longestTaskMs) ? `${summary.longestTaskMs.toFixed(0)}ms` : '—'}）· 有效 ${summary.samples} 个帧间隔。\n\n实际战斗区间 ${summary.coverage.gameTimeStart}–${summary.coverage.gameTimeEnd} 秒，playing墙钟 ${summary.coverage.playingWallSeconds.toFixed(1)} 秒，排除非战斗rAF ${summary.coverage.skippedFrames} 帧。夹具输入、自然暖场和妖王阶段见 report.json；瞬时特效沿真实快照规则重新生成。仅作日报观测，不因无头环境速度设门槛。\n`,
       );
       console.log(
         `渲染实测：平均 ${summary.meanFps.toFixed(1)} fps，5% 低分位 ${summary.p5Fps.toFixed(1)} fps，最差帧间隔 ${summary.maxGapMs.toFixed(0)}ms，长任务 ${summary.longTasks} 个，采样 ${summary.samples} 帧。`,

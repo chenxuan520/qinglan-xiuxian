@@ -131,3 +131,15 @@ test('坊间互动、炉边故人与拍卖准备只随坊市按需模块加载',
   ])
     assert.match(market, new RegExp(`\\b${name}\\b`), `market-event-ui 需导出 ${name}`);
 });
+
+test('妖王来历与排行榜交互只在按需模块加载', () => {
+  const entry = entryModules();
+  for (const lazy of [
+    'bestiary-lore',
+    'leaderboard-panel',
+    'leaderboard-controller',
+    'leaderboard-client',
+    'leaderboard-contract',
+  ])
+    assert.equal(entry.has(lazy), false, `${lazy} 被静态导入进了首屏入口`);
+});

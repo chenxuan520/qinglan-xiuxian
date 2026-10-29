@@ -15,6 +15,12 @@ import { ModuleSource, retryModule } from './module-source.ts';
 import { BattleResolution } from './battle-resolution.ts';
 
 type BattleArt = typeof import('./battle-art.ts');
+interface SpriteTexture {
+  canvas: HTMLCanvasElement;
+  width: number;
+  height: number;
+  artScale: number;
+}
 const battleArtSource = new ModuleSource<BattleArt>((attempt) =>
   attempt ? retryModule('battle-art', 'battle-art', attempt) : import('./battle-art.ts'),
 );
@@ -23,7 +29,7 @@ export class Renderer {
   ctx: CanvasRenderingContext2D;
   private battleArt: BattleArt | null = null;
   private images = new Map<string, HTMLImageElement>();
-  private sprites = new Map<string, HTMLCanvasElement>();
+  private sprites = new Map<string, SpriteTexture>();
   private formations = new Map<string, HTMLCanvasElement>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
   private shade: CanvasGradient | null = null;
@@ -1031,20 +1037,19 @@ export class Renderer {
     c.beginPath();
     c.ellipse(0, 11, size * 0.25, size * 0.09, 0, 0, TAU);
     c.fill();
-    const playerFrame = index === 0 ? playerSpriteFrame(path) : undefined;
-    const frame = playerFrame ?? spriteFrame(index);
-    const artScale = playerFrame?.scale ?? 1;
-    const source = this.images.get(frame.url);
-    const width = Math.min(size, (size * 4 * frame.width) / (3 * frame.height));
-    const height = (width * frame.height) / frame.width;
-    if (source?.complete && source.naturalWidth) {
-      const key = `${index}:${size}:${flash}:${index === 0 ? path : ''}`;
-      let sprite = this.sprites.get(key);
-      if (!sprite) {
-        sprite = document.createElement('canvas');
-        sprite.width = Math.ceil(width * 2);
-        sprite.height = Math.ceil(height * 2);
-        const context = sprite.getContext('2d')!;
+    const key = `${index}:${size}:${flash}:${index === 0 ? path : ''}`;
+    let sprite = this.sprites.get(key);
+    if (!sprite) {
+      const playerFrame = index === 0 ? playerSpriteFrame(path) : undefined;
+      const frame = playerFrame ?? spriteFrame(index);
+      const source = this.images.get(frame.url);
+      if (source?.complete && source.naturalWidth) {
+        const width = Math.min(size, (size * 4 * frame.width) / (3 * frame.height));
+        const height = (width * frame.height) / frame.width;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(width * 2);
+        canvas.height = Math.ceil(height * 2);
+        const context = canvas.getContext('2d')!;
         context.imageSmoothingQuality = 'high';
         if (flash) context.filter = 'brightness(1.7)';
         context.drawImage(
@@ -1055,13 +1060,19 @@ export class Renderer {
           source.naturalHeight / frame.rows,
           0,
           0,
-          sprite.width,
-          sprite.height,
+          canvas.width,
+          canvas.height,
         );
+        sprite = { canvas, width, height, artScale: playerFrame?.scale ?? 1 };
+        // 静态裁切与展示尺寸一起复用；尺寸/闪光/路线仍各自独立，长局缓存有界。
+        if (this.sprites.size >= 256) this.sprites.delete(this.sprites.keys().next().value!);
         this.sprites.set(key, sprite);
       }
+    }
+    if (sprite) {
+      const { canvas, width, height, artScale } = sprite;
       c.drawImage(
-        sprite,
+        canvas,
         (-width * artScale) / 2,
         -height * 0.765 + (height * (1 - artScale)) / 2,
         width * artScale,

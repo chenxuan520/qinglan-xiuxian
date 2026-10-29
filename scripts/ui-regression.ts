@@ -150,7 +150,8 @@ async function open(viewport: string, save: SaveData, testInitScript = '') {
   await browser.call('navigate_page', {
     pageId,
     url: baseUrl,
-    initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(save))});${UI_AD_FIXTURE}${testInitScript}`,
+    // 这套既有界面回归不依赖本地排行榜服务；排行榜另有协议、路由和专项浏览器验证。
+    initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-leaderboard-v1','0');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(save))});${UI_AD_FIXTURE}${testInitScript}`,
   });
   await wait('() => !!document.querySelector("[data-action=settings]")');
 }

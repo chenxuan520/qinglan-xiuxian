@@ -19,6 +19,79 @@ const KINDS = new Set([
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
 export const hasArtifactField = (z: Zone) => !z.hostile && KINDS.has(z.kind);
 
+type FixedStroke = ReadonlyArray<ReadonlyArray<number>>;
+const FIXED_PATHS = new WeakMap<FixedStroke, Path2D>();
+const VORTEX_STROKES = new Map<number, FixedStroke[][]>();
+const PAGODA_LEVELS = Array.from({ length: 5 }, (_, i) => {
+  const width = 11 + i * 5;
+  const y = -85 + i * 17;
+  return {
+    width,
+    y,
+    roof: [
+      [-width, y + 7],
+      [0, y - 3],
+      [width, y + 7],
+      [width + 5, y + 5],
+    ],
+  };
+});
+const PAGODA_SPIRE = [
+  [0, -94],
+  [0, -85],
+];
+
+// 只复用两种法宝的固定笔画；各条仍独立描边，保持原透明度与覆盖顺序。
+function fixedLine(c: CanvasRenderingContext2D, points: FixedStroke) {
+  c.beginPath();
+  if (typeof Path2D === 'undefined') {
+    points.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.stroke();
+    return;
+  }
+  let path = FIXED_PATHS.get(points);
+  if (!path) {
+    path = new Path2D();
+    points.forEach(([x, y], i) => (i ? path!.lineTo(x, y) : path!.moveTo(x, y)));
+    FIXED_PATHS.set(points, path);
+  }
+  c.stroke(path);
+}
+
+function vortexStrokes(radius: number) {
+  let trigrams = VORTEX_STROKES.get(radius);
+  if (!trigrams) {
+    trigrams = Array.from({ length: 8 }, (_, i) => {
+      const strokes: FixedStroke[] = [];
+      for (let bar = 0; bar < 3; bar++) {
+        const x = radius * (0.76 + bar * 0.045);
+        const width = radius * 0.075;
+        if (i & (1 << bar)) {
+          strokes.push(
+            [
+              [x, -width],
+              [x, -width * 0.23],
+            ],
+            [
+              [x, width * 0.23],
+              [x, width],
+            ],
+          );
+        } else
+          strokes.push([
+            [x, -width],
+            [x, width],
+          ]);
+      }
+      return strokes;
+    });
+    // 半径不按时间分桶；最多保留16种，移出的坐标与Path2D可一起被回收。
+    if (VORTEX_STROKES.size >= 16) VORTEX_STROKES.delete(VORTEX_STROKES.keys().next().value!);
+    VORTEX_STROKES.set(radius, trigrams);
+  }
+  return trigrams;
+}
+
 // 只读取对局时钟；暂停、续局和画布重建都不重放施法，也不使用战斗随机数。
 export function artifactCue(z: Zone, reducedMotion = false) {
   const initialDelay = z.castDelay ?? Math.max(z.delay, 0);
@@ -125,27 +198,11 @@ export function drawArtifactField(
     }
     c.strokeStyle = '#d7d6acaa';
     c.lineWidth = Math.max(1, r * 0.012);
+    const trigrams = vortexStrokes(r);
     for (let i = 0; i < 8; i++) {
       c.save();
       c.rotate((i * TAU) / 8);
-      for (let bar = 0; bar < 3; bar++) {
-        const x = r * (0.76 + bar * 0.045),
-          w = r * 0.075;
-        if (i & (1 << bar)) {
-          line(c, [
-            [x, -w],
-            [x, -w * 0.23],
-          ]);
-          line(c, [
-            [x, w * 0.23],
-            [x, w],
-          ]);
-        } else
-          line(c, [
-            [x, -w],
-            [x, w],
-          ]);
-      }
+      for (const stroke of trigrams[i]) fixedLine(c, stroke);
       c.restore();
     }
     c.fillStyle = '#e0dec6aa';
@@ -536,31 +593,17 @@ export function drawArtifactObject(
   } else if (z.kind === 'pagoda') {
     c.translate(0, -7);
     c.scale(z.castEvolved ? 1.15 : 1, z.castEvolved ? 1.15 : 1);
-    for (let i = 0; i < 5; i++) {
-      const w = 11 + i * 5,
-        y = -85 + i * 17;
+    for (const { width: w, y, roof } of PAGODA_LEVELS) {
       c.fillStyle = '#375e50';
       c.strokeStyle = '#d8c88e';
-      line(
-        c,
-        [
-          [-w, y + 7],
-          [0, y - 3],
-          [w, y + 7],
-          [w + 5, y + 5],
-        ],
-        false,
-      );
+      fixedLine(c, roof);
       c.fillRect(-w * 0.66, y + 8, w * 1.32, 9);
       c.strokeRect(-w * 0.66, y + 8, w * 1.32, 9);
       c.fillStyle = '#fff0b0';
       c.fillRect(-2, y + 10, 4, 5);
     }
     c.strokeStyle = '#eee1b0';
-    line(c, [
-      [0, -94],
-      [0, -85],
-    ]);
+    fixedLine(c, PAGODA_SPIRE);
     c.fillStyle = z.color;
     mote(c, 0, -98, 3);
   } else if (z.kind === 'banner') {

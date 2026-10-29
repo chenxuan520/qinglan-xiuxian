@@ -19,6 +19,7 @@ import { bestiaryEnemyStats } from './bestiary-stats.ts';
 import { enemyCombatStats } from './enemy-stats.ts';
 import { formatNumber } from './number-format.ts';
 import { smallIcon } from './icons.ts';
+import { BOSS_LORE } from './bestiary-lore.ts';
 import type { PanelDefinition } from './panel-host.ts';
 function numberRange(values: readonly number[]) {
   const shown = values.map(formatNumber);
@@ -41,7 +42,11 @@ const trialBossHints = bossHints
       hint + (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
   )
   .concat('环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。');
-export function bestiaryPanel(bestiaryStage: number, difficulty = 0): PanelDefinition {
+export function bestiaryPanel(
+  bestiaryStage: number,
+  difficulty = 0,
+  completed: readonly number[] = [],
+): PanelDefinition {
   if (!DIFFICULTIES[difficulty]) difficulty = 0;
   const behavior: Record<string, string> = {
     chase: '追击 · 保持距离',
@@ -124,7 +129,7 @@ export function bestiaryPanel(bestiaryStage: number, difficulty = 0): PanelDefin
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${formatTime(time)} 后现身` : `${stage.name} · ${formatTime(time)} 后现身`}</p><small>${bossSkills(bossStage, trial).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] })}</div></article>`;
+        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${formatTime(time)} 后现身` : `${stage.name} · ${formatTime(time)} 后现身`}</p><small>${bossSkills(bossStage, trial).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] })}<p class="boss-lore" aria-label="妖王来历">${completed.includes(bossStage) ? BOSS_LORE[bossStage] : '击败后可见来历'}</p></div></article>`;
       })
       .join(
         '',

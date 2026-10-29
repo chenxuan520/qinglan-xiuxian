@@ -7,6 +7,7 @@ import {
   type MarketFellowChoice,
   type MarketFellowState,
 } from './market-fellow-data.ts';
+import { marketFellowLife as life, marketFellowEndedAt as endedAt } from './market-fellow-life.ts';
 
 export interface MarketFellowView {
   title: string;
@@ -22,33 +23,6 @@ export interface MarketFellowView {
   complete: boolean;
 }
 
-function life(story: MarketFellowState) {
-  const originalEnd = story.metAt + MARKET_FELLOW_SETTINGS.remainingYears;
-  const goldenAt =
-    story.chosenAt !== null && story.chosenAt + MARKET_FELLOW_SETTINGS.outcomeYears < originalEnd
-      ? story.chosenAt + MARKET_FELLOW_SETTINGS.outcomeYears
-      : null;
-  const goldenEnd = story.metAt + MARKET_FELLOW_SETTINGS.goldenRemainingYears;
-  const soulAt =
-    goldenAt !== null &&
-    story.choice === 'travel' &&
-    story.chosenAt! + MARKET_FELLOW_SETTINGS.soulYears < goldenEnd
-      ? story.chosenAt! + MARKET_FELLOW_SETTINGS.soulYears
-      : null;
-  return {
-    goldenAt,
-    soulAt,
-    endedAt:
-      soulAt !== null
-        ? story.metAt + MARKET_FELLOW_SETTINGS.soulRemainingYears
-        : goldenAt !== null
-          ? goldenEnd
-          : originalEnd,
-  };
-}
-function endedAt(story: MarketFellowState) {
-  return life(story).endedAt;
-}
 function available(save: SaveData) {
   return !!save.mortal.population && !!save.mortal.sectMarket && save.cultivation > 0;
 }

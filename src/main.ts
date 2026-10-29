@@ -5,6 +5,9 @@ import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
 import { BattleHud } from './battle-hud.ts';
+import { LetterReminder } from './letter-reminder.ts';
+import { leaderboardAvailable } from './leaderboard-availability.ts';
+import { LeaderboardPreference, leaderboardSettings } from './leaderboard-preference.ts';
 import { DamageNumbersPreference } from './damage-numbers.ts';
 import { JourneyCardPanel } from './journey-card-panel.ts';
 import { PanelHost, type PanelLocation } from './panel-host.ts';
@@ -376,6 +379,20 @@ let marketNpc: MarketCultivator | null = null;
 let auctionView: AuctionView = 'buy';
 let auctionKind: AuctionKind = 'medicine';
 const shownHumanLetters = new Set<string>();
+const letterReminder = new LetterReminder();
+const rankingPreference = new LeaderboardPreference();
+type RankingModule = typeof import('./leaderboard-feature.ts');
+const rankingSource = new ModuleSource<RankingModule>((attempt) =>
+  attempt
+    ? retryModule<RankingModule>('leaderboard-feature', 'leaderboard', attempt)
+    : import('./leaderboard-feature.ts'),
+);
+let rankingOffer: InstanceType<RankingModule['LeaderboardOffer']> | null = null;
+let rankingPanel: InstanceType<RankingModule['LeaderboardPanel']> | null = null;
+let rankingReturn: PanelLocation | null = null;
+let rankingInheritance: string | null = null;
+let rankingQueuedSeed: number | null = null;
+let rankingEpoch = 0;
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 const guideSource = new GuideSource();
@@ -442,7 +459,11 @@ function writeSave(data: SaveData, run: Game | null, reset = false) {
     storageNote.textContent = '关于《叩仙门》 · GitHub';
   }
   chronicleSource.observe(data, reset);
-  if (reset) hideAchievementNotice();
+  if (reset) {
+    hideAchievementNotice();
+    letterReminder.clear();
+    clearRanking();
+  }
 }
 function persist() {
   if (
@@ -504,12 +525,25 @@ function toast(text: string, duration = 3200, achievement = false) {
   const el = toastElement;
   el.hidden = false;
   el.textContent = text;
+  el.removeAttribute('data-ranking');
+  el.removeAttribute('data-letter-reminder');
   el.toggleAttribute('data-achievement', achievement);
   el.classList.add('visible');
   window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => el.classList.remove('visible'), duration);
 }
 let toastTimer = 0;
+function showLetterReminder(text: string) {
+  toast(text);
+  toastElement.setAttribute('data-letter-reminder', '');
+}
+function hideLetterReminder() {
+  if (!toastElement.hasAttribute('data-letter-reminder')) return;
+  toastElement.hidden = true;
+  toastElement.classList.remove('visible');
+  toastElement.removeAttribute('data-letter-reminder');
+  window.clearTimeout(toastTimer);
+}
 function hideAchievementNotice() {
   if (toastElement.hasAttribute('data-achievement')) {
     toastElement.hidden = true;
@@ -637,6 +671,8 @@ function renderLobby(returnYears?: number) {
   );
   ui.querySelector('.journey-actions [data-action="arsenal"]')?.remove();
   syncChronicleIndicators();
+  letterReminder.queue();
+  queueRanking();
   if (sectDuesPending(save)) renderSectDues();
   else if (returnYears !== undefined && returnYears > 0)
     toast(
@@ -646,7 +682,8 @@ function renderLobby(returnYears?: number) {
 }
 
 function renderEpilogue() {
-  return sceneFlow.renderEpilogue(shellBindings());
+  sceneFlow.renderEpilogue(shellBindings());
+  queueRanking();
 }
 function renderPrologue(replay = false) {
   if (save.journeyEnded) return;
@@ -731,7 +768,9 @@ function showHometown(parent?: ParentId) {
   return sceneFlow.showHometown(shellBindings(), parent);
 }
 function showTownEvent(npc: TownResident) {
-  return sceneFlow.showTownEvent(shellBindings(), npc);
+  sceneFlow.showTownEvent(shellBindings(), npc);
+  if (npc.id === 'smith' && panel === 'town-event' && modal.querySelector('.town-story'))
+    letterReminder.markSmithViewed(save);
 }
 function showMarketEvent(npc: MarketCultivator) {
   if (!inMarket || marketScene?.nearbyNpc?.id !== npc.id) return;
@@ -964,6 +1003,8 @@ function renderMortal(enter = false) {
       letters.forEach((key) => shownHumanLetters.add(key));
     }
   }
+  if (!panel && !inTown && !inMarket && ui.querySelector('.mortal-journal.town-story'))
+    letterReminder.markSmithViewed(save);
 }
 function syncMortalChange() {
   resolveActivity(save);
@@ -1025,6 +1066,11 @@ function restorePanel(location: PanelLocation) {
   return sceneFlow.restorePanel(shellBindings(), location);
 }
 function panelFrame(title: string, subtitle: string, body: string, wide = false) {
+  if (panel) hideLetterReminder();
+  if (panel !== 'leaderboard') {
+    rankingPanel?.destroy();
+    rankingPanel = null;
+  }
   return sceneFlow.panelFrame(shellBindings(), title, subtitle, body, wide);
 }
 async function renderJourneyCard() {
@@ -1064,10 +1110,165 @@ function syncChronicleIndicators(force = true) {
   });
 }
 function renderPanel() {
+  if (panel === 'leaderboard') {
+    renderRanking();
+    return;
+  }
   sceneFlow.renderPanel(shellBindings());
+  if (panel === 'chronicle' && rankingEnabled()) {
+    const score = modal.querySelector('.chronicle-score');
+    if (score && !score.querySelector('[data-action="leaderboard"]'))
+      score.insertAdjacentHTML(
+        'beforeend',
+        '<button class="secondary-button" data-action="leaderboard">查看万魂幡</button>',
+      );
+  }
   if (panel === 'chronicle' && modal.querySelector('.chronicle-achievements'))
     chronicleSource.markRead();
   syncChronicleIndicators();
+}
+function rankingEnabled() {
+  return rankingPreference.enabled && leaderboardAvailable();
+}
+function clearRanking() {
+  rankingEpoch++;
+  rankingOffer?.clear();
+  rankingOffer = null;
+  rankingPanel?.destroy();
+  rankingPanel = null;
+  rankingQueuedSeed = null;
+  if (toastElement.hasAttribute('data-ranking')) {
+    toastElement.classList.remove('visible');
+    toastElement.removeAttribute('data-ranking');
+  }
+  document.querySelectorAll('[data-ranking-offer]').forEach((item) => item.remove());
+}
+function queueRanking() {
+  if (
+    !rankingEnabled() ||
+    saveLock ||
+    rankingOffer ||
+    rankingQueuedSeed === save.medicine.recipeSeed ||
+    (!save.pendingReincarnation &&
+      !save.journeyEnded &&
+      !save.completed.includes(FINAL_TRIAL_STAGE))
+  )
+    return;
+  const epoch = rankingEpoch;
+  rankingQueuedSeed = save.medicine.recipeSeed;
+  void rankingSource
+    .load()
+    .then((module) => {
+      if (epoch === rankingEpoch && rankingEnabled() && !saveLock)
+        rankingOffer ??= new module.LeaderboardOffer(rankingEnabled);
+    })
+    .catch(() => {});
+}
+function rankingReady() {
+  if (
+    !rankingEnabled() ||
+    game ||
+    pendingRun ||
+    saveLock ||
+    sceneLoading ||
+    inMortalWorld ||
+    document.hidden ||
+    !document.hasFocus() ||
+    toastElement.classList.contains('visible') ||
+    guideSource.current?.tourActive ||
+    marketEventSource.current?.treasureTrialSource.active
+  )
+    return false;
+  if (panel.endsWith('-farewell') || panel === 'epilogue-reincarnate') return true;
+  return (
+    panel === '' &&
+    !!ui.querySelector('.lobby-main') &&
+    !sectDuesPending(save) &&
+    !tribulationDue(save) &&
+    lifespanInfo(save).remaining > 0
+  );
+}
+function showRankingOffer() {
+  const host = panel ? modal.querySelector('.panel') : ui.querySelector('.lobby-main');
+  if (!host || host.querySelector('[data-ranking-offer]')) return;
+  const notice = document.createElement('div');
+  notice.className = 'save-actions leaderboard-offer';
+  notice.setAttribute('data-ranking-offer', '');
+  notice.innerHTML =
+    '<button class="secondary-button" data-action="leaderboard">留名万魂幡</button><button class="secondary-button" data-action="leaderboard-dismiss">稍后</button>';
+  if (panel) host.append(notice);
+  else host.prepend(notice);
+  toast('此世道果已可列入前百，可选择留名万魂幡。');
+  toastElement.setAttribute('data-ranking', '');
+}
+function closeRanking() {
+  rankingPanel?.destroy();
+  rankingPanel = null;
+  const previous = rankingReturn;
+  rankingReturn = null;
+  modal.innerHTML = '';
+  panel = previous?.name ?? '';
+  if (panel.endsWith('-farewell') && save.pendingReincarnation)
+    renderJourneyFarewell(save.pendingReincarnation);
+  else if (panel === 'epilogue-reincarnate') {
+    panelFrame(...epilogueReincarnatePanel(save));
+    const choice = modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance');
+    if (choice && rankingInheritance !== null) {
+      choice.value = rankingInheritance;
+      const preview = modal.querySelector<HTMLElement>('.inheritance-preview');
+      if (preview) preview.innerHTML = inheritancePreview(save, choice.value);
+    }
+    const section = modal.querySelector<HTMLElement>('.panel');
+    if (section && previous) section.scrollTop = previous.scroll;
+  } else if (previous) restorePanel(previous);
+  rankingInheritance = null;
+}
+function renderRanking() {
+  rankingPanel?.destroy();
+  rankingPanel = null;
+  if (!rankingEnabled()) {
+    closeRanking();
+    return;
+  }
+  panelFrame(
+    '万魂幡',
+    '此世道果 · 前一百名',
+    '<div data-ranking-host><p class="panel-note" role="status">正在读取榜单…</p></div>',
+  );
+  const host = modal.querySelector<HTMLElement>('[data-ranking-host]')!;
+  const epoch = rankingEpoch;
+  const seed = save.medicine.recipeSeed;
+  const current = () =>
+    host.isConnected &&
+    panel === 'leaderboard' &&
+    !saveLock &&
+    !game &&
+    rankingEnabled() &&
+    epoch === rankingEpoch &&
+    seed === save.medicine.recipeSeed;
+  const load = () => {
+    if (!current()) return;
+    void rankingSource
+      .load()
+      .then((module) => {
+        if (!current()) return;
+        rankingPanel = new module.LeaderboardPanel(host, {
+          isCurrent: current,
+          enabled: rankingEnabled,
+          eligibleFacts: () => (pendingRun ? null : module.extractLeaderboardFacts(save)),
+          score: () => module.journeyScore(save).total,
+          onClose: closeRanking,
+        });
+        void rankingPanel.load();
+      })
+      .catch(() => {
+        if (!current()) return;
+        host.innerHTML =
+          '<p class="panel-note">榜单暂时无法展开。</p><button class="secondary-button" data-ranking-retry>重试</button>';
+        host.querySelector<HTMLButtonElement>('[data-ranking-retry]')!.onclick = load;
+      });
+  };
+  load();
 }
 function renderHud() {
   return sceneFlow.renderHud(shellBindings());
@@ -1419,6 +1620,7 @@ function renderJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnatio
 
   panelFrame(...journeyFarewellPanel(reason));
   modal.querySelector('[data-action="close"]')?.remove();
+  queueRanking();
 }
 function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation']>) {
   if (reason === 'ambush' && save.mortal.marketSocial?.ambush?.snapshot.outcome !== 'defeat')
@@ -1770,7 +1972,7 @@ function shellBindings(): ActionShell {
     get rootPickerView() { return rootPickerView; },
     get sceneLoading() { return sceneLoading; },
     set sceneLoading(next) { sceneLoading = next; },
-    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled); },
+    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled, leaderboardAvailable() ? leaderboardSettings(rankingPreference.enabled) : ''); },
     get refreshAutoplaySettings() { return refreshAutoplaySettings; },
     get settlementModal() { return settlementModal; },
     get showAuction() { return showAuction; },
@@ -1803,6 +2005,38 @@ function handleAction(action: string, id?: string) {
       persist();
       renderPrologue();
     }
+    return;
+  }
+  if (action === 'leaderboard-dismiss') {
+    document.querySelectorAll('[data-ranking-offer]').forEach((item) => item.remove());
+    return;
+  }
+  if (action === 'leaderboard-toggle' && panel === 'settings' && leaderboardAvailable()) {
+    if (!rankingPreference.toggle()) {
+      toast('排行榜设置尚未保存，请重试');
+      return;
+    }
+    if (!rankingPreference.enabled) clearRanking();
+    renderPanel();
+    queueRanking();
+    return;
+  }
+  if (
+    action === 'leaderboard' &&
+    rankingEnabled() &&
+    !game &&
+    (['', 'settings', 'chronicle', 'epilogue-reincarnate'].includes(panel) ||
+      panel.endsWith('-farewell'))
+  ) {
+    rankingReturn = rememberPanel();
+    rankingInheritance =
+      modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance')?.value ?? null;
+    panel = 'leaderboard';
+    renderRanking();
+    return;
+  }
+  if (panel === 'leaderboard' && action === 'close') {
+    closeRanking();
     return;
   }
   if (action === 'damage-numbers' && (panel === 'settings' || game?.state === 'paused')) {
@@ -1883,6 +2117,7 @@ function handleAction(action: string, id?: string) {
     return;
   }
   dispatchAction(shellBindings(), action, id);
+  queueRanking();
 }
 bindSettlementDirectory(ui, () => ({ save, unfinished: !!pendingRun, locked: !!saveLock }));
 
@@ -2310,6 +2545,22 @@ function frame(now: number) {
     saveLock ||
     marketEventSource.current?.treasureTrialSource.active;
   if (blocked) hideAchievementNotice();
+  if (
+    toastElement.hasAttribute('data-letter-reminder') &&
+    (blocked ||
+      inMortalWorld ||
+      panel ||
+      document.hidden ||
+      !document.hasFocus() ||
+      sceneLoading ||
+      !assetsReady ||
+      guideSource.current?.tourActive ||
+      !ui.querySelector('.lobby-main') ||
+      sectDuesPending(save) ||
+      tribulationDue(save) ||
+      lifespanInfo(save).remaining === 0)
+  )
+    hideLetterReminder();
   chronicleSource.flush(
     !blocked &&
       !document.hidden &&
@@ -2317,6 +2568,28 @@ function frame(now: number) {
       !toastElement.classList.contains('visible'),
     (text) => toast(text, 3200, true),
   );
+  if (!blocked && !inMortalWorld && !panel) {
+    letterReminder.flush(
+      save,
+      {
+        atHome: !inMortalWorld && !!ui.querySelector('.lobby-main'),
+        gamePresent: !!game,
+        panel,
+        foreground: !document.hidden && document.hasFocus(),
+        toastVisible: toastElement.classList.contains('visible'),
+        blocked:
+          !!blocked ||
+          sceneLoading ||
+          !assetsReady ||
+          !!guideSource.current?.tourActive ||
+          sectDuesPending(save) ||
+          tribulationDue(save) ||
+          lifespanInfo(save).remaining === 0,
+      },
+      showLetterReminder,
+    );
+  }
+  rankingOffer?.flush(save, rankingReady(), showRankingOffer);
   if (saveLock) {
     guideSource.current?.stopInterfaceTour();
     marketEventSource.current?.treasureTrialSource.stop();

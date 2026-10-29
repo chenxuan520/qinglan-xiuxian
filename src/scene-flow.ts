@@ -561,6 +561,7 @@ export function renderPanel(shell: ActionShell) {
       const view = shell.guideSource.current.bestiaryPanel(
         shell.bestiaryStage,
         shell.bestiaryDifficulty,
+        shell.save.completed,
       );
       shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
     } else {

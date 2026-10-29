@@ -1,3 +1,4 @@
+import { notificationLeaves } from './helpers/notification-leaves.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -31,6 +32,7 @@ function harness(pending = false) {
     refreshes = 0;
   const messages: string[] = [];
   const context = createContext({
+    ...notificationLeaves(),
     // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
     chronicleSource: { observe() {} },
     hideAchievementNotice() {},

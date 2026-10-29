@@ -1,0 +1,247 @@
+import {
+  LEADERBOARD_LIMIT,
+  LEADERBOARD_MAX_BYTES,
+  LEADERBOARD_VERSION,
+  normalizeLeaderboardName,
+  type LeaderboardEntry,
+} from '../../src/leaderboard-contract.ts';
+import { parseLeaderboardFacts, scoreLeaderboardFacts } from './score.ts';
+
+export type LeaderboardWorkerEnv = Pick<LeaderboardEnv, 'DB' | 'SUBMIT_LIMITER'>;
+const ORIGIN = 'https://xiuxian.011203.xyz';
+const PATH = '/api/leaderboard';
+export const OWNER_COOKIE = '__Host-qinglan-rank-owner';
+const PUBLIC_COLUMNS = 'display_name, score, grade, title, life_mode, ending, updated_at';
+interface RankingRow {
+  display_name: string;
+  score: number;
+  grade: string;
+  title: string;
+  life_mode: LeaderboardEntry['lifeMode'];
+  ending: LeaderboardEntry['ending'];
+  updated_at: string;
+  owner_hash?: string;
+  ahead?: number;
+}
+const entry = (row: RankingRow): LeaderboardEntry => ({
+  name: row.display_name,
+  score: row.score,
+  grade: row.grade,
+  title: row.title,
+  lifeMode: row.life_mode,
+  ending: row.ending,
+  updatedAt: row.updated_at,
+});
+function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
+  return Response.json(body, {
+    status,
+    headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers },
+  });
+}
+function error(code: string, message: string, status: number, headers?: Record<string, string>) {
+  return json({ error: code, message }, status, headers);
+}
+async function digest(value: string) {
+  return Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))),
+    (n) => n.toString(16).padStart(2, '0'),
+  ).join('');
+}
+function ownerCookie(request: Request) {
+  const values = (request.headers.get('Cookie') ?? '')
+    .split(';')
+    .map((part) => part.trim())
+    .filter((part) => part.startsWith(OWNER_COOKIE + '='))
+    .map((part) => part.slice(OWNER_COOKIE.length + 1));
+  return values.length === 1 && /^[a-f0-9]{64}$/.test(values[0]) ? values[0] : null;
+}
+function newOwnerCookie() {
+  const owner = Array.from(crypto.getRandomValues(new Uint8Array(32)), (n) =>
+    n.toString(16).padStart(2, '0'),
+  ).join('');
+  return `${OWNER_COOKIE}=${owner}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=31536000`;
+}
+async function boundedJson(request: Request): Promise<unknown> {
+  const length = request.headers.get('Content-Length');
+  if (length !== null && (!/^\d+$/.test(length) || Number(length) > LEADERBOARD_MAX_BYTES))
+    throw Error('body-limit');
+  if (!request.body) throw Error('empty-body');
+  const reader = request.body.getReader(),
+    decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false });
+  let bytes = 0,
+    body = '';
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > LEADERBOARD_MAX_BYTES) {
+        await reader.cancel();
+        throw Error('body-limit');
+      }
+      body += decoder.decode(chunk.value, { stream: true });
+    }
+    body += decoder.decode();
+    return JSON.parse(body);
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function submit(request: Request, env: LeaderboardWorkerEnv) {
+  if (
+    request.headers.get('Origin') !== ORIGIN ||
+    !/^application\/json(?:\s*;|$)/i.test(request.headers.get('Content-Type') ?? '')
+  ) {
+    return error('invalid-input', '请从官网提交排名。', 400);
+  }
+  // Cloudflare overwrites this header at its edge. Raw addresses are never stored or logged.
+  const ip = request.headers.get('CF-Connecting-IP');
+  if (!ip || !env.SUBMIT_LIMITER) return error('unavailable', '排名暂时不可用，请稍后再试。', 503);
+  try {
+    if (!(await env.SUBMIT_LIMITER.limit({ key: await digest(ip) })).success) {
+      return error('rate-limited', '提交较频繁，请稍后再试。', 429, { 'Retry-After': '60' });
+    }
+  } catch {
+    console.warn(JSON.stringify({ event: 'leaderboard-unavailable', stage: 'rate-limit' }));
+    return error('unavailable', '排名暂时不可用，请稍后再试。', 503);
+  }
+  let body: unknown;
+  try {
+    body = await boundedJson(request);
+  } catch {
+    return error('invalid-input', '排名资料格式不正确。', 400);
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body))
+    return error('invalid-input', '排名资料格式不正确。', 400);
+  const fields = body as Record<string, unknown>;
+  const name = normalizeLeaderboardName(fields.name),
+    facts = parseLeaderboardFacts(fields.facts);
+  if (
+    Object.keys(fields).length !== 3 ||
+    fields.version !== LEADERBOARD_VERSION ||
+    !name ||
+    !facts
+  ) {
+    return error('invalid-input', '排名资料格式不正确。', 400);
+  }
+  const score = scoreLeaderboardFacts(facts);
+  if (
+    !Number.isSafeInteger(score.total) ||
+    score.total < 0 ||
+    !Number.isFinite(score.permanentPower)
+  ) {
+    return error('invalid-input', '排名资料超出有效范围。', 400);
+  }
+  const owner = ownerCookie(request);
+  // Establish the browser capability before claiming a name. A lost first response cannot lock it.
+  if (!owner)
+    return error('identity-required', '正在准备匿名署名，请重试。', 428, {
+      'Set-Cookie': newOwnerCookie(),
+    });
+  const ownerHash = await digest(owner),
+    submissionHash = await digest(JSON.stringify(facts));
+  const now = new Date().toISOString();
+  const results = await env.DB.batch<RankingRow>([
+    env.DB.prepare(
+      `INSERT INTO leaderboard
+      (name_key, display_name, owner_hash, score, grade, title, life_mode, ending, submission_hash, created_at, updated_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE (SELECT COUNT(*) FROM
+        (SELECT 1 FROM leaderboard WHERE score>=? AND name_key<>? LIMIT 100))<100
+      ON CONFLICT(name_key) DO UPDATE SET display_name=excluded.display_name, score=excluded.score,
+        grade=excluded.grade, title=excluded.title, life_mode=excluded.life_mode, ending=excluded.ending,
+        submission_hash=excluded.submission_hash, updated_at=excluded.updated_at
+      WHERE leaderboard.owner_hash=excluded.owner_hash AND excluded.score>leaderboard.score
+      RETURNING ${PUBLIC_COLUMNS}`,
+    ).bind(
+      name.key,
+      name.name,
+      ownerHash,
+      score.total,
+      score.grade,
+      score.tier,
+      facts.lifeMode,
+      facts.ending,
+      submissionHash,
+      now,
+      now,
+      score.total,
+      name.key,
+    ),
+    env.DB.prepare(
+      `SELECT ${PUBLIC_COLUMNS}, owner_hash,
+      (SELECT COUNT(*) FROM leaderboard AS ahead WHERE ahead.score>current.score
+        OR (ahead.score=current.score AND ahead.updated_at<current.updated_at)
+        OR (ahead.score=current.score AND ahead.updated_at=current.updated_at AND ahead.name_key<current.name_key)) AS ahead
+      FROM leaderboard AS current WHERE current.name_key=?`,
+    ).bind(name.key),
+  ]);
+  if (results.some((result) => !result.success)) throw Error('database-result');
+  const row = results[1].results[0];
+  if (!row) return error('not-qualified', '道果尚未进入前百，可待修行有成后再留名。', 409);
+  if (row.owner_hash !== ownerHash)
+    return error('name-taken', '这个姓名已有署名，请换一个姓名。', 409);
+  if (row.ahead === undefined || row.ahead >= LEADERBOARD_LIMIT)
+    return error('not-qualified', '道果尚未进入前百，可待修行有成后再留名。', 409);
+  return json({
+    version: LEADERBOARD_VERSION,
+    status: results[0].results.length ? 'saved' : 'unchanged',
+    entry: entry(row),
+  });
+}
+
+export default {
+  async fetch(
+    request: Request,
+    env: LeaderboardWorkerEnv,
+    ctx?: Pick<ExecutionContext, 'waitUntil'>,
+  ): Promise<Response> {
+    const url = new URL(request.url);
+    if (url.origin !== ORIGIN || url.pathname !== PATH || url.search)
+      return error('invalid-input', '接口不存在。', 404);
+    if (request.method !== 'GET' && request.method !== 'POST')
+      return error('invalid-input', '请求方式不支持。', 405, { Allow: 'GET, POST' });
+    try {
+      if (request.method === 'POST') return await submit(request, env);
+      const cache = ctx && typeof caches !== 'undefined' ? caches.default : null;
+      const cacheKey = new Request(ORIGIN + PATH);
+      if (cache) {
+        try {
+          const cached = await cache.match(cacheKey);
+          if (cached) return cached;
+        } catch {
+          /* A cache outage must not make the public board unavailable. */
+        }
+      }
+      const result = await env.DB.prepare(
+        `SELECT ${PUBLIC_COLUMNS} FROM leaderboard ORDER BY score DESC, updated_at ASC, name_key ASC LIMIT ?`,
+      )
+        .bind(LEADERBOARD_LIMIT)
+        .all<RankingRow>();
+      if (!result.success) throw Error('database-result');
+      const entries = result.results.map(entry);
+      const response = json(
+        {
+          version: LEADERBOARD_VERSION,
+          limit: LEADERBOARD_LIMIT,
+          minimumScore: entries.length === LEADERBOARD_LIMIT ? entries.at(-1)!.score : 0,
+          entries,
+        },
+        200,
+        { 'Cache-Control': 'public, max-age=30, s-maxage=30' },
+      );
+      if (cache && ctx) ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => {}));
+      return response;
+    } catch {
+      // Fixed reason codes only: never record names, facts, raw IPs, capabilities, or DB exceptions.
+      console.warn(
+        JSON.stringify({ event: 'leaderboard-unavailable', stage: 'database-or-score' }),
+      );
+      return error('unavailable', '排名暂时不可用，请稍后再试。', 503);
+    }
+  },
+} satisfies ExportedHandler<LeaderboardWorkerEnv>;

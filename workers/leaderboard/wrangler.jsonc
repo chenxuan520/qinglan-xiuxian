@@ -1,0 +1,25 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "qinglan-leaderboard",
+  "main": "index.ts",
+  "compatibility_date": "2026-10-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "xiuxian.011203.xyz/api/leaderboard", "zone_name": "011203.xyz" }],
+  "ratelimits": [
+    {
+      "name": "SUBMIT_LIMITER",
+      "namespace_id": "1825766705",
+      "simple": { "limit": 12, "period": 60 },
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "qinglan-leaderboard",
+      "database_id": "7e968f2e-0498-4c36-b142-51d8ba95f0a7",
+      "migrations_dir": "migrations",
+    },
+  ],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 },
+}

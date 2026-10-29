@@ -1,3 +1,4 @@
+import { notificationLeaves } from './helpers/notification-leaves.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -50,6 +51,7 @@ test('实际领取入口须广告结束，分档提示与到账一致，重复�
     save.hometownSeen = true;
     if (save.mortal.hometown) save.mortal.hometown.stage = 'departed';
     const context = createContext({
+      ...notificationLeaves(),
       dispatchAction,
       save,
       saveLock: null,

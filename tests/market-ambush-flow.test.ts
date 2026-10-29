@@ -1,3 +1,4 @@
+import { notificationLeaves } from './helpers/notification-leaves.ts';
 import * as lifeMode from '../src/life-mode.ts';
 import { endExtremeLife } from '../src/progress.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
@@ -153,6 +154,7 @@ function harness(data = fixture()) {
   }
   const noop = () => {};
   const context = createContext({
+    ...notificationLeaves(),
     battleHud: { reset: noop },
     // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
     chronicleSource: { observe() {} },

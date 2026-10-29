@@ -557,6 +557,14 @@
   color: var(--gold);
   font-weight: 400;
 }
+.enemy-card .boss-lore {
+  margin: 12px 0 0;
+  color: #91aa96;
+  font-size: 11px;
+  line-height: 1.9;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
 .boss-note {
   border: 1px solid #baac7e3b;
   margin-top: 20px;

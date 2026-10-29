@@ -1,3 +1,4 @@
+import { notificationLeaves } from './helpers/notification-leaves.ts';
 import { homeTownEntrance } from '../src/home-town.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -106,6 +107,7 @@ function harness(save: SaveData) {
   let rolls = 0;
   const firstTourValues = new Map<string, string>();
   const context = createContext({
+    ...notificationLeaves(),
     battleHud: { reset: noop },
     // 成就队列另有真实回归，此处隔离界面通知，不跳过实际存档写入。
     chronicleSource: { observe() {} },
