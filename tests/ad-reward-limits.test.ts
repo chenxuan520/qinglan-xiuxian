@@ -132,3 +132,19 @@ test('满投入模拟遵守真实补给冷却，不能在同一年反复领取�
   assert.equal(row.ads.borrow, 0);
   assert.equal(row.ads.revive, 0);
 });
+
+test('非整数年岁领取和整数冷却边界不因浮点误差多显示一年', () => {
+  for (const age of [15.1, 15.15, 15.6, 20.2]) {
+    const save = freshSave();
+    save.age = age;
+    claimSuppliesReward(save);
+    assert.equal(suppliesCooldown(save).hint, '再过 10 年可领取');
+    save.age = age + 9;
+    assert.equal(suppliesCooldown(save).hint, '再过 1 年可领取');
+    save.age = age + 9.5;
+    assert.equal(suppliesCooldown(save).hint, '尚需不足一年');
+    save.age = age + 10;
+    assert.equal(suppliesCooldown(save).hint, '');
+    assert.equal(suppliesCooldown(save).available, true);
+  }
+});

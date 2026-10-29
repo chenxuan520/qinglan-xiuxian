@@ -3,16 +3,22 @@ import { MAX_LIFESPAN_ADS, SUPPLIES_COOLDOWN_YEARS } from './ad-rules.ts';
 import { isExtremeLife } from './life-mode.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 
+const YEAR_EPSILON = 1e-9;
+
 export function suppliesCooldown(save: SaveData) {
   const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const years = SUPPLIES_COOLDOWN_YEARS[realm.index];
   const remaining = Math.max(0, save.suppliesReadyAt - save.age);
-  const cooling = remaining > 1e-9;
+  const cooling = remaining > YEAR_EPSILON;
   return {
     years,
     remaining,
     available: !isExtremeLife(save) && !cooling,
-    hint: cooling ? (remaining < 1 ? '尚需不足一年' : `再过 ${Math.ceil(remaining)} 年可领取`) : '',
+    hint: cooling
+      ? remaining < 1 - YEAR_EPSILON
+        ? '尚需不足一年'
+        : `再过 ${Math.ceil(remaining - YEAR_EPSILON)} 年可领取`
+      : '',
   };
 }
 
