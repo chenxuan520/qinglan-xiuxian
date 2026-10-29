@@ -1,3 +1,4 @@
+import { claimSuppliesReward, canClaimLifespanAd } from '../src/ad-reward-limits.ts';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -6,7 +7,6 @@ import { isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { Game } from '../src/game.ts';
 import type { Enemy } from '../src/game.ts';
 import {
-  adSupplies,
   ELEMENTS,
   MAX_FORGE_LEVEL,
   ROOT_STARTERS,
@@ -175,9 +175,7 @@ function trial(
 function supplies(save: SaveData, stones: number, iron: number, ledger: Ledger) {
   while (save.stones < stones || save.iron < iron) {
     if (ledger.supplies >= LIMITS.supplies) throw new BudgetStop('supplies-budget');
-    const reward = adSupplies(save.unlocked);
-    save.stones += reward.stones;
-    save.iron += reward.iron;
+    if (!claimSuppliesReward(save)) throw new BudgetStop('supplies-cooldown');
     ledger.supplies++;
   }
 }
@@ -189,8 +187,9 @@ function boundaries(save: SaveData, c: BalanceCase, ledger: Ledger, random: () =
     }
     if (lifespanInfo(save).remaining === 0) {
       if (!assisted(c)) throw new BudgetStop('expired');
-      if (ledger.borrow >= LIMITS.borrows) throw new BudgetStop('borrow-budget');
+      if (!canClaimLifespanAd(save)) throw new BudgetStop('expired');
       assert.ok(extendLifespan(save));
+      save.adUsage.lifespan++;
       ledger.borrow++;
       resolveActivity(save, random);
       continue;
@@ -329,11 +328,12 @@ function fight(save: SaveData, stage: number, attempt: number, c: BalanceCase, l
         stop = 'expired';
         break;
       }
-      if (ledger.borrow >= LIMITS.borrows) {
-        stop = 'borrow-budget';
+      if (!canClaimLifespanAd(save)) {
+        stop = 'expired';
         break;
       }
       assert.ok(g.borrowLife());
+      save.adUsage.lifespan++;
       ledger.borrow++;
       g.resume();
     }

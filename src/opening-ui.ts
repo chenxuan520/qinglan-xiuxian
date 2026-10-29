@@ -1,3 +1,4 @@
+import { lifespanAdsRemaining } from './ad-reward-limits.ts';
 import { isExtremeLife, rewardDisabled } from './life-mode.ts';
 import { FINAL_TRIAL_STAGE, MAX_REVIVES, elementInfo, spiritRootInfo, treasure } from './data.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
@@ -116,10 +117,12 @@ export function journeyFarewellPanel(
 
 export function lifespanEndPanel(save: SaveData): PanelParts {
   const life = lifespanInfo(save);
+  const remaining = lifespanAdsRemaining(save);
+  const exhausted = !isExtremeLife(save) && remaining === 0;
   return [
     '一生将尽，山河仍远',
     '寿元已尽 · 此世未了',
-    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。山风拂过衣袖，你望着来时的路，久久没有言语。</p></div><p class="pause-description">此世行至${currentRealm(save).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">${isExtremeLife(save) ? '极限模式不可借寿。此世行至寿尽，可留存此世后轮回。' : `完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。`}</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad" ${rewardDisabled(save)}>向天再借五百年</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
+    `<div class="lifespan-story"><p>灵力渐渐散去，你抬起手，才看清指间不知何时添了这样深的纹路。走过的山川一一浮现，最后停在十五岁那年的青岚渡口——那时行囊很轻，你以为前路还长。</p><p>远处似有钟声。山风拂过衣袖，你望着来时的路，久久没有言语。</p></div><p class="pause-description">此世行至${currentRealm(save).name} · 年岁 ${life.age.toFixed(1)} / ${life.limit} 年。修行已暂停。</p><p class="panel-note">${isExtremeLife(save) ? '极限模式不可借寿。此世行至寿尽，可留存此世后轮回。' : exhausted ? '本世三次借寿已尽。' : `本世剩余 ${remaining} 次。完整观看 ${AD_SECONDS} 秒广告可增加 ${Math.round(life.base * 0.3)} 年寿元（当前境界基础寿命的 30%），保留全部修行进度。选择不再借寿后，可先留存此世，再确认轮回。`}</p><div class="save-actions"><button class="primary-button" data-action="watch-lifespan-ad" ${rewardDisabled(save) || (exhausted ? 'disabled' : '')}>${exhausted ? '天不常借' : '向天再借五百年'}</button><button class="secondary-button" data-action="end-lifetime">不再借寿 · 此世落幕</button></div>`,
   ];
 }
 

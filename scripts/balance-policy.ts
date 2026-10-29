@@ -1,3 +1,4 @@
+import { MAX_LIFESPAN_ADS } from '../src/ad-rules.ts';
 import { CULTIVATION_PATHS, ROOT_STARTERS, SPIRIT_ROOTS } from '../src/data.ts';
 import type { CultivationPath, SpiritRootId, WeaponKind } from '../src/data.ts';
 
@@ -26,7 +27,7 @@ export const LIMITS = {
   trialSeconds: 600,
   preparationOperations: 1000,
   supplies: 2000,
-  borrows: 100,
+  borrows: MAX_LIFESPAN_ADS,
   ratePoints: 0.1,
   starterRatePoints: 0.2,
   medianTime: 0.2,

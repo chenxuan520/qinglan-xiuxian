@@ -1,3 +1,4 @@
+import { suppliesCooldown } from './ad-reward-limits.ts';
 import { isExtremeLife, rewardDisabled } from './life-mode.ts';
 import {
   CULTIVATION_PATHS,
@@ -234,7 +235,8 @@ export function rootPickerView(
 export function sectDuesModal(save: SaveData): string {
   const dues = save.mortal.member!.dues;
   const supplies = adSupplies(save.unlocked);
-  return `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="宗门供奉到期"><div class="eyebrow">仙门供奉</div><h2>供奉到期</h2><p>本期需 ${dues} 灵石，现有 ${save.stones} 灵石。${save.stones < dues ? `<br>还缺 ${dues - save.stones} 灵石。` : '<br>物资已足，可以补缴。'}</p><p class="panel-note">人间计时已暂停，在籍身份与精研保留。${save.stones < dues ? (isExtremeLife(save) ? '<br>极限模式无法领取补给。' : `<br>可看广告领取 ${supplies.stones} 灵石与 ${supplies.iron} 玄铁，一次不足可再次领取。`) : ''}放弃补缴会被清退出宗门。</p><div class="result-actions death-actions">${save.stones < dues ? `<button class="primary-button" data-action="dues-ad" ${rewardDisabled(save)}>看广告 · 领取物资</button>` : '<button class="primary-button" data-action="dues-pay">补缴供奉 · 继续游历</button>'}<button class="secondary-button" data-action="dues-decline">放弃补缴 · 离开宗门</button></div></section></div>`;
+  const cooldown = suppliesCooldown(save);
+  return `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="宗门供奉到期"><div class="eyebrow">仙门供奉</div><h2>供奉到期</h2><p>本期需 ${dues} 灵石，现有 ${save.stones} 灵石。${save.stones < dues ? `<br>还缺 ${dues - save.stones} 灵石。` : '<br>物资已足，可以补缴。'}</p><p class="panel-note">人间计时已暂停，在籍身份与精研保留。${save.stones < dues ? (isExtremeLife(save) ? '<br>极限模式无法领取补给。' : !cooldown.available ? `<br>${cooldown.hint}；供奉待缴期间年岁暂停。` : `<br>可看广告领取 ${supplies.stones} 灵石与 ${supplies.iron} 玄铁，领取后需等待 ${cooldown.years} 个游戏年。`) : ''}放弃补缴会被清退出宗门。</p><div class="result-actions death-actions">${save.stones < dues ? `<button class="primary-button" data-action="dues-ad" ${rewardDisabled(save) || (!cooldown.available ? 'disabled' : '')}>${!isExtremeLife(save) && !cooldown.available ? '机缘未至' : '看广告 · 领取物资'}</button>` : '<button class="primary-button" data-action="dues-pay">补缴供奉 · 继续游历</button>'}<button class="secondary-button" data-action="dues-decline">放弃补缴 · 离开宗门</button></div></section></div>`;
 }
 
 export function retreatResultPanel(

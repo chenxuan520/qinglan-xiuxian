@@ -1,3 +1,4 @@
+import { validSuppliesReadyAt } from './ad-rules.ts';
 import {
   CURIO_IDS,
   isCurio,
@@ -118,10 +119,11 @@ export interface SaveData {
   mortal: MortalState;
   chronicle: Chronicle;
   adUsage: AdUsage;
+  suppliesReadyAt: number;
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 34;
+export const SAVE_SCHEMA = 35;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -209,6 +211,7 @@ export function freshSave(
     spiritRoot,
     rootElements: [...rootElements],
     adUsage: freshAdUsage(spiritRoot),
+    suppliesReadyAt: 0,
   };
 }
 const int = (n: unknown, max = Number.MAX_SAFE_INTEGER) =>
@@ -458,6 +461,9 @@ export function readSave(
     if (s.adUsage !== undefined && !validAdUsage(s.adUsage))
       return { save: base, status: newer ? 'newer' : 'unreadable' };
     base.adUsage = normalizeAdUsage(s.adUsage, base.spiritRoot);
+    if (s.suppliesReadyAt !== undefined && !validSuppliesReadyAt(s.suppliesReadyAt))
+      return { save: base, status: newer ? 'newer' : 'unreadable' };
+    base.suppliesReadyAt = s.suppliesReadyAt ?? 0;
     for (const key of ['stones', 'iron', 'cultivation', 'bestKills', 'runs'] as const)
       base[key] = int(s[key]);
     base.unlocked = int(s.unlocked, STAGES.length - 1);

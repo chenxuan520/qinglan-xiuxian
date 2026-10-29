@@ -1,3 +1,4 @@
+import { canClaimLifespanAd, claimSuppliesReward } from './ad-reward-limits.ts';
 import {
   isExtremeLife,
   minimumDifficulty,
@@ -805,7 +806,7 @@ function handleLifeLimit(shell: ActionShell, action: string): boolean {
     if (claim && !shell.adCompleted()) return true;
     const target = shell.game ?? shell.pendingRun;
     let years = 0;
-    if (claim) {
+    if (claim && canClaimLifespanAd(shell.save)) {
       const next = shell.structuredClone(shell.save);
       const restored = target ? shell.Game.restore(next, target.snapshot()) : null;
       if (target && !restored) {
@@ -1475,9 +1476,10 @@ function handleRewardAd(shell: ActionShell, action: string, id?: string): boolea
       if (!shell.attuneSpiritRoot(next, shell.adRoot, shell.adElements)) return true;
       next.adUsage.root++;
     } else {
-      next.stones += supplies.stones;
-      next.iron += supplies.iron;
-      next.adUsage.supplies++;
+      if (!claimSuppliesReward(next)) {
+        shell.closeRewardAd();
+        return true;
+      }
     }
     if (!savePreparation(shell, next)) return true;
     reportAdClaim(shell);

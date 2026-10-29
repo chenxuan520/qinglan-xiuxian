@@ -399,7 +399,7 @@ node --experimental-strip-types scripts/standalone-check.ts artifacts/standalone
 - **provider 接口**：`RewardAdProvider` 的 `prepare({ placement, signal })` 与 `play()` 仍共用完成和失败回调。`ads-platform-source.ts` 按需加载平台模块，`ads-platform.ts` 读取后台供给快照并选择自营或 Google；取消后的迟到配置和 SDK 回调无效。新增平台需实现接口并同步平台协议、后台选项与校验。
 - **占位 provider**：无投放、配置或网络失败时沿用 5 秒占位倒计时，奖励规则不变。
 - **AdSense provider（`src/ads-adsense.ts`）**：按后台发布商 ID 注入官方 H5 SDK，测试模式通过 `data-adbreak-test` 设置，四个 placement name 使用后台值。默认名称为 `qinglan-revive` / `qinglan-reward-root` / `qinglan-reward-supplies` / `qinglan-lifespan`。SDK `beforeAd` 后接管观看时钟，仅 `adViewed` 算看完；无库存、脚本被拦截和未完成观看均回退占位。真实 Google 投放需本人先完成官方站点审核及 H5 游戏广告资格确认；本地受控 SDK 测试不能作为真实库存或审核通过证据。
-- **奖励发放**：仍在游戏原有领取点执行（复活、灵根洗练、`adSupplies(save.unlocked)`、借寿），SDK 不改游戏数值；统计领取回调只在原保存及应用完成后执行。物资补给暂无每日次数限制。
+- **奖励发放**：仍在游戏原有领取点执行（复活、灵根洗练、`adSupplies(save.unlocked)`、借寿），SDK 不改游戏数值；统计领取回调只在原保存及应用完成后执行。物资补给不按现实日期限次；`ad-reward-limits.ts` 统一判断供奉与所有资源不足入口的冷却。领取按当前大境界确定 10/25/50/100/200/500/1000 年（大乘及真仙沿用 1000），成功写档才应用 `suppliesReadyAt = age + cooldown`，突破不重算。结构版本 35 新增 `suppliesReadyAt`，缺失默认 0，非法值拒绝读取/导入，同版导出往返保留到期年岁。借寿每世最多三次，沿用 `adUsage.lifespan`，旧计数不清零，取消、加载失败或拒写不消耗；新世由 freshSave 重置两项。无界面辅助策略同样遵守冷却与三次借寿，冷却停止记 `supplies-cooldown`，借寿用尽按 `expired` 结算；不改变裸开荒样本和验收阈值。
   `src/common-ui.ts` 收纳首页、洞府与战斗共用的纯展示片段，只按参数渲染 HTML，不读写全局游戏状态。新增同类片段时优先放这里，保持 `main.ts` 只做状态衔接与事件路由。
 
 ## 开发时保护正在运行的游戏

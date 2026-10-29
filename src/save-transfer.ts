@@ -1,3 +1,4 @@
+import { validSuppliesReadyAt } from './ad-rules.ts';
 import { validCurios } from './curio-data.ts';
 import { validMedicine } from './medicine-data.ts';
 import {
@@ -160,6 +161,7 @@ export function importSave(text: string) {
     (data.path !== undefined && !isCultivationPath(data.path)) ||
     (data.spiritRoot !== undefined && !SPIRIT_ROOTS.some((r) => r.id === data.spiritRoot)) ||
     (data.adUsage !== undefined && !validAdUsage(data.adUsage)) ||
+    (data.suppliesReadyAt !== undefined && !validSuppliesReadyAt(data.suppliesReadyAt)) ||
     (data.artifacts !== undefined && !artifactIds(data.artifacts)) ||
     (data.artifactDrops !== undefined && !artifactIds(data.artifactDrops)) ||
     (data.autoplayBuild !== undefined && !validAutoplayBuild(data.autoplayBuild)) ||

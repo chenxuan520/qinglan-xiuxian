@@ -1,3 +1,4 @@
+import { canClaimLifespanAd, claimSuppliesReward } from '../src/ad-reward-limits.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -65,6 +66,8 @@ function harness(kind: string, location = 'idle') {
     adSupplies,
     spiritRootInfo,
     extendLifespan,
+    canClaimLifespanAd,
+    claimSuppliesReward,
     lifespanInfo,
     tribulationDue,
     game: location === 'active' ? run : null,
@@ -175,6 +178,8 @@ for (const kind of ['root', 'supplies', 'revive', 'lifespan'])
         if (kind === 'supplies') {
           assert.equal(c.save.stones, adSupplies(c.save.unlocked).stones);
           assert.equal(c.save.iron, 30);
+          assert.equal(c.save.suppliesReadyAt, 30);
+          assert.equal(read.suppliesReadyAt, c.save.suppliesReadyAt);
         }
         if (kind === 'revive') {
           assert.equal(c.game.revivesUsed, 1);
@@ -198,3 +203,36 @@ for (const kind of ['root', 'supplies', 'revive', 'lifespan'])
       },
     );
   }
+
+for (const location of ['idle', 'pending', 'active']) {
+  test('借寿第三次成功保存、第四次旧事件不发放也不上报 / ' + location, () => {
+    const c = harness('lifespan', location);
+    c.save.adUsage.lifespan = 2;
+    c.watched = true;
+    c.blocked = false;
+    c.act();
+    assert.equal(c.save.adUsage.lifespan, 3);
+    assert.equal(c.save.lifespanBonus, 30);
+    assert.equal(c.writes, 1);
+    c.save.age = 130;
+    c.panel = 'lifespan-ad';
+    c.adClaimReport = () => c.reports++;
+    c.act();
+    assert.equal(c.save.lifespanBonus, 30);
+    assert.equal(c.save.adUsage.lifespan, 3);
+    assert.equal(c.writes, 1);
+    assert.equal(c.reports, 1);
+  });
+}
+test('补给观看完成后的旧事件也不能越过共享冷却', () => {
+  const c = harness('supplies');
+  c.watched = true;
+  c.blocked = false;
+  c.save.suppliesReadyAt = 21;
+  const before = JSON.stringify(c.save);
+  c.act();
+  assert.equal(JSON.stringify(c.save), before);
+  assert.equal(c.writes, 0);
+  assert.equal(c.reports, 0);
+  assert.equal(c.panel, '');
+});

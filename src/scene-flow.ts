@@ -1,3 +1,4 @@
+import { canClaimLifespanAd, lifespanAdsRemaining, suppliesCooldown } from './ad-reward-limits.ts';
 import { STANDALONE } from './build-mode.ts';
 import { isExtremeLife, difficultyAllowed, rewardDisabled } from './life-mode.ts';
 import { resourceFailureContent } from './resource-panel.ts';
@@ -751,8 +752,9 @@ export function showSuppliesShortage(shell: ActionShell, stones: number, iron: n
   ]
     .filter(Boolean)
     .join('、');
+  const cooldown = suppliesCooldown(shell.save);
   shell.panel = 'supplies-shortage';
-  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${shell.save.stones} 灵石、${shell.save.iron} 玄铁。<br>${isExtremeLife(shell.save) ? '极限模式不可领取补给，请通过历练或交易积累资粮。' : `可观看 ${shell.AD_SECONDS} 秒广告，领取 ${shell.adSupplies(shell.save.unlocked).stones} 灵石与 ${shell.adSupplies(shell.save.unlocked).iron} 玄铁。领取后返回原页面，再选择要进行的操作。`}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad" ${rewardDisabled(shell.save)}>看广告 · 领取物资</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
+  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="物资不足"><div class="eyebrow">修行资粮</div><h2>物资不足</h2><p>本次操作还缺 ${missing}。</p><p class="panel-note">当前持有 ${shell.save.stones} 灵石、${shell.save.iron} 玄铁。<br>${isExtremeLife(shell.save) ? '极限模式不可领取补给，请通过历练或交易积累资粮。' : !cooldown.available ? cooldown.hint : `可观看 ${shell.AD_SECONDS} 秒广告，领取 ${shell.adSupplies(shell.save.unlocked).stones} 灵石与 ${shell.adSupplies(shell.save.unlocked).iron} 玄铁。领取后需等待 ${cooldown.years} 个游戏年；返回原页面后再选择要进行的操作。`}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-supplies-ad" ${rewardDisabled(shell.save) || (!cooldown.available ? 'disabled' : '')}>${!isExtremeLife(shell.save) && !cooldown.available ? '机缘未至' : '看广告 · 领取物资'}</button><button class="secondary-button" data-action="cancel-supplies">暂不领取</button></div></section></div>`;
   shell.modal.querySelector<HTMLButtonElement>('[data-action="cancel-supplies"]')?.focus();
   return true;
 }
@@ -760,6 +762,7 @@ export function showSuppliesShortage(shell: ActionShell, stones: number, iron: n
 export function showRewardAd(shell: ActionShell, kind: 'root' | 'supplies') {
   if (isExtremeLife(shell.save)) return;
   if (shell.game || shell.rewardAd) return;
+  if (kind === 'supplies' && !suppliesCooldown(shell.save).available) return;
   if (shell.panel !== 'supplies-shortage') shell.rememberRewardReturn();
   shell.rewardAd = kind;
   shell.adRoot = 'heaven';
@@ -1085,10 +1088,10 @@ export function finishTribulation(shell: ActionShell) {
 }
 
 export function showLifespanAd(shell: ActionShell) {
-  if (isExtremeLife(shell.save)) return;
+  if (!canClaimLifespanAd(shell.save)) return;
   const life = shell.lifespanInfo(shell.save);
   if (!Number.isFinite(life.base) || life.remaining > 0 || shell.panel !== 'lifespan-ended') return;
   shell.panel = 'lifespan-ad';
-  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div>${shell.AD_PLACEHOLDER_HTML}<p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>再次寿尽时可再借，年数累加；突破后保留已借寿元。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>${shell.AD_SECONDS} 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
+  shell.modal.innerHTML = `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="借寿广告"><div class="eyebrow">向天再借五百年</div>${shell.AD_PLACEHOLDER_HTML}<p>本次增加 ${Math.round(life.base * 0.3)} 年寿元（基础寿命的 30%）。<br>本世剩余 ${lifespanAdsRemaining(shell.save)} 次。借寿年数累加，突破后保留。</p><div class="result-actions death-actions"><button class="primary-button" data-action="claim-lifespan" disabled>${shell.AD_SECONDS} 秒后借寿</button><button class="secondary-button" data-action="cancel-lifespan">暂不借寿</button></div></section></div>`;
   shell.startAdWatch('claim-lifespan', '领取寿元', 'lifespan');
 }
