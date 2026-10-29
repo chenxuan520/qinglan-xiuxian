@@ -92,7 +92,9 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
     return false;
   if (
     facts.ending !== 'tribulation' &&
-    /此身止于天劫|此世止于天劫|殒于天劫|天劫殒命|雷声为此世收笔|未能渡过此劫|随最后一道雷光(?:远去|而去)|落在了雷光里/.test(text)
+    /此身止于天劫|此世止于天劫|殒于天劫|天劫殒命|雷声为此世收笔|未能渡过此劫|随最后一道雷光(?:远去|而去)|落在了雷光里/.test(
+      text,
+    )
   )
     return false;
   if (

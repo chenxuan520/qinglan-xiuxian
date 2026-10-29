@@ -5,6 +5,7 @@ import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
 import { BattleHud } from './battle-hud.ts';
+import { DamageNumbersPreference } from './damage-numbers.ts';
 import { JourneyCardPanel } from './journey-card-panel.ts';
 import { PanelHost, type PanelLocation } from './panel-host.ts';
 import { lifeModeChoice } from './life-mode-ui.ts';
@@ -222,6 +223,12 @@ const modal = document.querySelector<HTMLDivElement>('#modal-root')!;
 const joystick = document.querySelector<HTMLDivElement>('#joystick')!;
 const toastElement = document.querySelector<HTMLDivElement>('#toast')!;
 const renderer = new Renderer(document.querySelector<HTMLCanvasElement>('#world')!);
+const damageNumbers = new DamageNumbersPreference(
+  () => localStorage,
+  (enabled) => {
+    renderer.showDamageNumbers = enabled;
+  },
+);
 const frameRate = new FrameRate();
 let sceneLoading = false;
 let storageAvailable = true;
@@ -1749,7 +1756,7 @@ function shellBindings(): ActionShell {
     set oldRealm(next) { oldRealm = next; },
     get openOfflinePanel() { return openOfflinePanel; },
     get panelHost() { return panelHost; },
-    get pausePanel() { return pausePanel; },
+    get pausePanel() { return (game: Game, save: SaveData, fps: number | undefined, abandon: boolean) => pausePanel(game, save, fps, abandon, damageNumbers.enabled); },
     get prepareAuction() { return marketEventSource.current!.prepareAuction; },
     get releaseTownScene() { return releaseTownScene; },
     get rememberRewardReturn() { return rememberRewardReturn; },
@@ -1763,7 +1770,7 @@ function shellBindings(): ActionShell {
     get rootPickerView() { return rootPickerView; },
     get sceneLoading() { return sceneLoading; },
     set sceneLoading(next) { sceneLoading = next; },
-    get settingsContent() { return settingsContent; },
+    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled); },
     get refreshAutoplaySettings() { return refreshAutoplaySettings; },
     get settlementModal() { return settlementModal; },
     get showAuction() { return showAuction; },
@@ -1796,6 +1803,18 @@ function handleAction(action: string, id?: string) {
       persist();
       renderPrologue();
     }
+    return;
+  }
+  if (action === 'damage-numbers' && (panel === 'settings' || game?.state === 'paused')) {
+    const button = modal.querySelector<HTMLButtonElement>('[data-action="damage-numbers"]');
+    if (!button) return;
+    if (!damageNumbers.toggle()) {
+      toast('显示设置尚未保存，请重试');
+      return;
+    }
+    button.setAttribute('aria-pressed', String(damageNumbers.enabled));
+    button.textContent = damageNumbers.enabled ? '关闭' : '开启';
+    canvasDirty = true;
     return;
   }
   if (

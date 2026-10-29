@@ -53,9 +53,15 @@ const LIFE_MODE_NOTES: Record<string, string> = {
 };
 export function guideContent(tab: string) {
   const note = LIFE_MODE_NOTES[tab] ? `<p class="panel-note">${LIFE_MODE_NOTES[tab]}</p>` : '';
+  const display = ['basics', 'combat'].includes(tab)
+    ? '<p class="panel-note">设置与暂停页可开关「伤害数字」；关闭后仍保留血条与伤害统计。</p>'
+    : '';
   return tab === 'basics'
-    ? guideDetail(tab) + `<h3 class="guide-subheading">普通与极限修行</h3>${note}` + guideFaq()
-    : note + guideDetail(tab);
+    ? guideDetail(tab) +
+        display +
+        `<h3 class="guide-subheading">普通与极限修行</h3>${note}` +
+        guideFaq()
+    : note + display + guideDetail(tab);
 }
 function guideDetail(tab: string) {
   if (tab === 'lore') return guideLoreContent();

@@ -41,6 +41,7 @@ export class Renderer {
   private terrainImages: HTMLImageElement[] = [];
   private tiles: CanvasPattern[] = [];
   needsRedraw = true;
+  showDamageNumbers = true;
   constructor(public canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     canvas.addEventListener('contextrestored', () => this.restore());
@@ -879,6 +880,7 @@ export class Renderer {
     }
     for (const e of game.effects) {
       if (e.kind === 'line') continue;
+      if (!this.showDamageNumbers && e.kind === 'text' && /^\d/.test(e.text ?? '')) continue;
       c.save();
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;

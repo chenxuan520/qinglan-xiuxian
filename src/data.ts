@@ -108,7 +108,7 @@ export const ELEMENTS = [
   { id: 'wood', name: '木', color: '#9fe2b1' },
   { id: 'water', name: '水', color: '#a9ddf3' },
   { id: 'fire', name: '火', color: '#f3a887' },
-  { id: 'earth', name: '土', color: '#d7bc94' },
+  { id: 'earth', name: '土', color: '#bf916b' },
 ] as const;
 export type ElementId = (typeof ELEMENTS)[number]['id'];
 export const elementInfo = (id: ElementId) => ELEMENTS.find((e) => e.id === id)!;

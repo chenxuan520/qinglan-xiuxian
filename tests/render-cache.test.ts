@@ -78,6 +78,7 @@ function environment() {
     gradients: 0,
     images: [] as number[][],
     fills: [] as { alpha: number; gradient: boolean }[],
+    texts: [] as { method: string; value: string }[],
     context() {
       const stack: { globalAlpha: number; fillStyle: unknown }[] = [];
       const values: Record<string, unknown> = { globalAlpha: 1, fillStyle: '' };
@@ -93,6 +94,8 @@ function environment() {
               stack.push({ globalAlpha: Number(target.globalAlpha), fillStyle: target.fillStyle });
             if (name === 'restore') Object.assign(target, stack.pop());
             if (name === 'drawImage') state.images.push(args.slice(1));
+            if (name === 'fillText' || name === 'strokeText')
+              state.texts.push({ method: name, value: args[0] });
             if (name === 'fillRect')
               state.fills.push({
                 alpha: Number(target.globalAlpha),
@@ -105,6 +108,47 @@ function environment() {
   };
   return state;
 }
+
+test('关闭伤害数字停止描边和文字绘制，奖励提示、血条绘制与战斗状态保持', () =>
+  fixture((r, f) => {
+    const game = new Game(freshSave(), 0, 0, () => 0.5);
+    game.weapons = [];
+    const enemy = (game as any).spawnEnemy(0);
+    enemy.hp = enemy.maxHp / 2;
+    const damage = ['12', '3.2万!', '1亿'];
+    game.effects = [...damage, '+气血', '+玄铁'].map((text) => ({
+      x: 0,
+      y: 0,
+      life: 1,
+      maxLife: 1,
+      radius: 0,
+      color: '#ffffff',
+      kind: 'text',
+      text,
+    }));
+    const before = game.snapshot();
+    const effects = structuredClone(game.effects);
+    game.random = () => {
+      throw new Error('显示偏好不得消耗战斗随机数');
+    };
+    r.showDamageNumbers = true;
+    r.drawGame(game, 0);
+    assert.equal(f.texts.filter((text) => damage.includes(text.value)).length, 6);
+    const visibleBars = structuredClone(f.fills);
+    f.texts.length = f.fills.length = 0;
+    r.showDamageNumbers = false;
+    r.drawGame(game, 0);
+    assert.equal(f.texts.filter((text) => damage.includes(text.value)).length, 0);
+    assert.equal(f.texts.filter((text) => ['+气血', '+玄铁'].includes(text.value)).length, 4);
+    assert.deepEqual(f.fills, visibleBars);
+    assert.deepEqual(game.snapshot(), before);
+    assert.deepEqual(game.effects, effects);
+    f.texts.length = 0;
+    r.showDamageNumbers = true;
+    r.drawGame(game, 0);
+    assert.equal(f.texts.filter((text) => damage.includes(text.value)).length, 6);
+    assert.deepEqual(game.snapshot(), before);
+  }));
 
 test('飞剑移动与旋转复用纹理，剑尾完整保留，颜色分别缓存且总量有界', () =>
   fixture((r, f) => {

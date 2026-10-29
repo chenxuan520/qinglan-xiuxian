@@ -1,4 +1,5 @@
 import { suppliesCooldown } from './ad-reward-limits.ts';
+import { damageNumbersControl } from './damage-numbers.ts';
 import { isExtremeLife, rewardDisabled } from './life-mode.ts';
 import {
   CULTIVATION_PATHS,
@@ -151,11 +152,12 @@ export function pausePanel(
   save: SaveData,
   fps: number | undefined,
   abandonConfirm: boolean,
+  showDamageNumbers = true,
 ): PanelParts {
   return [
     '静心片刻',
     '修行暂歇',
-    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · <span class="pause-kills">已斩 ${game.kills} 妖${fps === undefined ? '' : `<small class="pause-frame-rate" title="暂停前最近一秒的平均帧率">${fps} FPS</small>`}</span></p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}<span class="pause-weapon-name">${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重</span>${weaponAffinity(treasure(w.id), game.spiritRoot, game.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${isExtremeLife(save) ? '大道无情，生死有命。此战不可退离；未完战斗刷新或关闭页面将身陨。' : game.tribulation ? '放弃后此世落幕，可先留存此世，再确认轮回。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p><div class="pause-actions">${autoplayButton(save.autoplay)}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon" ${isExtremeLife(save) ? 'disabled title="极限历练不可主动结束"' : ''}>${game.tribulation ? '放弃渡劫' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
+    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · <span class="pause-kills">已斩 ${game.kills} 妖${fps === undefined ? '' : `<small class="pause-frame-rate" title="暂停前最近一秒的平均帧率">${fps} FPS</small>`}</span></p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}<span class="pause-weapon-name">${w.evolved ? treasure(w.id).evolution : treasure(w.id).name} · ${w.level}重</span>${weaponAffinity(treasure(w.id), game.spiritRoot, game.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${isExtremeLife(save) ? '大道无情，生死有命。此战不可退离；未完战斗刷新或关闭页面将身陨。' : game.tribulation ? '放弃后此世落幕，可先留存此世，再确认轮回。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p>${damageNumbersControl(showDamageNumbers)}<div class="pause-actions">${autoplayButton(save.autoplay)}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon" ${isExtremeLife(save) ? 'disabled title="极限历练不可主动结束"' : ''}>${game.tribulation ? '放弃渡劫' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
   ];
 }
 

@@ -1,6 +1,7 @@
 import { freshSave, settleRun, type SaveData } from './progress.ts';
 import { Game } from './game.ts';
 import { Renderer } from './render.ts';
+import { readDamageNumbers } from './damage-numbers.ts';
 import { BattleHud } from './battle-hud.ts';
 import type { MobileDisplay } from './mobile-display.ts';
 import { PanelHost, type PanelDefinition } from './panel-host.ts';
@@ -61,6 +62,7 @@ export function startInterfaceTour(
   const canvas = document.createElement('canvas');
   canvas.className = 'tour-canvas';
   const renderer = new Renderer(canvas);
+  renderer.showDamageNumbers = readDamageNumbers();
   let hud = new BattleHud(ui, sample, display);
   const host = new PanelHost(modal, ui);
   const overlay = document.createElement('div');
@@ -142,7 +144,11 @@ export function startInterfaceTour(
     ui.innerHTML = lobbyView(sample, 0, 0, false, display, null, true, true, innerWidth < 650);
     ui.scrollTop = 0;
     if (next === 'settings')
-      panel(next, { title: '设置', subtitle: '游戏选项', body: settingsContent(sample) });
+      panel(next, {
+        title: '设置',
+        subtitle: '游戏选项',
+        body: settingsContent(sample, renderer.showDamageNumbers),
+      });
     if (next === 'cultivation') panel(next, cultivationPanel(sample, 0));
     if (next === 'treasure')
       panel(

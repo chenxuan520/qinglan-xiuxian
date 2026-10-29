@@ -3,6 +3,7 @@ import { treasure, passive } from './data.ts';
 import { icon, smallIcon } from './icons.ts';
 import { computeManualInput, trapModalTab } from './input-controller.ts';
 import { Renderer } from './render.ts';
+import { readDamageNumbers } from './damage-numbers.ts';
 import { resourceFailureContent } from './resource-panel.ts';
 import { TreasureTrial, type TrialForm, type TrialFormation } from './treasure-trial.ts';
 import { destinationInput } from './walk-navigation.ts';
@@ -62,6 +63,7 @@ export function startTreasureTrial(
   root.prepend(style);
   const canvas = root.querySelector<HTMLCanvasElement>('canvas')!;
   const renderer = new Renderer(canvas);
+  renderer.showDamageNumbers = readDamageNumbers();
   const trial = new TreasureTrial(item.id);
   const message = root.querySelector<HTMLElement>('.treasure-trial-message')!;
   const pauseButton = root.querySelector<HTMLButtonElement>('[data-trial="pause"]')!;
