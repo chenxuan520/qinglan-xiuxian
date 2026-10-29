@@ -38,6 +38,16 @@ export { mountJourneyCardActions } from './journey-card-actions.ts';
 
 export const JOURNEY_CARD_QR = encode(JOURNEY_SHARE_URL, { ecc: 'M', border: 4 });
 export const JOURNEY_CARD_QR_COLORS = { light: '#e1d3a4', dark: '#102b28' } as const;
+const SCORE_COLORS: Record<ReturnType<typeof journeyScore>['grade'], string> = {
+  下品: '#a8b6ae',
+  中下品: '#b8d0c7',
+  中品: '#83c7b0',
+  中上品: '#69d6b0',
+  上品: '#d8c998',
+  极品: '#f2d37a',
+  仙品: '#d6c6f2',
+  帝品: '#f4ad6b',
+};
 export type { JourneyCardEnding } from './journey-appraisal.ts';
 const ROOT_SEALS: Record<SpiritRootId, string> = {
   heaven: '天',
@@ -570,17 +580,37 @@ export async function createJourneyCard(
     text(`${card.weapon.element}系 · 炼器 ${card.weapon.forge} 阶`, 728, 974, 28, '#bcc7af', 270);
     text(`此世灵威 ${formatNumber(card.power)}`, 728, 1014, 24, '#d8c998', 270);
     c.save();
-    c.textAlign = 'center';
-    text(
+    c.textAlign = 'left';
+    c.fillStyle = SCORE_COLORS[card.score.grade];
+    if (card.score.grade === '帝品') {
+      c.shadowColor = '#f4ad6b66';
+      c.shadowBlur = 6;
+    }
+    const scoreSuffix =
       card.ending === 'immortal' || card.progress.deepest === STAGES[FINAL_TRIAL_STAGE].name
-        ? `此世道果 ${card.score.total}（${card.score.grade}·${card.score.tier}）`
-        : `此世道果 ${card.score.total}（${card.score.grade}·${card.score.tier}） · ${card.progress.deepest ?? '尚未踏破秘境'}`,
-      540,
-      1092,
-      30,
-      '#d8c998',
-      880,
-    );
+        ? ''
+        : ` · ${card.progress.deepest ?? '尚未踏破秘境'}`;
+    const scoreParts = [
+      { value: '此世道果 ', weight: 600 },
+      { value: String(card.score.total), weight: 700 },
+      { value: `（${card.score.grade}·${card.score.tier}）${scoreSuffix}`, weight: 600 },
+    ];
+    let scoreSize = 30;
+    const scoreFont = (weight: number) =>
+      `${weight} ${scoreSize}px "Noto Serif SC", "Songti SC", "STSong", serif`;
+    const scoreWidth = () =>
+      scoreParts.reduce((width, part) => {
+        c.font = scoreFont(part.weight);
+        return width + c.measureText(part.value).width;
+      }, 0);
+    const fullScoreWidth = scoreWidth();
+    if (fullScoreWidth > 880) scoreSize *= 880 / fullScoreWidth;
+    let scoreX = 540 - scoreWidth() / 2;
+    for (const part of scoreParts) {
+      c.font = scoreFont(part.weight);
+      c.fillText(part.value, scoreX, 1092);
+      scoreX += c.measureText(part.value).width;
+    }
     c.restore();
     line(1100);
     text('此 世 留 痕', 80, 1142, 28, '#d8c998');
