@@ -182,12 +182,16 @@ Vite 的 `scripts/offline-build.ts` 为每次生产构建生成 `offline-manifes
 
 使用 `wrangler.jsonc` 与独立构建目录 `artifacts/cloudflare`，避免覆盖本机正在运行的 `dist`。Cloudflare 使用根路径 `/`，GitHub Pages 仍按仓库子路径构建。
 
+**自动发布（默认）**：推送 `master` 后，`.github/workflows/cloudflare.yml` 自动执行 `npm run deploy:cloudflare`，与 GitHub Pages 发布并行。令牌只存放在仓库 Settings → Secrets and variables → Actions 的 `CLOUDFLARE_API_TOKEN`（Cloudflare 的 Account → Cloudflare Pages → Edit 权限，或「Edit Cloudflare Workers」模板），账号 ID 写在工作流里。未配置 Secret 时工作流跳过而不报错；令牌失效时部署步骤失败，到上述页面更新即可。需要重发时在 Actions 页手动 Run workflow，或执行 `gh workflow run cloudflare.yml --ref master`。
+
+**本机手动发布（备用）**：
+
 ```bash
-npx wrangler login
+npx wrangler login   # 或设置环境变量 CLOUDFLARE_API_TOKEN
 npm run deploy:cloudflare
 ```
 
-首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。仓库 Secret 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）后，`.github/workflows/cloudflare.yml` 在推送 master 时自动执行同一条 `npm run deploy:cloudflare`，与 GitHub Pages 部署并行；未配置该 Secret 时该工作流跳过，仍可在本机用上述命令手动发布。
+首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。不在仓库、日志或文档中保存令牌。
 
 帮助短片由随指南按需载入的 `guide-film.ts` 自定义元素承接，不打开新标签。未展开时 `<video>` 无 `src` 且 `preload="none"`，点击才设置官网地址并播放；原生控件支持暂停、拖动和全屏。收起及元素卸载都暂停、移除地址并释放媒体，覆盖关闭帮助、切分类和重绘；播放失败只在播放器旁提供重试。单机版不注册或显示此联网入口。
 

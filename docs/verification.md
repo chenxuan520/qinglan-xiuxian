@@ -3185,3 +3185,8 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 
 - 基线 `ad66a27`。用户逐条确认后改四句题诗（原句→新句）：三道皆证「玄魔两忘，过山片尘不染。」→「三途行遍，过山片尘不染。」；丹成造化「丹成九转，偷得岁月宽平。」→「丹成九转，偷得百岁春秋。」；百炼归真「千回吐纳，铅华散尽见真我。」→「千回吐纳，铅华散尽始归真。」；生死证道「孤锋一命，斩尽七境方回头。」→「孤锋一命，斩尽七境不回头。」。其余十一句与长短参差的句式按用户意见保留。
 - 题诗在首个全角逗号处分为上下两行（`verseLines`），每行块级显示并 `text-wrap: balance`，消除两列卡片里单字掉行。390px 宽实测 15 句均不换行、无溢出；320px 宽四句八字下半句平衡折为两行、无溢出。测试改为断言两行结构。类型检查通过，完整单测 **1858/1858**。无存档、数值或流程改动。
+
+### 2026-10-29 Cloudflare 主站改为 CI 自动发布
+
+- 新增 `.github/workflows/cloudflare.yml`：push `master` 或手动触发时执行 `npm run deploy:cloudflare`，令牌取自仓库 Secret `CLOUDFLARE_API_TOKEN`，未配置时跳过。独立审查子 agent 结论 PASS。
+- 用户配置 Secret 后手动触发运行 40885066560：检出、安装、构建、视频恢复与上传全部 success。随后核验官网 `https://xiuxian.011203.xyz/` 已含提交 ee96868 的新题诗「三途行遍」，`/media/qinglan-promo-30s.mp4` 返回 200、6,137,116 字节。开发文档与发布规则按用户要求改为以自动发布为默认、本机命令为备用。
