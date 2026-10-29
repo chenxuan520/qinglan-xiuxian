@@ -322,13 +322,19 @@
   background: #cbd09c18;
 }
 @media (max-width: 600px) {
-  .auction-halls small:last-child {
-    min-height: 3.2em;
+  .auction-halls {
+    grid-template-columns: 1fr;
   }
-}
-@media (max-width: 360px) {
+  .auction-halls button {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    text-align: left;
+  }
   .auction-halls small:last-child {
-    min-height: 6.4em;
+    flex-basis: 100%;
+    min-height: 0;
   }
 }
 .auction-iron {

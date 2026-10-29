@@ -443,7 +443,22 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 15px;
 }
+.section-heading.cultivation-training-heading {
+  flex-wrap: wrap;
+}
+.cultivation-training-heading > h3 {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.cultivation-training-heading .header-right {
+  margin-left: auto;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .training-card {
+  display: flex;
+  flex-direction: column;
   padding: 24px;
   border: 1px solid var(--border);
   background: #0f2c2630;
@@ -466,6 +481,7 @@
   margin-top: 10px;
 }
 .training-card > strong {
+  flex: 1;
   display: block;
   font-size: 12px;
   color: #d5d5ae;
@@ -473,9 +489,15 @@
   margin-top: 17px;
 }
 .training-card button {
+  flex-wrap: wrap;
+  gap: 2px 0.35em;
   margin-top: 22px;
   width: 100%;
   font-size: 12px;
+}
+.training-card button > span {
+  display: inline-block;
+  white-space: nowrap;
 }
 .bestiary-grid {
   display: grid;

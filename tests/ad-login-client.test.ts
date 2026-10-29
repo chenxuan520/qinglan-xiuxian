@@ -3,18 +3,26 @@ import assert from 'node:assert/strict';
 import { runInNewContext } from 'node:vm';
 import { LOGIN_SCRIPT } from '../workers/house-ads/admin.ts';
 
-function client(t: any, width = 390) {
+function client(t: any, width = 390, observeResize = true) {
+  let availableWidth = width < 700 ? width - 74 : 366;
+  let resized: (() => void) | undefined;
   const button: any = { disabled: true },
     retry: any = { hidden: true, disabled: false };
   const status: any = { textContent: '', dataset: {} },
-    container = { dataset: { sitekey: '0x4SyntheticTestSiteKey' } };
+    container = {
+      dataset: { sitekey: '0x4SyntheticTestSiteKey' },
+      getBoundingClientRect: () => ({ width: availableWidth }),
+      replaceChildren() {},
+    };
   const form: any = {
     elements: { username: { value: 'synthetic-user' }, password: { value: 'synthetic-password' } },
     querySelector: () => button,
   };
   let widget: any,
     resets = 0,
-    fetches = 0;
+    fetches = 0,
+    renders = 0,
+    removals = 0;
   const scripts: any[] = [],
     requests: any[] = [],
     redirects: string[] = [],
@@ -23,6 +31,7 @@ function client(t: any, width = 390) {
     Response.json({ message: '账号或密码不正确。' }, { status: 401 });
   const sdk = {
     render(_node: any, opts: any) {
+      renders++;
       widget = opts;
       return 'fixture-widget';
     },
@@ -30,8 +39,17 @@ function client(t: any, width = 390) {
       assert.equal(id, 'fixture-widget');
       resets++;
     },
+    remove(id: string) {
+      assert.equal(id, 'fixture-widget');
+      removals++;
+    },
   };
-  const window: any = {};
+  const window: any = {
+    addEventListener(name: string, fn: () => void) {
+      assert.equal(name, 'resize');
+      resized = fn;
+    },
+  };
   const elements: any = {
     'login-form': form,
     status,
@@ -46,6 +64,16 @@ function client(t: any, width = 390) {
       head: { append: (script: any) => scripts.push(script) },
     },
     innerWidth: width,
+    ResizeObserver: observeResize
+      ? class {
+          constructor(fn: () => void) {
+            resized = fn;
+          }
+          observe(node: unknown) {
+            assert.equal(node, container);
+          }
+        }
+      : undefined,
     AbortController,
     JSON,
     Error,
@@ -81,6 +109,12 @@ function client(t: any, width = 390) {
     widget: () => widget,
     resets: () => resets,
     fetches: () => fetches,
+    renders: () => renders,
+    removals: () => removals,
+    resize(nextWidth: number) {
+      availableWidth = nextWidth;
+      resized!();
+    },
     reply(fn: typeof reply) {
       reply = fn;
     },
@@ -182,4 +216,59 @@ test('脚本失败能重试，旧脚本迟到回调不覆盖新加载状态', as
   old.onerror();
   assert.equal(c.button.disabled, false);
   assert.equal(c.status.textContent, '');
+});
+
+test('验证码按表单实际宽度选择尺寸，缩放只在跨过300px时重建且保留输入', (t) => {
+  for (const observer of [true, false]) {
+    const c = client(t, 844, observer);
+    c.ready();
+    assert.equal(c.widget().size, 'flexible');
+    const old = c.widget();
+    old.callback('synthetic-proof');
+    c.resize(286);
+    assert.equal(c.widget().size, 'compact');
+    assert.equal(c.button.disabled, true);
+    assert.equal(c.removals(), 1);
+    assert.equal(c.form.elements.username.value, 'synthetic-user');
+    assert.equal(c.form.elements.password.value, 'synthetic-password');
+    old.callback('late-removed-proof');
+    assert.equal(c.button.disabled, true);
+    c.widget().callback('new-proof');
+    for (const event of ['error-callback', 'expired-callback', 'timeout-callback']) old[event]();
+    assert.equal(c.button.disabled, false);
+    const renders = c.renders();
+    c.resize(299);
+    assert.equal(c.renders(), renders);
+    assert.equal(c.button.disabled, false);
+    c.resize(300);
+    assert.equal(c.widget().size, 'flexible');
+    assert.equal(c.button.disabled, true);
+    assert.equal(c.removals(), 2);
+    assert.equal(c.fetches(), 0);
+  }
+  const narrowForm = client(t, 360);
+  narrowForm.ready();
+  assert.equal(narrowForm.widget().size, 'compact');
+});
+
+test('登录请求中旋转仍适配组件，不重发请求，返回失败后须重新验证', async (t) => {
+  const c = client(t, 844);
+  c.ready();
+  let finish!: (r: Response) => void;
+  c.reply(async () => new Promise((r) => (finish = r)));
+  c.widget().callback('synthetic-proof');
+  const pending = c.submit();
+  c.resize(246);
+  assert.equal(c.widget().size, 'compact');
+  c.widget().callback('ignored-while-busy');
+  await c.submit();
+  assert.equal(c.fetches(), 1);
+  assert.equal(c.button.disabled, true);
+  finish(Response.json({ message: '账号或密码不正确。' }, { status: 401 }));
+  await pending;
+  assert.equal(c.form.elements.password.value, 'synthetic-password');
+  assert.equal(c.button.disabled, true);
+  c.widget().callback('fresh-after-failure');
+  assert.equal(c.button.disabled, false);
+  assert.deepEqual(c.redirects, []);
 });

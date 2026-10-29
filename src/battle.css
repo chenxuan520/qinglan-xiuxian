@@ -169,6 +169,8 @@
 }
 .battle-notice {
   position: absolute;
+  width: max-content;
+  max-width: calc(100% - 20px);
   top: max(24%, calc(var(--battle-info-bottom, 0px) + 10px));
   left: 50%;
   transform: translateX(-50%);

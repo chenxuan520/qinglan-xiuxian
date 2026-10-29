@@ -13,7 +13,7 @@ import { lobbyView } from '../src/lobby-ui.ts';
 import { settingsContent } from '../src/settings-ui.ts';
 import { mortalTabContent } from '../src/mortal-ui.ts';
 import { SECTS, MAX_MASTERY } from '../src/mortal-data.ts';
-import { joinSect, studyPlan } from '../src/mortal.ts';
+import { advanceMortal, joinSect, sectDues, studyPlan } from '../src/mortal.ts';
 import { cultivationPanel } from '../src/cultivation-ui.ts';
 
 const source = [
@@ -283,4 +283,74 @@ test('仙门先列三项所得，报价对照实际研习，满阶不展示不�
   const full = mortalTabContent(save, 'sects', 'all');
   assert.doesNotMatch(full, /class="sect-study-quote"/);
   assert.match(full, /本门精研已满/);
+});
+
+function mainSectDues(save: ReturnType<typeof freshSave>) {
+  const html = mortalTabContent(save, 'sects', 'all');
+  const costs = html.slice(
+    html.indexOf('class="mortal-study sect-costs"'),
+    html.indexOf('data-disclosure="sect-study-rules"'),
+  );
+  const summary = costs.match(/data-sect-dues>([^]*?)<\/p>/)?.[1];
+  assert.ok(summary, '供奉须在主卡花费区可见，不能仅依赖页首或底部规则');
+  return summary
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+test('入宗前主卡明示当前境界供奉，真仙只显示免供奉，不改存档', () => {
+  for (const step of [0, 3, 6, 9, 12, 15, 18, 21, 24]) {
+    const save = freshSave();
+    save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    if (step === 24) save.completed = [6];
+    const before = structuredClone(save);
+    const dues = sectDues(save);
+    const text = mainSectDues(save);
+    assert.ok(text.includes('城镇游历与办事计入账期；秘境、闭关不计。'));
+    if (dues.stones) {
+      assert.ok(text.includes(`每 ${dues.years} 人间年缴 ${dues.stones} 灵石`));
+      assert.doesNotMatch(text, /本期|下期|已到期/);
+    } else {
+      assert.match(text, /真仙免供奉/);
+      assert.doesNotMatch(text, /每 .*人间年缴|本期|下期/);
+    }
+    assert.deepEqual(save, before);
+  }
+});
+
+test('主卡区分本期原账单和突破借寿后的下期标准，满阶仍展示供奉', () => {
+  const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  save.stones = 1000;
+  assert.equal(joinSect(save, SECTS[0].id), true);
+  advanceMortal(save, 120);
+  save.cultivation = realmCost(0) + realmCost(1) + realmCost(2);
+  save.lifespanBonus = 30;
+  save.mortal.mastery[SECTS[0].id] = MAX_MASTERY;
+  const before = structuredClone(save);
+  const text = mainSectDues(save);
+  assert.match(text, /本期 50 灵石 · 18\.0 人间年后到期/);
+  assert.match(text, /下期：每 56 人间年缴 100 灵石/);
+  const full = mortalTabContent(save, 'sects', 'all');
+  assert.doesNotMatch(
+    full.slice(
+      full.indexOf('class="mortal-study sect-costs"'),
+      full.indexOf('data-disclosure="sect-study-rules"'),
+    ),
+    /精研费用/,
+  );
+  assert.deepEqual(save, before);
+
+  save.mortal.years = save.mortal.member!.dueAt - 0.01;
+  assert.match(mainSectDues(save), /不足 0\.1 人间年后到期/);
+  save.mortal.years = save.mortal.member!.dueAt;
+  assert.match(mainSectDues(save), /本期 50 灵石 · 已到期/);
+
+  save.cultivation = Array.from({ length: 24 }, (_, i) => realmCost(i)).reduce((a, b) => a + b, 0);
+  save.completed = [6];
+  assert.match(mainSectDues(save), /真仙免供奉/);
+  assert.doesNotMatch(mainSectDues(save), /本期 50|已到期|下期/);
 });
