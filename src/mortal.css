@@ -1012,6 +1012,10 @@
 .sect-costs p {
   margin: 8px 0 0;
 }
+.sect-benefits [data-action='sect-service-open'] {
+  margin-top: 12px;
+  max-width: 100%;
+}
 .sect-study-quote {
   display: flex;
   align-items: baseline;
@@ -1068,6 +1072,11 @@
 }
 .mortal-study small {
   line-height: 1.8;
+}
+.sect-leave-effects {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 .secondary-button.mortal-leave {
   color: #e6b3a8;

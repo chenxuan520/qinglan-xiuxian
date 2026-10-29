@@ -14,6 +14,7 @@ import { settingsContent } from '../src/settings-ui.ts';
 import { mortalTabContent } from '../src/mortal-ui.ts';
 import { SECTS, MAX_MASTERY } from '../src/mortal-data.ts';
 import { advanceMortal, joinSect, sectDues, studyPlan } from '../src/mortal.ts';
+import { SECT_SPECIALTIES } from '../src/sect-service-data.ts';
 import { cultivationPanel } from '../src/cultivation-ui.ts';
 
 const source = [
@@ -263,7 +264,7 @@ test('境界题句保留原字句，八字短句单列、较长凡人题句按�
   }
 });
 
-test('仙门先列三项所得，报价对照实际研习，满阶不展示不存在的下一阶价格', () => {
+test('仙门先列四项所得，报价对照实际研习，满阶不展示不存在的下一阶价格', () => {
   const save = freshSave();
   save.stones = 100000;
   joinSect(save, SECTS[0].id);
@@ -353,4 +354,35 @@ test('主卡区分本期原账单和突破借寿后的下期标准，满阶仍�
   save.completed = [6];
   assert.match(mainSectDues(save), /真仙免供奉/);
   assert.doesNotMatch(mainSectDues(save), /本期 50|已到期|下期/);
+});
+
+test('各宗专长作为第四项福利，入口位于福利内且费用区不再重复；未入宗只给说明', () => {
+  for (const sect of SECTS) {
+    const save = freshSave();
+    save.stones = 1000;
+    assert.equal(joinSect(save, sect.id), true);
+    const before = structuredClone(save);
+    const html = mortalTabContent(save, 'sects', 'all');
+    const benefits = html.slice(
+      html.indexOf('class="sect-benefits"'),
+      html.indexOf('class="mortal-study sect-costs"'),
+    );
+    assert.deepEqual(
+      [...benefits.matchAll(/data-sect-benefit="([^"]+)"/g)].map((m) => m[1]),
+      ['manual', 'medicine', 'mastery', 'specialty'],
+    );
+    const fourth = benefits.slice(benefits.indexOf('data-sect-benefit="specialty"'));
+    assert.match(fourth, /<b>四<\/b>/);
+    assert.ok(fourth.includes(SECT_SPECIALTIES[sect.id].text));
+    assert.ok(fourth.includes('本门专长 · ' + SECT_SPECIALTIES[sect.id].title));
+    assert.equal((html.match(/data-action="sect-service-open"/g) ?? []).length, 1);
+    assert.doesNotMatch(
+      html.slice(html.indexOf('class="mortal-study sect-costs"')),
+      /data-action="sect-service-open"/,
+    );
+    assert.deepEqual(save, before);
+  }
+  const html = mortalTabContent(freshSave(), 'sects', 'all');
+  assert.match(html, /data-sect-benefit="specialty"/);
+  assert.doesNotMatch(html, /data-action="sect-service-open"|data-action="mortal-leave"/);
 });

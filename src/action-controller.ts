@@ -23,6 +23,7 @@ import type {
 } from './data.ts';
 import { changeAutoplayBuild } from './autoplay-build.ts';
 import { sectEntryMedicinePool } from './mortal.ts';
+import { SECTS } from './mortal-data.ts';
 import type { ironMarketContent } from './iron-market-ui.ts';
 import type { MedicinePanel } from './medicine-panel.ts';
 import type { catalogPanel, forgeTreasure } from './catalog-ui.ts';
@@ -1222,14 +1223,37 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
     return true;
   }
   if (action === 'mortal-buy' || action === 'mortal-sell') return true;
+  if (action === 'mortal-leave') {
+    const member = shell.save.mortal.member;
+    if (!shell.inMortalWorld || shell.game || shell.panel || shell.saveLock || !member) return true;
+    shell.panel = 'sect-leave-confirm';
+    shell.panelFrame(
+      '退出宗门？',
+      SECTS.find((sect) => sect.id === member.id)!.name,
+      `<div class="sect-leave-effects"><p>精研等级保留，加成暂停。</p><p>下次历练不再自带本门功法。</p><p>重新入宗仍需支付入门礼。</p>${shell.save.mortal.activity?.kind === 'study' ? '<p>当前未完成的研习将中止，已付灵石不退。</p>' : ''}</div><div class="result-actions"><button class="primary-button" data-action="close">留在本门</button><button class="secondary-button mortal-leave" data-action="mortal-leave-confirm" data-id="${member.id}">确认退出宗门</button></div>`,
+    );
+    shell.modal.querySelector<HTMLButtonElement>('.result-actions [data-action="close"]')?.focus();
+    return true;
+  }
+  const confirmingLeave =
+    action === 'mortal-leave-confirm' &&
+    !shell.saveLock &&
+    shell.panel === 'sect-leave-confirm' &&
+    !!shell.save.mortal.member &&
+    id === shell.save.mortal.member.id &&
+    shell.modal.querySelector<HTMLButtonElement>('[data-action="mortal-leave-confirm"]')?.dataset
+      .id === id;
+  if (action === 'mortal-leave-confirm' && !confirmingLeave) return true;
   if (
     action.startsWith('mortal-') &&
     shell.inMortalWorld &&
     !shell.game &&
     (!shell.panel ||
       shell.panel === 'town-event' ||
+      confirmingLeave ||
       (shell.panel === 'tea-story' && action === 'mortal-activity' && id === 'tea'))
   ) {
+    if (confirmingLeave) action = 'mortal-leave';
     if (
       shell.panel === 'tea-story' &&
       shell.modal.querySelector<HTMLButtonElement>('.tea-story-next')?.disabled !== false
@@ -1300,7 +1324,7 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
         }
         Object.assign(shell.save, next);
         const fromTown = shell.panel === 'town-event' || shell.panel === 'tea-story';
-        if (fromTown) {
+        if (fromTown || confirmingLeave) {
           shell.closeNpcChat();
           shell.panel = '';
           shell.modal.innerHTML = '';
@@ -1672,6 +1696,7 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
     }
     shell.closeNpcChat();
     const wasHumanMemory = shell.panel === 'human-memory' || shell.panel === 'sect-service';
+    const wasSectLeave = shell.panel === 'sect-leave-confirm';
     const returnToAbout = shell.panel === 'about';
     const returnToSettings = shell.panel === 'settings';
     if (shell.game?.state === 'lost' && !shell.settled) return true;
@@ -1695,6 +1720,10 @@ function handlePanels(shell: ActionShell, action: string, id?: string): boolean 
       if (shell.inMarket)
         shell.document.getElementById('sect-market-view')?.focus({ preventScroll: true });
       if (wasHumanMemory && shell.inMortalWorld && !shell.inTown) shell.renderMortal();
+      if (wasSectLeave)
+        shell.ui.querySelector<HTMLButtonElement>('[data-action="mortal-leave"]')?.focus({
+          preventScroll: true,
+        });
       if (returnToAbout)
         shell.ui.querySelector<HTMLButtonElement>('[data-action="about"]')?.focus({
           preventScroll: true,

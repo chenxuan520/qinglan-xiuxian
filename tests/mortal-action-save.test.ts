@@ -38,7 +38,22 @@ function harness(panel = 'town-event') {
     syncHumanStories,
     tribulationDue,
     lifespanInfo,
-    modal: { innerHTML: 'original dialog', querySelector: () => ({ disabled: false }) },
+    modal: {
+      innerHTML: panel ? 'original dialog' : '',
+      querySelector(selector: string) {
+        if (selector === '[data-action="mortal-leave-confirm"]') {
+          const id = shell.modal.innerHTML.match(
+            /data-action="mortal-leave-confirm" data-id="([^"]+)"/,
+          )?.[1];
+          return id ? { dataset: { id } } : null;
+        }
+        return { disabled: false, focus() {} };
+      },
+    },
+    ui: { querySelector: () => ({ focus() {} }) },
+    panelFrame(_title: string, _subtitle: string, body: string) {
+      shell.modal.innerHTML = body;
+    },
     medicinePanel: { handle: () => false },
     closeNpcChat: () => effects.push('close-chat'),
     renderMortal: () => effects.push('render'),
@@ -64,21 +79,30 @@ function harness(panel = 'town-event') {
 
 for (const kind of [...Object.keys(TOWN_JOBS), 'study', 'leave']) {
   test(`人间${kind}保存失败不结算、不关弹窗；恢复后仅一次入账且能读回`, () => {
-    const { shell, effects, toasts, stored, allow } = harness();
+    const { shell, effects, toasts, stored, allow } = harness(kind === 'leave' ? '' : 'town-event');
     const before = structuredClone(shell.save);
     const raw = stored();
-    const action = kind === 'leave' ? 'mortal-leave' : 'mortal-activity';
-    for (let i = 0; i < 2; i++) {
-      dispatchAction(shell, action, kind);
+    if (kind === 'leave') {
+      dispatchAction(shell, 'mortal-leave');
       assert.deepEqual(shell.save, before);
       assert.equal(stored(), raw);
-      assert.equal(shell.panel, 'town-event');
-      assert.equal(shell.modal.innerHTML, 'original dialog');
+      assert.deepEqual(effects, []);
+    }
+    const originalPanel = shell.panel;
+    const originalDialog = shell.modal.innerHTML;
+    const action = kind === 'leave' ? 'mortal-leave-confirm' : 'mortal-activity';
+    const id = kind === 'leave' ? before.mortal.member!.id : kind;
+    for (let i = 0; i < 2; i++) {
+      dispatchAction(shell, action, id);
+      assert.deepEqual(shell.save, before);
+      assert.equal(stored(), raw);
+      assert.equal(shell.panel, originalPanel);
+      assert.equal(shell.modal.innerHTML, originalDialog);
       assert.deepEqual(effects, []);
       assert.match(toasts.at(-1)!, /尚未保存/);
     }
     allow();
-    dispatchAction(shell, action, kind);
+    dispatchAction(shell, action, id);
     assert.equal(effects[0], 'write');
     assert.equal(effects.filter((e) => e === 'write').length, 1);
     assert.equal(shell.panel, '');
@@ -161,4 +185,79 @@ test('委托跨故人离世时，旧信、年表与奖励在同一次成功写�
   assert.deepEqual(JSON.parse(stored()), shell.save);
   assert.equal(syncHumanStories(shell.save), false);
   assert.deepEqual(readSave(stored()).save, shell.save);
+});
+
+test('退宗首点和重复首点只显示确认，取消不改身份、研习或存档，旧确认不能生效', () => {
+  const h = harness('');
+  const { shell, effects, stored, allow } = h;
+  shell.save.mortal.mastery.haste = 3;
+  shell.save.mortal.activity = { kind: 'study', sect: 'haste', remaining: 1, total: 1 };
+  const before = structuredClone(shell.save),
+    raw = stored();
+  for (let i = 0; i < 2; i++) dispatchAction(shell, 'mortal-leave');
+  assert.equal(shell.panel, 'sect-leave-confirm');
+  assert.match(shell.modal.innerHTML, /精研等级保留，加成暂停/);
+  assert.match(shell.modal.innerHTML, /重新入宗仍需支付入门礼/);
+  assert.match(shell.modal.innerHTML, /未完成的研习将中止，已付灵石不退/);
+  assert.deepEqual(shell.save, before);
+  assert.equal(stored(), raw);
+  assert.deepEqual(effects, []);
+  dispatchAction(shell, 'close');
+  assert.equal(shell.panel, '');
+  assert.equal(shell.modal.innerHTML, '');
+  assert.deepEqual(shell.save, before);
+  assert.equal(stored(), raw);
+  allow();
+  dispatchAction(shell, 'mortal-leave-confirm', 'haste');
+  assert.deepEqual(shell.save, before);
+  assert.equal(effects.includes('write'), false);
+});
+
+test('退宗确认绑定当前宗门与面板，成功后保留精研并中止待结研习，重复确认不再写入', () => {
+  const { shell, effects, stored, allow } = harness('');
+  shell.save.mortal.mastery.haste = 3;
+  shell.save.mortal.activity = { kind: 'study', sect: 'haste', remaining: 1, total: 1 };
+  const before = structuredClone(shell.save);
+  dispatchAction(shell, 'mortal-leave');
+  allow();
+  dispatchAction(shell, 'mortal-leave-confirm', 'power');
+  assert.deepEqual(shell.save, before);
+  assert.deepEqual(effects, []);
+  shell.save.mortal.member.id = 'power';
+  dispatchAction(shell, 'mortal-leave-confirm', 'haste');
+  assert.deepEqual(effects, []);
+  shell.save.mortal.member.id = 'haste';
+  dispatchAction(shell, 'mortal-leave-confirm', 'haste');
+  assert.equal(shell.save.mortal.member, null);
+  assert.equal(shell.save.mortal.mastery.haste, 3);
+  assert.equal(shell.save.mortal.activity, null);
+  assert.equal(shell.save.stones, before.stones);
+  assert.equal(shell.save.age, before.age);
+  assert.equal(shell.save.path, before.path);
+  assert.deepEqual(readSave(stored()).save, shell.save);
+  dispatchAction(shell, 'mortal-leave-confirm', 'haste');
+  assert.equal(effects.filter((e) => e === 'write').length, 1);
+});
+
+test('无宗门、其他弹窗、非人间页面和锁档时不能打开或确认退宗', () => {
+  for (const kind of ['none', 'panel', 'outside', 'locked']) {
+    const { shell, effects, stored, allow } = harness('');
+    allow();
+    if (kind === 'none') shell.save.mortal.member = null;
+    if (kind === 'panel') shell.panel = 'settings';
+    if (kind === 'outside') shell.inMortalWorld = false;
+    if (kind === 'locked') {
+      shell.saveLock = 'stale';
+      shell.renderSaveLocked = () => {};
+    }
+    const before = structuredClone(shell.save),
+      panel = shell.panel,
+      raw = stored();
+    dispatchAction(shell, 'mortal-leave');
+    dispatchAction(shell, 'mortal-leave-confirm', 'haste');
+    assert.deepEqual(shell.save, before);
+    assert.equal(shell.panel, panel);
+    assert.equal(stored(), raw);
+    assert.deepEqual(effects, []);
+  }
 });
