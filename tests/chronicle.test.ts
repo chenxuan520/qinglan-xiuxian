@@ -38,7 +38,13 @@ test('十五项成就各有独立印记，亮灭对应真实达成状态且保�
       const card = cards[i][1];
       assert.ok(card.includes(`data-achievement-icon="${a.id}" data-achieved="${a.achieved}"`));
       assert.ok(card.includes(`<span>${a.title}</span>`));
-      assert.ok(card.includes(a.verse));
+      const cut = a.verse.indexOf('，') + 1;
+      assert.ok(cut > 0, `${a.id} 题诗以逗号分成上下两行`);
+      assert.ok(
+        card.includes(
+          `<p class="achievement-verse"><span>${a.verse.slice(0, cut)}</span><span>${a.verse.slice(cut)}</span></p>`,
+        ),
+      );
       assert.ok(card.includes(a.detail));
       assert.ok(card.includes(a.achieved ? '15 岁' : '尚未达成'));
       assert.match(card, /aria-hidden="true" focusable="false"/);

@@ -38,14 +38,14 @@ export function chronicleAchievements(save: SaveData) {
       difficulty: 70,
       title: '三道皆证',
       detail: '同一世以正道、魔道、兼修各通关一次',
-      verse: '玄魔两忘，过山片尘不染。',
+      verse: '三途行遍，过山片尘不染。',
     },
     {
       id: 'permanent-medicine',
       difficulty: 30,
       title: '丹成造化',
       detail: '首次服用本世珍品丹药',
-      verse: '丹成九转，偷得岁月宽平。',
+      verse: '丹成九转，偷得百岁春秋。',
     },
     {
       id: 'story',
@@ -66,7 +66,7 @@ export function chronicleAchievements(save: SaveData) {
       difficulty: 80,
       title: '百炼归真',
       detail: '单局达到一百级',
-      verse: '千回吐纳，铅华散尽见真我。',
+      verse: '千回吐纳，铅华散尽始归真。',
     },
     {
       id: 'mastery',
@@ -128,7 +128,7 @@ export function chronicleAchievements(save: SaveData) {
       id: 'one-life-clear',
       title: '生死证道',
       detail: '以极限模式一命踏破七境，成就真仙',
-      verse: '孤锋一命，斩尽七境方回头。',
+      verse: '孤锋一命，斩尽七境不回头。',
       difficulty: 130,
     },
   ];

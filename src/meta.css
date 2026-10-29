@@ -463,7 +463,11 @@
   margin: 0;
   color: #8c9f8e;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+.chronicle-achievements .achievement-verse span {
+  display: block;
+  text-wrap: balance;
 }
 .chronicle-achievements .achieved {
   border-color: #c2b97888;
