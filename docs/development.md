@@ -187,7 +187,7 @@ npx wrangler login
 npm run deploy:cloudflare
 ```
 
-首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。Cloudflare 通过上述命令发布，GitHub Pages 仍在推送 master 后自动发布。
+首次创建项目时执行 `npx wrangler pages project create qinglan-xiuxian --production-branch master --force`。部署使用当前登录账号，不在仓库保存令牌。仓库 Secret 配置 `CLOUDFLARE_API_TOKEN`（仅 Pages 编辑权限）后，`.github/workflows/cloudflare.yml` 在推送 master 时自动执行同一条 `npm run deploy:cloudflare`，与 GitHub Pages 部署并行；未配置该 Secret 时该工作流跳过，仍可在本机用上述命令手动发布。
 
 帮助短片由随指南按需载入的 `guide-film.ts` 自定义元素承接，不打开新标签。未展开时 `<video>` 无 `src` 且 `preload="none"`，点击才设置官网地址并播放；原生控件支持暂停、拖动和全屏。收起及元素卸载都暂停、移除地址并释放媒体，覆盖关闭帮助、切分类和重绘；播放失败只在播放器旁提供重试。单机版不注册或显示此联网入口。
 

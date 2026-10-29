@@ -1,0 +1,44 @@
+name: Deploy to Cloudflare Pages
+
+# 推送 master 后自动直传官网 Pages 项目（qinglan-xiuxian），与 GitHub Pages 部署互不阻塞。
+# 需要仓库 Secret：CLOUDFLARE_API_TOKEN（仅 Pages 编辑权限）。未配置时整个任务跳过，不报错。
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 6dfe244c6d35a2d3ed3ae6488bf64cfc
+    steps:
+      - name: Skip when token is not configured
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "未配置 CLOUDFLARE_API_TOKEN，跳过官网部署。"
+      - name: Checkout
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # 拉取完整历史与标签，供构建时注入 git describe 版本号
+          fetch-depth: 0
+      - name: Set up Node.js
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npm ci
+      - name: Build, restore promo video and deploy
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npm run deploy:cloudflare
