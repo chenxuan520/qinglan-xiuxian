@@ -109,7 +109,7 @@ export function lobbyView(
         completed
           ? completedJourney(save, realm.name, realm.max, realmVerse(realm))
           : `<section class="hero">
-        <div class="hero-copy"><div class="eyebrow"><span></span>青岚少年 · 觅长生 · 寻大道</div><h1>御剑问长生<span>青岚入仙途</span></h1><p>在青岚镇长大，十五岁踏上仙途。<br>为觅长生，为追寻大道，向山海深处去。</p>
+        <div class="hero-copy"><div class="eyebrow"><span></span>青岚少年 · 觅长生 · 寻大道</div><h1>御剑问长生<span>青岚入仙途</span></h1><p>生于临水青岚，十五岁负剑离乡。<br>叩问长生，行过重山，去寻一个不负此生的答案。</p>
           <div class="hero-features"><span>一世修行，叩问仙门</span>${isExtremeLife(save) ? '<span class="life-mode-badge">极限模式 · 一命问道</span>' : ''}</div>
         </div>
         <button class="realm-preview" data-action="cultivation"><span class="vertical-poem${shortVerse ? ' is-short' : ''}">${verticalVerse}</span><span class="realm-circle"><small>当前境界</small><strong>${save.cultivation === 0 ? '凡人' : realm.ascending ? '渡劫' : REALMS[realm.index]}</strong><span>${save.cultivation === 0 ? '尚未入道' : realm.ascending ? '待破七境' : ['初期', '中期', '后期'][realm.step % 3]}</span></span><span class="realm-link">洞府修炼 ${smallIcon('arrow')}</span></button>

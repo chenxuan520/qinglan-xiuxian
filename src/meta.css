@@ -459,10 +459,19 @@
   color: #a4b6a4;
   font-size: 13px;
 }
+.chronicle-achievements .achievement-verse {
+  margin: 0;
+  color: #8c9f8e;
+  font-size: 12px;
+  line-height: 1.5;
+}
 .chronicle-achievements .achieved {
   border-color: #c2b97888;
   background: #b9b57612;
   color: #e1d5a1;
+}
+.chronicle-achievements .achieved .achievement-verse {
+  color: #dfd49a;
 }
 .chronicle-achievements small {
   color: #a4b6a4;

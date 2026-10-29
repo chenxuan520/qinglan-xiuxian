@@ -82,7 +82,10 @@ test('首页恢复品牌改写前原文和标签，不再直接揭示传承', ()
     );
     assert.match(home, /青岚少年 · 觅长生 · 寻大道/);
     assert.match(home, /御剑问长生<span>青岚入仙途/);
-    assert.match(home, /在青岚镇长大，十五岁踏上仙途。<br>为觅长生，为追寻大道，向山海深处去。/);
+    assert.match(
+      home,
+      /生于临水青岚，十五岁负剑离乡。<br>叩问长生，行过重山，去寻一个不负此生的答案。/,
+    );
     assert.match(home, /一世修行，叩问仙门/);
     assert.doesNotMatch(home, /一物传承|故人来信|叩入仙门后可留/);
   }
