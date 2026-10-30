@@ -1119,7 +1119,7 @@ function renderPanel() {
     if (score && !score.querySelector('[data-leaderboard-link]'))
       score.insertAdjacentHTML(
         'beforeend',
-        '<a class="secondary-button" data-leaderboard-link href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看万魂幡 ↗</a>',
+        '<a class="secondary-button leaderboard-settings-link" data-leaderboard-link href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看万魂幡 ↗</a>',
       );
   }
   if (panel === 'chronicle' && modal.querySelector('.chronicle-achievements'))

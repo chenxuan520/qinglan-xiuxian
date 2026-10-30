@@ -353,6 +353,15 @@
 .journey-card-entry {
   margin-top: 18px;
 }
+.leaderboard-settings-link {
+  margin-top: 14px;
+}
+.journey-card-cta {
+  width: 100%;
+  margin: 14px 0 6px;
+  min-height: 48px;
+  letter-spacing: 4px;
+}
 .journey-card-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
