@@ -126,7 +126,7 @@ test('留影年岁、寿限与历劫次数不加千分位，保留年岁小数�
   const card = journeyCardData(save);
   assert.equal(card.age, '17421.3');
   assert.equal(card.lifespan, '寿限 20100 年');
-  assert.ok(card.memories.some((memory) => memory.title === '历劫 1234 次'));
+  assert.ok(card.memories.some((memory) => memory.title === '历劫一千二百三十四次'));
   assert.equal(JSON.stringify(save), before);
 });
 

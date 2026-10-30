@@ -34,6 +34,27 @@ import { journeyScore } from './journey-score.ts';
 import { spiritPower } from './spirit-power.ts';
 import { formatNumber } from './number-format.ts';
 import { isExtremeLife } from './life-mode.ts';
+// 此世留痕只用于小计数（劫数、炼器阶数），写成「七阶」「一次」更合古风；年岁、道果等大数仍用阿拉伯数字。
+export function chineseCount(n: number) {
+  const digits = '零一二三四五六七八九';
+  if (!Number.isSafeInteger(n) || n < 0 || n > 9999) return String(n);
+  if (n < 10) return digits[n];
+  const units = ['', '十', '百', '千'];
+  const parts = String(n).split('').map(Number);
+  let out = '';
+  let zero = false;
+  parts.forEach((d, i) => {
+    const unit = units[parts.length - 1 - i];
+    if (d === 0) zero = out !== '';
+    else {
+      if (zero) out += '零';
+      zero = false;
+      out += (d === 1 && unit === '十' && i === 0 ? '' : digits[d]) + unit;
+    }
+  });
+  return out;
+}
+
 export { mountJourneyCardActions } from './journey-card-actions.ts';
 
 export const JOURNEY_CARD_QR = encode(JOURNEY_SHARE_URL, { ecc: 'M', border: 4 });
@@ -320,7 +341,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     memories.push({ title: '六仙同御', detail: '曾在一场历练中同时觉醒六件仙器' });
   if (save.tribulations > 0)
     memories.push({
-      title: `历劫 ${save.tribulations.toLocaleString('zh-CN', { useGrouping: false })} 次`,
+      title: `历劫${chineseCount(save.tribulations)}次`,
       detail: '渡过的天劫，已化作此世劫印',
     });
   if (save.completed.length)
@@ -331,7 +352,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
   memories.push({
     title: `本命 · ${treasure(save.starter).name}`,
     detail: save.forge[save.starter]
-      ? `炼器 ${save.forge[save.starter]} 阶`
+      ? `炼器${chineseCount(save.forge[save.starter])}阶`
       : '伴此行山海，问一程长生',
   });
   if (save.chronicle.milestones.departure === 15)

@@ -556,3 +556,94 @@
   top: 14px;
   right: 18px;
 }
+
+/* 设置里的开关统一画成拨动开关：按钮原有文字保留给读屏与逻辑，视觉上只看滑块位置与「开 / 关」。 */
+.settings-section-heading > button[aria-pressed],
+.about-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 60px;
+  min-width: 60px;
+  height: 32px;
+  min-height: 32px;
+  margin: 6px 0;
+  padding: 0;
+  border: 1px solid #a9baa166;
+  border-radius: 999px;
+  background: #0a211b;
+  color: transparent;
+  font-size: 0;
+  letter-spacing: 0;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+.settings-section-heading > button[aria-pressed]::before,
+.about-toggle::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #8fa596;
+  box-shadow: 0 1px 4px #0008;
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+.settings-section-heading > button[aria-pressed]::after,
+.about-toggle::after {
+  content: '关';
+  position: absolute;
+  top: 50%;
+  right: 9px;
+  transform: translateY(-50%);
+  color: #8fa596;
+  font-size: 11px;
+  line-height: 1;
+}
+.settings-section-heading > button[aria-pressed='true'],
+.about-toggle[aria-pressed='true'] {
+  border-color: #d5c58e;
+  background: #d5c58e;
+}
+.settings-section-heading > button[aria-pressed='true']::before,
+.about-toggle[aria-pressed='true']::before {
+  transform: translateX(28px);
+  background: #10302a;
+}
+.settings-section-heading > button[aria-pressed='true']::after,
+.about-toggle[aria-pressed='true']::after {
+  content: '开';
+  right: auto;
+  left: 10px;
+  color: #10302a;
+}
+.settings-section-heading > button.secondary-button[aria-pressed]:not(:disabled):hover,
+.about-toggle:hover {
+  border-color: #e8d69c;
+  color: transparent;
+}
+.settings-section-heading > button.secondary-button[aria-pressed='false']:not(:disabled):hover,
+.about-toggle[aria-pressed='false']:hover {
+  background: #0f2a22;
+}
+.settings-section-heading > button.secondary-button[aria-pressed='true']:not(:disabled):hover {
+  background: #e2d39c;
+}
+.settings-section-heading > button[aria-pressed]:focus-visible,
+.about-toggle:focus-visible {
+  outline: 2px solid #e8d69c;
+  outline-offset: 3px;
+}
+.about-toggle {
+  margin-left: auto;
+}
+.settings-section-heading > button[aria-pressed]:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
