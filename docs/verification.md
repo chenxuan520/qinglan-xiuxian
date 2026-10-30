@@ -3257,6 +3257,6 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 ### 2026-10-30 万魂幡公开榜单页面视觉优化
 
 - 只改 `workers/leaderboard/page.ts` 的公开榜单页：`main` 增加 `public` 类，新增样式全部限定在 `.public` 下，管理页、登录页、脚本逻辑、元素 id 与接口均不变。
-- 首屏以同源 `/assets/qinglan-prologue-dark.webp`（游戏序章夜景，CSP `img-src 'self'` 允许）作渐隐背景；内容宽度收窄至 920px；前三名电脑端按 2-1-3 排列，第一名加高并加「魁」字印，第二、三名分别用银、铜色描边；列表行高由约 100px 压到约 70px；品第文字按游戏留影同一套八品配色着色；「一命问道」改为朱色小印签；空榜改为「幡」字印。手机端前三名仍按名次纵向排列。
+- 首屏去掉单独的「幡」字印章，以同源 `/assets/qinglan-prologue-dark.webp`（游戏序章夜景，CSP `img-src 'self'` 允许）作渐隐背景；内容宽度收窄至 920px；前三名电脑端按 2-1-3 排列，第一名加高并加「魁」字印，第二、三名分别用银、铜色描边；列表行高由约 100px 压到约 70px；品第文字按游戏留影同一套八品配色着色；「一命问道」改为朱色小印签；空榜卡片不再放单独的字符装饰。手机端前三名仍按名次纵向排列。
 - 本地用模拟 12 条与 0 条数据，在 1280px 与 390px 宽度逐张截图核对：无横向滚动、长名省略、模式签不拉伸、首屏图底部平滑过渡。`tests/leaderboard-page.test.ts` 5/5 通过，`npm run check:leaderboard` 通过。
 - 该页面由独立 Worker `qinglan-leaderboard` 提供，**推送不会自动上线**，需执行 `npm run deploy:leaderboard` 后生效。
