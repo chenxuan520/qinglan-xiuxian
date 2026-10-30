@@ -10,6 +10,7 @@ import { MARKET_FELLOW_SETTINGS } from '../src/market-fellow-data.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
 import {
   LETTER_REMINDER_TEXT,
+  LETTER_REMINDER_KEY,
   LetterReminder,
   waitingLetterKeys,
   type LetterReminderContext,
@@ -361,7 +362,7 @@ test('已落幕或待轮回的存档不因暂时没有面板而显示提醒', ()
   }
 });
 
-test('实际通知失败不消耗提醒；新一世清理只触及内存，不改存档或访问浏览器存储', () => {
+test('实际通知失败不消耗提醒；存储被拒仍正常提示，清理不重提同信且不改人物存档', () => {
   const save = friendLetter();
   const before = JSON.stringify(save);
   const keys = Object.keys(save);
@@ -369,7 +370,7 @@ test('实际通知失败不消耗提醒；新一世清理只触及内存，不�
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     get() {
-      assert.fail('来信提醒不得访问本机存储');
+      throw new Error('storage denied');
     },
   });
   try {
@@ -391,8 +392,8 @@ test('实际通知失败不消耗提醒；新一世清理只触及内存，不�
     );
     reminders.queue();
     assert.equal(
-      reminders.flush(save, ready, () => {}),
-      true,
+      reminders.flush(save, ready, () => assert.fail('清理后同信不重提')),
+      false,
     );
     assert.equal(JSON.stringify(save), before);
     assert.deepEqual(Object.keys(save), keys);
@@ -400,4 +401,222 @@ test('实际通知失败不消耗提醒；新一世清理只触及内存，不�
     if (storage) Object.defineProperty(globalThis, 'localStorage', storage);
     else Reflect.deleteProperty(globalThis, 'localStorage');
   }
+});
+
+function reminderStorage(initial: string | null = null) {
+  let value = initial;
+  let writes = 0;
+  return {
+    get value() {
+      return value;
+    },
+    get writes() {
+      return writes;
+    },
+    getItem(key: string) {
+      assert.equal(key, LETTER_REMINDER_KEY);
+      return value;
+    },
+    setItem(key: string, next: string) {
+      assert.equal(key, LETTER_REMINDER_KEY);
+      value = next;
+      writes++;
+    },
+  };
+}
+
+test('已提示信件跨实例与刷新去重，换世清理不重提原信，新信仍可提醒', () => {
+  const store = reminderStorage();
+  const save = friendLetter();
+  const before = JSON.stringify(save);
+  const a = new LetterReminder(() => store);
+  a.queue();
+  assert.equal(
+    a.flush(save, ready, () => {}),
+    true,
+  );
+  const b = new LetterReminder(() => store);
+  b.queue();
+  assert.equal(
+    b.flush(save, ready, () => assert.fail('刷新不重提')),
+    false,
+  );
+  b.clear();
+  b.queue();
+  assert.equal(
+    b.flush(save, ready, () => assert.fail('原信不重提')),
+    false,
+  );
+  assert.equal(JSON.stringify(save), before);
+  const next = friendLetter();
+  next.mortal.population!.seed++;
+  b.queue();
+  assert.equal(
+    b.flush(next, ready, () => {}),
+    true,
+  );
+  const c = new LetterReminder(() => store);
+  c.queue();
+  assert.equal(
+    c.flush(next, ready, () => assert.fail('新信只一次')),
+    false,
+  );
+});
+
+test('另一实例已提示的信件在本页下一次首页排队时也不重提', () => {
+  const store = reminderStorage();
+  const early = new LetterReminder(() => store);
+  const later = new LetterReminder(() => store);
+  const save = friendLetter();
+  later.queue();
+  assert.equal(
+    later.flush(save, ready, () => {}),
+    true,
+  );
+  early.queue();
+  assert.equal(
+    early.flush(save, ready, () => assert.fail('应回读其他页面记录')),
+    false,
+  );
+});
+
+test('通知函数失败不写去重记录，存储拒写只在当页去重且不阻断游戏', () => {
+  const store = reminderStorage();
+  const save = friendLetter();
+  const r = new LetterReminder(() => store);
+  r.queue();
+  assert.throws(() =>
+    r.flush(save, ready, () => {
+      throw new Error('notify failed');
+    }),
+  );
+  assert.equal(store.writes, 0);
+  const fresh = new LetterReminder(() => store);
+  fresh.queue();
+  assert.equal(
+    fresh.flush(save, ready, () => {}),
+    true,
+  );
+  const blocked = new LetterReminder(() => ({
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+  }));
+  const before = JSON.stringify(save);
+  blocked.queue();
+  assert.equal(
+    blocked.flush(save, ready, () => {}),
+    true,
+  );
+  blocked.queue();
+  assert.equal(
+    blocked.flush(save, ready, () => assert.fail('当页不重提')),
+    false,
+  );
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('损坏、过大或非信件字符串记录不阻断正常提醒，历史记录保持有界', () => {
+  for (const raw of [
+    '{',
+    '{}',
+    'null',
+    '[1]',
+    '[""]',
+    JSON.stringify(['x'.repeat(257)]),
+    'x'.repeat(32769),
+    JSON.stringify(Array(129).fill('old')),
+  ]) {
+    const store = reminderStorage(raw);
+    const r = new LetterReminder(() => store);
+    r.queue();
+    assert.equal(
+      r.flush(friendLetter(), ready, () => {}),
+      true,
+    );
+    assert.ok(Array.isArray(JSON.parse(store.value!)));
+  }
+  const store = reminderStorage(JSON.stringify(Array.from({ length: 128 }, (_, i) => `past:${i}`)));
+  const save = friendLetter();
+  const r = new LetterReminder(() => store);
+  r.queue();
+  assert.equal(
+    r.flush(save, ready, () => {}),
+    true,
+  );
+  const keys = JSON.parse(store.value!);
+  assert.equal(keys.length, 128);
+  assert.ok(keys.includes(waitingLetterKeys(save)[0]));
+  const reload = new LetterReminder(() => store);
+  reload.queue();
+  assert.equal(
+    reload.flush(save, ready, () => assert.fail('最新记录仍在')),
+    false,
+  );
+});
+
+test('无信或首页被阻塞时不写提示记录，也不提前消耗信件', () => {
+  const store = reminderStorage();
+  const r = new LetterReminder(() => store);
+  r.queue();
+  assert.equal(
+    r.flush(resident(), ready, () => assert.fail()),
+    false,
+  );
+  assert.equal(store.writes, 0);
+  r.queue();
+  assert.equal(
+    r.flush(friendLetter(), { ...ready, blocked: true }, () => assert.fail()),
+    false,
+  );
+  assert.equal(store.writes, 0);
+  assert.equal(
+    r.flush(friendLetter(), ready, () => {}),
+    true,
+  );
+  assert.equal(store.writes, 1);
+});
+
+test('家书发现前后的稳定键跨刷新保持同一提醒，实际发现和阅读不受影响', () => {
+  const store = reminderStorage();
+  const save = resident();
+  delete save.mortal.population;
+  const home = save.mortal.hometown!;
+  save.age = Math.max(...Object.values(home.parents).map((p) => 15 + p.diesAt - p.ageAtStart));
+  const r = new LetterReminder(() => store);
+  r.queue();
+  assert.equal(
+    r.flush(save, ready, () => {}),
+    true,
+  );
+  assert.equal(home.letterFoundAt, null);
+  assert.equal(home.letterRead, false);
+  assert.ok(visitHometown(save));
+  const reload = new LetterReminder(() => store);
+  reload.queue();
+  assert.equal(
+    reload.flush(save, ready, () => assert.fail('家书发现后不重提')),
+    false,
+  );
+  assert.ok(readHometownLetter(save));
+  assert.equal(home.letterRead, true);
+});
+
+test('铁匠旧账正文已实际展示的记录跨刷新保留，不改故事选择', () => {
+  const store = reminderStorage();
+  const save = resident();
+  save.mortal.hometown!.letterRead = true;
+  assert.ok(chooseSmithStory(save, 'bellows'));
+  save.age = smithAt(save.mortal.population!, save.age).leavesAt;
+  const before = JSON.stringify(save);
+  const r = new LetterReminder(() => store);
+  r.markSmithViewed(save);
+  assert.equal(JSON.stringify(save), before);
+  const reload = new LetterReminder(() => store);
+  reload.queue();
+  assert.equal(
+    reload.flush(save, ready, () => assert.fail('已看铁匠正文不重提')),
+    false,
+  );
 });
