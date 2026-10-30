@@ -19,7 +19,7 @@ export function trainingStepPreview(save: SaveData, kind: keyof SaveData['traini
       power: `${current.weapon}基础伤害`,
       speed: '入场移速',
     }[kind],
-    unit: kind === 'speed' ? '地图像素/秒' : '',
+    unit: '',
     current: current[field[kind]],
     next: next?.[field[kind]] ?? null,
   };
