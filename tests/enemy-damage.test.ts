@@ -61,6 +61,7 @@ test('前六境精英伤害增幅高于普通怪，碰撞按减伤后实际扣�
           (1 + stage * 0.12) *
           1.175 *
           DIFFICULTIES[difficulty].damage *
+          DIFFICULTIES[difficulty].stageRamp[stage] *
           (elite ? 2.2 : 1.3) *
           (1 + [0, 0.08, 0.16, 0.24, 0.85, 0.9][stage] * (elite ? 1 : 0.65)) *
           realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *

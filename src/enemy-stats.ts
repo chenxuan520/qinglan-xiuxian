@@ -44,8 +44,17 @@ export function enemyCombatStats(
           : 120000 + bossStage * 35000
         : (16000 + stage * 11000) * (tribulation ? 1 : stage === 4 ? 1.3 : stage === 5 ? 1.5 : 1)) *
       difficulty.hp *
-      (tribulation ? 1 : isFinalTrial ? BOSS_COMBAT.trialHp : BOSS_COMBAT.hp[stage])
-    : template.hp * strength * difficulty.hp * (elite ? 7 : 1) * (eliteScaling?.hp ?? 1);
+      (tribulation
+        ? 1
+        : isFinalTrial
+          ? BOSS_COMBAT.trialHp
+          : BOSS_COMBAT.hp[stage] * difficulty.bossHp[stage])
+    : template.hp *
+      strength *
+      difficulty.hp *
+      (elite ? 7 : 1) *
+      (eliteScaling?.hp ?? 1) *
+      (tribulation || isFinalTrial ? 1 : difficulty.stageRamp[stage]);
   const lateHealth =
     !tribulation && stage >= 2 && stage <= 5 && elite && !boss
       ? 1 +
@@ -64,6 +73,7 @@ export function enemyCombatStats(
         : template.damage * (1 + stage * 0.12)) *
       (boss ? 1 : isFinalTrial ? 1.1 + progress * 0.9 : 1 + progress * 0.35) *
       difficulty.damage *
+      (boss || tribulation || isFinalTrial ? 1 : difficulty.stageRamp[stage]) *
       (boss || elite ? scaling.damage : 1 + (scaling.damage - 1) * 0.65) *
       (isFinalTrial || boss ? 1 : elite ? 2.2 : 1.3) *
       realmHealthMultiplier(realmStep) *

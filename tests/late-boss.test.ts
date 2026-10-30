@@ -32,7 +32,9 @@ test('三难度七境妖王使用固定强化倍率，终关单列，移动速�
           boss.hp,
           baseHp *
             rules.hp *
-            (stage === FINAL_TRIAL_STAGE ? BOSS_COMBAT.trialHp : BOSS_COMBAT.hp[stage]) *
+            (stage === FINAL_TRIAL_STAGE
+              ? BOSS_COMBAT.trialHp
+              : BOSS_COMBAT.hp[stage] * rules.bossHp[stage]) *
             scaling.hp *
             realmDamageMultiplier(STAGE_REALM_STEPS[stage]),
         );
@@ -71,7 +73,7 @@ test('第二境妖王在既有增幅上再加20%气血，固定强度不随玩�
         save.cultivation = cultivation;
         const g = new Game(save, 1, difficulty, () => 0.5);
         const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, 1);
-        assert.ok(Math.abs(boss.maxHp / beforeHp - 1.2) < 1e-12);
+        assert.ok(Math.abs(boss.maxHp / beforeHp - 1.2 * rules.bossHp[1]) < 1e-12);
         assert.equal(boss.hp, boss.maxHp);
         assert.equal(
           boss.damage,
