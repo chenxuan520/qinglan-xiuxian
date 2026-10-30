@@ -3260,3 +3260,4 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 - 首屏去掉单独的「幡」字印章，以同源 `/assets/qinglan-prologue-dark.webp`（游戏序章夜景，CSP `img-src 'self'` 允许）作渐隐背景；内容宽度收窄至 920px；前三名电脑端按 2-1-3 排列，第一名加高并加「魁」字印，第二、三名分别用银、铜色描边；列表行高由约 100px 压到约 70px；品第文字按游戏留影同一套八品配色着色；「一命问道」改为朱色小印签；空榜卡片不再放单独的字符装饰。手机端前三名仍按名次纵向排列。
 - 本地用模拟 12 条与 0 条数据，在 1280px 与 390px 宽度逐张截图核对：无横向滚动、长名省略、模式签不拉伸、首屏图底部平滑过渡。`tests/leaderboard-page.test.ts` 5/5 通过，`npm run check:leaderboard` 通过。
 - 该页面由独立 Worker `qinglan-leaderboard` 提供，**推送不会自动上线**，需执行 `npm run deploy:leaderboard` 后生效。
+- 追加（用户选定）：标题下题词「一入此幡深似海，从此道友是幡魂。」，原规则说明缩小保留其下；榜单计数「已留名 N / 100」改为「幡中已收 N 魂」；空榜标题改为「幡已祭起，尚缺第一魂。」。游戏内留名面板文案未改。1280px（12 条）与 390px（空榜）截图核对无换行异常；页面测试 5/5、`check:leaderboard` 通过。
