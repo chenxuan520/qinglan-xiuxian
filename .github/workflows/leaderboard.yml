@@ -2,7 +2,7 @@ name: Deploy leaderboard Worker
 
 # 推送 master 后自动部署万魂幡排行榜 Worker（qinglan-leaderboard）。D1 迁移改动极少，仍按开发文档手动执行，不放进自动流程。
 # Worker 引用了 src/ 下的道果与事实校验代码，所以每次推送都部署，保证前后端规则一致。
-# 需要仓库 Secret：CLOUDFLARE_WORKERS_TOKEN（Workers 脚本编辑权限；与 Pages 用的 CLOUDFLARE_API_TOKEN 分开）。未配置时整个任务跳过，不报错。
+# 复用仓库 Secret：CLOUDFLARE_API_TOKEN（与 Pages 部署同一令牌，需含 Workers 脚本编辑权限）。未配置时整个任务跳过，不报错。
 on:
   push:
     branches: [master]
@@ -19,12 +19,12 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: 6dfe244c6d35a2d3ed3ae6488bf64cfc
     steps:
       - name: Skip when token is not configured
         if: env.CLOUDFLARE_API_TOKEN == ''
-        run: echo "未配置 CLOUDFLARE_WORKERS_TOKEN，跳过排行榜 Worker 部署。"
+        run: echo "未配置 CLOUDFLARE_API_TOKEN，跳过排行榜 Worker 部署。"
       - name: Checkout
         if: env.CLOUDFLARE_API_TOKEN != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
