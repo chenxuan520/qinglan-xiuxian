@@ -104,7 +104,7 @@ for (const arena of [4, 6])
     assert.ok(g.zones.every((z) => z.endX === undefined));
   });
 
-test('原生远距与终关轮换保留毒君六秒追云和冥主瞬移，均无条带', () => {
+test('原生远距十二秒追云与终关六秒追云保留独立参数，冥主瞬移不变，均无条带', () => {
   for (const origin of [3, 4])
     for (const arena of [origin, 6]) {
       const { g, e } = encounter(origin, arena === 6 ? (origin === 3 ? 4 : 5) : 0, arena);
@@ -118,9 +118,9 @@ test('原生远距与终关轮换保留毒君六秒追云和冥主瞬移，均�
       if (origin === 3) {
         const z = g.zones[0];
         assert.ok(z);
-        assert.equal(z.life, 6);
+        assert.equal(z.life, arena === 3 ? 12 : 6);
         assert.equal(z.radius, 58);
-        assert.equal(z.vx, 32);
+        assert.equal(z.vx, arena === 3 ? 96 : 32);
         assert.equal(z.vy, 0);
         assert.ok(z.delay >= 1.18);
         assert.equal(z.damage, e.damage * 0.8);

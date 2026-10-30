@@ -159,7 +159,15 @@ export function drawPlayerAilments(
   reduced: boolean,
 ) {
   const p = game.player;
-  if (!game.slowed && !game.burning.life && !game.immobilized && !game.sealed) return;
+  if (
+    !game.slowed &&
+    !game.burning.life &&
+    !game.immobilized &&
+    !game.sealed &&
+    !game.entangled &&
+    !game.corroded
+  )
+    return;
   c.save();
   c.font = 'bold 13px serif';
   c.textAlign = 'center';
@@ -180,6 +188,8 @@ export function drawPlayerAilments(
   for (const [active, label] of [
     [game.immobilized, '雷麻 · 禁锢'],
     [game.sealed, '封宝 · 无法施法'],
+    [game.entangled, '藤缠 · 暂难拾取'],
+    [game.corroded, '蚀体 · 无法回复'],
   ] as const) {
     if (active <= 0) continue;
     c.strokeStyle = '#173e4e';
@@ -187,6 +197,27 @@ export function drawPlayerAilments(
     c.strokeText(label, p.x, labelY);
     c.fillText(label, p.x, labelY);
     labelY += 16;
+  }
+  if (game.entangled > 0) {
+    c.strokeStyle = '#b4d59b';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.ellipse(p.x, p.y + 10, 24, 12, -0.4, 0, Math.PI * 2);
+    c.stroke();
+    c.beginPath();
+    for (let i = -1; i <= 1; i++) {
+      c.moveTo(p.x - 18, p.y + i * 8);
+      c.quadraticCurveTo(p.x, p.y - 16 + i * 8, p.x + 18, p.y + i * 8);
+    }
+    c.stroke();
+  }
+  if (game.corroded > 0) {
+    c.fillStyle = '#82a65d';
+    for (let i = 0; i < 3; i++) {
+      c.beginPath();
+      c.arc(p.x - 15 + i * 15, p.y - 8 + (i % 2) * 14, 4, 0, Math.PI * 2);
+      c.fill();
+    }
   }
   if (game.burning.life > 0) {
     c.fillStyle = '#ffc58b';

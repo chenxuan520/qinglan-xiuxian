@@ -103,7 +103,7 @@ test('幽魂先转弯再直飞，暂停与续局保留弹幕轨迹；旧弹不�
   }
 });
 
-test('木阵冰牢只在落地后减速，固定瘴池与毒矢受解毒丹减伤，残圈不再伤人', () => {
+test('木阵藤缠与冰牢减速只在落地后生效，毒池毒矢减伤及残圈边界保留', () => {
   for (const stage of [0, 2, 3]) {
     const { g, e } = encounter(stage, stage === 3 ? 6 : stage, stage === 3);
     e.skillStep = stage === 2 ? 2 : 0;
@@ -114,10 +114,17 @@ test('木阵冰牢只在落地后减速，固定瘴池与毒矢受解毒丹减�
     g.updateZones(0.5);
     assert.equal(g.player.hp, hp);
     assert.equal(g.slowed, 0);
+    assert.equal(g.entangled, 0);
+    assert.equal(g.corroded, 0);
     z.delay = 0;
     g.updateZones(0.01);
-    if (stage === 3) assert.ok(Math.abs(hp - g.player.hp - e.damage * 0.8) < 1e-8);
-    else assert.equal(g.slowed, 0.55);
+    if (stage === 3) {
+      assert.ok(Math.abs(hp - g.player.hp - e.damage * 0.8) < 1e-8);
+      assert.equal(g.corroded, 3);
+    } else {
+      assert.equal(g.slowed, stage === 2 ? 0.55 : 0);
+      assert.equal(g.entangled, stage === 0 ? 3 : 0);
+    }
     g.player.invincible = 0;
     z.life = 0.001;
     z.tick = 0;

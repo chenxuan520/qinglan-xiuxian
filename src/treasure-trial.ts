@@ -56,8 +56,8 @@ class TrialGame extends Game {
     }
   }
 
-  override hurtPlayer(damage: number, burn = false) {
-    super.hurtPlayer(damage, burn);
+  override hurtPlayer(damage: number, burn = false, poison = false) {
+    super.hurtPlayer(damage, burn, poison);
     // Retain ordinary hurt/retaliation/invulnerability. A fatal exhibition hit
     // replenishes health instead of entering the real death/revival flow.
     if (this.player.hp <= 0) this.player.hp = this.player.maxHp;

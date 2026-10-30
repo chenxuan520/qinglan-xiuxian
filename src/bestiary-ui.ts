@@ -1,4 +1,5 @@
 import { bossSkills, bossSkillCooldown } from './boss-skills.ts';
+import { BOSS_MECHANICS } from './boss-mechanics.ts';
 import { ENEMY_SKILLS, regionalSkillDetails } from './regional-skill-info.ts';
 import { regionalEnemyTactics } from './regional-combat.ts';
 import {
@@ -35,18 +36,21 @@ function statLine(
     return `<small class="enemy-stats"><b>${label}</b><br>气血 ???<br>触碰伤害 ???</small>`;
   return `<small class="enemy-stats"><b>${label}</b><br>气血 约${numberRange(stats.hp)}<br>触碰伤害 约${numberRange(stats.damage)}</small>`;
 }
+const miasmaHint = (life: number) =>
+  `五处固定瘴池、五道毒矢与四名护卫召唤，另有三团持续${life}秒的漂移毒瘴；毒伤命中后3秒无法回复，清灵散可减伤。`;
 const bossHints = [
-  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，留意藤圈间隙；木心生长2.4秒后成阵，可提前击碎。',
+  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，藤圈造成3秒藤缠，暂难拾取；木心生长2.4秒后成阵，可提前击碎。',
   '九发火扇、五点火径与十六发火弹环射，离开火圈并穿过弹幕间隙；回焰短暂停留后沿原路折返。',
   '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后；两头猎狼从侧翼绕行后蓄势合扑，另有重新锁向的两段连扑。',
-  '五处固定瘴池、五道毒矢与四名护卫召唤，另有三团持续6秒的漂移毒瘴；绕开毒池，清灵散可减伤。',
+  miasmaHint(BOSS_MECHANICS.nativeMiasmaLife),
   '四名护卫召唤、二十发摄魂环弹与六点鬼牢，留意中央落阵；魂弹命中封宝1秒；魂影沿你刚走过的路线逆行；还会瞬移留下三具假影，假影不提供收获。',
   '十字天雷分两拍落下、二十二发星环与五点陨雷，观察圆形预警后换位；三颗星珠绕行后错拍向外飞出。',
 ];
 const trialBossHints = bossHints
   .map(
     (hint, id) =>
-      hint + (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
+      (id === 3 ? miasmaHint(6) : hint) +
+      (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
   )
   .concat('环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。');
 export function bestiaryPanel(
@@ -63,7 +67,7 @@ export function bestiaryPanel(
     tank: '重甲 · 持续输出',
     explode: '自爆 · 离开红圈',
     summon: '召唤 · 优先击杀',
-    poison: '毒域 · 避开地面毒圈',
+    poison: '毒域 · 命中后3秒无法回复',
     volley: '散射 · 穿过弹幕间隙',
     nova: '环射 · 保持距离，寻找缺口',
     shield: '护盾 · 亮盾时减伤 55%，暗盾时集中攻击',
@@ -113,7 +117,7 @@ export function bestiaryPanel(
                     : e.behavior === 'tank'
                       ? '重甲近身震地，离开落点预警'
                       : e.behavior === 'poison'
-                        ? '在自身前方留下毒池，绕开毒圈'
+                        ? '在自身前方留下毒池，命中后3秒无法回复'
                         : behavior[e.behavior];
         }
         if (e.behavior === 'explode' && !detail.includes('自爆'))

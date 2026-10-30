@@ -41,7 +41,14 @@ import {
   regionalEnemyTactics,
   type RegionalField,
 } from './regional-combat.ts';
-import { hazardDistance, slowingHazard, bindingHazard, ENEMY_CONTROL } from './regional-hazards.ts';
+import {
+  hazardDistance,
+  slowingHazard,
+  bindingHazard,
+  entanglingHazard,
+  poisonousHazard,
+  ENEMY_CONTROL,
+} from './regional-hazards.ts';
 import { medicineEffects, medicineLoot } from './medicine-data.ts';
 import { recordChronicle } from './chronicle.ts';
 import { masteryBonus } from './mortal.ts';
@@ -150,6 +157,8 @@ export class Game {
   slowed = 0;
   immobilized = 0;
   sealed = 0;
+  entangled = 0;
+  corroded = 0;
   burning = { life: 0, damage: 0 };
   bossSpawned = false;
   trialBossesDefeated = 0;
@@ -165,6 +174,9 @@ export class Game {
   private nextEnemySlowAt = 0;
   private nextEnemyBindAt = 0;
   private nextEnemySealAt = 0;
+  private nextEnemyEntangleAt = 0;
+  private shownAilments = new Set<string>();
+  private pendingAilmentNotices: string[] = [];
   tribulation = 0;
   tribulationStep = 0;
   tribulationNextAt = 1.2;
@@ -272,6 +284,8 @@ export class Game {
       this.slowed = 0;
       this.immobilized = 0;
       this.sealed = 0;
+      this.entangled = 0;
+      this.corroded = 0;
       this.burning = { life: 0, damage: 0 };
       this.state = 'paused';
       this.announce(`向天借寿 · 寿元 +${years} 年`);
@@ -464,7 +478,7 @@ export class Game {
       this.baseHp += hp;
       const increase = this.maximumHealth() - this.player.maxHp;
       this.player.maxHp = this.maximumHealth();
-      if (this.player.hp > 0) this.player.hp += increase;
+      if (this.player.hp > 0) this.heal(increase);
       this.announce(`${major ? '大境界突破' : '境界突破'} · ${realm.name} · 气血与法宝威力提升`);
       if (major) this.effects = this.effects.filter((e) => e.kind !== 'realm-breakthrough');
       if (major && realm.index <= 7 && showRealmEffect) {
@@ -500,6 +514,7 @@ export class Game {
       nextEnemySlowAt: this.nextEnemySlowAt,
       nextEnemyBindAt: this.nextEnemyBindAt,
       nextEnemySealAt: this.nextEnemySealAt,
+      nextEnemyEntangleAt: this.nextEnemyEntangleAt,
       lateEliteWaves: this.lateEliteWaves,
       stage: this.stage,
       stageDuration: this.stageDuration,
@@ -567,6 +582,8 @@ export class Game {
       slowed: this.slowed,
       immobilized: this.immobilized,
       sealed: this.sealed,
+      entangled: this.entangled,
+      corroded: this.corroded,
       burning: { ...this.burning },
       nextEnemySkillAt: this.nextEnemySkillAt,
       nextMedicinePulse: this.nextMedicinePulse,
@@ -605,6 +622,7 @@ export class Game {
       g.nextEnemySlowAt = s.nextEnemySlowAt ?? 0;
       g.nextEnemyBindAt = s.nextEnemyBindAt ?? 0;
       g.nextEnemySealAt = s.nextEnemySealAt ?? 0;
+      g.nextEnemyEntangleAt = s.nextEnemyEntangleAt ?? 0;
       g.level = Math.min(MAX_RUN_LEVEL, s.level);
       g.xp = g.level === MAX_RUN_LEVEL ? 0 : s.xp;
       g.kills = s.kills;
@@ -616,6 +634,10 @@ export class Game {
       g.slowed = s.slowed ?? 0;
       g.immobilized = s.immobilized ?? 0;
       g.sealed = s.sealed ?? 0;
+      g.entangled = s.entangled ?? 0;
+      g.corroded = s.corroded ?? 0;
+      if (g.entangled > 0) g.shownAilments.add('entangle');
+      if (g.corroded > 0) g.shownAilments.add('corrode');
       g.burning = { ...(s.burning ?? { life: 0, damage: 0 }) };
       if (
         s.nextMedicinePulse !== undefined &&
@@ -635,7 +657,10 @@ export class Game {
       // 快照之后精研、功法或境界变化会重新计算上限；保留已损失气血，不重复回血。
       const growth = g.maximumHealth(s.medicineHpFactor) - s.player.maxHp;
       g.player.maxHp = maxHp;
-      g.player.hp = Math.max(1, Math.min(maxHp, g.player.hp + growth));
+      g.player.hp = Math.max(
+        1,
+        Math.min(maxHp, g.player.hp + (g.corroded > 0 ? Math.min(0, growth) : growth)),
+      );
       g.enemies = s.enemies.map((e) => ({
         ...e,
         ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
@@ -805,6 +830,8 @@ export class Game {
     this.slowed = Math.max(0, this.slowed - dt);
     this.immobilized = Math.max(0, this.immobilized - dt);
     this.sealed = Math.max(0, this.sealed - dt);
+    this.entangled = Math.max(0, this.entangled - dt);
+    this.corroded = Math.max(0, this.corroded - dt);
     const p = this.player,
       stats = this.stats;
     p.invincible = Math.max(0, p.invincible - dt);
@@ -906,6 +933,11 @@ export class Game {
         this.onEvent('upgrade');
         this.input = { x: 0, y: 0 };
       }
+    }
+    if (this.pendingAilmentNotices.length) {
+      // 首次状态提示在本帧拾取等提示之后显示；升级、结算仍优先。
+      if (this.state === 'playing') this.announce(this.pendingAilmentNotices.join('　'));
+      this.pendingAilmentNotices.length = 0;
     }
   }
   private updateTribulation() {
@@ -1758,18 +1790,20 @@ export class Game {
   }
   private castBossPursuit(e: Enemy, nx: number, ny: number) {
     if ((e.bossStage ?? this.stage) === 3) {
+      const native = this.stage === 3 && !this.tribulation;
+      const speed = native ? BOSS_MECHANICS.nativePursuitMiasmaSpeed : 32;
       this.zone(
         e.x + nx * 165,
         e.y + ny * 165,
         58,
-        6,
+        native ? BOSS_MECHANICS.nativeMiasmaLife : 6,
         e.damage * 0.8,
         STAGES[3].color,
         'boss-miasma',
         1.2,
         true,
       );
-      Object.assign(this.zones.at(-1)!, { vx: nx * 32, vy: ny * 32 });
+      Object.assign(this.zones.at(-1)!, { vx: nx * speed, vy: ny * speed });
     } else {
       this.effect(e.x, e.y, 0.7, e.radius, STAGES[4].color, 'pulse');
       e.x = this.player.x - nx * 260;
@@ -1835,13 +1869,15 @@ export class Game {
         shot.radius = 10;
       }
     } else if (stage === 3) {
-      // 保留原来六秒漂移毒瘴，不带回条形毒息。
+      // 只加强第四境原生毒瘴，终关劫相保留原参数与圆形攻击。
+      const native = this.stage === 3 && !this.tribulation;
+      const speed = native ? rules.nativeMiasmaSpeed : 24;
       for (const side of [-105, 0, 105]) {
         this.zone(
           this.player.x + nx * (side ? 60 : 0) - ny * side,
           this.player.y + ny * (side ? 60 : 0) + nx * side,
           62,
-          6,
+          native ? rules.nativeMiasmaLife : 6,
           e.damage,
           STAGES[3].color,
           'boss-miasma',
@@ -1849,8 +1885,8 @@ export class Game {
           true,
         );
         const z = this.zones.at(-1)!;
-        z.vx = -ny * Math.sign(side || 1) * 24;
-        z.vy = nx * Math.sign(side || 1) * 24;
+        z.vx = -ny * Math.sign(side || 1) * speed;
+        z.vy = nx * Math.sign(side || 1) * speed;
       }
     } else if (stage === 4) {
       if (this.shots.filter((b) => b.bossMotion?.kind === 'memory').length >= 6) return;
@@ -2372,6 +2408,7 @@ export class Game {
           this.hurtPlayer(
             b.damage * (b.bossStage === 3 ? this.medicine.poison : 1),
             !this.isFinalTrial && this.stage === 1 && b.enemySkill === 'firebolt',
+            b.bossStage === 3,
           );
           b.life = 0;
         }
@@ -2456,11 +2493,15 @@ export class Game {
       if (
         z.hostile &&
         z.life > 0 &&
-        (slowingHazard(z) || bindingHazard(z)) &&
+        (slowingHazard(z) || bindingHazard(z) || entanglingHazard(z)) &&
         this.player.invincible <= 0 &&
         hazardDistance(z, this.player) < z.radius + 8
       )
-        bindingHazard(z) ? this.enemyBind() : this.enemySlow();
+        bindingHazard(z)
+          ? this.enemyBind()
+          : entanglingHazard(z)
+            ? this.enemyEntangle()
+            : this.enemySlow();
       if (z.kind === 'vortex')
         for (const e of this.enemies) {
           const d = distance(e, z);
@@ -2474,13 +2515,10 @@ export class Game {
         if (z.hostile) {
           if (this.tribulation && z.kind === 'blast' && z.life > 0)
             this.effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
-          if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8)
-            this.hurtPlayer(
-              z.damage *
-                (['poison', 'enemy-miasma', 'boss-miasma'].includes(z.kind)
-                  ? this.medicine.poison
-                  : 1),
-            );
+          if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8) {
+            const poison = poisonousHazard(z);
+            this.hurtPlayer(z.damage * (poison ? this.medicine.poison : 1), false, poison);
+          }
         } else if (z.kind === 'pagoda') {
           const weapon = this.weapons.find((w) => w.id === 'pagoda');
           const count = weapon && (weapon.level >= 3 || weapon.evolved) ? 3 : 2;
@@ -2509,9 +2547,11 @@ export class Game {
     this.zones = this.zones.filter((z) => z.life > 0);
   }
   private updatePickups(dt: number) {
+    if (this.entangled > 0) return;
     const p = this.player,
       s = this.stats;
     for (const item of this.pickups) {
+      if (this.corroded > 0 && item.kind === 'heal') continue;
       const d = distance(item, p);
       if (d < s.magnet || item.pull) {
         item.pull = true;
@@ -2609,6 +2649,23 @@ export class Game {
     if (this.player.invincible > 0 || this.time < this.nextEnemySealAt) return;
     this.sealed = ENEMY_CONTROL.seal;
     this.nextEnemySealAt = this.time + ENEMY_CONTROL.protection;
+  }
+  private enemyEntangle() {
+    if (this.player.invincible > 0 || this.entangled > 0 || this.time < this.nextEnemyEntangleAt)
+      return;
+    this.entangled = ENEMY_CONTROL.entangle;
+    this.nextEnemyEntangleAt = this.time + ENEMY_CONTROL.entangle + ENEMY_CONTROL.protection;
+    this.ailmentNotice('entangle', '藤缠 · 暂难拾取');
+  }
+  private enemyCorrode() {
+    this.corroded = ENEMY_CONTROL.corrode;
+    this.ailmentNotice('corrode', '蚀体 · 无法回复');
+  }
+  private ailmentNotice(kind: string, message: string) {
+    if (this.shownAilments.has(kind)) return;
+    this.shownAilments.add(kind);
+    this.pendingAilmentNotices.push(message);
+    this.announce(message);
   }
   private addRegionalFields(e: Enemy, fields: RegionalField[]) {
     for (const { damageScale, ...field } of fields) {
@@ -3059,6 +3116,8 @@ export class Game {
     this.slowed = 0;
     this.immobilized = 0;
     this.sealed = 0;
+    this.entangled = 0;
+    this.corroded = 0;
     this.burning = { life: 0, damage: 0 };
     this.player.hp = this.player.maxHp;
     this.player.invincible = 3;
@@ -3069,13 +3128,14 @@ export class Game {
     this.announce('重燃道心 · 满血复活 · 三息护体');
     return true;
   }
-  hurtPlayer(damage: number, burn = false) {
+  hurtPlayer(damage: number, burn = false, poison = false) {
     if (this.player.invincible > 0 || this.state !== 'playing') return;
     const total = damage * this.stats.armor;
     const delayed = burn && this.burning.life <= 0 ? total * 0.2 : 0;
     if (delayed > 0) this.burning = { life: 1.5, damage: delayed };
     this.player.hp -= total - delayed;
     this.player.invincible = 0.8;
+    if (poison && total > 0) this.enemyCorrode();
     if (this.passives.bone && this.player.hp > 0) {
       this.areaDamage(
         this.player,
@@ -3092,7 +3152,8 @@ export class Game {
     this.onEvent('hurt');
   }
   private heal(amount: number) {
-    if (this.player.hp > 0) this.player.hp = Math.min(this.player.maxHp, this.player.hp + amount);
+    if (this.player.hp > 0 && this.corroded <= 0)
+      this.player.hp = Math.min(this.player.maxHp, this.player.hp + amount);
   }
   private effect(
     x: number,
@@ -3208,10 +3269,7 @@ export class Game {
       }
     }
     if (c.type === 'heal') {
-      this.player.hp = Math.min(
-        this.player.maxHp,
-        this.player.hp + this.player.maxHp * (this.isFinalTrial ? 0.15 : 0.4),
-      );
+      this.heal(this.player.maxHp * (this.isFinalTrial ? 0.15 : 0.4));
       this.iron++;
     }
     this.state = 'playing';

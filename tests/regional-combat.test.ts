@@ -143,7 +143,8 @@ test('前六境远距保留毒君追云和冥主瞬移，其余冲锋完整预�
       assert.equal(boss.charge, 0);
       assert.equal(g.zones.length, 1);
       assert.equal(g.zones[0].endX, undefined);
-      assert.equal(g.zones[0].vx, 32);
+      assert.equal(g.zones[0].vx, 96);
+      assert.equal(g.zones[0].life, 12);
     } else if (stage === 4) {
       assert.equal(boss.charge, 0);
       assert.equal(boss.x, -260);

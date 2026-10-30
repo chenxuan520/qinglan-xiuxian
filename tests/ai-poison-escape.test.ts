@@ -305,7 +305,7 @@ test('延迟圈叠加tick倒计时、已经错过首tick的持续圈仍避开后
   }
 });
 
-test('无后续伤害tick的缚根与寒霜仍避让持续减速，不与视觉残圈混淆', () => {
+test('无后续伤害tick的藤缠与寒霜仍避让持续控制，不与视觉残圈混淆', () => {
   for (const kind of ['poison', 'enemy-roots', 'enemy-frost']) {
     const g = encounter();
     ring(g, 5, 95, 70, 0);
@@ -321,7 +321,7 @@ test('无后续伤害tick的缚根与寒霜仍避让持续减速，不与视觉�
     else
       assert.ok(
         result.samples.every((sample) => !sample.covered),
-        '迟滞仍有效时不能穿圈',
+        '藤缠或迟滞仍有效时不能穿圈',
       );
     assert.equal(advance(g, 2).hits, 0);
     assert.ok(g.player.x > 250);

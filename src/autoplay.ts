@@ -1,7 +1,12 @@
 import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
 import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
 import type { Choice, Game } from './game.ts';
-import { hazardDistance, regionalExposure, regionalHazard } from './regional-hazards.ts';
+import {
+  hazardDistance,
+  regionalExposure,
+  regionalHazard,
+  entanglingHazard,
+} from './regional-hazards.ts';
 import { buildChoiceScore } from './autoplay-build.ts';
 
 const favored = [
@@ -80,7 +85,7 @@ export function autoplayInput(g: Game) {
   let nearest: Game['pickups'][number] | undefined;
   let nearestDistance = Infinity;
   for (const item of g.pickups) {
-    if (item.pull) continue;
+    if (item.pull || g.entangled > 0 || (g.corroded > 0 && item.kind === 'heal')) continue;
     const d = (item.x - p.x) ** 2 + (item.y - p.y) ** 2;
     if (d < nearestDistance) {
       nearest = item;
@@ -188,7 +193,8 @@ export function autoplayInput(g: Game) {
         if (regionalHazard(z)) {
           risk +=
             (regionalExposure(z, p, x, y, speed) / 0.5) *
-            ((z.damage / Math.max(1, p.hp)) * 4 + (z.kind.includes('thunder') ? 0.12 : 0));
+            ((z.damage / Math.max(1, p.hp)) * 4 +
+              (z.kind.includes('thunder') || entanglingHazard(z) ? 0.12 : 0));
           continue;
         }
         const zx = p.x - z.x,
@@ -208,7 +214,7 @@ export function autoplayInput(g: Game) {
         const delay = Math.max(0, z.delay);
         const tick = Math.max(0, z.tick);
         const nextTick = tick + Math.max(0, Math.ceil((enter - 0.12 - delay - tick) / 0.5)) * 0.5;
-        // 缚根与寒霜在伤害间隔中仍持续减速，不能当作无害残影。
+        // 藤缠与寒霜在伤害间隔中仍有控制，不能当作无害残影。
         if (
           !['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind) &&
           (nextTick > z.life || delay + nextTick > exit + 0.12)
@@ -218,7 +224,9 @@ export function autoplayInput(g: Game) {
           0,
           Math.min(exit, delay + z.life) - Math.max(enter, Math.max(0, delay - 0.12)),
         );
-        risk += (exposure / 0.5) * (z.damage / Math.max(1, p.hp)) * 4;
+        risk +=
+          (exposure / 0.5) *
+          ((z.damage / Math.max(1, p.hp)) * 4 + (entanglingHazard(z) ? 0.12 : 0));
       }
       for (const e of g.enemies) {
         if (e.dead || e.illusionOf !== undefined) continue;

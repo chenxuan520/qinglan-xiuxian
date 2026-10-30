@@ -15,10 +15,18 @@ export const ENEMY_SKILLS = {
   },
   stomp: { name: '撼地重击', hint: '近身蓄力震地，离开红圈', eliteHint: '原地及前方连续震击' },
   summon: { name: '唤卫护阵', hint: '召来两名护卫，优先击杀', eliteHint: '召来三名护卫，优先击杀' },
-  roots: { name: '青藤缠足', hint: '藤阵伤害并短暂减速', eliteHint: '双阵缠足，移速降低 25%' },
+  roots: {
+    name: '青藤缠足',
+    hint: '藤阵命中后3秒暂难拾取',
+    eliteHint: '双阵藤缠，3秒暂难拾取掉落',
+  },
   firepath: { name: '离火封路', hint: '两段火径，侧向脱离', eliteHint: '三段火径封路，侧向脱离' },
   frost: { name: '寒霜凝阵', hint: '寒阵伤害并短暂减速', eliteHint: '双阵夹击，移速降低 25%' },
-  miasma: { name: '瘴池蔓延', hint: '预警后留下持续毒池', eliteHint: '双池封路，绕开毒圈' },
+  miasma: {
+    name: '瘴池蔓延',
+    hint: '预警后留下毒池，命中后3秒无法回复',
+    eliteHint: '双池封路，毒伤命中后3秒无法回复',
+  },
   soul: {
     name: '摄魂交射',
     hint: '两侧魂弹交汇，命中短暂封禁法宝',
@@ -65,8 +73,8 @@ export function regionalSkillDetails(
       {
         roots: {
           name: '青藤横生',
-          hint: '藤枝封路并短暂减速，击杀施法者可散阵',
-          eliteHint: '双枝封路，命中移速降低25%',
+          hint: '藤枝封路并使你3秒暂难拾取，击杀施法者可散阵',
+          eliteHint: '双枝封路，藤缠期间3秒暂难拾取',
         },
         frost: {
           name: '凝霜冰棱',
@@ -75,8 +83,8 @@ export function regionalSkillDetails(
         },
         miasma: {
           name: '游瘴吐息',
-          hint: '瘴云向箭头方向漂移，寻找干净落脚点',
-          eliteHint: '游瘴持续漂移，绕开行进路径',
+          hint: '瘴云沿箭头漂移，毒伤命中后3秒无法回复',
+          eliteHint: '游瘴持续漂移，命中后3秒无法回复，绕开行进路径',
         },
         storm: {
           name: '错拍雷织',

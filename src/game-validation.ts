@@ -138,13 +138,15 @@ export function validateRunSnapshot(
     for (const [duration, limit] of [
       ['immobilized', ENEMY_CONTROL.bind],
       ['sealed', ENEMY_CONTROL.seal],
+      ['entangled', ENEMY_CONTROL.entangle],
+      ['corroded', ENEMY_CONTROL.corrode],
     ] as const)
       if (
         s[duration] !== undefined &&
         (!Number.isFinite(s[duration]) || s[duration] < 0 || s[duration] > limit)
       )
         return null;
-    for (const key of ['nextEnemyBindAt', 'nextEnemySealAt'] as const)
+    for (const key of ['nextEnemyBindAt', 'nextEnemySealAt', 'nextEnemyEntangleAt'] as const)
       if (s[key] !== undefined && (!Number.isFinite(s[key]) || s[key] < 0)) return null;
     if (s.cacheChallenge != null) {
       const c = s.cacheChallenge;
@@ -446,7 +448,10 @@ export function validateRunSnapshot(
               regionalZone(z.kind) &&
               Number.isFinite(z.vx) &&
               Number.isFinite(z.vy) &&
-              Math.hypot(z.vx!, z.vy!) <= 40)) &&
+              Math.hypot(z.vx!, z.vy!) <=
+                (s.stage === 3 && !s.tribulation && z.kind === 'boss-miasma'
+                  ? BOSS_MECHANICS.nativePursuitMiasmaSpeed + 1e-8
+                  : 40))) &&
           (z.sourceId === undefined ||
             (z.hostile === true &&
               regionalZone(z.kind) &&

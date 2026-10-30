@@ -128,7 +128,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 37;
+export const SAVE_SCHEMA = 38;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
