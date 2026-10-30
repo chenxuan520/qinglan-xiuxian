@@ -3522,3 +3522,9 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 
 - 用户选定：万魂幡页标题下题词由「一入此幡深似海，从此道友是幡魂。」改为「修仙不努力，万魂幡里做兄弟。」，其余页面不变。
 - 新增 `.github/workflows/leaderboard.yml`：push `master` 或手动触发时执行 `npm run deploy:leaderboard`，令牌复用仓库 Secret `CLOUDFLARE_API_TOKEN`，未配置时跳过。首版在 CI 中执行 D1 迁移，因令牌无 D1 权限失败（7403），已移除该步，迁移保留手动。本次题词已用用户提供的令牌手动部署上线并在官网核验。
+
+## 2026-10-31 · 关联 Worker 按代码变更自动部署
+
+基线`bb159af`。新增NPC与广告后台自动发布工作流，为排行榜工作流加路径过滤：推送`master`时响应各自`workers/`目录、共用`src/`、根依赖/TypeScript配置及各自工作流变更，排行榜另覆盖复用的广告登录脚本`workers/house-ads/admin.ts`；保留手动发布。共用`src/`采用保守范围，界面代码改动也可能触发，根文档及公共素材变更不触发。三者各用独立并发组，不取消正在运行的部署；沿用现有仓库Secret和原`deploy:*`命令及`--keep-vars`，缺少凭据或部署失败明确标红。未修改Worker业务、数据库结构/数据、密钥或授权，根域`qinglan-ads-verify`不接自动部署。
+
+实测：工作流定向检查 **7/7通过**，全量`npm test` **2003/2003通过、0失败/跳过/取消**；格式和素材门禁通过。独立审查核对YAML结构、实际传递依赖与路径覆盖（NPC60模块、广告13、排行榜55）、失败分支及发布命令。本次无界面或玩法改动，不做浏览器回归或平衡实验；推送后分别回读三条Worker流水线的真实部署步骤，不把跳过当发布成功。

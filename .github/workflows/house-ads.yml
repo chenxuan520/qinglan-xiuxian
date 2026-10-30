@@ -1,0 +1,46 @@
+name: Deploy house ads Worker
+
+# 仅部署广告平台；根域 ads.txt 验证 Worker 保持原来的独立发布方式。
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'workers/house-ads/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - '.github/workflows/house-ads.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: house-ads-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 6dfe244c6d35a2d3ed3ae6488bf64cfc
+    steps:
+      - name: Require deployment token
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: |
+          echo "::error::未配置 CLOUDFLARE_API_TOKEN，无法部署广告 Worker。"
+          exit 1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Type-check and deploy Worker
+        run: npm run deploy:house-ads

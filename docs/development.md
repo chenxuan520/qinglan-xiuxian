@@ -191,7 +191,7 @@ npx wrangler d1 migrations apply qinglan-leaderboard --remote --config workers/l
 npx wrangler deploy --config workers/leaderboard/wrangler.jsonc --keep-vars
 ```
 
-**自动部署**：推送 `master` 后，`.github/workflows/leaderboard.yml` 用仓库 Secret `CLOUDFLARE_API_TOKEN`（与 Pages 部署同一令牌，需含 Workers 脚本编辑权限）执行 `npm run deploy:leaderboard`，未配置时工作流跳过。Worker 引用 `src/` 的道果与事实校验代码，因此每次推送都部署。D1 迁移改动极少，新增迁移时仍用上面第一条命令手动执行（需要 D1 编辑权限）。
+**自动部署**：推送 `master` 且排行榜代码、`workers/house-ads/admin.ts`（榜单管理登录页共用脚本）、`src/`、根依赖文件或根 TypeScript 配置变化时，`.github/workflows/leaderboard.yml` 执行 `npm run deploy:leaderboard`；修改该工作流本身也会触发，并保留手动运行入口。复用仓库 Secret `CLOUDFLARE_API_TOKEN`，缺少凭据或部署失败会让任务明确失败，不将跳过当作已发布。三个 Worker 均采用整个 `src/` 的保守范围，避免新增共享依赖漏部署，因此其中的界面代码改动也可能触发；仅 `docs/`、仓库根 `README.md`、公共素材或根域验证 Worker 改动不触发。D1 迁移仍按原有命令单独执行，自动流程不包含数据库操作。
 
 ## 妖物志遭遇与未知形影
 
@@ -289,6 +289,8 @@ npx wrangler d1 migrations apply qinglan-house-ads --remote --config workers/hou
 npm run deploy:house-ads
 ```
 
+**自动部署**：`.github/workflows/house-ads.yml` 在推送 `master` 且广告 Worker 代码、`src/`、根依赖或 TypeScript 配置及该工作流变化时，执行 `npm run deploy:house-ads`，也可手动运行。沿用已有 `CLOUDFLARE_API_TOKEN` 与 `--keep-vars`，不重置账号、会话、投放数据或密钥；缺少凭据及发布失败明确标红。NPC、广告与排行榜各有独立并发组，不取消进行中的部署。根域 `qinglan-ads-verify` 不接自动部署，现有发布方式不变。
+
 首次部署先创建同名D1数据库，写入ID并应用迁移。已有平台部署前应用 `0003_ad_platform.sql`，增加集中设置、凭条和日汇总；不改既有账号、会话、广告和 revision。根域验证 Worker 也须绑定同一 D1 并单独发布。`0002_admin_login.sql`只创建登录所需表，不写入公开默认账号或密码；管理账号和随机初始密码由部署工具在本地安全生成并单独交付，只将盐和校验值写入D1，不能提交Git或公开展示。密码可在后台修改，遗忘时由维护者更新D1校验值并撤销旧会话。官网将`/ads/*`、`/ads.txt`及匿名故障入口`/api/client-status`路由至广告Worker，不影响游戏页面、小说或其他后端；旧广告域名只保留已有客户端的公开接口和管理入口跳转。移除本广告原有Access应用，不修改其他Access应用、组织或环境授权。仓库配置仅声明管理来源及官网/Pages CORS；部署用`--keep-vars`，无管理身份或密码进入前端。先验证Worker真实密码登录，再发布游戏两站；隔离测试身份不用于线上登录。
 
 ## NPC 对话 · Cloudflare Workers AI
@@ -302,7 +304,7 @@ npm run deploy:npc-ai
 
 留影评语复用同一 Worker 与原生 `AI` binding，独立使用 `@cf/qwen/qwen3-30b-a3b-fp8`，不改变 NPC 文字模型；参数集中在 `JOURNEY_APPRAISAL_SETTINGS`。`POST /journey-appraisal` 仅允许官网及本机开发来源，GitHub Pages 与独立预览直接用前端兜底；其他现有 NPC 接口的来源规则不变。输入上限 4096 字节，严格校验封闭字段、成就 / 牵挂枚举和事实一致性，拒绝任意提示、整份存档及未知字段。`NPC_LIMITER` 用独立 `journey:<ip>` 键限流，和闲谈不共用同一个计数键。推理最多 12 秒，客户端最多等待 15 秒，不自动重试；关闭面板取消请求。接口使用模型 JSON 模式和 `/no_think` 短答指令，并给出由真实事实生成的本地参考。模型输出题名、结局、成果和牵挂四个字段；无牵挂事实时牵挂字段必须为空字符串，有事实时才写对应句，不以缺项说明充当正文。成品校验拒绝「尚无记载」「缘簿留白」等资料说明或由缺项推断的孤独。正文 30–80 字，不强制三段或凑字数。Worker 兼容完整 JSON 的单层代码围栏及字段排版空白，拒绝额外说明；缺句末时补句号，尾部逗号等改为句号，不裁切语义。规范化后仍检查每段长度与汉字内容、全文长度、纯文本及明显事实矛盾，合成题名 / 正文，失败时前端自动选择组合式本地评语。输出失败的响应附固定 `outputIssue` 诊断码，不附模型正文或事实摘要。AI 成功结果只保存在当前页面的最多 16 项内存缓存中，按完整事实摘要区分，不改存档 schema。图片仍由 Canvas 本地生成；日志不记录摘要或生成正文，前端没有密钥。
 
-`check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。GitHub Actions 同步执行此检查，但只部署静态站；Worker 和 Cloudflare Pages 分别发布。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
+`check:npc-ai` 先创建输出目录，再将 Wrangler 类型生成到忽略提交的 `artifacts/npc-ai-env.d.ts`，并用独立 tsconfig 检查 Worker。`.github/workflows/npc-ai.yml` 在 `master` 的 NPC Worker 代码、`src/`、根依赖或 TypeScript 配置及该工作流变化时，自动执行 `npm run deploy:npc-ai`，也可手动运行；沿用 `--keep-vars` 与现有密钥，不重置调试开关。Worker 与 Cloudflare Pages 独立发布，不等待游戏测试门禁。更换对话地址时可在构建环境配置 `VITE_NPC_AI_URL`，默认域名、模型、前后端超时、消息和历史长度、输出参数集中在 `src/setting.ts`，镇民换代年限及百年城景间隔也在该文件。域名绑定、CORS 和边缘限流在 Worker 的 `wrangler.jsonc`。
 
 服务端按 `Origin` 完整匹配公网来源：`https://xiuxian.011203.xyz`、`https://chenxuan520.github.io`。本地另允许 `localhost`、`127.0.0.1`、`[::1]` 的 HTTP / HTTPS 任意合法端口（含默认端口），不用逐个加入白名单。拒绝其他 Pages / GitHub 站点、后缀相似域名、混入路径或凭据的来源、多个来源、`null` 或缺失来源。除公开聚合监控 GET 外，所有路由（包括 `/health` 与预检）先校验来源，不通过时返回空的 403，不读取请求体、不调用 AI，也不返回 CORS 放行头。白名单配置空项不会放行无来源请求。部署新的游戏域名时同步更新 `ALLOWED_ORIGINS`；浏览器自动携带来源，手动健康检查也需带允许的 `Origin`。来源检查用于限制其他网页调用，非浏览器脚本可伪造该请求头，不能替代限流或身份认证。请求体最多 8 KB，玩家消息最多 200 字，历史最多六条；对白按来源 IP 每 60 秒允许 12 次请求，配图独立限制为 2 次，限流是边缘节点级保护，不是登录认证。普通闲谈的模型输出最多 512 tokens，关闭深度思考以保证短对白响应，只展示最终回答，Worker 推理超时 12 秒，客户端 20 秒；失败回退本地台词，不自动重试普通闲谈。关闭对话会取消请求并通知上游，返回文本用 DOM 文本节点展示，不能执行 HTML 或修改游戏存档。
 
