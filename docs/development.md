@@ -191,7 +191,7 @@ npx wrangler d1 migrations apply qinglan-leaderboard --remote --config workers/l
 npx wrangler deploy --config workers/leaderboard/wrangler.jsonc --keep-vars
 ```
 
-**自动部署**：推送 `master` 后，`.github/workflows/leaderboard.yml` 用仓库 Secret `CLOUDFLARE_API_TOKEN` 依次执行上面的 D1 迁移（已应用的跳过）和 `npm run deploy:leaderboard`；该令牌须含 Workers 脚本编辑与 D1 编辑权限，未配置时工作流跳过。Worker 引用 `src/` 的道果与事实校验代码，因此每次推送都部署。上面两条命令保留为本机备用。
+**自动部署**：推送 `master` 后，`.github/workflows/leaderboard.yml` 用仓库 Secret `CLOUDFLARE_WORKERS_TOKEN`（Workers 脚本编辑权限，与 Pages 用的 `CLOUDFLARE_API_TOKEN` 分开）执行 `npm run deploy:leaderboard`，未配置时工作流跳过。Worker 引用 `src/` 的道果与事实校验代码，因此每次推送都部署。D1 迁移改动极少，新增迁移时仍用上面第一条命令手动执行（需要 D1 编辑权限）。
 
 ## 妖物志遭遇与未知形影
 

@@ -3521,4 +3521,4 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 ### 2026-10-30 万魂幡题词与排行榜 Worker 自动部署
 
 - 用户选定：万魂幡页标题下题词由「一入此幡深似海，从此道友是幡魂。」改为「修仙不努力，万魂幡里做兄弟。」，其余页面不变。
-- 新增 `.github/workflows/leaderboard.yml`：push `master` 或手动触发时先 `wrangler d1 migrations apply --remote`，再 `npm run deploy:leaderboard`；令牌取自仓库 Secret `CLOUDFLARE_API_TOKEN`，未配置时跳过。`docs/development.md` 同步说明。
+- 新增 `.github/workflows/leaderboard.yml`：push `master` 或手动触发时执行 `npm run deploy:leaderboard`，令牌取自独立的仓库 Secret `CLOUDFLARE_WORKERS_TOKEN`，未配置时跳过。首版曾复用 Pages 令牌并在 CI 中执行 D1 迁移，因该令牌无 Workers / D1 权限而失败（7403），已改为独立 Secret、迁移保留手动。本次题词已用用户提供的令牌手动部署上线并在官网核验。
