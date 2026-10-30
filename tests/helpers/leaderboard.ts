@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { factsSealInput, FACTS_VERSION } from '../../src/leaderboard-integrity.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import worker, { type LeaderboardWorkerEnv } from '../../workers/leaderboard/index.ts';
@@ -78,6 +80,24 @@ export function submitLeaderboard(
   cookie?: string,
   headers: Record<string, string> = {},
 ) {
+  // 旧有事务测试统一构造有效摘要；刻意传seal:null仍保留给拒绝用例。
+  const payload = JSON.parse(JSON.stringify(body));
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    Object.hasOwn(payload, 'facts') &&
+    !Object.hasOwn(payload, 'seal')
+  ) {
+    try {
+      payload.seal = {
+        v: FACTS_VERSION,
+        h: createHash('sha256').update(factsSealInput(payload.facts)).digest('hex'),
+      };
+    } catch {
+      payload.seal = null;
+    }
+  }
   return new Request(leaderboardUrl, {
     method: 'POST',
     headers: {
@@ -87,7 +107,7 @@ export function submitLeaderboard(
       ...(cookie ? { Cookie: cookie } : {}),
       ...headers,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
   });
 }
 export async function anonymousCookie(store: ReturnType<typeof leaderboardStore>, body: unknown) {

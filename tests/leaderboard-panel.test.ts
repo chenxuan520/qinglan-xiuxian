@@ -8,6 +8,7 @@ import {
   type LeaderboardEntry,
 } from '../src/leaderboard-contract.ts';
 import { freshSave } from '../src/progress.ts';
+import { TAMPERED_LEADERBOARD_MESSAGE } from '../src/leaderboard-integrity.ts';
 
 // 仅测试控制器的请求、幂等与迟到状态；真实布局由 MCP 正常入口另验。
 class Element {
@@ -72,6 +73,12 @@ const board = (entries: LeaderboardEntry[] = []) => ({
 });
 async function turn() {
   for (let i = 0; i < 12; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+}
+async function waitFor(ready: () => boolean) {
+  const deadline = Date.now() + 3000;
+  while (!ready() && Date.now() < deadline)
+    await new Promise<void>((resolve) => setTimeout(resolve, 2));
+  assert.equal(ready(), true, '等待控制器完成当前操作');
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -141,11 +148,13 @@ function environment(fetcher: typeof fetch) {
     score = 2500,
     eligible: LeaderboardFacts | null = facts(),
     closes = 0;
+  let blockedReason = '';
   const panel = new LeaderboardPanel(host as unknown as HTMLElement, {
     isCurrent: () => current,
     enabled: () => enabled,
     score: () => score,
     eligibleFacts: () => eligible,
+    blockedReason: () => blockedReason,
     client: new LeaderboardClient({
       origin: 'http://localhost:5173',
       fetcher,
@@ -190,6 +199,9 @@ function environment(fetcher: typeof fetch) {
     },
     set eligible(v: LeaderboardFacts | null) {
       eligible = v;
+    },
+    set blockedReason(v: string) {
+      blockedReason = v;
     },
   };
 }
@@ -250,6 +262,7 @@ test('满榜平分不显示署名；入榜成功后读权威榜单，点击/键�
       const e = f.submit();
       f.submit();
       assert.equal(e.defaultPrevented, true);
+      await waitFor(() => posts === 1);
       assert.equal(posts, 1);
       assert.equal(f.el('name').disabled, true);
       assert.equal(f.el('submit').disabled, true);
@@ -293,7 +306,7 @@ test('低分更新保留服务端最高分，刷新失败也不把已确认入�
       await f.panel.load();
       f.el('name').value = entry.name;
       f.submit();
-      await turn();
+      await waitFor(() => !f.el('submit').disabled);
       assert.match(f.el('status').textContent, /已保留这个名字的最高道果/);
       assert.match(f.el('status').textContent, /榜单暂未刷新/);
       assert.equal(f.el('submit').disabled, false);
@@ -326,7 +339,7 @@ test('无效署名、占名、限流及过期前百资格均不显示假成功�
         assert.match(f.el('status').textContent, /姓名需为/);
         f.el('name').value = '自取名';
         f.submit();
-        await turn();
+        await waitFor(() => posts === 1 && !f.el('submit').disabled);
         assert.equal(posts, 1);
         assert.equal(f.el('name').value, '自取名');
         assert.equal(f.el('submit').disabled, false);
@@ -395,6 +408,8 @@ test('换世、关闭开关或移走面板后，迟到留名不改新对象、�
         await f.panel.load();
         f.el('name').value = '旧世姓名';
         f.submit();
+        await waitFor(() => calls === 2);
+        assert.equal(calls, 2);
         const writes = f.el('status').textWrites;
         if (change === 'life') f.eligible = { ...facts(), age: 101 };
         else if (change === 'disabled') f.enabled = false;
@@ -407,6 +422,29 @@ test('换世、关闭开关或移走面板后，迟到留名不改新对象、�
       },
     );
   }
+});
+
+test('改动标记阻止读榜和提交，明确显示原因且不影响关闭', async () => {
+  let calls = 0;
+  await fixture(
+    async () => {
+      calls++;
+      return Response.json(board());
+    },
+    async (f) => {
+      f.blockedReason = TAMPERED_LEADERBOARD_MESSAGE;
+      await f.panel.load();
+      f.el('name').value = '不应上传';
+      f.submit();
+      await turn();
+      assert.equal(calls, 0);
+      assert.equal(f.el('sign').hidden, true);
+      assert.equal(f.el('eligibility').textContent, TAMPERED_LEADERBOARD_MESSAGE);
+      assert.equal(f.el('status').textContent, TAMPERED_LEADERBOARD_MESSAGE);
+      f.click('close');
+      assert.equal(f.closes, 1);
+    },
+  );
 });
 
 test('设置关闭时不读取、不留名、不写提示', async () => {

@@ -408,6 +408,29 @@ test('main.ts 所有存档写入都经过 writeSave，启动与多窗口入口�
   assert.match(source, /function handleAction\([^)]*\) \{\n {2}if \(saveLock\) \{/);
 });
 
+test('签名与改动标记只在真实写入成功后应用，失败不会污染原存档或操作副本', () => {
+  const { context, storage } = harness({ stored: null });
+  const next = structuredClone(context.save);
+  next.cultivation = 123;
+  next.factsTampered = true;
+  const original = JSON.stringify(context.save),
+    candidate = JSON.stringify(next);
+  const setItem = storage.setItem;
+  storage.setItem = () => {
+    throw new DOMException('full', 'QuotaExceededError');
+  };
+  assert.throws(() => context.writeSave(next, null), /full/);
+  assert.equal(JSON.stringify(next), candidate);
+  assert.equal(JSON.stringify(context.save), original);
+  assert.equal(storage.getItem(SAVE_KEY), null);
+  storage.setItem = setItem;
+  context.writeSave(next, null);
+  const saved = JSON.parse(storage.getItem(SAVE_KEY)!);
+  assert.deepEqual(next.factsSeal, saved.factsSeal);
+  assert.equal(saved.factsTampered, true);
+  assert.equal(context.save.factsTampered, false);
+});
+
 test('实际启动恢复代码只续同结构对局，旧档和高版本保留永久进度而不续局', () => {
   const startup = source.slice(
     source.indexOf('let pendingRun: Game | null = null;'),

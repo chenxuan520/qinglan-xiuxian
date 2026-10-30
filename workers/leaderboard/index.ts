@@ -1,3 +1,4 @@
+import { createFactsSeal, verifyFactsSeal } from '../../src/leaderboard-integrity.ts';
 import {
   LEADERBOARD_LIMIT,
   LEADERBOARD_MAX_BYTES,
@@ -10,7 +11,7 @@ import { leaderboardAdminApi } from './admin-api.ts';
 import { leaderboardPage } from './page.ts';
 
 export type LeaderboardWorkerEnv = Pick<LeaderboardEnv, 'DB' | 'SUBMIT_LIMITER'> &
-  Partial<Pick<LeaderboardEnv, 'ADMIN_AUTH'>>;
+  Partial<Pick<LeaderboardEnv, 'ADMIN_AUTH' | 'LEGACY_SEAL_UNTIL'>>;
 const ORIGIN = 'https://xiuxian.011203.xyz';
 const PATH = '/api/leaderboard';
 export const OWNER_COOKIE = '__Host-qinglan-rank-owner';
@@ -121,16 +122,23 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
   if (!body || typeof body !== 'object' || Array.isArray(body))
     return error('invalid-input', '排名资料格式不正确。', 400);
   const fields = body as Record<string, unknown>;
-  const name = normalizeLeaderboardName(fields.name),
-    facts = parseLeaderboardFacts(fields.facts);
+  const name = normalizeLeaderboardName(fields.name);
+  const hasSeal = Object.hasOwn(fields, 'seal');
+  const transitionEnd = Date.parse(env.LEGACY_SEAL_UNTIL ?? '');
+  const remaining = transitionEnd - Date.now();
+  // 默认严格；显式部署过渡期最长1小时、到期自动收紧，不形成永久无摘要入口。
+  const legacyTransition = !hasSeal && remaining > 0 && remaining <= 3600000;
+  // 先限制事实的固定结构，避免对恶意深层JSON递归规范化。校验过程不读写数据库。
+  const facts = parseLeaderboardFacts(fields.facts);
+  if (!facts) return error('invalid-input', '排名资料格式不正确。', 400);
+  const sealValid = hasSeal && verifyFactsSeal(fields.facts, fields.seal);
   if (
-    Object.keys(fields).length !== 3 ||
+    Object.keys(fields).length !== (hasSeal ? 4 : 3) ||
     fields.version !== LEADERBOARD_VERSION ||
     !name ||
-    !facts
-  ) {
+    (!sealValid && !legacyTransition)
+  )
     return error('invalid-input', '排名资料格式不正确。', 400);
-  }
   const score = scoreLeaderboardFacts(facts);
   if (
     !Number.isSafeInteger(score.total) ||
@@ -146,7 +154,7 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
       'Set-Cookie': newOwnerCookie(),
     });
   const ownerHash = await digest(owner),
-    submissionHash = await digest(JSON.stringify(facts));
+    submissionHash = createFactsSeal(facts).h;
   const now = new Date().toISOString();
   const results = await env.DB.batch<RankingRow>([
     env.DB.prepare(

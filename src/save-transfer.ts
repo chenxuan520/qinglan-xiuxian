@@ -24,9 +24,27 @@ import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
 import { validAutoplayBuild } from './autoplay-build.ts';
 import { isExtremeLife } from './life-mode.ts';
+import { inspectSaveIntegrity, sealSaveSnapshot } from './leaderboard-integrity.ts';
 
 export const MAX_SAVE_FILE_BYTES = 10 * 1024 * 1024;
 export const UNREADABLE_SAVE_PREFIX = `${SAVE_KEY}-unreadable-`;
+
+// 验的是原始事实，必须在readSave补默认字段、修复历史格式之前执行。
+export function readSealedSave(raw: string | null) {
+  let data: unknown = null;
+  try {
+    data = raw === null ? null : JSON.parse(raw);
+  } catch {
+    return readSave(raw);
+  }
+  const tampered = inspectSaveIntegrity(data, 'local');
+  const read = readSave(raw);
+  if (read.status === 'ok') {
+    read.save.factsTampered ||= tampered;
+    read.save = sealSaveSnapshot(read.save);
+  }
+  return read;
+}
 
 // 读不懂的原始存档另存一份再允许覆盖；同样内容只留一份。
 export function backupUnreadableSave(
@@ -91,7 +109,7 @@ export function exportSave(save: SaveData, run: Game | null) {
       version: 1,
       exportedAt: new Date().toISOString(),
       save: {
-        ...save,
+        ...sealSaveSnapshot(save),
         activeRun:
           save.journeyEnded || save.pendingReincarnation ? null : (run?.snapshot() ?? null),
       },
@@ -116,6 +134,7 @@ export function importSave(text: string) {
   if (file?.format !== undefined && (file.format !== 'qinglan-save' || file.version !== 1))
     throw new Error('不支持此存档格式或版本');
   const data = file?.format === 'qinglan-save' ? file.save : file;
+  const tampered = inspectSaveIntegrity(data, 'import');
   // 与本机读档共用旧版遭遇升级规则；无快照的旧记录不伪造战果。
   if (data && (data.schema ?? 0) < 19 && data.mortal?.marketSocial?.ambush)
     data.mortal.marketSocial.ambush = null;
@@ -209,5 +228,7 @@ export function importSave(text: string) {
   // 老版本档的进行中对局格式不保证兼容，升级时直接放弃历练、保留永久进度。
   const legacyRun = data.schema !== SAVE_SCHEMA;
   const run = restoreSavedRun(save, legacyRun && !isExtremeLife(save) ? null : data.activeRun);
+  save.factsTampered ||= tampered;
+  Object.assign(save, sealSaveSnapshot(save));
   return { save, run };
 }

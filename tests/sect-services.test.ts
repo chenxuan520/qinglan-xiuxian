@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost, readSave, SAVE_SCHEMA, trainingCost } from '../src/progress.ts';
@@ -77,7 +78,7 @@ test('十六宗各有可真实结算的专长，原本命、境界与全局掉�
     }
     if (q.recipe) assert.ok(s.medicine.recipes.includes(q.recipe));
     assert.ok(validMortal(s.mortal, s.age), sect.id);
-    assert.deepEqual(importSave(exportSave(s)).save, s, sect.id);
+    assert.deepEqual(importSave(exportSave(s)).save, sealSaveSnapshot(s), sect.id);
     const before = JSON.stringify(s);
     assert.equal(executeSectService(s, choice, sectServiceStamp(s)), undefined);
     assert.equal(JSON.stringify(s), before);
@@ -216,7 +217,7 @@ test('精研五阶赐灵品丹；献器保护本命，非本命入门器的已�
   assert.ok(validMortal(s.mortal, s.age));
   const restored = importSave(exportSave(s)).save;
   assert.ok(!restored.artifacts.includes(other));
-  assert.deepEqual(restored, s);
+  assert.deepEqual(restored, sealSaveSnapshot(s));
 });
 test('换丹不生成永久丹与价值循环，炉料、境界及丹囊上限校验不能跳过', () => {
   for (const id of ['area', 'abyss', 'curse']) {
@@ -372,7 +373,7 @@ test('一器连修跨过五阶和十阶各赐丹一次，法宝及炼器只转�
   assert.ok(gifts.every((m) => m.years > 0));
   assert.ok(!s.artifacts.includes(item));
   assert.equal(s.forge[item], 0);
-  assert.deepEqual(importSave(exportSave(s)).save, s);
+  assert.deepEqual(importSave(exportSave(s)).save, sealSaveSnapshot(s));
   const before = JSON.stringify(s);
   assert.equal(executeSectService(s, item, sectServiceStamp(s)), undefined);
   assert.equal(JSON.stringify(s), before);
@@ -396,7 +397,7 @@ test('献丹按整份折价连续淬体，不服药、不退现金、不重复�
   assert.equal(s.medicine.bag[id], before.medicine.bag[id] - 1);
   assert.deepEqual(s.medicine.active, before.medicine.active);
   assert.equal(s.stones, before.stones - q.stones - q.reserve);
-  assert.deepEqual(importSave(exportSave(s)).save, s);
+  assert.deepEqual(importSave(exportSave(s)).save, sealSaveSnapshot(s));
   const late = fixture('devour');
   late.training.vitality = 19;
   const valuable = MEDICINES.find(

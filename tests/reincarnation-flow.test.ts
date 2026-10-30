@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import { notificationLeaves } from './helpers/notification-leaves.ts';
 import { homeTownEntrance } from '../src/home-town.ts';
 import test from 'node:test';
@@ -86,6 +87,7 @@ const flow = new Script(
 );
 
 function harness(save: SaveData) {
+  Object.assign(save, sealSaveSnapshot(save));
   const noop = () => {};
   const element = {
     remove: noop,
@@ -492,6 +494,7 @@ test('重抽或确认轮回时发现另一窗口更新存档，保留存档锁�
 
 test('主动轮回保留清档确认与取消，确认后清旧进度并直接展示新命盘', () => {
   const save = previousLife();
+  save.factsTampered = true;
   const context = harness(save);
   context.pendingRun = {
     snapshot: () => ({ previousRun: true }),
@@ -531,7 +534,8 @@ test('主动轮回保留清档确认与取消，确认后清旧进度并直接�
   departHometown(expected);
   // 药方种子独立随机；比较清档结果，不要求两次 freshSave 抽到同一种子。
   expected.medicine.recipeSeed = save.medicine.recipeSeed;
-  assert.deepEqual(save, expected);
+  assert.deepEqual(save, sealSaveSnapshot(expected));
+  assert.equal(save.factsTampered, false);
   assert.equal(context.shownHumanLetters.size, 0);
 });
 
@@ -887,8 +891,8 @@ test('真仙主动重启进入同一离界终章：取消保留修行，赠魔�
   save.completed = [data.FINAL_TRIAL_STAGE];
   save.cultivation = 1e9;
   save.forge.skull = 10;
-  const old = JSON.stringify(save);
   const context = harness(save);
+  const old = JSON.stringify(save);
   context.handleAction('reincarnate');
   assert.equal(context.panel, 'immortal-gate');
   assert.doesNotMatch(context.modal.innerHTML, /只能轮回|确认轮回/);

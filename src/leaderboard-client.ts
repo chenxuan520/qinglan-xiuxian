@@ -1,3 +1,4 @@
+import { createFactsSeal } from './leaderboard-integrity.ts';
 import { leaderboardAvailable } from './leaderboard-availability.ts';
 import {
   LEADERBOARD_MAX_BYTES,
@@ -108,11 +109,22 @@ export class LeaderboardClient {
   ): Promise<LeaderboardResult> {
     const normalized = normalizeLeaderboardName(name);
     if (!normalized) throw new LeaderboardError('invalid-input');
+    if (signal.aborted) throw new LeaderboardError('cancelled');
+    if (!this.available()) throw new LeaderboardError('unavailable');
     let body: string;
     try {
-      body = JSON.stringify({ version: LEADERBOARD_VERSION, name: normalized.name, facts });
+      const snapshot = structuredClone(facts);
+      const seal = createFactsSeal(snapshot);
+      if (signal.aborted || !this.available()) throw new LeaderboardError('cancelled');
+      body = JSON.stringify({
+        version: LEADERBOARD_VERSION,
+        name: normalized.name,
+        facts: snapshot,
+        seal,
+      });
       if (new Blob([body]).size > LEADERBOARD_MAX_BYTES) throw Error('too-large');
-    } catch {
+    } catch (error) {
+      if (error instanceof LeaderboardError) throw error;
       throw new LeaderboardError('invalid-input');
     }
     const value = await this.request(signal, body);

@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost, readSave, SAVE_SCHEMA } from '../src/progress.ts';
@@ -65,7 +66,7 @@ test('完整固定种子同时覆盖获得和落空，两者都付费一年并�
     assert.equal(s.starter, before.starter);
     if (found) assert.equal(s.forge.pagoda, 0);
     else assert.equal(s.forge.pagoda, before.forge.pagoda);
-    assert.deepEqual(importSave(exportSave(s)).save, s);
+    assert.deepEqual(importSave(exportSave(s)).save, sealSaveSnapshot(s));
     const snapshot = JSON.stringify(s);
     assert.equal(seekArtifact(s, 'fire', venueStamp(s)), undefined);
     assert.equal(JSON.stringify(s), snapshot);

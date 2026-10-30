@@ -110,5 +110,6 @@ export function debugGrant(save: SaveData, input: DebugGrant) {
     recordCurioAchievement(next);
     message = `${curioName(id)}已收入行囊 · 持有即生效`;
   } else return { error: '请选择发放类别。' };
+  next.factsTampered = true;
   return { next, message };
 }

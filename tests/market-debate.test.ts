@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -99,7 +100,7 @@ test('灵品80/珍品200明码抄录：只学方、不送药、不改本世配�
     assert.deepEqual(s.medicine.bag, before.medicine.bag);
     assert.equal(s.medicine.recipeSeed, before.medicine.recipeSeed);
     assert.match(debateReason(s, ids[1], 1, 'talk'), /再历/);
-    assert.deepEqual(importSave(exportSave(s, null)).save, s);
+    assert.deepEqual(importSave(exportSave(s, null)).save, sealSaveSnapshot(s));
   }
 });
 test('付费抄录不要求先解锁丹方对应秘境', () => {

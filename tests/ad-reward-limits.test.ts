@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave, realmCost, SAVE_SCHEMA } from '../src/progress.ts';
@@ -51,7 +52,7 @@ test('冷却和历史借寿次数同版导出回导、刷新不重置，下一�
   assert.equal(loaded.status, 'ok');
   assert.equal(loaded.save.suppliesReadyAt, s.suppliesReadyAt);
   const imported = importSave(exportSave(s, null)).save;
-  assert.deepEqual(imported, loaded.save);
+  assert.deepEqual(imported, sealSaveSnapshot(loaded.save));
   assert.equal(lifespanAdsRemaining(imported), 0);
   assert.equal(canClaimLifespanAd(imported), false);
   const nextLife = freshSave();

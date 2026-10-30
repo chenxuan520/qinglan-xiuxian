@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -525,7 +526,7 @@ test('旧研习和委托立即结算剩余年岁，不重复收费或领取收�
     assert.equal(resolveActivity(s), false);
     const restored = importSave(exportSave(s, null)).save;
     assert.equal(resolveActivity(restored), false);
-    assert.deepEqual(restored, parseSave(JSON.stringify(s)));
+    assert.deepEqual(restored, sealSaveSnapshot(parseSave(JSON.stringify(s))));
   }
 });
 

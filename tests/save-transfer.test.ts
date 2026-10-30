@@ -10,6 +10,7 @@ import { joinSect } from '../src/mortal.ts';
 import { SECTS } from '../src/mortal-data.ts';
 import { chooseSmithStory } from '../src/town-story.ts';
 import { importConfirmPanel } from '../src/lobby-ui.ts';
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 
 test('新功能完整往返：丹囊药效药方限购、宗门城景旧事奇遇、履历与受伤续局', () => {
   const save = freshSave('heaven', ['fire']);
@@ -197,13 +198,16 @@ test('存档导入自动收取旧遗宝，保留永久进度、五行、炼器�
   const before = JSON.stringify(save);
   const file = exportSave(save, null);
   const restored = importSave(file);
-  assert.deepEqual(restored.save, parseSave(before));
+  assert.deepEqual(restored.save, sealSaveSnapshot(parseSave(before)));
   assert.ok(['brush', 'whip'].every((id) => restored.save.artifacts.includes(id)));
   assert.deepEqual(restored.save.artifactDrops, []);
   assert.equal(restored.run, null);
   assert.equal(JSON.stringify(save), before);
   assert.equal(JSON.parse(file).format, 'qinglan-save');
-  assert.deepEqual(importSave(before).save, restored.save);
+  assert.deepEqual(
+    importSave(before).save,
+    sealSaveSnapshot({ ...restored.save, factsTampered: true }),
+  );
   assert.deepEqual(importSave(exportSave(restored.save, null)).save, restored.save);
 });
 

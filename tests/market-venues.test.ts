@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import { enterNextMarketBatch } from './market-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -172,7 +173,7 @@ test('寻物只在化神开放，成本与物品同存，本命不变、不会�
           !found && before.mortal.auction!.releasedArtifacts.includes(offer.item.id),
         );
       }
-      assert.deepEqual(importSave(exportSave(a, null)).save, a);
+      assert.deepEqual(importSave(exportSave(a, null)).save, sealSaveSnapshot(a));
     }
   }
   assert.ok(checkedArtifact);
@@ -209,7 +210,7 @@ test('旧识求助需要真实往来，同批结果固定，核验或资助不�
     assert.deepEqual(s.medicine.bag, before.medicine.bag);
     assert.equal(s.stones, before.stones - (method === 'pay' ? offer.price : 0));
     assert.match(venueActionReason(s, 'favor@check', venueStamp(s)), /再过/);
-    assert.deepEqual(importSave(exportSave(s, null)).save, s);
+    assert.deepEqual(importSave(exportSave(s, null)).save, sealSaveSnapshot(s));
   }
   const low = reunion(0);
   if (venueFavor(low)!.other.realmIndex > 0)
@@ -253,7 +254,7 @@ test('新增存档往返保留、旧档正常升级，损坏字段本机安全�
   const s = fixture();
   executeVenue(s, 'work', venueStamp(s));
   assert.ok(validMarketVenues(s.mortal.marketVenues, s.age));
-  assert.deepEqual(importSave(exportSave(s, null)).save, s);
+  assert.deepEqual(importSave(exportSave(s, null)).save, sealSaveSnapshot(s));
   const old = structuredClone(s);
   old.schema = SAVE_SCHEMA - 1;
   delete old.mortal.marketVenues;

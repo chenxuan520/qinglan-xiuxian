@@ -38,6 +38,7 @@ test('排行榜契约只提取计分事实；成仙前未结束不上传，通�
   const save = freshSave();
   assert.equal(extractLeaderboardFacts(save), null);
   save.completed = [FINAL_TRIAL_STAGE];
+  save.age = 35778;
   save.cultivation = IMMORTAL_CULTIVATION;
   const snapshot = JSON.stringify(save);
   const facts = extractLeaderboardFacts(save)!;
@@ -70,6 +71,7 @@ test('后端使用真实道果公式重算，涵盖全部灵根、极限、根�
       save.lifeMode = lifeMode;
       save.cultivation = IMMORTAL_CULTIVATION;
       save.completed = [0, 1, 2, 3, 4, 5, 6];
+      save.age = 35778;
       save.training = { vitality: 20, power: 20, speed: 20 };
       save.retreatBonus = { vitality: 37, power: 29, speed: 13 };
       save.forge[save.starter] = 10;
@@ -202,6 +204,7 @@ test('同浏览器只保留最高分，重复重试幂等；另一浏览器和�
     const high = endingSave();
     high.cultivation = 200000;
     high.completed = [0, 1, 2, 3, 4, 5];
+    high.age = 35778;
     high.training.power = 20;
     const higher = await (
       await worker.fetch(submitLeaderboard(body(high), cookie), store.env)
@@ -394,6 +397,7 @@ test('POST原子复核过时GET门槛：不够当前前百不占名、同分不�
     const high = endingSave();
     high.cultivation = IMMORTAL_CULTIVATION;
     high.completed = [0, 1, 2, 3, 4, 5, 6];
+    high.age = 35778;
     high.pendingReincarnation = null;
     const accepted = await worker.fetch(submitLeaderboard(body(high), cookie), store.env);
     assert.equal(accepted.status, 200);

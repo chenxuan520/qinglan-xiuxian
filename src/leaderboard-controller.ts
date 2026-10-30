@@ -16,6 +16,7 @@ export interface LeaderboardPanelOptions {
   eligibleFacts(): LeaderboardFacts | null;
   score?(): number;
   enabled?(): boolean;
+  blockedReason?(): string;
   client?: LeaderboardClient;
   onClose?(): void;
 }
@@ -90,6 +91,7 @@ export class LeaderboardPanel {
   }
   private canSign() {
     return (
+      !this.options.blockedReason?.() &&
       !!this.board &&
       !!this.options.eligibleFacts() &&
       (!this.options.score || canSubmitLeaderboardScore(this.board, this.options.score()))
@@ -102,11 +104,12 @@ export class LeaderboardPanel {
     this.element('[data-leaderboard-score]').textContent =
       score === undefined ? '' : `此世道果 ${score}`;
     this.element('[data-leaderboard-eligibility]').textContent =
-      !this.board || eligible
+      this.options.blockedReason?.() ||
+      (!this.board || eligible
         ? ''
         : this.options.eligibleFacts()
           ? `当前入榜需高于 ${this.board.minimumScore} 道果。`
-          : '成仙或此世落幕后，可选择署名入榜。';
+          : '成仙或此世落幕后，可选择署名入榜。');
   }
   private list(board: LeaderboardBoard) {
     this.board = board;
@@ -154,6 +157,11 @@ export class LeaderboardPanel {
   }
   async load() {
     if (this.busy || !this.current()) return;
+    if (this.options.blockedReason?.()) {
+      this.eligibility();
+      this.status(this.options.blockedReason());
+      return;
+    }
     if (!this.client.available()) {
       this.status('排行榜仅在官网开放。');
       this.element('[data-leaderboard-sign]').hidden = true;
@@ -176,6 +184,11 @@ export class LeaderboardPanel {
     }
   }
   private async submit() {
+    if (this.options.blockedReason?.()) {
+      this.eligibility();
+      this.status(this.options.blockedReason());
+      return;
+    }
     if (this.busy || !this.current() || !this.canSign()) return;
     const input = this.element<HTMLInputElement>('[data-leaderboard-name]');
     const name = normalizeLeaderboardName(input.value);

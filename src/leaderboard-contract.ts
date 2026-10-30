@@ -1,4 +1,6 @@
+import { projectLeaderboardFactsV1, LEADERBOARD_ACHIEVEMENTS_V1 } from './leaderboard-facts-v1.ts';
 import type { SaveData } from './progress.ts';
+import type { FactsSeal } from './leaderboard-integrity.ts';
 import type { CultivationPath, ElementId, SpiritRootId } from './data.ts';
 import type { LifeMode } from './life-mode.ts';
 import type { AdUsage } from './journey-score.ts';
@@ -54,62 +56,18 @@ export interface LeaderboardSubmission {
   version: 1;
   name: string;
   facts: LeaderboardFacts;
+  seal: FactsSeal;
 }
 export interface LeaderboardResult {
   version: 1;
   status: 'saved' | 'unchanged';
   entry: LeaderboardEntry;
 }
-const ACHIEVEMENTS = [
-  'story',
-  'permanent-medicine',
-  'curio-three',
-  'mastery',
-  'three-paths',
-  'level-100',
-  'collection',
-  'six-immortals',
-  'forge',
-  'training-master',
-  'five-tribulations',
-  'hard-immortal',
-  'one-life-clear',
-  'rootless-immortal',
-] as const;
-export const LEADERBOARD_ACHIEVEMENTS: readonly string[] = ACHIEVEMENTS;
+export const LEADERBOARD_ACHIEVEMENTS = LEADERBOARD_ACHIEVEMENTS_V1;
 
 export function extractLeaderboardFacts(save: SaveData): LeaderboardFacts | null {
-  const ending =
-    save.pendingReincarnation ??
-    (save.journeyEnded || save.completed.includes(6) ? 'immortal' : null);
-  if (!ending) return null;
-  return {
-    ending,
-    lifeMode: save.lifeMode,
-    cultivation: save.cultivation,
-    completed: [...save.completed],
-    age: save.age,
-    tribulations: save.tribulations,
-    path: save.path,
-    spiritRoot: save.spiritRoot,
-    rootElements: [...save.rootElements],
-    training: { ...save.training },
-    retreatBonus: { ...save.retreatBonus },
-    forge: { ...save.forge },
-    artifacts: [...save.artifacts],
-    starter: save.starter,
-    curios: Object.keys(save.curios.bag).filter(
-      (id) => (save.curios.bag[id as keyof typeof save.curios.bag] ?? 0) > 0,
-    ),
-    acquiredCurios: [...save.curios.acquired],
-    member: save.mortal.member?.id ?? null,
-    mastery: { ...save.mortal.mastery },
-    peiyingUsed: save.medicine.used.peiying ?? 0,
-    achievements: ACHIEVEMENTS.filter((id) => Object.hasOwn(save.chronicle.milestones, id)),
-    inherited:
-      !!save.birthInheritance || Object.hasOwn(save.chronicle.milestones, 'birth-inheritance'),
-    adUsage: { ...save.adUsage },
-  };
+  const facts = projectLeaderboardFactsV1(save);
+  return facts.ending ? { ...facts, ending: facts.ending } : null;
 }
 export function normalizeLeaderboardName(value: unknown) {
   if (typeof value !== 'string' || /[\p{Cc}\p{Cf}<>]/u.test(value)) return null;

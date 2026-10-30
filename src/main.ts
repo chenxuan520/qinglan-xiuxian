@@ -1,3 +1,4 @@
+import { TAMPERED_LEADERBOARD_MESSAGE, sealSaveSnapshot } from './leaderboard-integrity.ts';
 import { bindSettlementDirectory } from './settlement-directory-source.ts';
 import { retargetPendingFirstTour } from './first-run-tour-state.ts';
 import { STANDALONE } from './build-mode.ts';
@@ -119,7 +120,6 @@ import {
 import {
   parseSave,
   endExtremeLife,
-  readSave,
   freshSave,
   applyBirthInheritance,
   resolveInheritance,
@@ -144,6 +144,7 @@ import { Game } from './game.ts';
 import {
   exportSave,
   importSave,
+  readSealedSave,
   restoreSavedRun,
   backupUnreadableSave,
   MAX_SAVE_FILE_BYTES,
@@ -241,7 +242,7 @@ try {
 } catch {
   storageAvailable = false;
 }
-const saveRead = readSave(raw);
+const saveRead = readSealedSave(raw);
 // 读不懂的存档先另存原文，玩家确认前不写入；来自新版本的存档只读不写。
 let saveLock: 'unreadable' | 'newer' | 'stale' | null =
   saveRead.status === 'unreadable' || saveRead.status === 'newer' ? saveRead.status : null;
@@ -448,8 +449,11 @@ function writeSave(data: SaveData, run: Game | null, reset = false) {
     lockStaleSave();
     throw new Error('存档已在其他窗口更新');
   }
-  const text = JSON.stringify({ ...data, activeRun: run?.snapshot() ?? null });
+  const snapshot = sealSaveSnapshot(data);
+  const text = JSON.stringify({ ...snapshot, activeRun: run?.snapshot() ?? null });
   localStorage.setItem(SAVE_KEY, text);
+  data.factsSeal = snapshot.factsSeal;
+  data.factsTampered = snapshot.factsTampered;
   lastSaveText = text;
   storageAvailable = true;
   const storageNote = globalThis.document?.querySelector?.('.lobby-save-status.storage-warning');
@@ -1146,6 +1150,7 @@ function queueRanking() {
   if (
     !rankingEnabled() ||
     saveLock ||
+    save.factsTampered ||
     rankingOffer ||
     rankingQueuedSeed === save.medicine.recipeSeed ||
     (!save.pendingReincarnation &&
@@ -1158,7 +1163,7 @@ function queueRanking() {
   void rankingSource
     .load()
     .then((module) => {
-      if (epoch === rankingEpoch && rankingEnabled() && !saveLock)
+      if (epoch === rankingEpoch && rankingEnabled() && !saveLock && !save.factsTampered)
         rankingOffer ??= new module.LeaderboardOffer(rankingEnabled);
     })
     .catch(() => {});
@@ -1166,6 +1171,7 @@ function queueRanking() {
 function rankingReady() {
   if (
     !rankingEnabled() ||
+    save.factsTampered ||
     game ||
     pendingRun ||
     saveLock ||
@@ -1188,6 +1194,7 @@ function rankingReady() {
   );
 }
 function showRankingOffer() {
+  if (save.factsTampered) return;
   const host = panel ? modal.querySelector('.panel') : ui.querySelector('.lobby-main');
   if (!host || host.querySelector('[data-ranking-offer]')) return;
   const notice = document.createElement('div');
@@ -1254,7 +1261,9 @@ function renderRanking() {
         rankingPanel = new module.LeaderboardPanel(host, {
           isCurrent: current,
           enabled: rankingEnabled,
-          eligibleFacts: () => (pendingRun ? null : module.extractLeaderboardFacts(save)),
+          eligibleFacts: () =>
+            pendingRun || save.factsTampered ? null : module.extractLeaderboardFacts(save),
+          blockedReason: () => (save.factsTampered ? TAMPERED_LEADERBOARD_MESSAGE : ''),
           score: () => module.journeyScore(save).total,
           onClose: closeRanking,
         });
@@ -1969,7 +1978,7 @@ function shellBindings(): ActionShell {
     get rootPickerView() { return rootPickerView; },
     get sceneLoading() { return sceneLoading; },
     set sceneLoading(next) { sceneLoading = next; },
-    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled, leaderboardAvailable() ? leaderboardSettings(rankingPreference.enabled) : ''); },
+    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled, leaderboardAvailable() ? leaderboardSettings(rankingPreference.enabled, save.factsTampered) : ''); },
     get refreshAutoplaySettings() { return refreshAutoplaySettings; },
     get settlementModal() { return settlementModal; },
     get showAuction() { return showAuction; },

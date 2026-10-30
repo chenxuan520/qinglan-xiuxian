@@ -3,6 +3,10 @@ import {
   MAX_FORGE_LEVEL,
   SPIRIT_ROOTS,
   STAGES,
+  STAGE_YEARS_PER_MINUTE,
+  FINAL_TRIAL_STAGE,
+  TRIAL_BOSS_STAGES,
+  TRIAL_BOSS_TIMES,
   TREASURES,
   allowsSchool,
 } from '../../src/data.ts';
@@ -121,6 +125,17 @@ function validShape(v: unknown): v is LeaderboardFacts {
   );
 }
 
+// 只计必经的首通战斗时间；根基、闭关及人间事项可能被奇物免龄，不据此抬高下限。
+export function minimumLeaderboardAge(completed: readonly number[]) {
+  return completed.reduce((age, stage) => {
+    const minutes =
+      stage === FINAL_TRIAL_STAGE
+        ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(FINAL_TRIAL_STAGE)] / 60
+        : STAGES[stage].minutes;
+    return age + minutes * STAGE_YEARS_PER_MINUTE[stage];
+  }, 15);
+}
+
 export function parseLeaderboardFacts(value: unknown): LeaderboardFacts | null {
   if (!validShape(value)) return null;
   const f = value,
@@ -149,6 +164,8 @@ export function parseLeaderboardFacts(value: unknown): LeaderboardFacts | null {
     ((has('rootless-immortal') || has('hard-immortal')) && !final)
   )
     return null;
+  // 为取整、续局及天劫交接留下1年容差；不把该松下限当作真实游玩证明。
+  if (f.age + 1 < minimumLeaderboardAge(f.completed)) return null;
   return {
     ...f,
     completed: [...f.completed].sort((a, b) => a - b),

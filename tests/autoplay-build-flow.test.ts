@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import { notificationLeaves } from './helpers/notification-leaves.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +26,7 @@ function harness(pending = false) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
+  Object.assign(save, sealSaveSnapshot(save));
   const run = pending ? new Game(save, 0, 0, () => 0.5) : null;
   run?.pause();
   let stored = JSON.stringify({ ...save, activeRun: run?.snapshot() ?? null }),

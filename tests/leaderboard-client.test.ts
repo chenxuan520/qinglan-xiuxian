@@ -1,3 +1,4 @@
+import { createFactsSeal } from '../src/leaderboard-integrity.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { leaderboardAvailable } from '../src/leaderboard-availability.ts';
@@ -117,7 +118,12 @@ test('首次428只按同一正文有界重试一次，服务端最高分unchange
   assert.equal(result.entry.score, 2500);
   assert.equal(bodies.length, 2);
   assert.equal(bodies[0], bodies[1]);
-  assert.deepEqual(JSON.parse(String(bodies[0])), { version: 1, name: '青岚客', facts: original });
+  assert.deepEqual(JSON.parse(String(bodies[0])), {
+    version: 1,
+    name: '青岚客',
+    facts: original,
+    seal: await createFactsSeal(original),
+  });
   assert.deepEqual(original, before);
 });
 

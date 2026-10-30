@@ -1,3 +1,4 @@
+import { sealSaveSnapshot } from '../src/leaderboard-integrity.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost, readSave, forgeCost, SAVE_SCHEMA } from '../src/progress.ts';
@@ -151,7 +152,7 @@ test('旧游商购买记录与已获丹药完整往返，但不恢复购货和�
     receipts: [{ kind: 'caravan', at: 29, text: '旧日购置远游珍匣，所得丹药已收入丹囊。' }],
   };
   const restored = importSave(exportSave(s)).save;
-  assert.deepEqual(restored, s);
+  assert.deepEqual(restored, sealSaveSnapshot(s));
   assert.equal(marketShopQuote(restored, 'medicine', 'heqi@juyuan').reason, '');
   assert.equal(
     executeMarketShop(
@@ -162,7 +163,7 @@ test('旧游商购买记录与已获丹药完整往返，但不恢复购货和�
     ),
     undefined,
   );
-  assert.deepEqual(restored, s);
+  assert.deepEqual(restored, sealSaveSnapshot(s));
 });
 test('寿元、天劫、供奉、未结历练、落幕、数量溢出、陈旧报价均在扣费前拒绝', () => {
   for (const [venue, choice] of [
@@ -218,7 +219,7 @@ test('供奉使用全程预留，不能用成交所得垫付；真正交割后�
   s.stones++;
   assert.ok(trade(s, 'medicine', 'heqi@juyuan'));
   assert.equal(s.stones, 0);
-  assert.deepEqual(importSave(exportSave(s)).save, s);
+  assert.deepEqual(importSave(exportSave(s)).save, sealSaveSnapshot(s));
 });
 test('旧档新增商铺额度默认为未用；同版本往返保留，非法冷却拒绝且不清旧档进度', () => {
   const s = fixture();
@@ -230,7 +231,7 @@ test('旧档新增商铺额度默认为未用；同版本往返保留，非法�
   assert.equal(migrated.mortal.marketVenues!.workAt, 29);
   assert.equal(marketShopQuote(migrated, 'medicine', 'heqi@juyuan').reason, '');
   trade(migrated, 'medicine', 'heqi@juyuan');
-  assert.deepEqual(importSave(exportSave(migrated)).save, migrated);
+  assert.deepEqual(importSave(exportSave(migrated)).save, sealSaveSnapshot(migrated));
   assert.ok(validMarketVenues(migrated.mortal.marketVenues, migrated.age));
   for (const at of [-1, NaN, Infinity, migrated.age + 1])
     assert.equal(
