@@ -11,7 +11,7 @@ import {
 import { forge, forgeCost, forgeDamageBonus, type SaveData } from './progress.ts';
 import type { ActionShell } from './action-controller.ts';
 import { currency, weaponAffinity, catalogEvolutionRecipe } from './common-ui.ts';
-import { icon, smallIcon } from './icons.ts';
+import { icon } from './icons.ts';
 import { masteryDescription } from './mortal-ui.ts';
 import type { PanelDefinition } from './panel-host.ts';
 import { CURIOS } from './curio-info.ts';
@@ -20,7 +20,6 @@ export interface CatalogView {
   panel: 'arsenal' | 'treasure-detail';
   catalogTreasures: typeof TREASURES;
   schoolFilter: string;
-  treasurePage: number;
   selectedTreasure: string;
   bookTab: string;
 }
@@ -40,11 +39,10 @@ export function forgeTreasure(shell: ActionShell) {
   shell.toast(`${treasure(shell.selectedTreasure).name}炼器成功 · 伤害永久提升`);
 }
 export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition {
-  const { panel, catalogTreasures, schoolFilter, treasurePage, selectedTreasure, bookTab } = view;
+  const { panel, catalogTreasures, schoolFilter, selectedTreasure, bookTab } = view;
   const visibleTreasures = catalogTreasures.filter(
     (t) => schoolFilter === 'all' || t.school === schoolFilter,
   );
-  const pageCount = Math.ceil(visibleTreasures.length / 12);
   const t = treasure(selectedTreasure),
     level = save.forge[t.id] || 0,
     cost = forgeCost(level, save),
@@ -77,14 +75,9 @@ export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition
     body: `${header}${
       bookTab === 'curios'
         ? curioCollection(save)
-        : `<div class="collection-navigation"><div class="collection-filters" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div>${
-            bookTab === 'treasures' && pageCount > 1
-              ? `<nav class="collection-pages" aria-label="法宝分页"><button class="collection-previous" data-action="treasure-page" data-id="previous" aria-label="上一页法宝" ${treasurePage === 0 ? 'disabled' : ''}>${smallIcon('arrow')}</button><span aria-live="polite" aria-atomic="true" title="第 ${treasurePage * 12 + 1}–${Math.min(visibleTreasures.length, (treasurePage + 1) * 12)} 件，共 ${visibleTreasures.length} 件"><span class="sr-only">第 </span>${treasurePage + 1}<span aria-hidden="true"> / </span><span class="sr-only"> 页，共 </span>${pageCount}<span class="sr-only"> 页</span></span><button data-action="treasure-page" data-id="next" aria-label="下一页法宝" ${treasurePage === pageCount - 1 ? 'disabled' : ''}>${smallIcon('arrow')}</button></nav>`
-              : ''
-          }</div><div class="collection-grid ${bookTab === 'treasures' ? 'treasure-grid' : ''}">${
+        : `<div class="collection-navigation"><div class="collection-filters" role="group" aria-label="物品流派筛选">${[{ id: 'all', name: '全部流派' }, ...CULTIVATION_PATHS.filter((p) => p.id !== 'dual')].map((p) => `<button data-action="school-filter" data-id="${p.id}" class="${schoolFilter === p.id ? 'active' : ''}" aria-pressed="${schoolFilter === p.id}">${p.name}</button>`).join('')}</div></div><div class="collection-grid ${bookTab === 'treasures' ? 'treasure-grid' : ''}">${
             bookTab === 'treasures'
               ? visibleTreasures
-                  .slice(treasurePage * 12, treasurePage * 12 + 12)
                   .map(
                     (t) =>
                       `<button class="collection-card ${selectedTreasure === t.id ? 'selected' : ''}${save.artifacts.includes(t.id) ? (save.forge[t.id] === MAX_FORGE_LEVEL ? ' is-forged-max' : '') : ' is-unowned'}" data-action="treasure" data-id="${t.id}" style="--item-color:${t.color}">${icon(t.id, t.color)}<div><strong>${t.name}</strong><small>${pathInfo(t.school).name} · ${save.artifacts.includes(t.id) ? '已收藏' : '待收集'}</small>${weaponAffinity(t, save.spiritRoot, save.rootElements, true)}${catalogEvolutionRecipe(t)}</div>${save.starter === t.id ? '<span class="equipped-label">本命</span>' : ''}<span class="forge-dots"><span>炼器 ${save.forge[t.id] || 0} / ${MAX_FORGE_LEVEL}</span><span class="forge-bonus">伤害 +${Math.round(forgeDamageBonus(save.forge[t.id] || 0) * 100)}%</span></span></button>`,

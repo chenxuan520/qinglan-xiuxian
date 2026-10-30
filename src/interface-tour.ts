@@ -157,7 +157,6 @@ export function startInterfaceTour(
           panel: 'treasure-detail',
           catalogTreasures: TREASURES,
           schoolFilter: 'all',
-          treasurePage: 0,
           selectedTreasure: sample.starter,
           bookTab: 'treasures',
         }),

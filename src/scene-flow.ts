@@ -487,7 +487,6 @@ export function renderPanel(shell: ActionShell) {
       panel: shell.panel,
       catalogTreasures: shell.catalogTreasures,
       schoolFilter: shell.schoolFilter,
-      treasurePage: shell.treasurePage,
       selectedTreasure: shell.selectedTreasure,
       bookTab: shell.bookTab,
     });

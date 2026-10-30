@@ -354,7 +354,6 @@ export interface ActionShell {
   ) => void;
   readonly train: typeof train;
   readonly treasure: typeof treasure;
-  treasurePage: number;
   treasureReturn: PanelLocation | null;
   readonly tribulationDue: typeof tribulationDue;
   readonly ui: HTMLDivElement;
@@ -1306,9 +1305,6 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
       if (shell.pendingRun)
         shell.pendingRun = shell.Game.restore(shell.save, shell.pendingRun.snapshot());
       shell.selectedTreasure = shell.save.starter;
-      shell.treasurePage = Math.floor(
-        shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
-      );
       shell.renderMortal();
       shell.toast(message);
     } else {
@@ -1392,9 +1388,6 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
     shell.pendingImport = null;
     shell.selectedStage = shell.save.unlocked;
     shell.selectedTreasure = shell.save.starter;
-    shell.treasurePage = Math.floor(
-      shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
-    );
     shell.difficulty = minimumDifficulty(shell.save);
     shell.schoolFilter = 'all';
     shell.bookTab = 'treasures';
@@ -1485,9 +1478,6 @@ function handleRewardAd(shell: ActionShell, action: string, id?: string): boolea
     reportAdClaim(shell);
     if (kind === 'root') {
       shell.selectedTreasure = shell.save.starter;
-      shell.treasurePage = Math.floor(
-        shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
-      );
     }
     shell.closeRewardAd();
     shell.toast(
@@ -1916,33 +1906,12 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
       return true;
     if (aligned) {
       shell.selectedTreasure = shell.save.starter;
-      shell.treasurePage = Math.floor(
-        shell.catalogTreasures.findIndex((t) => t.id === shell.save.starter) / 12,
-      );
       shell.schoolFilter = 'all';
     }
     shell.renderLobby();
   }
-  if (action === 'treasure-page') {
-    const treasures = shell.catalogTreasures.filter(
-      (t) => shell.schoolFilter === 'all' || t.school === shell.schoolFilter,
-    );
-    shell.treasurePage = Math.max(
-      0,
-      Math.min(Math.ceil(treasures.length / 12) - 1, shell.treasurePage + (id === 'next' ? 1 : -1)),
-    );
-    shell.selectedTreasure = treasures[shell.treasurePage * 12].id;
-    shell.renderPanel();
-    shell.modal.querySelector('.panel')?.scrollTo(0, 0);
-    (
-      shell.modal.querySelector<HTMLButtonElement>(
-        `.collection-pages button[data-id="${id}"]:not(:disabled)`,
-      ) ?? shell.modal.querySelector<HTMLButtonElement>('.collection-pages button:not(:disabled)')
-    )?.focus({ preventScroll: true });
-  }
   if (action === 'school-filter') {
     shell.schoolFilter = id!;
-    shell.treasurePage = 0;
     shell.selectedTreasure = shell.catalogTreasures.find(
       (t) => shell.schoolFilter === 'all' || t.school === shell.schoolFilter,
     )!.id;

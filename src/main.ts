@@ -408,7 +408,6 @@ let touchHintDismissed = false;
 let schoolFilter = 'all';
 let bestiaryStage = -1;
 let bestiaryDifficulty = 0;
-let treasurePage = Math.floor(catalogTreasures.findIndex((t) => t.id === save.starter) / 12);
 let rewards: ReturnType<typeof settleRun> | null = null,
   oldRealm = '',
   abandonConfirm = false;
@@ -1117,10 +1116,10 @@ function renderPanel() {
   sceneFlow.renderPanel(shellBindings());
   if (panel === 'chronicle' && rankingEnabled()) {
     const score = modal.querySelector('.chronicle-score');
-    if (score && !score.querySelector('[data-action="leaderboard"]'))
+    if (score && !score.querySelector('[data-leaderboard-link]'))
       score.insertAdjacentHTML(
         'beforeend',
-        '<button class="secondary-button" data-action="leaderboard">查看万魂幡</button>',
+        '<a class="secondary-button" data-leaderboard-link href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看万魂幡 ↗</a>',
       );
   }
   if (panel === 'chronicle' && modal.querySelector('.chronicle-achievements'))
@@ -1232,7 +1231,7 @@ function renderRanking() {
   }
   panelFrame(
     '万魂幡',
-    '此世道果 · 前一百名',
+    '此世道果 · 署名入榜',
     '<div data-ranking-host><p class="panel-note" role="status">正在读取榜单…</p></div>',
   );
   const host = modal.querySelector<HTMLElement>('[data-ranking-host]')!;
@@ -1563,7 +1562,7 @@ function resetLifetime(
   game = pendingRun = null;
   rewards = null;
   gameAudio.sync();
-  selectedStage = treasurePage = 0;
+  selectedStage = 0;
   difficulty = minimumDifficulty(save);
   selectedTreasure = save.starter;
   schoolFilter = 'all';
@@ -1898,8 +1897,6 @@ function shellBindings(): ActionShell {
     get trackReincarnation() { return trackReincarnation; },
     get train() { return train; },
     get treasure() { return treasure; },
-    get treasurePage() { return treasurePage; },
-    set treasurePage(next) { treasurePage = next; },
     get treasureReturn() { return treasureReturn; },
     set treasureReturn(next) { treasureReturn = next; },
     get tribulationDue() { return tribulationDue; },

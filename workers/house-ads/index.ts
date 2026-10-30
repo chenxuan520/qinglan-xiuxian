@@ -389,6 +389,7 @@ export const createHouseAdsWorker = (
       }
       if (request.method === 'GET') {
         if (path === '/admin/') return page(ADMIN_HTML, 'text/html; charset=utf-8');
+        if (path === '/admin/session') return json({ ok: true });
         if (path === '/admin/diagnostics') {
           const days = Number(url.searchParams.get('days') ?? '7');
           if (![1, 7, 30].includes(days)) return json({ error: 'invalid-window' }, 400);

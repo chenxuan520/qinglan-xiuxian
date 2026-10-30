@@ -5,7 +5,12 @@
   "compatibility_date": "2026-10-29",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "routes": [{ "pattern": "xiuxian.011203.xyz/api/leaderboard", "zone_name": "011203.xyz" }],
+  "routes": [
+    { "pattern": "xiuxian.011203.xyz/api/leaderboard", "zone_name": "011203.xyz" },
+    { "pattern": "xiuxian.011203.xyz/leaderboard", "zone_name": "011203.xyz" },
+    { "pattern": "xiuxian.011203.xyz/leaderboard/*", "zone_name": "011203.xyz" },
+  ],
+  "services": [{ "binding": "ADMIN_AUTH", "service": "qinglan-house-ads" }],
   "ratelimits": [
     {
       "name": "SUBMIT_LIMITER",

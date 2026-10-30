@@ -6,8 +6,11 @@ import {
   type LeaderboardEntry,
 } from '../../src/leaderboard-contract.ts';
 import { parseLeaderboardFacts, scoreLeaderboardFacts } from './score.ts';
+import { leaderboardAdminApi } from './admin-api.ts';
+import { leaderboardPage } from './page.ts';
 
-export type LeaderboardWorkerEnv = Pick<LeaderboardEnv, 'DB' | 'SUBMIT_LIMITER'>;
+export type LeaderboardWorkerEnv = Pick<LeaderboardEnv, 'DB' | 'SUBMIT_LIMITER'> &
+  Partial<Pick<LeaderboardEnv, 'ADMIN_AUTH'>>;
 const ORIGIN = 'https://xiuxian.011203.xyz';
 const PATH = '/api/leaderboard';
 export const OWNER_COOKIE = '__Host-qinglan-rank-owner';
@@ -152,6 +155,7 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       WHERE (SELECT COUNT(*) FROM
         (SELECT 1 FROM leaderboard WHERE score>=? AND name_key<>? LIMIT 100))<100
+      AND NOT EXISTS (SELECT 1 FROM leaderboard_blocks WHERE name_key=? OR owner_hash=?)
       ON CONFLICT(name_key) DO UPDATE SET display_name=excluded.display_name, score=excluded.score,
         grade=excluded.grade, title=excluded.title, life_mode=excluded.life_mode, ending=excluded.ending,
         submission_hash=excluded.submission_hash, updated_at=excluded.updated_at
@@ -171,6 +175,8 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
       now,
       score.total,
       name.key,
+      name.key,
+      ownerHash,
     ),
     env.DB.prepare(
       `SELECT ${PUBLIC_COLUMNS}, owner_hash,
@@ -181,6 +187,13 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
     ).bind(name.key),
   ]);
   if (results.some((result) => !result.success)) throw Error('database-result');
+  const blocked = await env.DB.prepare(
+    'SELECT 1 FROM leaderboard_blocks WHERE name_key=? OR owner_hash=? LIMIT 1',
+  )
+    .bind(name.key, ownerHash)
+    .all();
+  if (!blocked.success) throw Error('database-result');
+  if (blocked.results.length) return error('blocked', '暂时无法使用此署名提交排名。', 403);
   const row = results[1].results[0];
   if (!row) return error('not-qualified', '道果尚未进入前百，可待修行有成后再留名。', 409);
   if (row.owner_hash !== ownerHash)
@@ -201,8 +214,17 @@ export default {
     ctx?: Pick<ExecutionContext, 'waitUntil'>,
   ): Promise<Response> {
     const url = new URL(request.url);
-    if (url.origin !== ORIGIN || url.pathname !== PATH || url.search)
-      return error('invalid-input', '接口不存在。', 404);
+    if (url.origin !== ORIGIN) return error('invalid-input', '接口不存在。', 404);
+    if (url.pathname === '/leaderboard' || url.pathname.startsWith('/leaderboard/')) {
+      const admin = await leaderboardAdminApi(request, env);
+      if (admin) {
+        if (request.method === 'POST' && admin.ok && typeof caches !== 'undefined')
+          await caches.default.delete(new Request(ORIGIN + PATH)).catch(() => {});
+        return admin;
+      }
+      return await leaderboardPage(request, env);
+    }
+    if (url.pathname !== PATH || url.search) return error('invalid-input', '接口不存在。', 404);
     if (request.method !== 'GET' && request.method !== 'POST')
       return error('invalid-input', '请求方式不支持。', 405, { Allow: 'GET, POST' });
     try {

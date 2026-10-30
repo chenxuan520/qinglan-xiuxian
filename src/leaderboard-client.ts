@@ -17,6 +17,7 @@ export type LeaderboardErrorCode =
   | 'not-qualified'
   | 'unavailable'
   | 'identity-required'
+  | 'blocked'
   | 'timeout'
   | 'cancelled';
 export class LeaderboardError extends Error {
@@ -40,6 +41,7 @@ const errors: readonly string[] = [
   'not-qualified',
   'unavailable',
   'identity-required',
+  'blocked',
 ];
 async function readResponse(response: Response, signal: AbortSignal): Promise<unknown> {
   const length = response.headers.get('Content-Length');
@@ -201,6 +203,7 @@ export function leaderboardErrorMessage(error: unknown, writing = false) {
   if (code === 'rate-limited') return '请求过于频繁，请稍后再试。';
   if (code === 'not-qualified') return '道果尚未进入前百，可待修行有成后再留名。';
   if (code === 'identity-required') return '暂时无法确认署名，请允许本站 Cookie 后重试。';
+  if (code === 'blocked') return '该署名暂时无法提交排名。';
   if (code === 'timeout') return '请求超时，请重试。';
   return writing ? '此次留名尚未确认，请重试。' : '榜单暂不可用，请重试。';
 }

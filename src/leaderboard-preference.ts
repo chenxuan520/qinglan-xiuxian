@@ -28,5 +28,5 @@ export class LeaderboardPreference {
 }
 
 export function leaderboardSettings(enabled: boolean) {
-  return `<section class="settings-display"><div class="settings-section-heading"><h3>万魂幡</h3><button class="secondary-button" data-action="leaderboard-toggle" aria-label="排行榜" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></div><p>成仙或此世落幕后，可选择留名排行榜。关闭后不查询、不提醒、不上传。</p>${enabled ? '<button class="secondary-button" data-action="leaderboard">查看万魂幡</button>' : ''}</section>`;
+  return `<section class="settings-display"><div class="settings-section-heading"><h3>万魂幡</h3><button class="secondary-button" data-action="leaderboard-toggle" aria-label="排行榜" aria-pressed="${enabled}">${enabled ? '关闭' : '开启'}</button></div><p>成仙或此世落幕后，可选择留名排行榜。关闭后不查询、不提醒、不上传。</p><a class="secondary-button" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看万魂幡 ↗</a></section>`;
 }

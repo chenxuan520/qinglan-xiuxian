@@ -156,15 +156,19 @@ npm run deploy:npc-ai -- --var DEBUG_MODE_ENABLED:false
 
 ## 万魂幡 · 官网匿名排行榜
 
-`workers/leaderboard/` 是独立 Cloudflare Worker，官网同源路由 `/api/leaderboard`，使用独立 D1 `qinglan-leaderboard`。`GET` 返回 `version: 1`、`limit: 100`、`minimumScore` 和公开榜单 `entries`（姓名、道果、品第、称号、模式、结局、更新时间）；不足一百名时门槛为0。按分数降序、更新时间升序、归一姓名升序排列，公开 GET 使用30秒短缓存，不创建匿名身份。
+`workers/leaderboard/` 是独立 Cloudflare Worker，正式榜单页面位于 `/leaderboard/`，管理页位于 `/leaderboard/admin/`，官网同源数据路由 `/api/leaderboard`，使用独立 D1 `qinglan-leaderboard`。`GET` 返回 `version: 1`、`limit: 100`、`minimumScore` 和公开榜单 `entries`（姓名、道果、品第、称号、模式、结局、更新时间）；不足一百名时门槛为0。按分数降序、更新时间升序、归一姓名升序排列，公开 GET 使用30秒短缓存，不创建匿名身份。
 
-前端设置可开关该功能；关闭后不查询、不提示、不上传。仅官网使用服务，本机预览只允许请求自己的相对接口，GitHub Pages、自建副本和单机版不请求官网排行榜。成仙或本世离世后、轮回前，只异步读取入榜门槛并给轻提示；选择留名才加载表单并发起 `POST {version: 1, name, facts}`。面板按需加载，网络失败、关闭、切换人生或关掉设置不阻塞游戏，也不让迟到响应重新打开界面。
+设置和履历只提供另开独立榜单页的链接，游戏内只保留署名小表单，不展示完整列表。前端设置可开关该功能；关闭后不查询、不提示、不上传。仅官网使用服务，本机预览只允许请求自己的相对接口，GitHub Pages、自建副本和单机版不请求官网排行榜。成仙或本世离世后、轮回前，只异步读取入榜门槛并给轻提示；选择留名才加载表单并发起 `POST {version: 1, name, facts}`。面板按需加载，网络失败、关闭、切换人生或关掉设置不阻塞游戏，也不让迟到响应重新打开界面。
 
 `extractLeaderboardFacts(save)` 仅取道果计算所需的成长、灵根、本命、奇物、宗门加成、永久丹药、成就标识、外缘次数、通关与结局；不上传完整存档、年表、聊天、小说或图片。Worker 以正式 `journeyScore` 重新计算，不信任客户端总分，并检查输入上限和明显矛盾；这能拦直接篡改总分及不合理事实，不能证明客户端真的完成这些经历，不是服务器权威游戏或完整防作弊。服务端只持久化排名字段、匿名持有者散列、提交事实散列和时间，不保存事实原文。
 
 姓名按 NFKC、首尾及连续空白、大小写归一为唯一键，显示名保留规范后的写法，限1–24个 Unicode 码点。首次有效 POST 缺少匿名 Cookie 时返回 `428 identity-required`，只设置一年期 `__Host-qinglan-rank-owner`（256位随机值、Secure、HttpOnly、SameSite=Strict、Path=/），不写 D1；客户端仅以同一正文自动重试一次，Cookie 不可用时停止。只有原 Cookie 持有者可提高同名分数；低分或重复提交不降低记录。清除网站数据不能自动认领旧名，Cookie 值及原始 IP 不写日志或公开响应。
 
-POST 限同源 JSON，正文流上限16,384字节；原生 `SUBMIT_LIMITER` 按 Cloudflare 可信 IP 的 SHA-256 限约12次/60秒，包含身份握手，属于同机房近似频控，不承诺严格全局配额。写入在 D1 batch 事务中重新核对前百门槛；平分不挤入，不合格不占用姓名，已有姓名落榜后保留记录以防被别人重新认领。成功返回 `saved` 或 `unchanged`；错误使用 `invalid-input`、`identity-required`、`name-taken`、`not-qualified`、`rate-limited` 或 `unavailable`，排行榜故障不影响本地存档、奖励或轮回。
+POST 限同源 JSON，正文流上限16,384字节；原生 `SUBMIT_LIMITER` 按 Cloudflare 可信 IP 的 SHA-256 限约12次/60秒，包含身份握手，属于同机房近似频控，不承诺严格全局配额。写入在 D1 batch 事务中重新核对前百门槛；平分不挤入，不合格不占用姓名，已有姓名落榜后保留记录以防被别人重新认领。成功返回 `saved` 或 `unchanged`；错误使用 `invalid-input`、`identity-required`、`name-taken`、`not-qualified`、`rate-limited`、`blocked`（403，姓名或匿名身份被屏蔽）或 `unavailable`，排行榜故障不影响本地存档、奖励或轮回。
+
+榜单与管理界面由同一 Worker 提供正式 HTML、独立 CSS/JS，不新增游戏 HTML 入口、不并入首屏、离线清单或单机包。公开页只读排行榜、不读取游戏存档、不自动上传；先读取独立本机偏好，关闭时不查询，可主动开启。支持浏览器返回缓存恢复、跨窗口开关和失败重试，不自动循环请求。所有姓名以 textContent 渲染。
+
+管理登录 `/leaderboard/admin/login` 使用既有广告后台账号和 Turnstile 登录链路；`ADMIN_AUTH` 服务绑定调用 `qinglan-house-ads` 的只读 `/ads/admin/session` 验证当前 Cookie（不读取账号、密码、广告配置，不支持广告 Access Key 管榜）。失效或核验故障不放行。`GET /leaderboard/admin/entries?q=...` 返回最多100条成绩与100条屏蔽记录，可按姓名查询，不公开身份散列。`POST /leaderboard/admin/moderate` 限同源 JSON、正文2048字节，提交 `{name, expectedUpdatedAt, expectedScore, action}`；action为remove/block/unblock，旧界面版本冲突返回409。删除仅移除当前成绩；屏蔽以D1事务保存姓名与匿名持有者散列并移除成绩，阻止该姓名及当前身份再次提交；解除不恢复旧成绩。清除匿名身份并改名仍可绕过，并非实名封禁。二次确认明确展示目标，Esc/取消不产生写请求；401停止操作，网络失败不自动重放写入。公开短缓存跨机房可能保留旧榜最长约30秒。
 
 部署时先配置已创建的 D1 绑定，应用 `workers/leaderboard/migrations/`，再发布 Worker，最后发布前端；不把数据库占位值当作已部署资源。使用已有 Cloudflare 授权，不扩大 Pages CI 凭据权限：
 

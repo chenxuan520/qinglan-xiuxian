@@ -11,6 +11,12 @@ export function leaderboardStore() {
       'utf8',
     ),
   );
+  sqlite.exec(
+    readFileSync(
+      new URL('../../workers/leaderboard/migrations/0002_moderation.sql', import.meta.url),
+      'utf8',
+    ),
+  );
   const statements = new WeakMap<object, () => unknown[]>();
   let failAt = -1;
   const db = {

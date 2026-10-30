@@ -945,12 +945,12 @@ async function checkHomePanels(name: string) {
         ),
         true,
       );
-      await click('[data-action="treasure-page"][data-id="next"]');
       assert.deepEqual(
         await evaluate(
-          `() => ({cards:document.querySelectorAll('.collection-card').length,previous:document.querySelector('[data-action="treasure-page"][data-id="previous"]').disabled,next:document.querySelector('[data-action="treasure-page"][data-id="next"]').disabled})`,
+          `() => ({cards:document.querySelectorAll('.collection-card').length,pagination:document.querySelector('[data-action="treasure-page"]')!==null})`,
         ),
-        { cards: 6, previous: false, next: true },
+        { cards: 18, pagination: false },
+        '魔道法宝完整连续展示，无分页',
       );
       await evaluate(
         `() => { document.querySelector('.collection-card:last-child').scrollIntoView({block:'center'}); return true; }`,
@@ -1014,8 +1014,8 @@ async function checkHomePanels(name: string) {
         } else if (tab === 'treasures') {
           assert.equal(
             await evaluate(`() => document.querySelectorAll('.collection-card').length`),
-            6,
-            '跨分类切换保留魔道筛选与第二页',
+            18,
+            '跨分类切换保留魔道筛选并完整展示',
           );
         }
         await check(checkpoint);
