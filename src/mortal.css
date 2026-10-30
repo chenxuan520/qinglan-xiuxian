@@ -2043,3 +2043,51 @@
   display: block;
   margin-top: 24px;
 }
+
+.dock-rumors {
+  margin: 24px 0;
+  padding: 20px 0;
+  border-block: 1px solid var(--border);
+}
+.dock-rumors h3 {
+  margin-bottom: 12px;
+  color: var(--gold);
+  font-weight: 400;
+}
+.dock-rumors .panel-note + .panel-note {
+  margin-top: 12px;
+}
+.dock-rumors > a {
+  margin: 12px 0;
+}
+.night-boat-offer {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+.night-boat-offer > div {
+  min-width: 0;
+}
+.night-boat-offer strong {
+  font-weight: 400;
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+.night-boat-offer .medicine-art,
+.night-boat-offer .curio-art {
+  flex-shrink: 0;
+}
+.night-boat-offer + .primary-button {
+  width: 100%;
+}
+
+.night-boat-unknown {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  color: var(--gold);
+  font-size: 2rem;
+}

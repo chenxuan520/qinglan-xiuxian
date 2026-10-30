@@ -446,11 +446,10 @@ export function medicineLoot(
   const guarantee = stage >= 2 && firstClear && !s.firstClears.includes(stage);
   if (guarantee) s.firstClears.push(stage);
   const roll = random();
-  const permanent =
-    (stage === 6 && finalSovereign) || ((stage === 4 || stage === 5) && roll < 0.01);
+  const permanent = (stage === 6 && finalSovereign) || (stage >= 0 && stage <= 5 && roll < 0.04);
   const give = (tier: Medicine['tier'], timed: boolean) => {
     const pool = MEDICINES.filter(
-      (m) => m.stage <= Math.max(1, stage) && m.tier === tier && !!m.years === timed,
+      (m) => (!timed || m.stage <= Math.max(1, stage)) && m.tier === tier && !!m.years === timed,
     );
     rewards.push(`${grantMedicine(s, pool[Math.floor(random() * pool.length)].id)} ×1`);
   };
@@ -460,6 +459,15 @@ export function medicineLoot(
   return rewards;
 }
 export function townMedicineReward(s: MedicineState, kind: string, random: () => number) {
+  if (kind === 'fishing') {
+    const roll = random();
+    const tier = roll < 0.005 ? '珍品' : roll < 0.055 ? '灵品' : null;
+    if (!tier) return '';
+    const pool = MEDICINES.filter(
+      (m) => m.tier === tier && m.years > 0 && Number.isSafeInteger((s.bag[m.id] ?? 0) + 1),
+    );
+    return pool.length ? `${grantMedicine(s, pool[Math.floor(random() * pool.length)].id)} ×1` : '';
+  }
   if ((kind === 'herbs' && random() < 0.1) || (kind === 'tea' && random() < 0.02)) {
     return `${grantMedicine(s, MEDICINES[Math.floor(random() * 8)].id)} ×1`;
   }

@@ -36,6 +36,9 @@ const TOWN_IMAGES = [
   '/assets/town-npcs.webp',
   ...Object.values(PLAYER_IMAGES),
 ];
+const NIGHT_BOAT_APPROACH = { x: 3370, y: 1270 };
+type NightBoatScene = { visible(): boolean; interact(): void };
+
 type HometownScene = {
   state: HometownState;
   interact: (target: 'home' | 'dock' | 'father' | 'mother') => void;
@@ -80,7 +83,8 @@ export class TownScene {
   private buildingSize = 305;
   private route: TownPoint[] = [];
   private clickRoute: TownPoint[] = [];
-  private clickTarget: { id: string; generation?: number; kind: 'npc' | 'home' } | null = null;
+  private clickTarget: { id: string; generation?: number; kind: 'npc' | 'home' | 'boat' } | null =
+    null;
   private selectedNpc: TownResident | null = null;
   private routeGuide?: SVGPolylineElement;
   private routeShown = false;
@@ -91,6 +95,9 @@ export class TownScene {
   private playerPath: () => CultivationPath;
   private hometown?: HometownScene;
   private passage?: SettlementPassage;
+  private nightBoat?: NightBoatScene;
+  private boatCanvas?: HTMLCanvasElement;
+  private nearBoat = false;
 
   constructor(
     host: HTMLElement,
@@ -102,6 +109,7 @@ export class TownScene {
     scenery?: TownScenery,
     hometown?: HometownScene,
     connection?: { open: () => boolean; enter: (entry?: 'button') => void },
+    nightBoat?: NightBoatScene,
   ) {
     this.host = host;
     host.style.contain = 'layout paint style';
@@ -110,6 +118,7 @@ export class TownScene {
     this.interact = interact;
     this.playerPath = playerPath;
     this.hometown = hometown;
+    this.nightBoat = nightBoat;
     this.layout = townSceneryLayout(population.seed, scenery, !!hometown);
     this.buildingSize = scenery?.revision ? 270 : 305;
     if (!townWalkable(this.position, this.layout.buildings, this.buildingSize))
@@ -131,6 +140,7 @@ export class TownScene {
         '',
       )}<div class="town-player" style="background:${playerSpriteBackground(playerPath())}"><span>你</span></div>${this.residents.map((npc) => `<div class="town-npc ${npc.id.startsWith('villager-') ? 'town-villager' : ''}" data-npc="${npc.id}" data-resident="${npc.id}:${npc.generation}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="town-npc-art" style="background-position:${(npc.art % 3) * 50}% ${Math.floor(npc.art / 3) * 50}%;filter:hue-rotate(${npc.tint}deg)"></span><span class="town-npc-name">${npc.name}<small>${npc.place} · ${npc.role}</small></span></div>`).join('')}</div><svg class="town-minimap" viewBox="0 0 ${TOWN_WIDTH} ${TOWN_HEIGHT}" aria-label="青岚镇方位图"><rect width="3600" height="2500" fill="#253b2d"/><rect x="3180" width="420" height="2500" fill="#315658"/>${TOWN_STREETS.map(([x, y, r, b]) => `<rect x="${x}" y="${y}" width="${r - x}" height="${b - y}" fill="#8b8d72"/>`).join('')}${this.layout.npcs.map((n) => `<circle cx="${n.x}" cy="${n.y}" r="37" fill="#dbc17a"/>`).join('')}<circle class="town-map-marker" r="45" fill="#fff" stroke="#315e41" stroke-width="16"/></svg><div class="town-loading" role="status"><div>青岚镇 · 街巷铺展中<progress max="${TOWN_IMAGES.length}" value="0" aria-label="城镇加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.town-map')!;
+    if (nightBoat) this.mountNightBoat();
     this.player = host.querySelector('.town-player')!;
     this.playerSprite = new SettlementSprite(this.player, this.position);
     this.marker = host.querySelector('.town-map-marker')!;
@@ -211,7 +221,7 @@ export class TownScene {
         if (
           key === 'e' &&
           !e.repeat &&
-          (this.nearby || this.homeTarget || this.hometown?.state.stage === 'walk')
+          (this.nearby || this.nearBoat || this.homeTarget || this.hometown?.state.stage === 'walk')
         ) {
           e.preventDefault();
           this.talk();
@@ -316,6 +326,64 @@ export class TownScene {
         );
       });
   }
+  private boatVisible() {
+    return (
+      (!this.hometown || this.hometown.state.stage === 'departed') && !!this.nightBoat?.visible()
+    );
+  }
+  private mountNightBoat() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 220;
+    canvas.height = 120;
+    canvas.className = 'town-night-boat';
+    canvas.setAttribute('data-town-boat', '');
+    canvas.style.cssText =
+      'position:absolute;left:3370px;top:1340px;width:220px;height:120px;transform:translate(-50%,-50%);z-index:1340;cursor:pointer';
+    canvas.hidden = !this.boatVisible();
+    this.map.append(canvas);
+    this.boatCanvas = canvas;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#0c2528';
+    ctx.beginPath();
+    ctx.ellipse(110, 94, 98, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#8e9580';
+    ctx.lineWidth = 3;
+    ctx.fillStyle = '#172d2b';
+    ctx.beginPath();
+    ctx.moveTo(12, 66);
+    ctx.quadraticCurveTo(108, 88, 208, 61);
+    ctx.lineTo(180, 99);
+    ctx.quadraticCurveTo(108, 115, 38, 99);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#293d34';
+    ctx.beginPath();
+    ctx.moveTo(63, 73);
+    ctx.quadraticCurveTo(61, 21, 113, 20);
+    ctx.quadraticCurveTo(162, 22, 164, 73);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#6e7d6c';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(111, 21);
+    ctx.lineTo(112, 77);
+    ctx.moveTo(84, 29);
+    ctx.lineTo(85, 77);
+    ctx.moveTo(138, 30);
+    ctx.lineTo(140, 76);
+    ctx.stroke();
+    ctx.strokeStyle = '#9da387';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(181, 36);
+    ctx.lineTo(199, 111);
+    ctx.stroke();
+  }
   showArrival(text: string) {
     const notice = document.createElement('p');
     notice.className = 'town-return-note';
@@ -344,9 +412,12 @@ export class TownScene {
     this.clickTarget = null;
     let target = mapClick(this.map, TOWN_WIDTH, TOWN_HEIGHT, x, y);
     const node = element?.closest<HTMLElement>(
-      '[data-parent], [data-npc], [data-town-place], [data-passage], .town-dock',
+      '[data-town-boat], [data-parent], [data-npc], [data-town-place], [data-passage], .town-dock',
     );
-    if (node?.dataset.passage === 'town') target = SETTLEMENT_PATHS.town.gate;
+    if (node?.hasAttribute('data-town-boat') && this.boatVisible()) {
+      this.clickTarget = { id: 'night-boat', kind: 'boat' };
+      target = NIGHT_BOAT_APPROACH;
+    } else if (node?.dataset.passage === 'town') target = SETTLEMENT_PATHS.town.gate;
     else if (node?.dataset.parent && this.hometown?.state.stage === 'departed') {
       this.clickTarget = { id: node.dataset.parent, kind: 'home' };
       target = HOMETOWN_START;
@@ -370,6 +441,19 @@ export class TownScene {
   private interactAfterWalking() {
     const target = this.clickTarget;
     if (!this.enabled || !target) return;
+    if (target.kind === 'boat') {
+      if (!this.boatVisible()) this.clearInput();
+      else if (
+        Math.hypot(
+          this.position.x - NIGHT_BOAT_APPROACH.x,
+          this.position.y - NIGHT_BOAT_APPROACH.y,
+        ) <= 90
+      ) {
+        this.clearInput();
+        this.nightBoat?.interact();
+      }
+      return;
+    }
     if (target.kind === 'home') {
       const point = target.id === 'dock' ? HOMETOWN_DOCK : HOMETOWN_START;
       if (Math.hypot(this.position.x - point.x, this.position.y - point.y) <= 115) {
@@ -474,6 +558,13 @@ export class TownScene {
     if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
       route.shift();
     if (this.enabled && !this.reducedMotion.matches) this.walkingSeconds += Math.min(dt, 0.05);
+    const nearBoat =
+      this.boatVisible() &&
+      Math.hypot(
+        this.position.x - NIGHT_BOAT_APPROACH.x,
+        this.position.y - NIGHT_BOAT_APPROACH.y,
+      ) <= 115;
+    if (this.boatCanvas) this.boatCanvas.hidden = !this.boatVisible();
     const nearId = this.nearbyNpc?.id;
     const departure = this.hometown && this.hometown.state.stage !== 'departed';
     const homeTarget = this.hometown
@@ -489,26 +580,34 @@ export class TownScene {
       departure || homeTarget ? undefined : this.residents.find((npc) => npc.id === nearId);
     if (homeTarget === 'dock' && this.route.length) this.stopDockNavigation();
     const navigating = this.route.length > 0;
-    if (this.nearby !== near || this.homeTarget !== homeTarget || this.routeShown !== navigating) {
+    if (
+      this.nearby !== near ||
+      this.nearBoat !== nearBoat ||
+      this.homeTarget !== homeTarget ||
+      this.routeShown !== navigating
+    ) {
+      this.nearBoat = nearBoat;
       this.nearby = near;
       this.homeTarget = homeTarget;
       this.routeShown = navigating;
       const button = document.querySelector<HTMLButtonElement>('[data-action="town-talk"]');
       if (button) {
-        button.disabled = !near && !homeTarget && !departure;
+        button.disabled = !near && !nearBoat && !homeTarget && !departure;
         button.textContent =
           homeTarget === 'dock'
             ? '离开青岚'
             : homeTarget === 'home'
               ? '故居'
-              : near
-                ? `与${near.name}交谈`
-                : departure
-                  ? navigating
-                    ? '自动前往 · 点击停下'
-                    : '前往渡口'
-                  : '走近镇民可交谈';
-        if (homeTarget || near) {
+              : nearBoat
+                ? '夜船'
+                : near
+                  ? `与${near.name}交谈`
+                  : departure
+                    ? navigating
+                      ? '自动前往 · 点击停下'
+                      : '前往渡口'
+                    : '走近镇民可交谈';
+        if (homeTarget || near || nearBoat) {
           const hint = document.createElement('span');
           hint.className = 'keyboard-hint';
           hint.textContent = ' · E';
@@ -587,6 +686,7 @@ export class TownScene {
     if (!this.enabled) return;
     if (this.homeTarget) this.hometown?.interact(this.homeTarget);
     else if (this.hometown?.state.stage === 'walk') this.toggleDockNavigation();
+    else if (this.nearBoat && this.boatVisible()) this.nightBoat?.interact();
     else if (this.nearby) this.interact(this.nearby);
   }
   toggleDockNavigation() {
@@ -616,3 +716,11 @@ export class TownScene {
 }
 
 export { travelSettlement } from './settlement-travel.ts';
+
+export {
+  immortalEncounterPanel,
+  teaStoryPanel,
+  dockRumorsContent,
+  nightBoatPanel,
+} from './dock-ui.ts';
+export { claimNightBoat } from './night-boat-claim.ts';

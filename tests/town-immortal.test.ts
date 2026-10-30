@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { freshSave, type SaveData } from '../src/progress.ts';
 import { CURIO_IDS, grantCurio } from '../src/curio-data.ts';
 import { showTownEvent } from '../src/scene-flow.ts';
-import { immortalEncounterPanel } from '../src/town-host.ts';
+import { immortalEncounterPanel } from '../src/dock-ui.ts';
 import type { ActionShell } from '../src/action-controller.ts';
 import { medicineInfo } from '../src/medicine-data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';

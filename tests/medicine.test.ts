@@ -672,7 +672,7 @@ test('妖王灵品概率、限时首通保底与永久稀有池独立，终关�
     medicineLoot(s, stage, false, false, () => 0);
     const ids = Object.keys(s.bag);
     assert.equal(ids.length, 1);
-    assert.equal(MEDICINES.find((m) => m.id === ids[0])!.years === 0, stage === 4 || stage === 5);
+    assert.equal(MEDICINES.find((m) => m.id === ids[0])!.years === 0, stage < 6);
     const guaranteed = freshMedicine(() => 0);
     medicineLoot(guaranteed, stage, true, false, () => 0.9);
     if (stage >= 2) {

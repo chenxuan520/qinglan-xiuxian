@@ -268,6 +268,8 @@ export function masteryRewardPool(level: number) {
   return MEDICINES.filter((m) => m.tier === tier && m.years > 0);
 }
 
+const FIRST_FISHING_MEDICINE = '钓线一沉，捞上来一只封好的旧药瓶。';
+
 function completeActivity(save: SaveData, random: () => number) {
   const world = save.mortal;
   const activity = world.activity;
@@ -299,9 +301,16 @@ function completeActivity(save: SaveData, random: () => number) {
       save.stones += stones;
       save.iron += job.iron;
       const medicine = townMedicineReward(save.medicine, activity.kind, random);
+      const firstFishingMedicine =
+        activity.kind === 'fishing' &&
+        !!medicine &&
+        !Object.hasOwn(save.chronicle.milestones, 'fishing-medicine');
+      if (firstFishingMedicine) {
+        recordChronicle(save, '码头垂钓', FIRST_FISHING_MEDICINE, 'fishing-medicine');
+      }
       log(
         save,
-        `${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事'}${medicine ? `、${medicine}` : ''}。`,
+        `${firstFishingMedicine ? FIRST_FISHING_MEDICINE : ''}${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事'}${medicine ? `、${medicine}` : ''}。`,
       );
     }
     return true;

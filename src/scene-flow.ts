@@ -139,6 +139,24 @@ export function mountTownScene(shell: ActionShell) {
             if (host.isConnected) module.travelSettlement(shell, 'market', entry);
           },
         },
+        {
+          visible: () => !!shell.save.mortal.nightBoat && !shell.save.mortal.nightBoat.claimed,
+          interact: () => {
+            if (
+              !host.isConnected ||
+              !shell.inTown ||
+              shell.panel ||
+              shell.game ||
+              shell.saveLock ||
+              !shell.save.mortal.nightBoat ||
+              shell.save.mortal.nightBoat.claimed
+            )
+              return;
+            shell.closeNpcChat();
+            shell.panel = 'night-boat';
+            shell.panelFrame(...module.nightBoatPanel(shell.save, shell.pendingRun?.loot.curios));
+          },
+        },
       );
       if (host.dataset.arrival) {
         shell.townScene.showArrival(host.dataset.arrival);
@@ -261,6 +279,12 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   shell.townNpc = npc;
   shell.panel = 'town-event';
   shell.panelFrame(npc.name, `${npc.place} · ${npc.role}`, shell.townEventContent(shell.save, npc));
+  const rumors = npc.id === 'fisher' ? shell.modal.querySelector('[data-dock-rumors]') : null;
+  if (rumors && shell.townSource.current)
+    rumors.innerHTML = shell.townSource.current.dockRumorsContent(
+      shell.save,
+      shell.rankingEnabled?.() ?? false,
+    );
   shell.mountNpcChat(shell.modal.querySelector<HTMLElement>('.npc-dialogue')!, shell.save, npc);
 }
 

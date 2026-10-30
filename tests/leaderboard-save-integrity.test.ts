@@ -115,6 +115,7 @@ test('签名只增加两个存档字段，无关字段不影响摘要，下一�
     'journeyEnded',
     'lifeMode',
     'lifespanBonus',
+    'lifespanSpent',
     'medicine',
     'mortal',
     'nextTribulationAge',

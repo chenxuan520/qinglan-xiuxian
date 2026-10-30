@@ -15,7 +15,8 @@ import { LU_CHI_TEA_STORY } from '../src/local-tea-stories.ts';
 import { TEA_STORY_SETTINGS } from '../src/setting.ts';
 import { AD_SECONDS } from '../src/ads.ts';
 import { MedicinePanel } from '../src/medicine-panel.ts';
-import { executeMortalAction, teaStoryPanel } from '../src/town-host.ts';
+import { executeMortalAction } from '../src/town-host.ts';
+import { teaStoryPanel } from '../src/dock-ui.ts';
 import { dispatchAction } from '../src/action-controller.ts';
 import { commitSaveAction } from '../src/save-action.ts';
 import { lifespanEndPanel, tribulationPendingPanel } from '../src/opening-ui.ts';
@@ -156,7 +157,7 @@ function harness(t: TestContext, firstStory = false) {
     },
     removeNumberGrouping,
     executeMortalAction,
-    teaStoryPanel,
+    townSource: { current: { teaStoryPanel } },
     lifespanEndPanel,
     tribulationPendingPanel,
     sectDuesModal,

@@ -1,55 +1,11 @@
 import type { CultivationPath } from './data.ts';
 import type { SaveData } from './progress.ts';
-import { medicineInfo } from './medicine-data.ts';
-import { medicineArt } from './medicine-ui.ts';
-import { curioArt } from './curio-art.ts';
-import { curioName, acquiredCurio } from './curio-data.ts';
-import { freshTownPopulation, type TownResident } from './town-population.ts';
+import { freshTownPopulation } from './town-population.ts';
 import { townVisit, townReturnMemory } from './town-history.ts';
+import { visitNightBoat } from './night-boat.ts';
 import { visitTownImmortal } from './town-immortal.ts';
 import { joinSect, leaveSect, startActivity, tradeIron } from './mortal.ts';
 import type { PanelParts } from './panel-host.ts';
-
-export function immortalEncounterPanel(
-  save: SaveData,
-  npc: TownResident,
-  granted: boolean,
-  pendingCurios: Record<string, number> = {},
-): PanelParts {
-  const visitor = save.mortal.immortal!;
-  const medicine = medicineInfo(visitor.medicineId)!;
-  const curio =
-    visitor.curioId &&
-    (visitor.claimed || (!acquiredCurio(save, visitor.curioId) && !pendingCurios[visitor.curioId]))
-      ? visitor.curioId
-      : undefined;
-  const name = curio ? curioName(curio) : medicine.name;
-  const held = curio ? save.curios.bag[curio] || 0 : save.medicine.bag[medicine.id] || 0;
-  const offered = visitor.claimed;
-  let story = granted
-    ? '<p>那人混在赶集的人群里，衣衫寻常，正替摊主扶稳一盏旧灯。你停步问路，他却笑着说起千年前的渡口——连那时桥下的一株老柳，也记得清楚。</p><p>街声依旧喧闹，四周灵机却在他抬眼时静了一瞬。你才明白，眼前并非凡人。</p><p>“走得远了，才知人间一碗热茶，也值得回来。”他将一只小瓷瓶放入你掌心，“长生路长，莫只顾赶路。今日相逢，便赠你这一炉余香。”</p><p>再望去，他仍只是街巷里一张平常的面孔。你收好瓷瓶，把这场相逢记在心里。</p>'
-    : '<p>你再度向这位前辈问候。他仍坐在街巷间，笑着与你说起人间烟火。这场仙缘已记在心里，此次相遇的赠礼也已收下。</p>';
-  if (curio)
-    story = story
-      .replace('一只小瓷瓶', '一件随身旧物')
-      .replace('这一炉余香', '这件随我走过山河的旧物')
-      .replace('收好瓷瓶', '将旧物收入行囊');
-  if (!offered)
-    story = '<p>前辈将赠礼收在袖中，笑着等你整理行囊。腾出余地后，再来领这场仙缘便是。</p>';
-  return [
-    '市井逢仙',
-    `青岚镇 · 与${npc.name}的一席闲谈`,
-    `<section class="immortal-gift${granted ? '' : ' is-claimed'}" aria-label="仙人赠礼">${curio ? curioArt(curio) : medicineArt(medicine)}<div><small>仙人赠礼 · ${curio ? '奇物' : medicine.years ? '珍品' : '本世珍品'}</small><strong>${granted ? '获赠' : offered ? '此前获赠' : '待赠'}：${name} <span>×1</span></strong><p>${granted ? (curio ? '已收入行囊 · 持有即生效' : '已收入丹囊') : offered ? '此次赠礼已收下' : '行囊已满，尚未领取'} · 现持有 ${held} ${curio ? '件' : '份'}</p></div></section><div class="town-story immortal-encounter">${story}</div><button class="primary-button" data-action="close">${granted ? '谢过前辈' : '与前辈作别'} · 继续游历</button>`,
-  ];
-}
-
-export function teaStoryPanel(): PanelParts {
-  return [
-    '一盏茶，半卷仙途',
-    '听雨茶馆 · 仙途旧闻',
-    '<section class="tea-story" aria-label="茶馆说书"><p class="tea-story-status panel-note" role="status">说书人正待开讲…</p><div class="tea-story-text"></div><div class="save-actions"><button class="secondary-button tea-story-play" hidden>朗读故事</button><button class="secondary-button tea-story-stop" hidden disabled>停止朗读</button></div><p class="tea-story-image-status panel-note" role="status"></p><p class="panel-note">听书半载，有 30% 机会获赠 8 灵石。阅读与朗读不另耗年岁；再听一回另耗半载。</p><div class="save-actions"><button class="primary-button" data-action="close">回到街巷</button><button class="secondary-button tea-story-next" data-action="mortal-activity" data-id="tea" disabled>再听一回 · 半载</button><button class="secondary-button tea-story-retry" hidden disabled>重试这一回</button></div></section>',
-  ];
-}
 
 export function marketAmbushPanel(held: number, extreme = false): PanelParts {
   return [
@@ -71,6 +27,7 @@ export function enterTownVisit(save: SaveData): string | null {
   const previous = save.mortal.scenery;
   save.mortal.population ??= freshTownPopulation(save.age);
   visitTownImmortal(save, previous?.lastVisitAge);
+  visitNightBoat(save, previous?.lastVisitAge);
   const scenery = (save.mortal.scenery = townVisit(previous, save.age));
   const memory = townReturnMemory(
     save.mortal.population.seed,

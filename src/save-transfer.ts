@@ -153,6 +153,7 @@ export function importSave(text: string) {
     (data.mortal !== undefined &&
       !validMortal(data.mortal, Number(data.age ?? 15), Number(data.schema ?? 0) < 26)) ||
     (data.lifespanBonus !== undefined && !integer(data.lifespanBonus)) ||
+    (data.lifespanSpent !== undefined && !integer(data.lifespanSpent)) ||
     (data.tribulations !== undefined && !integer(data.tribulations)) ||
     (data.nextTribulationAge !== undefined &&
       (typeof data.nextTribulationAge !== 'number' ||

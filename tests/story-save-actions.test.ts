@@ -38,6 +38,7 @@ import { resolveActivity } from '../src/mortal.ts';
 import { Game } from '../src/game.ts';
 import { importSave } from '../src/save-transfer.ts';
 import { hometownContent } from '../src/mortal-ui.ts';
+import { dockRumorsContent } from '../src/dock-ui.ts';
 
 function fixture(prepare = (_save: ReturnType<typeof freshSave>) => {}) {
   const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -82,6 +83,7 @@ function fixture(prepare = (_save: ReturnType<typeof freshSave>) => {}) {
     syncHumanStories,
     HOMETOWN_START,
     townScene: { position: { ...HOMETOWN_START } },
+    townSource: { current: { dockRumorsContent } },
     humanStoryContent: () => '',
     hometownLetterContent: () => '',
     hometownContent: () => '',

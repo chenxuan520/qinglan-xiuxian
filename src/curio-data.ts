@@ -130,6 +130,21 @@ export function bossCurio(
 }
 
 export const curioCycle = (age: number) => Math.max(0, Math.floor((age - 15 + 1e-9) / 10));
+function curioConsignmentAt(save: { curios: CurioState }, cycle: number): CurioId | null {
+  const n = curioRoll(save.curios.seed, `consignment:${cycle}`);
+  const id = CURIO_IDS[1 + ((n >>> 8) % 8)];
+  return n % 100 < 35 && !acquiredCurio(save, id) ? id : null;
+}
+
+export function forecastCurioConsignment(save: { age: number; curios: CurioState }) {
+  const now = curioCycle(save.age);
+  for (let cycle = now + 1; cycle <= now + 30; cycle++) {
+    const id = curioConsignmentAt(save, cycle);
+    if (id) return { id, years: 15 + cycle * 10 - save.age };
+  }
+  return null;
+}
+
 export function prepareCurioConsignment(save: { age: number; curios: CurioState }) {
   const cycle = curioCycle(save.age);
   if (save.curios.consignment?.cycle === cycle) {
@@ -139,11 +154,9 @@ export function prepareCurioConsignment(save: { age: number; curios: CurioState 
     }
     return;
   }
-  const n = curioRoll(save.curios.seed, `consignment:${cycle}`);
-  const id = CURIO_IDS[1 + ((n >>> 8) % 8)];
   save.curios.consignment = {
     cycle,
-    id: n % 100 < 35 && !acquiredCurio(save, id) ? id : null,
+    id: curioConsignmentAt(save, cycle),
     closed: false,
   };
 }

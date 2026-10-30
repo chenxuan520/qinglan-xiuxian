@@ -328,7 +328,7 @@ test('茶馆明确朗读也尊重保存失败，主控制器回传失败且不�
     soundSettings,
     panel: '',
     modal: { querySelector: () => ({}) },
-    teaStoryPanel: () => [],
+    townSource: { current: { teaStoryPanel: () => [] } },
     panelFrame() {},
     mountTeaStory(_host: unknown, _save: unknown, callback: () => boolean) {
       context.enableSound = callback;

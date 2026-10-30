@@ -34,13 +34,34 @@ import {
 } from './auction.ts';
 import { ironMarket } from './iron-market.ts';
 import { AUCTION_SETTINGS } from './setting.ts';
-function roll(save: SaveData, key: string) {
-  let hash = save.mortal.population!.seed;
-  for (const c of `auction:${save.mortal.sectMarket!.visit}:${save.mortal.auction!.hall ? `${save.mortal.auction!.hall}:` : ''}${key}`)
-    hash = Math.imul(hash ^ c.charCodeAt(0), 16777619);
-  hash = Math.imul(hash ^ (hash >>> 16), 0x7feb352d);
-  hash = Math.imul(hash ^ (hash >>> 15), 0x846ca68b);
-  return (hash ^ (hash >>> 16)) >>> 0;
+function roll(
+  save: SaveData,
+  key: string,
+  visit = save.mortal.sectMarket!.visit,
+  hall = save.mortal.auction!.hall,
+) {
+  return curioRoll(
+    save.mortal.population!.seed,
+    `auction:${visit}:${hall ? `${hall}:` : ''}${key}`,
+  );
+}
+
+function auctionMedicine(seed: number, hall: number, slot: number) {
+  const tier =
+    hall === 0 ? (slot % 4 === 0 ? '凡品' : '灵品') : hall === 1 && slot !== 5 ? '灵品' : '珍品';
+  const permanent = hall === 2 && slot === 5 && (seed >>> 24) % 4 === 0;
+  const pool = MEDICINES.filter((m) => m.tier === tier && (m.years === 0) === permanent);
+  return pool[(seed >>> 8) % pool.length];
+}
+
+export function forecastPermanentMedicine(save: SaveData) {
+  const currentVisit = save.mortal.sectMarket?.visit;
+  if (!save.mortal.population || currentVisit === undefined) return null;
+  for (let visit = currentVisit + 1; visit <= currentVisit + 10; visit++) {
+    const medicine = auctionMedicine(roll(save, 'lot:5', visit, 2), 2, 5);
+    if (medicine.years === 0) return { id: medicine.id, visits: visit - currentVisit };
+  }
+  return null;
 }
 
 export function auctionLots(
@@ -60,19 +81,10 @@ export function auctionLots(
     const npc = npcs[seed % npcs.length];
     let item: AuctionItem;
     if (slot % 4 < 2) {
-      const tier =
-        hall === 0
-          ? slot % 4 === 0
-            ? '凡品'
-            : '灵品'
-          : hall === 1 && slot !== 5
-            ? '灵品'
-            : '珍品';
-      const permanent = hall === 2 && slot === 5 && (seed >>> 24) % 4 === 0;
-      const pool = MEDICINES.filter((m) => m.tier === tier && (m.years === 0) === permanent);
+      const medicine = auctionMedicine(seed, hall, slot);
       item = {
         kind: 'medicine',
-        id: pool[(seed >>> 8) % pool.length].id,
+        id: medicine.id,
         quantity: 1,
         forgeLevel: 0,
       };

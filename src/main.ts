@@ -49,13 +49,7 @@ import {
   upgradeChoicesModal,
   victoryModal,
 } from './lobby-ui.ts';
-import {
-  enterTownVisit,
-  executeMortalAction,
-  immortalEncounterPanel,
-  marketAmbushPanel,
-  teaStoryPanel,
-} from './town-host.ts';
+import { enterTownVisit, executeMortalAction, marketAmbushPanel } from './town-host.ts';
 import { computeManualInput, trapModalTab } from './input-controller.ts';
 import { destinationInput } from './walk-navigation.ts';
 import { dispatchAction, type ActionShell } from './action-controller.ts';
@@ -946,7 +940,7 @@ function refreshAuction(selected = '') {
 }
 function showTeaStory() {
   panel = 'tea-story';
-  const story = teaStoryPanel();
+  const story = townSource.current!.teaStoryPanel();
   panelFrame(...story);
   void mountTeaStory(modal.querySelector<HTMLElement>('.tea-story')!, save, () => {
     return soundSettings.enableNarration();
@@ -1937,7 +1931,7 @@ function shellBindings(): ActionShell {
     get hometownContent() { return hometownContent; },
     get hometownFarewellModal() { return hometownFarewellModal; },
     get hometownParents() { return hometownParents; },
-    get immortalEncounterPanel() { return immortalEncounterPanel; },
+    get immortalEncounterPanel() { return townSource.current!.immortalEncounterPanel; },
     get markAdWatched() { return markAdWatched; },
     get marketAmbushPanel() { return marketAmbushPanel; },
     get marketCultivators() { return marketCultivators; },
@@ -1973,6 +1967,7 @@ function shellBindings(): ActionShell {
     get telemetryRow() { return telemetryRow; },
     get touchHintDismissed() { return touchHintDismissed; },
     get townEventContent() { return townEventContent; },
+    get rankingEnabled() { return rankingEnabled; },
     get townPage() { return townPage; },
     get townVisit() { return townVisit; },
     get tribulationWonPanel() { return tribulationWonPanel; },

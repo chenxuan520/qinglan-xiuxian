@@ -33,7 +33,7 @@ export function settlementPlaces(save: SaveData, market = false, unfinished = fa
         ? [{ name: '青岚故居', use: '回家叙话，看看旧居', cost: '交谈不另耗年岁' }]
         : []),
       ...TOWN_NPCS.filter((npc) => !npc.id.startsWith('villager-')).map((npc) => {
-        const job = TOWN_JOBS[npc.id as keyof typeof TOWN_JOBS];
+        const job = TOWN_JOBS[(npc.id === 'fisher' ? 'fishing' : npc.id) as keyof typeof TOWN_JOBS];
         const use: Record<string, string> = {
           herbs: '购买凡品丹药，也可采药赚取灵石',
           tea: '听仙途旧闻，翻阅案头旧书',
@@ -41,7 +41,7 @@ export function settlementPlaces(save: SaveData, market = false, unfinished = fa
           market: '按当期行情买卖玄铁',
           smith: '与匠人叙话',
           scholar: '向游学人讲讲山外',
-          fisher: '船头歇脚，与渔夫闲谈',
+          fisher: '陪渔夫垂钓，听船客传闻',
           farmer: '听听田间近况',
           tailor: '檐下闲谈，说些家常',
         };
@@ -49,7 +49,7 @@ export function settlementPlaces(save: SaveData, market = false, unfinished = fa
           name: npc.place,
           use: use[npc.id],
           cost: job
-            ? `${npc.id === 'herbs' ? '采药' : npc.id === 'tea' ? '听书' : '护送'}${job.years}年／次 · ${job.stones ? `报酬${job.stones}灵石${job.iron ? `、${job.iron}玄铁` : ''}${npc.id === 'herbs' ? '；买丹另看明价，不另耗年岁' : ''}` : '不收灵石，赠礼随缘；翻阅旧书不耗年岁'}`
+            ? `${npc.id === 'herbs' ? '采药' : npc.id === 'tea' ? '听书' : npc.id === 'fisher' ? '垂钓' : '护送'}${job.years}年／次 · ${job.stones ? `报酬${job.stones}灵石${job.iron ? `、${job.iron}玄铁` : ''}${npc.id === 'herbs' ? '；买丹另看明价，不另耗年岁' : ''}` : '不收灵石，赠礼随缘；翻阅旧书不耗年岁'}`
             : npc.id === 'market'
               ? '买卖不另耗年岁，价格与额度见货商报价'
               : '闲谈不另耗年岁',

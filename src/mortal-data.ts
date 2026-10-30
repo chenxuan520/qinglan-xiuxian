@@ -1,3 +1,4 @@
+import { validNightBoat, type NightBoat } from './night-boat.ts';
 import { validSectServices, type SectServiceState } from './sect-service-data.ts';
 import { validMarketVenues, type MarketVenueState } from './market-venue-data.ts';
 import { validMarketRelations } from './market-relations-data.ts';
@@ -95,6 +96,13 @@ export const SECT_DUES = [
   { years: 0, stones: 0 },
 ];
 export const TOWN_JOBS = {
+  fishing: {
+    name: '码头垂钓',
+    years: 1,
+    stones: 12,
+    iron: 0,
+    desc: '陪渔夫在码头坐上一年，钓些河鲜换钱，偶尔也钓上别的东西。',
+  },
   herbs: { name: '药铺采药', years: 1, stones: 18, iron: 0, desc: '替城中药铺采集山间药草。' },
   escort: { name: '镖局护送', years: 2, stones: 40, iron: 1, desc: '护送凡人商队，换些修行资粮。' },
   tea: {
@@ -121,6 +129,7 @@ export interface MortalState {
   scenery?: TownScenery;
   smithStory?: SmithStory;
   immortal?: TownImmortal | null;
+  nightBoat?: NightBoat | null;
   humanStories?: HumanStories;
   member: { id: string; dueAt: number; dues: number } | null;
   mastery: Record<string, number>;
@@ -133,7 +142,7 @@ export interface MortalState {
   events: string[];
 }
 export function freshMortal(): MortalState {
-  return { years: 0, member: null, mastery: {}, activity: null, events: [] };
+  return { years: 0, member: null, mastery: {}, activity: null, events: [], nightBoat: null };
 }
 export function validMortal(value: unknown, age = 15, legacyAuction = false): value is MortalState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -153,6 +162,7 @@ export function validMortal(value: unknown, age = 15, legacyAuction = false): va
       validMarketRelations(s.marketRelations, age, s.sectMarket)) &&
     (s.hometown === undefined || validHometown(s.hometown, age)) &&
     (s.immortal == null || validTownImmortal(s.immortal, age)) &&
+    (s.nightBoat == null || validNightBoat(s.nightBoat, age)) &&
     (s.population === undefined || validTownPopulation(s.population)) &&
     (s.humanStories === undefined || validHumanStories(s.humanStories, s.population, age)) &&
     (s.scenery === undefined || validTownScenery(s.scenery)) &&

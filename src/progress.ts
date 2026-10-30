@@ -121,6 +121,7 @@ export interface SaveData {
   rootElements: ElementId[];
   age: number;
   lifespanBonus: number;
+  lifespanSpent: number;
   tribulations: number;
   nextTribulationAge: number;
   tribulationReturn: unknown | null;
@@ -131,7 +132,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 39;
+export const SAVE_SCHEMA = 40;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -192,6 +193,7 @@ export function freshSave(
     chronicle: freshChronicle(),
     age: 15,
     lifespanBonus: 0,
+    lifespanSpent: 0,
     tribulations: 0,
     nextTribulationAge: 0,
     tribulationReturn: null,
@@ -482,6 +484,8 @@ export function readSave(
     base.hometownSeen =
       typeof s.hometownSeen === 'boolean' ? s.hometownSeen : !base.mortal.hometown;
     base.lifespanBonus = int(s.lifespanBonus);
+    base.lifespanSpent = int(s.lifespanSpent);
+    base.mortal.nightBoat ??= null;
     base.tribulations = int(s.tribulations);
     if (typeof s.nextTribulationAge === 'number' && Number.isFinite(s.nextTribulationAge))
       base.nextTribulationAge = Math.max(0, s.nextTribulationAge);
@@ -709,7 +713,7 @@ export const IMMORTAL_CULTIVATION = Array.from({ length: 24 }, (_, step) => real
 export function lifespanInfo(save: SaveData) {
   const realm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const base = REALM_LIFESPANS[realm.index];
-  const limit = base + save.lifespanBonus;
+  const limit = base + save.lifespanBonus - save.lifespanSpent;
   return { age: save.age, base, limit, remaining: Math.max(0, limit - save.age) };
 }
 export function extendLifespan(save: SaveData) {

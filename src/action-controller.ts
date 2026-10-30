@@ -1,3 +1,4 @@
+import type { immortalEncounterPanel } from './dock-ui.ts';
 import { canClaimLifespanAd, claimSuppliesReward } from './ad-reward-limits.ts';
 import {
   isExtremeLife,
@@ -51,12 +52,7 @@ import type {
   upgradeChoicesModal,
   victoryModal,
 } from './lobby-ui.ts';
-import type {
-  enterTownVisit,
-  executeMortalAction,
-  immortalEncounterPanel,
-  marketAmbushPanel,
-} from './town-host.ts';
+import type { enterTownVisit, executeMortalAction, marketAmbushPanel } from './town-host.ts';
 import type { executeMarketSocial } from './market-social-actions.ts';
 import type { isImmortalSuccessor } from './inheritance-ui.ts';
 import type { AD_SECONDS, AdPlacement, getAdProvider, watchAdPlacement } from './ads.ts';
@@ -425,6 +421,7 @@ export interface ActionShell {
   readonly telemetryRow: typeof telemetryRow;
   readonly touchHintDismissed: boolean;
   readonly townEventContent: typeof townEventContent;
+  readonly rankingEnabled?: () => boolean;
   readonly townPage: typeof townPage;
   readonly townVisit: typeof townVisit;
   readonly tribulationWonPanel: typeof tribulationWonPanel;
@@ -1154,6 +1151,23 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
     ) {
       shell.showTownEvent(shell.townNpc!);
     }
+    return true;
+  }
+  if (
+    action === 'night-boat-buy' &&
+    shell.panel === 'night-boat' &&
+    shell.inTown &&
+    !shell.game &&
+    !shell.saveLock
+  ) {
+    const module = shell.townSource.current;
+    if (
+      module &&
+      commitSaveAction(shell, (next) =>
+        module.claimNightBoat(next, shell.pendingRun?.loot.curios),
+      ) === true
+    )
+      shell.panelFrame(...module.nightBoatPanel(shell.save, shell.pendingRun?.loot.curios));
     return true;
   }
   if (action.startsWith('town-') && shell.inMortalWorld && !shell.game && !shell.panel) {
