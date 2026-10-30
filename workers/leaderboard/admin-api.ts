@@ -20,7 +20,7 @@ export async function leaderboardAdminSession(request: Request, env: AdminEnv) {
       new Request(ORIGIN + '/ads/admin/session', {
         headers: { Cookie: request.headers.get('Cookie') ?? '' },
         signal: controller.signal,
-        redirect: 'error',
+        redirect: 'manual',
       }),
     );
     void response.body?.cancel().catch(() => {});

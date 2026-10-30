@@ -22,6 +22,11 @@ function fixture() {
       async fetch(request: Request) {
         checks++;
         assert.equal(request.url, origin + '/ads/admin/session');
+        assert.equal(
+          request.redirect,
+          'manual',
+          'Workers只支持manual/follow，管理调用不能使用error',
+        );
         if (fail) throw Error('isolated auth transport failure');
         return Response.json({ ok: authenticated }, { status: authenticated ? 200 : 401 });
       },

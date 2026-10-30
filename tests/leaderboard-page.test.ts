@@ -58,6 +58,7 @@ test('管理登录复用既有组件但回到自己的管理页，缺失服务�
     ADMIN_AUTH: {
       async fetch(request: Request) {
         assert.equal(request.url, 'https://xiuxian.011203.xyz/ads/admin/login');
+        assert.equal(request.redirect, 'manual', 'Worker服务调用不得使用不支持的redirect error');
         return new Response(LOGIN_HTML.replace('__TURNSTILE_SITE_KEY__', 'public-local-site-key'), {
           headers: { 'Content-Type': 'text/html' },
         });

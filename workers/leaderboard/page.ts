@@ -105,7 +105,7 @@ export async function leaderboardPage(
       const response = await env.ADMIN_AUTH.fetch(
         new Request('https://xiuxian.011203.xyz/ads/admin/login', {
           signal: controller.signal,
-          redirect: 'error',
+          redirect: 'manual',
         }),
       );
       if (!response.ok || !response.headers.get('Content-Type')?.includes('text/html'))
