@@ -39,6 +39,7 @@ import { bossSkills, bossSkillCooldown, bossPursuitCooldown } from './boss-skill
 import {
   regionalEnemyFields,
   regionalEnemyTactics,
+  CHARGE_SKILLS,
   type RegionalField,
 } from './regional-combat.ts';
 import {
@@ -1057,11 +1058,7 @@ export class Game {
     if (this.usesElitePacing && late) {
       first =
         available
-          .filter((type) =>
-            ['dash', 'firecharge', 'thundercharge'].includes(
-              this.enemyTactics(type).eliteSkill ?? '',
-            ),
-          )
+          .filter((type) => CHARGE_SKILLS.includes(this.enemyTactics(type).eliteSkill!))
           .at(-1) ?? first;
       second =
         available
@@ -1238,6 +1235,7 @@ export class Game {
         }
       }
       const charging = e.charge > 0;
+      let soulContact = false;
       const winding = !e.boss && this.usesRegionalSkill(e) && (e.windup ?? 0) > 0;
       if (winding) {
         e.windup = Math.max(0, e.windup! - dt);
@@ -1256,6 +1254,11 @@ export class Game {
           const movement = (Math.min(0.55, before) - Math.min(0.55, e.charge)) * 380;
           e.x += e.dx * movement;
           e.y += e.dy * movement;
+          const tactics = this.enemyTactics(e.type);
+          const skill = e.elite ? tactics.eliteSkill : tactics.skill;
+          soulContact = movement > 0 && skill === 'soulcharge';
+          if (e.charge === 0 && skill === 'miasmacharge')
+            this.addRegionalFields(e, regionalEnemyFields(e, skill, e.dx, e.dy)!);
         } else if (e.charge < 0.55) {
           e.x += e.dx * 380 * dt;
           e.y += e.dy * 380 * dt;
@@ -1372,7 +1375,10 @@ export class Game {
         this.enemyField(e, 0, 0, 66, 0.3, e.damage * 1.4, '#ee9b76', 'blast', 0.85);
       }
       d = distance(e, p);
-      if (d < e.radius + 13 && !e.dead) this.hurtPlayer(e.damage);
+      if (d < e.radius + 13 && !e.dead) {
+        if (soulContact) this.enemySeal();
+        this.hurtPlayer(e.damage);
+      }
       if (
         d > Math.max(this.viewport.width, this.viewport.height) * 1.5 &&
         !e.boss &&
@@ -1406,7 +1412,7 @@ export class Game {
       (['roots', 'frost', 'miasma', 'storm', 'firepath'].includes(skill) &&
         distance > ENEMY_FIELD_REACH) ||
       (skill === 'stomp' && distance > 180) ||
-      (['dash', 'thundercharge'].includes(skill) && distance > 360)
+      (CHARGE_SKILLS.includes(skill) && distance > 360)
     )
       return;
     const projectile = [
@@ -1426,6 +1432,8 @@ export class Game {
       'storm',
       'stomp',
       'thundercharge',
+      'frostcharge',
+      'miasmacharge',
     ].includes(skill);
     // 前六境技能共享弹幕与地面区域预算；妖王独立施法，避免小怪挤满画面。
     if (projectile && this.shots.filter((b) => b.kind === 'hostile').length >= 60) return;
@@ -1439,9 +1447,9 @@ export class Game {
     this.nextEnemySkillAt = this.time + 0.18;
     e.dx = nx;
     e.dy = ny;
-    if (skill === 'dash' || skill === 'firecharge' || skill === 'thundercharge') {
+    if (CHARGE_SKILLS.includes(skill)) {
       e.charge = 1.25 + (!this.isFinalTrial && this.stage === 2 ? (e.id % 2) * 0.3 : 0);
-      if (skill === 'firecharge' && !this.isFinalTrial) {
+      if ((skill === 'firecharge' || skill === 'frostcharge') && !this.isFinalTrial) {
         this.addRegionalFields(e, regionalEnemyFields(e, skill, nx, ny)!);
       } else if (skill === 'firecharge')
         for (let i = 0; i < (e.elite ? 3 : 2); i++)
@@ -2517,7 +2525,11 @@ export class Game {
             this.effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
           if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8) {
             const poison = poisonousHazard(z);
-            this.hurtPlayer(z.damage * (poison ? this.medicine.poison : 1), false, poison);
+            this.hurtPlayer(
+              z.damage * (poison ? this.medicine.poison : 1),
+              this.stage === 1 && z.kind === 'enemy-firepath',
+              poison,
+            );
           }
         } else if (z.kind === 'pagoda') {
           const weapon = this.weapons.find((w) => w.id === 'pagoda');

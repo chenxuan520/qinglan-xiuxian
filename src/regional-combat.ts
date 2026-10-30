@@ -1,6 +1,15 @@
 import type { Enemy, Point, Zone } from './game-types.ts';
 import type { EnemySkill } from './data.ts';
 
+export const CHARGE_SKILLS: readonly EnemySkill[] = [
+  'dash',
+  'firecharge',
+  'frostcharge',
+  'miasmacharge',
+  'soulcharge',
+  'thundercharge',
+];
+
 export type RegionalField = Omit<Zone, 'tick' | 'maxLife' | 'damage'> & { damageScale: number };
 type Tactics = {
   flank: boolean;
@@ -40,10 +49,11 @@ export function regionalEnemyTactics(
       overrides[stage]?.[type] ??
       (stage === 2 && base.flank && behavior === 'chase' ? 'dash' : base.eliteSkill),
   };
-  if (stage === 5) {
-    if (result.skill === 'dash') result.skill = 'thundercharge';
-    if (result.eliteSkill === 'dash') result.eliteSkill = 'thundercharge';
-  }
+  const charge = (
+    ['dash', 'firecharge', 'frostcharge', 'miasmacharge', 'soulcharge', 'thundercharge'] as const
+  )[stage];
+  if (result.skill === 'dash') result.skill = charge;
+  if (result.eliteSkill === 'dash') result.eliteSkill = charge;
   tacticsCache.set(key, result);
   return result;
 }
@@ -138,6 +148,12 @@ export function regionalEnemyFields(
     fields.push(lane('enemy-thunderpath', e, offset(e, nx, ny, 160), 16, 0.3, 1.3, 0.4, e.id));
   } else if (skill === 'firecharge' || skill === 'firepath') {
     fields.push(lane('enemy-firepath', e, offset(e, nx, ny, 160), 20, 2.4, 0.95, 0.45));
+  } else if (skill === 'frostcharge') {
+    // 冲刺沿原209距离留冰，预警与实际蓄势同步（冰谷部分兵种多0.3秒）。
+    fields.push(lane('enemy-frost', e, offset(e, nx, ny, 209), 16, 1.3, e.charge - 0.55, 0.65));
+  } else if (skill === 'miasmacharge') {
+    // 只在实际冲刺结束时调用；不从起点预测远处落阵。
+    fields.push(cloud('enemy-miasma', e, 0, 0, 50, 3.2, 1, 0.65));
   } else if (skill === 'frost') {
     for (const side of e.elite ? [-28, 28] : [0])
       fields.push(

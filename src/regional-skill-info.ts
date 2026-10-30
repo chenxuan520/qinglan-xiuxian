@@ -42,6 +42,21 @@ export const ENEMY_SKILLS = {
     hint: '蓄势扑击，短火痕留在行进路径',
     eliteHint: '扑击路径留下三段火痕，绕开回头路',
   },
+  frostcharge: {
+    name: '踏霜扑杀',
+    hint: '蓄势扑击，冲过留下短时冰路，触霜减速',
+    eliteHint: '扑击路线留下冰路，触霜减速，侧移避开',
+  },
+  miasmacharge: {
+    name: '迸瘴扑杀',
+    hint: '扑击终点爆开毒瘴，毒伤命中后3秒无法回复',
+    eliteHint: '扑击终点留瘴，命中后3秒无法回复，勿追终点',
+  },
+  soulcharge: {
+    name: '封魂扑杀',
+    hint: '蓄势扑击，冲撞命中后封宝1秒',
+    eliteHint: '冲撞命中后封宝1秒，侧移避开扑击路线',
+  },
   thundercharge: {
     name: '踏雷突袭',
     hint: '近处突袭沿扑击路线留雷痕，侧移避开，触雷短暂禁锢',
@@ -98,8 +113,8 @@ export function regionalSkillDetails(
         },
         firecharge: {
           ...original,
-          hint: '扑杀路线留下短时火痕，换一条路走',
-          eliteHint: '扑杀路线燃起火痕，绕开回头路',
+          hint: '扑杀路线留下短时火痕，命中后灼烧，换路避开',
+          eliteHint: '扑杀路线燃起火痕，命中后灼烧，绕开回头路',
         },
       } as Partial<Record<EnemySkill, typeof original>>
     )[skill] ?? original

@@ -145,7 +145,16 @@ test('前六境精英保留弹道、冲刺、震地与召唤，爆炸怪仍近�
       if (!skill) {
         assert.equal(ENEMIES[type].behavior, 'explode');
         assert.equal(e.charge, 0);
-      } else if (skill === 'dash' || skill === 'firecharge' || skill === 'thundercharge')
+      } else if (
+        [
+          'dash',
+          'firecharge',
+          'frostcharge',
+          'miasmacharge',
+          'soulcharge',
+          'thundercharge',
+        ].includes(skill)
+      )
         assert.ok(e.charge > 0.55);
       else if (
         ['ranged', 'volley', 'nova', 'soul', 'firebolt', 'frostbolt', 'gapring'].includes(skill)
