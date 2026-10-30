@@ -1,4 +1,5 @@
 import { validSuppliesReadyAt } from './ad-rules.ts';
+import { freshBestiarySeen, restoreBestiarySeen, type BestiarySeen } from './bestiary-seen.ts';
 import {
   CURIO_IDS,
   isCurio,
@@ -92,6 +93,7 @@ export interface SaveData {
   cultivation: number;
   unlocked: number;
   completed: number[];
+  bestiary: BestiarySeen;
   bestKills: number;
   runs: number;
   training: { vitality: number; power: number; speed: number };
@@ -123,7 +125,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 35;
+export const SAVE_SCHEMA = 36;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -191,6 +193,7 @@ export function freshSave(
     cultivation: 0,
     unlocked: 0,
     completed: [],
+    bestiary: freshBestiarySeen(),
     bestKills: 0,
     runs: 0,
     training: { vitality: 0, power: 0, speed: 0 },
@@ -478,6 +481,7 @@ export function readSave(
         ]
       : [];
     if (base.completed.includes(FINAL_TRIAL_STAGE - 1)) base.unlocked = FINAL_TRIAL_STAGE;
+    base.bestiary = restoreBestiarySeen(s.bestiary, base.completed);
     for (const key of ['vitality', 'power', 'speed'] as const) {
       base.training[key] = int(s.training?.[key], 20);
       base.retreatBonus[key] = int(s.retreatBonus?.[key]);

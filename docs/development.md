@@ -177,6 +177,14 @@ npx wrangler d1 migrations apply qinglan-leaderboard --remote --config workers/l
 npx wrangler deploy --config workers/leaderboard/wrangler.jsonc --keep-vars
 ```
 
+## 妖物志遭遇与未知形影
+
+`bestiary-seen.ts` 保存本世已实际遭遇的普通妖物类型与妖王原境序号，使用有界、去重整数数组；新增 `SaveData.bestiary` 并将 `SAVE_SCHEMA` 递增至36。`Game.spawnEnemy` 在实际出生后追加记录，不改变随机调用、敌人数值、掉落或时间；终关旧王按原境身份记录，独立天劫的核心不冒充仙尊，木心、猎狼与假影也不因借用普通妖物模板而解锁该种妖物。法宝试演与导览使用隔离角色，不修改实际存档；读取合法续局时也识别仍在场的妖物。沿用原有保存时机，不逐只写localStorage；轮回随本世角色重置。
+
+`readSave` 单点归一见闻数据。按用户确认，存档完全缺少 `bestiary` 字段时视为全部普通妖物和妖王都已认识，保持旧档原有图鉴信息；新档显式空记录仍从未知开始，损坏但存在的字段不按全知处理。妖王来历继续只读通关记录，不因旧档全知而提前解锁；旧档可照常导入。有效数组往返保留，不新增浏览器配置键或后端字段。更高版本存档仍只读，旧普通进行中对局按现有升级规则处理。
+
+妖物志按记录条件渲染真实名字/气血/触碰伤害/出场时间；未知只输出 `???`，不用隐藏的真名title或可访问标签。精灵继续用原图集和同一裁切尺寸，以brightness(0)保留透明轮廓，并加极淡边缘；不会新增素材。技能与招式说明保留，切换关卡或难度不解锁。已知数值继续共用 `enemyCombatStats`，妖王来历仍按真实通关解锁，与仅遇到分开。
+
 ## 妖王来历与来信轻提醒
 
 七段确认正文仅在 `bestiary-lore.ts` 随妖物志按需加载，`bestiaryPanel` 读取 `save.completed`；六王按各自原境序号解锁，仙尊按 `FINAL_TRIAL_STAGE` 解锁。终关劫相卡仍显示对应原境正文，不向战斗、登场或结算追加来历，不把新正文引入首屏入口。

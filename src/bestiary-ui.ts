@@ -21,11 +21,18 @@ import { formatNumber } from './number-format.ts';
 import { smallIcon } from './icons.ts';
 import { BOSS_LORE } from './bestiary-lore.ts';
 import type { PanelDefinition } from './panel-host.ts';
+import { freshBestiarySeen, type BestiarySeen } from './bestiary-seen.ts';
 function numberRange(values: readonly number[]) {
   const shown = values.map(formatNumber);
   return shown[0] === shown[1] ? shown[0] : shown.join('～');
 }
-function statLine(label: string, stats: { hp: readonly number[]; damage: readonly number[] }) {
+function statLine(
+  label: string,
+  stats: { hp: readonly number[]; damage: readonly number[] },
+  known = true,
+) {
+  if (!known)
+    return `<small class="enemy-stats"><b>${label}</b><br>气血 ???<br>触碰伤害 ???</small>`;
   return `<small class="enemy-stats"><b>${label}</b><br>气血 约${numberRange(stats.hp)}<br>触碰伤害 约${numberRange(stats.damage)}</small>`;
 }
 const bossHints = [
@@ -46,6 +53,7 @@ export function bestiaryPanel(
   bestiaryStage: number,
   difficulty = 0,
   completed: readonly number[] = [],
+  seen: BestiarySeen = freshBestiarySeen(),
 ): PanelDefinition {
   if (!DIFFICULTIES[difficulty]) difficulty = 0;
   const behavior: Record<string, string> = {
@@ -63,11 +71,12 @@ export function bestiaryPanel(
   return {
     title: '知妖性，方能破万劫',
     subtitle: '妖物志',
-    body: `<p class="panel-note">数值按「${DIFFICULTIES[difficulty].name}」列出。气血为妖物出场时的满血，伤害为减伤前的触碰伤害；灵弹、法阵与自爆按各自招式计算，实际承伤还受你的护体与减伤影响。</p><div class="medicine-tabs" role="group" aria-label="妖物数值难度">${DIFFICULTIES.map((d, index) => `<button data-action="bestiary-difficulty" data-id="${index}" aria-pressed="${index === difficulty}">${d.name}</button>`).join('')}</div><p class="panel-note">${bestiaryStage < 0 ? '全部页按原生秘境，从本类解锁时列至妖王登场；终关列至5:00压力顶峰。前六境妖王战中后续出场的妖物仍会继续增强，终关强化形态见「万劫归墟」。' : bestiaryStage === FINAL_TRIAL_STAGE ? '终关全部为精英，数值从本类解锁时起列至5:00压力顶峰，之后不再提高。' : '数值从本类解锁时起列至妖王登场，普通与精英按同一时段对照。妖王战中后续出场的妖物仍会继续增强。'}</p><details><summary>出场与招式说明</summary><p class="panel-note">前六境按妖王登场前已过时间的0%、25%、50%、75%分四批解锁，首境前20秒只有赤伞菇妖。终关四批分别在0:00、0:45、1:30、2:30解锁。守匣守卫可能提前出现，气血为同一时刻对应精英的七成，不计入常规形态范围。普通与精英按同一时段对照，并非每种精英都会在该时段自然出现。已有妖物不会随时间重新增加气血。普通与精英的地面攻击只在自身附近生成，远程灵弹有射程；妖王可锁定你的脚下落阵。</p></details><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物分类">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
+    body: `<p class="panel-note">未遇到的妖物仅显示轮廓，姓名与数值在遭遇后揭示；技能见闻可提前查看。</p><p class="panel-note">数值按「${DIFFICULTIES[difficulty].name}」列出。气血为妖物出场时的满血，伤害为减伤前的触碰伤害；灵弹、法阵与自爆按各自招式计算，实际承伤还受你的护体与减伤影响。</p><div class="medicine-tabs" role="group" aria-label="妖物数值难度">${DIFFICULTIES.map((d, index) => `<button data-action="bestiary-difficulty" data-id="${index}" aria-pressed="${index === difficulty}">${d.name}</button>`).join('')}</div><p class="panel-note">${bestiaryStage < 0 ? '全部页按原生秘境，从本类解锁时列至妖王登场；终关列至5:00压力顶峰。前六境妖王战中后续出场的妖物仍会继续增强，终关强化形态见「万劫归墟」。' : bestiaryStage === FINAL_TRIAL_STAGE ? '终关全部为精英，数值从本类解锁时起列至5:00压力顶峰，之后不再提高。' : '数值从本类解锁时起列至妖王登场，普通与精英按同一时段对照。妖王战中后续出场的妖物仍会继续增强。'}</p><details><summary>出场与招式说明</summary><p class="panel-note">前六境按妖王登场前已过时间的0%、25%、50%、75%分四批解锁，首境前20秒只有${seen.enemies.includes(0) ? ENEMIES[0].name : '???'}。终关四批分别在0:00、0:45、1:30、2:30解锁。守匣守卫可能提前出现，气血为同一时刻对应精英的七成，不计入常规形态范围。普通与精英按同一时段对照，并非每种精英都会在该时段自然出现。已有妖物不会随时间重新增加气血。普通与精英的地面攻击只在自身附近生成，远程灵弹有射程；妖王可锁定你的脚下落阵。</p></details><div class="guide-tabs bestiary-tabs" role="group" aria-label="秘境妖物分类">${[{ name: '全部', id: -1 }, ...STAGES.map((stage, id) => ({ name: stage.name, id }))].map((stage) => `<button data-action="bestiary-stage" data-id="${stage.id}" class="${bestiaryStage === stage.id ? 'active' : ''}" aria-pressed="${bestiaryStage === stage.id}">${stage.name}</button>`).join('')}</div><div class="bestiary-grid">${ENEMIES.filter(
       (_, index) => bestiaryStage < 0 || STAGE_ENEMIES[bestiaryStage].includes(index),
     )
       .map((e) => {
         const type = ENEMIES.indexOf(e);
+        const known = seen.enemies.includes(type);
         const region =
           bestiaryStage >= 0
             ? bestiaryStage
@@ -111,7 +120,7 @@ export function bestiaryPanel(
           detail += '<small>近身仍会自爆，及时远离</small>';
         const normal = bestiaryEnemyStats(region, difficulty, type)!;
         const eliteStats = bestiaryEnemyStats(region, difficulty, type, true)!;
-        return `<article class="enemy-card"><span class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}" style="${spriteStyle(e.sprite)}"></span><div><h3>${e.name}</h3><p class="${bestiaryStage === FINAL_TRIAL_STAGE ? '' : 'enemy-detail'}">${detail}${tactics.deathMiasma ? '<small>倒下后原地留瘴，预警后生效</small>' : ''}${tactics.boundSummons ? '<small>优先击杀召唤者，其护卫随之消散</small>' : ''}</p><small>${STAGES[region].name} · 最早 ${formatTime(normal.first)} 解锁</small>${region === FINAL_TRIAL_STAGE ? '' : statLine('普通形态', normal)}${statLine(region === FINAL_TRIAL_STAGE ? '精英形态' : '同刻精英对照', eliteStats)}</div></article>`;
+        return `<article class="enemy-card" data-enemy-type="${type}"><span aria-hidden="true" class="sprite-thumb ${e.sprite >= 8 ? 'extra-sprite' : ''}${known ? '' : ' is-unseen'}" style="${spriteStyle(e.sprite)}"></span><div><h3>${known ? e.name : '???'}</h3><p class="${bestiaryStage === FINAL_TRIAL_STAGE ? '' : 'enemy-detail'}">${detail}${tactics.deathMiasma ? '<small>倒下后原地留瘴，预警后生效</small>' : ''}${tactics.boundSummons ? '<small>优先击杀召唤者，其护卫随之消散</small>' : ''}</p><small>${STAGES[region].name} · 最早 ${known ? formatTime(normal.first) : '???'} 解锁</small>${region === FINAL_TRIAL_STAGE ? '' : statLine('普通形态', normal, known)}${statLine(region === FINAL_TRIAL_STAGE ? '精英形态' : '同刻精英对照', eliteStats, known)}</div></article>`;
       })
       .join(
         '',
@@ -123,13 +132,14 @@ export function bestiaryPanel(
     )
       .map((stage) => {
         const bossStage = STAGES.indexOf(stage);
+        const known = seen.bosses.includes(bossStage) || completed.includes(bossStage);
         const arena = bestiaryStage === FINAL_TRIAL_STAGE ? FINAL_TRIAL_STAGE : bossStage;
         const trial = arena === FINAL_TRIAL_STAGE;
         const time = trial
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span class="sprite-thumb" style="${spriteStyle(stage.sprite)}"></span><div><h3>${stage.boss}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${formatTime(time)} 后现身` : `${stage.name} · ${formatTime(time)} 后现身`}</p><small>${bossSkills(bossStage, trial).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] })}<p class="boss-lore" aria-label="妖王来历">${completed.includes(bossStage) ? BOSS_LORE[bossStage] : '击败后可见来历'}</p></div></article>`;
+        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small>${bossSkills(bossStage, trial).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] }, known)}<p class="boss-lore" aria-label="妖王来历">${completed.includes(bossStage) ? BOSS_LORE[bossStage] : '击败后可见来历'}</p></div></article>`;
       })
       .join(
         '',

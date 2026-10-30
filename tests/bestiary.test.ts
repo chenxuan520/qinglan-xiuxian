@@ -16,6 +16,8 @@ import {
   enemyRoster,
 } from '../src/data.ts';
 
+const seen = { enemies: ENEMIES.map((_, id) => id), bosses: STAGES.map((_, id) => id) };
+
 test('图鉴使用关卡实战数值，不能把原始模板的气血与伤害作为入场值', () => {
   const normal = bestiaryEnemyStats(1, 0, 28)!;
   assert.equal(normal.first, 0);
@@ -75,18 +77,18 @@ test('终关压力五分钟封顶且全为精英，前六境妖王战的新生�
 
 test('妖王在原生秘境与终关使用各自数值，难度切换不漏任何首领', () => {
   for (let difficulty = 0; difficulty < DIFFICULTIES.length; difficulty++) {
-    const trialHtml = bestiaryPanel(6, difficulty).body;
+    const trialHtml = bestiaryPanel(6, difficulty, [], seen).body;
     for (const [i, origin] of TRIAL_BOSS_STAGES.entries()) {
       for (const stage of origin === 6 ? [6] : [origin, 6]) {
         const game = new Game(freshSave(), stage, difficulty, () => 0.5);
         game.time = stage === 6 ? TRIAL_BOSS_TIMES[i] : STAGES[stage].minutes * 60;
         const actual = game.spawnEnemy(10, false, true, { x: 0, y: 0 }, origin);
-        const html = stage === 6 ? trialHtml : bestiaryPanel(stage, difficulty).body;
+        const html = stage === 6 ? trialHtml : bestiaryPanel(stage, difficulty, [], seen).body;
         assert.ok(html.includes(`气血 约${formatNumber(actual.maxHp)}`));
         assert.ok(html.includes(`触碰伤害 约${formatNumber(actual.damage)}`));
       }
     }
-    const all = bestiaryPanel(-1, difficulty).body;
+    const all = bestiaryPanel(-1, difficulty, [], seen).body;
     for (const enemy of ENEMIES) assert.ok(all.includes(enemy.name), enemy.name);
     assert.ok(all.includes(`数值按「${DIFFICULTIES[difficulty].name}」`));
   }

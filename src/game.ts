@@ -5,6 +5,7 @@ import {
   type TrailPoint,
 } from './boss-mechanics.ts';
 import { enemyCombatStats } from './enemy-stats.ts';
+import { recordBestiarySeen } from './bestiary-seen.ts';
 import { ownsCurio, bossCurio } from './curio-data.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
@@ -739,6 +740,14 @@ export class Game {
       g.announce('重续仙缘 · 上次历练已恢复');
       g.creditCultivation(false);
       g.recordRunAchievements();
+      if (!g.tribulation)
+        for (const enemy of g.enemies)
+          if (!enemy.dead && !enemy.bossSummon && enemy.illusionOf === undefined)
+            recordBestiarySeen(
+              g.save.bestiary,
+              enemy.boss ? (enemy.bossStage ?? g.stage) : enemy.type,
+              enemy.boss,
+            );
       return g;
     } catch {
       return null;
@@ -1068,6 +1077,7 @@ export class Game {
     boss = false,
     at?: Point,
     bossStage = this.isFinalTrial ? TRIAL_BOSS_STAGES[this.trialBossesDefeated] : this.stage,
+    recordEncounter = true,
   ) {
     if (this.isFinalTrial && !boss) elite = true;
     const available = enemyRoster(this.stage, this.time);
@@ -1138,6 +1148,8 @@ export class Game {
       enemy.bossSkillQueue = queue;
     }
     this.enemies.push(enemy);
+    if (!this.tribulation && recordEncounter)
+      recordBestiarySeen(this.save.bestiary, boss ? bossStage : type, boss);
     return enemy;
   }
   private enemyTactics(type: number) {
@@ -1646,10 +1658,17 @@ export class Game {
     if (stage === 4 && phase === 4) {
       for (const side of [-150, 0, 300]) {
         if (this.enemies.length >= (this.isFinalTrial ? 210 : 240)) break;
-        const illusion = this.spawnEnemy(58, false, false, {
-          x: e.x - ny * side,
-          y: e.y + nx * side,
-        });
+        const illusion = this.spawnEnemy(
+          58,
+          false,
+          false,
+          {
+            x: e.x - ny * side,
+            y: e.y + nx * side,
+          },
+          undefined,
+          false,
+        );
         illusion.illusionOf = e.id;
         illusion.radius = e.radius;
         illusion.hp = illusion.maxHp = 1;
@@ -1771,10 +1790,17 @@ export class Game {
         const angle =
           stage === 0 ? (i / limit) * TAU + Math.atan2(ny, nx) : Math.atan2(ny, nx) + side * 1.15;
         const center = stage === 0 ? this.player : e;
-        const child = this.spawnEnemy(stage === 0 ? 10 : 41, false, false, {
-          x: center.x + Math.cos(angle) * 145,
-          y: center.y + Math.sin(angle) * 145,
-        });
+        const child = this.spawnEnemy(
+          stage === 0 ? 10 : 41,
+          false,
+          false,
+          {
+            x: center.x + Math.cos(angle) * 145,
+            y: center.y + Math.sin(angle) * 145,
+          },
+          undefined,
+          false,
+        );
         child.summonedBy = e.id;
         child.bossSummon = { kind, age: 0, side };
         child.radius = stage === 0 ? 20 : 23;

@@ -561,6 +561,7 @@ export function renderPanel(shell: ActionShell) {
         shell.bestiaryStage,
         shell.bestiaryDifficulty,
         shell.save.completed,
+        shell.save.bestiary,
       );
       shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
     } else {

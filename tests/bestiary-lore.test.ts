@@ -47,7 +47,12 @@ test('未通关时各视图不泄露任何来历全文，只显示解锁提示',
 test('通关只解锁对应原境妖王，全文位于卡片现有数值之后', () => {
   for (const difficulty of [0, 1, 2]) {
     for (let completedStage = 0; completedStage < STAGES.length; completedStage++) {
-      const cards = bossCards(bestiaryPanel(-1, difficulty, [completedStage]).body);
+      const cards = bossCards(
+        bestiaryPanel(-1, difficulty, [completedStage], {
+          enemies: [],
+          bosses: STAGES.map((_, id) => id),
+        }).body,
+      );
       for (const [stage, card] of cards) {
         assert.ok(card.includes(`<h3>${STAGES[stage].boss}</h3>`));
         assert.equal(lore(card), stage === completedStage ? approved[stage] : '击败后可见来历');

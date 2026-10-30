@@ -484,6 +484,9 @@
   background-size: 400% 200%;
   flex-shrink: 0;
 }
+.enemy-card .sprite-thumb.is-unseen {
+  filter: brightness(0) drop-shadow(0 0 1px #6c85734d);
+}
 .enemy-card h3 {
   font-size: 15px;
   font-weight: 400;

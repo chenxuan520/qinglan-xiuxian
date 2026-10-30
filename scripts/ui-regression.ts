@@ -1065,6 +1065,14 @@ async function checkHomePanels(name: string) {
       );
       assert.match(bosses, /九天执劫仙尊/);
       assert.ok(bosses.includes(`最早 ${formatTime(TRIAL_BOSS_TIMES.at(-1)!)} 后现身`));
+      assert.equal(
+        await evaluate(`() => [...document.querySelectorAll('[data-boss-stage]')].every(card =>
+          card.dataset.bossStage === '6'
+            ? !card.querySelector('.is-unseen') && !card.querySelector('.enemy-stats').textContent.includes('???')
+            : card.querySelector('h3').textContent === '???' && !!card.querySelector('.is-unseen'))`),
+        true,
+        '仅已遇到的仙尊显示真容与数值，其余未遇妖王仍为黑影和问号',
+      );
       await check(`${name}-bestiary-final`);
     }
     await click('.panel-close[data-action=close]');
@@ -1298,7 +1306,10 @@ try {
     await checkDisplayAndShortcuts(name, viewport);
     await checkRecipeBuying(name, viewport);
     checkpoint = `${name}-settings`;
-    await open(viewport, fixture());
+    const homePanelSave = fixture();
+    // 合法隔离夹具：已遇仙尊、未击败；保留图鉴原有真名与出场时刻断言。
+    homePanelSave.bestiary.bosses = [6];
+    await open(viewport, homePanelSave);
     assert.equal((await saved()).sound, false, '进站默认静音');
     const home = await evaluate(`() => {
       const auto=document.querySelector('.header-right [data-action=autoplay]');
