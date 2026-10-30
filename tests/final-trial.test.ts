@@ -83,8 +83,8 @@ test('仙尊新增横扫、精英天兵与预警突进，伤害随终关强度�
   boss.skillStep = 5;
   boss.cooldown = 0;
   g.update(0.01);
-  assert.ok(boss.charge >= 1.5);
-  assert.ok(g.effects.some((e) => e.kind === 'line' && e.life > 0.9));
+  assert.ok(Math.abs(boss.charge - 1.2) < 1e-8);
+  assert.ok(g.effects.some((e) => e.kind === 'line' && Math.abs(e.maxLife - 0.5) < 1e-8));
   const x = boss.x;
   g.update(0.05);
   assert.equal(boss.x, x, '突进预警期间保持原地');

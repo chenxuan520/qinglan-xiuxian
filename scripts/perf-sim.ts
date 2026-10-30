@@ -8,7 +8,7 @@ import { Game } from '../src/game.ts';
 import { freshSave, realmCost } from '../src/progress.ts';
 import { freshMedicine } from '../src/medicine-data.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
-import { TREASURES, PASSIVES, FINAL_TRIAL_STAGE } from '../src/data.ts';
+import { TREASURES, PASSIVES, FINAL_TRIAL_STAGE, STAGE_REALM_STEPS } from '../src/data.ts';
 import { seeded } from './balance-policy.ts';
 
 // 每帧模拟耗时预算：全部为宽松兜底，本地实测余量见 docs/development.md。
@@ -160,8 +160,10 @@ export function createScenarioGame(spec: Scenario, seed: number) {
   save.prologueSeen = save.hometownSeen = true;
   save.mortal.hometown!.stage = 'departed';
   save.runs = 1;
-  // 修为对应每关入场大境（关卡 n ≈ 小境界 3n 步），避免开局属性过低秒败。
-  save.cultivation = Array.from({ length: spec.stage * 3 }, (_, step) => realmCost(step)).reduce(
+  // 妖王弹幕与后期自然暖场使用该境正式参考境界；旧前段对照保留原准备口径。
+  const realmStep =
+    spec.warmupSeconds || spec.progress === 1 ? STAGE_REALM_STEPS[spec.stage] : spec.stage * 3;
+  save.cultivation = Array.from({ length: realmStep }, (_, step) => realmCost(step)).reduce(
     (sum, cost) => sum + cost,
     0,
   );

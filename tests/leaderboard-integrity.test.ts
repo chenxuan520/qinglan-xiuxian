@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { freshSave, readSave, type SaveData } from '../src/progress.ts';
+import { projectLeaderboardFactsV2 } from '../src/leaderboard-facts-v2.ts';
 import { projectLeaderboardFactsV1 } from '../src/leaderboard-facts-v1.ts';
 import {
   canonicalFacts,
@@ -17,7 +18,7 @@ import { leaderboardSettings } from '../src/leaderboard-preference.ts';
 
 async function sealed() {
   const save = readSave(JSON.stringify(freshSave())).save;
-  save.factsSeal = await createFactsSeal(projectLeaderboardFactsV1(save));
+  save.factsSeal = await createFactsSeal(projectLeaderboardFactsV2(save));
   return save;
 }
 test('规范化按键排序、集合排序、保留有序数组和精确数字；UTF-8摘要与独立Node实现一致', async () => {
@@ -116,6 +117,7 @@ test('仅本地旧格式有首次补签例外，导入无哈希和新格式删�
 });
 test('事实版本升级严格先核原档，再迁移与重封；迁移前改过数字仍保留改动标记', async () => {
   const original = await sealed();
+  original.factsSeal = createFactsSeal(projectLeaderboardFactsV1(original), 1);
   const versions: FactsVersions = {
     current: 2,
     projectors: {

@@ -228,7 +228,7 @@ test('控制器读榜安全构造姓名与超长分数，无资格只读；重�
       );
       await loading;
       assert.equal(f.el('sign').hidden, true);
-      assert.match(f.el('eligibility').textContent, /成仙或此世落幕/);
+      assert.match(f.el('eligibility').textContent, /此世离世或完成终章/);
       const row = f.el('list').children[0].children[0];
       assert.equal(row.children[1].textContent, '长'.repeat(24));
       assert.equal(row.children[1].title, '长'.repeat(24));
@@ -273,6 +273,7 @@ test('满榜平分不显示署名；入榜成功后读权威榜单，点击/键�
       assert.equal(f.el('name').value, '青岚客');
       assert.equal(f.el('submit').disabled, false);
       assert.match(f.el('status').textContent, /已留名/);
+      assert.equal(f.el('sign').hidden, true, '即使本机不能保存署名，已成功的这一世不再展示表单');
       assert.equal(f.el('list').children[0].children[0].children[2].textContent, '2500');
     },
   );

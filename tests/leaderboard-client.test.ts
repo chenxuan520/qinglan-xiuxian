@@ -24,6 +24,7 @@ const empty = { version: 1, limit: 100, minimumScore: 0, entries: [] };
 function facts() {
   const save = freshSave('dual', ['metal', 'earth'], 'dual', () => 0.5);
   save.completed = [0, 1, 2, 3, 4, 5, 6];
+  save.journeyEnded = true;
   return extractLeaderboardFacts(save)!;
 }
 const errorCode = (code: string) => (error: unknown) =>
@@ -70,7 +71,7 @@ test('读榜使用相对同源接口和Cookie策略；不足百名及满榜分�
   const client = new LeaderboardClient({
     origin: 'http://localhost:5173',
     fetcher: async (url, init) => {
-      assert.equal(url, '/api/leaderboard');
+      assert.equal(url, '/api/leaderboard?self=1');
       assert.equal(init?.credentials, 'same-origin');
       assert.equal(init?.redirect, 'error');
       assert.equal(init?.cache, 'no-store');

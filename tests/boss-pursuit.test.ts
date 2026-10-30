@@ -16,17 +16,20 @@ function encounter(stage = 0, x = -500, arena = stage) {
   return { g, boss };
 }
 
-test('终关七位妖王远距离追袭先预警，锁定方向，冲刺距离与预警一致', () => {
+test('终关七位妖王追袭蓄力减半，锁定方向且保留冲刺速度与距离', () => {
   for (let stage = 0; stage < 7; stage++) {
     const { g, boss } = encounter(stage, -500, 6);
     g.update(0.01);
-    assert.ok(boss.charge > 1.5);
+    assert.ok(Math.abs(boss.charge - (0.425 + 0.7 - 0.01)) < 1e-8);
     const warning = g.effects.find((e) => e.kind === 'line')!;
     assert.ok(warning);
+    assert.ok(Math.abs(warning.maxLife - 0.425) < 1e-8);
     assert.equal(warning.x, -500);
     assert.equal(warning.x2, 74);
-    for (let i = 0; i < 16; i++) g.update(0.05);
+    for (let i = 0; i < 8; i++) g.update(0.05);
     assert.equal(boss.x, -500, '蓄力时不能前进');
+    g.update(0.025);
+    assert.ok(Math.abs(boss.x - (-500 + 0.01 * 820)) < 1e-8);
     g.player.y = 200;
     boss.cooldown = 0;
     while (boss.charge > 0) g.update(0.01);
@@ -58,6 +61,35 @@ test('追袭有距离和独立冷却限制，半血加快，普通冲刺保持�
   mob.cooldown = 999;
   g.update(0.05);
   assert.equal(mob.x, -81);
+});
+
+test('狼王原招与仙尊雷袭蓄力减半，半血不再缩短，暂停续局保留余时', () => {
+  for (const [stage, arena, phase, warning] of [
+    [2, 2, 0, 0.425],
+    [2, 6, 0, 0.425],
+    [6, 6, 5, 0.5],
+  ])
+    for (const half of [false, true]) {
+      const { g, boss } = encounter(stage, -200, arena);
+      boss.pursuitCooldown = 999;
+      boss.skillStep = phase;
+      if (half) boss.hp = boss.maxHp * 0.4;
+      g.castBossSkill(boss, 1, 0);
+      assert.ok(Math.abs(boss.charge - warning - 0.7) < 1e-8);
+      assert.ok(Math.abs(g.effects.find((e) => e.kind === 'line')!.maxLife - warning) < 1e-8);
+      g.update(0.05);
+      assert.equal(boss.x, -200);
+      g.pause();
+      const restored = Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot())))!;
+      assert.ok(restored);
+      assert.equal(restored.boss!.charge, boss.charge);
+      restored.update(0.1);
+      assert.equal(restored.boss!.charge, boss.charge);
+      assert.ok(
+        Math.abs(restored.effects.find((e) => e.kind === 'line')!.maxLife - (boss.charge - 0.7)) <
+          1e-8,
+      );
+    }
 });
 
 test('冲刺期间不被原有招式打断，冷却与预警跨刷新保留，兼容旧妖王快照', () => {

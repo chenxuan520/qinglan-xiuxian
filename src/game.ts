@@ -1147,7 +1147,8 @@ export class Game {
         : template.radius * (elite ? 1.55 : 1),
       speed: boss
         ? (70 + this.stage * 4) *
-          (this.tribulation ? 1 : this.stage === 4 ? 1.15 : this.stage === 5 ? 1.2 : 1)
+          (this.tribulation ? 1 : this.stage === 4 ? 1.15 : this.stage === 5 ? 1.2 : 1) *
+          (this.tribulation ? 1 : 1.3)
         : (this.isFinalTrial
             ? Math.max(95 + progress * 35, template.speed * (1.05 + progress * 0.3))
             : template.speed) *
@@ -1614,7 +1615,7 @@ export class Game {
     }
   }
   private startBossCharge(e: Enemy, nx: number, ny: number, warning = 0.85) {
-    e.charge = warning + 0.7;
+    e.charge = warning * 0.5 + 0.7;
     e.dx = nx;
     e.dy = ny;
     e.pursuitCooldown = bossPursuitCooldown(e.hp < e.maxHp / 2);

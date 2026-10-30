@@ -15,7 +15,7 @@ import {
 } from '../src/data.ts';
 import { freshSave, realmDamageMultiplier, realmHealthMultiplier } from '../src/progress.ts';
 
-test('三难度七境妖王使用固定强化倍率，终关单列，移动速度与判定半径保留', () => {
+test('三难度七境妖王使用固定强化倍率，移动速度提高30%，判定半径保留', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
     for (let stage = 0; stage < STAGES.length; stage++) {
       const g = new Game(freshSave(), stage, difficulty, () => 0.5);
@@ -39,7 +39,7 @@ test('三难度七境妖王使用固定强化倍率，终关单列，移动速�
             realmDamageMultiplier(STAGE_REALM_STEPS[stage]),
         );
         assert.equal(boss.maxHp, boss.hp);
-        assert.ok(Math.abs(boss.speed - [70, 74, 78, 82, 98.9, 108, 94][stage]) < 1e-10);
+        assert.ok(Math.abs(boss.speed - [70, 74, 78, 82, 98.9, 108, 94][stage] * 1.3) < 1e-10);
         assert.equal(g.spawnEnemy(10, true, true, { x: 100, y: 0 }, bossStage).speed, boss.speed);
         const damage =
           stage === FINAL_TRIAL_STAGE
@@ -66,14 +66,21 @@ test('三难度七境妖王使用固定强化倍率，终关单列，移动速�
 test('第二境妖王在既有增幅上再加20%气血，固定强度不随玩家资质或境界变化', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
     const beforeHp =
-      27000 * rules.hp * 1.65 * 1.3 * STAGE_COMBAT_SCALING[1].hp * realmDamageMultiplier(6);
+      27000 *
+      rules.hp *
+      1.65 *
+      1.3 *
+      1.2 *
+      rules.bossHp[1] *
+      STAGE_COMBAT_SCALING[1].hp *
+      realmDamageMultiplier(6);
     for (const root of ['heaven', 'none'] as const) {
       for (const cultivation of [0, 1e9]) {
         const save = freshSave(root);
         save.cultivation = cultivation;
         const g = new Game(save, 1, difficulty, () => 0.5);
         const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, 1);
-        assert.ok(Math.abs(boss.maxHp / beforeHp - 1.2 * rules.bossHp[1]) < 1e-12);
+        assert.ok(Math.abs(boss.maxHp / beforeHp - 1.2) < 1e-12);
         assert.equal(boss.hp, boss.maxHp);
         assert.equal(
           boss.damage,

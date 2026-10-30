@@ -109,3 +109,36 @@ test('正文上限内的深层非法事实拒绝为400，不递归溢出或误�
     store.close();
   }
 });
+
+test('事实v1仅在显式短过渡期验旧摘要后补估值，到期拒绝，不借迁移洗白旧事实', async () => {
+  const store = leaderboardStore();
+  try {
+    const { inheritanceValue, ...old } = facts();
+    const body = { version: 1, name: '旧版署名', facts: old, seal: createFactsSeal(old, 1) };
+    assert.equal((await worker.fetch(rawRequest(body), store.env)).status, 400);
+    store.env.LEGACY_SEAL_UNTIL = new Date(Date.now() + 60000).toISOString();
+    const cookie = await anonymousCookie(store, body);
+    const accepted = await worker.fetch(submitLeaderboard(body, cookie), store.env);
+    assert.equal(accepted.status, 200);
+    assert.equal((await accepted.json()).status, 'saved');
+    assert.equal(
+      (await worker.fetch(rawRequest({ ...body, facts: { ...old, age: old.age + 1 } }), store.env))
+        .status,
+      400,
+    );
+    assert.equal(
+      (
+        await worker.fetch(
+          rawRequest({ ...body, facts: { ...old, inheritanceValue: 0 } }),
+          store.env,
+        )
+      ).status,
+      400,
+    );
+    store.env.LEGACY_SEAL_UNTIL = new Date(Date.now() - 1).toISOString();
+    assert.equal((await worker.fetch(rawRequest(body), store.env)).status, 400);
+    assert.equal(store.rows().length, 1);
+  } finally {
+    store.close();
+  }
+});

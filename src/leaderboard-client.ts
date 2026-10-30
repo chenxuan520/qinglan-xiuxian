@@ -1,3 +1,4 @@
+import { rememberLeaderboardProfile } from './leaderboard-profile.ts';
 import { createFactsSeal } from './leaderboard-integrity.ts';
 import { leaderboardAvailable } from './leaderboard-availability.ts';
 import {
@@ -100,6 +101,7 @@ export class LeaderboardClient {
   async read(signal: AbortSignal): Promise<LeaderboardBoard> {
     const value = await this.request(signal);
     if (!isLeaderboardBoard(value)) throw new LeaderboardError('unavailable');
+    if (value.self) rememberLeaderboardProfile(value.self);
     return value;
   }
   async submit(
@@ -153,14 +155,19 @@ export class LeaderboardClient {
       // 身份Cookie握手只有一次重发机会，整个操作共用同一个超时预算。
       for (let attempt = 0; attempt < 2; attempt++) {
         if (controller.signal.aborted || !this.available()) throw new LeaderboardError('cancelled');
-        const response = await (this.options.fetcher ?? fetch)('/api/leaderboard', {
-          method: body === undefined ? 'GET' : 'POST',
-          ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body }),
-          credentials: 'same-origin',
-          cache: 'no-store',
-          redirect: 'error',
-          signal: controller.signal,
-        });
+        const response = await (this.options.fetcher ?? fetch)(
+          body === undefined ? '/api/leaderboard?self=1' : '/api/leaderboard',
+          {
+            method: body === undefined ? 'GET' : 'POST',
+            ...(body === undefined
+              ? {}
+              : { headers: { 'Content-Type': 'application/json' }, body }),
+            credentials: 'same-origin',
+            cache: 'no-store',
+            redirect: 'error',
+            signal: controller.signal,
+          },
+        );
         const value = await readResponse(response, controller.signal);
         if (response.ok) return value;
         const code =

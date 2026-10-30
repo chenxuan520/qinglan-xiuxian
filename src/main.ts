@@ -1153,9 +1153,7 @@ function queueRanking() {
     save.factsTampered ||
     rankingOffer ||
     rankingQueuedSeed === save.medicine.recipeSeed ||
-    (!save.pendingReincarnation &&
-      !save.journeyEnded &&
-      !save.completed.includes(FINAL_TRIAL_STAGE))
+    (!save.pendingReincarnation && !save.journeyEnded)
   )
     return;
   const epoch = rankingEpoch;
@@ -1184,28 +1182,14 @@ function rankingReady() {
     marketEventSource.current?.treasureTrialSource.active
   )
     return false;
-  if (panel.endsWith('-farewell') || panel === 'epilogue-reincarnate') return true;
-  return (
-    panel === '' &&
-    !!ui.querySelector('.lobby-main') &&
-    !sectDuesPending(save) &&
-    !tribulationDue(save) &&
-    lifespanInfo(save).remaining > 0
-  );
+  return panel.endsWith('-farewell') || panel === 'epilogue-reincarnate';
 }
-function showRankingOffer() {
+function showRankingOffer(notify = true) {
   if (save.factsTampered) return;
-  const host = panel ? modal.querySelector('.panel') : ui.querySelector('.lobby-main');
+  const host = modal.querySelector('.panel');
   if (!host || host.querySelector('[data-ranking-offer]')) return;
-  const notice = document.createElement('div');
-  notice.className = 'save-actions leaderboard-offer';
-  notice.setAttribute('data-ranking-offer', '');
-  notice.innerHTML =
-    '<button class="secondary-button" data-action="leaderboard">留名万魂幡</button><button class="secondary-button" data-action="leaderboard-dismiss">稍后</button>';
-  if (panel) host.append(notice);
-  else host.prepend(notice);
-  toast('此世道果已可列入前百，可选择留名万魂幡。');
-  toastElement.setAttribute('data-ranking', '');
+  rankingSource.current?.showOffer(host, notify ? toast : undefined);
+  if (notify) toastElement.setAttribute('data-ranking', '');
 }
 function closeRanking() {
   rankingPanel?.destroy();
@@ -1218,16 +1202,14 @@ function closeRanking() {
     renderJourneyFarewell(save.pendingReincarnation);
   else if (panel === 'epilogue-reincarnate') {
     panelFrame(...epilogueReincarnatePanel(save));
-    const choice = modal.querySelector<HTMLSelectElement>('#reincarnate-inheritance');
-    if (choice && rankingInheritance !== null) {
-      choice.value = rankingInheritance;
-      const preview = modal.querySelector<HTMLElement>('.inheritance-preview');
-      if (preview) preview.innerHTML = inheritancePreview(save, choice.value);
-    }
-    const section = modal.querySelector<HTMLElement>('.panel');
-    if (section && previous) section.scrollTop = previous.scroll;
+    rankingSource.current?.restoreInheritance(modal, save, rankingInheritance, previous?.scroll);
   } else if (previous) restorePanel(previous);
   rankingInheritance = null;
+  if (
+    (panel.endsWith('-farewell') || panel === 'epilogue-reincarnate') &&
+    rankingOffer?.canSign(save)
+  )
+    showRankingOffer(false);
 }
 function renderRanking() {
   rankingPanel?.destroy();
@@ -1266,6 +1248,10 @@ function renderRanking() {
           blockedReason: () => (save.factsTampered ? TAMPERED_LEADERBOARD_MESSAGE : ''),
           score: () => module.journeyScore(save).total,
           onClose: closeRanking,
+          onSaved: () => {
+            rankingOffer?.complete();
+            document.querySelectorAll('[data-ranking-offer]').forEach((item) => item.remove());
+          },
         });
         void rankingPanel.load();
       })
@@ -2013,10 +1999,6 @@ function handleAction(action: string, id?: string) {
     }
     return;
   }
-  if (action === 'leaderboard-dismiss') {
-    document.querySelectorAll('[data-ranking-offer]').forEach((item) => item.remove());
-    return;
-  }
   if (action === 'leaderboard-toggle' && panel === 'settings' && leaderboardAvailable()) {
     if (!rankingPreference.toggle()) {
       toast('排行榜设置尚未保存，请重试');
@@ -2031,8 +2013,8 @@ function handleAction(action: string, id?: string) {
     action === 'leaderboard' &&
     rankingEnabled() &&
     !game &&
-    (['', 'settings', 'chronicle', 'epilogue-reincarnate'].includes(panel) ||
-      panel.endsWith('-farewell'))
+    rankingOffer?.canSign(save) &&
+    (panel === 'epilogue-reincarnate' || panel.endsWith('-farewell'))
   ) {
     rankingReturn = rememberPanel();
     rankingInheritance =

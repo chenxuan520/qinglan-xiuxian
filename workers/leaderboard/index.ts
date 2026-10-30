@@ -1,4 +1,8 @@
-import { createFactsSeal, verifyFactsSeal } from '../../src/leaderboard-integrity.ts';
+import {
+  createFactsSeal,
+  validFactsSeal,
+  verifyFactsSeal,
+} from '../../src/leaderboard-integrity.ts';
 import {
   LEADERBOARD_LIMIT,
   LEADERBOARD_MAX_BYTES,
@@ -127,11 +131,32 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
   const transitionEnd = Date.parse(env.LEGACY_SEAL_UNTIL ?? '');
   const remaining = transitionEnd - Date.now();
   // 默认严格；显式部署过渡期最长1小时、到期自动收紧，不形成永久无摘要入口。
-  const legacyTransition = !hasSeal && remaining > 0 && remaining <= 3600000;
+  const inTransition = remaining > 0 && remaining <= 3600000;
+  const legacyTransition = !hasSeal && inTransition;
+  const previousFacts = fields.facts;
+  const previous =
+    inTransition &&
+    validFactsSeal(fields.seal) &&
+    fields.seal.v === 1 &&
+    !!previousFacts &&
+    typeof previousFacts === 'object' &&
+    !Array.isArray(previousFacts) &&
+    !Object.hasOwn(previousFacts, 'inheritanceValue');
   // 先限制事实的固定结构，避免对恶意深层JSON递归规范化。校验过程不读写数据库。
-  const facts = parseLeaderboardFacts(fields.facts);
+  const facts = parseLeaderboardFacts(
+    previous
+      ? {
+          ...previousFacts,
+          inheritanceValue: (previousFacts as Record<string, unknown>).inherited ? 100 : 0,
+        }
+      : fields.facts,
+  );
   if (!facts) return error('invalid-input', '排名资料格式不正确。', 400);
-  const sealValid = hasSeal && verifyFactsSeal(fields.facts, fields.seal);
+  const sealValid =
+    hasSeal &&
+    (previous
+      ? createFactsSeal(previousFacts, 1).h === (fields.seal as { h: string }).h
+      : verifyFactsSeal(fields.facts, fields.seal));
   if (
     Object.keys(fields).length !== (hasSeal ? 4 : 3) ||
     fields.version !== LEADERBOARD_VERSION ||
@@ -158,18 +183,26 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
   const now = new Date().toISOString();
   const results = await env.DB.batch<RankingRow>([
     env.DB.prepare(
-      `INSERT INTO leaderboard
+      `WITH owned AS (
+        SELECT name_key, display_name FROM leaderboard WHERE owner_hash=?
+        ORDER BY score DESC, updated_at ASC, name_key ASC LIMIT 1
+      ), identity AS (
+        SELECT COALESCE((SELECT name_key FROM owned), ?) AS name_key,
+          COALESCE((SELECT display_name FROM owned), ?) AS display_name
+      )
+      INSERT INTO leaderboard
       (name_key, display_name, owner_hash, score, grade, title, life_mode, ending, submission_hash, created_at, updated_at)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-      WHERE (SELECT COUNT(*) FROM
-        (SELECT 1 FROM leaderboard WHERE score>=? AND name_key<>? LIMIT 100))<100
-      AND NOT EXISTS (SELECT 1 FROM leaderboard_blocks WHERE name_key=? OR owner_hash=?)
+      SELECT identity.name_key, identity.display_name, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      FROM identity WHERE (SELECT COUNT(*) FROM
+        (SELECT 1 FROM leaderboard WHERE score>=? AND name_key<>identity.name_key LIMIT 100))<100
+      AND NOT EXISTS (SELECT 1 FROM leaderboard_blocks WHERE name_key=identity.name_key OR owner_hash=?)
       ON CONFLICT(name_key) DO UPDATE SET display_name=excluded.display_name, score=excluded.score,
         grade=excluded.grade, title=excluded.title, life_mode=excluded.life_mode, ending=excluded.ending,
         submission_hash=excluded.submission_hash, updated_at=excluded.updated_at
       WHERE leaderboard.owner_hash=excluded.owner_hash AND excluded.score>leaderboard.score
       RETURNING ${PUBLIC_COLUMNS}`,
     ).bind(
+      ownerHash,
       name.key,
       name.name,
       ownerHash,
@@ -182,8 +215,6 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
       now,
       now,
       score.total,
-      name.key,
-      name.key,
       ownerHash,
     ),
     env.DB.prepare(
@@ -191,14 +222,17 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
       (SELECT COUNT(*) FROM leaderboard AS ahead WHERE ahead.score>current.score
         OR (ahead.score=current.score AND ahead.updated_at<current.updated_at)
         OR (ahead.score=current.score AND ahead.updated_at=current.updated_at AND ahead.name_key<current.name_key)) AS ahead
-      FROM leaderboard AS current WHERE current.name_key=?`,
-    ).bind(name.key),
+      FROM leaderboard AS current WHERE current.owner_hash=? OR current.name_key=?
+      ORDER BY (current.owner_hash=?) DESC, current.score DESC, current.updated_at ASC, current.name_key ASC LIMIT 1`,
+    ).bind(ownerHash, name.key, ownerHash),
   ]);
   if (results.some((result) => !result.success)) throw Error('database-result');
   const blocked = await env.DB.prepare(
-    'SELECT 1 FROM leaderboard_blocks WHERE name_key=? OR owner_hash=? LIMIT 1',
+    `SELECT 1 FROM leaderboard_blocks WHERE name_key=COALESCE(
+      (SELECT name_key FROM leaderboard WHERE owner_hash=? ORDER BY score DESC, updated_at ASC, name_key ASC LIMIT 1), ?)
+      OR owner_hash=? LIMIT 1`,
   )
-    .bind(name.key, ownerHash)
+    .bind(ownerHash, name.key, ownerHash)
     .all();
   if (!blocked.success) throw Error('database-result');
   if (blocked.results.length) return error('blocked', '暂时无法使用此署名提交排名。', 403);
@@ -232,12 +266,14 @@ export default {
       }
       return await leaderboardPage(request, env);
     }
-    if (url.pathname !== PATH || url.search) return error('invalid-input', '接口不存在。', 404);
+    const personal = request.method === 'GET' && url.search === '?self=1';
+    if (url.pathname !== PATH || (url.search && !personal))
+      return error('invalid-input', '接口不存在。', 404);
     if (request.method !== 'GET' && request.method !== 'POST')
       return error('invalid-input', '请求方式不支持。', 405, { Allow: 'GET, POST' });
     try {
       if (request.method === 'POST') return await submit(request, env);
-      const cache = ctx && typeof caches !== 'undefined' ? caches.default : null;
+      const cache = !personal && ctx && typeof caches !== 'undefined' ? caches.default : null;
       const cacheKey = new Request(ORIGIN + PATH);
       if (cache) {
         try {
@@ -254,15 +290,30 @@ export default {
         .all<RankingRow>();
       if (!result.success) throw Error('database-result');
       const entries = result.results.map(entry);
+      let self: LeaderboardEntry | null = null;
+      const owner = personal ? ownerCookie(request) : null;
+      if (owner) {
+        const own = await env.DB.prepare(
+          `SELECT ${PUBLIC_COLUMNS} FROM leaderboard WHERE owner_hash=?
+          ORDER BY score DESC, updated_at ASC, name_key ASC LIMIT 1`,
+        )
+          .bind(await digest(owner))
+          .all<RankingRow>();
+        if (!own.success) throw Error('database-result');
+        if (own.results[0]) self = entry(own.results[0]);
+      }
       const response = json(
         {
           version: LEADERBOARD_VERSION,
           limit: LEADERBOARD_LIMIT,
           minimumScore: entries.length === LEADERBOARD_LIMIT ? entries.at(-1)!.score : 0,
           entries,
+          ...(personal ? { self } : {}),
         },
         200,
-        { 'Cache-Control': 'public, max-age=30, s-maxage=30' },
+        personal
+          ? { 'Cache-Control': 'no-store', Vary: 'Cookie' }
+          : { 'Cache-Control': 'public, max-age=30, s-maxage=30' },
       );
       if (cache && ctx) ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => {}));
       return response;

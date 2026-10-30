@@ -147,7 +147,7 @@ export function bestiaryPanel(
       })
       .join(
         '',
-      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有不同的圆阵、弹幕与特色招式，仙尊有六招。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋保留完整蓄势。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
+      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有不同的圆阵、弹幕与特色招式，仙尊有六招。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋蓄力0.425秒，仙尊雷袭0.5秒。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
     wide: true,
   };
 }

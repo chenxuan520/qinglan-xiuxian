@@ -10,6 +10,11 @@ import {
   canSubmitLeaderboardScore,
   leaderboardErrorMessage,
 } from './leaderboard-client.ts';
+import {
+  improvesLeaderboardProfile,
+  readLeaderboardProfile,
+  rememberLeaderboardProfile,
+} from './leaderboard-profile.ts';
 
 export interface LeaderboardPanelOptions {
   isCurrent(): boolean;
@@ -19,6 +24,7 @@ export interface LeaderboardPanelOptions {
   blockedReason?(): string;
   client?: LeaderboardClient;
   onClose?(): void;
+  onSaved?(): void;
 }
 
 // 只管理父面板中的内容；关闭、轮回和存档替换仍由正常入口负责。
@@ -31,12 +37,18 @@ export class LeaderboardPanel {
   private board: LeaderboardBoard | null = null;
   private busy = false;
   private closed = false;
+  private saved = false;
 
   constructor(host: HTMLElement, options: LeaderboardPanelOptions) {
     this.host = host;
     this.options = options;
     this.client = options.client ?? new LeaderboardClient({ enabled: options.enabled });
     host.innerHTML = `<div class="leaderboard-panel"><div class="leaderboard-tools"><a class="panel-note" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看完整榜单 ↗</a><button type="button" class="secondary-button" data-leaderboard-refresh>刷新</button></div><p class="leaderboard-status panel-note" role="status" aria-live="polite" data-leaderboard-status></p><section class="leaderboard-sign" data-leaderboard-sign hidden><h3>留名万魂幡</h3><p class="panel-note" data-leaderboard-score></p><form data-leaderboard-form><label>姓名<input name="leaderboard-name" autocomplete="off" maxlength="${LEADERBOARD_NAME_LIMIT * 2}" aria-label="留名姓名" required data-leaderboard-name></label><p class="panel-note">最多 ${LEADERBOARD_NAME_LIMIT} 字；已有人使用的名字需另取。</p><button class="primary-button" type="submit" data-leaderboard-submit>署名入榜</button></form></section><p class="panel-note" data-leaderboard-eligibility></p><div data-leaderboard-list hidden aria-label="万魂幡前一百名"></div><button type="button" class="secondary-button leaderboard-return" data-leaderboard-close>返回</button></div>`;
+    const profile = readLeaderboardProfile();
+    if (profile) {
+      const input = this.element<HTMLInputElement>('[data-leaderboard-name]');
+      input.value = profile.name;
+    }
     host.addEventListener(
       'submit',
       (event) => {
@@ -91,10 +103,13 @@ export class LeaderboardPanel {
   }
   private canSign() {
     return (
+      !this.saved &&
       !this.options.blockedReason?.() &&
       !!this.board &&
       !!this.options.eligibleFacts() &&
-      (!this.options.score || canSubmitLeaderboardScore(this.board, this.options.score()))
+      (!this.options.score ||
+        (canSubmitLeaderboardScore(this.board, this.options.score()) &&
+          improvesLeaderboardProfile(this.board, this.options.score(), readLeaderboardProfile())))
     );
   }
   private eligibility() {
@@ -105,14 +120,21 @@ export class LeaderboardPanel {
       score === undefined ? '' : `此世道果 ${score}`;
     this.element('[data-leaderboard-eligibility]').textContent =
       this.options.blockedReason?.() ||
-      (!this.board || eligible
+      (!this.board || eligible || this.saved
         ? ''
         : this.options.eligibleFacts()
-          ? `当前入榜需高于 ${this.board.minimumScore} 道果。`
-          : '成仙或此世落幕后，可选择署名入榜。');
+          ? !improvesLeaderboardProfile(this.board, score ?? 0, readLeaderboardProfile())
+            ? '此世道果尚未超过此前留名的最高成绩。'
+            : `当前入榜需高于 ${this.board.minimumScore} 道果。`
+          : '此世离世或完成终章后，可选择署名入榜。');
   }
   private list(board: LeaderboardBoard) {
     this.board = board;
+    if (board.self) {
+      const input = this.element<HTMLInputElement>('[data-leaderboard-name]');
+      input.value = board.self.name;
+      input.readOnly = true;
+    }
     const host = this.element('[data-leaderboard-list]');
     host.replaceChildren();
     if (!board.entries.length) {
@@ -209,7 +231,12 @@ export class LeaderboardPanel {
     try {
       const result = await this.client.submit(name.name, snapshot, request.signal);
       if (!sameLife()) return;
-      input.value = name.name;
+      this.saved = true;
+      rememberLeaderboardProfile(result.entry);
+      input.value = result.entry.name;
+      input.readOnly = true;
+      this.options.onSaved?.();
+      this.eligibility();
       const message = result.status === 'saved' ? '已留名万魂幡。' : '已保留这个名字的最高道果。';
       this.status(message);
       try {

@@ -55,14 +55,15 @@ test('连续列表不改变功法筛选和详情返回入口', () => {
   assert.match(detail.body, /data-action="close">返回法宝列表/);
 });
 
-test('设置保留开关及独立页面链接，不再用查看按钮打开内嵌榜单', () => {
-  for (const enabled of [true, false]) {
-    const html = leaderboardSettings(enabled);
-    assert.match(html, /data-action="leaderboard-toggle"/);
-    assert.match(
-      html,
-      /href="https:\/\/xiuxian\.011203\.xyz\/leaderboard\/" target="_blank" rel="noopener"/,
-    );
-    assert.doesNotMatch(html, /data-action="leaderboard"/);
-  }
+test('设置只保留榜单开关与独立网页链接，不在仍可游玩时提供留名', () => {
+  for (const enabled of [true, false])
+    for (const tampered of [true, false]) {
+      const html = leaderboardSettings(enabled, tampered);
+      assert.match(html, /data-action="leaderboard-toggle"/);
+      assert.match(
+        html,
+        /href="https:\/\/xiuxian\.011203\.xyz\/leaderboard\/" target="_blank" rel="noopener"/,
+      );
+      assert.doesNotMatch(html, /data-action="leaderboard"|data-leaderboard-list/);
+    }
 });

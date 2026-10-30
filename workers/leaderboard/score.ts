@@ -64,6 +64,7 @@ function validShape(v: unknown): v is LeaderboardFacts {
       'peiyingUsed',
       'achievements',
       'inherited',
+      'inheritanceValue',
       'adUsage',
     ])
   )
@@ -75,6 +76,7 @@ function validShape(v: unknown): v is LeaderboardFacts {
     choice(v.path, ['orthodox', 'demonic', 'dual']) &&
     choice(v.ending, ['lifespan', 'tribulation', 'ambush', 'extreme', 'immortal']) &&
     count(v.cultivation) &&
+    count(v.inheritanceValue) &&
     count(v.tribulations) &&
     typeof v.age === 'number' &&
     Number.isFinite(v.age) &&
@@ -144,7 +146,8 @@ export function parseLeaderboardFacts(value: unknown): LeaderboardFacts | null {
   if (
     !allowsSchool(f.path, item.school) ||
     (f.member && SECTS.find((s) => s.id === f.member)!.school !== f.path) ||
-    !f.curios.every((id) => f.acquiredCurios.includes(id))
+    !f.curios.every((id) => f.acquiredCurios.includes(id)) ||
+    (!f.inherited && f.inheritanceValue !== 0)
   )
     return null;
   if (
@@ -206,6 +209,7 @@ export function scoreLeaderboardFacts(facts: LeaderboardFacts) {
     artifacts: [...facts.artifacts],
     starter: facts.starter,
     adUsage: { ...facts.adUsage },
+    inheritanceValue: facts.inheritanceValue,
     journeyEnded: facts.ending === 'immortal',
     pendingReincarnation: facts.ending === 'immortal' ? null : facts.ending,
   });

@@ -5,6 +5,7 @@ import {
   CURIO_IDS,
   isCurio,
   curioName,
+  curioValue,
   freshCurios,
   validCurios,
   ownsCurio,
@@ -31,6 +32,7 @@ import {
   validMedicine,
   MEDICINES,
   medicineInfo,
+  medicineMarketValue,
   type MedicineState,
 } from './medicine-data.ts';
 import {
@@ -86,6 +88,7 @@ export interface SaveData {
   lifeMode: LifeMode;
   curios: CurioState;
   birthInheritance: BirthInheritance | null;
+  inheritanceValue: number;
   medicine: MedicineState;
   version: 1;
   schema: number;
@@ -128,7 +131,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 38;
+export const SAVE_SCHEMA = 39;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -181,6 +184,7 @@ export function freshSave(
     lifeMode: 'normal',
     curios: freshCurios(Math.floor(random() * 0x100000000)),
     birthInheritance: null,
+    inheritanceValue: 0,
     version: 1,
     schema: SAVE_SCHEMA,
     medicine: freshMedicine(),
@@ -278,6 +282,24 @@ export function validBirthInheritance(save: SaveData, value: unknown): value is 
     ? save.artifacts.includes(value.id) && (save.forge[value.id] || 0) === value.level
     : (save.medicine.bag[value.id] || 0) === 1;
 }
+export function inheritanceGiftValue(gift: BirthInheritance) {
+  let value =
+    gift.kind === 'curio'
+      ? curioValue(gift.id)
+      : gift.kind === 'medicine'
+        ? medicineMarketValue(gift.id)
+        : Object.values(ROOT_STARTERS)
+              .flat()
+              .some((id) => id === gift.id)
+          ? 0
+          : 180;
+  if (gift.kind === 'artifact')
+    for (let level = 0; level < gift.level; level++) {
+      const cost = forgeCost(level);
+      value += cost.stones + cost.iron * 12;
+    }
+  return value;
+}
 // 只用于新的一世；选项在旧世确认时校验，命盘重抽时从新生存档继续携带。
 export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | null) {
   if (
@@ -296,6 +318,7 @@ export function applyBirthInheritance(save: SaveData, gift: BirthInheritance | n
   } else if (gift.kind === 'curio' && isCurio(gift.id)) {
     if (grantCurio(save, gift.id)) recordCurioAchievement(save);
   } else save.medicine.bag[gift.id] = 1;
+  save.inheritanceValue = inheritanceGiftValue(gift);
   save.birthInheritance = { ...gift };
   recordChronicle(
     save,
@@ -557,6 +580,14 @@ export function readSave(
     if (validBirthInheritance(base, s.birthInheritance))
       base.birthInheritance = { ...s.birthInheritance };
     restoreChronicle(base, s.chronicle, realm.step, realm.ascending);
+    base.inheritanceValue =
+      s.schema >= 39 && s.factsSeal?.v !== 1
+        ? int(s.inheritanceValue)
+        : base.birthInheritance
+          ? inheritanceGiftValue(base.birthInheritance)
+          : Object.hasOwn(base.chronicle.milestones, 'birth-inheritance')
+            ? 100
+            : 0;
     if (upgrading && ascensionCultivation > 0) {
       // 旧记录无法证明当年通关的灵根、难度和年岁，不补造相关成就。
       base.chronicle.milestones['realm-24'] ??= null;

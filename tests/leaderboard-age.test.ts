@@ -32,6 +32,7 @@ test('七境全通年岁100拒绝，35778岁真仙事实通过；天机屋与根
   const save = freshSave();
   save.cultivation = IMMORTAL_CULTIVATION;
   save.completed = [0, 1, 2, 3, 4, 5, 6];
+  save.journeyEnded = true;
   save.age = 100;
   assert.equal(parseLeaderboardFacts(extractLeaderboardFacts(save)), null);
   save.age = 35778;

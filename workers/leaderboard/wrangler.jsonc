@@ -5,7 +5,7 @@
   "compatibility_date": "2026-10-29",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "vars": { "LEGACY_SEAL_UNTIL": "" },
+  "vars": { "LEGACY_SEAL_UNTIL": "2026-10-30T18:32:19Z" },
   "routes": [
     { "pattern": "xiuxian.011203.xyz/api/leaderboard", "zone_name": "011203.xyz" },
     { "pattern": "xiuxian.011203.xyz/leaderboard", "zone_name": "011203.xyz" },

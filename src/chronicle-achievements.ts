@@ -35,7 +35,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'three-paths',
-      difficulty: 70,
+      difficulty: 20,
       title: '三道皆证',
       detail: '同一世以正道、魔道、兼修各通关一次',
       verse: '三途行遍，过山片尘不染。',
@@ -63,7 +63,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'level-100',
-      difficulty: 80,
+      difficulty: 50,
       title: '百炼归真',
       detail: '单局达到一百级',
       verse: '千回吐纳，铅华散尽始归真。',
@@ -112,7 +112,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'curio-three',
-      difficulty: 50,
+      difficulty: 80,
       title: '奇珍有缘',
       detail: '本世先后获得三件不同奇物',
       verse: '世外遗珍，袖底自藏乾坤。',

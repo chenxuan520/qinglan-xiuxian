@@ -10,6 +10,7 @@ import {
   LEADERBOARD_PREFERENCE_KEY,
 } from '../src/leaderboard-preference.ts';
 
+const feature = readFileSync(new URL('../src/leaderboard-feature.ts', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const script = new Script(
   stripTypeScriptTypes(
@@ -17,6 +18,7 @@ const script = new Script(
       'rankingEnabled',
       'clearRanking',
       'queueRanking',
+      'showRankingOffer',
       'closeRanking',
       'renderRanking',
       'handleAction',
@@ -26,7 +28,9 @@ const script = new Script(
         assert.ok(source, name);
         return source[0];
       })
-      .join('\n'),
+      .join('\n') +
+      '\n' +
+      feature.match(/^export function restoreInheritance\([^]*?^\}/m)![0].replace('export ', ''),
   ),
 );
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -53,10 +57,11 @@ function harness() {
     messages: [] as string[],
     frames: [] as string[][],
     loads: 0,
+    offers: 0,
   };
   const inheritance = { value: 'pagoda' };
   const preview = { innerHTML: '' };
-  const section = { scrollTop: 0 };
+  const section = { scrollTop: 0, querySelector: () => null };
   const host = { isConnected: true, innerHTML: '', querySelector: () => null };
   const context = createContext({
     dispatchAction,
@@ -73,6 +78,7 @@ function harness() {
     rankingPreference: new LeaderboardPreference(() => storage),
     leaderboardAvailable: () => true,
     rankingOffer: {
+      canSign: () => true,
       clear() {
         calls.clears++;
       },
@@ -114,7 +120,10 @@ function harness() {
     },
     rememberPanel: () => ({ name: context.panel, scroll: 91, openDetails: ['score'] }),
     restorePanel: (location: unknown) => calls.restores.push(location),
-    panelFrame: (...parts: string[]) => calls.frames.push(parts),
+    panelFrame: (...parts: string[]) => {
+      host.isConnected = context.panel === 'leaderboard';
+      calls.frames.push(parts);
+    },
     rankingSource: {
       load() {
         calls.loads++;
@@ -126,6 +135,12 @@ function harness() {
     renderJourneyFarewell() {},
   });
   script.runInContext(context);
+  context.rankingSource.current = {
+    restoreInheritance: context.restoreInheritance,
+    showOffer() {
+      calls.offers++;
+    },
+  };
   return {
     context,
     save,
@@ -210,6 +225,7 @@ test('实际榜单入口关闭后迟到模块不重开，返回终章保留传�
   assert.equal(h.inheritance.value, 'pagoda');
   assert.equal(h.preview.innerHTML, 'preview:pagoda');
   assert.equal(h.section.scrollTop, 91);
+  assert.equal(h.calls.offers, 1, '关闭署名后恢复原页唯一留名入口');
   finish({
     LeaderboardPanel: class {
       constructor() {

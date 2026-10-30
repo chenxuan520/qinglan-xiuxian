@@ -32,13 +32,13 @@ export const ROOT_REVERSE_RATES: Record<SpiritRootId, number> = {
 export const ACHIEVEMENT_SCORES: Record<string, number> = {
   story: 15,
   'permanent-medicine': 20,
-  'curio-three': 25,
+  'curio-three': 40,
   mastery: 30,
-  'three-paths': 35,
-  'level-100': 40,
+  'three-paths': 18,
+  'level-100': 25,
   collection: 45,
   'six-immortals': 50,
-  forge: 50,
+  forge: 53,
   'training-master': 55,
   'five-tribulations': 60,
   'hard-immortal': 80,
@@ -141,10 +141,28 @@ export function journeyScore(save: SaveData) {
     usage.supplies * AD_PENALTIES.supplies;
 
   const rawScore = Math.max(0, powerScore + rootBonus + achievementScore - adPenalty);
-  const clarityFactor =
+  const baseClarityFactor =
     adCount === 0
       ? CLARITY_FULL_BONUS
       : Math.max(CLARITY_MIN_FACTOR, Number((1 - adCount * CLARITY_STEP_DECAY).toFixed(2)));
+  const inherited =
+    !!save.birthInheritance || Object.hasOwn(save.chronicle.milestones, 'birth-inheritance');
+  const inheritanceValue = save.inheritanceValue ?? 0;
+  const inheritancePenalty = !inherited
+    ? 0
+    : inheritanceValue >= 100000
+      ? 0.25
+      : inheritanceValue >= 20000
+        ? 0.2
+        : inheritanceValue >= 5000
+          ? 0.15
+          : inheritanceValue >= 500
+            ? 0.1
+            : 0.05;
+  const clarityFactor = Math.max(
+    CLARITY_MIN_FACTOR,
+    Number((baseClarityFactor - inheritancePenalty).toFixed(2)),
+  );
   const clarityTotal = Math.round(rawScore * clarityFactor);
   const clarityDelta = clarityTotal - rawScore;
   const modeFactor = isExtremeLife(save) ? EXTREME_SCORE_FACTOR : 1;
@@ -171,6 +189,9 @@ export function journeyScore(save: SaveData) {
     adCount,
     adPenalty,
     clarityFactor,
+    baseClarityFactor,
+    inheritanceValue,
+    inheritancePenalty,
     clarityDelta,
     clarityTotal,
     modeFactor,

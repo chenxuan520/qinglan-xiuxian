@@ -34,10 +34,12 @@ const body = (save = endingSave(), name = '青岚客') => ({
   facts: extractLeaderboardFacts(save)!,
 });
 
-test('排行榜契约只提取计分事实；成仙前未结束不上传，通终关无需结束此世', () => {
+test('排行榜契约只提取计分事实；仍可游玩时不上传，完成终章才可留名', () => {
   const save = freshSave();
   assert.equal(extractLeaderboardFacts(save), null);
   save.completed = [FINAL_TRIAL_STAGE];
+  assert.equal(extractLeaderboardFacts(save), null);
+  save.journeyEnded = true;
   save.age = 35778;
   save.cultivation = IMMORTAL_CULTIVATION;
   const snapshot = JSON.stringify(save);
@@ -71,6 +73,7 @@ test('后端使用真实道果公式重算，涵盖全部灵根、极限、根�
       save.lifeMode = lifeMode;
       save.cultivation = IMMORTAL_CULTIVATION;
       save.completed = [0, 1, 2, 3, 4, 5, 6];
+      save.journeyEnded = true;
       save.age = 35778;
       save.training = { vitality: 20, power: 20, speed: 20 };
       save.retreatBonus = { vitality: 37, power: 29, speed: 13 };
@@ -248,6 +251,91 @@ test('标准化同名争抢只有一人成功，SQL参数不允许姓名注入',
   }
 });
 
+test('同一匿名身份改填姓名仍固定首次确认名，仅更高道果更新且不占新名字', async () => {
+  const store = leaderboardStore();
+  try {
+    const payload = body(endingSave(), '首次确认名');
+    const cookie = await anonymousCookie(store, payload);
+    const first = await (await worker.fetch(submitLeaderboard(payload, cookie), store.env)).json();
+    assert.equal(first.status, 'saved');
+    const original = store.rows()[0];
+    const same = await (
+      await worker.fetch(submitLeaderboard(body(endingSave(), '改填的名字'), cookie), store.env)
+    ).json();
+    assert.equal(same.status, 'unchanged');
+    assert.deepEqual(same.entry, first.entry);
+    assert.deepEqual(store.rows(), [original]);
+    const high = endingSave();
+    high.training.power = 20;
+    const improved = await (
+      await worker.fetch(submitLeaderboard(body(high, '又一个名字'), cookie), store.env)
+    ).json();
+    assert.equal(improved.status, 'saved');
+    assert.equal(improved.entry.name, first.entry.name);
+    assert.equal(improved.entry.score, journeyScore(high).total);
+    assert.ok(improved.entry.score > first.entry.score);
+    const highest = store.rows()[0];
+    const lower = await (
+      await worker.fetch(submitLeaderboard(body(endingSave(), '第四个名字'), cookie), store.env)
+    ).json();
+    assert.equal(lower.status, 'unchanged');
+    assert.deepEqual(lower.entry, improved.entry);
+    assert.deepEqual(store.rows(), [highest]);
+    assert.equal(highest.name_key, original.name_key);
+    assert.equal(highest.display_name, original.display_name);
+    assert.equal(highest.created_at, original.created_at);
+    assert.equal(highest.owner_hash, original.owner_hash);
+    const otherPayload = body(endingSave(), '改填的名字');
+    const otherCookie = await anonymousCookie(store, otherPayload);
+    const other = await worker.fetch(submitLeaderboard(otherPayload, otherCookie), store.env);
+    assert.equal(other.status, 200, '改填但未使用的名字没有被占名');
+    assert.equal(store.rows().length, 2);
+  } finally {
+    store.close();
+  }
+});
+
+test('同一匿名身份并发用不同姓名提交只保留一行和首次确认名，最终保留最高分', async () => {
+  for (const reverse of [false, true]) {
+    const store = leaderboardStore();
+    try {
+      const high = endingSave();
+      high.training.power = 20;
+      const lowPayload = body(endingSave(), '并发低分名');
+      const highPayload = body(high, '并发高分名');
+      const cookie = await anonymousCookie(store, lowPayload);
+      const payloads = reverse ? [highPayload, lowPayload] : [lowPayload, highPayload];
+      const responses = await Promise.all(
+        payloads.map((payload) => worker.fetch(submitLeaderboard(payload, cookie), store.env)),
+      );
+      assert.deepEqual(
+        responses.map((response) => response.status),
+        [200, 200],
+      );
+      const results = await Promise.all(responses.map((response) => response.json()));
+      assert.ok(results.every(isLeaderboardResult));
+      const rows = store.rows();
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].score, journeyScore(high).total);
+      assert.ok(['并发低分名', '并发高分名'].includes(String(rows[0].display_name)));
+      assert.ok(results.every((result) => result.entry.name === rows[0].display_name));
+      const before = store.rows();
+      const retry = await (
+        await worker.fetch(
+          submitLeaderboard(body(endingSave(), '并发结束后改名'), cookie),
+          store.env,
+        )
+      ).json();
+      assert.equal(retry.status, 'unchanged');
+      assert.equal(retry.entry.name, rows[0].display_name);
+      assert.equal(retry.entry.score, rows[0].score);
+      assert.deepEqual(store.rows(), before);
+    } finally {
+      store.close();
+    }
+  }
+});
+
 test('D1批次任何一步失败都回滚，不留下首次占名或半更新', async () => {
   const store = leaderboardStore();
   try {
@@ -399,6 +487,7 @@ test('POST原子复核过时GET门槛：不够当前前百不占名、同分不�
     high.completed = [0, 1, 2, 3, 4, 5, 6];
     high.age = 35778;
     high.pendingReincarnation = null;
+    high.journeyEnded = true;
     const accepted = await worker.fetch(submitLeaderboard(body(high), cookie), store.env);
     assert.equal(accepted.status, 200);
     const saved = await accepted.json();
@@ -467,6 +556,117 @@ test('并发争夺第100名在同一事务按实时门槛判定，仅一位同�
   }
 });
 
+test('self读榜不进入Cache API，两浏览器身份不串且自己的记录可在前百之外', async () => {
+  const store = leaderboardStore();
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'caches');
+  let cacheAccesses = 0,
+    backgroundTasks = 0;
+  const ctx = {
+    waitUntil() {
+      backgroundTasks++;
+    },
+  };
+  try {
+    const a = body(endingSave(), '浏览器甲');
+    const high = endingSave();
+    high.training.power = 20;
+    const b = body(high, '浏览器乙');
+    const cookieA = await anonymousCookie(store, a),
+      cookieB = await anonymousCookie(store, b);
+    for (const [payload, cookie] of [
+      [a, cookieA],
+      [b, cookieB],
+    ] as const)
+      assert.equal((await worker.fetch(submitLeaderboard(payload, cookie), store.env)).status, 200);
+    const ownRows = store.rows();
+    const cutoff = Math.max(...ownRows.map((row) => Number(row.score))) + 1;
+    const seed = store.sqlite.prepare(
+      'INSERT INTO leaderboard VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    );
+    const stamp = '2026-10-30T00:00:00.000Z';
+    for (let i = 0; i < 100; i++)
+      seed.run(
+        'ahead' + i,
+        '前百修士' + i,
+        'f'.repeat(64),
+        cutoff + i,
+        '下品',
+        '凡尘初涉',
+        'normal',
+        'lifespan',
+        'b'.repeat(64),
+        stamp,
+        stamp,
+      );
+    Object.defineProperty(globalThis, 'caches', {
+      configurable: true,
+      value: {
+        get default() {
+          cacheAccesses++;
+          throw Error('private query must not access shared edge cache');
+        },
+      },
+    });
+    for (const [cookie, expected] of [
+      [cookieA, '浏览器甲'],
+      [cookieB, '浏览器乙'],
+      [cookieA, '浏览器甲'],
+      [OWNER_COOKIE + '=' + '0'.repeat(64), null],
+      ['', null],
+    ] as const) {
+      const response = await worker.fetch(
+        new Request(leaderboardUrl + '?self=1', {
+          headers: cookie ? { Cookie: cookie } : {},
+        }),
+        store.env,
+        ctx,
+      );
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('Cache-Control'), 'no-store');
+      assert.equal(response.headers.get('Vary'), 'Cookie');
+      assert.equal(response.headers.get('Set-Cookie'), null);
+      const text = await response.text();
+      const board = JSON.parse(text);
+      assert.ok(isLeaderboardBoard(board));
+      assert.equal(board.entries.length, 100);
+      assert.equal(board.minimumScore, cutoff);
+      assert.equal(
+        board.entries.some((item: { name: string }) =>
+          ['浏览器甲', '浏览器乙'].includes(item.name),
+        ),
+        false,
+      );
+      assert.equal(board.self?.name ?? null, expected);
+      if (expected) {
+        assert.equal(
+          board.self.score,
+          Number(ownRows.find((row) => row.display_name === expected)!.score),
+        );
+        assert.deepEqual(Object.keys(board.self).sort(), [
+          'ending',
+          'grade',
+          'lifeMode',
+          'name',
+          'score',
+          'title',
+          'updatedAt',
+        ]);
+      } else assert.equal(board.self, null);
+      for (const row of ownRows) assert.equal(text.includes(String(row.owner_hash)), false);
+      assert.equal(text.includes('owner_hash'), false);
+      assert.equal(text.includes('submission_hash'), false);
+      assert.equal(text.includes(cookieA.slice(OWNER_COOKIE.length + 1)), false);
+      assert.equal(text.includes(cookieB.slice(OWNER_COOKIE.length + 1)), false);
+    }
+    assert.equal(cacheAccesses, 0);
+    assert.equal(backgroundTasks, 0);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, 'caches', previous);
+    else Reflect.deleteProperty(globalThis, 'caches');
+    store.close();
+  }
+});
+
 test('公开榜单边缘缓存30秒，共享读取不附带身份且缓存故障可降级直接读库', async () => {
   const store = leaderboardStore(),
     previous = Object.getOwnPropertyDescriptor(globalThis, 'caches');
@@ -483,9 +683,11 @@ test('公开榜单边缘缓存30秒，共享读取不附带身份且缓存故障
       value: {
         default: {
           async match(request: Request) {
+            assert.equal(request.headers.get('Cookie'), null);
             return responses.get(request.url)?.clone();
           },
           async put(request: Request, response: Response) {
+            assert.equal(request.headers.get('Cookie'), null);
             responses.set(request.url, response);
           },
         },
@@ -498,12 +700,16 @@ test('公开榜单边缘缓存30秒，共享读取不附带身份且缓存故障
     );
     assert.equal(first.status, 200);
     assert.equal(first.headers.get('set-cookie'), null);
+    assert.equal(first.headers.get('cache-control'), 'public, max-age=30, s-maxage=30');
+    assert.equal(Object.hasOwn(await first.json(), 'self'), false);
     await Promise.all(pending);
     assert.equal(responses.size, 1);
     store.sqlite.exec('DROP TABLE leaderboard');
     const cached = await worker.fetch(new Request(leaderboardUrl), store.env, ctx);
     assert.equal(cached.status, 200);
-    assert.ok(isLeaderboardBoard(await cached.json()));
+    const board = await cached.json();
+    assert.ok(isLeaderboardBoard(board));
+    assert.equal(Object.hasOwn(board, 'self'), false);
   } finally {
     if (previous) Object.defineProperty(globalThis, 'caches', previous);
     else Reflect.deleteProperty(globalThis, 'caches');

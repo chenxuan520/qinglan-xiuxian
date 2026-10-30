@@ -1,4 +1,5 @@
-import { projectLeaderboardFactsV1, LEADERBOARD_ACHIEVEMENTS_V1 } from './leaderboard-facts-v1.ts';
+import { LEADERBOARD_ACHIEVEMENTS_V1 } from './leaderboard-facts-v1.ts';
+import { projectLeaderboardFactsV2 } from './leaderboard-facts-v2.ts';
 import type { SaveData } from './progress.ts';
 import type { FactsSeal } from './leaderboard-integrity.ts';
 import type { CultivationPath, ElementId, SpiritRootId } from './data.ts';
@@ -34,6 +35,7 @@ export interface LeaderboardFacts {
   peiyingUsed: number;
   achievements: string[];
   inherited: boolean;
+  inheritanceValue: number;
   adUsage: AdUsage;
 }
 
@@ -51,6 +53,7 @@ export interface LeaderboardBoard {
   limit: 100;
   minimumScore: number;
   entries: LeaderboardEntry[];
+  self?: LeaderboardEntry | null;
 }
 export interface LeaderboardSubmission {
   version: 1;
@@ -66,7 +69,7 @@ export interface LeaderboardResult {
 export const LEADERBOARD_ACHIEVEMENTS = LEADERBOARD_ACHIEVEMENTS_V1;
 
 export function extractLeaderboardFacts(save: SaveData): LeaderboardFacts | null {
-  const facts = projectLeaderboardFactsV1(save);
+  const facts = projectLeaderboardFactsV2(save);
   return facts.ending ? { ...facts, ending: facts.ending } : null;
 }
 export function normalizeLeaderboardName(value: unknown) {
@@ -104,7 +107,8 @@ export function isLeaderboardBoard(value: unknown): value is LeaderboardBoard {
     Number(value.minimumScore) < 0 ||
     !Array.isArray(value.entries) ||
     value.entries.length > LEADERBOARD_LIMIT ||
-    !value.entries.every(isLeaderboardEntry)
+    !value.entries.every(isLeaderboardEntry) ||
+    (Object.hasOwn(value, 'self') && value.self !== null && !isLeaderboardEntry(value.self))
   )
     return false;
   const names = value.entries.map((entry) => normalizeLeaderboardName(entry.name)!.key);

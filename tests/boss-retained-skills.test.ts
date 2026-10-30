@@ -35,12 +35,12 @@ function advance(g: Game, seconds: number) {
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} ≠ ${b}`);
 
 for (const arena of [2, 6])
-  test(`第${arena + 1}关狼王保留两段连扑：分别锁向完整蓄势、暂停续局不丢第二扑`, () => {
+  test(`第${arena + 1}关狼王两段连扑各自蓄力减半，暂停续局不丢第二扑`, () => {
     const { g, e } = encounter(2, 4, arena);
     g.castBossSkill(e, 1, 0);
     assert.equal(e.chargeFollowup, true);
-    near(e.charge, 1.55);
-    advance(g, 0.5);
+    near(e.charge, 1.125);
+    advance(g, 0.4);
     near(e.x, -180);
     g.pause();
     const raw = JSON.parse(JSON.stringify(g.snapshot()));
@@ -62,7 +62,7 @@ for (const arena of [2, 6])
     near(e.dy, direction.y / d);
     const x = e.x,
       y = e.y;
-    advance(g, 0.8);
+    advance(g, 0.4);
     near(e.x, x);
     near(e.y, y);
     e.cooldown = 99999;
@@ -153,7 +153,7 @@ test('七王旧圆阵与所有保留非条带技能均进入实际招式轮换�
   assert.ok(bossSkills(4, true).includes('幽影追踪'));
 });
 
-test('所有妖王现有冷却缩短15%，半血额外缩短15%，不缩短完整蓄势', () => {
+test('所有妖王现有冷却再缩短30%，保留半血加速与完整蓄势', () => {
   for (let origin = 0; origin < 7; origin++)
     for (const final of [false, true])
       for (const half of [false, true]) {
@@ -171,20 +171,20 @@ test('所有妖王现有冷却缩短15%，半血额外缩短15%，不缩短完�
             : 3;
         near(
           bossSkillCooldown(origin, final, half),
-          Math.round(old * 0.85 * (half ? 0.85 : 1) * 1000) / 1000,
+          Math.round(Math.round(old * 0.85 * (half ? 0.85 : 1) * 1000) * 0.7) / 1000,
         );
         const { g, e } = encounter(origin, 1, final ? 6 : origin);
         if (half) e.hp = e.maxHp * 0.4;
         g.castBossSkill(e, 1, 0);
         near(e.cooldown, bossSkillCooldown(origin, final, half));
       }
-  near(bossPursuitCooldown(false), 7.65);
-  near(bossPursuitCooldown(true), 4.696);
+  near(bossPursuitCooldown(false), 5.355);
+  near(bossPursuitCooldown(true), 3.287);
 });
 
-test('只提升第二三四境妖王气血20%，终关及其他境倍率、伤害保持', () => {
-  const hp = [1.15, 2.145, 2.2, 2.4, 2.4, 2.4];
-  BOSS_COMBAT.hp.forEach((n, i) => near(n, hp[i] * ([1, 2, 3].includes(i) ? 1.2 : 1)));
+test('第二境妖王气血再加20%，第三至六境再加10%，首境终关与伤害保持', () => {
+  const hp = [1.15, 2.145 * 1.2 * 1.2, 2.2 * 1.2 * 1.1, 2.4 * 1.2 * 1.1, 2.4 * 1.1, 2.4 * 1.1];
+  BOSS_COMBAT.hp.forEach((n, i) => near(n, hp[i]));
   assert.equal(BOSS_COMBAT.trialHp, 1.1);
   assert.equal(BOSS_COMBAT.trialDamage, 1.08);
   assert.deepEqual(BOSS_COMBAT.damage, [1.1, 1.15, 1.15, 1.15, 1.18, 1.18]);

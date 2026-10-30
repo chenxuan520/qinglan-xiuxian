@@ -32,12 +32,14 @@ export function bossSkillCooldown(stage: number, finalTrial: boolean, enraged: b
     : enraged
       ? 1.85
       : 3;
-  // 保留原有半血加速；统一缩短15%，半血再额外缩短15%。
+  // 保留原有半血加速，在当前间隔上再缩短30%。
   return reducedInterval(interval, enraged);
 }
 
-const reducedInterval = (interval: number, enraged: boolean) =>
-  Math.round(interval * 0.85 * (enraged ? 0.85 : 1) * 1000) / 1000;
+const reducedInterval = (interval: number, enraged: boolean) => {
+  const milliseconds = Math.round(interval * 0.85 * (enraged ? 0.85 : 1) * 1000);
+  return Math.round(milliseconds * 0.7) / 1000;
+};
 export function bossPursuitCooldown(enraged: boolean) {
   return reducedInterval(enraged ? 6.5 : 9, enraged);
 }

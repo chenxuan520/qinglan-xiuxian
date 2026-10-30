@@ -1,4 +1,5 @@
 import { projectLeaderboardFactsV1 } from './leaderboard-facts-v1.ts';
+import { projectLeaderboardFactsV2 } from './leaderboard-facts-v2.ts';
 import type { SaveData } from './progress.ts';
 import { sha256 } from './sha256.ts';
 
@@ -6,7 +7,7 @@ export interface FactsSeal {
   v: number;
   h: string;
 }
-export const FACTS_VERSION = 1;
+export const FACTS_VERSION = 2;
 export const INTEGRITY_SAVE_SCHEMA = 37;
 export const TAMPERED_LEADERBOARD_MESSAGE = '此世存档曾被改动，不可留名万魂幡。';
 export class InvalidFactsError extends Error {}
@@ -18,7 +19,10 @@ export interface FactsVersions {
 // 事实/计分规则改动时增加版本并保留旧投影；普通存档字段不增加事实版本。
 export const FACTS_VERSIONS: FactsVersions = {
   current: FACTS_VERSION,
-  projectors: { 1: (save) => projectLeaderboardFactsV1(save as SaveData) },
+  projectors: {
+    1: (save) => projectLeaderboardFactsV1(save as SaveData),
+    2: (save) => projectLeaderboardFactsV2(save as SaveData),
+  },
 };
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
