@@ -191,6 +191,8 @@ npx wrangler d1 migrations apply qinglan-leaderboard --remote --config workers/l
 npx wrangler deploy --config workers/leaderboard/wrangler.jsonc --keep-vars
 ```
 
+**自动部署**：推送 `master` 后，`.github/workflows/leaderboard.yml` 用仓库 Secret `CLOUDFLARE_API_TOKEN` 依次执行上面的 D1 迁移（已应用的跳过）和 `npm run deploy:leaderboard`；该令牌须含 Workers 脚本编辑与 D1 编辑权限，未配置时工作流跳过。Worker 引用 `src/` 的道果与事实校验代码，因此每次推送都部署。上面两条命令保留为本机备用。
+
 ## 妖物志遭遇与未知形影
 
 `bestiary-seen.ts` 保存本世已实际遭遇的普通妖物类型与妖王原境序号，使用有界、去重整数数组；新增 `SaveData.bestiary` 并将 `SAVE_SCHEMA` 递增至36。`Game.spawnEnemy` 在实际出生后追加记录，不改变随机调用、敌人数值、掉落或时间；终关旧王按原境身份记录，独立天劫的核心不冒充仙尊，木心、猎狼与假影也不因借用普通妖物模板而解锁该种妖物。法宝试演与导览使用隔离角色，不修改实际存档；读取合法续局时也识别仍在场的妖物。沿用原有保存时机，不逐只写localStorage；轮回随本世角色重置。
