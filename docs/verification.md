@@ -3253,3 +3253,10 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 - 两处服务绑定调用在构造 Worker `Request` 时使用了 `redirect: error`。Cloudflare 当前官方 Request 文档明确该模式尚未实现，会抛 TypeError；Node 的 Request 支持它，所以此前 Node/SQLite 浏览器夹具未复现。这不是密码或授权失效。改为 `manual`，不跟随重定向；会话响应仍只接受200、未登录401，其他响应拒绝，不降低验证条件，也不改既有账号、密码、人机验证或秘密绑定。
 - 新增断言核对这两次服务请求必须使用manual；对应10项管理/页面测试通过。另使用已安装的原生 Miniflare/workerd 与真实 Worker bundle、真实服务绑定做独立对照：原代码查询503/登录页503，修复后未登录查询401/登录页200且保留公开验证组件配置。仅用default导出的本机entry wrapper导入真实bundle，不替代处理器；本机workerd最高兼容日期为2026-09-25，夹具显式使用此日期，生产日期及项目配置未改。合成站点配置只用于本机测试，不是生产凭据；原生初始化时的工具配置失败一并保留。
 - 此次只有两处服务请求模式及对应断言、技术记录变化，前端布局、榜单排序、存档与游戏行为无变化；完成独立复核后追加修复提交，并再次在生产正常入口核验，生产结果另行回报。
+
+### 2026-10-30 万魂幡公开榜单页面视觉优化
+
+- 只改 `workers/leaderboard/page.ts` 的公开榜单页：`main` 增加 `public` 类，新增样式全部限定在 `.public` 下，管理页、登录页、脚本逻辑、元素 id 与接口均不变。
+- 首屏以同源 `/assets/qinglan-prologue-dark.webp`（游戏序章夜景，CSP `img-src 'self'` 允许）作渐隐背景；内容宽度收窄至 920px；前三名电脑端按 2-1-3 排列，第一名加高并加「魁」字印，第二、三名分别用银、铜色描边；列表行高由约 100px 压到约 70px；品第文字按游戏留影同一套八品配色着色；「一命问道」改为朱色小印签；空榜改为「幡」字印。手机端前三名仍按名次纵向排列。
+- 本地用模拟 12 条与 0 条数据，在 1280px 与 390px 宽度逐张截图核对：无横向滚动、长名省略、模式签不拉伸、首屏图底部平滑过渡。`tests/leaderboard-page.test.ts` 5/5 通过，`npm run check:leaderboard` 通过。
+- 该页面由独立 Worker `qinglan-leaderboard` 提供，**推送不会自动上线**，需执行 `npm run deploy:leaderboard` 后生效。
