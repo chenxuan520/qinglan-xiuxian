@@ -56,12 +56,26 @@ export function immortalEncounterPanel(
   ];
 }
 
+const rumorSpeakers: Record<DockRumor['key'], string> = {
+  ranking: '陈砚',
+  immortal: '许长庚',
+  ambush: '乔平川',
+  bottle: '贺知远',
+  rootless: '方泊舟',
+  'lu-boatman': '周慎',
+  ruyi: '温行简',
+  zhehuo: '梁景和',
+  'night-boat': '杜怀川',
+  fishing: '严松年',
+  'forecast-curio': '邵望舒',
+  'forecast-medicine': '潘承安',
+};
 let visitCache: { key: string; normal: DockRumor[]; ranked: DockRumor[] } | null = null;
 export function dockRumorsContent(save: SaveData, rankingEnabled: boolean) {
   const key = `${save.medicine.recipeSeed}:${save.mortal.population?.seed}:${save.mortal.scenery?.lastVisitAge}`;
   if (visitCache?.key !== key)
     visitCache = { key, normal: dockRumors(save, false), ranked: dockRumors(save, true) };
-  return `<section class="dock-rumors"><h3>船客传闻</h3>${(rankingEnabled ? visitCache.ranked : visitCache.normal).map((r) => `<p class="panel-note">${escape(r.text)}${rankingEnabled && r.href ? ` <a class="dock-rumor-link" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">去看看 ↗</a>` : ''}</p>`).join('')}</section>`;
+  return `<section class="dock-rumors"><h3>船客传闻</h3>${(rankingEnabled ? visitCache.ranked : visitCache.normal).map((r) => `<p class="panel-note"><span class="dock-rumor-speaker">${escape(rumorSpeakers[r.key])}说：</span>${escape(r.text)}${rankingEnabled && r.href ? ` <a class="dock-rumor-link" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">去看看 ↗</a>` : ''}</p>`).join('')}</section>`;
 }
 export function nightBoatPanel(
   save: SaveData,

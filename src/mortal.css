@@ -2055,14 +2055,17 @@
   font-weight: 400;
 }
 .dock-rumors > .panel-note + .panel-note {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  margin-top: 20px;
 }
 .dock-rumors > .panel-note {
   font-size: 16px;
   line-height: 1.9;
   color: inherit;
+}
+.dock-rumor-speaker {
+  color: var(--gold);
+  font-weight: 500;
+  white-space: nowrap;
 }
 .dock-rumor-link {
   display: inline;
