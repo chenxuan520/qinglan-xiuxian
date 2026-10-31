@@ -6,7 +6,6 @@ import {
   pathInfo,
   allowsSchool,
   evolutionPassives,
-  treasure,
 } from './data.ts';
 import { forge, forgeCost, forgeDamageBonus, type SaveData } from './progress.ts';
 import type { ActionShell } from './action-controller.ts';
@@ -16,12 +15,15 @@ import { masteryDescription } from './mortal-ui.ts';
 import type { PanelDefinition } from './panel-host.ts';
 import { CURIOS } from './curio-info.ts';
 import { curioCollection } from './curio-ui.ts';
+import { comboTreasure } from './curio-combos.ts';
+import type { Weapon } from './game.ts';
 export interface CatalogView {
   panel: 'arsenal' | 'treasure-detail';
   catalogTreasures: typeof TREASURES;
   schoolFilter: string;
   selectedTreasure: string;
   bookTab: string;
+  weapons?: Weapon[];
 }
 // 与藏器阁共用按需模块；保存成功后才应用炼器与成就。
 export function forgeTreasure(shell: ActionShell) {
@@ -36,14 +38,20 @@ export function forgeTreasure(shell: ActionShell) {
   Object.assign(shell.save, next);
   shell.renderLobby();
   shell.renderPanel();
-  shell.toast(`${treasure(shell.selectedTreasure).name}炼器成功 · 伤害永久提升`);
+  const acquired =
+    (shell.game ?? shell.pendingRun)?.weapons.some((w) => w.id === shell.selectedTreasure) ?? false;
+  shell.toast(
+    `${comboTreasure(shell.save, shell.selectedTreasure, acquired).name}炼器成功 · 伤害永久提升`,
+  );
 }
 export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition {
   const { panel, catalogTreasures, schoolFilter, selectedTreasure, bookTab } = view;
-  const visibleTreasures = catalogTreasures.filter(
-    (t) => schoolFilter === 'all' || t.school === schoolFilter,
-  );
-  const t = treasure(selectedTreasure),
+  const display = (id: string) =>
+    comboTreasure(save, id, view.weapons?.some((w) => w.id === id) ?? false);
+  const visibleTreasures = catalogTreasures
+    .map((t) => display(t.id))
+    .filter((t) => schoolFilter === 'all' || t.school === schoolFilter);
+  const t = display(selectedTreasure),
     level = save.forge[t.id] || 0,
     cost = forgeCost(level, save),
     owned = save.artifacts.includes(t.id);
@@ -88,7 +96,7 @@ export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition
                     (p) =>
                       `<article class="passive-card">${icon(p.id, p.color)}<h3>${p.name}</h3><span class="school-label" style="color:${pathInfo(p.school).color}">${pathInfo(p.school).name} · 每重效果</span><p>${p.desc}</p><small>${masteryDescription(save, p.id)}</small><small>共鸣：${
                         TREASURES.filter((t) => evolutionPassives(t).includes(p.id))
-                          .map((t) => t.name)
+                          .map((t) => display(t.id).name)
                           .join('、') || '提升所有法宝'
                       }</small></article>`,
                   )

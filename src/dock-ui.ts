@@ -69,6 +69,9 @@ const rumorSpeakers: Record<DockRumor['key'], string> = {
   fishing: '严松年',
   'forecast-curio': '邵望舒',
   'forecast-medicine': '潘承安',
+  'combo-sword': '孟青川',
+  'combo-fan': '沈松亭',
+  'combo-soul': '顾玄微',
 };
 let visitCache: { key: string; normal: DockRumor[]; ranked: DockRumor[] } | null = null;
 export function dockRumorsContent(save: SaveData, rankingEnabled: boolean) {

@@ -1,4 +1,5 @@
 import { Game } from './game.ts';
+import { treasureDisplayName } from './curio-combos.ts';
 import { treasure, weaponRootBonus } from './data.ts';
 import type { CultivationPath } from './data.ts';
 import { forgeDamageBonus, type SaveData } from './progress.ts';
@@ -21,7 +22,7 @@ export function spiritPower(save: SaveData, path?: CultivationPath) {
     score,
     hp: preview.player.maxHp,
     ...stats,
-    weapon: weapon.name,
+    weapon: treasureDisplayName(save, weapon.id),
     weaponId: weapon.id,
     path: preview.path,
     weaponDamage: preview.weaponHitDamage(preview.weapons[0]),

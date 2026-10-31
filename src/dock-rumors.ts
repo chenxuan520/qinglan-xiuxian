@@ -15,7 +15,10 @@ export type DockRumorKey =
   | 'night-boat'
   | 'fishing'
   | 'forecast-curio'
-  | 'forecast-medicine';
+  | 'forecast-medicine'
+  | 'combo-sword'
+  | 'combo-fan'
+  | 'combo-soul';
 export interface DockRumor {
   key: DockRumorKey;
   text: string;
@@ -28,6 +31,18 @@ const ranking: DockRumor = {
   href: 'https://xiuxian.011203.xyz/leaderboard/',
 };
 const rumors: DockRumor[] = [
+  {
+    key: 'combo-sword',
+    text: '有人说，金雷竹的细叶落在剑上，那剑就再不肯叫原来的名字了。',
+  },
+  {
+    key: 'combo-fan',
+    text: '船上有个老人摇着一把破蒲扇说，扇子扇的是风，风认的却是手里那点温润。',
+  },
+  {
+    key: 'combo-soul',
+    text: '庙里的道士讲，木头里也能养魂，魂养足了，符纸压得住的东西就多一个。',
+  },
   {
     key: 'immortal',
     text: '老辈人说，久不归乡的修士回来，街上偶尔会多出个面生的人。肯上前搭话的，总能捎点什么走。',

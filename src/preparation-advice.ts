@@ -1,4 +1,6 @@
-import { MAX_FORGE_LEVEL, treasure } from './data.ts';
+import { MAX_FORGE_LEVEL } from './data.ts';
+import { comboTreasure } from './curio-combos.ts';
+import type { Game } from './game.ts';
 import {
   forgeCost,
   forgeDamageBonus,
@@ -14,7 +16,7 @@ import { medicineUseReason } from './medicine.ts';
 import { trainingStepText } from './training-preview.ts';
 
 // 只读当前行囊与正式报价；不推断败因、不代替玩家购买或服药。
-export function preparationAdvice(save: SaveData, unfinished = false) {
+export function preparationAdvice(save: SaveData, unfinished = false, weapons?: Game['weapons']) {
   if (
     unfinished ||
     save.tribulationReturn ||
@@ -40,7 +42,7 @@ export function preparationAdvice(save: SaveData, unfinished = false) {
       action: 'treasure',
       id: save.starter,
       label: '查看本命炼器',
-      text: `现有资粮可将${treasure(save.starter).name}炼至${level + 1}阶：${cost.stones}灵石、${cost.iron}玄铁，不耗年岁；同等搭配下此宝伤害较当前提升${gain.toFixed(1)}%。`,
+      text: `现有资粮可将${comboTreasure(save, save.starter, weapons?.some((w) => w.id === save.starter) ?? false).name}炼至${level + 1}阶：${cost.stones}灵石、${cost.iron}玄铁，不耗年岁；同等搭配下此宝伤害较当前提升${gain.toFixed(1)}%。`,
     };
   }
   const years = trainingYears(save);
@@ -75,8 +77,13 @@ export function preparationAdvice(save: SaveData, unfinished = false) {
   return null;
 }
 
-export function preparationAdviceContent(save: SaveData, unfinished = false, settlement = false) {
-  const advice = preparationAdvice(save, unfinished);
+export function preparationAdviceContent(
+  save: SaveData,
+  unfinished = false,
+  settlement = false,
+  weapons?: Game['weapons'],
+) {
+  const advice = preparationAdvice(save, unfinished, weapons);
   if (!advice) return '';
   return `<div class="panel-note preparation-advice" aria-label="行前可备"><strong>行前可备</strong><p>${advice.text}</p>${settlement ? '<small>返回首页后可查看准备，也可直接继续历练。</small>' : `<button class="secondary-button" data-action="${advice.action}"${advice.id ? ` data-id="${advice.id}"` : ''}>${advice.label} →</button>`}</div>`;
 }

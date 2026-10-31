@@ -12,7 +12,6 @@ import {
   formatTime,
   passive,
   pathInfo,
-  treasure,
   xpNeeded,
 } from './data.ts';
 import { activeMedicines } from './medicine-data.ts';
@@ -21,6 +20,7 @@ import { controls } from './common-ui.ts';
 import { icon } from './icons.ts';
 import type { MobileDisplay } from './mobile-display.ts';
 import { HudLayout } from './hud-layout.ts';
+import { comboTreasure, curioCombo } from './curio-combos.ts';
 
 export class BattleHud {
   private lastLoadout = '';
@@ -167,7 +167,7 @@ export class BattleHud {
         `${(game.boss.hp / game.boss.maxHp) * 100}%`;
     }
     const loadout = JSON.stringify([
-      game.weapons.map((w) => [w.id, w.level, w.evolved]),
+      game.weapons.map((w) => [w.id, w.level, w.evolved, !!curioCombo(save, w.id)]),
       game.passives,
     ]);
     if (loadout !== this.lastLoadout) {
@@ -176,7 +176,7 @@ export class BattleHud {
         const w = game!.weapons[i];
         if (!w)
           return '<div class="equipped-slot empty"><span>＋</span><small>待悟法宝</small></div>';
-        const t = treasure(w.id);
+        const t = comboTreasure(save, w.id);
         return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}">${icon(t.id, t.color)}<div><strong>${w.evolved ? t.evolution : t.name}</strong><span>${w.evolved ? '仙器 · 觉醒' : `${['', '一', '二', '三', '四', '五', '六'][w.level]}重`}<i>${'·'.repeat(w.level)}</i></span></div></div>`;
       }).join('');
       document.getElementById('passive-slots')!.innerHTML = Object.entries(game.passives)

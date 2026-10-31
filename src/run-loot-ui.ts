@@ -5,8 +5,9 @@ import { treasure } from './data.ts';
 import { icon } from './icons.ts';
 import { medicineInfo } from './medicine-data.ts';
 import { medicineArt } from './medicine-ui.ts';
+import { treasureDisplayName } from './curio-combos.ts';
 
-export function runLootContent(loot: Game['loot']) {
+export function runLootContent(loot: Game['loot'], game?: Game) {
   const items = [
     ...Object.entries(loot.curios ?? {}).map(([id, count]) => ({
       name: curioName(id),
@@ -16,7 +17,13 @@ export function runLootContent(loot: Game['loot']) {
     })),
     ...loot.artifacts.map((id) => {
       const item = treasure(id);
-      return { name: item.name, detail: '新获法宝', art: icon(id, item.color), count: 1 };
+      const w = game?.weapons.find((w) => w.id === id);
+      return {
+        name: w ? treasureDisplayName(game!.save, id, w.evolved) : item.name,
+        detail: '新获法宝',
+        art: icon(id, item.color),
+        count: 1,
+      };
     }),
     ...Object.entries(loot.medicines).map(([id, count]) => {
       const item = medicineInfo(id)!;

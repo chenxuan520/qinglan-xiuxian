@@ -7,6 +7,7 @@ import {
 import { enemyCombatStats } from './enemy-stats.ts';
 import { recordBestiarySeen } from './bestiary-seen.ts';
 import { ownsCurio, bossCurio } from './curio-data.ts';
+import { curioCombo, treasureDisplayName } from './curio-combos.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
   Point,
@@ -176,8 +177,10 @@ export class Game {
   private nextEnemyBindAt = 0;
   private nextEnemySealAt = 0;
   private nextEnemyEntangleAt = 0;
-  private shownAilments = new Set<string>();
-  private pendingAilmentNotices: string[] = [];
+  #shownAilments = new Set<string>();
+  #pendingAilmentNotices: string[] = [];
+  #shownCombos = new Set<string>();
+  #pendingComboNotices: string[] = [];
   tribulation = 0;
   tribulationStep = 0;
   tribulationNextAt = 1.2;
@@ -221,7 +224,7 @@ export class Game {
     this.startedImmortal = this.realm === 24;
     this.baseHp = spiritRootInfo(this.spiritRoot).baseHp + realmBonuses(this.realm).hp;
     if (save.mortal.member) this.passives[save.mortal.member.id] = 1;
-    this.player.hp = this.player.maxHp = this.maximumHealth();
+    this.player.hp = this.player.maxHp = this.#maximumHealth();
     const starter =
       TREASURES.find(
         (t) =>
@@ -233,7 +236,7 @@ export class Game {
   private passivePower(id: string) {
     return (this.passives[id] || 0) * (1 + masteryBonus(this.save, id));
   }
-  private maximumHealth(medicineHp = this.medicine.hp) {
+  #maximumHealth(medicineHp = this.medicine.hp) {
     const base =
       this.baseHp *
       (1 +
@@ -325,7 +328,7 @@ export class Game {
       g.weapons[0].evolved = true;
     }
     g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
-    g.player.hp = g.player.maxHp = g.maximumHealth();
+    g.player.hp = g.player.maxHp = g.#maximumHealth();
     g.player.y = 240;
     g.bossSpawned = true;
     const boss = g.spawnEnemy(10, false, true, { x: 0, y: 0 }, 6);
@@ -424,7 +427,8 @@ export class Game {
         85 *
         (1 + this.passivePower('magnet') * 0.28) *
         this.medicine.magnet *
-        (ownsCurio(this.save, 'spirit-spring') ? 1.25 : 1),
+        (ownsCurio(this.save, 'spirit-spring') ? 1.25 : 1) *
+        (this.#activeCombo('fan') ? 1.4 : 1),
       xp:
         ((1 +
           this.passivePower('spirit') * 0.15 +
@@ -477,8 +481,8 @@ export class Game {
       const major = realm.index > Math.floor(this.realm / 3);
       this.realm = realm.step;
       this.baseHp += hp;
-      const increase = this.maximumHealth() - this.player.maxHp;
-      this.player.maxHp = this.maximumHealth();
+      const increase = this.#maximumHealth() - this.player.maxHp;
+      this.player.maxHp = this.#maximumHealth();
       if (this.player.hp > 0) this.heal(increase);
       this.announce(`${major ? '大境界突破' : '境界突破'} · ${realm.name} · 气血与法宝威力提升`);
       if (major) this.effects = this.effects.filter((e) => e.kind !== 'realm-breakthrough');
@@ -494,7 +498,7 @@ export class Game {
           kind: 'realm-breakthrough',
           realmIndex: realm.index,
         });
-      } else this.effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
+      } else this.#effect(this.player.x, this.player.y, 1.2, 85, '#ebd99c', 'pulse');
       this.onEvent('breakthrough');
     }
   }
@@ -637,8 +641,8 @@ export class Game {
       g.sealed = s.sealed ?? 0;
       g.entangled = s.entangled ?? 0;
       g.corroded = s.corroded ?? 0;
-      if (g.entangled > 0) g.shownAilments.add('entangle');
-      if (g.corroded > 0) g.shownAilments.add('corrode');
+      if (g.entangled > 0) g.#shownAilments.add('entangle');
+      if (g.corroded > 0) g.#shownAilments.add('corrode');
       g.burning = { ...(s.burning ?? { life: 0, damage: 0 }) };
       if (
         s.nextMedicinePulse !== undefined &&
@@ -648,15 +652,17 @@ export class Game {
       g.nextMedicinePulse = s.nextMedicinePulse ?? 0;
       g.nextEnemySkillAt = s.nextEnemySkillAt ?? 0;
       g.weapons = s.weapons.map((w) => ({ ...w }));
+      // 提示不入快照；续局已有的组合视为已经提示，不重复打断战斗。
+      for (const w of g.weapons) if (g.#activeCombo(w.id)) g.#shownCombos.add(w.id);
       g.passives = { ...s.passives };
-      const maxHp = g.maximumHealth();
+      const maxHp = g.#maximumHealth();
       if (
         s.medicineHpFactor !== undefined &&
         (!Number.isFinite(s.medicineHpFactor) || s.medicineHpFactor <= 0)
       )
         return null;
       // 快照之后精研、功法或境界变化会重新计算上限；保留已损失气血，不重复回血。
-      const growth = g.maximumHealth(s.medicineHpFactor) - s.player.maxHp;
+      const growth = g.#maximumHealth(s.medicineHpFactor) - s.player.maxHp;
       g.player.maxHp = maxHp;
       g.player.hp = Math.max(
         1,
@@ -816,7 +822,7 @@ export class Game {
       this.elapsedYears += Math.max(0, this.save.age - ageBefore);
     if (this.save.age >= this.medicine.expiresAt) {
       this.medicine = medicineEffects(this.save.medicine, this.save.age);
-      this.player.maxHp = this.maximumHealth();
+      this.player.maxHp = this.#maximumHealth();
       this.player.hp = Math.min(this.player.hp, this.player.maxHp);
     }
     if (this.medicine.frost && this.time >= this.nextMedicinePulse) {
@@ -824,7 +830,7 @@ export class Game {
       for (const enemy of this.enemies)
         if (!enemy.dead && distance(enemy, this.player) <= 180)
           enemy.slow = Math.max(enemy.slow, 2);
-      this.effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'impact');
+      this.#effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'impact');
     }
     const progress = this.combatProgress;
     this.noticeTime -= dt;
@@ -898,6 +904,11 @@ export class Game {
       }
     }
     for (const w of this.weapons) {
+      const combo = this.#activeCombo(w.id);
+      if (combo && !this.#shownCombos.has(w.id)) {
+        this.#shownCombos.add(w.id);
+        this.#pendingComboNotices.push(combo.notice);
+      }
       w.timer -= dt;
       if (this.sealed > 0) w.timer = Math.max(0, w.timer);
       else if (w.timer <= 0) {
@@ -935,11 +946,13 @@ export class Game {
         this.input = { x: 0, y: 0 };
       }
     }
-    if (this.pendingAilmentNotices.length) {
+    if (this.#pendingAilmentNotices.length) {
       // 首次状态提示在本帧拾取等提示之后显示；升级、结算仍优先。
-      if (this.state === 'playing') this.announce(this.pendingAilmentNotices.join('　'));
-      this.pendingAilmentNotices.length = 0;
+      if (this.state === 'playing') this.announce(this.#pendingAilmentNotices.join('　'));
+      this.#pendingAilmentNotices.length = 0;
     }
+    if (this.state === 'playing' && this.noticeTime <= 0 && this.#pendingComboNotices.length)
+      this.announce(this.#pendingComboNotices.shift()!);
   }
   private updateTribulation() {
     const boss = this.boss;
@@ -1343,7 +1356,7 @@ export class Game {
           e.charge = 1.25;
           e.dx = nx;
           e.dy = ny;
-          this.effect(
+          this.#effect(
             e.x,
             e.y,
             0.75,
@@ -1392,7 +1405,7 @@ export class Game {
     }
   }
   private bossChargeWarning(e: Enemy) {
-    this.effect(
+    this.#effect(
       e.x,
       e.y,
       e.charge - 0.7,
@@ -1490,7 +1503,7 @@ export class Game {
         summoned.summonedBy = e.id;
         if (e.cacheGuardian) summoned.cacheGuardian = true;
       }
-      this.effect(e.x, e.y, 0.7, 60, '#c8b9df', 'pulse');
+      this.#effect(e.x, e.y, 0.7, 60, '#c8b9df', 'pulse');
       e.windup = 0.7;
       return;
     }
@@ -1717,7 +1730,7 @@ export class Game {
         illusion.elite = false;
         illusion.cooldown = 3;
       }
-      this.effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
+      this.#effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
       e.x -= ny * 150;
       e.y += nx * 150;
       return;
@@ -1814,7 +1827,7 @@ export class Game {
       );
       Object.assign(this.zones.at(-1)!, { vx: nx * speed, vy: ny * speed });
     } else {
-      this.effect(e.x, e.y, 0.7, e.radius, STAGES[4].color, 'pulse');
+      this.#effect(e.x, e.y, 0.7, e.radius, STAGES[4].color, 'pulse');
       e.x = this.player.x - nx * 260;
       e.y = this.player.y - ny * 260;
     }
@@ -1972,7 +1985,7 @@ export class Game {
       if (e.charge === 0) e.dead = true;
     }
   }
-  private nearest(at: Point, excluded = new Set<number>(), range = 950) {
+  #nearest(at: Point, excluded = new Set<number>(), range = 950) {
     let result: Enemy | undefined,
       nearest = range * range;
     for (const e of this.enemies) {
@@ -1984,7 +1997,17 @@ export class Game {
     }
     return result;
   }
-  weaponHitDamage(w: Weapon) {
+  #activeCombo(id: string) {
+    return this.weapons.some((w) => w.id === id) ? curioCombo(this.save, id) : undefined;
+  }
+  #comboDamage(id: string) {
+    return (id === 'sword' || id === 'talisman') && this.#activeCombo(id)
+      ? id === 'sword'
+        ? 1.2
+        : 1.15
+      : 1;
+  }
+  weaponHitDamage(w: Weapon, includeCombo = true) {
     const t = treasure(w.id);
     return (
       t.damage *
@@ -1993,7 +2016,8 @@ export class Game {
       (1 + forgeDamageBonus(this.save.forge[w.id] || 0)) *
       (w.evolved ? EVOLVED_DAMAGE : 1) *
       (w.id === 'skull' ? 1 + this.passivePower('bone') * 0.08 : 1) *
-      (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t))
+      (1 + weaponRootBonus(this.spiritRoot, this.rootElements, t)) *
+      (includeCombo ? this.#comboDamage(w.id) : 1)
     );
   }
   private awaken(w: Weapon) {
@@ -2011,10 +2035,11 @@ export class Game {
       element: t.element,
     });
     this.onEvent('evolve');
-    const damage = this.weaponHitDamage(w) * AWAKENING_BURST.hits;
+    const damage = this.weaponHitDamage(w, false) * AWAKENING_BURST.hits;
     for (const e of this.enemies) {
       if (e.dead || distance(e, p) > AWAKENING_BURST.radius + e.radius) continue;
-      const bossCap = (e.maxHp * AWAKENING_BURST.bossShare) / this.eliteDamage;
+      const bossCap =
+        (e.maxHp * AWAKENING_BURST.bossShare) / (this.eliteDamage * this.#comboDamage(w.id));
       this.hitEnemy(e, e.boss ? Math.min(damage, bossCap) : damage, false, w.id);
     }
   }
@@ -2022,9 +2047,10 @@ export class Game {
     const t = treasure(w.id),
       p = this.player,
       s = this.stats,
-      target = this.nearest(p);
+      target = this.#nearest(p);
     const count = 1 + Math.floor(w.level / 2) + (w.evolved ? 3 : 0);
-    const dmg = this.weaponHitDamage(w);
+    // 弹丸保存基础伤害，命中时判断组合，售出奇物立即影响在途攻击。
+    const dmg = this.weaponHitDamage(w, false);
     const a = target ? Math.atan2(target.y - p.y, target.x - p.x) : this.time;
     const radius = (95 + w.level * 7) * s.area;
     const volley: BossAttack['volley'] | undefined =
@@ -2063,7 +2089,7 @@ export class Game {
         }
       }
       this.areaDamage(p, radius * 1.6, dmg, 'pulse', w.id);
-      this.effect(p.x, p.y, 0.7, radius * 1.6, t.color, 'umbrella');
+      this.#effect(p.x, p.y, 0.7, radius * 1.6, t.color, 'umbrella');
       for (let i = 0; i < Math.min(blocked, 8); i++)
         launch(a + (i - (Math.min(blocked, 8) - 1) / 2) * 0.2, p, { pierce: 3 });
       return;
@@ -2087,7 +2113,7 @@ export class Game {
       return;
     }
     if (w.id === 'pulse' || w.id === 'ice') {
-      this.effect(p.x, p.y, 0.75, radius * 1.5, t.color, w.id === 'pulse' ? 'bell' : w.id);
+      this.#effect(p.x, p.y, 0.75, radius * 1.5, t.color, w.id === 'pulse' ? 'bell' : w.id);
       this.areaDamage(p, radius * 1.5, dmg, w.id);
       return;
     }
@@ -2202,7 +2228,7 @@ export class Game {
     if (w.id === 'scythe') {
       const crit = this.random() < s.crit;
       const reach = radius * 1.8;
-      this.effect(
+      this.#effect(
         p.x,
         p.y,
         0.55,
@@ -2309,7 +2335,7 @@ export class Game {
         .sort((a, b) => distance(a, p) - distance(b, p))
         .slice(0, count);
       for (const e of selected) {
-        this.effect(e.x, e.y, 0.45, 60, t.color, 'lightning');
+        this.#effect(e.x, e.y, 0.45, 60, t.color, 'lightning');
         this.areaDamage(e, 65 * s.area, dmg, 'lightning', 'lightning', attack());
       }
       this.onEvent('lightning');
@@ -2321,11 +2347,11 @@ export class Game {
       const hit = new Set<number>();
       for (let i = 0; i < count + 2; i++) {
         hit.add(current.id);
-        this.effect(from.x, from.y, 0.4, 5, t.color, 'chain', undefined, current.x, current.y);
+        this.#effect(from.x, from.y, 0.4, 5, t.color, 'chain', undefined, current.x, current.y);
         this.hitEnemy(current, dmg, false, w.id);
         current.slow = 2;
         from = current;
-        const next = this.nearest(current, hit, 190 * s.area);
+        const next = this.#nearest(current, hit, 190 * s.area);
         if (!next) break;
         current = next;
       }
@@ -2352,7 +2378,7 @@ export class Game {
         pierce: ['sword', 'fan', 'blade', 'dragon'].includes(w.id)
           ? 2 + w.level
           : w.id === 'talisman'
-            ? 2
+            ? 2 + (this.#activeCombo('talisman') ? 1 : 0)
             : 1,
         hit: new Set(),
         origin: { x: p.x, y: p.y },
@@ -2369,7 +2395,7 @@ export class Game {
       b.life -= dt;
       b.age += dt;
       if (['flute', 'nail', 'skull'].includes(b.kind)) {
-        const target = this.nearest(b, b.hit, 600);
+        const target = this.#nearest(b, b.hit, 600);
         if (target) {
           const d = distance(b, target) || 1;
           const speed = Math.hypot(b.vx, b.vy);
@@ -2424,11 +2450,20 @@ export class Game {
         continue;
       }
       if (b.life <= 0) continue;
+      if (b.kind === 'talisman') {
+        b.pierce = 2 + (this.#activeCombo('talisman') ? 1 : 0) - b.hit.size;
+        if (b.pierce <= 0) {
+          b.life = 0;
+          continue;
+        }
+      }
       for (const e of this.enemies) {
         if (e.dead || b.hit.has(e.id) || distanceSquared(b, e) > (b.radius + e.radius) ** 2)
           continue;
         b.hit.add(e.id);
         this.hitEnemy(e, b.damage, b.crit, b.kind, b.bossAttack);
+        if (b.kind === 'sword' && this.#activeCombo('sword'))
+          this.#effect(e.x, e.y, 0.45, 60, treasure('sword').color, 'lightning');
         b.pierce--;
         if (b.kind === 'shard' && b.bounce === -1) {
           b.bounce = 0;
@@ -2453,7 +2488,7 @@ export class Game {
         if (b.kind === 'fire') {
           const radius = 62 * this.stats.area;
           this.areaDamage(b, radius, b.damage * 0.65, 'fire', 'fire', b.bossAttack);
-          this.effect(b.x, b.y, 0.45, radius, b.color, 'impact');
+          this.#effect(b.x, b.y, 0.45, radius, b.color, 'impact');
         }
         if (b.kind === 'dragon') {
           const d = distance(e, this.player) || 1;
@@ -2461,7 +2496,7 @@ export class Game {
           e.y += ((e.y - this.player.y) / d) * 25;
         }
         if (b.bounce > 0) {
-          const next = this.nearest(b, b.hit, 300);
+          const next = this.#nearest(b, b.hit, 300);
           if (next) {
             const d = distance(next, b) || 1;
             b.vx = ((next.x - b.x) / d) * 450;
@@ -2523,7 +2558,7 @@ export class Game {
         z.tick = 0.5;
         if (z.hostile) {
           if (this.tribulation && z.kind === 'blast' && z.life > 0)
-            this.effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
+            this.#effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
           if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8) {
             const poison = poisonousHazard(z);
             this.hurtPlayer(
@@ -2537,10 +2572,10 @@ export class Game {
           const count = weapon && (weapon.level >= 3 || weapon.evolved) ? 3 : 2;
           const hit = new Set<number>();
           for (let i = 0; i < count; i++) {
-            const target = this.nearest(z, hit, z.radius);
+            const target = this.#nearest(z, hit, z.radius);
             if (!target) break;
             hit.add(target.id);
-            this.effect(z.x, z.y, 0.3, 4, z.color, 'tower-ray', undefined, target.x, target.y);
+            this.#effect(z.x, z.y, 0.3, 4, z.color, 'tower-ray', undefined, target.x, target.y);
             this.hitEnemy(target, z.damage * (i === 0 ? 1 : 0.35), false, z.kind);
           }
         } else {
@@ -2579,12 +2614,12 @@ export class Game {
         }
         if (item.kind === 'heal' && !this.isFinalTrial) {
           this.heal(p.maxHp * 0.3);
-          this.float(p, '+气血', '#b4e4aa');
+          this.#float(p, '+气血', '#b4e4aa');
           this.onEvent('heal');
         }
         if (item.kind === 'iron') {
           this.iron += item.value;
-          this.float(p, '+玄铁', '#ded1b0');
+          this.#float(p, '+玄铁', '#ded1b0');
           this.onEvent('iron');
         }
         if (item.kind === 'magnet') {
@@ -2599,7 +2634,9 @@ export class Game {
           if (candidates.length) {
             const w = candidates[Math.floor(this.random() * candidates.length)];
             w.level++;
-            this.announce(`炼器宝匣 · ${treasure(w.id).name}升至${w.level}重 · 玄铁 +2`);
+            this.announce(
+              `炼器宝匣 · ${treasureDisplayName(this.save, w.id)}升至${w.level}重 · 玄铁 +2`,
+            );
           } else {
             this.iron += 2;
             this.announce(`炼器宝匣 · 玄铁 +4${this.isFinalTrial ? '' : ' · 气血回复'}`);
@@ -2668,16 +2705,16 @@ export class Game {
       return;
     this.entangled = ENEMY_CONTROL.entangle;
     this.nextEnemyEntangleAt = this.time + ENEMY_CONTROL.entangle + ENEMY_CONTROL.protection;
-    this.ailmentNotice('entangle', '藤缠 · 暂难拾取');
+    this.#ailmentNotice('entangle', '藤缠 · 暂难拾取');
   }
   private enemyCorrode() {
     this.corroded = ENEMY_CONTROL.corrode;
-    this.ailmentNotice('corrode', '蚀体 · 无法回复');
+    this.#ailmentNotice('corrode', '蚀体 · 无法回复');
   }
-  private ailmentNotice(kind: string, message: string) {
-    if (this.shownAilments.has(kind)) return;
-    this.shownAilments.add(kind);
-    this.pendingAilmentNotices.push(message);
+  #ailmentNotice(kind: string, message: string) {
+    if (this.#shownAilments.has(kind)) return;
+    this.#shownAilments.add(kind);
+    this.#pendingAilmentNotices.push(message);
     this.announce(message);
   }
   private addRegionalFields(e: Enemy, fields: RegionalField[]) {
@@ -2912,7 +2949,7 @@ export class Game {
     pull = false,
     attack?: BossAttack,
   ) {
-    this.effect(
+    this.#effect(
       from.x,
       from.y,
       0.45,
@@ -2945,6 +2982,7 @@ export class Game {
   }
   hitEnemy(e: Enemy, damage: number, crit = false, source = 'other', attack?: BossAttack) {
     if (e.dead) return;
+    damage *= this.#comboDamage(source);
     if (e.illusionOf !== undefined) {
       if (damage > 0) e.dead = true;
       return;
@@ -2983,7 +3021,7 @@ export class Game {
     this.damageDealt += actual;
     this.damageBySource[source] = (this.damageBySource[source] || 0) + actual;
     if (this.effects.length < 100)
-      this.float(
+      this.#float(
         e,
         `${formatNumber(Math.ceil(damage))}${crit ? '!' : ''}`,
         crit ? '#f8db88' : '#e5edce',
@@ -3159,16 +3197,16 @@ export class Game {
           this.stats.damage,
         'bone',
       );
-      this.effect(this.player.x, this.player.y, 0.4, 115 * this.stats.area, '#dbcfb9', 'bone');
+      this.#effect(this.player.x, this.player.y, 0.4, 115 * this.stats.area, '#dbcfb9', 'bone');
     }
-    this.effect(this.player.x, this.player.y, 0.35, 35, '#f3a69b', 'pulse');
+    this.#effect(this.player.x, this.player.y, 0.35, 35, '#f3a69b', 'pulse');
     this.onEvent('hurt');
   }
   private heal(amount: number) {
     if (this.player.hp > 0 && this.corroded <= 0)
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + amount);
   }
-  private effect(
+  #effect(
     x: number,
     y: number,
     life: number,
@@ -3182,8 +3220,8 @@ export class Game {
     if (this.effects.length < 250)
       this.effects.push({ x, y, life, maxLife: life, radius, color, kind, text, x2, y2 });
   }
-  private float(at: Point, text: string, color: string) {
-    this.effect(at.x + (this.random() - 0.5) * 16, at.y - 22, 0.65, 0, color, 'text', text);
+  #float(at: Point, text: string, color: string) {
+    this.#effect(at.x + (this.random() - 0.5) * 16, at.y - 22, 0.65, 0, color, 'text', text);
   }
   evolutionRequirements(id: string) {
     const t = treasure(id);
@@ -3275,8 +3313,8 @@ export class Game {
       this.passives[c.id] = c.level;
       if (c.id === 'guard' || c.id === 'bone' || c.id === 'frenzy') {
         const oldMax = this.player.maxHp;
-        const increase = this.maximumHealth() - this.player.maxHp;
-        this.player.maxHp = this.maximumHealth();
+        const increase = this.#maximumHealth() - this.player.maxHp;
+        this.player.maxHp = this.#maximumHealth();
         if (increase >= 0) this.heal(increase);
         else this.player.hp *= this.player.maxHp / oldMax;
       }

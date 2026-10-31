@@ -513,6 +513,7 @@ export function renderPanel(shell: ActionShell) {
       schoolFilter: shell.schoolFilter,
       selectedTreasure: shell.selectedTreasure,
       bookTab: shell.bookTab,
+      weapons: (shell.game ?? shell.pendingRun)?.weapons,
     });
     shell.panelFrame(view.title, view.subtitle, view.body, view.wide);
     if (shell.panel === 'treasure-detail') return;
