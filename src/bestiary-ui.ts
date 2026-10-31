@@ -37,7 +37,7 @@ function statLine(
   return `<small class="enemy-stats"><b>${label}</b><br>气血 约${numberRange(stats.hp)}<br>触碰伤害 约${numberRange(stats.damage)}</small>`;
 }
 const miasmaHint = (life: number) =>
-  `五处固定瘴池、五道毒矢与四名护卫召唤，另有三团持续${life}秒的漂移毒瘴；毒伤命中后3秒无法回复，清灵散可减伤。`;
+  `五处固定瘴池、五道毒矢与四名护卫召唤，另有三团持续${life}秒的漂移毒瘴；毒伤命中后3秒无法回复，清灵散可减伤并缩短蚀体。`;
 const bossHints = [
   '六处环形藤阵、七发荆棘扇射与三名山灵召唤，藤圈造成3秒藤缠，暂难拾取；木心生长2.4秒后成阵，可提前击碎。',
   '九发火扇、五点火径与十六发火弹环射，离开火圈并穿过弹幕间隙；回焰短暂停留后沿原路折返。',

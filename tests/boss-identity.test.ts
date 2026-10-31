@@ -119,8 +119,8 @@ test('木阵藤缠与冰牢减速只在落地后生效，毒池毒矢减伤及�
     z.delay = 0;
     g.updateZones(0.01);
     if (stage === 3) {
-      assert.ok(Math.abs(hp - g.player.hp - e.damage * 0.8) < 1e-8);
-      assert.equal(g.corroded, 3);
+      assert.ok(Math.abs(hp - g.player.hp - e.damage * 0.7) < 1e-8);
+      assert.equal(g.corroded, 1.5);
     } else {
       assert.equal(g.slowed, stage === 2 ? 0.55 : 0);
       assert.equal(g.entangled, stage === 0 ? 3 : 0);
@@ -139,7 +139,7 @@ test('木阵藤缠与冰牢减速只在落地后生效，毒池毒矢减伤及�
       Object.assign(arrow, { x: g.player.x, y: g.player.y });
       g.player.invincible = 0;
       g.updateShots(0);
-      assert.ok(Math.abs(after - g.player.hp - arrow.damage * 0.8) < 1e-8);
+      assert.ok(Math.abs(after - g.player.hp - arrow.damage * 0.7) < 1e-8);
     }
   }
 });

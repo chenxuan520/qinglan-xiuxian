@@ -2687,28 +2687,28 @@ export class Game {
   }
   private enemySlow() {
     if (this.player.invincible > 0 || this.time < this.nextEnemySlowAt) return;
-    this.slowed = ENEMY_CONTROL.slow;
+    this.slowed = ENEMY_CONTROL.slow * this.medicine.cleanse;
     this.nextEnemySlowAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemyBind() {
     if (this.player.invincible > 0 || this.time < this.nextEnemyBindAt) return;
-    this.immobilized = ENEMY_CONTROL.bind;
+    this.immobilized = ENEMY_CONTROL.bind * this.medicine.cleanse;
     this.nextEnemyBindAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemySeal() {
     if (this.player.invincible > 0 || this.time < this.nextEnemySealAt) return;
-    this.sealed = ENEMY_CONTROL.seal;
+    this.sealed = ENEMY_CONTROL.seal * this.medicine.cleanse;
     this.nextEnemySealAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemyEntangle() {
     if (this.player.invincible > 0 || this.entangled > 0 || this.time < this.nextEnemyEntangleAt)
       return;
-    this.entangled = ENEMY_CONTROL.entangle;
-    this.nextEnemyEntangleAt = this.time + ENEMY_CONTROL.entangle + ENEMY_CONTROL.protection;
+    this.entangled = ENEMY_CONTROL.entangle * this.medicine.cleanse;
+    this.nextEnemyEntangleAt = this.time + this.entangled + ENEMY_CONTROL.protection;
     this.#ailmentNotice('entangle', '藤缠 · 暂难拾取');
   }
   private enemyCorrode() {
-    this.corroded = ENEMY_CONTROL.corrode;
+    this.corroded = ENEMY_CONTROL.corrode * this.medicine.cleanse;
     this.#ailmentNotice('corrode', '蚀体 · 无法回复');
   }
   #ailmentNotice(kind: string, message: string) {

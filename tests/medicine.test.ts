@@ -653,7 +653,7 @@ test('清灵减免毒池，无常不再解毒；雪魄周期减速，暂停不�
       hostile: true,
     });
     g.update(0.01);
-    approx(hp - g.player.hp, 10 * (id === 'qingling' ? 0.8 : 1));
+    approx(hp - g.player.hp, 10 * (id === 'qingling' ? 0.7 : 1));
   }
   const s = rich();
   useMedicine(s, 'xuepo');
@@ -795,4 +795,13 @@ test('降尘丹按服用前大境界给予25%修为，旧库存和限次标记�
   assert.equal(useMedicine(s, 'jiuqu').ok, false);
   assert.equal(JSON.stringify(s), before);
   assert.deepEqual(s.completed, []);
+});
+
+test('清灵散使减速、定身、封宝、藤缠、蚀体时长减半', async () => {
+  const { medicineEffects, freshMedicine } = await import('../src/medicine-data.ts');
+  const s = freshMedicine(() => 0);
+  assert.equal(medicineEffects(s, 15).cleanse, 1);
+  s.active.qingling = 200;
+  assert.equal(medicineEffects(s, 15).cleanse, 0.5);
+  assert.equal(medicineEffects(s, 15).poison, 0.7);
 });
