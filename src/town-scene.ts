@@ -727,3 +727,9 @@ export {
   nightBoatPanel,
 } from './dock-ui.ts';
 export { claimNightBoat } from './night-boat-claim.ts';
+export {
+  meetTownImmortal,
+  claimNovelResonance,
+  handleNovelResonance,
+  novelResonanceContent,
+} from './novel-resonance.ts';

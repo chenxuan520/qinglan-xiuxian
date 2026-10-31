@@ -190,7 +190,6 @@ import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-ch
 import { openOfflinePanel, offlineAction, initOffline } from './offline.ts';
 import { settingsContent, settingsSoundNote, autoplayBuildContent } from './settings-ui.ts';
 import { townVisit } from './town-history.ts';
-import { meetTownImmortal } from './town-immortal.ts';
 import { chooseSmithStory } from './town-story.ts';
 import {
   HUMAN_STORIES,
@@ -1937,7 +1936,7 @@ function shellBindings(): ActionShell {
     get marketCultivators() { return marketCultivators; },
     get marketPosition() { return marketPosition; },
     set marketPosition(next) { marketPosition = next; },
-    get meetTownImmortal() { return meetTownImmortal; },
+    get meetTownImmortal() { return townSource.current!.meetTownImmortal; },
     get mountNpcChat() { return mountNpcChat; },
     get mountTownScene() { return mountTownScene; },
     get oldRealm() { return oldRealm; },

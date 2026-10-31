@@ -1020,3 +1020,46 @@ test('茶馆说书使用独立完整故事提示和输出预算，不把长篇�
   );
   assert.equal((await worker.fetch(request(body), env(undefined, false))).status, 429);
 });
+
+test('在线闲谈提示词按身份注入旧件另议与药母封签行话，不改变本地对白与境界边界', () => {
+  const smithPrompt = dialogueMessages({ ...input, npcId: 'smith' })[0].content;
+  assert.match(smithPrompt, /旧件拆验另议/);
+  assert.match(smithPrompt, /不替修士炼制或拆解法宝/);
+  assert.doesNotMatch(smithPrompt, /药母/);
+
+  const herbsPrompt = dialogueMessages({ ...input, npcId: 'herbs' })[0].content;
+  assert.match(herbsPrompt, /稳住药母/);
+  assert.match(herbsPrompt, /真封签只证容器来历/);
+  assert.match(herbsPrompt, /不会自然过期/);
+  assert.doesNotMatch(herbsPrompt, /旧件拆验另议/);
+
+  const fisherPrompt = dialogueMessages({ ...input, npcId: 'fisher' })[0].content;
+  assert.doesNotMatch(fisherPrompt, /旧件拆验另议|药母/);
+
+  const marketVisit = { visit: 1, realmIndex: 2 };
+  const alchemistPrompt = dialogueMessages({
+    ...input,
+    npcId: 'market-alchemist',
+    marketVisit,
+  })[0].content;
+  assert.match(alchemistPrompt, /药母/);
+  assert.match(alchemistPrompt, /真封签/);
+  assert.match(alchemistPrompt, /不会自然过期/);
+
+  const disciplePrompt = dialogueMessages({
+    ...input,
+    npcId: 'market-disciple',
+    marketVisit,
+  })[0].content;
+  assert.match(disciplePrompt, /临场催动的器式随当次周天散去/);
+  assert.match(disciplePrompt, /旧件拆验另议/);
+  assert.match(disciplePrompt, /四成、不返灵石/);
+
+  const wandererPrompt = dialogueMessages({
+    ...input,
+    npcId: 'market-wanderer',
+    marketVisit,
+  })[0].content;
+  assert.match(wandererPrompt, /旧件拆验另议/);
+  assert.match(wandererPrompt, /药母/);
+});

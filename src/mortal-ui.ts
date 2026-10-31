@@ -180,7 +180,7 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     .map((id) => humanStoryContent(save, id, true))
     .join(
       '',
-    )}${npcDialogueContent(npc.id, npc.name)}${npc.id === 'fisher' ? '<div data-dock-rumors></div>' : ''}${actions}`;
+    )}${npc.id === 'tea' || npc.id === 'fisher' ? '<div data-novel-resonance></div>' : ''}${npcDialogueContent(npc.id, npc.name)}${npc.id === 'fisher' ? '<div data-dock-rumors></div>' : ''}${actions}`;
 }
 
 export function npcDialogueContent(

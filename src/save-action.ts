@@ -1,10 +1,15 @@
-import type { ActionShell } from './action-controller.ts';
+import type { Game } from './game.ts';
 import type { SaveData } from './progress.ts';
 
-type SaveActionHost = Pick<
-  ActionShell,
-  'save' | 'game' | 'settled' | 'pendingRun' | 'saveLock' | 'writeSave' | 'toast'
->;
+export interface SaveActionHost {
+  readonly save: SaveData;
+  readonly game: Game | null;
+  readonly settled: boolean;
+  readonly pendingRun: Game | null;
+  readonly saveLock: 'unreadable' | 'newer' | 'stale' | null;
+  readonly writeSave: (data: SaveData, run: Game | null, reset?: boolean) => void;
+  readonly toast: (text: string, duration?: number) => void;
+}
 
 // false 为写入失败，null 为无变化；调用者只能在成功后切换画面或显示收获。
 export function commitSaveAction(host: SaveActionHost, change: (next: SaveData) => boolean) {

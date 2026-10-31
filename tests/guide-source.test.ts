@@ -165,3 +165,13 @@ test('连续失败递增模块重试身份，并发请求只占一次尝试', as
   assert.equal(await source.load(), guide);
   assert.deepEqual(attempts, [0, 1, 2]);
 });
+
+test('人间宗门帮助说明旧器同途与渡口旧玉的触发条件、炼器升阶及满阶玄铁规则', () => {
+  const mortal = guide.guideContent('mortal');
+  assert.match(
+    mortal,
+    /青霄剑、九霄雷符与玄天伞.*听雨茶馆.*旧器同途.*最低且未满十阶的一件免费提升一阶.*15枚玄铁/,
+  );
+  assert.match(mortal, /玉如意.*码头与渔夫交谈.*渡口旧玉.*当前本命法宝免费提升一阶炼器.*15枚玄铁/);
+  assert.match(mortal, /不耗年岁与灵石，本世各限一次/);
+});

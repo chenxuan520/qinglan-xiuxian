@@ -1097,6 +1097,8 @@ function handleSectAndMarket(shell: ActionShell, action: string, id?: string): b
 
 // 青岚镇与人间：入镇、镇民旧事、市集买卖、宗门与研习委托。
 function handleTown(shell: ActionShell, action: string, id?: string): boolean {
+  if (action === 'novel-resonance')
+    return !!shell.townSource.current?.handleNovelResonance(shell, id);
   if (
     action === 'smith-story' &&
     shell.panel === 'town-event' &&

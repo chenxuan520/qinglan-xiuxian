@@ -279,6 +279,9 @@ export function showTownEvent(shell: ActionShell, npc: TownResident) {
   shell.townNpc = npc;
   shell.panel = 'town-event';
   shell.panelFrame(npc.name, `${npc.place} · ${npc.role}`, shell.townEventContent(shell.save, npc));
+  const resonance = shell.modal.querySelector('[data-novel-resonance]');
+  if (resonance && shell.townSource.current?.novelResonanceContent)
+    resonance.innerHTML = shell.townSource.current.novelResonanceContent(shell.save, npc.id);
   const rumors = npc.id === 'fisher' ? shell.modal.querySelector('[data-dock-rumors]') : null;
   if (rumors && shell.townSource.current)
     rumors.innerHTML = shell.townSource.current.dockRumorsContent(

@@ -1,13 +1,5 @@
-import { MEDICINES, grantMedicine, medicineInfo } from './medicine-data.ts';
-import {
-  CURIO_IDS,
-  acquiredCurio,
-  grantCurio,
-  isCurio,
-  curioName,
-  type CurioId,
-} from './curio-data.ts';
-import { recordChronicle, recordCurioAchievement } from './chronicle.ts';
+import { MEDICINES, medicineInfo } from './medicine-data.ts';
+import { CURIO_IDS, acquiredCurio, isCurio, type CurioId } from './curio-data.ts';
 import { TOWN_NPCS } from './town.ts';
 import type { SaveData } from './progress.ts';
 
@@ -63,32 +55,4 @@ export function visitTownImmortal(save: SaveData, lastVisitAge?: number, random 
   };
 }
 
-export function meetTownImmortal(
-  save: SaveData,
-  npcId: string,
-  name: string,
-  pendingCurios: Record<string, number> = {},
-) {
-  const encounter = save.mortal.immortal;
-  if (!encounter || encounter.npcId !== npcId || encounter.claimed || save.journeyEnded)
-    return false;
-  const curio = encounter.curioId;
-  // 已在其他机缘中取得（包括待结历练）的奇物不再发放，改赠入镇时已固定的丹药。
-  const canGiftCurio = curio && !acquiredCurio(save, curio) && !pendingCurios[curio];
-  if (!canGiftCurio && !Number.isSafeInteger((save.medicine.bag[encounter.medicineId] || 0) + 1))
-    return false;
-  let gift: string;
-  if (canGiftCurio && grantCurio(save, curio)) {
-    gift = curioName(curio);
-    recordCurioAchievement(save);
-  } else {
-    delete encounter.curioId;
-    gift = grantMedicine(save.medicine, encounter.medicineId);
-  }
-  encounter.claimed = true;
-  const memory = `游历青岚镇，与${name}闲谈，方知仙人也恋人间烟火。获赠${gift}一份，记下一场街巷仙缘。`;
-  recordChronicle(save, '市井逢仙', memory);
-  save.mortal.events.unshift(`${save.age.toFixed(1)} 岁 · ${memory}`);
-  save.mortal.events.splice(6);
-  return true;
-}
+export { meetTownImmortal } from './novel-resonance.ts';

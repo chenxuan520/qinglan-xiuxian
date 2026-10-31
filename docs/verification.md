@@ -2,6 +2,17 @@
 
 本文按日期记录当时的实现与验证结果，历史数值、结构版本和测试结论不代表当前规则。现行玩法见 [玩法详解](gameplay.md)，自动测试的最新源版本与结果见 [运行监控](https://xiuxian.011203.xyz/monitor/)。
 
+## 《不系舟》器物共鸣彩蛋与在线闲谈行话（2026-10-31）
+
+- 初始基线 `fe2cee2`，推前同步远端 `04109bb`。按用户确认，新增两处《不系舟》器物共鸣彩蛋（`src/novel-resonance.ts`，随城镇按需模块 `town-scene.ts` 加载）：
+  1. **听雨茶馆 · 旧器同途（剑雷伞之约）**：本世藏器阁同时收藏「青霄剑 + 九霄雷符 + 玄天伞」时，与茶馆掌柜（`tea`）交谈出现机缘卡片；点击按钮将三器中炼器阶数最低且未满十阶的一件（同阶按青霄剑→九霄雷符→玄天伞顺序）免费升 1 阶炼器，三件均满十阶则获赠 15 枚玄铁。
+  2. **青岚码头 · 渡口旧玉**：本世随身持有奇物「玉如意」时，与码头渔夫（`fisher`）交谈出现机缘卡片（区分离界传缘所赠与普通偶得两套文案）；点击按钮优先将当前本命法宝免费升 1 阶炼器，本命已满十阶则顺延其他未满十阶的最低阶已藏法宝，全部已藏法宝均满十阶则获赠 15 枚玄铁。
+  3. **单次约束、成就与存档安全**：通过 `save.chronicle.milestones` 记录 `novel-tea-resonance` 与 `novel-dock-resonance`，不耗年岁与灵石，本世各限一次，互不挤占；升至十阶时同步解锁「炉火纯青」（`forge`）成就；经 `commitSaveAction` 先保存并重签 `factsSeal` 再应用，保存失败回滚且可原位重试。同步更新 `src/guide.ts`（「人间宗门 → 市井逢仙」）与 `docs/gameplay.md`。
+- 同时按用户要求，不改动本地对白兜底（`src/npc-dialogue.ts`、`src/sect-market-data.ts`），仅在 `workers/npc-ai/index.ts` 的 `dialogueMessages` 中按身份注入「旧件拆验另议」「稳住药母、真封签只证容器来历、成品丹药不会自然过期」行当常识。
+- 独审发现并修复两项问题：① 真实流程接受命盘后 `save.birthInheritance` 清为 `null`，已改为同时核对 `birth-inheritance` 里程碑与 `薪火相传` 玉如意记录，确保承缘玉如意进入人间后仍显示专属文案；② `src/save-action.ts` 与 `src/novel-resonance.ts` 改用独立窄接口，避免 `town-immortal.ts` 重导出把浏览器 DOM 类型带入 Worker `tsconfig.json`。
+- 定向单测 `tests/novel-resonance.test.ts`、`tests/town-immortal.test.ts`、`tests/dock-flow.test.ts`、`tests/story-save-actions.test.ts`、`tests/entry-boundaries.test.ts`、`tests/npc-worker.test.ts`、`tests/guide-source.test.ts` 共 **95/95** 通过，NPC 与坊市关联测试 **100/100** 通过；`npm run docs:check`（**38/38**）、`npm run check:npc-ai`、`npm run assets:check`、Prettier 格式检查及根路径/Pages 子路径/单机三种构建与原体积门禁均通过（同步 `04109bb` 后根入口 JS 559,841 B / gzip 205,943 B，Pages 子路径入口 JS 559,953 B / gzip 205,985 B，CSS 158,000 B / gzip 33,489 B，总目录 16,346,944 B）。
+- 主实施者与唯一独立审查者分别经 Chrome DevTools MCP 隔离上下文在 `http://localhost:5173/` 完成桌面（1440×1000）、手机竖屏（390×844）、手机窄屏（320×640）、手机横屏（844×390）下茶馆「旧器同途」与码头「渡口旧玉」的走近交谈、拒写回滚与恢复领取、9→10 阶解锁「炉火纯青」、满十阶折算 15 玄铁、承缘玉如意文案、刷新读回及「修行指南 → 人间宗门」核验（主验 9 张、独审 15 张截图存于 `/tmp/qinglan-novel-resonance-20261031/` 与 `/tmp/qinglan-novel-resonance-review/`，结合 DOM 计算样式与 PIL 像素分布核验无横向溢出或裁切）。因当前 CLI 模型管道在 `Read` 读取图片二进制附件时会挂起，截图均通过 `filePath` 落盘并用 PIL 与 DOM 度量核验。
+
 ## 土系棕色与伤害数字开关（2026-10-30）
 
 - 功能起始基线 `2831a0fa4cf5e72b73970320af9bdf86737248de`；推前无冲突先后同步远端 `e0c329b207138ac9bc1e71f52d6bd9298692a65e` 与 `57c3b9c`，保留全部已确认措辞、说明及真仙 HUD 空标题修正。按用户要求，共享土系色从 `#d7bc94` 改为 `#bf916b`，金系仍为 `#e8d69c`；首页与命盘确认、指南五行标题、八件土系法宝的属性标识、升级/暂停及真实留影同步取同一数据源，法宝自身美术配色和所有数值不变。
