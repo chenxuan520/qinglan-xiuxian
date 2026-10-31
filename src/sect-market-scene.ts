@@ -27,7 +27,7 @@ import {
 } from './market-roaming.ts';
 import { marketBuildingArt } from './market-art.ts';
 import { marketFellowCharacter } from './market-fellow.ts';
-import { mapClick, walkRoute } from './walk-navigation.ts';
+import { mapClick, walkRoute } from './settlement-navigation.ts';
 import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';

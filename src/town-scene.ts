@@ -24,7 +24,7 @@ import { townResidents, type TownPopulation, type TownResident } from './town-po
 import { townSceneryLayout, type TownScenery } from './town-history.ts';
 import { townCrowd, townCrowdPosition, type TownPasserby } from './town-crowd.ts';
 import { hometownParents, type HometownState } from './hometown.ts';
-import { mapClick, walkRoute } from './walk-navigation.ts';
+import { mapClick, walkRoute } from './settlement-navigation.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';
 
@@ -564,7 +564,10 @@ export class TownScene {
         this.position.x - NIGHT_BOAT_APPROACH.x,
         this.position.y - NIGHT_BOAT_APPROACH.y,
       ) <= 115;
-    if (this.boatCanvas) this.boatCanvas.hidden = !this.boatVisible();
+    if (this.boatCanvas) {
+      const hidden = !this.boatVisible();
+      if (this.boatCanvas.hidden !== hidden) this.boatCanvas.hidden = hidden;
+    }
     const nearId = this.nearbyNpc?.id;
     const departure = this.hometown && this.hometown.state.stage !== 'departed';
     const homeTarget = this.hometown

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { walkRoute, destinationInput, mapClick } from '../src/walk-navigation.ts';
+import { destinationInput } from '../src/walk-navigation.ts';
+import { walkRoute, mapClick } from '../src/settlement-navigation.ts';
 import {
   TOWN_WIDTH,
   TOWN_HEIGHT,
@@ -61,6 +62,49 @@ test('小镇点击路线可抵达全部职业人物、屋后与窄隙，沿真�
       x: target.x,
       y: target.y,
     });
+  }
+});
+
+test('长距离绕屋寻路保留可达终点，单次点击不反复扫描数十万次碰撞', () => {
+  for (const target of TOWN_NPCS.slice(0, 9)) {
+    let checks = 0;
+    const allowed = (point: { x: number; y: number }) => {
+      checks++;
+      return townWalkable(point);
+    };
+    const route = walkRoute(TOWN_START, target, allowed, TOWN_WIDTH, TOWN_HEIGHT);
+    assert.ok(checks < 100_000, `${target.id} 的一次点击检查了 ${checks} 次碰撞`);
+    assert.deepEqual(follow(TOWN_START, route, moveInTown, townWalkable), {
+      x: target.x,
+      y: target.y,
+    });
+  }
+});
+
+test('目标最近格点隔墙时仍寻找合法连接，不能为省计算穿过窄墙', () => {
+  const from = { x: 150, y: 150 },
+    target = { x: 44, y: 44 };
+  const allowed = (p: { x: number; y: number }) =>
+    p.x >= 16 &&
+    p.y >= 16 &&
+    p.x <= 164 &&
+    p.y <= 164 &&
+    !(p.x > 35 && p.x < 38 && p.y > 35 && p.y < 48) &&
+    !(p.x > 80 && p.x < 100 && p.y > 70 && p.y < 160);
+  const route = walkRoute(from, target, allowed, 180, 180);
+  assert.ok(route.length > 1);
+  assert.deepEqual(route.at(-1), target);
+  let start = from;
+  for (const end of route) {
+    const steps = Math.ceil(Math.hypot(end.x - start.x, end.y - start.y));
+    for (let i = 1; i <= steps; i++)
+      assert.ok(
+        allowed({
+          x: start.x + ((end.x - start.x) * i) / steps,
+          y: start.y + ((end.y - start.y) * i) / steps,
+        }),
+      );
+    start = end;
   }
 });
 

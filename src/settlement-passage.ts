@@ -79,13 +79,16 @@ export class SettlementPassage {
     host.querySelector('.town-minimap')?.append(marker);
   }
   update(position: TownPoint, enabled: boolean) {
+    const open = this.open();
     if (this.button) {
-      this.button.disabled = !enabled || !this.open();
-      this.button.title = this.open() ? '' : '获得修为后可前往坊市';
+      const disabled = !enabled || !open;
+      const title = open ? '' : '获得修为后可前往坊市';
+      if (this.button.disabled !== disabled) this.button.disabled = disabled;
+      if (this.button.title !== title) this.button.title = title;
     }
     const distance = Math.hypot(position.x - this.path.gate.x, position.y - this.path.gate.y);
     if (distance > CLEAR_DISTANCE) this.entered = false;
-    if (!enabled || distance > 48 || this.entered || !this.open()) return;
+    if (!enabled || distance > 48 || this.entered || !open) return;
     this.entered = true;
     this.enter();
   }
