@@ -25,7 +25,7 @@ export const LEADERBOARD_CSS = `
 const COMMON_SCRIPT = String.raw`'use strict';
 const $=id=>document.getElementById(id),status=$('status');
 const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=String(text);return node;};
-const number=value=>new Intl.NumberFormat('zh-CN').format(value);
+const number=value=>new Intl.NumberFormat('zh-CN',{useGrouping:false}).format(value);
 let busy=false,active,closed=false,generation=0,signedOut=false;
 function message(text,error=false){status.textContent=text;status.dataset.error=String(error);}
 function controls(value){busy=value;document.querySelectorAll('button').forEach(node=>node.disabled=value||signedOut);}

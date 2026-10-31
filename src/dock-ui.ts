@@ -61,7 +61,7 @@ export function dockRumorsContent(save: SaveData, rankingEnabled: boolean) {
   const key = `${save.medicine.recipeSeed}:${save.mortal.population?.seed}:${save.mortal.scenery?.lastVisitAge}`;
   if (visitCache?.key !== key)
     visitCache = { key, normal: dockRumors(save, false), ranked: dockRumors(save, true) };
-  return `<section class="dock-rumors"><h3>船客传闻</h3>${(rankingEnabled ? visitCache.ranked : visitCache.normal).map((r) => `<p class="panel-note">${escape(r.text)}</p>${rankingEnabled && r.href ? `<a class="secondary-button leaderboard-settings-link" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">去看看 ↗</a>` : ''}`).join('')}</section>`;
+  return `<section class="dock-rumors"><h3>船客传闻</h3>${(rankingEnabled ? visitCache.ranked : visitCache.normal).map((r) => `<p class="panel-note">${escape(r.text)}</p>${rankingEnabled && r.href ? `<a class="dock-rumor-link" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">去看看 ↗</a>` : ''}`).join('')}</section>`;
 }
 export function nightBoatPanel(
   save: SaveData,

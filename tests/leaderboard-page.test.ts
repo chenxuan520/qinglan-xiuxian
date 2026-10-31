@@ -225,3 +225,40 @@ test('管理确认每次清空结果，Esc取消不提交；401停用操作', as
   await settle();
   assert.equal(h.calls(), 2);
 });
+
+test('公开前三、后排与管理页完整显示分数，不增加千位逗号或舍入', async () => {
+  const entries = [Number.MAX_SAFE_INTEGER, 1234567, 2500, 1000, 999].map((score, i) => ({
+    name: `署名${i}`,
+    score,
+    grade: '上品',
+    title: '道行通玄',
+    lifeMode: 'normal',
+    ending: 'old-age',
+    updatedAt: '2026-10-31T00:00:00Z',
+  }));
+  const original = JSON.stringify(entries);
+  const publicPage = harness(LEADERBOARD_SCRIPT, '0');
+  await settle();
+  vm.runInContext(`render({entries:${original}})`, publicPage.context);
+  const cards = [
+    ...publicPage.element('podium').children,
+    ...publicPage.element('entries').children,
+  ];
+  assert.equal(cards.length, entries.length);
+  assert.deepEqual(
+    cards.map((row) => row.children.find((child) => child.className === 'score')!.textContent),
+    entries.map((entry) => String(entry.score)),
+  );
+  const adminPage = harness(LEADERBOARD_ADMIN_SCRIPT);
+  await settle();
+  vm.runInContext(`state={entries:${original},blocked:[]};render()`, adminPage.context);
+  const rows = adminPage.element('admin-entries').children;
+  assert.equal(rows.length, entries.length);
+  rows.forEach((row, i) =>
+    assert.equal(
+      row.children[0].children[1].textContent,
+      `${entries[i].score} 道果 · 上品 · 普通修行`,
+    ),
+  );
+  assert.equal(JSON.stringify(entries), original);
+});

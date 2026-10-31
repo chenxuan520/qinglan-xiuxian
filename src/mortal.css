@@ -2057,8 +2057,18 @@
 .dock-rumors .panel-note + .panel-note {
   margin-top: 12px;
 }
-.dock-rumors > a {
-  margin: 12px 0;
+.dock-rumors > .panel-note {
+  font-size: 16px;
+  line-height: 1.9;
+  color: inherit;
+}
+.dock-rumor-link {
+  display: inline-block;
+  margin: 4px 0 10px;
+  color: var(--gold);
+  font-size: 16px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .night-boat-offer {
   display: flex;
