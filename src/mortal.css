@@ -2054,8 +2054,10 @@
   color: var(--gold);
   font-weight: 400;
 }
-.dock-rumors .panel-note + .panel-note {
-  margin-top: 12px;
+.dock-rumors > .panel-note + .panel-note {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 .dock-rumors > .panel-note {
   font-size: 16px;
@@ -2063,8 +2065,8 @@
   color: inherit;
 }
 .dock-rumor-link {
-  display: inline-block;
-  margin: 4px 0 10px;
+  display: inline;
+  white-space: nowrap;
   color: var(--gold);
   font-size: 16px;
   text-decoration: underline;
