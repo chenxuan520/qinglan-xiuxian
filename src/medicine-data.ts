@@ -45,7 +45,7 @@ export const MEDICINES: Medicine[] = [
     name: '清灵散',
     tier: '凡品',
     years: 100,
-    desc: '毒伤降低 30%；减速、定身、封宝、藤缠、蚀体的时长减半。',
+    desc: '毒伤降低 30%，受控时长减半。',
     stage: 0,
     price: 35,
     craftYears: 0,
@@ -427,8 +427,6 @@ export function medicineEffects(s: MedicineState, age: number) {
     frost: has('xuepo'),
     drawback: 1,
     poison: has('qingling') ? 0.7 : 1,
-    // 清灵散：减速、定身、封宝、藤缠、蚀体的持续时间减半。
-    cleanse: has('qingling') ? 0.5 : 1,
     cultivation: (has('xuling') ? 1.2 : 1) * (has('zengyuan') ? 1.1 : 1),
     bossCultivation: has('xuling') ? 1.3 : 1,
   };

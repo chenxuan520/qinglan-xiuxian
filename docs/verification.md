@@ -3644,3 +3644,4 @@ node --experimental-strip-types /workspace/qinglan-balance-review/compare.mjs --
 
 - 改动：清灵散毒伤减免由 20% 提到 30%，并新增效果：减速、定身、封宝、藤缠、蚀体的持续时间减半（`medicineEffects().cleanse`，在 `src/game.ts` 五个施加函数中相乘；藤缠保护间隔仍为结束后 1 秒）。同步药效说明、妖物志、游戏内指南、`docs/medicine.md` 与 `docs/gameplay.md`。
 - 验证：`tsc --noEmit` 通过；`npm test` 2087 项通过（更新 0.8→0.7 与蚀体 3→1.5 的断言，新增 `cleanse` 单测）；独立子 agent 审查确认五种控制只在这五个函数中赋值，续局校验接受减半后的时长，自动历练与状态标签只判断是否大于 0。
+- 入口 JS 预算：清灵散改动使 Pages 构建入口超出原 560000 字节上限约 150 字节；经用户确认，`scripts/size-check.ts` 的 `jsBytes` 提升为 570000，`docs/development.md` 同步。实现同时收窄为 `#ctl()` 一处换算（以清灵散毒伤倍率判断是否服用），药效说明缩为「毒伤降低 30%，受控时长减半。」本地 Pages 构建入口 559950 字节。

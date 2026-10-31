@@ -2685,30 +2685,34 @@ export class Game {
     this.shots.push(shot);
     return shot;
   }
+  // 清灵散（毒伤倍率 < 1 即服用中）使受控时长减半。
+  #ctl(kind: 'slow' | 'bind' | 'seal' | 'entangle' | 'corrode') {
+    return ENEMY_CONTROL[kind] * (this.medicine.poison < 1 ? 0.5 : 1);
+  }
   private enemySlow() {
     if (this.player.invincible > 0 || this.time < this.nextEnemySlowAt) return;
-    this.slowed = ENEMY_CONTROL.slow * this.medicine.cleanse;
+    this.slowed = this.#ctl('slow');
     this.nextEnemySlowAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemyBind() {
     if (this.player.invincible > 0 || this.time < this.nextEnemyBindAt) return;
-    this.immobilized = ENEMY_CONTROL.bind * this.medicine.cleanse;
+    this.immobilized = this.#ctl('bind');
     this.nextEnemyBindAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemySeal() {
     if (this.player.invincible > 0 || this.time < this.nextEnemySealAt) return;
-    this.sealed = ENEMY_CONTROL.seal * this.medicine.cleanse;
+    this.sealed = this.#ctl('seal');
     this.nextEnemySealAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemyEntangle() {
     if (this.player.invincible > 0 || this.entangled > 0 || this.time < this.nextEnemyEntangleAt)
       return;
-    this.entangled = ENEMY_CONTROL.entangle * this.medicine.cleanse;
+    this.entangled = this.#ctl('entangle');
     this.nextEnemyEntangleAt = this.time + this.entangled + ENEMY_CONTROL.protection;
     this.#ailmentNotice('entangle', '藤缠 · 暂难拾取');
   }
   private enemyCorrode() {
-    this.corroded = ENEMY_CONTROL.corrode * this.medicine.cleanse;
+    this.corroded = this.#ctl('corrode');
     this.#ailmentNotice('corrode', '蚀体 · 无法回复');
   }
   #ailmentNotice(kind: string, message: string) {

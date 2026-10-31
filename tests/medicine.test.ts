@@ -797,11 +797,10 @@ test('降尘丹按服用前大境界给予25%修为，旧库存和限次标记�
   assert.deepEqual(s.completed, []);
 });
 
-test('清灵散使减速、定身、封宝、藤缠、蚀体时长减半', async () => {
+test('清灵散毒伤倍率 0.7，未服用为 1', async () => {
   const { medicineEffects, freshMedicine } = await import('../src/medicine-data.ts');
   const s = freshMedicine(() => 0);
-  assert.equal(medicineEffects(s, 15).cleanse, 1);
+  assert.equal(medicineEffects(s, 15).poison, 1);
   s.active.qingling = 200;
-  assert.equal(medicineEffects(s, 15).cleanse, 0.5);
   assert.equal(medicineEffects(s, 15).poison, 0.7);
 });
