@@ -2292,7 +2292,7 @@ document.addEventListener('visibilitychange', () => {
   frameRate.sample(0, false);
   if (document.hidden) {
     clearInput();
-    if ((!save.autoplay || isExtremeLife(save)) && game?.state === 'playing') handleAction('pause');
+    if (!save.autoplay && game?.state === 'playing') handleAction('pause');
     if ((game && !settled) || inMortalWorld) persist();
   } else renderer.restore();
 });

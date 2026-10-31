@@ -401,6 +401,104 @@ test('bfcache 保留内存胜利时继续结算，真正未完极限对局返回
   }
 });
 
+test('普通和极限自动历练切后台均继续，手动暂停，主动暂停不被后台心跳恢复', () => {
+  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const lifecycle = source.slice(
+    source.indexOf("window.addEventListener('blur'"),
+    source.indexOf('const canvas = renderer.canvas;'),
+  );
+  const heartbeat = source.slice(
+    source.indexOf('const backgroundClock = new Worker('),
+    source.indexOf('syncMortalSave(true);', source.indexOf('const backgroundClock = new Worker(')),
+  );
+  const code = new Script(
+    stripTypeScriptTypes(
+      (lifecycle + heartbeat).replaceAll(
+        'import.meta.url',
+        JSON.stringify(new URL('../src/main.ts', import.meta.url).href),
+      ),
+    ),
+  );
+  for (const lifeMode of ['normal', 'extreme'] as const)
+    for (const autoplay of [false, true])
+      for (const initialState of ['playing', 'paused'] as const) {
+        const save = freshSave();
+        save.lifeMode = lifeMode;
+        save.autoplay = autoplay;
+        const game = new Game(save, 0, lifeMode === 'extreme' ? 1 : 0, () => 0.99);
+        game.state = initialState;
+        const handlers = new Map<string, () => void>();
+        let clock: { onmessage?: () => void } = {},
+          pauses = 0,
+          ticks = 0,
+          writes = 0;
+        const document = {
+          hidden: true,
+          addEventListener(name: string, handler: () => void) {
+            handlers.set(name, handler);
+          },
+        };
+        code.runInContext(
+          createContext({
+            save,
+            game,
+            document,
+            settled: false,
+            inMortalWorld: false,
+            lastMortalTick: 0,
+            lastBackgroundSave: 0,
+            performance: { now: () => 6000 },
+            window: {
+              addEventListener(name: string, handler: () => void) {
+                handlers.set(name, handler);
+              },
+            },
+            Worker: class {
+              constructor() {
+                clock = this;
+              }
+            },
+            URL,
+            frameRate: { sample() {} },
+            renderer: { restore() {} },
+            clearInput() {},
+            isExtremeLife: (s: typeof save) => s.lifeMode === 'extreme',
+            handleAction(action: string) {
+              assert.equal(action, 'pause');
+              pauses++;
+              game.pause();
+            },
+            persist() {
+              writes++;
+            },
+            tick() {
+              ticks++;
+              game.update(0.1);
+            },
+          }),
+        );
+        handlers.get('blur')!();
+        handlers.get('visibilitychange')!();
+        assert.equal(
+          game.state,
+          autoplay ? initialState : 'paused',
+          `${lifeMode}/${autoplay}/${initialState}`,
+        );
+        assert.equal(pauses, !autoplay && initialState === 'playing' ? 1 : 0);
+        const before = game.time;
+        clock.onmessage!();
+        assert.equal(ticks, autoplay ? 1 : 0);
+        assert.equal(game.time > before, autoplay && initialState === 'playing');
+        assert.equal(save.autoplay, autoplay);
+        assert.ok(writes >= 1, '切后台保存实际状态');
+        document.hidden = false;
+        handlers.get('visibilitychange')!();
+        clock.onmessage!();
+        assert.equal(ticks, autoplay ? 1 : 0, '前台不重复消费后台心跳');
+        assert.equal(game.state, autoplay ? initialState : 'paused', '切回前台不擅自恢复暂停');
+      }
+});
+
 test('导入确认明确显示普通或极限及落幕状态，不把极限中断伪装成可继续', () => {
   const save = extreme();
   const candidate = importSave(exportSave(save, new Game(save, 0, 1)));
