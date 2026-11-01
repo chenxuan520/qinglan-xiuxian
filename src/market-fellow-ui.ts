@@ -1,3 +1,4 @@
+import { assetUrl } from './asset-url.ts';
 import { FINAL_TRIAL_STAGE } from './data.ts';
 import { marketFellowCharacter, marketFellowView } from './market-fellow.ts';
 import { playerSpriteBackground } from './player-appearance.ts';
@@ -11,7 +12,7 @@ export function marketFellowContent(save: SaveData) {
   if (!npc || !view) return '';
   const rank = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
   const relation = marketRelation(npc.realmIndex, rank);
-  return `<div class="sect-market-profile"><span class="sect-market-portrait" aria-hidden="true" style="background:${playerSpriteBackground(npc.path)}"></span><div><strong>${relation} · ${marketRealmLabel(npc, rank)} · ${npc.role}</strong><p>${view.alive ? '炉边相识，山河再逢。' : '旧人已去，药册传家。'}</p></div></div><section class="town-story immortal-encounter" aria-label="炉边故人"><span class="eyebrow">${view.phase}</span>${view.text.map((line) => `<p>${line}</p>`).join('')}<blockquote>${view.quote}</blockquote>${view.hint ? `<p class="market-inspection">${view.hint}</p>` : ''}${view.actions.length ? `<div class="story-choices">${view.actions.map((action) => `<button class="secondary-button" data-action="sect-market-fellow" data-id="${action.id}" data-visit="${save.mortal.sectMarket!.visit}">${action.label}</button>`).join('')}</div>` : ''}<small>相逢与选择记入此世纪事，交谈不另耗年岁。历练、闭关与闲逛期间，故人也会继续修行、老去。</small></section><button class="secondary-button" data-action="close">回到坊市</button>`;
+  return `<div class="sect-market-profile"><span class="sect-market-portrait" aria-hidden="true" style="background:${playerSpriteBackground(npc.path)}"></span><div><strong>${relation} · ${marketRealmLabel(npc, rank)} · ${npc.role}</strong><p>${view.alive ? '炉边相识，山河再逢。' : '旧人已去，药册传家。'}</p></div></div><section class="town-story immortal-encounter" aria-label="炉边故人"><span class="eyebrow">${view.phase}</span>${view.text.map((line) => `<p>${line}</p>`).join('')}<blockquote>${view.quote}</blockquote>${view.hint ? `<p class="market-inspection">${view.hint}</p>` : ''}${view.actions.length ? `<div class="story-choices">${view.actions.map((action) => `<button class="secondary-button" data-action="sect-market-fellow" data-id="${action.id}" data-visit="${save.mortal.sectMarket!.visit}">${action.label}</button>`).join('')}</div>` : ''}<small>相逢与选择记入此世纪事，交谈不另耗年岁。历练、闭关与闲逛期间，故人也会继续修行、老去。</small></section><p class="panel-note">炉边压着一本旧书《寸阴炉》，写的是一位验药人守火的一生。旧事已成旧闻，你仍可走自己的路。</p><a class="secondary-button" href="${assetUrl('novel/?book=cunyin')}" target="_blank" rel="noopener">翻阅《青岚纪·寸阴炉》 ↗</a><p class="panel-note">随手翻阅，不耗年岁。</p><button class="secondary-button" data-action="close">回到坊市</button>`;
 }
 
 // 旧识教会辨认具体凭据，而非改变机缘真假或代替玩家成交。按已有机缘提供可核对的线索。

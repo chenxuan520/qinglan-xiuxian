@@ -1171,7 +1171,7 @@ async function checkNovelReader(name: string, viewport: string) {
   await wait('() => !!document.querySelector("qinglan-film > button")');
   assert.ok(
     await evaluate(`() => {
-      const link = document.querySelector('.guide-lore > a');
+      const link = document.querySelector('.guide-book-links a');
       const button = document.querySelector('qinglan-film > button');
       return Math.abs(link.getBoundingClientRect().width - button.getBoundingClientRect().width) <= 1;
     }`),
@@ -1184,7 +1184,7 @@ async function checkNovelReader(name: string, viewport: string) {
   );
   await check(`${name}-lore-buttons`);
   const gamePageId = pageId;
-  await click('.guide-lore > a');
+  await click('.guide-book-links a');
   const pages = await browser.call('list_pages');
   pageId = Number(
     pages

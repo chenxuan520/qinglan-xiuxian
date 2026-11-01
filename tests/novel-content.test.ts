@@ -5,6 +5,7 @@ import test from 'node:test';
 import { parseNovel } from '../src/novel-content.ts';
 
 const manuscript = readFileSync(new URL('../docs/novel.md', import.meta.url), 'utf8');
+const secondManuscript = readFileSync(new URL('../docs/novel-2.md', import.meta.url), 'utf8');
 const opening = '# 测试书名\n\n## 第一卷 起程\n\n### 第1章 渡口\n\n';
 
 test('已审小说六卷四十二章完整进入阅读数据，正文无改写、遗漏或重复', () => {
@@ -38,6 +39,31 @@ test('已审小说六卷四十二章完整进入阅读数据，正文无改写�
   assert.equal(
     createHash('sha256').update(paragraphs.join('\n\n')).digest('hex'),
     'e03d799eb88050900741b344a878c72a1278eefd382b2a9cbf6f8abb75b69742',
+  );
+});
+
+test('第二部小说六卷四十二章完整进入阅读数据，末尾出处不混入正文', () => {
+  const novel = parseNovel(secondManuscript);
+  assert.equal(novel.title, '青岚纪 · 寸阴炉');
+  assert.deepEqual(
+    novel.volumes.map((volume) => volume.title),
+    ['寸阴账', '省火方', '夜船灯', '百年炉', '太虚雷', '归墟渡'],
+  );
+  assert.deepEqual(
+    novel.chapters.map((chapter) => chapter.id),
+    Array.from({ length: 42 }, (_, index) => `chapter-${index + 1}`),
+  );
+  const paragraphs = novel.chapters.flatMap((chapter) => chapter.paragraphs);
+  assert.equal(paragraphs.length, 1690);
+  assert.match(paragraphs[0], /^一百一十五岁这年，林见微在坊市替人验药/);
+  assert.equal(
+    paragraphs.at(-1),
+    '第二日天还没亮透，陈禾就到了公证坪。他拨开凉透的炉灰，添上新炭，塞进细柴，俯身一口一口地吹，吹得满脸是灰也不停手。凉了一夜的缺耳泥炉里，火重新点了起来。',
+  );
+  assert.ok(paragraphs.every((paragraph) => !paragraph.includes('novel-2-notes.md')));
+  assert.equal(
+    createHash('sha256').update(paragraphs.join('\n\n')).digest('hex'),
+    '7559d0d232efa6efbe41f3fb65770513f524408f912504cd2afa4f1fc0c3e03a',
   );
 });
 

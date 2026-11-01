@@ -13,6 +13,14 @@
         }
       } catch {}
     </script>
+    <script>
+      try {
+        if (new URLSearchParams(location.search).get('book') === 'cunyin') {
+          document.documentElement.dataset.book = 'cunyin';
+          document.title = '青岚纪 · 寸阴炉';
+        }
+      } catch {}
+    </script>
     <meta
       name="description"
       content="《青岚纪·不系舟》：一个青岚少年的修行长卷。山河辽阔，故人有信。"
@@ -25,13 +33,27 @@
       <a href="../" class="home-link">← 青岚首页</a>
       <span>山河旧闻 · 藏书</span>
     </header>
-    <main class="book" aria-label="青岚纪·不系舟阅读器">
+    <main class="book" id="book-main" aria-label="青岚纪·不系舟阅读器">
       <aside class="book-contents" aria-label="小说目录">
         <div class="contents-inner" id="contents-inner">
+          <nav class="book-shelf" aria-label="青岚纪藏书">
+            <p class="shelf-heading">青岚纪 · 藏书</p>
+            <a class="shelf-book" href="?book=buxizhou" data-book-link="buxizhou">
+              <strong>不系舟</strong>
+              <span>陆迟 · 山河辽阔，故人有信</span>
+            </a>
+            <a class="shelf-book" href="?book=cunyin" data-book-link="cunyin">
+              <strong>寸阴炉</strong>
+              <span>林见微 · 药有火候，人有寸阴</span>
+            </a>
+          </nav>
           <header class="book-cover">
             <p class="book-series">青岚纪</p>
-            <h1>不系舟<span class="book-seal" aria-hidden="true">旧闻</span></h1>
-            <p class="book-intro">山河辽阔，故人有信。</p>
+            <h1>
+              <span id="book-short-title">不系舟</span
+              ><span class="book-seal" id="book-seal" aria-hidden="true">旧闻</span>
+            </h1>
+            <p class="book-intro" id="book-intro">山河辽阔，故人有信。</p>
             <p class="story-note">故事含后期情节，可随心翻阅。</p>
             <a
               class="manuscript-download"
@@ -116,7 +138,7 @@
           </button>
         </nav>
         <footer class="reading-footer">
-          <span>青岚纪 · 不系舟</span><span id="chapter-position"></span>
+          <span id="book-footer-title">青岚纪 · 不系舟</span><span id="chapter-position"></span>
         </footer>
         <noscript><p class="reader-error">请开启浏览器的 JavaScript 后阅读。</p></noscript>
       </section>

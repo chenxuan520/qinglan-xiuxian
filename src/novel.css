@@ -114,6 +114,49 @@ button:not(:disabled):hover {
 .contents-inner {
   padding: 34px 24px 30px;
 }
+.book-shelf {
+  margin-bottom: 26px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #a39b8077;
+}
+.shelf-heading {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  color: #727460;
+}
+.shelf-book {
+  display: block;
+  min-height: 44px;
+  padding: 9px 10px;
+  margin: 0 -10px;
+  border-left: 2px solid transparent;
+  text-decoration: none;
+  color: #6b705f;
+}
+.shelf-book strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: #314636;
+}
+.shelf-book span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.shelf-book:hover {
+  background: #445b4410;
+}
+.shelf-book[aria-current='page'] {
+  background: #47604b12;
+  border-left-color: #8b5b43;
+}
+.shelf-book[aria-current='page'] strong {
+  color: #8b5b43;
+}
 .book-cover {
   margin-bottom: 30px;
 }
@@ -526,6 +569,22 @@ button:not(:disabled):hover {
 }
 [data-theme='dark'] .chapter-link {
   color: #b9c2ae;
+}
+[data-theme='dark'] .shelf-heading {
+  color: var(--muted);
+}
+[data-theme='dark'] .shelf-book {
+  color: #b9c2ae;
+}
+[data-theme='dark'] .shelf-book strong {
+  color: #d9d6c5;
+}
+[data-theme='dark'] .shelf-book[aria-current='page'] {
+  background: #c4cb9b1c;
+  border-left-color: #ac9969;
+}
+[data-theme='dark'] .shelf-book[aria-current='page'] strong {
+  color: #e0d09b;
 }
 [data-theme='dark'] :is(.volume-title, .book-ending, .chapter-heading h2) {
   color: #d9c88e;

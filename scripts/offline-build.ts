@@ -40,6 +40,7 @@ export function offlineBuild(version: string): Plugin {
           'monitor/index.html',
           'novel/index.html',
           'docs/novel.md',
+          'docs/novel-2.md',
           'vite.config.ts',
           'scripts/offline-build.ts',
           'package-lock.json',

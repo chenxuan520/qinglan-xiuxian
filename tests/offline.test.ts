@@ -395,6 +395,7 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
       'monitor/index.html',
       'novel/index.html',
       'docs/novel.md',
+      'docs/novel-2.md',
       'vite.config.ts',
       'scripts/offline-build.ts',
       'package-lock.json',
@@ -451,9 +452,12 @@ test('构建清单收录完整输出并校验内容，部署子路径和资源�
     writeFileSync(join(root, 'docs/novel.md'), 'novel text changed');
     const novelTextChanged = build('/qinglan-xiuxian/');
     assert.notEqual(novelPageChanged.manifest.build, novelTextChanged.manifest.build);
+    writeFileSync(join(root, 'docs/novel-2.md'), 'second novel text changed');
+    const secondNovelTextChanged = build('/qinglan-xiuxian/');
+    assert.notEqual(novelTextChanged.manifest.build, secondNovelTextChanged.manifest.build);
     writeFileSync(join(root, 'monitor/index.html'), 'monitor changed');
     const monitorChanged = build('/qinglan-xiuxian/');
-    assert.notEqual(novelTextChanged.manifest.build, monitorChanged.manifest.build);
+    assert.notEqual(secondNovelTextChanged.manifest.build, monitorChanged.manifest.build);
     writeFileSync(join(root, 'public/assets/map.webp'), 'changed');
     assert.notEqual(monitorChanged.manifest.build, build('/qinglan-xiuxian/').manifest.build);
     assert.match(
@@ -475,6 +479,7 @@ test('构建产物与清单不收录 public 复制来的点文件，输出目录
       'monitor/index.html',
       'novel/index.html',
       'docs/novel.md',
+      'docs/novel-2.md',
       'vite.config.ts',
       'scripts/offline-build.ts',
       'package-lock.json',
@@ -517,8 +522,10 @@ for (const base of ['/', '/qinglan-xiuxian/']) {
   test(`缓存原文经普通导航可在离线时作为附件下载：${base}`, async () => {
     const h = harness(base);
     const path = 'assets/novel-abCD_12.md';
+    const cunyinPath = 'assets/novel-2-abCD_12.md';
     const text = '# 青岚纪 · 不系舟\n\n山河未尽。\n';
-    h.fixture(BUILD, 'book', { [path]: text });
+    const cunyinText = '# 青岚纪 · 寸阴炉\n\n炉火未凉。\n';
+    h.fixture(BUILD, 'book', { [path]: text, [cunyinPath]: cunyinText });
     assert.equal((await h.message('cache')).error, undefined);
     for (const offline of [false, true]) {
       h.setOffline(offline);
@@ -534,6 +541,12 @@ for (const base of ['/', '/qinglan-xiuxian/']) {
         assert.equal(await response.text(), text);
       }
     }
+    const cunyin = await h.request(cunyinPath, { navigate: true });
+    assert.equal(cunyin.status, 200);
+    assert.ok(
+      cunyin.headers.get('Content-Disposition').includes(encodeURIComponent('青岚纪_寸阴炉.md')),
+    );
+    assert.equal(await cunyin.text(), cunyinText);
     const html = await h.request('index.html', { navigate: true });
     assert.equal(html.headers.has('Content-Disposition'), false, '正常页面不能被误作附件');
   });

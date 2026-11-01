@@ -1,16 +1,65 @@
-import manuscript from '../docs/novel.md?raw';
-import manuscriptUrl from '../docs/novel.md?url';
-import { parseNovel } from './novel-content.ts';
+import buxizhouManuscript from '../docs/novel.md?raw';
+import buxizhouManuscriptUrl from '../docs/novel.md?url';
+import cunyinManuscript from '../docs/novel-2.md?raw';
+import cunyinManuscriptUrl from '../docs/novel-2.md?url';
+import { parseNovel, type Novel } from './novel-content.ts';
 import './novel.css';
 
-const book = parseNovel(manuscript);
+type BookId = 'buxizhou' | 'cunyin';
+interface BookDefinition {
+  id: BookId;
+  label: string;
+  shortTitle: string;
+  seal: string;
+  intro: string;
+  description: string;
+  ending: string;
+  downloadName: string;
+  manuscriptUrl: string;
+  novel: Novel;
+}
+const books: Record<BookId, BookDefinition> = {
+  buxizhou: {
+    id: 'buxizhou',
+    label: '青岚纪 · 不系舟',
+    shortTitle: '不系舟',
+    seal: '旧闻',
+    intro: '山河辽阔，故人有信。',
+    description: '《青岚纪·不系舟》：一个青岚少年的修行长卷。山河辽阔，故人有信。',
+    ending: '山河未尽，此卷已终。',
+    downloadName: '青岚纪_不系舟.md',
+    manuscriptUrl: buxizhouManuscriptUrl,
+    novel: parseNovel(buxizhouManuscript),
+  },
+  cunyin: {
+    id: 'cunyin',
+    label: '青岚纪 · 寸阴炉',
+    shortTitle: '寸阴炉',
+    seal: '炉火',
+    intro: '药有火候，人有寸阴。',
+    description: '《青岚纪·寸阴炉》：一位验药人守火的一生。药有火候，人有寸阴。',
+    ending: '炉火未凉，此卷已终。',
+    downloadName: '青岚纪_寸阴炉.md',
+    manuscriptUrl: cunyinManuscriptUrl,
+    novel: parseNovel(cunyinManuscript),
+  },
+};
+function bookIdFromUrl(): BookId {
+  return new URLSearchParams(location.search).get('book') === 'cunyin' ? 'cunyin' : 'buxizhou';
+}
+let bookId = bookIdFromUrl();
+let active = books[bookId];
+let book = active.novel;
 const READING_KEY = 'qinglan-novel-reader-v1';
 const sizes = [16, 18, 20, 22, 24];
-interface ReadingPlace {
+interface ChapterPlace {
   chapter: string;
   position: number;
+}
+interface ReadingPlace extends ChapterPlace {
   size: number;
   theme: 'light' | 'dark';
+  places?: Partial<Record<BookId, ChapterPlace>>;
 }
 const get = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const page = get<HTMLElement>('reading-page');
@@ -26,27 +75,41 @@ const larger = get<HTMLButtonElement>('type-larger');
 const themeToggle = get<HTMLButtonElement>('theme-toggle');
 const previous = get<HTMLButtonElement>('previous-chapter');
 const next = get<HTMLButtonElement>('next-chapter');
-let saved: ReadingPlace | null = null;
+const places: Partial<Record<BookId, ChapterPlace>> = {};
+let storedSize: number | undefined;
 try {
   const value: unknown = JSON.parse(localStorage.getItem(READING_KEY) || 'null');
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const record = value as Partial<ReadingPlace>;
-    if (
-      book.chapters.some((chapter) => chapter.id === record.chapter) &&
-      typeof record.position === 'number' &&
-      Number.isFinite(record.position) &&
-      record.position >= 0 &&
-      record.position <= 1 &&
-      typeof record.size === 'number' &&
-      sizes.includes(record.size)
-    )
-      saved = record as ReadingPlace;
+    const validPlace = (candidate: unknown, target: BookId): ChapterPlace | null => {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+      const place = candidate as Partial<ChapterPlace>;
+      return books[target].novel.chapters.some((chapter) => chapter.id === place.chapter) &&
+        typeof place.position === 'number' &&
+        Number.isFinite(place.position) &&
+        place.position >= 0 &&
+        place.position <= 1
+        ? { chapter: place.chapter!, position: place.position }
+        : null;
+    };
+    // 旧版顶层 chapter / position 只属于《不系舟》，迁移时原样保留。
+    const legacy = validPlace(record, 'buxizhou');
+    if (legacy) places.buxizhou = legacy;
+    if (record.places && typeof record.places === 'object' && !Array.isArray(record.places)) {
+      for (const target of ['buxizhou', 'cunyin'] as const) {
+        const place = validPlace(record.places[target], target);
+        if (place) places[target] = place;
+      }
+    }
+    if (typeof record.size === 'number' && sizes.includes(record.size)) storedSize = record.size;
+    if (record.theme === 'dark') document.documentElement.dataset.theme = 'dark';
   }
 } catch {
   /* 阅读位置不可用时仍可正常翻阅。 */
 }
+const savedPlace = () => places[bookId];
 let index = 0;
-let size = saved?.size ?? 20;
+let size = storedSize ?? 20;
 let theme: ReadingPlace['theme'] =
   document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
 let scrollTimer: ReturnType<typeof setTimeout> | undefined;
@@ -59,15 +122,18 @@ function position() {
 }
 function remember() {
   if (restoring) return;
+  places[bookId] = { chapter: book.chapters[index].id, position: position() };
   try {
+    const first = places.buxizhou;
     localStorage.setItem(
       READING_KEY,
       JSON.stringify({
-        chapter: book.chapters[index].id,
-        position: position(),
+        // 顶层仍镜像《不系舟》位置，兼容旧版阅读器与防闪烁脚本。
+        ...(first ? { chapter: first.chapter, position: first.position } : {}),
         size,
         theme,
-      } satisfies ReadingPlace),
+        places,
+      }),
     );
   } catch {
     /* 本机存储被拒绝不影响阅读或切章。 */
@@ -110,8 +176,8 @@ function renderChapter(target: number, fraction = 0, focus = false) {
   )!.label;
   get('chapter-number').textContent = `第 ${chapter.number} 章`;
   title.textContent = chapter.title;
-  get('reading-caption').textContent = '青岚纪 · 不系舟';
-  document.title = `${chapter.label} · 不系舟`;
+  get('reading-caption').textContent = active.label;
+  document.title = `${chapter.label} · ${active.shortTitle}`;
   const paragraphs = document.createDocumentFragment();
   for (const text of chapter.paragraphs) {
     if (text === '---') {
@@ -125,6 +191,7 @@ function renderChapter(target: number, fraction = 0, focus = false) {
     paragraphs.append(p);
   }
   prose.replaceChildren(paragraphs);
+  get('book-ending').textContent = active.ending;
   get('book-ending').hidden = index !== book.chapters.length - 1;
   previous.disabled = index === 0;
   next.disabled = index === book.chapters.length - 1;
@@ -137,8 +204,8 @@ function renderChapter(target: number, fraction = 0, focus = false) {
     if (link.dataset.chapter === chapter.id) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');
   }
-  const active = list.querySelector<HTMLAnchorElement>('[aria-current=page]')!;
-  active.closest('details')!.open = true;
+  const activeLink = list.querySelector<HTMLAnchorElement>('[aria-current=page]')!;
+  activeLink.closest('details')!.open = true;
   if (focus) title.focus({ preventScroll: true });
   restorePosition(fraction);
 }
@@ -151,39 +218,96 @@ function selectChapter(target: number) {
   history.pushState(null, '', `#${book.chapters[target].id}`);
   renderChapter(target, 0, true);
 }
-for (const volume of book.volumes) {
-  const details = document.createElement('details');
-  details.className = 'volume';
-  details.dataset.volume = String(volume.number);
-  const summary = document.createElement('summary');
-  summary.textContent = volume.label;
-  const ol = document.createElement('ol');
-  for (const chapter of volume.chapters) {
-    const li = document.createElement('li');
-    const link = document.createElement('a');
-    link.className = 'chapter-link';
-    link.dataset.chapter = chapter.id;
-    link.href = `#${chapter.id}`;
-    const number = document.createElement('span');
-    number.className = 'chapter-index';
-    number.textContent = String(chapter.number).padStart(2, '0');
-    const text = document.createElement('span');
-    text.textContent = chapter.title;
-    link.append(number, text);
-    link.addEventListener('click', (event) => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      selectChapter(book.chapters.indexOf(chapter));
-    });
-    li.append(link);
-    ol.append(li);
+function buildChapterList() {
+  list.replaceChildren();
+  for (const volume of book.volumes) {
+    const details = document.createElement('details');
+    details.className = 'volume';
+    details.dataset.volume = String(volume.number);
+    const summary = document.createElement('summary');
+    summary.textContent = volume.label;
+    const ol = document.createElement('ol');
+    for (const chapter of volume.chapters) {
+      const li = document.createElement('li');
+      const link = document.createElement('a');
+      link.className = 'chapter-link';
+      link.dataset.chapter = chapter.id;
+      link.href = `#${chapter.id}`;
+      const number = document.createElement('span');
+      number.className = 'chapter-index';
+      number.textContent = String(chapter.number).padStart(2, '0');
+      const text = document.createElement('span');
+      text.textContent = chapter.title;
+      link.append(number, text);
+      link.addEventListener('click', (event) => {
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        selectChapter(book.chapters.indexOf(chapter));
+      });
+      li.append(link);
+      ol.append(li);
+    }
+    details.append(summary, ol);
+    list.append(details);
   }
-  details.append(summary, ol);
-  list.append(details);
 }
 const download = get<HTMLAnchorElement>('download-manuscript');
-download.href = manuscriptUrl;
-download.hidden = false;
+function updateBookChrome() {
+  get('book-main').setAttribute('aria-label', `${active.label}阅读器`);
+  get('book-short-title').textContent = active.shortTitle;
+  get('book-seal').textContent = active.seal;
+  get('book-intro').textContent = active.intro;
+  get('book-footer-title').textContent = active.label;
+  document.querySelector<HTMLMetaElement>('meta[name="description"]')!.content = active.description;
+  download.href = active.manuscriptUrl;
+  download.download = active.downloadName;
+  download.hidden = false;
+  get('book-count').textContent = `${book.volumes.length} 卷 · ${book.chapters.length} 章`;
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-book-link]')) {
+    if (link.dataset.bookLink === bookId) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+}
+function activateBook(targetId: BookId, target: number, fraction: number) {
+  bookId = targetId;
+  active = books[bookId];
+  book = active.novel;
+  buildChapterList();
+  updateBookChrome();
+  renderChapter(target, fraction);
+}
+function switchBook(
+  targetId: BookId,
+  push = true,
+  override?: { target: number; fraction: number },
+) {
+  if (targetId === bookId) return;
+  clearTimeout(scrollTimer);
+  remember();
+  const place = places[targetId];
+  const target =
+    override?.target ??
+    (place
+      ? Math.max(
+          0,
+          books[targetId].novel.chapters.findIndex((chapter) => chapter.id === place.chapter),
+        )
+      : 0);
+  activateBook(targetId, target, override?.fraction ?? (place ? place.position : 0));
+  const url = new URL(location.href);
+  if (targetId === 'cunyin') url.searchParams.set('book', 'cunyin');
+  else url.searchParams.delete('book');
+  url.hash = books[targetId].novel.chapters[target].id;
+  if (push) history.pushState(null, '', url);
+  else history.replaceState(null, '', url);
+}
+for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-book-link]')) {
+  link.addEventListener('click', (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    switchBook(link.dataset.bookLink as BookId);
+  });
+}
 let downloading = false;
 download.addEventListener('click', (event) => {
   if (!navigator.serviceWorker?.controller) return;
@@ -193,11 +317,11 @@ download.addEventListener('click', (event) => {
   document.getElementById('download-error')?.remove();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
-  void fetch(manuscriptUrl, { signal: controller.signal })
+  void fetch(active.manuscriptUrl, { signal: controller.signal })
     .then((response) => {
       if (!response.ok) throw new Error('download-unavailable');
       const link = document.createElement('a');
-      link.href = manuscriptUrl;
+      link.href = active.manuscriptUrl;
       // 附件响应须用普通导航接收；未启用缓存时沿用同源静态下载。
       if (!response.headers.get('Content-Disposition')?.startsWith('attachment'))
         link.download = download.download;
@@ -219,7 +343,6 @@ download.addEventListener('click', (event) => {
       downloading = false;
     });
 });
-get('book-count').textContent = `${book.volumes.length} 卷 · ${book.chapters.length} 章`;
 previous.addEventListener('click', () => selectChapter(index - 1));
 next.addEventListener('click', () => selectChapter(index + 1));
 themeToggle.addEventListener('click', () => {
@@ -273,27 +396,38 @@ window.addEventListener('pagehide', remember);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) remember();
 });
-window.addEventListener('hashchange', () => {
-  const target = chapterAtHash();
-  if (target === index) return;
+function syncFromUrl() {
+  const nextId = bookIdFromUrl();
+  const nextBook = books[nextId].novel;
+  const hashTarget = nextBook.chapters.findIndex((chapter) => `#${chapter.id}` === location.hash);
+  if (nextId !== bookId) {
+    switchBook(nextId, false, hashTarget >= 0 ? { target: hashTarget, fraction: 0 } : undefined);
+    return;
+  }
+  if (hashTarget === index) return;
   clearTimeout(scrollTimer);
   remember();
   closeContents();
-  if (target < 0) {
+  if (hashTarget < 0) {
     history.replaceState(null, '', `#${book.chapters[index].id}`);
     return;
   }
-  renderChapter(target, 0, true);
-});
+  renderChapter(hashTarget, 0, true);
+}
+window.addEventListener('hashchange', syncFromUrl);
+window.addEventListener('popstate', syncFromUrl);
 updateTheme();
 updateType();
+buildChapterList();
+updateBookChrome();
 const initial = chapterAtHash();
+const initialPlace = savedPlace();
 index =
   initial >= 0
     ? initial
     : Math.max(
         0,
-        book.chapters.findIndex((chapter) => chapter.id === saved?.chapter),
+        book.chapters.findIndex((chapter) => chapter.id === initialPlace?.chapter),
       );
 history.replaceState(null, '', `#${book.chapters[index].id}`);
-renderChapter(index, saved?.chapter === book.chapters[index].id ? saved.position : 0);
+renderChapter(index, initialPlace?.chapter === book.chapters[index].id ? initialPlace.position : 0);

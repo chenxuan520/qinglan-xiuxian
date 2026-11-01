@@ -301,12 +301,13 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || !url.href.startsWith(scope)) return;
   event.respondWith(
     handleFetch(event.request).then((response) => {
-      if (!response.ok || !/\/assets\/novel-[\w-]+\.md$/.test(url.pathname)) return response;
+      if (!response.ok || !/\/assets\/novel(?:-2)?-[\w-]+\.md$/.test(url.pathname)) return response;
       // 普通导航经过缓存后再发起附件下载，避免原生 download 请求绕过离线服务。
+      const cunyin = /\/assets\/novel-2-[\w-]+\.md$/.test(url.pathname);
       const headers = new Headers(response.headers);
       headers.set(
         'Content-Disposition',
-        `attachment; filename="qinglan-novel.md"; filename*=UTF-8''${encodeURIComponent('青岚纪_不系舟.md')}`,
+        `attachment; filename="${cunyin ? 'qinglan-novel-2.md' : 'qinglan-novel.md'}"; filename*=UTF-8''${encodeURIComponent(cunyin ? '青岚纪_寸阴炉.md' : '青岚纪_不系舟.md')}`,
       );
       return new Response(response.body, {
         status: response.status,
