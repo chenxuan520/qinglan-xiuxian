@@ -94,6 +94,8 @@ export class LeaderboardPanel {
   }
   private status(message: string) {
     this.element('[data-leaderboard-status]').textContent = message;
+    const eligibility = this.element('[data-leaderboard-eligibility]');
+    if (message && eligibility.textContent === message) eligibility.textContent = '';
   }
   private setBusy(busy: boolean) {
     this.busy = busy;
@@ -119,15 +121,18 @@ export class LeaderboardPanel {
     const score = this.options.score?.();
     this.element('[data-leaderboard-score]').textContent =
       score === undefined ? '' : `此世道果 ${score}`;
-    this.element('[data-leaderboard-eligibility]').textContent =
-      this.options.blockedReason?.() ||
-      (!this.board || eligible || this.saved
+    const reason = this.options.blockedReason?.();
+    this.element('[data-leaderboard-eligibility]').textContent = reason
+      ? this.element('[data-leaderboard-status]').textContent === reason
+        ? ''
+        : reason
+      : !this.board || eligible || this.saved
         ? ''
         : this.options.eligibleFacts()
           ? !improvesLeaderboardProfile(this.board, score ?? 0, readLeaderboardProfile())
             ? '此世道果尚未超过此前留名的最高成绩。'
             : `当前入榜需高于 ${this.board.minimumScore} 道果。`
-          : '此世离世或完成终章后，可选择署名入榜。');
+          : '此世离世或完成终章后，可选择署名入榜。';
   }
   private list(board: LeaderboardBoard) {
     this.board = board;

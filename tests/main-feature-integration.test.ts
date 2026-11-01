@@ -5,6 +5,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
 import { freshSave, lifespanInfo, tribulationDue } from '../src/progress.ts';
 import { dispatchAction } from '../src/action-controller.ts';
+import { leaderboardUnavailableContent } from '../src/leaderboard-notice.ts';
 import {
   LeaderboardPreference,
   LEADERBOARD_PREFERENCE_KEY,
@@ -16,6 +17,9 @@ const script = new Script(
   stripTypeScriptTypes(
     [
       'rankingEnabled',
+      'getRankingTestAccess',
+      'rankingBlocked',
+      'showRankingUnavailable',
       'clearRanking',
       'queueRanking',
       'showRankingOffer',
@@ -61,7 +65,13 @@ function harness() {
   };
   const inheritance = { value: 'pagoda' };
   const preview = { innerHTML: '' };
-  const section = { scrollTop: 0, querySelector: () => null };
+  const section = {
+    scrollTop: 0,
+    querySelector: () => null,
+    insertAdjacentHTML(_position: string, html: string) {
+      calls.frames.push(['notice', html]);
+    },
+  };
   const host = { isConnected: true, innerHTML: '', querySelector: () => null };
   const context = createContext({
     dispatchAction,
@@ -89,6 +99,12 @@ function harness() {
       },
     },
     rankingQueuedSeed: null,
+    rankingLoadFailedSeed: null,
+    rankingTestAllowed: false,
+    rankingTestCheck: null,
+    debugAccess: async () => 'disabled',
+    NPC_AI_BASE: 'test',
+    leaderboardUnavailableContent,
     rankingEpoch: 0,
     rankingReturn: null,
     rankingInheritance: null,

@@ -484,3 +484,21 @@
   line-height: 1.8;
   color: var(--jade);
 }
+
+.panel .farewell-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.farewell-actions > button {
+  white-space: nowrap;
+  min-width: 0;
+}
+.text-phrase {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .farewell-actions > button {
+    padding-inline: 10px;
+    gap: 8px;
+  }
+}

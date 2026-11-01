@@ -352,7 +352,11 @@ test('实际导入较早低阶存档后只剔除越界的旧回复，合法聊�
     toast() {},
   };
   const context = createContext({ minimumDifficulty });
-  new Script(extract('../src/action-controller.ts', 'handleSaveTransfer')).runInContext(context);
+  new Script(
+    extract('../src/action-controller.ts', 'applyImportedSave') +
+      '\n' +
+      extract('../src/action-controller.ts', 'handleSaveTransfer'),
+  ).runInContext(context);
   assert.equal((context as any).handleSaveTransfer(shell, 'confirm-import'), true);
   assert.equal(marketConversationIdentity(high, npc.id), identity);
   assert.equal(marketRealmLabel(npc, realmInfo(high.cultivation).index), '修为难测');

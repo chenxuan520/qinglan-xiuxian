@@ -452,7 +452,13 @@ test('改动标记阻止读榜和提交，明确显示原因且不影响关闭',
       await turn();
       assert.equal(calls, 0);
       assert.equal(f.el('sign').hidden, true);
-      assert.equal(f.el('eligibility').textContent, TAMPERED_LEADERBOARD_MESSAGE);
+      assert.equal(
+        [f.el('eligibility').textContent, f.el('status').textContent].filter(
+          (text) => text === TAMPERED_LEADERBOARD_MESSAGE,
+        ).length,
+        1,
+        '同一限制原因只出现一次',
+      );
       assert.equal(f.el('status').textContent, TAMPERED_LEADERBOARD_MESSAGE);
       f.click('close');
       assert.equal(f.closes, 1);
@@ -502,6 +508,7 @@ test('旧标记测试档署名前重核权限，关闭时不POST、不挂忙碌�
       assert.equal(f.el('submit').disabled, false);
       assert.equal(f.el('name').disabled, false);
       assert.match(f.el('status').textContent, /不可留名/);
+      assert.equal(f.el('eligibility').textContent, '', '署名前权限关闭后原因不重复');
       assert.equal(f.el('save').hidden, false);
     },
   );

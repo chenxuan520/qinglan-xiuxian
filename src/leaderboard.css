@@ -3,14 +3,6 @@
   gap: 22px;
   min-width: 0;
 }
-.farewell-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.farewell-actions > button {
-  white-space: nowrap;
-  min-width: 0;
-}
 .leaderboard-offer {
   margin-top: 16px;
 }
@@ -117,10 +109,6 @@
   width: 100%;
 }
 @media (max-width: 480px) {
-  .farewell-actions > button {
-    padding-inline: 10px;
-    gap: 8px;
-  }
   .leaderboard-panel {
     gap: 18px;
   }
