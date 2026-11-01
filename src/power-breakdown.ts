@@ -140,7 +140,13 @@ export function powerBreakdown(save: SaveData) {
         const after = current.damage / base.damage - 1;
         if (before > 0) amplification = { before, after, percent: after / before - 1 };
       }
-      const related = id === 'vitality' && ownsCurio(save, 'soul-wood') ? '养魂木 → 淬体气血' : '';
+      const related = ownsCurio(save, 'soul-wood')
+        ? id === 'vitality'
+          ? '养魂木 → 淬体气血'
+          : id === 'speed'
+            ? '养魂木 → 身法移速'
+            : ''
+        : '';
       return { id, name, detail, changes, amplification, related };
     })
     .filter((row) => row.changes.length);

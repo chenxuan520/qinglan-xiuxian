@@ -53,7 +53,10 @@ test('帮助将三成边界限定为功法合计系数，并说明奇物另算',
   assert.match(builds, /施法间隔与承伤的功法合计系数各最低取基础的 30%/);
   assert.match(builds, /之后仍乘丹药及相应奇物效果，最终值可更低/);
   assert.match(guide.guideContent('cultivation'), /未持有奇物时的修习效果/);
-  assert.match(guide.guideContent('cultivation'), /养魂木另使淬体气血与悟道增伤的加成提高 30%/);
+  assert.match(
+    guide.guideContent('cultivation'),
+    /养魂木另使淬体气血、悟道增伤与身法移速的加成提高 50%/,
+  );
   assert.doesNotMatch(builds, /施法间隔最低为基础的 30%|承伤最低为基础的 30%/);
 });
 

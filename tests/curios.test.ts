@@ -72,9 +72,9 @@ test('九件奇物按持有生效，重复获取被拒绝；移走恢复真实�
   const baseline = new Game(structuredClone(s), 0, 0, () => 0.5);
   for (const id of CURIO_IDS) assert.equal(grantCurio(s, id), true);
   const g = new Game(s, 0, 0, () => 0.5);
-  near(g.stats.damage / baseline.stats.damage, 1.26 / 1.2);
-  assert.equal(g.player.maxHp, Math.round((baseline.player.maxHp / 1.5) * 1.65 * 1.2));
-  near(g.stats.speed / baseline.stats.speed, 1.15);
+  near(g.stats.damage / baseline.stats.damage, 1.3 / 1.2);
+  assert.equal(g.player.maxHp, Math.round((baseline.player.maxHp / 1.5) * 1.75 * 1.2));
+  near(g.stats.speed / baseline.stats.speed, (1.3 / 1.2) * 1.15);
   near(g.stats.xp / baseline.stats.xp, 1.15);
   near(g.stats.magnet / baseline.stats.magnet, 1.25);
   near(g.stats.armor / baseline.stats.armor, 0.9);
@@ -302,13 +302,13 @@ test('天机屋不允许退宗重领奖励或借零年岁刷新交易；付费�
     }
   }
 });
-test('养魂木闭关修为增三成，金阙玉书只降炼器灵石；灵威列出奇物的实际贡献', () => {
+test('养魂木闭关修为增五成，金阙玉书只降炼器灵石；灵威列出奇物的实际贡献', () => {
   const s = ready();
   s.cultivation = 1;
   const a = retreatPlan(s, 10)!;
   grantCurio(s, 'soul-wood');
   const b = retreatPlan(s, 10)!;
-  near(b.cultivation.minPercent / a.cultivation.minPercent, 1.3);
+  near(b.cultivation.minPercent / a.cultivation.minPercent, 1.5);
   grantCurio(s, 'jade-book');
   for (let level = 0; level < 10; level++) {
     const base = forgeCost(level),
@@ -627,7 +627,7 @@ test('劫修固定战况按持有奇物计算气血与承伤，刷新沿用该�
       chooseMarketOpportunity(s, id, 1, 'accept');
       const plain = base.mortal.marketSocial!.ambush!,
         enhanced = s.mortal.marketSocial!.ambush!;
-      assert.equal(enhanced.stats.hp, Math.round((100 + 50 * 1.3) * 1.2));
+      assert.equal(enhanced.stats.hp, Math.round((100 + 50 * 1.5) * 1.2));
       near(enhanced.stats.enemyDamage, plain.stats.enemyDamage * 0.9);
       const restored = importSave(exportSave(s));
       assert.deepEqual(restored.save.mortal.marketSocial!.ambush!.stats, enhanced.stats);

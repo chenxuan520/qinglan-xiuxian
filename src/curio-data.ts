@@ -83,6 +83,8 @@ export function validCurios(value: unknown, age: number, legacy = false): value 
 }
 export const ownsCurio = (save: { curios: CurioState }, id: CurioId) =>
   (save.curios.bag[id] ?? 0) > 0;
+export const soulWoodMultiplier = (save: { curios: CurioState }) =>
+  ownsCurio(save, 'soul-wood') ? 1.5 : 1;
 export const acquiredCurio = (save: { curios: CurioState }, id: CurioId) =>
   save.curios.acquired.includes(id) || Object.hasOwn(save.curios.bag, id);
 export function grantCurio(save: { curios: CurioState }, id: string) {

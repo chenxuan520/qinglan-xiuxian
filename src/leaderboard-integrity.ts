@@ -7,7 +7,7 @@ export interface FactsSeal {
   v: number;
   h: string;
 }
-export const FACTS_VERSION = 2;
+export const FACTS_VERSION = 3;
 export const INTEGRITY_SAVE_SCHEMA = 37;
 export const TAMPERED_LEADERBOARD_MESSAGE = '此世存档曾被改动，不可留名万魂幡。';
 export class InvalidFactsError extends Error {}
@@ -22,6 +22,8 @@ export const FACTS_VERSIONS: FactsVersions = {
   projectors: {
     1: (save) => projectLeaderboardFactsV1(save as SaveData),
     2: (save) => projectLeaderboardFactsV2(save as SaveData),
+    // v3调整养魂木计分乘区；事实字段不变，沿用冻结的v2投影。
+    3: (save) => projectLeaderboardFactsV2(save as SaveData),
   },
 };
 const record = (value: unknown): value is Record<string, unknown> =>

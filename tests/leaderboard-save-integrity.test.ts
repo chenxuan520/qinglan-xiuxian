@@ -151,14 +151,14 @@ test('签名只增加两个存档字段，无关字段不影响摘要，下一�
   assert.equal(inspectSaveIntegrity(next, 'local'), false);
 });
 
-test('事实 v2 纳入承缘估值，仅真正落幕才提取留名事实，首通终关不算落幕', () => {
+test('当前v3沿用v2承缘估值与终局投影，首通终关不算落幕', () => {
   const save = clean();
   save.completed = [6];
   save.cultivation = IMMORTAL_CULTIVATION;
   save.inheritanceValue = 30000;
   save.chronicle.milestones['birth-inheritance'] = 15;
   const before = JSON.stringify(save);
-  assert.equal(FACTS_VERSION, 2);
+  assert.equal(FACTS_VERSION, 3);
   assert.equal(projectLeaderboardFactsV1(save).ending, 'immortal', '冻结的旧投影不回写规则');
   const facts = projectLeaderboardFactsV2(save);
   assert.equal(facts.ending, null);
@@ -177,7 +177,7 @@ test('事实 v2 纳入承缘估值，仅真正落幕才提取留名事实，首�
   }
 });
 
-test('v2 的承缘估值和真正终局都受摘要保护，改动不能在读档或文件往返中洗白', () => {
+test('当前摘要保护v2投影的承缘估值和真正终局，改动不能在读档或文件往返中洗白', () => {
   const original = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   original.cultivation = IMMORTAL_CULTIVATION;
   original.completed = [6];
@@ -193,13 +193,13 @@ test('v2 的承缘估值和真正终局都受摘要保护，改动不能在读�
       importSave(JSON.stringify(raw)).save,
     ]) {
       assert.equal(restored.factsTampered, true, key);
-      assert.equal(restored.factsSeal?.v, 2);
+      assert.equal(restored.factsSeal?.v, 3);
       assert.equal(importSave(exportSave(restored, null)).save.factsTampered, true, key);
     }
   }
 });
 
-test('旧 v1 先验原始哈希再迁移 v2：终关未落幕及旧承缘默认值改变投影仍保持清白', () => {
+test('旧v1先验原始哈希再迁移当前v3：终关未落幕及旧承缘默认值改变投影仍保持清白', () => {
   const raw = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
   raw.schema = 38;
   raw.completed = [6];
@@ -215,7 +215,7 @@ test('旧 v1 先验原始哈希再迁移 v2：终关未落幕及旧承缘默认�
   for (const save of [local.save, importSave(original).save]) {
     assert.equal(save.schema, SAVE_SCHEMA);
     assert.equal(save.factsTampered, false);
-    assert.equal(save.factsSeal?.v, 2);
+    assert.equal(save.factsSeal?.v, 3);
     assert.equal(save.inheritanceValue, 100, '无法还原的旧已消耗赠物使用旧档估值');
     assert.equal(save.journeyEnded, false);
     assert.equal(projectLeaderboardFactsV2(save).ending, null);
@@ -227,7 +227,7 @@ test('旧 v1 先验原始哈希再迁移 v2：终关未落幕及旧承缘默认�
   assert.equal(JSON.stringify(raw), original);
 });
 
-test('旧 v1 原始事实被改或已有标记，升级重签 v2 以及反复导入仍为 tampered', () => {
+test('旧v1原始事实被改或已有标记，升级重签v3及反复导入仍为tampered', () => {
   for (const alreadyTampered of [false, true]) {
     const raw = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
     raw.schema = 38;
@@ -240,7 +240,7 @@ test('旧 v1 原始事实被改或已有标记，升级重签 v2 以及反复导
       importSave(JSON.stringify(raw)).save,
     ]) {
       assert.equal(restored.factsTampered, true);
-      assert.equal(restored.factsSeal?.v, 2);
+      assert.equal(restored.factsSeal?.v, 3);
       assert.equal(
         verifyFactsSeal(projectLeaderboardFactsV2(restored), restored.factsSeal, true),
         true,

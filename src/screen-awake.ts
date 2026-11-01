@@ -1,4 +1,10 @@
 // 只在前台自动历练时持有屏幕常亮请求，不写入存档。
+export const autoplayScreenAwake = (
+  autoplay: boolean,
+  state: string | undefined,
+  blocked: boolean,
+) => autoplay && !blocked && (state === 'playing' || state === 'upgrade');
+
 export class ScreenAwake {
   private wanted = false;
   private lock: WakeLockSentinel | null = null;

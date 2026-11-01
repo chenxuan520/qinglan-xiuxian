@@ -9,6 +9,7 @@ import {
   freshCurios,
   validCurios,
   ownsCurio,
+  soulWoodMultiplier,
   grantCurio,
   curioTrainingYears,
   type CurioState,
@@ -132,7 +133,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 40;
+export const SAVE_SCHEMA = 41;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -779,9 +780,8 @@ export function retreatPlan(save: SaveData, requested: number) {
   const chance = immortal ? 0 : years / life.limit;
   const major = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
   const budget = realmCost(major * 3) + realmCost(major * 3 + 1) + realmCost(major * 3 + 2);
-  // 天灵根投入整段寿元，也至多获得当前大境界总修为的 32%；历练仍是突破的主要来源。
-  const minPercent =
-    chance * 16 * spiritRootInfo(save.spiritRoot).rate * (ownsCurio(save, 'soul-wood') ? 1.3 : 1);
+  // 未计养魂木时，天灵根投入整段寿元至多获得当前大境界总修为的 32%；历练仍是突破的主要来源。
+  const minPercent = chance * 16 * spiritRootInfo(save.spiritRoot).rate * soulWoodMultiplier(save);
   const maxPercent = minPercent * 2;
   return {
     years,

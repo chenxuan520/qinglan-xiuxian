@@ -153,7 +153,7 @@ import { createErrorWatch } from './error-report.ts';
 import { assetUrl } from './asset-url.ts';
 import { MobileDisplay } from './mobile-display.ts';
 
-import { ScreenAwake } from './screen-awake.ts';
+import { ScreenAwake, autoplayScreenAwake } from './screen-awake.ts';
 import { FrameRate } from './frame-rate.ts';
 import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
@@ -2469,17 +2469,8 @@ function simulate(dt: number, now: number) {
   }
 }
 const screenAwake = new ScreenAwake();
-const coarsePointer = matchMedia('(pointer: coarse)');
 function syncScreenAwake() {
-  screenAwake.setActive(
-    coarsePointer.matches &&
-      document.hasFocus() &&
-      !saveLock &&
-      !settled &&
-      save.autoplay &&
-      !!game &&
-      (game.state === 'playing' || game.state === 'upgrade'),
-  );
+  screenAwake.setActive(autoplayScreenAwake(save.autoplay, game?.state, !!saveLock || settled));
 }
 function tick(now: number, draw: boolean) {
   if (guideSource.current?.tourActive || marketEventSource.current?.treasureTrialSource.active) {

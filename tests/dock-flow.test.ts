@@ -346,12 +346,12 @@ test('非法累计折寿或夜船字段的文件导入拒绝，旧schema缺字�
   assert.equal(imported.mortal.nightBoat, null);
 });
 
-test('夜船与折寿不进入万魂幡事实，事实版本保持v2且新字段单独变化不影响原seal', () => {
+test('夜船与折寿不进入当前v3万魂幡事实，新字段单独变化不影响原seal', () => {
   const save = traveller();
   Object.assign(save, sealSaveSnapshot(save));
   const facts = projectLeaderboardFactsV2(save);
   const seal = structuredClone(save.factsSeal);
-  assert.equal(FACTS_VERSION, 2);
+  assert.equal(FACTS_VERSION, 3);
   assert.equal(Object.hasOwn(facts, 'lifespanSpent'), false);
   assert.equal(Object.hasOwn(facts, 'nightBoat'), false);
   offer(save, 0.5);

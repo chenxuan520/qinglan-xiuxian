@@ -7,7 +7,7 @@ import {
 } from './boss-mechanics.ts';
 import { enemyCombatStats } from './enemy-stats.ts';
 import { recordBestiarySeen } from './bestiary-seen.ts';
-import { ownsCurio, bossCurio } from './curio-data.ts';
+import { ownsCurio, bossCurio, soulWoodMultiplier } from './curio-data.ts';
 import { curioCombo, treasureDisplayName } from './curio-combos.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
@@ -240,10 +240,7 @@ export class Game {
   #maximumHealth(medicineHp = this.medicine.hp) {
     const base =
       this.baseHp *
-      (1 +
-        trainingEffect(this.save.training.vitality) *
-          0.05 *
-          (ownsCurio(this.save, 'soul-wood') ? 1.3 : 1)) *
+      (1 + trainingEffect(this.save.training.vitality) * 0.05 * soulWoodMultiplier(this.save)) *
       (1 + this.passivePower('guard') * 0.1);
     return Math.round(
       base *
@@ -374,7 +371,7 @@ export class Game {
         (1 +
           (powerTrainingEffect(this.save.training.power) *
             spiritRootInfo(this.spiritRoot).powerPerLevel *
-            (ownsCurio(this.save, 'soul-wood') ? 1.3 : 1)) /
+            soulWoodMultiplier(this.save)) /
             100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
@@ -397,7 +394,7 @@ export class Game {
       speed:
         spiritRootInfo(this.spiritRoot).baseSpeed *
         (1 +
-          trainingEffect(this.save.training.speed) * 0.02 +
+          trainingEffect(this.save.training.speed) * 0.02 * soulWoodMultiplier(this.save) +
           this.passivePower('crit') * 0.03 +
           (this.player.hp < this.player.maxHp / 2 ? this.passivePower('frenzy') * 0.04 : 0)) *
         (1 + this.save.retreatBonus.speed / 100) *

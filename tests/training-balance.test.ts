@@ -174,6 +174,6 @@ test('洞府悟道当前与下一阶显示真实入场增幅，计入养魂木�
   const example = freshSave('heaven', ['metal']);
   example.training.power = 10;
   example.curios.bag['soul-wood'] = 1;
-  assert.match(cultivationPanel(example, 0).body, /当前增伤 \+26%/);
-  assert.match(cultivationPanel(example, 0).body, /下一阶实际增伤 \+2\.27%/);
+  assert.match(cultivationPanel(example, 0).body, /当前增伤 \+30%/);
+  assert.match(cultivationPanel(example, 0).body, /下一阶实际增伤 \+2\.54%/);
 });

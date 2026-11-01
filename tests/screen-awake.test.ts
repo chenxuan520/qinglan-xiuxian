@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ScreenAwake } from '../src/screen-awake.ts';
+import { ScreenAwake, autoplayScreenAwake } from '../src/screen-awake.ts';
+import { readFileSync } from 'node:fs';
 
 class Lease extends EventTarget {
   released = false;
@@ -39,6 +40,80 @@ function environment(request?: () => Promise<WakeLockSentinel>) {
   );
   return { awake, page, orientation, locks, calls: () => calls };
 }
+
+test('常亮跟随自动战斗，升级选择不中断，暂停、结算、锁档和无对局均释放', async () => {
+  const e = environment();
+  e.awake.setActive(autoplayScreenAwake(true, 'playing', false));
+  await flush();
+  assert.equal(e.calls(), 1);
+  e.awake.setActive(autoplayScreenAwake(true, 'upgrade', false));
+  await flush();
+  assert.equal(e.locks[0].released, false);
+  assert.equal(e.calls(), 1);
+  for (const state of ['paused', 'lost', 'won', undefined]) {
+    e.awake.setActive(autoplayScreenAwake(true, state, false));
+    await flush();
+    assert.equal(e.locks[0].released, true);
+    assert.equal(e.calls(), 1);
+  }
+  e.awake.setActive(autoplayScreenAwake(true, 'playing', true));
+  e.awake.setActive(autoplayScreenAwake(false, 'playing', false));
+  await flush();
+  assert.equal(e.calls(), 1);
+  e.awake.setActive(autoplayScreenAwake(true, 'playing', false));
+  await flush();
+  assert.equal(e.calls(), 2);
+  assert.equal(e.locks[1].released, false);
+  e.awake.setActive(false);
+});
+
+test('主循环真实常亮调用不以细指针或缺少页面焦点拒绝前台自动历练', async () => {
+  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const body = source.match(/function syncScreenAwake\(\) \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(body);
+  // 执行真正调用处，避免只验证状态helper而漏掉调用者重新加设备/焦点门槛。
+  const sync = new Function(
+    'screenAwake',
+    'autoplayScreenAwake',
+    'save',
+    'game',
+    'saveLock',
+    'settled',
+    'document',
+    'matchMedia',
+    'coarsePointer',
+    body,
+  );
+  for (const lifeMode of ['normal', 'extreme']) {
+    const e = environment();
+    const save = { autoplay: true, lifeMode };
+    const game = { state: 'playing' };
+    const call = () =>
+      sync(
+        e.awake,
+        autoplayScreenAwake,
+        save,
+        game,
+        null,
+        false,
+        { hasFocus: () => false },
+        () => ({ matches: false }),
+        { matches: false },
+      );
+    call();
+    await flush();
+    assert.equal(e.calls(), 1);
+    assert.equal(e.locks[0].released, false);
+    game.state = 'upgrade';
+    call();
+    await flush();
+    assert.equal(e.locks[0].released, false);
+    game.state = 'paused';
+    call();
+    await flush();
+    assert.equal(e.locks[0].released, true);
+  }
+});
 
 test('自动历练只申请一次常亮，关闭或暂停会释放', async () => {
   const e = environment();

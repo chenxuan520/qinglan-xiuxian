@@ -1,5 +1,6 @@
 import {
   createFactsSeal,
+  FACTS_VERSION,
   validFactsSeal,
   verifyFactsSeal,
 } from '../../src/leaderboard-integrity.ts';
@@ -130,38 +131,23 @@ async function submit(request: Request, env: LeaderboardWorkerEnv) {
   const hasSeal = Object.hasOwn(fields, 'seal');
   const transitionEnd = Date.parse(env.LEGACY_SEAL_UNTIL ?? '');
   const remaining = transitionEnd - Date.now();
-  // 默认严格；显式部署过渡期最长1小时、到期自动收紧，不形成永久无摘要入口。
+  // 默认严格；固定部署窗口仅接受上一版合法摘要，到期自动收紧。
   const inTransition = remaining > 0 && remaining <= 3600000;
-  const legacyTransition = !hasSeal && inTransition;
-  const previousFacts = fields.facts;
   const previous =
-    inTransition &&
-    validFactsSeal(fields.seal) &&
-    fields.seal.v === 1 &&
-    !!previousFacts &&
-    typeof previousFacts === 'object' &&
-    !Array.isArray(previousFacts) &&
-    !Object.hasOwn(previousFacts, 'inheritanceValue');
+    inTransition && validFactsSeal(fields.seal) && fields.seal.v === FACTS_VERSION - 1;
   // 先限制事实的固定结构，避免对恶意深层JSON递归规范化。校验过程不读写数据库。
-  const facts = parseLeaderboardFacts(
-    previous
-      ? {
-          ...previousFacts,
-          inheritanceValue: (previousFacts as Record<string, unknown>).inherited ? 100 : 0,
-        }
-      : fields.facts,
-  );
+  const facts = parseLeaderboardFacts(fields.facts);
   if (!facts) return error('invalid-input', '排名资料格式不正确。', 400);
   const sealValid =
     hasSeal &&
     (previous
-      ? createFactsSeal(previousFacts, 1).h === (fields.seal as { h: string }).h
+      ? createFactsSeal(fields.facts, FACTS_VERSION - 1).h === (fields.seal as { h: string }).h
       : verifyFactsSeal(fields.facts, fields.seal));
   if (
-    Object.keys(fields).length !== (hasSeal ? 4 : 3) ||
+    Object.keys(fields).length !== 4 ||
     fields.version !== LEADERBOARD_VERSION ||
     !name ||
-    (!sealValid && !legacyTransition)
+    !sealValid
   )
     return error('invalid-input', '排名资料格式不正确。', 400);
   const score = scoreLeaderboardFacts(facts);

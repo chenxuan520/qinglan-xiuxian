@@ -189,7 +189,7 @@ test('履历按需合并加载，失败可重试、成功复用，详细数字�
   assert.ok(!/<details[^>]*class="power-details[^>]*\bopen\b/.test(powerDetailsContent(s)));
 });
 
-test('养魂木解释训练本身的20%到26%，独立展开来源给完整比较数值且不改存档', () => {
+test('养魂木解释训练本身的20%到30%，独立展开来源给完整比较数值且不改存档', () => {
   const s = freshSave('heaven', ['metal']);
   s.training.power = 10;
   s.curios.bag['soul-wood'] = 1;
@@ -197,10 +197,10 @@ test('养魂木解释训练本身的20%到26%，独立展开来源给完整比�
   const before = JSON.stringify(s);
   const row = powerBreakdown(s).rows.find((row) => row.id === 'power')!;
   near(row.amplification!.before, 0.2);
-  near(row.amplification!.after, 0.26);
-  near(row.amplification!.percent, 0.3);
+  near(row.amplification!.after, 0.3);
+  near(row.amplification!.percent, 0.5);
   const html = powerDetailsContent(s);
-  assert.match(html, /悟道增伤 20% → 26% · 养魂木 \+30%/);
+  assert.match(html, /悟道增伤 20% → 30% · 养魂木 \+50%/);
   const change = row.changes.find((change) => change.key === 'weaponDamage')!;
   assert.ok(
     html.includes(
@@ -209,7 +209,7 @@ test('养魂木解释训练本身的20%到26%，独立展开来源给完整比�
   );
   assert.ok(
     html.includes(
-      `→ ${change.after.toLocaleString('zh-CN', { maximumFractionDigits: 2, useGrouping: false })}（+26%）`,
+      `→ ${change.after.toLocaleString('zh-CN', { maximumFractionDigits: 2, useGrouping: false })}（+30%）`,
     ),
   );
   assert.match(html, /保留其他加成对比/);
@@ -243,7 +243,7 @@ test('淬体短句关联养魂木，只对照真实整数气血而不反推训�
   assert.equal(row.amplification, undefined);
   const change = row.changes.find((change) => change.key === 'hp')!;
   assert.equal(change.before, 112);
-  assert.equal(change.after, 185);
+  assert.equal(change.after, 196);
 });
 
 test('履历头部维持简写，完整灵威仅在展开明细中显示', () => {

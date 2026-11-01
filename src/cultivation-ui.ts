@@ -7,9 +7,11 @@ import { icon } from './icons.ts';
 import type { PanelDefinition } from './panel-host.ts';
 import { trainingStepText } from './training-preview.ts';
 import { cultivationChronicleEntrance } from './chronicle-ui.ts';
+import { soulWoodMultiplier } from './curio-data.ts';
 export function cultivationPanel(save: SaveData, selectedStage: number): PanelDefinition {
   const r = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE));
   const current = spiritPower(save);
+  const trainingMultiplier = soulWoodMultiplier(save);
   const powerLevel = save.training.power,
     trainingDamage = (power: number) =>
       spiritPower({ ...save, training: { ...save.training, power } }).damage,
@@ -32,7 +34,7 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
           id: 'vitality',
           name: '淬体',
           icon: 'guard',
-          desc: '基础：前十阶每阶气血 +5%，满阶 +103.75%',
+          desc: `${trainingMultiplier > 1 ? '含养魂木' : '基础'}：前十阶每阶气血 +${5 * trainingMultiplier}%，满阶 +${103.75 * trainingMultiplier}%`,
           detail: '筋骨如玉，百劫不摧',
         },
         {
@@ -49,7 +51,7 @@ export function cultivationPanel(save: SaveData, selectedStage: number): PanelDe
           id: 'speed',
           name: '身法',
           icon: 'haste',
-          desc: '前十阶每阶移速 +2%，满阶 +41.5%',
+          desc: `${trainingMultiplier > 1 ? '含养魂木：' : ''}前十阶每阶移速 +${2 * trainingMultiplier}%，满阶 +${41.5 * trainingMultiplier}%`,
           detail: '身随风起，踏雪无痕',
         },
       ] as const

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { freshSave, readSave, type SaveData } from '../src/progress.ts';
+import { freshSave, readSave, SAVE_SCHEMA, type SaveData } from '../src/progress.ts';
 import { projectLeaderboardFactsV2 } from '../src/leaderboard-facts-v2.ts';
 import { projectLeaderboardFactsV1 } from '../src/leaderboard-facts-v1.ts';
 import {
@@ -12,7 +12,9 @@ import {
   migrateSealedSave,
   verifyFactsSeal,
   type FactsVersions,
+  FACTS_VERSION,
 } from '../src/leaderboard-integrity.ts';
+import { exportSave, importSave, readSealedSave } from '../src/save-transfer.ts';
 import { debugGrant, type DebugGrant } from '../src/debug-resources.ts';
 import { leaderboardSettings } from '../src/leaderboard-preference.ts';
 
@@ -144,6 +146,30 @@ test('事实版本升级严格先核原档，再迁移与重封；迁移前改�
       migrated.factsSeal!.h,
       (await createFactsSeal(versions.projectors[2](migrated), 2, changed)).h,
     );
+  }
+});
+
+test('养魂木计分升级到v3/格式41：真实v2本地与文件先验旧摘要，再迁移，改档仍标记', () => {
+  assert.equal(FACTS_VERSION, 3);
+  assert.equal(SAVE_SCHEMA, 41);
+  const base = freshSave('heaven', ['metal'], 'dual', () => 0.5);
+  base.training = { vitality: 10, power: 10, speed: 10 };
+  base.curios.bag['soul-wood'] = 1;
+  base.curios.acquired.push('soul-wood');
+  const old = JSON.parse(exportSave(base, null)).save;
+  old.schema = 40;
+  old.factsSeal = createFactsSeal(projectLeaderboardFactsV2(old), 2);
+  for (const changed of [false, true]) {
+    const raw = structuredClone(old);
+    if (changed) raw.training.speed++;
+    const text = JSON.stringify(raw);
+    for (const save of [readSealedSave(text).save, importSave(text).save]) {
+      assert.equal(save.schema, 41);
+      assert.equal(save.factsSeal!.v, 3);
+      assert.equal(save.factsTampered, changed);
+      assert.equal(inspectSaveIntegrity(save, 'local'), changed);
+      assert.deepEqual(Object.keys(save).sort(), Object.keys(base).sort());
+    }
   }
 });
 

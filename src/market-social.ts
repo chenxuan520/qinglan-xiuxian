@@ -1,4 +1,4 @@
-import { isCurio, grantCurio, ownsCurio, acquiredCurio } from './curio-data.ts';
+import { isCurio, grantCurio, ownsCurio, acquiredCurio, soulWoodMultiplier } from './curio-data.ts';
 import { trainingEffect } from './training.ts';
 import { debateQuote } from './market-debate.ts';
 import { FINAL_TRIAL_STAGE, TREASURES, treasure, spiritRootInfo, pathInfo } from './data.ts';
@@ -523,8 +523,7 @@ export function chooseMarketOpportunity(
     const ratio = Math.max(0.5, Math.min(2.7, 1.28 ** (o.n.realmIndex - playerRealm)));
     const stats = {
       hp: Math.round(
-        (root.baseHp +
-          trainingEffect(save.training.vitality) * 5 * (ownsCurio(save, 'soul-wood') ? 1.3 : 1)) *
+        (root.baseHp + trainingEffect(save.training.vitality) * 5 * soulWoodMultiplier(save)) *
           (ownsCurio(save, 'sacred-fragment') ? 1.2 : 1),
       ),
       damage: (7 + root.rate * 8) * (1 + forgeDamageBonus(save.forge[save.starter] || 0)),
