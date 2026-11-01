@@ -122,6 +122,7 @@ export function dockRumorPool(save: SaveData): DockRumor[] {
 export function dockRumors(save: SaveData, rankingEnabled: boolean): DockRumor[] {
   const age = save.mortal.scenery?.lastVisitAge ?? save.age;
   const seed = curioRoll(save.mortal.population?.seed ?? 0, `dock-rumors:${age}`);
-  const pool = dockRumorPool(save).sort((a, b) => curioRoll(seed, a.key) - curioRoll(seed, b.key));
-  return rankingEnabled ? [{ ...ranking }, ...pool.slice(0, 2)] : pool.slice(0, 3);
+  const pool = dockRumorPool(save);
+  if (rankingEnabled) pool.push({ ...ranking });
+  return pool.sort((a, b) => curioRoll(seed, a.key) - curioRoll(seed, b.key)).slice(0, 3);
 }

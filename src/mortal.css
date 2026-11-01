@@ -288,6 +288,39 @@
 .market-border-tree {
   pointer-events: none;
 }
+.market-ranking {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--gold);
+  text-decoration: none;
+}
+.market-ranking[hidden] {
+  display: none;
+}
+.market-ranking-art {
+  width: calc(96px * var(--ranking-scale, 1));
+  height: calc(96px * var(--ranking-scale, 1));
+  background-size: 400% 300%;
+  background-repeat: no-repeat;
+}
+.market-ranking-name {
+  padding: 4px 10px;
+  background: #082d25ed;
+  border: 1px solid #d5c58e88;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.market-ranking:hover .market-ranking-name,
+.market-ranking:focus-visible .market-ranking-name {
+  border-color: var(--gold);
+  text-decoration: underline;
+}
 .auction-toolbar {
   display: flex;
   flex-wrap: wrap;

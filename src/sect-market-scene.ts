@@ -31,6 +31,7 @@ import { mapClick, walkRoute } from './settlement-navigation.ts';
 import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';
+import { MARKET_RANKING_ART, MARKET_RANKING_SPOT, marketRankingContent } from './market-ranking.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -83,6 +84,8 @@ export class SectMarketScene {
   private lastTransform = '';
   private nearbyId = '';
   private guidedId = '';
+  private rankingLink: HTMLAnchorElement | null;
+  private rankingEnabled: () => boolean;
 
   private host: HTMLElement;
   public position: TownPoint;
@@ -98,6 +101,7 @@ export class SectMarketScene {
     openAuction: () => void = () => {},
     openVenue: (id: MarketVenueId) => void = () => {},
     returnTown?: (entry?: 'button') => void,
+    rankingEnabled: () => boolean = () => false,
   ) {
     this.host = host;
     host.style.contain = 'layout paint style';
@@ -106,6 +110,7 @@ export class SectMarketScene {
     this.interact = interact;
     this.openAuction = openAuction;
     this.openVenue = openVenue;
+    this.rankingEnabled = rankingEnabled;
     this.residents = marketCharacters(save.mortal.population!, save.mortal.sectMarket!);
     const fellow = marketFellowCharacter(save);
     if (fellow) this.residents.push(fellow);
@@ -132,6 +137,9 @@ export class SectMarketScene {
         '',
       )}<div class="town-player" style="background:${playerSpriteBackground(save.path)}"><span>你</span></div>${this.residents.map((npc) => `<div class="sect-market-npc ${npc.roaming ? 'market-visitor' : 'market-trader'}" data-market-npc="${npc.id}" style="left:${npc.x}px;top:${npc.y}px;z-index:${npc.y}"><span class="sect-market-npc-art" style="background:${playerSpriteBackground(npc.path)}"></span><span class="sect-market-npc-name">${npc.name}<small>${marketRelation(npc.realmIndex, realm)} · ${marketRealmLabel(npc, realm)}<br>${npc.role}</small></span></div>`).join('')}</div></div><svg class="town-minimap" viewBox="0 0 ${MARKET_WIDTH} ${MARKET_HEIGHT}" aria-label="宗门坊市方位图"><rect width="${MARKET_WIDTH}" height="${MARKET_HEIGHT}" fill="#253b2d"/>${MARKET_BUILDINGS.map((b) => `<rect x="${b.x - 130}" y="${b.y - 260}" width="260" height="260" fill="#65745c"/>`).join('')}${MARKET_VENUES.map((v) => `<circle cx="${v.x}" cy="${v.y}" r="22" fill="#d3be80"/>`).join('')}${this.residents.map((n) => `<circle data-market-marker="${n.id}" cx="${n.x}" cy="${n.y}" r="${n.roaming ? 18 : 28}" fill="${n.roaming ? '#a5bca0' : '#dbc17a'}"/>`).join('')}<rect x="${AUCTION_SPOT.x - 25}" y="${AUCTION_SPOT.y - 25}" width="50" height="50" fill="#f1db9a"/><circle class="town-map-marker" r="28" fill="#fff" stroke="#315e41" stroke-width="10"/></svg><div class="town-loading" role="status"><div>宗门坊市 · 同道将至<progress max="${IMAGES.length}" value="0" aria-label="坊市加载进度"></progress><small class="town-load-progress">0%</small></div></div>`;
     this.map = host.querySelector('.sect-market-map')!;
+    // 原生外链放在装饰地图的 aria-hidden 之外，保留键盘及触屏直接打开能力。
+    this.map.insertAdjacentHTML('afterend', marketRankingContent(rankingEnabled()));
+    this.rankingLink = host.querySelector('.market-ranking');
     this.playerSprite = new SettlementSprite(host.querySelector('.town-player')!, this.position);
     this.marker = host.querySelector('.town-map-marker')!;
     this.marker.parentElement!.style.transform = 'translateZ(0)';
@@ -160,6 +168,14 @@ export class SectMarketScene {
     });
     this.observer.observe(host);
     const options = { signal: this.events.signal };
+    this.rankingLink?.addEventListener(
+      'click',
+      (event) => {
+        if (!this.enabled || !this.rankingEnabled()) event.preventDefault();
+        this.clearInput();
+      },
+      options,
+    );
     document.addEventListener(
       'keydown',
       (e) => {
@@ -201,6 +217,7 @@ export class SectMarketScene {
     host.addEventListener(
       'pointerdown',
       (e) => {
+        if ((e.target as Element).closest('.market-ranking')) return;
         if (!this.enabled || this.pointer || !e.isPrimary || e.button !== 0) return;
         e.preventDefault();
         host.focus({ preventScroll: true });
@@ -243,8 +260,10 @@ export class SectMarketScene {
     for (const event of ['pointercancel', 'lostpointercapture'])
       host.addEventListener(event, () => this.clearPointer(), options);
     let loaded = 0;
+    const images = this.rankingLink ? [...IMAGES, MARKET_RANKING_ART.src] : IMAGES;
+    host.querySelector<HTMLProgressElement>('progress')!.max = images.length;
     Promise.all(
-      IMAGES.map(
+      images.map(
         (url) =>
           new Promise<void>((resolve, reject) => {
             const image = new Image();
@@ -254,7 +273,7 @@ export class SectMarketScene {
                 if (bar) bar.value = ++loaded;
                 const progress = host.querySelector('.town-load-progress');
                 if (progress)
-                  progress.textContent = `${Math.round((loaded / IMAGES.length) * 100)}% · ${loaded} / ${IMAGES.length} 项资源`;
+                  progress.textContent = `${Math.round((loaded / images.length) * 100)}% · ${loaded} / ${images.length} 项资源`;
               }
               resolve();
             };
@@ -456,6 +475,10 @@ export class SectMarketScene {
           node.classList.toggle('market-guided', node.dataset.marketMarker === this.guidedId),
         );
     const { scale, x, y } = marketCamera(this.width, this.height, this.position);
+    if (this.rankingLink) {
+      const hidden = !this.enabled || !this.rankingEnabled();
+      if (this.rankingLink.hidden !== hidden) this.rankingLink.hidden = hidden;
+    }
     const view = {
       width: this.width,
       height: this.height,
@@ -479,10 +502,13 @@ export class SectMarketScene {
     const transform = `translate3d(${x}px,${y}px,0) scale(${scale})`;
     if (transform !== this.lastTransform) {
       this.map.style.transform = transform;
+      if (this.rankingLink)
+        this.rankingLink.style.transform = `translate3d(${x + (MARKET_SCENE_PADDING + MARKET_RANKING_SPOT.x) * scale}px,${y + (MARKET_SCENE_PADDING + MARKET_RANKING_SPOT.y) * scale}px,0) translate(-50%,-100%)`;
       this.lastTransform = transform;
     }
     if (scale !== this.lastScale) {
       this.map.style.setProperty('--market-scale', String(scale));
+      this.rankingLink?.style.setProperty('--ranking-scale', String(scale));
       this.lastScale = scale;
     }
     this.playerSprite.move(this.position);

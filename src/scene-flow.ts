@@ -81,6 +81,7 @@ export function mountTownScene(shell: ActionShell) {
             (entry?: 'button') => {
               if (marketHost.isConnected) module.travelSettlement(shell, 'town', entry);
             },
+            () => shell.rankingEnabled?.() ?? false,
           );
         },
         () => {

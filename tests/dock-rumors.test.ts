@@ -17,7 +17,7 @@ function fixture(seed = 6) {
   return save;
 }
 
-test('船客传闻原文按已确认附件保留，万魂幡不进入随机池', () => {
+test('船客传闻原文按已确认附件保留，关闭万魂幡时不携带榜单传闻', () => {
   const expected = {
     immortal:
       '老辈人说，久不归乡的修士回来，街上偶尔会多出个面生的人。肯上前搭话的，总能捎点什么走。',
@@ -42,7 +42,9 @@ test('船客传闻原文按已确认附件保留，万魂幡不进入随机池',
     pool.some((rumor) => rumor.key === 'ranking' || rumor.href),
     false,
   );
-  const ranking = dockRumors(save, true)[0];
+  const ranking = Array.from({ length: 64 }, (_, seed) => dockRumors(fixture(seed), true))
+    .flat()
+    .find((rumor) => rumor.key === 'ranking');
   assert.deepEqual(ranking, {
     key: 'ranking',
     text: '下游有座山上祭着一面幡，收的全是修士的名号。听说道行越深，名字挂得越高，也不知图个什么。',
@@ -50,7 +52,7 @@ test('船客传闻原文按已确认附件保留，万魂幡不进入随机池',
   });
 });
 
-test('一次入镇三条互异且固定，万魂幡开启首条常驻，关闭及非官网不携带条目或链接', () => {
+test('一次入镇三条互异且固定，万魂幡参与普通轮换，关闭及非官网不携带条目或链接', () => {
   const save = fixture();
   const before = structuredClone(save);
   const off = dockRumors(save, false);
@@ -59,8 +61,8 @@ test('一次入镇三条互异且固定，万魂幡开启首条常驻，关闭�
   assert.equal(on.length, 3);
   assert.equal(new Set(off.map((rumor) => rumor.key)).size, 3);
   assert.equal(new Set(on.map((rumor) => rumor.key)).size, 3);
-  assert.equal(on[0].key, 'ranking');
-  assert.deepEqual(on.slice(1), off.slice(0, 2));
+  const ordinary = on.filter((rumor) => rumor.key !== 'ranking');
+  assert.deepEqual(ordinary, off.slice(0, ordinary.length));
   assert.equal(
     off.some((rumor) => rumor.key === 'ranking' || rumor.href),
     false,
@@ -87,6 +89,20 @@ test('一次入镇三条互异且固定，万魂幡开启首条常驻，关闭�
   const returned = dockRumors(save, true);
   returned[0].text = 'caller mutation';
   assert.notEqual(dockRumors(save, true)[0].text, 'caller mutation');
+});
+
+test('万魂幡可未抽中，也可出现在三条中的任一位置，不固定首条或保底出现', () => {
+  const positions = new Set<number>();
+  const save = fixture();
+  for (let seed = 0; seed < 128; seed++) {
+    save.mortal.population!.seed = seed;
+    const selected = dockRumors(save, true);
+    positions.add(selected.findIndex((rumor) => rumor.key === 'ranking'));
+    assert.equal(selected.length, 3);
+    assert.equal(new Set(selected.map((rumor) => rumor.key)).size, 3);
+    assert.deepEqual(dockRumors(save, true), selected);
+  }
+  assert.deepEqual([...positions].sort(), [-1, 0, 1, 2]);
 });
 
 test('已得掌天瓶不再进入池，预告无结果不入池且抽选不补虚假预告', () => {
