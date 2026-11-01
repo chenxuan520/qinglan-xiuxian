@@ -9,6 +9,7 @@ import {
   TOWN_NPCS,
   townWalkable,
   moveInTown,
+  TOWN_WALK_SPEED,
 } from '../src/town.ts';
 import {
   MARKET_WIDTH,
@@ -37,7 +38,7 @@ function follow(
       position = move(
         position,
         { x: x / distance, y: y / distance },
-        Math.min(1 / 60, distance / 180),
+        Math.min(1 / 60, distance / TOWN_WALK_SPEED),
       );
       assert.ok(allowed(position), `不能穿墙: ${JSON.stringify(position)}`);
     }

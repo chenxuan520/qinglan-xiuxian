@@ -1,4 +1,5 @@
 import { enterNextMarketBatch } from './market-fixture.ts';
+import { TOWN_WALK_SPEED } from '../src/town.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, readSave, realmCost, realmInfo, SAVE_SCHEMA } from '../src/progress.ts';
@@ -485,7 +486,11 @@ test('场地可达三位修士、保持距离才可交谈；边界与两处建�
     assert.ok(pos.y >= b.y);
   }
   const next = moveInSectMarket(MARKET_START, { x: 1, y: 1 }, 1000);
-  assert.ok(Math.hypot(next.x - MARKET_START.x, next.y - MARKET_START.y) <= 9.001);
+  assert.ok(Math.hypot(next.x - MARKET_START.x, next.y - MARKET_START.y) <= 11.701);
+  const straight = moveInSectMarket(MARKET_START, { x: 1, y: 0 }, 0.05);
+  assert.ok(Math.abs(straight.x - MARKET_START.x - 11.7) < 1e-9);
+  assert.equal(straight.y, MARKET_START.y);
+  assert.equal(TOWN_WALK_SPEED, 234);
   const edge = moveInSectMarket(
     { x: MARKET_WIDTH - 24, y: MARKET_HEIGHT - 24 },
     { x: 1, y: 1 },

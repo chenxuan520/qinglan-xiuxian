@@ -17,6 +17,7 @@ import {
   HOMETOWN_START,
   HOMETOWN_DOCK,
   HOMETOWN_NAV_SPEED,
+  TOWN_WALK_SPEED,
 } from '../src/town.ts';
 
 test('房前屋后与两侧空地可走，不再把整块宅地当作空气墙', () => {
@@ -106,7 +107,7 @@ test('自动走动按离乡速度前进且约十秒走完，不在最后不足�
     assert.ok(frames * dt <= expected + dt);
     assert.ok(Math.hypot(target.x - p.x, target.y - p.y) <= 0.01);
   }
-  assert.equal(moveInTown(start, { x: 1, y: 0 }, 0.05).x - start.x, 9);
+  assert.ok(Math.abs(moveInTown(start, { x: 1, y: 0 }, 0.05).x - start.x - 11.7) < 1e-9);
   const route = townDockPath(HOMETOWN_START);
   let distance = 0,
     previous = HOMETOWN_START;
@@ -196,7 +197,7 @@ test('九位职业镇民与十二位村民均在可达街巷，走近可触发�
     for (const target of [...targets, npc]) {
       for (let i = 0; i < 600 && Math.hypot(target.x - p.x, target.y - p.y) > 2; i++) {
         const delta = { x: target.x - p.x, y: target.y - p.y };
-        p = moveInTown(p, delta, Math.min(0.05, Math.hypot(delta.x, delta.y) / 180));
+        p = moveInTown(p, delta, Math.min(0.05, Math.hypot(delta.x, delta.y) / TOWN_WALK_SPEED));
         assert.ok(townWalkable(p));
       }
       assert.ok(Math.hypot(target.x - p.x, target.y - p.y) <= 2, npc.id);
