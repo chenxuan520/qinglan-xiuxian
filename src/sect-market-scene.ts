@@ -31,7 +31,14 @@ import { mapClick, walkRoute } from './settlement-navigation.ts';
 import { townWalkable, TOWN_WALK_SPEED } from './town.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';
-import { MARKET_RANKING_ART, MARKET_RANKING_SPOT, marketRankingContent } from './market-ranking.ts';
+import {
+  MARKET_RANKING_ART,
+  MARKET_RANKING_SPOT,
+  marketRankingContent,
+  paintMarketRankingArt,
+  marketRankingCaptionObscured,
+  marketRankingCaptionOffset,
+} from './market-ranking.ts';
 
 const IMAGES = [
   '/assets/town-ground.webp',
@@ -269,6 +276,14 @@ export class SectMarketScene {
             const image = new Image();
             image.onload = () => {
               if (!this.events.signal.aborted) {
+                if (url === MARKET_RANKING_ART.src) {
+                  const canvas = this.rankingLink?.querySelector<HTMLCanvasElement>('canvas');
+                  if (canvas) {
+                    const painted = paintMarketRankingArt(canvas, image);
+                    canvas.hidden = !painted;
+                    this.rankingLink!.classList.toggle('market-ranking-no-art', !painted);
+                  }
+                }
                 const bar = host.querySelector<HTMLProgressElement>('.town-loading progress');
                 if (bar) bar.value = ++loaded;
                 const progress = host.querySelector('.town-load-progress');
@@ -450,7 +465,7 @@ export class SectMarketScene {
           : usePlace
             ? `走入${place.name}`
             : near
-              ? `与${near.name}交谈`
+              ? `与${near.name}\u200b交谈`
               : '走近可互动';
       }
       this.host
@@ -478,6 +493,18 @@ export class SectMarketScene {
     if (this.rankingLink) {
       const hidden = !this.enabled || !this.rankingEnabled();
       if (this.rankingLink.hidden !== hidden) this.rankingLink.hidden = hidden;
+      const crowded =
+        marketRankingCaptionObscured(this.position, scale) ||
+        this.residents.some((npc) => marketRankingCaptionObscured(npc, scale));
+      this.rankingLink.classList.toggle('market-ranking-crowded', crowded);
+      if (crowded && this.rankingLink.classList.contains('market-ranking-no-art')) {
+        const people = [this.position, ...this.residents].filter((p) =>
+          marketRankingCaptionObscured(p, scale),
+        );
+        const shift = `${marketRankingCaptionOffset(people, scale, y + (MARKET_SCENE_PADDING + MARKET_RANKING_SPOT.y) * scale, this.height)}px`;
+        if (this.rankingLink.style.getPropertyValue('--ranking-caption-shift') !== shift)
+          this.rankingLink.style.setProperty('--ranking-caption-shift', shift);
+      }
     }
     const view = {
       width: this.width,

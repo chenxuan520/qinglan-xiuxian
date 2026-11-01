@@ -295,6 +295,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
   color: var(--gold);
   text-decoration: none;
 }
@@ -302,24 +303,50 @@
   display: none;
 }
 .market-ranking-art {
-  width: calc(96px * var(--ranking-scale, 1));
-  height: calc(96px * var(--ranking-scale, 1));
-  background-size: 400% 300%;
-  background-repeat: no-repeat;
+  width: calc(80px * var(--ranking-scale, 1));
+  height: calc(80px * var(--ranking-scale, 1));
+  filter: drop-shadow(1px 3px 2px #18241766);
 }
 .market-ranking-name {
-  padding: 4px 10px;
-  background: #082d25ed;
-  border: 1px solid #d5c58e88;
-  font-size: 16px;
+  color: #fff0bd;
+  font-size: 14px;
   line-height: 1.5;
-  font-weight: 600;
+  font-weight: 500;
+  text-shadow:
+    0 1px 2px #171b12,
+    0 0 4px #171b12;
   white-space: nowrap;
+}
+.market-ranking-crowded .market-ranking-name {
+  visibility: hidden;
+}
+.market-ranking-no-art.market-ranking-crowded .market-ranking-name {
+  visibility: visible;
+  transform: translateY(var(--ranking-caption-shift, 0px));
 }
 .market-ranking:hover .market-ranking-name,
 .market-ranking:focus-visible .market-ranking-name {
-  border-color: var(--gold);
   text-decoration: underline;
+}
+.market-ranking:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.market-ranking-no-art:focus-visible {
+  outline: none;
+}
+.market-ranking-no-art:focus-visible .market-ranking-name {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.sect-market-scene [data-action='sect-market-talk'] {
+  padding-inline: 12px;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+.sect-market-scene .town-scene-controls .action-phrase {
+  display: inline-block;
+  white-space: nowrap;
 }
 .auction-toolbar {
   display: flex;
