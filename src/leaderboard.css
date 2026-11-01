@@ -134,4 +134,6 @@
 .leaderboard-panel .leaderboard-status {
   font-size: 13px;
   line-height: 1.8;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }

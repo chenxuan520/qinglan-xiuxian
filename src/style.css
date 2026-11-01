@@ -494,3 +494,13 @@ button:not(:disabled):hover {
 .life-mode-badge {
   color: #e5b89d;
 }
+
+.difficulty-name {
+  white-space: nowrap;
+}
+.difficulty-name.difficulty-1 {
+  color: #e6c56a;
+}
+.difficulty-name.difficulty-2 {
+  color: #ef8e82;
+}
