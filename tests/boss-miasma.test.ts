@@ -150,7 +150,7 @@ test('续局只扩大第四境妖王毒瘴的合法速度，不放行其他危�
   }
 });
 
-test('固定毒池与小怪瘴云不受影响，图鉴区分第四境和终关的毒瘴时长', () => {
+test('固定毒池保持，小怪瘴云提速150%，图鉴区分第四境和终关时长', () => {
   const { g, boss } = encounter();
   boss.skillStep = 0;
   g.castBossSkill(boss, 1, 0);
@@ -159,7 +159,7 @@ test('固定毒池与小怪瘴云不受影响，图鉴区分第四境和终关�
   const enemy = g.spawnEnemy(50, false, false);
   const [cloud] = regionalEnemyFields(enemy, 'miasma', 1, 0)!;
   assert.ok(Math.abs(cloud.life - 4.8) < 1e-8);
-  assert.equal(cloud.vx, 12);
+  assert.equal(cloud.vx, 30);
   assert.match(bestiaryPanel(3).body, /三团持续12秒的漂移毒瘴/);
   assert.match(bestiaryPanel(6).body, /三团持续6秒的漂移毒瘴/);
   assert.doesNotMatch(bestiaryPanel(6).body, /三团持续12秒的漂移毒瘴/);

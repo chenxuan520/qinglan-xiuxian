@@ -4,7 +4,7 @@ import { Game } from '../src/game.ts';
 import { freshSave, readSave, SAVE_SCHEMA } from '../src/progress.ts';
 import { bossSkills } from '../src/boss-skills.ts';
 import { STAGES } from '../src/data.ts';
-import { BOSS_MECHANICS as R, bossShotPose } from '../src/boss-mechanics.ts';
+import { BOSS_MECHANICS as R, bossReturnOut, bossShotPose } from '../src/boss-mechanics.ts';
 import { drawBossSummon, drawBossMotionCue } from '../src/boss-mechanics-render.ts';
 import { autoplayInput } from '../src/autoplay.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
@@ -157,7 +157,7 @@ test('木心每王最多三枚，不叠加刷屏，主人倒下或八秒到期�
   assert.ok(g.enemies.filter((c) => c.bossSummon).every((c) => c.dead));
 });
 
-test('两猎狼从相反侧翼绕行，完整蓄势后各扑一次，锁向后不追踪、无额外奖励', () => {
+test('两猎狼从相反侧翼绕行，完整蓄势后各扑一次，锁向后不追踪、自然消散不结算', () => {
   const { g } = cast(2);
   const wolves = actors(g);
   assert.equal(wolves.length, 2);
@@ -194,13 +194,13 @@ test('回焰预热无伤，去程与返程沿同一轨迹，转向短停，真�
   Object.assign(h.player, { x: 900, y: 900 });
   const shot = h.shots[2];
   const out = bossShotPose(shot, R.returnWarmup + 0.5),
-    back = bossShotPose(shot, R.returnWarmup + 2 * R.returnOut + R.returnRest - 0.5);
+    back = bossShotPose(shot, R.returnWarmup + 2 * bossReturnOut(shot) + R.returnRest - 0.5);
   assert.ok(Math.abs(out.x - back.x) < 1e-9 && Math.abs(out.y - back.y) < 1e-9);
   assert.ok(out.vx > 0 && back.vx < 0);
-  const wait = bossShotPose(shot, R.returnWarmup + R.returnOut + 0.2);
+  const wait = bossShotPose(shot, R.returnWarmup + bossReturnOut(shot) + 0.2);
   assert.equal(wait.vx, 0);
   assert.equal(wait.vy, 0);
-  h.updateShots(R.returnWarmup + R.returnOut + 0.2);
+  h.updateShots(R.returnWarmup + bossReturnOut(shot) + 0.2);
   const at = { x: shot.x, y: shot.y };
   h.updateShots(0.1);
   assert.deepEqual({ x: shot.x, y: shot.y }, at);
@@ -212,8 +212,10 @@ test('回焰与星珠跨转折点按同一轨迹推进，长短帧和读档不�
     Object.assign(g.player, { x: 900, y: 900 });
     const h = Game.restore(g.save, g.snapshot())!;
     assert.ok(h);
-    g.updateShots(2.3);
-    for (let i = 0; i < 230; i++) h.updateShots(0.01);
+    const span =
+      origin === 1 ? R.returnWarmup + bossReturnOut(g.shots[0]) + R.returnRest + 0.2 : 2.3;
+    g.updateShots(span);
+    for (let t = 0; t < span - 1e-9; t += 0.01) h.updateShots(Math.min(0.01, span - t));
     for (let i = 0; i < g.shots.length; i++) {
       assert.ok(Math.abs(g.shots[i].x - h.shots[i].x) < 1e-7);
       assert.ok(Math.abs(g.shots[i].y - h.shots[i].y) < 1e-7);
@@ -354,7 +356,12 @@ test('自动走位遇上折返、逆行和错拍的实际碰撞路线会放弃�
     g.pickups = [{ x: 200, y: 0, kind: 'xp', value: 1, pull: false }];
     const shot = g.shots[origin === 1 ? 2 : 0];
     g.shots = [shot];
-    shot.age = origin === 1 ? 2.5 : origin === 4 ? 1.5 : 1.3;
+    shot.age =
+      origin === 1
+        ? R.returnWarmup + bossReturnOut(shot) + R.returnRest + 0.1
+        : origin === 4
+          ? 1.5
+          : 1.3;
     // 将真实攻击轨迹置于拾取直路，保持各招自己的转向、延迟和速度。
     const future = bossShotPose(shot, shot.age + 0.36);
     const dx = g.stats.speed * 0.36 - future.x,

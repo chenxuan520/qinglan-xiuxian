@@ -225,18 +225,19 @@ test('AI按可见错拍预警换位，画面在减少动态下也能区分灼烧
   assert.equal(ENEMIES[e.type].name, '曜日星灵');
 });
 
-test('小怪漂移瘴云时长延长50%，妖王恢复五处固定瘴池', () => {
+test('小怪漂移瘴云保持4.8秒并提速150%，妖王仍为五处固定瘴池', () => {
   const g = arena(3),
     e = g.spawnEnemy(50, false, false, { x: 0, y: 0 });
   const [cloud] = regionalEnemyFields(e, 'miasma', 1, 0)!;
   assert.ok(Math.abs(cloud.life - 4.8) < 1e-9);
   assert.equal(cloud.delay, 1);
   assert.equal(cloud.damageScale, 0.65);
-  assert.ok(
+  assert.equal(cloud.vx, 30);
+  assert.equal(cloud.vy, 0);
+  const reach =
     Math.hypot(cloud.x - e.x + cloud.vx! * cloud.life, cloud.y - e.y + cloud.vy! * cloud.life) +
-      cloud.radius <=
-      200,
-  );
+    cloud.radius;
+  assert.ok(Math.abs(reach - 269) < 1e-9);
   const boss = g.spawnEnemy(10, false, true);
   boss.skillStep = 0;
   g.castBossSkill(boss, 1, 0);

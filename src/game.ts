@@ -1,5 +1,6 @@
 import {
   BOSS_MECHANICS,
+  bossReturnOut,
   bossShotPose,
   cloneBossMotion,
   type TrailPoint,
@@ -1698,10 +1699,10 @@ export class Game {
       const pool =
         stage === FINAL_TRIAL_STAGE ? [24, 25] : enemyRoster(stage, STAGES[stage].minutes * 60);
       for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++)
-        this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], false, false, {
+        this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], true, false, {
           x: e.x + Math.cos((i / count) * TAU) * 90,
           y: e.y + Math.sin((i / count) * TAU) * 90,
-        }).summonedBy = !this.isFinalTrial && stage === 4 ? e.id : undefined;
+        }).summonedBy = e.id;
     };
     this.announce(`${STAGES[stage].boss} · ${bossSkills(stage, this.isFinalTrial)[phase]}`);
     if (stage === 2 && phase === 4) {
@@ -1848,7 +1849,7 @@ export class Game {
         const center = stage === 0 ? this.player : e;
         const child = this.spawnEnemy(
           stage === 0 ? 10 : 41,
-          false,
+          stage === 2,
           false,
           {
             x: center.x + Math.cos(angle) * 145,
@@ -1860,9 +1861,9 @@ export class Game {
         child.summonedBy = e.id;
         child.bossSummon = { kind, age: 0, side };
         child.radius = stage === 0 ? 20 : 23;
-        child.hp = child.maxHp *= stage === 0 ? 0.45 : 0.6;
-        child.damage = stage === 0 ? 0 : e.damage * 0.65;
-        child.speed = stage === 0 ? 0 : 210;
+        if (stage === 0) child.hp = child.maxHp *= 0.45;
+        child.damage = stage === 0 ? 0 : Math.max(child.damage, e.damage * 0.65);
+        child.speed = stage === 0 ? 0 : Math.max(child.speed, 210);
         child.dx = nx;
         child.dy = ny;
         child.cooldown = 99;
@@ -1885,9 +1886,11 @@ export class Game {
       if (this.shots.filter((b) => b.bossMotion?.kind === 'return').length >= 10) return;
       for (let i = 0; i < 5; i++) {
         const a = Math.atan2(ny, nx) + (i / 4 - 0.5) * 1.2;
-        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), 155, e.damage * 0.55);
+        const speed =
+          this.stage === 1 && !this.tribulation ? rules.nativeReturnSpeed : rules.returnSpeed;
+        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.55);
         shot.bossMotion = { kind: 'return', velocity: { x: shot.vx, y: shot.vy } };
-        shot.life = rules.returnWarmup + 2 * rules.returnOut + rules.returnRest;
+        shot.life = rules.returnWarmup + 2 * bossReturnOut(shot) + rules.returnRest;
         shot.radius = 10;
       }
     } else if (stage === 3) {
@@ -3033,7 +3036,7 @@ export class Game {
     if (e.hp <= 0) {
       e.dead = true;
       this.enemyDeath(e);
-      if (e.cacheGuardian || e.bossSummon) return;
+      if (e.cacheGuardian || e.bossSummon?.kind === 'heart') return;
       this.kills++;
       if (this.tribulation) {
         this.state = this.player.hp > 0 ? 'won' : 'lost';
@@ -3131,9 +3134,15 @@ export class Game {
             distance(e, this.player) <=
               (110 + this.passives.soul * 50) * (1 + masteryBonus(this.save, 'soul')),
         });
+      // 普通召唤者的原掉落保留；妖王已离场时，其仍存活的召唤物也不能补出宝匣。
+      const summoner =
+        e.summonedBy === undefined
+          ? undefined
+          : this.enemies.find((owner) => owner.id === e.summonedBy);
+      const bossSummoned = e.summonedBy !== undefined && (!summoner || summoner.boss);
       if (
-        (e.elite && (!this.isFinalTrial || this.random() < 0.06)) ||
-        (e.boss && this.isFinalTrial)
+        !bossSummoned &&
+        ((e.elite && (!this.isFinalTrial || this.random() < 0.06)) || (e.boss && this.isFinalTrial))
       )
         this.pickups.push({ x: e.x + 14, y: e.y, kind: 'chest', value: 1, pull: false });
       else if (!e.boss) {

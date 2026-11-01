@@ -11,7 +11,10 @@ export const BOSS_MECHANICS = {
   nativeMiasmaSpeed: 72,
   nativePursuitMiasmaSpeed: 96,
   returnWarmup: 0.8,
+  returnSpeed: 155,
+  nativeReturnSpeed: 232.5,
   returnOut: 1.15,
+  nativeReturnOut: 2.3,
   returnRest: 0.4,
   orbitRadius: 135,
   orbitSpeed: 1.1,
@@ -33,12 +36,21 @@ export interface TrailPoint extends Point {
   time: number;
 }
 
+// 速度已保存在弹丸中：原生古墟新回焰走新时长，旧续局及终关回焰保留原轨迹。
+export function bossReturnOut(b: Shot) {
+  const m = b.bossMotion;
+  return m?.kind === 'return' &&
+    Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - BOSS_MECHANICS.nativeReturnSpeed) < 1e-6
+    ? BOSS_MECHANICS.nativeReturnOut
+    : BOSS_MECHANICS.returnOut;
+}
+
 // 同一条轨迹供模拟、画面方向和自动走位预测使用，不读取未来选招。
 export function bossShotPose(b: Shot, age = b.age) {
   const m = b.bossMotion!;
   if (m.kind === 'return') {
     const t = age - BOSS_MECHANICS.returnWarmup;
-    const out = BOSS_MECHANICS.returnOut,
+    const out = bossReturnOut(b),
       rest = BOSS_MECHANICS.returnRest;
     const distance = Math.max(0, t < out ? t : t < out + rest ? out : 2 * out + rest - t);
     const direction = t < 0 || (t >= out && t < out + rest) ? 0 : t < out ? 1 : -1;
@@ -94,7 +106,9 @@ export function validBossMotion(m: BossMotion, stage: number | undefined) {
     return (
       stage === 1 &&
       point(m.velocity) &&
-      Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - 155) < 1e-6
+      [BOSS_MECHANICS.returnSpeed, BOSS_MECHANICS.nativeReturnSpeed].some(
+        (speed) => Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - speed) < 1e-6,
+      )
     );
   if (m.kind === 'star')
     return (

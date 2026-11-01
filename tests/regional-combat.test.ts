@@ -98,7 +98,7 @@ test('移动云和条带警示期间无伤，激活后按真实边界命中且�
   }
 });
 
-test('所有小怪新危险区及全部漂移路径均在施法者200像素内', () => {
+test('小怪危险区仍限200像素，用户指定提速的瘴云完整路径精确到269像素', () => {
   for (const skill of ['roots', 'firecharge', 'firepath', 'frost', 'miasma', 'storm'] as const)
     for (const elite of [false, true])
       for (const angle of [0, 0.7, Math.PI, -1.2]) {
@@ -109,7 +109,12 @@ test('所有小怪新危险区及全部漂移路径均在施法者200像素内',
           for (const end of [0, f.life]) {
             const dx = (f.vx || 0) * end,
               dy = (f.vy || 0) * end;
-            assert.ok(Math.hypot(f.x + dx - e.x, f.y + dy - e.y) + f.radius <= 200);
+            const reach = Math.hypot(f.x + dx - e.x, f.y + dy - e.y) + f.radius;
+            if (skill === 'miasma') {
+              assert.ok(Math.abs(Math.hypot(f.vx!, f.vy!) - 30) < 1e-9);
+              assert.ok(Math.abs(reach - (125 + 30 * end)) < 1e-9);
+              assert.ok(reach <= 269 + 1e-9);
+            } else assert.ok(reach <= 200);
             if (f.endX !== undefined)
               assert.ok(Math.hypot(f.endX + dx - e.x, f.endY! + dy - e.y) + f.radius <= 200);
           }

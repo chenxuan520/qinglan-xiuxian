@@ -1,5 +1,5 @@
 import type { Enemy, Shot } from './game-types.ts';
-import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
+import { BOSS_MECHANICS, bossReturnOut, bossShotPose } from './boss-mechanics.ts';
 import { TAU } from './data.ts';
 
 export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
@@ -74,7 +74,7 @@ export function drawBossMotionCue(c: CanvasRenderingContext2D, b: Shot) {
   if (m.kind === 'return') {
     // 回焰转向前短暂停驻，箭头向来路，不能误画成仍然向外飞。
     const t = b.age - BOSS_MECHANICS.returnWarmup;
-    const returning = t >= BOSS_MECHANICS.returnOut;
+    const returning = t >= bossReturnOut(b);
     c.save();
     const direction = Math.atan2(m.velocity.y, m.velocity.x) + (returning ? Math.PI : 0);
     c.rotate(direction - Math.atan2(b.vy, b.vx));

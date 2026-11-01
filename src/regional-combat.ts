@@ -168,7 +168,7 @@ export function regionalEnemyFields(
         ),
       );
   } else if (skill === 'miasma') {
-    fields.push(cloud('enemy-miasma', offset(e, nx, ny, 75), nx * 12, ny * 12, 50, 3.2, 1, 0.65));
+    fields.push(cloud('enemy-miasma', offset(e, nx, ny, 75), nx * 30, ny * 30, 50, 3.2, 1, 0.65));
   } else if (skill === 'storm') {
     for (const [index, side] of [-1, 1].entries()) {
       const angle = Math.atan2(ny, nx) + side * 0.48;
