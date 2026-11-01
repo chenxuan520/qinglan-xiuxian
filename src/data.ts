@@ -894,15 +894,16 @@ export const REALM_LIFESPANS = [100, 250, 500, 1000, 2000, 5000, 10000, Infinity
 export const STAGE_YEARS_PER_MINUTE = [10, 25, 50, 100, 200, 500, 1000];
 export const FINAL_TRIAL_STAGE = 6;
 export function tribulationRules(round: number) {
-  const tier = Math.min(4, Math.max(0, round - 1));
-  const extra = Math.max(0, round - 5);
+  const tier = Math.min(3, Math.max(0, round - 1));
+  const extra = Math.max(0, round - 4);
   return {
-    hp: [5000, 8000, 12000, 20000, 40000][tier] * (1 + extra * 0.35),
-    damage: Math.min(0.65, [0.25, 0.28, 0.32, 0.38, 0.55][tier] + extra * 0.025),
-    warning: Math.max(0.55, [1.2, 1.1, 1, 0.85, 0.7][tier] - extra * 0.015),
-    interval: Math.max(1.2, [3.4, 3.1, 2.8, 2.4, 1.8][tier] - extra * 0.035),
-    opening: Math.max(0.65, [2.8, 2.5, 2.2, 1.8, 1][tier] - extra * 0.025),
-    openingDamage: [0.26, 0.24, 0.22, 0.18, 0.03][tier],
+    // 每劫递进至第十二劫封顶，不让后期气血无限复利。
+    hp: [5000, 8000, 12000, 20000][tier] * 1.5 ** Math.min(8, extra),
+    damage: Math.min(1, [0.25, 0.28, 0.32, 0.38][tier] + extra * 0.05),
+    warning: Math.max(0.1, [1.2, 1.1, 1, 0.85][tier] - extra * 0.1),
+    interval: Math.max(1.2, [3.4, 3.1, 2.8, 2.4][tier] - extra * 0.3),
+    opening: Math.max(0.65, [2.8, 2.5, 2.2, 1.8][tier] - extra * 0.3),
+    openingDamage: Math.max(0.03, [0.26, 0.24, 0.22, 0.18][tier] - extra * 0.02),
   };
 }
 export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];

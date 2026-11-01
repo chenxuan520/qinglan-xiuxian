@@ -173,7 +173,7 @@ test('养魂木计分升级到v3/格式41：真实v2本地与文件先验旧摘�
   }
 });
 
-test('七类调试发放只标记成功的副本，设置可见原因且公共榜单链接保留', () => {
+test('七类调试发放不禁榜，设置说明真实校验异常且公共榜单链接保留', () => {
   const save = freshSave();
   for (const input of [
     { kind: 'stones' },
@@ -187,14 +187,14 @@ test('七类调试发放只标记成功的副本，设置可见原因且公共�
     const grant = { id: '', quantity: 1, forge: 0, ...input } satisfies DebugGrant;
     const result = debugGrant(save, grant);
     assert.ok(result.next, result.error);
-    assert.equal(result.next.factsTampered, true);
+    assert.equal(result.next.factsTampered, false);
     assert.equal(save.factsTampered, false);
   }
   assert.ok(debugGrant(save, { kind: 'stones', id: '', quantity: -1, forge: 0 }).error);
   assert.equal(save.factsTampered, false);
   const clean = leaderboardSettings(true, false),
     changed = leaderboardSettings(true, true);
-  assert.doesNotMatch(clean, /此世存档曾被改动/);
-  assert.match(changed, /此世存档曾被改动，不可留名万魂幡。/);
+  assert.doesNotMatch(clean, /此世存档未通过完整性校验/);
+  assert.match(changed, /此世存档未通过完整性校验，不可留名万魂幡。/);
   assert.match(changed, /https:\/\/xiuxian\.011203\.xyz\/leaderboard\//);
 });

@@ -1,3 +1,5 @@
+import { debugAccess } from './debug-access.ts';
+import { leaderboardUnavailableContent } from './leaderboard-notice.ts';
 import { TAMPERED_LEADERBOARD_MESSAGE, sealSaveSnapshot } from './leaderboard-integrity.ts';
 import { bindSettlementDirectory } from './settlement-directory-source.ts';
 import { retargetPendingFirstTour } from './first-run-tour-state.ts';
@@ -386,7 +388,10 @@ let rankingPanel: InstanceType<RankingModule['LeaderboardPanel']> | null = null;
 let rankingReturn: PanelLocation | null = null;
 let rankingInheritance: string | null = null;
 let rankingQueuedSeed: number | null = null;
+let rankingLoadFailedSeed: number | null = null;
 let rankingEpoch = 0;
+let rankingTestAllowed = false;
+let rankingTestCheck: Promise<boolean> | null = null;
 let lastMortalTick = performance.now();
 let nextMortalStatus = 0;
 const guideSource = new GuideSource();
@@ -1111,6 +1116,12 @@ function renderPanel() {
     return;
   }
   sceneFlow.renderPanel(shellBindings());
+  if (panel === 'settings' && rankingEnabled() && save.factsTampered && !rankingTestCheck) {
+    const epoch = rankingEpoch;
+    void getRankingTestAccess().then(() => {
+      if (panel === 'settings' && epoch === rankingEpoch && !saveLock) renderPanel();
+    });
+  }
   if (panel === 'chronicle' && rankingEnabled()) {
     const score = modal.querySelector('.chronicle-score');
     if (score && !score.querySelector('[data-leaderboard-link]'))
@@ -1126,6 +1137,33 @@ function renderPanel() {
 function rankingEnabled() {
   return rankingPreference.enabled && leaderboardAvailable();
 }
+function getRankingTestAccess(refresh = false): Promise<boolean> {
+  if (!refresh && rankingTestCheck) return rankingTestCheck;
+  const epoch = rankingEpoch;
+  const pending = debugAccess(NPC_AI_BASE).then((access) => {
+    const allowed = access === 'enabled';
+    if (epoch === rankingEpoch && rankingTestCheck === pending) rankingTestAllowed = allowed;
+    return allowed;
+  });
+  rankingTestCheck = pending;
+  return pending;
+}
+function rankingBlocked() {
+  return save.factsTampered && !rankingTestAllowed;
+}
+function showRankingUnavailable(blocked = rankingBlocked()) {
+  if (
+    !rankingEnabled() ||
+    saveLock ||
+    game ||
+    pendingRun ||
+    (!panel.endsWith('-farewell') && panel !== 'epilogue-reincarnate')
+  )
+    return;
+  const host = modal.querySelector('.panel');
+  if (!host || host.querySelector('[data-ranking-offer], [data-ranking-unavailable]')) return;
+  host.insertAdjacentHTML('beforeend', leaderboardUnavailableContent(blocked));
+}
 function clearRanking() {
   rankingEpoch++;
   rankingOffer?.clear();
@@ -1133,43 +1171,69 @@ function clearRanking() {
   rankingPanel?.destroy();
   rankingPanel = null;
   rankingQueuedSeed = null;
+  rankingLoadFailedSeed = null;
+  rankingTestAllowed = false;
+  rankingTestCheck = null;
   if (toastElement.hasAttribute('data-ranking')) {
     toastElement.classList.remove('visible');
     toastElement.removeAttribute('data-ranking');
   }
-  document.querySelectorAll('[data-ranking-offer]').forEach((item) => item.remove());
+  document
+    .querySelectorAll('[data-ranking-offer], [data-ranking-unavailable]')
+    .forEach((item) => item.remove());
 }
 function queueRanking() {
-  if (
-    !rankingEnabled() ||
-    saveLock ||
-    save.factsTampered ||
-    rankingOffer ||
-    rankingQueuedSeed === save.medicine.recipeSeed ||
-    (!save.pendingReincarnation && !save.journeyEnded)
-  )
-    return;
+  if (!rankingEnabled() || saveLock || (!save.pendingReincarnation && !save.journeyEnded)) return;
   const epoch = rankingEpoch;
-  rankingQueuedSeed = save.medicine.recipeSeed;
+  const seed = save.medicine.recipeSeed;
+  const current = () =>
+    epoch === rankingEpoch && seed === save.medicine.recipeSeed && rankingEnabled() && !saveLock;
+  if (rankingBlocked()) {
+    void getRankingTestAccess().then((allowed) => {
+      if (!current()) return;
+      if (allowed) {
+        modal.querySelector('[data-ranking-unavailable]')?.remove();
+        queueRanking();
+      } else showRankingUnavailable(true);
+    });
+    return;
+  }
+  if (rankingLoadFailedSeed === seed) {
+    showRankingUnavailable(false);
+    return;
+  }
+  if (rankingOffer || rankingQueuedSeed === seed) return;
+  rankingQueuedSeed = seed;
   void rankingSource
     .load()
     .then((module) => {
-      if (epoch === rankingEpoch && rankingEnabled() && !saveLock && !save.factsTampered)
-        rankingOffer ??= new module.LeaderboardOffer(rankingEnabled);
+      if (current() && !rankingBlocked())
+        rankingOffer ??= new module.LeaderboardOffer(
+          rankingEnabled,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          () => rankingTestAllowed,
+        );
     })
-    .catch(() => {});
+    .catch(() => {
+      if (current()) {
+        rankingLoadFailedSeed = seed;
+        showRankingUnavailable(false);
+      }
+    });
 }
 function rankingReady() {
   if (
     !rankingEnabled() ||
-    save.factsTampered ||
+    rankingBlocked() ||
     game ||
     pendingRun ||
     saveLock ||
     sceneLoading ||
     inMortalWorld ||
     document.hidden ||
-    !document.hasFocus() ||
     toastElement.classList.contains('visible') ||
     guideSource.current?.tourActive ||
     marketEventSource.current?.treasureTrialSource.active
@@ -1178,9 +1242,10 @@ function rankingReady() {
   return panel.endsWith('-farewell') || panel === 'epilogue-reincarnate';
 }
 function showRankingOffer(notify = true) {
-  if (save.factsTampered) return;
+  if (rankingBlocked()) return;
   const host = modal.querySelector('.panel');
   if (!host || host.querySelector('[data-ranking-offer]')) return;
+  host.querySelector('[data-ranking-unavailable]')?.remove();
   rankingSource.current?.showOffer(host, notify ? toast : undefined);
   if (notify) toastElement.setAttribute('data-ranking', '');
 }
@@ -1237,8 +1302,14 @@ function renderRanking() {
           isCurrent: current,
           enabled: rankingEnabled,
           eligibleFacts: () =>
-            pendingRun || save.factsTampered ? null : module.extractLeaderboardFacts(save),
-          blockedReason: () => (save.factsTampered ? TAMPERED_LEADERBOARD_MESSAGE : ''),
+            pendingRun || rankingBlocked() ? null : module.extractLeaderboardFacts(save),
+          blockedReason: () => (rankingBlocked() ? TAMPERED_LEADERBOARD_MESSAGE : ''),
+          beforeSubmit: async () => {
+            if (!current()) return false;
+            if (!save.factsTampered) return true;
+            const allowed = await getRankingTestAccess(true);
+            return current() && allowed;
+          },
           score: () => module.journeyScore(save).total,
           onClose: closeRanking,
           onSaved: () => {
@@ -1251,7 +1322,7 @@ function renderRanking() {
       .catch(() => {
         if (!current()) return;
         host.innerHTML =
-          '<p class="panel-note">榜单暂时无法展开。</p><button class="secondary-button" data-ranking-retry>重试</button>';
+          '<p class="panel-note">榜单暂时无法展开，可先保存此世存档。</p><div class="save-actions"><button class="secondary-button" data-action="export-save">保存此世存档</button><button class="secondary-button" data-ranking-retry>重试</button></div>';
         host.querySelector<HTMLButtonElement>('[data-ranking-retry]')!.onclick = load;
       });
   };
@@ -1957,7 +2028,7 @@ function shellBindings(): ActionShell {
     get rootPickerView() { return rootPickerView; },
     get sceneLoading() { return sceneLoading; },
     set sceneLoading(next) { sceneLoading = next; },
-    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled, leaderboardAvailable() ? leaderboardSettings(rankingPreference.enabled, save.factsTampered) : ''); },
+    get settingsContent() { return (save: SaveData) => settingsContent(save, damageNumbers.enabled, leaderboardAvailable() ? leaderboardSettings(rankingPreference.enabled, rankingBlocked()) : ''); },
     get refreshAutoplaySettings() { return refreshAutoplaySettings; },
     get settlementModal() { return settlementModal; },
     get showAuction() { return showAuction; },
@@ -1967,6 +2038,7 @@ function shellBindings(): ActionShell {
     get touchHintDismissed() { return touchHintDismissed; },
     get townEventContent() { return townEventContent; },
     get rankingEnabled() { return rankingEnabled; },
+    get getRankingTestAccess() { return getRankingTestAccess; },
     get townPage() { return townPage; },
     get townVisit() { return townVisit; },
     get tribulationWonPanel() { return tribulationWonPanel; },
@@ -1991,6 +2063,17 @@ function handleAction(action: string, id?: string) {
       persist();
       renderPrologue();
     }
+    return;
+  }
+  if (
+    action === 'leaderboard-retry' &&
+    rankingEnabled() &&
+    !game &&
+    !pendingRun &&
+    (panel.endsWith('-farewell') || panel === 'epilogue-reincarnate')
+  ) {
+    clearRanking();
+    queueRanking();
     return;
   }
   if (action === 'leaderboard-toggle' && panel === 'settings' && leaderboardAvailable()) {
@@ -2219,6 +2302,8 @@ document.addEventListener('change', async (event) => {
     const text = await file.text();
     if (!current()) return;
     const candidate = importSave(text);
+    const testAccess = candidate.save.factsTampered ? await getRankingTestAccess(true) : false;
+    if (!current()) return;
     if (
       game ||
       panel !== 'settings' ||
@@ -2228,7 +2313,7 @@ document.addEventListener('change', async (event) => {
     pendingImport = candidate;
     panel = 'import-confirm';
 
-    panelFrame(...importConfirmPanel(candidate));
+    panelFrame(...importConfirmPanel(candidate, testAccess));
   } catch (error) {
     if (current() && !game && panel === 'settings')
       toast(error instanceof Error ? error.message : '存档读取失败，当前进度未更改');
@@ -2562,7 +2647,7 @@ function frame(now: number) {
       showLetterReminder,
     );
   }
-  rankingOffer?.flush(save, rankingReady(), showRankingOffer);
+  rankingOffer?.flush(save, rankingReady(), showRankingOffer, showRankingUnavailable);
   if (saveLock) {
     guideSource.current?.stopInterfaceTour();
     marketEventSource.current?.treasureTrialSource.stop();

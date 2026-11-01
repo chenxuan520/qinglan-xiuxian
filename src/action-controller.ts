@@ -57,6 +57,7 @@ import type { executeMarketSocial } from './market-social-actions.ts';
 import type { isImmortalSuccessor } from './inheritance-ui.ts';
 import type { AD_SECONDS, AdPlacement, getAdProvider, watchAdPlacement } from './ads.ts';
 import { commitSaveAction } from './save-action.ts';
+import { importConfirmPanel } from './lobby-ui.ts';
 import type { GAME_VERSION } from './version.ts';
 import type {
   damageReport,
@@ -422,6 +423,7 @@ export interface ActionShell {
   readonly touchHintDismissed: boolean;
   readonly townEventContent: typeof townEventContent;
   readonly rankingEnabled?: () => boolean;
+  readonly getRankingTestAccess?: (refresh?: boolean) => Promise<boolean>;
   readonly townPage: typeof townPage;
   readonly townVisit: typeof townVisit;
   readonly tribulationWonPanel: typeof tribulationWonPanel;
@@ -473,6 +475,13 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
 
 // 伏击未了、终章与待轮回时只处理对应动作；关闭留影时先取消生成。
 function handleLockedState(shell: ActionShell, action: string): boolean {
+  if (
+    action === 'export-save' &&
+    !shell.game &&
+    !shell.saveLock &&
+    (shell.save.journeyEnded || shell.save.pendingReincarnation)
+  )
+    return handleSaveTransfer(shell, action);
   // 以持久遭遇为准，不能通过改面板、返回首页或导入存档绕过生死。
   if (shell.save.mortal.marketSocial?.ambush && !shell.save.pendingReincarnation) {
     shell.handleMarketAmbushAction(action);
@@ -1366,6 +1375,53 @@ function handleTown(shell: ActionShell, action: string, id?: string): boolean {
   return false;
 }
 
+type ImportCandidate = NonNullable<ActionShell['pendingImport']>;
+const pendingImportChecks = new WeakSet<ImportCandidate>();
+
+function applyImportedSave(shell: ActionShell, candidate: ImportCandidate) {
+  const next = shell.structuredClone(candidate.save);
+  next.sound = shell.save.sound;
+  if (!next.journeyEnded && !next.pendingReincarnation && !next.mortal.marketSocial?.ambush) {
+    shell.resolveActivity(next);
+    shell.syncHumanStories(next);
+  }
+  const run = candidate.run ? shell.Game.restore(next, candidate.run.snapshot()) : null;
+  try {
+    shell.writeSave(next, run, true);
+  } catch {
+    if (!shell.saveLock) shell.toast('浏览器无法写入存档，当前进度未更改');
+    return;
+  }
+  Object.assign(shell.save, next);
+  shell.pendingRun = run;
+  if (run) run.save = shell.save;
+  shell.storageAvailable = true;
+  shell.pendingImport = null;
+  shell.selectedStage = shell.save.unlocked;
+  shell.selectedTreasure = shell.save.starter;
+  shell.difficulty = minimumDifficulty(shell.save);
+  shell.schoolFilter = 'all';
+  shell.bookTab = 'treasures';
+  shell.gameAudio.sync();
+  shell.returnLobby();
+  if (shell.save.journeyEnded) return;
+  if (shell.save.pendingReincarnation) {
+    shell.renderJourneyFarewell(shell.save.pendingReincarnation);
+    return;
+  }
+  if (shell.lifespanInfo(shell.save).remaining === 0) {
+    shell.renderLifespanEnd();
+    return;
+  }
+  if (shell.tribulationDue(shell.save)) {
+    shell.renderTribulationPending();
+    return;
+  }
+  if (!shell.save.prologueSeen && shell.save.mortal.hometown?.stage !== 'departed')
+    shell.renderPrologue();
+  shell.toast('存档已导入，修行进度已恢复');
+}
+
 // 存档导出与导入。
 function handleSaveTransfer(shell: ActionShell, action: string): boolean {
   if (action === 'export-save' && !shell.game) {
@@ -1384,47 +1440,41 @@ function handleSaveTransfer(shell: ActionShell, action: string): boolean {
     shell.pendingImport
   ) {
     const candidate = shell.pendingImport;
-    const next = shell.structuredClone(candidate.save);
-    next.sound = shell.save.sound;
-    if (!next.journeyEnded && !next.pendingReincarnation && !next.mortal.marketSocial?.ambush) {
-      shell.resolveActivity(next);
-      shell.syncHumanStories(next);
-    }
-    const run = candidate.run ? shell.Game.restore(next, candidate.run.snapshot()) : null;
-    try {
-      shell.writeSave(next, run, true);
-    } catch {
-      if (!shell.saveLock) shell.toast('浏览器无法写入存档，当前进度未更改');
+    if (candidate.save.factsTampered && shell.getRankingTestAccess) {
+      if (pendingImportChecks.has(candidate)) return true;
+      pendingImportChecks.add(candidate);
+      const button = shell.modal.querySelector<HTMLButtonElement>('[data-action="confirm-import"]');
+      const text = button?.textContent ?? '';
+      if (button) {
+        button.disabled = true;
+        button.textContent = '正在核对…';
+      }
+      const current = () =>
+        !shell.saveLock &&
+        !shell.game &&
+        shell.panel === 'import-confirm' &&
+        shell.pendingImport === candidate;
+      void Promise.resolve()
+        .then(() => shell.getRankingTestAccess!(true))
+        .catch(() => false)
+        .then((testAccess) => {
+          if (!current()) return;
+          if (!testAccess && !shell.modal.querySelector('[data-import-ranking-warning]')) {
+            shell.panelFrame(...importConfirmPanel(candidate, false));
+            return;
+          }
+          applyImportedSave(shell, candidate);
+        })
+        .finally(() => {
+          pendingImportChecks.delete(candidate);
+          if (current() && button?.isConnected) {
+            button.disabled = false;
+            button.textContent = text;
+          }
+        });
       return true;
     }
-    Object.assign(shell.save, next);
-    shell.pendingRun = run;
-    if (run) run.save = shell.save;
-    shell.storageAvailable = true;
-    shell.pendingImport = null;
-    shell.selectedStage = shell.save.unlocked;
-    shell.selectedTreasure = shell.save.starter;
-    shell.difficulty = minimumDifficulty(shell.save);
-    shell.schoolFilter = 'all';
-    shell.bookTab = 'treasures';
-    shell.gameAudio.sync();
-    shell.returnLobby();
-    if (shell.save.journeyEnded) return true;
-    if (shell.save.pendingReincarnation) {
-      shell.renderJourneyFarewell(shell.save.pendingReincarnation);
-      return true;
-    }
-    if (shell.lifespanInfo(shell.save).remaining === 0) {
-      shell.renderLifespanEnd();
-      return true;
-    }
-    if (shell.tribulationDue(shell.save)) {
-      shell.renderTribulationPending();
-      return true;
-    }
-    if (!shell.save.prologueSeen && shell.save.mortal.hometown?.stage !== 'departed')
-      shell.renderPrologue();
-    shell.toast('存档已导入，修行进度已恢复');
+    applyImportedSave(shell, candidate);
     return true;
   }
   if (

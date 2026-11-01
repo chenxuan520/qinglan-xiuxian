@@ -93,6 +93,9 @@ qinglan-guide-ask .guide-ask-toggle {
   line-height: 1.6;
   cursor: pointer;
 }
+.guide-quantity {
+  white-space: nowrap;
+}
 .guide-subheading {
   font-size: 15px;
   font-weight: 400;

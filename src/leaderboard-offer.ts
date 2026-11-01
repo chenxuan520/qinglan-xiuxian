@@ -8,10 +8,13 @@ import {
   type LeaderboardProfile,
 } from './leaderboard-profile.ts';
 
-// 一世最多核对一次；查询失败不自动循环，也不影响结算和轮回。
+// 正常一世核对一次；失败后仅在可提示时退避重试一次，不影响结算和轮回。
 export class LeaderboardOffer {
   private checked: number | null = null;
   private pending: AbortController | null = null;
+  private attempts = 0;
+  private retryAt: number | null = null;
+  private unavailable: number | null = null;
   private qualified: number | null = null;
   private offered: number | null = null;
   private board: LeaderboardBoard | null = null;
@@ -19,22 +22,28 @@ export class LeaderboardOffer {
   private readonly read: (signal: AbortSignal) => Promise<LeaderboardBoard>;
   private readonly score: (save: SaveData) => number;
   private readonly profile: () => LeaderboardProfile | null;
+  private readonly now: () => number;
+  private readonly testing: () => boolean;
   constructor(
     enabled: () => boolean,
     read: (signal: AbortSignal) => Promise<LeaderboardBoard> = (signal) =>
       fetchLeaderboardBoard(signal, { enabled }),
     score: (save: SaveData) => number = (save) => journeyScore(save).total,
     profile: () => LeaderboardProfile | null = readLeaderboardProfile,
+    now: () => number = Date.now,
+    testing: () => boolean = () => false,
   ) {
     this.enabled = enabled;
     this.read = read;
     this.score = score;
     this.profile = profile;
+    this.now = now;
+    this.testing = testing;
   }
   canSign(save: SaveData) {
     return (
       this.enabled() &&
-      !save.factsTampered &&
+      (!save.factsTampered || this.testing()) &&
       this.offered === save.medicine.recipeSeed &&
       !!this.board &&
       !!extractLeaderboardFacts(save) &&
@@ -49,24 +58,33 @@ export class LeaderboardOffer {
     this.pending?.abort();
     this.pending = null;
     this.checked = this.qualified = this.offered = null;
+    this.attempts = 0;
+    this.retryAt = null;
+    this.unavailable = null;
     this.board = null;
   }
-  flush(save: SaveData, ready: boolean, notify: () => void) {
+  flush(save: SaveData, ready: boolean, notify: () => void, failed: () => void = () => {}) {
     const key = save.medicine.recipeSeed;
     if (!this.enabled()) {
       this.clear();
       return;
     }
     if (this.checked !== null && this.checked !== key) this.clear();
-    if (!ready || (this.checked === key && this.qualified !== key)) return;
+    if (!ready || (save.factsTampered && !this.testing())) return;
     if (!extractLeaderboardFacts(save)) return;
+    if (this.unavailable === key) {
+      this.unavailable = null;
+      failed();
+    }
     if (this.qualified === key) {
       this.offered = key;
       this.qualified = null;
       if (this.canSign(save)) notify();
     }
-    if (this.checked === key) return;
+    if (this.checked === key && (this.retryAt === null || this.now() < this.retryAt)) return;
     this.checked = key;
+    this.retryAt = null;
+    this.attempts++;
     const request = new AbortController();
     this.pending = request;
     const score = this.score(save);
@@ -84,7 +102,18 @@ export class LeaderboardOffer {
           this.qualified = key;
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (
+          this.pending === request &&
+          !request.signal.aborted &&
+          this.enabled() &&
+          this.checked === key &&
+          this.attempts < 2
+        )
+          this.retryAt = this.now() + 1500;
+        else if (this.pending === request && !request.signal.aborted && this.checked === key)
+          this.unavailable = key;
+      })
       .finally(() => {
         if (this.pending === request) this.pending = null;
       });

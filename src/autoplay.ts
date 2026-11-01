@@ -142,10 +142,28 @@ export function autoplayInput(g: Game) {
       dy -= ((b.y - p.y) / d) * 2;
     }
   }
+  // 天劫核心不可追贴：在收束雷环内侧持续绕行，给落雷与迎面雷弹留反应距离。
+  const core = g.tribulation ? g.boss : undefined;
+  // 核心显露且仍来得及撤离时给短程法宝反击距离，窗口结束前先退回。
+  const coreDistance =
+    core && g.tribulationVulnerable && g.tribulationNextAt - g.time > 50 / g.stats.speed + 0.12
+      ? 170
+      : 220;
+  if (core) {
+    const distance = Math.hypot(p.x - core.x, p.y - core.y);
+    const nx = distance ? (p.x - core.x) / distance : 1;
+    const ny = distance ? (p.y - core.y) / distance : 0;
+    const radial = Math.max(-1, Math.min(1, (coreDistance - distance) / 50));
+    dx = nx * radial - ny * 0.7;
+    dy = ny * radial + nx * 0.7;
+  }
   const norm = Math.hypot(dx, dy) || 1;
   const preferred = { x: dx / norm, y: dy / norm };
   const movingShots = g.shots.filter(
-    (b) => b.kind === 'hostile' && b.bossMotion && Math.hypot(b.x - p.x, b.y - p.y) < 420,
+    (b) =>
+      b.kind === 'hostile' &&
+      (b.bossMotion || g.tribulation) &&
+      Math.hypot(b.x - p.x, b.y - p.y) < 420,
   );
   const charges = g.enemies.filter(
     (e) =>
@@ -185,7 +203,17 @@ export function autoplayInput(g: Game) {
   for (let i = 0; i < (zones.length ? 18 : 16); i++) {
     const x = i === 17 ? 0 : i === 16 ? preferred.x : Math.cos((i * Math.PI) / 8),
       y = i === 17 ? 0 : i === 16 ? preferred.y : Math.sin((i * Math.PI) / 8);
+    // 天劫弹幕持续推进，不能把等待当作躲过最后一招的方案。
+    if (core && i === 17) continue;
     let score = -(x * preferred.x + y * preferred.y) * 0.08;
+    if (core) {
+      const separation = Math.hypot(
+        p.x + x * speed * 0.36 - core.x,
+        p.y + y * speed * 0.36 - core.y,
+      );
+      score += Math.max(0, (coreDistance - 30 - separation) / 60) * 3;
+      score += Math.max(0, (separation - 270) / 60) * 2;
+    }
     if (zones.length) {
       score -= (x * g.input.x + y * g.input.y) * 0.02;
       let risk = 0;
@@ -247,7 +275,20 @@ export function autoplayInput(g: Game) {
       // 无伤路线优先于拾取；所有方向都有风险时仍按累计损失选，而非停住。
       score += risk > 0 ? 1 + risk : 0;
     }
-    for (const b of movingShots)
+    for (const b of movingShots) {
+      if (!b.bossMotion) {
+        const rx = b.x - p.x,
+          ry = b.y - p.y,
+          vx = b.vx - x * speed,
+          vy = b.vy - y * speed;
+        const closest = Math.max(
+          0,
+          Math.min(0.6, b.life, -(rx * vx + ry * vy) / (vx * vx + vy * vy || 1)),
+        );
+        const separation = Math.hypot(rx + vx * closest, ry + vy * closest);
+        score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 4;
+        continue;
+      }
       for (const seconds of [0.12, 0.24, 0.36, 0.6]) {
         if (b.life <= seconds) continue;
         const point = bossShotPose(b, b.age + seconds);
@@ -258,6 +299,7 @@ export function autoplayInput(g: Game) {
         );
         score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 2;
       }
+    }
     for (const e of charges) {
       for (const seconds of [0.12, 0.24, 0.36]) {
         const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);

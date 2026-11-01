@@ -468,3 +468,19 @@
     transform: translateY(0);
   }
 }
+
+.leaderboard-unavailable {
+  margin-top: 16px;
+}
+.ranking-retry {
+  padding: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: underline;
+}
+.panel [data-import-ranking-warning],
+.leaderboard-unavailable > .panel-note {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--jade);
+}

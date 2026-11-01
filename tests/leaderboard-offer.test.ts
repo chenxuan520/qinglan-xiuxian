@@ -354,3 +354,149 @@ test('成功留名后即使本机不能记住profile，此世也不重新邀请�
   assert.equal(notices, 2);
   assert.equal(reads, 2);
 });
+
+test('落幕资格首次网络失败后退避且最多重试一次，恢复后只提示一次', async () => {
+  const save = ended();
+  let now = 0,
+    reads = 0,
+    notices = 0;
+  const offer = new LeaderboardOffer(
+    () => true,
+    async () => {
+      if (++reads === 1) throw Error('temporary offline');
+      return board;
+    },
+    () => 101,
+    () => ({ name: '自己', score: 100 }),
+    () => now,
+  );
+  offer.flush(save, true, () => notices++);
+  await settle();
+  for (now = 0; now < 1500; now += 100) offer.flush(save, true, () => notices++);
+  assert.equal(reads, 1);
+  offer.flush(save, false, () => notices++);
+  assert.equal(reads, 1, '隐藏或离开落幕不发起重试');
+  offer.flush(save, true, () => notices++);
+  await settle();
+  offer.flush(save, true, () => notices++);
+  assert.equal(reads, 2);
+  assert.equal(notices, 1);
+  assert.equal(offer.canSign(save), true);
+  now += 10000;
+  for (let i = 0; i < 20; i++) offer.flush(save, true, () => notices++);
+  assert.equal(reads, 2);
+  assert.equal(notices, 1);
+});
+
+test('资格查询持续失败不无限重试，关闭及换世清除待重试状态', async () => {
+  let now = 0,
+    reads = 0,
+    notices = 0,
+    enabled = true;
+  const save = ended();
+  const offer = new LeaderboardOffer(
+    () => enabled,
+    async () => {
+      reads++;
+      throw Error('offline');
+    },
+    () => 101,
+    () => null,
+    () => now,
+  );
+  for (let i = 0; i < 20; i++) {
+    offer.flush(save, true, () => notices++);
+    await settle();
+    now += 2000;
+  }
+  assert.equal(reads, 2);
+  assert.equal(notices, 0);
+  enabled = false;
+  offer.flush(save, true, () => notices++);
+  enabled = true;
+  offer.flush(save, true, () => notices++);
+  await settle();
+  assert.equal(reads, 3);
+  const next = ended();
+  next.medicine.recipeSeed = save.medicine.recipeSeed + 1;
+  offer.flush(next, true, () => notices++);
+  await settle();
+  assert.equal(reads, 4, '新一世独立核对，不继承上世重试次数');
+  offer.clear();
+  now += 2000;
+  offer.flush(freshSave(), true, () => notices++);
+  assert.equal(reads, 4);
+  assert.equal(notices, 0);
+});
+
+test('服务器允许的测试准入可让旧标记档留名，关闭准入仍禁止且不清洗存档', async () => {
+  const save = ended();
+  save.factsTampered = true;
+  const before = JSON.stringify(save);
+  let testing = false,
+    reads = 0,
+    notices = 0;
+  const offer = new LeaderboardOffer(
+    () => true,
+    async () => {
+      reads++;
+      return board;
+    },
+    () => 101,
+    () => null,
+    Date.now,
+    () => testing,
+  );
+  offer.flush(save, true, () => notices++);
+  await settle();
+  assert.equal(reads, 0);
+  testing = true;
+  offer.flush(save, true, () => notices++);
+  await settle();
+  offer.flush(save, true, () => notices++);
+  assert.equal(reads, 1);
+  assert.equal(notices, 1);
+  assert.equal(offer.canSign(save), true);
+  testing = false;
+  assert.equal(offer.canSign(save), false);
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('两次资格查询失败才提供一次失败通知，隐藏页面延后显示且清理后不迟到', async () => {
+  const save = ended();
+  let now = 0,
+    reads = 0,
+    failures = 0;
+  const offer = new LeaderboardOffer(
+    () => true,
+    async () => {
+      reads++;
+      throw Error('offline');
+    },
+    () => 101,
+    () => null,
+    () => now,
+  );
+  const flush = (ready = true) =>
+    offer.flush(
+      save,
+      ready,
+      () => assert.fail('不应给资格'),
+      () => failures++,
+    );
+  flush();
+  await settle();
+  assert.equal(failures, 0);
+  now = 1600;
+  flush();
+  await settle();
+  flush(false);
+  assert.equal(failures, 0);
+  flush();
+  flush();
+  assert.equal(reads, 2);
+  assert.equal(failures, 1);
+  offer.clear();
+  flush(false);
+  assert.equal(failures, 1);
+});

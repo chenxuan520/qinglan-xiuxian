@@ -22,6 +22,7 @@ export interface LeaderboardPanelOptions {
   score?(): number;
   enabled?(): boolean;
   blockedReason?(): string;
+  beforeSubmit?(): Promise<boolean>;
   client?: LeaderboardClient;
   onClose?(): void;
   onSaved?(): void;
@@ -43,7 +44,7 @@ export class LeaderboardPanel {
     this.host = host;
     this.options = options;
     this.client = options.client ?? new LeaderboardClient({ enabled: options.enabled });
-    host.innerHTML = `<div class="leaderboard-panel"><div class="leaderboard-tools"><a class="panel-note" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看完整榜单 ↗</a><button type="button" class="secondary-button" data-leaderboard-refresh>刷新</button></div><p class="leaderboard-status panel-note" role="status" aria-live="polite" data-leaderboard-status></p><section class="leaderboard-sign" data-leaderboard-sign hidden><h3>留名万魂幡</h3><p class="panel-note" data-leaderboard-score></p><form data-leaderboard-form><label>姓名<input name="leaderboard-name" autocomplete="off" maxlength="${LEADERBOARD_NAME_LIMIT * 2}" aria-label="留名姓名" required data-leaderboard-name></label><p class="panel-note">最多 ${LEADERBOARD_NAME_LIMIT} 字；已有人使用的名字需另取。</p><button class="primary-button" type="submit" data-leaderboard-submit>署名入榜</button></form></section><p class="panel-note" data-leaderboard-eligibility></p><div data-leaderboard-list hidden aria-label="万魂幡前一百名"></div><button type="button" class="secondary-button leaderboard-return" data-leaderboard-close>返回</button></div>`;
+    host.innerHTML = `<div class="leaderboard-panel"><div class="leaderboard-tools"><a class="panel-note" href="https://xiuxian.011203.xyz/leaderboard/" target="_blank" rel="noopener">查看完整榜单 ↗</a><button type="button" class="secondary-button" data-leaderboard-refresh>刷新</button></div><p class="leaderboard-status panel-note" role="status" aria-live="polite" data-leaderboard-status></p><section class="leaderboard-sign" data-leaderboard-sign hidden><h3>留名万魂幡</h3><p class="panel-note" data-leaderboard-score></p><form data-leaderboard-form><label>姓名<input name="leaderboard-name" autocomplete="off" maxlength="${LEADERBOARD_NAME_LIMIT * 2}" aria-label="留名姓名" required data-leaderboard-name></label><p class="panel-note">最多 ${LEADERBOARD_NAME_LIMIT} 字；已有人使用的名字需另取。</p><button class="primary-button" type="submit" data-leaderboard-submit>署名入榜</button></form></section><p class="panel-note" data-leaderboard-eligibility></p><div data-leaderboard-list hidden aria-label="万魂幡前一百名"></div><button type="button" class="secondary-button leaderboard-return" data-leaderboard-save data-action="export-save" hidden>保存此世存档</button><button type="button" class="secondary-button leaderboard-return" data-leaderboard-close>返回</button></div>`;
     const profile = readLeaderboardProfile();
     if (profile) {
       const input = this.element<HTMLInputElement>('[data-leaderboard-name]');
@@ -197,9 +198,13 @@ export class LeaderboardPanel {
       const board = await this.client.read(request.signal);
       if (!this.current(request)) return;
       this.list(board);
+      this.element('[data-leaderboard-save]').hidden = true;
       this.status('');
     } catch (error) {
-      if (this.current(request)) this.status(leaderboardErrorMessage(error));
+      if (this.current(request)) {
+        this.status(leaderboardErrorMessage(error));
+        this.element('[data-leaderboard-save]').hidden = false;
+      }
     } finally {
       if (this.current(request)) this.setBusy(false);
       if (this.request === request) this.request = null;
@@ -228,7 +233,17 @@ export class LeaderboardPanel {
     this.status('正在留名…');
     const sameLife = () =>
       this.current(request) && JSON.stringify(this.options.eligibleFacts()) === identity;
+    let accessRefused = false;
     try {
+      if (this.options.beforeSubmit && !(await this.options.beforeSubmit())) {
+        accessRefused = true;
+        if (this.current(request)) {
+          this.status(this.options.blockedReason?.() || '暂时无法确认留名资格，请稍后重试。');
+          this.element('[data-leaderboard-save]').hidden = false;
+        }
+        return;
+      }
+      if (!sameLife()) return;
       const result = await this.client.submit(name.name, snapshot, request.signal);
       if (!sameLife()) return;
       this.saved = true;
@@ -247,9 +262,12 @@ export class LeaderboardPanel {
         if (sameLife()) this.status(`${message} 榜单暂未刷新，可稍后手动刷新。`);
       }
     } catch (error) {
-      if (sameLife()) this.status(leaderboardErrorMessage(error, true));
-    } finally {
       if (sameLife()) {
+        this.status(leaderboardErrorMessage(error, true));
+        this.element('[data-leaderboard-save]').hidden = false;
+      }
+    } finally {
+      if (sameLife() || (accessRefused && this.current(request))) {
         this.setBusy(false);
         this.eligibility();
       }

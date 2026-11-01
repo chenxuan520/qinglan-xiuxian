@@ -142,3 +142,8 @@
     gap: 5px 10px;
   }
 }
+
+.leaderboard-panel .leaderboard-status {
+  font-size: 13px;
+  line-height: 1.8;
+}

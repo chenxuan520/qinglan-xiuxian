@@ -117,12 +117,17 @@ function environment(fetcher: typeof fetch) {
     'eligibility',
     'list',
     'close',
+    'save',
   ];
   const elements = new Map(
     selectors.map((key) => [
       key,
       new Element(
-        ['refresh', 'submit', 'close'].includes(key) ? 'BUTTON' : key === 'form' ? 'FORM' : 'DIV',
+        ['refresh', 'submit', 'close', 'save'].includes(key)
+          ? 'BUTTON'
+          : key === 'form'
+            ? 'FORM'
+            : 'DIV',
       ),
     ]),
   );
@@ -149,12 +154,14 @@ function environment(fetcher: typeof fetch) {
     eligible: LeaderboardFacts | null = facts(),
     closes = 0;
   let blockedReason = '';
+  let authorize: (() => Promise<boolean>) | undefined;
   const panel = new LeaderboardPanel(host as unknown as HTMLElement, {
     isCurrent: () => current,
     enabled: () => enabled,
     score: () => score,
     eligibleFacts: () => eligible,
     blockedReason: () => blockedReason,
+    beforeSubmit: () => authorize?.() ?? Promise.resolve(true),
     client: new LeaderboardClient({
       origin: 'http://localhost:5173',
       fetcher,
@@ -199,6 +206,9 @@ function environment(fetcher: typeof fetch) {
     },
     set eligible(v: LeaderboardFacts | null) {
       eligible = v;
+    },
+    set authorize(v: () => Promise<boolean>) {
+      authorize = v;
     },
     set blockedReason(v: string) {
       blockedReason = v;
@@ -369,8 +379,10 @@ test('初次读取失败可手动重试，已有草稿不丢；关闭后迟到�
       f.el('name').value = '草稿姓名';
       await f.panel.load();
       assert.match(f.el('status').textContent, /暂不可用/);
+      assert.equal(f.el('save').hidden, false, '读榜失败可保存此世存档');
       assert.equal(f.el('refresh').disabled, false);
       await f.panel.load();
+      assert.equal(f.el('save').hidden, true, '重新读榜成功后收起失败导出入口');
       assert.equal(f.el('name').value, '草稿姓名');
       assert.equal(f.el('sign').hidden, false);
     },
@@ -462,6 +474,59 @@ test('设置关闭时不读取、不留名、不写提示', async () => {
       await turn();
       assert.equal(calls, 0);
       assert.equal(f.el('status').textWrites, 0);
+    },
+  );
+});
+
+test('旧标记测试档署名前重核权限，关闭时不POST、不挂忙碌且可保存存档', async () => {
+  let posts = 0,
+    checks = 0;
+  await fixture(
+    async (_input, init) => {
+      if (init?.method === 'POST') posts++;
+      return Response.json(board());
+    },
+    async (f) => {
+      await f.panel.load();
+      f.el('name').value = '测试客';
+      f.authorize = async () => {
+        checks++;
+        f.blockedReason = '本世不可留名';
+        return false;
+      };
+      f.submit();
+      f.submit();
+      await turn();
+      assert.equal(checks, 1);
+      assert.equal(posts, 0);
+      assert.equal(f.el('submit').disabled, false);
+      assert.equal(f.el('name').disabled, false);
+      assert.match(f.el('status').textContent, /不可留名/);
+      assert.equal(f.el('save').hidden, false);
+    },
+  );
+});
+
+test('署名前权限异步返回时已经关闭的面板不上传、不迟到写入', async () => {
+  let posts = 0;
+  const pending = deferred<boolean>();
+  await fixture(
+    async (_input, init) => {
+      if (init?.method === 'POST') posts++;
+      return Response.json(board());
+    },
+    async (f) => {
+      await f.panel.load();
+      f.el('name').value = '测试客';
+      f.authorize = () => pending.promise;
+      f.submit();
+      await turn();
+      f.click('close');
+      const before = f.el('status').textWrites;
+      pending.resolve(true);
+      await turn();
+      assert.equal(posts, 0);
+      assert.equal(f.el('status').textWrites, before);
     },
   );
 });

@@ -264,7 +264,7 @@ test('第五次天劫记录五劫不灭成就', () => {
   assert.equal(save.chronicle.entries.filter((entry) => entry.title === '五劫不灭').length, 1);
 });
 
-test('第五劫强度跃升且第六劫继续增强，预警保底，输出窗口缩短，仍按实际胜负结算', () => {
+test('前四劫保留强度，第五劫起逐次递进且仍按实际胜负结算', () => {
   for (let round = 1; round <= 6; round++) {
     const rules = tribulationRules(round);
     const next = tribulationRules(round + 1);
@@ -281,9 +281,9 @@ test('第五劫强度跃升且第六劫继续增强，预警保底，输出窗�
     assert.equal(g.tribulationStep, 1);
     assert.ok(g.zones.every((z) => z.delay >= rules.warning - 0.011));
   }
-  assert.equal(tribulationRules(5).hp, tribulationRules(4).hp * 2);
-  assert.equal(tribulationRules(5).openingDamage, 0.03);
-  assert.ok(tribulationRules(100).warning >= 0.55);
+  assert.equal(tribulationRules(5).hp, tribulationRules(4).hp * 1.5);
+  assert.ok(Math.abs(tribulationRules(5).openingDamage - 0.16) < 1e-12);
+  assert.equal(tribulationRules(100).warning, 0.1);
 });
 
 test('天劫瞄准雷弹真实移动并造成伤害，续局保留弹幕；核心开放清除敌方攻击', () => {

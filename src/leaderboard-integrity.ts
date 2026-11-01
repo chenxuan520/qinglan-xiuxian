@@ -9,7 +9,7 @@ export interface FactsSeal {
 }
 export const FACTS_VERSION = 3;
 export const INTEGRITY_SAVE_SCHEMA = 37;
-export const TAMPERED_LEADERBOARD_MESSAGE = '此世存档曾被改动，不可留名万魂幡。';
+export const TAMPERED_LEADERBOARD_MESSAGE = '此世存档未通过完整性校验，不可留名万魂幡。';
 export class InvalidFactsError extends Error {}
 
 export interface FactsVersions {
