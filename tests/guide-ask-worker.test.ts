@@ -137,7 +137,8 @@ test('输出截到300字、过滤思考块，Analytics只记录长度命中耗�
   env.AI.run = async () => ({ response: '<think>private</think>' + '答'.repeat(500) });
   const question = '丹药什么时候能吃';
   const response = await worker.fetch(request({ question }), env as never);
-  assert.equal((await response.json()).answer, '答'.repeat(300));
+  const citation = '\n详见：丹药炼制 · 行前一炉丹香';
+  assert.equal((await response.json()).answer, '答'.repeat(300 - citation.length) + citation);
   assert.equal(metrics.length, 1);
   const point = metrics[0] as { indexes: string[]; doubles: number[] };
   assert.deepEqual(Object.keys(point).sort(), ['doubles', 'indexes']);
@@ -150,6 +151,21 @@ test('输出截到300字、过滤思考块，Analytics只记录长度命中耗�
     throw Error('unavailable');
   };
   assert.equal((await worker.fetch(request({ question }), env as never)).status, 200);
+});
+
+test('模型遗漏或写错引用时以可信检索首节补齐末行，已有正确引用不重复', async () => {
+  const { env } = fixture();
+  for (const reply of [
+    '只在出发前服用。',
+    '只在出发前服用。\n详见：不存在 · 编造的小节',
+    '只在出发前服用。\n详见：丹药炼制 · 行前一炉丹香',
+  ]) {
+    env.AI.run = async () => ({ response: reply });
+    const response = await worker.fetch(request({ question: '丹药什么时候能吃' }), env as never);
+    const data = await response.json();
+    assert.equal(data.answer, '只在出发前服用。\n详见：丹药炼制 · 行前一炉丹香');
+    assert.deepEqual(data.source, { tab: 'medicine', heading: '行前一炉丹香' });
+  }
 });
 
 test('来源与方法校验复用原Worker；推理/限流故障给固定失败，不泄露异常原文', async () => {

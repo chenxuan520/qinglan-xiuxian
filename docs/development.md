@@ -340,7 +340,7 @@ Worker 失败响应包含安全的 `error`、中文 `message`、`retryable`、`r
 
 guide.ts保留浏览器门面，正文渲染移入无DOM的guide-content.ts；两端的guideCorpus()直接使用同一guideContent(tab)，按既有h3/guide-subheading切节、去HTML并保留按键文字，单段最多1500字，模块内只缓存指南资料。不能读取docs/gameplay.md：开发文档含隐藏组合和内部细节，不能当玩家答疑知识。测试禁止组合暗语进入语料。检索用中文二字切片、英文/数字词及同义词，标题权重为正文三倍，每次最多三节、正文合计4000字；没有命中时直接返回固定说明，不调用模型。
 
-系统规则固定为仅依据摘录、简体中文、平实短答并给出小节引用；参数为400 tokens、temperature 0.3、关闭思考。Worker推理最多9秒，输出去思考块后最多300字。JSON响应为 { answer, source: { tab, heading } | null }，source由检索第一名确定，不解析模型引用；前端以纯文本展示并核对来源确实存在。EVENTS直接记固定索引guide_ask及doubles [问题长度, 命中0或1, 耗时毫秒]，不记录问题、历史、答案、IP或存档，统计失败不阻断答疑。
+系统规则固定为仅依据摘录、简体中文、平实短答并给出小节引用；参数为400 tokens、temperature 0.3、关闭思考。Worker推理最多9秒，输出去思考块后最多300字，并以检索第一节统一「详见」末行，正文截断预留引用长度。JSON响应为 { answer, source: { tab, heading } | null }，source由检索第一名确定，不解析模型引用；前端以纯文本展示并核对来源确实存在。引用规范化不能保证模型概括完全正确，答案仍须以指南原文为准。EVENTS直接记固定索引guide_ask及doubles [问题长度, 命中0或1, 耗时毫秒]，不记录问题、历史、答案、IP或存档，统计失败不阻断答疑。
 
 ### 宗门坊市
 

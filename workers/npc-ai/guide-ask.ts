@@ -102,7 +102,13 @@ export async function guideAskResponse(
     );
     const answer = answerText(output);
     if (!answer) return json({ message: GUIDE_ASK_FAILURE }, 502);
-    return json({ answer, source: { tab: sections[0].tab, heading: sections[0].heading } });
+    // 模型可能漏写或写错引用；末行只取可信检索结果，不依赖生成文本。
+    const citation = '详见：' + sections[0].tabName + ' · ' + sections[0].heading;
+    const body = answer.replace(/(?:^|\n)\s*详见[：:][^\n]*$/, '').trim();
+    return json({
+      answer: body.slice(0, 299 - citation.length).trimEnd() + '\n' + citation,
+      source: { tab: sections[0].tab, heading: sections[0].heading },
+    });
   } catch {
     return json({ message: GUIDE_ASK_FAILURE }, 503);
   } finally {
