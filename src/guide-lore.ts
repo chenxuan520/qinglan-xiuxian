@@ -1,6 +1,5 @@
 import { assetUrl } from './asset-url.ts';
 import { STANDALONE } from './build-mode.ts';
-import './guide-film.ts';
 
 export function guideLoreContent(): string {
   return `<div class="guide-lore">

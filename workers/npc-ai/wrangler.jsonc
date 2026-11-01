@@ -9,6 +9,11 @@
   "ai": { "binding": "AI" },
   "ratelimits": [
     {
+      "name": "GUIDE_LIMITER",
+      "namespace_id": "202611011",
+      "simple": { "limit": 6, "period": 60 },
+    },
+    {
       "name": "NPC_LIMITER",
       "namespace_id": "202609201",
       "simple": { "limit": 12, "period": 60 },

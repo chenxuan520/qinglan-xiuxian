@@ -1,5 +1,15 @@
 import { resourceFailed } from './update-check.ts';
 
+// Vite默认哈希为8字符；限定后缀，避免guide误选guide-content或guide-ask。
+export function lazyModulePath(resources: { path?: unknown }[], name: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return resources.find(
+    (resource) =>
+      typeof resource.path === 'string' &&
+      new RegExp('^assets/' + escaped + '-[\\w-]{8}\\.js$').test(resource.path),
+  )?.path;
+}
+
 // 同一加载共享请求；失败后保留重试资格，并通知页面核验是否已有新版。
 export class ModuleSource<T> {
   current: T | null = null;
@@ -39,13 +49,9 @@ export async function retryModule<T>(name: string, prefix: string, attempt: numb
     const manifest = await response.json();
     if (manifest.build !== __QINGLAN_BUILD_ID__ || !Array.isArray(manifest.resources))
       throw Error(`${prefix}-manifest-invalid`);
-    const entry = manifest.resources.find(
-      (resource: { path?: unknown }) =>
-        typeof resource.path === 'string' &&
-        new RegExp(`^assets/${name}-[\\w-]+\\.js$`).test(resource.path),
-    );
+    const entry = lazyModulePath(manifest.resources, name);
     if (!entry) throw Error(`${prefix}-module-missing`);
-    path = entry.path;
+    path = String(entry);
   }
   const url = new URL(path, base);
   url.hash = `${prefix}-retry-${attempt}`;

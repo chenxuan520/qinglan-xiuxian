@@ -183,3 +183,19 @@ test('单机帮助不承诺联网新故事或配图，保留本地留影说明',
   assert.match(mortal, /单机版讲述茶馆收录的旧闻/);
   assert.doesNotMatch(mortal, /可伴着画卷|连接失败时说书暂歇/);
 });
+
+test('单机指南不渲染问一问入口，即使传入在线域名也不提问', async () => {
+  const { guidePanel } = await import('../src/lobby-ui.ts');
+  const { GUIDE_TABS } = await import('../src/guide.ts');
+  const { requestGuideAnswer } = await import('../src/guide-ask-client.ts');
+  const { guideAskBaseUrl } = await import('../src/guide-ask-contract.ts');
+  assert.equal(guideAskBaseUrl(), '');
+  for (const tab of GUIDE_TABS)
+    assert.doesNotMatch(
+      guidePanel(tab.id, false, GUIDE_TABS, guideContent)[2],
+      /qinglan-guide-ask/,
+    );
+  const before = requests;
+  await assert.rejects(requestGuideAnswer('丹药怎么吃', [], new AbortController().signal, fetcher));
+  assert.equal(requests, before);
+});

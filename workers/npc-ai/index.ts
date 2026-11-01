@@ -1,3 +1,5 @@
+import { guideAskResponse } from './guide-ask.ts';
+import { GUIDE_ASK_PATH, GUIDE_ASK_TIMEOUT } from '../../src/guide-ask-contract.ts';
 import { marketDisposition } from '../../src/market-social-data.ts';
 import { TOWN_NPCS } from '../../src/town.ts';
 import { townResidents, validTownPopulation } from '../../src/town-population.ts';
@@ -567,7 +569,12 @@ export default {
         env.EVENTS.writeDataPoint(telemetryPoint(batch, event, site.host));
       return new Response(null, { status: 204, headers });
     }
-    if (path !== '/chat' && path !== '/story-image' && path !== JOURNEY_APPRAISAL_SETTINGS.path)
+    if (
+      path !== '/chat' &&
+      path !== '/story-image' &&
+      path !== JOURNEY_APPRAISAL_SETTINGS.path &&
+      path !== GUIDE_ASK_PATH
+    )
       return fail('not-found', 404, '接口不存在。');
     if (
       path === JOURNEY_APPRAISAL_SETTINGS.path &&
@@ -590,6 +597,10 @@ export default {
     } catch {
       return fail('invalid-body', 400, '请求内容无效或过大。');
     }
+    if (path === GUIDE_ASK_PATH)
+      return guideAskResponse(request, input, env, headers, (run) =>
+        runInference(request.signal, GUIDE_ASK_TIMEOUT - 1000, run),
+      );
     if (path === JOURNEY_APPRAISAL_SETTINGS.path) {
       if (!validJourneyAppraisalFacts(input))
         return fail('invalid-appraisal', 400, '此世摘要无效。');

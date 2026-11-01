@@ -1,3 +1,4 @@
+import { guideAskBaseUrl } from './guide-ask-contract.ts';
 import { suppliesCooldown } from './ad-reward-limits.ts';
 import { damageNumbersControl } from './damage-numbers.ts';
 import { isExtremeLife, rewardDisabled } from './life-mode.ts';
@@ -140,7 +141,7 @@ export function guidePanel(
   return [
     '修行指南',
     '道法有迹',
-    `<div class="guide-tabs" role="group" aria-label="说明分类">${tabs.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${content(guideTab)}<button class="primary-button guide-close" data-action="close">${inGame ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
+    `<div class="guide-tabs" role="group" aria-label="说明分类">${tabs.map((t) => `<button data-action="guide-tab" data-id="${t.id}" class="${guideTab === t.id ? 'active' : ''}" aria-pressed="${guideTab === t.id}">${t.title}</button>`).join('')}</div>${guideAskBaseUrl() ? '<qinglan-guide-ask></qinglan-guide-ask>' : ''}${content(guideTab)}<button class="primary-button guide-close" data-action="close">${inGame ? '返回暂停界面' : '道心已明'} ${smallIcon('arrow')}</button>`,
   ];
 }
 

@@ -1,0 +1,118 @@
+qinglan-guide-ask {
+  display: block;
+  margin: 14px 0 22px;
+}
+.guide-ask-toggle {
+  font: inherit;
+}
+.guide-ask-body {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #b8c99e38;
+  background: #0a27212e;
+}
+.guide-ask-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(46vh, 420px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.guide-ask-log:empty {
+  display: none;
+}
+.guide-ask-question,
+.guide-ask-answer {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 4px;
+  max-width: 94%;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+.guide-ask-question {
+  align-self: flex-end;
+  color: #ede0ad;
+  background: #c7b66c14;
+}
+.guide-ask-answer {
+  align-self: flex-start;
+  color: #d1d9c3;
+  background: #09221d88;
+  border: 1px solid #b8c99e20;
+}
+.guide-ask-answer p {
+  margin: 0;
+}
+.guide-ask-source {
+  margin-top: 9px;
+  font: inherit;
+  font-size: 0.9em;
+}
+.guide-ask-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  margin: 14px 0 10px;
+}
+.guide-ask-examples button {
+  border: 0;
+  border-bottom: 1px dotted #b8c99e55;
+  padding: 3px 0;
+  color: #bdcbaa;
+  background: transparent;
+  font: inherit;
+  font-size: 0.87em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.guide-ask-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+}
+.guide-ask-form input {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #b8c99e55;
+  border-radius: 0;
+  color: #e2dfbe;
+  background: #08221cb3;
+  font: inherit;
+  font-size: 0.9em;
+}
+.guide-ask-form input::placeholder {
+  color: #b8c99eaa;
+}
+.guide-ask-form button {
+  padding: 10px 16px;
+  min-width: 3em;
+  margin: 0;
+  font: inherit;
+  white-space: nowrap;
+}
+.guide-ask-disclaimer {
+  margin: 12px 0 0;
+  color: #b9c6ad;
+  font-size: 0.8em;
+  line-height: 1.7;
+}
+.guide-ask button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.guide-ask-body[hidden] {
+  display: none;
+}
+@media (max-width: 420px) {
+  .guide-ask-body {
+    padding: 12px;
+  }
+  .guide-ask-question,
+  .guide-ask-answer {
+    max-width: 100%;
+  }
+}

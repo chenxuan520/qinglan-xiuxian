@@ -143,3 +143,17 @@ test('妖王来历与排行榜交互只在按需模块加载', () => {
   ])
     assert.equal(entry.has(lazy), false, `${lazy} 被静态导入进了首屏入口`);
 });
+
+test('指南答疑与检索语料不进入首屏，完整组件只在点击后动态加载', () => {
+  const entry = entryModules();
+  for (const lazy of [
+    'guide-content',
+    'guide-corpus',
+    'guide-search',
+    'guide-ask',
+    'guide-ask-client',
+    'guide-ask-entry',
+  ])
+    assert.equal(entry.has(lazy), false, lazy + '进入首屏');
+  assert.match(source('guide-ask-entry'), /import\('\.\/guide-ask\.ts'\)/);
+});
