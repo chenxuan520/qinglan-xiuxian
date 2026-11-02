@@ -39,7 +39,7 @@ test('狐王原生与终关炎扇9+8发、轮舞20+20发，速度与半间隔交
     const { g, boss } = cast(1, arena, 0);
     assert.equal(g.shots.length, 17);
     g.shots.forEach((shot, i) => {
-      near(Math.hypot(shot.vx, shot.vy), i < 9 ? 210 : 150);
+      near(Math.hypot(shot.vx, shot.vy), i < 9 ? 200 : 145);
       near(
         Math.atan2(shot.vy, shot.vx),
         i < 9 ? (i / 8 - 0.5) * 1.5 : ((i - 9) / 7 - 0.5) * 1.5 * (7 / 8),
@@ -48,14 +48,14 @@ test('狐王原生与终关炎扇9+8发、轮舞20+20发，速度与半间隔交
     });
     const ring = cast(1, arena, 2);
     assert.equal(ring.g.shots.length, 40);
-    ring.g.shots.forEach((shot, i) => near(Math.hypot(shot.vx, shot.vy), i < 20 ? 190 : 135));
+    ring.g.shots.forEach((shot, i) => near(Math.hypot(shot.vx, shot.vy), i < 20 ? 180 : 130));
     const fire = cast(1, arena, 1);
     assert.equal(fire.g.zones.length, 5);
     assert.ok(fire.g.zones.every((zone) => zone.radius === 50 && zone.life === 3));
   }
 });
 
-test('七道回焰和五道魂影伤害0.7倍，重复施法及部分命中后严格遵守14/10上限', () => {
+test('七道回焰和五道魂影伤害0.6倍，重复施法及部分命中后严格遵守14/10上限', () => {
   for (const [origin, batch, limit, kind] of [
     [1, 7, 14, 'return'],
     [4, 5, 10, 'memory'],
@@ -64,7 +64,7 @@ test('七道回焰和五道魂影伤害0.7倍，重复施法及部分命中后�
       const { g, boss } = cast(origin, arena, 3);
       assert.equal(g.shots.length, batch);
       g.shots.forEach((shot, i) => {
-        assert.equal(shot.damage, boss.damage * 0.7);
+        assert.equal(shot.damage, boss.damage * 0.6);
         assert.equal(shot.bossMotion!.kind, kind);
         if (shot.bossMotion!.kind === 'memory') assert.equal(shot.bossMotion!.warmup, 1 + i * 0.35);
       });
@@ -77,12 +77,12 @@ test('七道回焰和五道魂影伤害0.7倍，重复施法及部分命中后�
   }
 });
 
-test('冥主摄魂灵轮20发速度230，百鬼召六只精英，毒君仍召四只', () => {
+test('冥主摄魂灵轮20发速度200，百鬼召六只精英，毒君仍召四只', () => {
   for (const arena of [4, 6]) {
     const { g, boss } = cast(4, arena, 1);
     assert.equal(g.shots.length, 20);
     for (const shot of g.shots) {
-      near(Math.hypot(shot.vx, shot.vy), 230);
+      near(Math.hypot(shot.vx, shot.vy), 200);
       assert.equal(shot.damage, boss.damage * 0.75);
       assert.equal(shot.bossMotion, undefined, '环弹不新增回程');
     }
@@ -124,8 +124,8 @@ test('三具幻影0.8秒前预警，满时各放八发魂弹后消失，不能�
     assert.equal(g.shots.length, 24);
     assert.ok(shadows.every((e) => e.dead));
     for (const shot of g.shots) {
-      near(Math.hypot(shot.vx, shot.vy), 170);
-      assert.equal(shot.damage, boss.damage * 0.5);
+      near(Math.hypot(shot.vx, shot.vy), 155);
+      assert.equal(shot.damage, boss.damage * 0.35);
       assert.equal(shot.color, '#baa2d0');
       assert.equal(shot.enemySkill, 'soul');
     }

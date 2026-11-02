@@ -1238,8 +1238,8 @@ export class Game {
               e,
               Math.cos(angle),
               Math.sin(angle),
-              170,
-              owner.damage * 0.5,
+              155,
+              owner.damage * 0.35,
             );
             shot.enemySkill = 'soul';
             shot.color = '#baa2d0';
@@ -1781,14 +1781,14 @@ export class Game {
         break;
       case 1:
         if (phase === 0) {
-          fan(9, 1.5, 210);
-          fan(8, 1.5 * (7 / 8), 150);
+          fan(9, 1.5, 200);
+          fan(8, 1.5 * (7 / 8), 145);
         } else if (phase === 1)
           for (let i = -2; i <= 2; i++)
             blast(p.x - ny * i * 85, p.y + nx * i * 85, 50, 3, 1.2 + Math.abs(i) * 0.18);
         else {
-          ring(20, 190);
-          ring(20, 135);
+          ring(20, 180);
+          ring(20, 130);
         }
         break;
       case 2:
@@ -1811,7 +1811,7 @@ export class Game {
         break;
       case 4:
         if (phase === 0) summons(6);
-        else if (phase === 1) ring(20, 230);
+        else if (phase === 1) ring(20, 200);
         else {
           ringZones(6, 165, 52, 2);
           blast(p.x, p.y, 60, 0.5, 1.8);
@@ -1926,7 +1926,7 @@ export class Game {
         const a = Math.atan2(ny, nx) + (i / 6 - 0.5) * 1.2;
         const speed =
           this.stage === 1 && !this.tribulation ? rules.nativeReturnSpeed : rules.returnSpeed;
-        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.7);
+        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.6);
         shot.bossMotion = { kind: 'return', velocity: { x: shot.vx, y: shot.vy } };
         shot.life = rules.returnWarmup + 2 * bossReturnOut(shot) + rules.returnRest;
         shot.radius = 10;
@@ -1968,7 +1968,7 @@ export class Game {
       let length = 0;
       for (let i = 1; i < path.length; i++) length += distance(path[i - 1], path[i]);
       for (let i = 0; i < count; i++) {
-        const shot = this.hostileShot(e, nx, ny, rules.memorySpeed, e.damage * 0.7);
+        const shot = this.hostileShot(e, nx, ny, rules.memorySpeed, e.damage * 0.6);
         shot.bossMotion = {
           kind: 'memory',
           path: path.map((p) => ({ ...p })),
