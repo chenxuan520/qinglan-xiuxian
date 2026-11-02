@@ -76,6 +76,7 @@ function environment() {
   const state = {
     canvases: 0,
     gradients: 0,
+    curves: 0,
     images: [] as number[][],
     fills: [] as { alpha: number; gradient: boolean }[],
     texts: [] as { method: string; value: string }[],
@@ -86,6 +87,7 @@ function environment() {
         get(target, name: string) {
           if (name in target) return target[name];
           return (...args: any[]) => {
+            if (name === 'bezierCurveTo' || name === 'quadraticCurveTo') state.curves++;
             if (name.startsWith('create') && name.endsWith('Gradient')) {
               state.gradients++;
               return { addColorStop() {} };
@@ -184,6 +186,40 @@ test('两种经验光点只各画一次，持续绘制不改真实对局与拾�
     assert.equal(f.canvases, 4, '画布恢复后重建一次静态缓存');
     assert.deepEqual(game.snapshot(), before);
   }));
+
+test('同色同半径的普通弹、魂弹、火球与冰锥独立缓存，先后顺序不抹去特殊形状', () => {
+  for (const reversed of [false, true])
+    fixture((r, f) => {
+      const game = new Game(freshSave(), 0, 0, () => 0.5);
+      game.weapons = [];
+      for (const enemySkill of [undefined, 'soul', 'firebolt', 'frostbolt'] as const) {
+        const shot = game.hostileShot({ x: 100, y: 0 }, 1, 0, 165, 5);
+        shot.enemySkill = enemySkill;
+      }
+      if (reversed) game.shots.reverse();
+      const before = game.snapshot();
+      let soulPaints = 0;
+      r.battleArt = {
+        ...battleArt,
+        drawSoulShot(c: CanvasRenderingContext2D, radius: number) {
+          soulPaints++;
+          battleArt.drawSoulShot(c, radius);
+        },
+      };
+      game.random = () => {
+        throw new Error('子弹美化不得消耗战斗随机数');
+      };
+      for (let frame = 0; frame < 120; frame++) r.drawGame(game, frame / 60);
+      assert.equal(f.canvases, 4);
+      assert.equal(r.glowSprites.size, 4);
+      assert.equal(soulPaints, 1, '魂弹实际绘制幽魂一次，随后复用纹理');
+      assert.ok(f.curves > 0, '魂弹具有幽魂曲线，不再回落为圆点');
+      r.reducedMotion.matches = true;
+      r.drawGame(game, 3);
+      assert.equal(f.canvases, 4);
+      assert.deepEqual(game.snapshot(), before, '颜色、碰撞、速度、伤害及状态均不被绘制改变');
+    });
+});
 
 test('屏幕渐变复用并随尺寸重建，低气血脉动仍实时变化且不泄漏透明度', () =>
   fixture((r, f) => {

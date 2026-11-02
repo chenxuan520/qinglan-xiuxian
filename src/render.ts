@@ -708,6 +708,7 @@ export class Renderer {
     for (const shot of game.shots) {
       if (!this.visible(shot, p)) continue;
       const a = Math.atan2(shot.vy, shot.vx);
+      const shotType = shot.kind === 'hostile' ? (shot.enemySkill ?? 'hostile') : shot.kind;
       const shotColor = soulCombo && shot.kind === 'talisman' ? '#b9ead4' : shot.color;
       if (fanCombo && shot.kind === 'fan' && shotBudget-- > 0)
         this.battleArt!.drawComboShot(c, shot, time, compact, this.reducedMotion.matches);
@@ -765,7 +766,7 @@ export class Renderer {
             c.stroke();
           }
         } else
-          this.glowSprite(`shot:${shot.kind}:${shotColor}:${shot.radius}`, 144, 112, (c) => {
+          this.glowSprite(`shot:${shotType}:${shotColor}:${shot.radius}`, 144, 112, (c) => {
             c.shadowColor = shotColor;
             c.shadowBlur = 12;
             c.strokeStyle = shotColor;
@@ -880,6 +881,8 @@ export class Renderer {
               c.beginPath();
               c.arc(-10, 0, 20, -0.8, 0.8);
               c.stroke();
+            } else if (shot.kind === 'hostile' && shot.enemySkill === 'soul') {
+              this.battleArt!.drawSoulShot(c, shot.radius);
             } else if (shot.enemySkill === 'frostbolt') {
               c.beginPath();
               c.moveTo(12, 0);

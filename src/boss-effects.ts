@@ -51,6 +51,19 @@ function soul(c: CanvasRenderingContext2D, size: number, bend: number) {
   c.fillRect(size * 0.12, -size * 0.3, size * 0.2, size * 0.23);
 }
 
+/** 与冥主魂弹共用幽魂笔画；弹心仍位于原碰撞中心，尾部仅提示飞行方向。 */
+export function drawSoulShot(c: CanvasRenderingContext2D, radius: number) {
+  c.save();
+  c.rotate(Math.PI / 2);
+  c.shadowColor = '#b395dc';
+  c.shadowBlur = 8;
+  c.fillStyle = '#c9a9ed';
+  c.strokeStyle = '#f0dcff';
+  c.lineWidth = 1;
+  soul(c, radius, radius * 0.3);
+  c.restore();
+}
+
 /** 只装饰真实圆形判定内侧；危险边界仍由 Renderer 最后覆盖绘制。 */
 export function drawBossField(
   c: CanvasRenderingContext2D,
@@ -238,12 +251,26 @@ export function drawBossShot(c: CanvasRenderingContext2D, shot: Shot) {
     c.rotate(Math.PI / 2);
     crystal(c, stage === 6 ? 18 : 13, 6);
   } else if (stage === 3) {
+    const r = shot.radius;
+    // 毒液的亮色弹心沿用真实半径，稀薄气泡只作尾迹。
     c.beginPath();
-    c.arc(0, 0, shot.radius, 0, TAU);
+    c.moveTo(r, 0);
+    c.bezierCurveTo(r, -r * 0.9, -r * 0.5, -r, -r * 0.8, -r * 0.45);
+    c.quadraticCurveTo(-r * 1.1, -r * 0.2, -r * 1.7, 0);
+    c.quadraticCurveTo(-r * 0.8, r * 0.25, -r * 0.6, r * 0.6);
+    c.bezierCurveTo(0, r, r, r * 0.65, r, 0);
+    c.fillStyle = '#91b94fdd';
     c.fill();
     c.stroke();
     c.fillStyle = '#eff3b9';
-    c.fillRect(-3, -3, 3, 3);
+    c.beginPath();
+    c.ellipse(r * 0.25, -r * 0.28, r * 0.26, r * 0.18, -0.4, 0, TAU);
+    c.fill();
+    c.fillStyle = '#c5dd7355';
+    c.beginPath();
+    c.arc(-r * 1.9, -r * 0.45, r * 0.23, 0, TAU);
+    c.arc(-r * 2.5, r * 0.28, r * 0.15, 0, TAU);
+    c.fill();
   } else if (stage === 4) {
     c.rotate(Math.PI / 2);
     soul(c, 9, 3);

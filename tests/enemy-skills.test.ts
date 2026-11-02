@@ -93,7 +93,13 @@ test('远程蓄力只画自身圆环，实弹、冲刺与落地预警仍绘制',
         assert.equal(g.shots.length, 0);
         advance(g, 0.2);
         assert.ok(g.shots.length > 0);
-        assert.ok(draw(g).some((c) => c.method === 'arc' && c.args[2] === 5));
+        const fired = draw(g);
+        if (g.shots[0].enemySkill === 'soul')
+          assert.ok(
+            fired.some((c) => c.method === 'bezierCurveTo'),
+            '魂弹绘制幽魂轮廓',
+          );
+        else assert.ok(fired.some((c) => c.method === 'arc' && c.args[2] === 5));
       }
 
   for (const elite of [false, true]) {
