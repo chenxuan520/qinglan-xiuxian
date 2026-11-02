@@ -324,6 +324,8 @@ export interface MedicineState {
   active: Record<string, number>;
   used: Record<string, number>;
   firstClears: number[];
+  // 前六境分别计本世妖王永久丹掉落；2 表示至少两次，概率已到下限。
+  permanentDrops: number[];
   recipes: string[];
   recipeSeed: number;
   shop: { ids: string[]; refreshAt: number; bought?: Record<string, number> } | null;
@@ -333,6 +335,7 @@ export const freshMedicine = (random = Math.random): MedicineState => ({
   active: {},
   used: {},
   firstClears: [],
+  permanentDrops: [0, 0, 0, 0, 0, 0],
   recipes: [],
   recipeSeed: Math.floor(random() * 4294967296),
   shop: null,
@@ -383,6 +386,10 @@ export function validMedicine(value: unknown): value is MedicineState {
             ? n <= 2
             : /^jiuqu-[0-6]$/.test(id) && n <= 1),
     ) &&
+    (s.permanentDrops === undefined ||
+      (Array.isArray(s.permanentDrops) &&
+        s.permanentDrops.length === 6 &&
+        Array.from(s.permanentDrops).every((n) => count(n) && n <= 2))) &&
     Array.isArray(s.firstClears) &&
     new Set(s.firstClears).size === s.firstClears.length &&
     s.firstClears.every((n) => Number.isInteger(n) && n >= 2 && n <= 6)
@@ -446,16 +453,22 @@ export function medicineLoot(
   const guarantee = stage >= 2 && firstClear && !s.firstClears.includes(stage);
   if (guarantee) s.firstClears.push(stage);
   const roll = random();
-  const permanent = (stage === 6 && finalSovereign) || (stage >= 0 && stage <= 5 && roll < 0.04);
+  const permanentRoll =
+    (stage === 6 && finalSovereign) || (stage >= 0 && stage <= 5 && roll < 0.04);
+  const permanent = permanentRoll && (stage === 6 || roll < 0.04 / 2 ** s.permanentDrops[stage]);
   const give = (tier: Medicine['tier'], timed: boolean) => {
     const pool = MEDICINES.filter(
       (m) => (!timed || m.stage <= Math.max(1, stage)) && m.tier === tier && !!m.years === timed,
     );
     rewards.push(`${grantMedicine(s, pool[Math.floor(random() * pool.length)].id)} ×1`);
   };
-  if (permanent) give('珍品', false);
-  if (guarantee || (!permanent && stage >= 2 && roll < 0.16)) give('珍品', true);
-  else if (!permanent && roll < (stage >= 2 ? 0.51 : 0.35)) give('灵品', true);
+  if (permanent) {
+    give('珍品', false);
+    if (stage < 6) s.permanentDrops[stage] = Math.min(2, s.permanentDrops[stage] + 1);
+  } else if (permanentRoll) random(); // 保留原奖池抽取步进，不改变后续战斗随机序列。
+  // 递减只减少永久丹，不把落空区间转成其他丹药，保留原有限时丹概率。
+  if (guarantee || (!permanentRoll && stage >= 2 && roll < 0.16)) give('珍品', true);
+  else if (!permanentRoll && roll < (stage >= 2 ? 0.51 : 0.35)) give('灵品', true);
   return rewards;
 }
 export function townMedicineReward(s: MedicineState, kind: string, random: () => number) {

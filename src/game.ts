@@ -126,6 +126,14 @@ import { REALM_BREAKTHROUGH_COLORS, REALM_BREAKTHROUGH_DURATION } from './realm-
 const distanceSquared = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
+// 只计数，不分配临时筛选数组；每次仍按原顺序完整扫描当前集合。
+function countMatching<T>(items: T[], matches: (item: T) => boolean) {
+  let count = 0;
+  for (let i = 0, length = items.length; i < length; i++)
+    if (i in items && matches(items[i])) count++;
+  return count;
+}
+
 export class Game {
   state: GameState = 'playing';
   playerTrail: TrailPoint[] = [];
@@ -359,21 +367,29 @@ export class Game {
     return this.medicine.eliteDamage * (ownsCurio(this.save, 'thunder-bamboo') ? 1.15 : 1);
   }
   get stats() {
+    // 只在本次求值内复用纯函数结果；不跨帧缓存，保留原公式运算顺序。
+    const root = spiritRootInfo(this.spiritRoot);
+    const soulWood = soulWoodMultiplier(this.save);
+    const spirit = this.passivePower('spirit');
+    const forbidden = this.passivePower('forbidden');
+    const frenzy = this.passivePower('frenzy');
+    const crit = this.passivePower('crit');
+    const curse = this.passivePower('curse');
+    const magnet = this.passivePower('magnet');
+    const duration = this.passivePower('duration');
+    const devour = this.passivePower('devour');
     return {
       damage:
         (1 + realmBonuses(this.realm).damage) *
         (1 +
           this.passivePower('power') * 0.12 +
-          this.passivePower('spirit') * 0.04 +
+          spirit * 0.04 +
           this.passivePower('blood') * 0.18 +
-          this.passivePower('forbidden') * 0.08 +
+          forbidden * 0.08 +
           (this.path === 'demonic' ? 0.12 : 0)) *
         (1 - (this.passives.abyss || 0) * 0.02 * this.medicine.drawback) *
         (1 +
-          (powerTrainingEffect(this.save.training.power) *
-            spiritRootInfo(this.spiritRoot).powerPerLevel *
-            soulWoodMultiplier(this.save)) /
-            100) *
+          (powerTrainingEffect(this.save.training.power) * root.powerPerLevel * soulWood) / 100) *
         (1 + this.save.tribulations * 0.02) *
         (1 + this.save.retreatBonus.power / 100) *
         realmDamageMultiplier(this.realm) *
@@ -383,34 +399,26 @@ export class Game {
           0.3,
           1 -
             this.passivePower('haste') * 0.07 -
-            this.passivePower('frenzy') * (this.player.hp < this.player.maxHp / 2 ? 0.1 : 0.08) +
+            frenzy * (this.player.hp < this.player.maxHp / 2 ? 0.1 : 0.08) +
             (this.passives.soul || 0) * 0.01 * this.medicine.drawback,
         ) * this.medicine.cooldown,
       area:
         (1 + this.passivePower('area') * 0.12 + this.passivePower('abyss') * 0.16) *
         this.medicine.area,
-      duration:
-        (1 + this.passivePower('duration') * 0.18 + this.passivePower('devour') * 0.2) *
-        this.medicine.duration,
+      duration: (1 + duration * 0.18 + devour * 0.2) * this.medicine.duration,
       speed:
-        spiritRootInfo(this.spiritRoot).baseSpeed *
+        root.baseSpeed *
         (1 +
-          trainingEffect(this.save.training.speed) * 0.02 * soulWoodMultiplier(this.save) +
-          this.passivePower('crit') * 0.03 +
-          (this.player.hp < this.player.maxHp / 2 ? this.passivePower('frenzy') * 0.04 : 0)) *
+          trainingEffect(this.save.training.speed) * 0.02 * soulWood +
+          crit * 0.03 +
+          (this.player.hp < this.player.maxHp / 2 ? frenzy * 0.04 : 0)) *
         (1 + this.save.retreatBonus.speed / 100) *
         (1 - (this.passives.bone || 0) * 0.01 * this.medicine.drawback) *
         (this.slowed > 0 ? 1 - 0.25 * this.medicine.drawback : 1) *
         this.medicine.speed *
         (this.windThunderActive ? 1.2 : ownsCurio(this.save, 'wind-wings') ? 1.15 : 1),
-      crit: Math.min(
-        0.85,
-        spiritRootInfo(this.spiritRoot).baseCrit +
-          this.passivePower('crit') * 0.07 +
-          this.passivePower('curse') * 0.08 +
-          this.medicine.crit,
-      ),
-      criticalDamage: 1.8 + this.passivePower('curse') * 0.12,
+      crit: Math.min(0.85, root.baseCrit + crit * 0.07 + curse * 0.08 + this.medicine.crit),
+      criticalDamage: 1.8 + curse * 0.12,
       armor:
         Math.max(
           0.3,
@@ -424,31 +432,27 @@ export class Game {
         (ownsCurio(this.save, 'jade-ruyi') ? 0.9 : 1),
       magnet:
         85 *
-        (1 + this.passivePower('magnet') * 0.28) *
+        (1 + magnet * 0.28) *
         this.medicine.magnet *
         (ownsCurio(this.save, 'spirit-spring') ? 1.25 : 1) *
         (this.#activeCombo('fan') ? 1.4 : 1),
       xp:
-        ((1 +
-          this.passivePower('spirit') * 0.15 +
-          this.passivePower('magnet') * 0.08 +
-          this.passivePower('soul') * 0.1 +
-          this.passivePower('forbidden') * 0.18) /
+        ((1 + spirit * 0.15 + magnet * 0.08 + this.passivePower('soul') * 0.1 + forbidden * 0.18) /
           DIFFICULTIES[this.difficulty].amount) *
         0.9 *
-        spiritRootInfo(this.spiritRoot).rate *
+        root.rate *
         this.medicine.xp *
         (ownsCurio(this.save, 'spirit-spring') ? 1.15 : 1),
       regen:
-        (spiritRootInfo(this.spiritRoot).baseRegen *
+        (root.baseRegen *
           (ownsCurio(this.save, 'sacred-fragment') ? 1.3 : 1) *
           this.medicine.regen *
           realmHealthMultiplier(this.realm) +
-          this.passivePower('duration') * this.player.maxHp * 0.001) *
+          duration * this.player.maxHp * 0.001) *
         (this.path === 'orthodox' ? 1.2 : 1) *
         (1 - (this.passives.devour || 0) * 0.04 * this.medicine.drawback),
       eliteDamage: this.eliteDamage,
-      killHeal: this.passivePower('devour') * this.player.maxHp * 0.0005,
+      killHeal: devour * this.player.maxHp * 0.0005,
     };
   }
   announce(message: string) {
@@ -1064,7 +1068,7 @@ export class Game {
     if (this.time < this.nextElite) return;
     if (
       (this.usesElitePacing || this.cacheChallenge?.phase === 'active') &&
-      this.enemies.filter((e) => e.elite && !e.boss && !e.dead).length + (late ? 2 : 1) >
+      countMatching(this.enemies, (e) => e.elite && !e.boss && !e.dead) + (late ? 2 : 1) >
         ELITE_PACING.maxAlive
     ) {
       // 满额时只延后一秒再尝试，不积攒波次等清场后一口气补齐。
@@ -1098,7 +1102,7 @@ export class Game {
   }
   private updateTrialBosses() {
     if (this.trialBossesSpawned >= TRIAL_BOSS_STAGES.length) return;
-    const alive = this.enemies.filter((e) => e.boss && !e.dead).length;
+    const alive = countMatching(this.enemies, (e) => e.boss && !e.dead);
     if (alive >= TRIAL_BOSS_CAP) {
       if (this.time >= this.nextTrialBossAt) this.trialBossBlocked = true;
       return;
@@ -1457,11 +1461,11 @@ export class Game {
       'miasmacharge',
     ].includes(skill);
     // 前六境技能共享弹幕与地面区域预算；妖王独立施法，避免小怪挤满画面。
-    if (projectile && this.shots.filter((b) => b.kind === 'hostile').length >= 60) return;
-    if (circles && this.zones.filter((z) => z.hostile).length > 9) return;
+    if (projectile && countMatching(this.shots, (b) => b.kind === 'hostile') >= 60) return;
+    if (circles && countMatching(this.zones, (z) => z.hostile) > 9) return;
     if (
       skill === 'summon' &&
-      this.enemies.filter((v) => !v.dead && v.summonedBy !== undefined).length >= 12
+      countMatching(this.enemies, (v) => !v.dead && v.summonedBy !== undefined) >= 12
     )
       return;
     e.cooldown = (e.elite ? 5.5 : 4.5) + this.random() * 2;
@@ -1498,7 +1502,7 @@ export class Game {
       const count = Math.min(
         e.elite ? 3 : 2,
         240 - this.enemies.length,
-        12 - this.enemies.filter((v) => !v.dead && v.summonedBy !== undefined).length,
+        12 - countMatching(this.enemies, (v) => !v.dead && v.summonedBy !== undefined),
       );
       const pool = enemyRoster(this.stage, this.time).slice(0, 2);
       for (let i = 0; i < count; i++) {
@@ -1604,7 +1608,7 @@ export class Game {
                     ? 4
                     : 2
                   : 1;
-    const available = 64 - this.shots.filter((b) => b.kind === 'hostile').length;
+    const available = 64 - countMatching(this.shots, (b) => b.kind === 'hostile');
     const angle = Math.atan2(e.dy, e.dx);
     for (let i = 0; i < Math.min(count, available); i++) {
       if (skill === 'gapring' && (i === 2 || i === 3)) continue;
@@ -1845,9 +1849,10 @@ export class Game {
     if (stage === 0 || stage === 2) {
       const kind = stage === 0 ? 'heart' : 'wolf';
       const limit = stage === 0 ? rules.heartLimit : rules.wolfLimit;
-      const alive = this.enemies.filter(
+      const alive = countMatching(
+        this.enemies,
         (c) => !c.dead && c.bossSummon?.kind === kind && c.summonedBy === e.id,
-      ).length;
+      );
       for (let i = alive; i < limit && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++) {
         const side = i % 2 ? -1 : 1;
         const angle =
@@ -1889,7 +1894,7 @@ export class Game {
         }
       }
     } else if (stage === 1) {
-      if (this.shots.filter((b) => b.bossMotion?.kind === 'return').length >= 10) return;
+      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'return') >= 10) return;
       for (let i = 0; i < 5; i++) {
         const a = Math.atan2(ny, nx) + (i / 4 - 0.5) * 1.2;
         const speed =
@@ -1920,7 +1925,7 @@ export class Game {
         z.vy = nx * Math.sign(side || 1) * speed;
       }
     } else if (stage === 4) {
-      if (this.shots.filter((b) => b.bossMotion?.kind === 'memory').length >= 6) return;
+      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'memory') >= 6) return;
       const path = [
         { x: e.x, y: e.y },
         { x: this.player.x, y: this.player.y },
@@ -1942,7 +1947,7 @@ export class Game {
         shot.radius = 10;
       }
     } else if (stage === 5) {
-      if (this.shots.filter((b) => b.bossMotion?.kind === 'star').length >= 6) return;
+      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'star') >= 6) return;
       for (let i = 0; i < 3; i++) {
         const shot = this.hostileShot(e, 1, 0, 220, e.damage * 0.85);
         shot.bossMotion = {
@@ -2772,7 +2777,7 @@ export class Game {
     for (const { damageScale, ...field } of fields) {
       if (
         !(e.boss && this.isFinalTrial) &&
-        this.zones.filter((z) => z.hostile && z.life > 0).length >= (e.boss ? 14 : 10)
+        countMatching(this.zones, (z) => z.hostile && z.life > 0) >= (e.boss ? 14 : 10)
       )
         break;
       this.zones.push({
@@ -2795,7 +2800,7 @@ export class Game {
     kind: string,
     delay = 0.9,
   ) {
-    if (!e.boss && this.zones.filter((z) => z.hostile).length >= 10) return;
+    if (!e.boss && countMatching(this.zones, (z) => z.hostile) >= 10) return;
     const reach = ENEMY_FIELD_REACH - radius;
     const scale = Math.min(1, Math.max(0, reach) / (Math.hypot(dx, dy) || 1));
     this.zone(
@@ -2863,7 +2868,7 @@ export class Game {
       this.player.hp <= 0 ||
       !this.cacheNearby ||
       !c ||
-      this.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2
+      countMatching(this.enemies, (e) => !e.dead && e.elite && !e.boss) > 2
     )
       return false;
     c.phase = 'active';
@@ -2920,7 +2925,10 @@ export class Game {
       this.announce('守匣灵阵散去 · 继续历练');
       this.onEvent('cache');
     } else if (c.phase === 'offered') {
-      if (!this.cacheNearby || this.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2)
+      if (
+        !this.cacheNearby ||
+        countMatching(this.enemies, (e) => !e.dead && e.elite && !e.boss) > 2
+      )
         this.cacheApproachStartedAt = null;
       else {
         this.cacheApproachStartedAt ??= this.time;

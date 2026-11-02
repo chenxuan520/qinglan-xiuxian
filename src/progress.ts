@@ -133,7 +133,7 @@ export interface SaveData {
 }
 export const SAVE_KEY = 'qinglan-immortal-v1';
 // 新增或改变存档字段时递增；页面读到更高版本只读不写，避免旧代码丢弃新字段。
-export const SAVE_SCHEMA = 41;
+export const SAVE_SCHEMA = 42;
 export type SaveReadStatus = 'empty' | 'ok' | 'newer' | 'unreadable';
 function initialStarter(
   elements: ElementId[],
@@ -415,7 +415,12 @@ export function readSave(
         }
       }
     }
-    if (validMedicine(s.medicine)) base.medicine = s.medicine;
+    if (validMedicine(s.medicine)) {
+      base.medicine = {
+        ...s.medicine,
+        permanentDrops: s.medicine.permanentDrops ?? [0, 0, 0, 0, 0, 0],
+      };
+    }
     // 旧版遭遇没有战况，升级只解除旧记录，不伪造胜负或补发奖励。
     if (upgrading && (s.schema ?? 0) < 19 && s.mortal?.marketSocial?.ambush) {
       s.mortal.marketSocial.ambush = null;

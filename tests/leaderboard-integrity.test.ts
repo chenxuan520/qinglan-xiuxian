@@ -149,9 +149,9 @@ test('事实版本升级严格先核原档，再迁移与重封；迁移前改�
   }
 });
 
-test('养魂木计分升级到v3/格式41：真实v2本地与文件先验旧摘要，再迁移，改档仍标记', () => {
+test('养魂木计分升级到v3/当前格式：真实v2本地与文件先验旧摘要，再迁移，改档仍标记', () => {
   assert.equal(FACTS_VERSION, 3);
-  assert.equal(SAVE_SCHEMA, 41);
+  assert.equal(SAVE_SCHEMA, 42);
   const base = freshSave('heaven', ['metal'], 'dual', () => 0.5);
   base.training = { vitality: 10, power: 10, speed: 10 };
   base.curios.bag['soul-wood'] = 1;
@@ -164,7 +164,7 @@ test('养魂木计分升级到v3/格式41：真实v2本地与文件先验旧摘�
     if (changed) raw.training.speed++;
     const text = JSON.stringify(raw);
     for (const save of [readSealedSave(text).save, importSave(text).save]) {
-      assert.equal(save.schema, 41);
+      assert.equal(save.schema, SAVE_SCHEMA);
       assert.equal(save.factsSeal!.v, 3);
       assert.equal(save.factsTampered, changed);
       assert.equal(inspectSaveIntegrity(save, 'local'), changed);
