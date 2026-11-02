@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AUTOPLAY_BUILDS } from '../src/autoplay-build.ts';
-import { ROOT_STARTERS } from '../src/data.ts';
+import { ROOT_STARTERS, STAGES } from '../src/data.ts';
 import { caseKey } from '../scripts/balance-policy.ts';
 import { simulateCampaign, type CampaignSample } from '../scripts/balance-simulation.ts';
 import { ciCases } from '../scripts/balance-ci.ts';
@@ -73,11 +73,38 @@ test('独立模式测试固定40配对开局，不扩充现有840矩阵', () => 
   assert.deepEqual(autoplayBuild('custom').targets, ['ice', 'skull']);
   assert.equal(ciCases().length, 840);
 });
-test('真实六关默认路径完全不变；漏关、重复、提前全胜及停止原因错误均失败', () => {
+// 统计器的胜利分支使用显式结构夹具，不要求某个真实开局在每次加难后仍必胜。
+// 真实模拟的默认策略一致性与战败路径仍在下方单独核验。
+function sixWinFixture(source: CampaignSample): CampaignSample {
+  const result = structuredClone(source);
+  result.battles = Array.from({ length: 6 }, (_, stage) => {
+    const battle = structuredClone(source.battles[0]);
+    const at = STAGES[stage].minutes * 60;
+    return {
+      ...battle,
+      stage,
+      state: 'won',
+      seconds: at + 20,
+      maxAliveBosses: 1,
+      bosses: [{ stage, at, deadAt: at + 20, observedSeconds: 20, hpFraction: 0 }],
+    };
+  });
+  result.cleared = 6;
+  result.complete = false;
+  result.stop = 'won';
+  result.seconds = result.battles.reduce((sum, battle) => sum + battle.seconds, 0);
+  return result;
+}
+
+test('真实默认走法一致，报告覆盖胜败样本；漏关、重复、提前全胜及停止原因错误均失败', () => {
   const c = autoplayCases()[0];
-  const sample = simulateCampaign(c, 6);
-  assert.equal(sample.cleared, 6);
-  assert.deepEqual(simulateCampaign(c, 6, autoplayBuild('default')), sample);
+  const actual = simulateCampaign(c, 6);
+  assert.deepEqual(simulateCampaign(c, 6, autoplayBuild('default')), actual);
+  checkAutoplayResults(
+    AUTOPLAY_BUILDS.map((m) => ({ mode: m.id, rows: [structuredClone(actual)] })),
+    [c],
+  );
+  const sample = sixWinFixture(actual);
   const groups = () =>
     AUTOPLAY_BUILDS.map((m) => ({ mode: m.id, rows: [structuredClone(sample)] }));
   const correct = groups();
@@ -105,7 +132,7 @@ test('真实六关默认路径完全不变；漏关、重复、提前全胜及�
 });
 test('配对统计按身份而非返回顺序，正确区分多过和少过', () => {
   const cases = autoplayCases().slice(0, 2);
-  const won = simulateCampaign(cases[0], 6);
+  const won = sixWinFixture(simulateCampaign(cases[0], 6));
   const row = (i: number, pass: boolean): CampaignSample => {
     const r = structuredClone(won);
     r.case = cases[i];

@@ -143,7 +143,14 @@ export function bestiaryPanel(
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small>${bossSkills(bossStage, trial).join(' · ')}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] }, known)}<p class="boss-lore" aria-label="妖王来历">${completed.includes(bossStage) ? BOSS_LORE[bossStage] : '击败后可见来历'}</p></div></article>`;
+        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small>${bossSkills(
+          bossStage,
+          trial,
+        )
+          .map((name) => `<span class="boss-skill-name">${name}</span>`)
+          .join(
+            ' · ',
+          )}<br>${trial ? trialBossHints[bossStage] : bossHints[bossStage]}</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] }, known)}<p class="boss-lore" aria-label="妖王来历">${completed.includes(bossStage) ? BOSS_LORE[bossStage] : '击败后可见来历'}</p></div></article>`;
       })
       .join(
         '',

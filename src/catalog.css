@@ -511,6 +511,9 @@
   color: #b7c6ab;
   font-size: inherit;
 }
+.enemy-card .boss-skill-name {
+  display: inline-block;
+}
 .enemy-card > div {
   min-width: 0;
 }

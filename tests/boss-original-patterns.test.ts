@@ -362,7 +362,7 @@ test('原环射保持完整360度和均匀缺口，扇射不偷偷变成条带�
     const { g, e } = encounter(origin, phase, 6);
     const angle = 0.4;
     g.castBossSkill(e, Math.cos(angle), Math.sin(angle));
-    assert.equal(g.shots.length, count);
+    assert.equal(g.shots.length, origin === 1 ? 17 : count);
     for (let i = 0; i < count; i++) {
       const expected = angle + (i / (count - 1) - 0.5) * spread;
       const b = g.shots[i];

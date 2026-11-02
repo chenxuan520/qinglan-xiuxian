@@ -71,6 +71,7 @@ test('第二境妖王在既有增幅上再加20%气血，固定强度不随玩�
       1.65 *
       1.3 *
       1.2 *
+      1.2 *
       rules.bossHp[1] *
       STAGE_COMBAT_SCALING[1].hp *
       realmDamageMultiplier(6);

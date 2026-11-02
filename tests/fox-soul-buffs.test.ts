@@ -174,7 +174,7 @@ test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥�
     [2.2, 5, 4.2, 4.8, 5, 1.8, 1],
   ];
   assert.equal(BOSS_COMBAT.hp[4], 2.4 * 1.2 * 1.1);
-  assert.equal(BOSS_COMBAT.hp[1], 1.65 * 1.3 * 1.2 * 1.2);
+  assert.equal(BOSS_COMBAT.hp[1], 1.65 * 1.3 * 1.2 * 1.2 * 1.2);
   for (const [difficulty, rule] of DIFFICULTIES.entries()) {
     assert.deepEqual(rule.bossHp, expected[difficulty]);
     assert.equal(rule.reward, [1, 1.5, 2.2][difficulty]);
