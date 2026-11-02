@@ -71,6 +71,10 @@ const rumorSpeakers: Record<DockRumor['key'], string> = {
   'forecast-medicine': '潘承安',
   'combo-sword': '孟青川',
   'combo-fan': '沈松亭',
+  'combo-beads': '慧澄',
+  'combo-wings': '程渡',
+  'combo-brush': '柳砚秋',
+  'combo-spring': '宋清漪',
   'combo-soul': '顾玄微',
 };
 let visitCache: { key: string; normal: DockRumor[]; ranked: DockRumor[] } | null = null;

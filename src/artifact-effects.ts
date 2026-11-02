@@ -1,4 +1,5 @@
 import { TAU } from './data.ts';
+import { drawFlame } from './boss-effects.ts';
 import type { Effect, Zone } from './game.ts';
 
 const KINDS = new Set([
@@ -576,7 +577,7 @@ export function drawArtifactObject(
     c.rotate(-0.15);
     const size = Math.min(1.05, r / 90);
     c.scale(size, size);
-    c.strokeStyle = '#122e31';
+    c.strokeStyle = z.color === '#bfe6cf' ? '#bfe6cf' : '#122e31';
     c.lineWidth = 5;
     const count = q.charging ? Math.max(1, Math.ceil(q.charge * strokes.length)) : strokes.length;
     for (const stroke of strokes.slice(0, count)) line(c, stroke);
@@ -978,5 +979,126 @@ export function drawArtifactBurst(c: CanvasRenderingContext2D, e: Effect, reduce
     mote(c, 0, 32, 4);
     c.restore();
   }
+  c.restore();
+}
+
+// 组合装饰仅随既有战斗特效模块加载；不消耗战斗随机数，不创建图片或纹理缓存。
+export function drawComboPlayer(
+  c: CanvasRenderingContext2D,
+  game: import('./game.ts').Game,
+  time: number,
+  reduced: boolean,
+  compact: boolean,
+) {
+  const p = game.player;
+  c.save();
+  if (
+    game.windThunderActive &&
+    game.state === 'playing' &&
+    p.moving &&
+    Math.hypot(game.input.x, game.input.y) > 0.05 &&
+    !reduced
+  ) {
+    const angle = Math.atan2(game.input.y, game.input.x);
+    c.translate(p.x, p.y + 5);
+    c.rotate(angle);
+    c.strokeStyle = '#ead79c';
+    c.lineWidth = 1.5;
+    for (let i = 0; i < (compact ? 2 : 3); i++) {
+      const x = -22 - i * 18;
+      c.globalAlpha = 0.42 - i * 0.1;
+      c.beginPath();
+      c.moveTo(x, -6);
+      c.lineTo(x - 10, 0);
+      c.lineTo(x - 5, 3);
+      c.lineTo(x - 18, 9);
+      c.stroke();
+    }
+    c.rotate(-angle);
+    c.translate(-p.x, -p.y - 5);
+  }
+  if (game.buddhaShieldReady) {
+    c.globalAlpha = reduced ? 0.7 : 0.65 + Math.sin(time * 2) * 0.1;
+    c.strokeStyle = '#ead79c';
+    c.lineWidth = 1.8;
+    c.beginPath();
+    c.ellipse(p.x, p.y + 7, 29, 22, 0, 0, TAU);
+    c.stroke();
+    c.globalAlpha *= 0.4;
+    c.beginPath();
+    c.ellipse(p.x, p.y + 7, 33, 25, 0, 0, TAU);
+    c.stroke();
+  }
+  c.restore();
+}
+
+export function drawComboShot(
+  c: CanvasRenderingContext2D,
+  shot: import('./game.ts').Shot,
+  time: number,
+  compact: boolean,
+  reduced: boolean,
+) {
+  if (shot.kind !== 'fan' || reduced) return;
+  c.save();
+  c.translate(shot.x, shot.y);
+  c.rotate(Math.atan2(shot.vy, shot.vx));
+  c.fillStyle = '#91cdb2';
+  for (let i = 0; i < (compact ? 1 : 3); i++) {
+    c.save();
+    c.translate(-9 - i * 9, Math.sin(time * 5 + i * 2) * 8);
+    c.rotate(-0.6 + i * 0.7);
+    c.globalAlpha = 0.75 - i * 0.15;
+    c.beginPath();
+    c.ellipse(0, 0, 2, 6, 0, 0, TAU);
+    c.fill();
+    c.restore();
+  }
+  c.restore();
+}
+
+export function drawComboPickup(
+  c: CanvasRenderingContext2D,
+  at: import('./game.ts').Point,
+  player: import('./game.ts').Point,
+) {
+  const dx = at.x - player.x,
+    dy = at.y - player.y,
+    d = Math.hypot(dx, dy);
+  if (d < 20) return;
+  c.save();
+  c.strokeStyle = '#b0e4cf70';
+  c.lineWidth = 1.3;
+  c.beginPath();
+  c.moveTo(at.x, at.y);
+  c.quadraticCurveTo(
+    at.x + (dx / d) * 10 - (dy / d) * 3,
+    at.y + (dy / d) * 10 + (dx / d) * 3,
+    at.x + (dx / d) * 22,
+    at.y + (dy / d) * 22,
+  );
+  c.stroke();
+  c.restore();
+}
+
+export function drawComboPool(c: CanvasRenderingContext2D, z: Zone) {
+  c.save();
+  c.strokeStyle = '#9fe2e8b0';
+  c.lineWidth = 1.8;
+  c.beginPath();
+  c.arc(z.x, z.y, z.radius * 0.9, 0, TAU);
+  c.stroke();
+  c.restore();
+}
+
+export function drawComboSoul(c: CanvasRenderingContext2D, e: Effect) {
+  const progress = 1 - e.life / e.maxLife;
+  c.save();
+  c.translate(e.x, e.y - progress * 15);
+  c.scale(1 - progress * 0.5, 1 - progress * 0.5);
+  c.fillStyle = e.color;
+  c.strokeStyle = e.color;
+  c.lineWidth = 0.7;
+  drawFlame(c, e.radius, progress * 2);
   c.restore();
 }

@@ -167,6 +167,8 @@ export function createScenarioGame(spec: Scenario, seed: number) {
     (sum, cost) => sum + cost,
     0,
   );
+  // 自然末段样本用合法满体魄承受较长封宝，保留原种子与末关覆盖门槛。
+  if (spec.warmupSeconds && spec.gear === 'full') save.training.vitality = 20;
   const game = new Game(save, spec.stage, 0, seeded(seed));
   if (spec.gear === 'full') {
     game.weapons = TREASURES.slice(0, 6).map((t) => ({

@@ -128,7 +128,10 @@ test('只发送前三节指南摘录与短历史，模型参数固定，source�
   assert.ok(system.content.startsWith(GUIDE_ASK_SYSTEM + '\n【丹药炼制 · 行前一炉丹香】\n'));
   assert.equal((system.content.match(/【/g) ?? []).length, 3);
   assert.ok(system.content.length <= GUIDE_ASK_SYSTEM.length + 4300);
-  assert.doesNotMatch(system.content, /青竹蜂云剑|金雷入剑|如意随风|魂木生息|隐藏组合/);
+  assert.doesNotMatch(
+    system.content,
+    /青竹蜂云剑|金雷入剑|如意随风|魂木生息|梵音护体|佛光护体|佛光挡劫|风雷相生|身法更疾|玉书落墨|判笔添字|灵泉入盏|血池回春|隐藏组合/,
+  );
   assert.equal(calls[0].input.messages.at(-1)?.content, '丹药什么时候能吃');
 });
 

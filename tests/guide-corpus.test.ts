@@ -22,7 +22,10 @@ test('指南语料覆盖全部标签、保持小节纯文本与1500字上限，�
     }
   }
   for (const section of corpus)
-    assert.doesNotMatch(section.heading + section.text, /青竹蜂云剑|金雷入剑|如意随风|魂木生息/);
+    assert.doesNotMatch(
+      section.heading + section.text,
+      /青竹蜂云剑|金雷入剑|如意随风|魂木生息|梵音护体|佛光护体|佛光挡劫|风雷相生|身法更疾|玉书落墨|判笔添字|灵泉入盏|血池回春/,
+    );
 });
 
 test('去除HTML保留按键文字和实体，不把脚本或样式当正文', () => {

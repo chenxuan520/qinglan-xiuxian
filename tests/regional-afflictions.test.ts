@@ -157,7 +157,7 @@ test('第六关雷兽与错拍雷路全在自身200像素内，击杀施法者�
   assert.ok(fields[0].delay + fields[0].life < fields[1].delay);
 });
 
-test('雷麻禁锢0.65秒/1秒保护，不在预警或护体时施加，远处不在脚下生成', () => {
+test('雷麻禁锢1秒/1秒保护，不在预警或护体时施加，远处不在脚下生成', () => {
   const g = arena(5),
     e = g.spawnEnemy(69, false, false, { x: -100, y: 0 });
   const fields = regionalEnemyFields(e, 'storm', 1, 0)!;
@@ -173,7 +173,7 @@ test('雷麻禁锢0.65秒/1秒保护，不在预警或护体时施加，远处�
   assert.equal(g.immobilized, 0);
   g.player.invincible = 0;
   g.updateZones(0.05);
-  assert.equal(g.immobilized, 0.65);
+  assert.equal(g.immobilized, 1);
   g.immobilized = 0;
   g.player.invincible = 0;
   g.updateZones(0.05);
@@ -213,7 +213,7 @@ test('AI按可见错拍预警换位，画面在减少动态下也能区分灼烧
       },
   });
   for (const reduced of [false, true]) {
-    g.immobilized = 0.65;
+    g.immobilized = 1;
     drawPlayerAilments(c, g, 1, reduced);
     const fire = arena();
     fire.burning = { life: 1, damage: 1 };
@@ -260,18 +260,18 @@ function soulHit(g: Game) {
   g.updateShots(0);
 }
 
-test('魂弹封宝一秒：仍可移动、已有攻击继续，恢复后立即按原冷却施法', () => {
+test('魂弹封宝两秒：仍可移动、已有攻击继续，恢复后立即按原冷却施法', () => {
   const g = arena(4);
   g.weapons[0].timer = 0;
   soulHit(g);
-  assert.equal(g.sealed, 1);
+  assert.equal(g.sealed, 2);
   let casts = 0;
   g.onEvent = (e) => {
     if (e === 'cast') casts++;
   };
   g.input = { x: 1, y: 0 };
   const x = g.player.x;
-  for (let i = 0; i < 19; i++) g.update(0.05);
+  for (let i = 0; i < 39; i++) g.update(0.05);
   assert.equal(casts, 0);
   assert.ok(g.player.x > x);
   assert.equal(g.weapons[0].timer, 0, '封宝时不积攒负冷却或多轮补发');
@@ -279,31 +279,31 @@ test('魂弹封宝一秒：仍可移动、已有攻击继续，恢复后立即�
   assert.ok(casts > 0);
 });
 
-test('连续魂弹在一秒内不续封，间隔满一秒的下一次真实命中可再次封宝', () => {
+test('连续魂弹在两秒内不续封，结束后的下一次真实命中可再次封宝', () => {
   const g = arena(4);
   soulHit(g);
   g.shots = [];
-  for (let i = 0; i < 12; i++) g.update(0.05);
+  for (let i = 0; i < 24; i++) g.update(0.05);
   const remaining = g.sealed;
   g.player.invincible = 0;
   soulHit(g);
   g.shots = [];
   assert.equal(g.sealed, remaining, '保护内再次受击不延长当前控制');
-  for (let i = 0; i < 9; i++) g.update(0.05);
+  for (let i = 0; i < 19; i++) g.update(0.05);
   assert.equal(g.sealed, 0);
   g.player.invincible = 0;
   soulHit(g);
-  assert.equal(g.sealed, 1, '满一秒后再次真实受击恢复完整一秒封宝');
+  assert.equal(g.sealed, 2, '封宝结束后再次真实受击恢复完整两秒封宝');
 });
 
-test('雷麻仅禁锢移动0.65秒，法宝照常施放；解除后输入继续生效', () => {
+test('雷麻仅禁锢移动1秒，法宝照常施放；解除后输入继续生效', () => {
   const g = arena(5);
   const target = g.spawnEnemy(65, false, false, { x: 300, y: 0 });
   target.speed = 0;
   target.cooldown = 9999;
   target.hp = target.maxHp = 1e9;
   g.enemyBind();
-  assert.equal(g.immobilized, 0.65);
+  assert.equal(g.immobilized, 1);
   assert.equal(g.slowed, 0);
   g.input = { x: 1, y: 0 };
   g.weapons[0].timer = 0;
@@ -312,19 +312,19 @@ test('雷麻仅禁锢移动0.65秒，法宝照常施放；解除后输入继续�
     if (e === 'cast') casts++;
   };
   const x = g.player.x;
-  for (let i = 0; i < 12; i++) g.update(0.05);
+  for (let i = 0; i < 19; i++) g.update(0.05);
   assert.equal(g.player.x, x);
   assert.ok(casts > 0);
   g.update(0.05);
-  g.update(0.001); // 浮点累计到0.65秒的边界后一帧
+  g.update(0.001); // 浮点累计到1秒的边界后一帧
   assert.ok(g.player.x > x);
-  assert.deepEqual(autoplayInput({ ...g, immobilized: 0.65 } as Game), { x: 0, y: 0 });
+  assert.deepEqual(autoplayInput({ ...g, immobilized: 1 } as Game), { x: 0, y: 0 });
 });
 
 test('禁锢与封宝各有1秒保护，护体不施加，暂停冻结、续局保留、复活和借寿清除', () => {
   for (const [key, method, duration, next] of [
-    ['immobilized', 'enemyBind', 0.65, 'nextEnemyBindAt'],
-    ['sealed', 'enemySeal', 1, 'nextEnemySealAt'],
+    ['immobilized', 'enemyBind', 1, 'nextEnemyBindAt'],
+    ['sealed', 'enemySeal', 2, 'nextEnemySealAt'],
   ] as const) {
     const g = arena(4);
     g.player.invincible = 1;
@@ -396,7 +396,7 @@ test('封宝不抹除已经发出的弹丸和法阵，终关魂弹共用封宝�
   const b = g.hostileShot(g.player, 1, 0, 1, 1);
   b.bossStage = 4;
   g.updateShots(0);
-  assert.equal(g.sealed, 1);
+  assert.equal(g.sealed, 2);
   g.player.invincible = 0;
   const e = g.spawnEnemy(69, false, false, { x: -100, y: 0 });
   g.castEnemySkill(e, 100, 1, 0);
@@ -425,6 +425,6 @@ test('旧快照缺省控制状态为零，当前快照的控制时钟往返一�
   restored.state = 'paused';
   const again = Game.restore(g.save, JSON.parse(JSON.stringify(restored.snapshot())))!;
   assert.ok(again);
-  assert.equal(again.immobilized, 0.65);
-  assert.equal(again.sealed, 1);
+  assert.equal(again.immobilized, 1);
+  assert.equal(again.sealed, 2);
 });

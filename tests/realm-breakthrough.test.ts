@@ -172,6 +172,7 @@ test('七个大境界适配手机和横屏，减少动态效果静止，动态�
             height,
             scale: 1,
             reducedMotion: { matches: still },
+            coarsePointer: { matches: width < 700 },
             formations: new Map(),
             sprite() {},
           });

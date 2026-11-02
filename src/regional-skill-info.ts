@@ -54,8 +54,8 @@ export const ENEMY_SKILLS = {
   },
   soulcharge: {
     name: '封魂扑杀',
-    hint: '蓄势扑击，冲撞命中后封宝1秒',
-    eliteHint: '冲撞命中后封宝1秒，侧移避开扑击路线',
+    hint: '蓄势扑击，冲撞命中后封宝2秒',
+    eliteHint: '冲撞命中后封宝2秒，侧移避开扑击路线',
   },
   thundercharge: {
     name: '踏雷突袭',

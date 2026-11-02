@@ -543,6 +543,7 @@ test('重击实体、己方光束和觉醒装饰都不能盖住地面圈、普�
         height: 800,
         scale: 1,
         reducedMotion: { matches: false },
+        coarsePointer: { matches: false },
         sprite() {},
         formation() {},
         cachedFormation() {},

@@ -47,7 +47,12 @@ export function forgeTreasure(shell: ActionShell) {
 export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition {
   const { panel, catalogTreasures, schoolFilter, selectedTreasure, bookTab } = view;
   const display = (id: string) =>
-    comboTreasure(save, id, view.weapons?.some((w) => w.id === id) ?? false);
+    comboTreasure(
+      save,
+      id,
+      view.weapons?.some((w) => w.id === id) ?? false,
+      view.weapons?.some((w) => w.id === id && w.evolved) ?? false,
+    );
   const visibleTreasures = catalogTreasures
     .map((t) => display(t.id))
     .filter((t) => schoolFilter === 'all' || t.school === schoolFilter);

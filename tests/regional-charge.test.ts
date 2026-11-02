@@ -127,7 +127,7 @@ test('九幽只在实际冲刺接触时封宝，普通碰撞/蓄势不封，护�
       g.sealed = 0;
     }
     g.updateEnemies(0.01);
-    assert.equal(g.sealed, phase === 'charge' ? 1 : 0, phase);
+    assert.equal(g.sealed, phase === 'charge' ? 2 : 0, phase);
   }
   const { g, e } = arena(4);
   e.x = -3.8;
@@ -135,7 +135,7 @@ test('九幽只在实际冲刺接触时封宝，普通碰撞/蓄势不封，护�
   e.dx = 1;
   g.updateEnemies(0.01);
   assert.equal(e.charge, 0);
-  assert.equal(g.sealed, 1);
+  assert.equal(g.sealed, 2);
   assert.ok(Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot()))));
 });
 
@@ -185,7 +185,7 @@ test('妖物志列出各境新冲刺后果，终关不显示新增的冰冲、�
     [1, '火痕，命中后灼烧'],
     [2, '冰路'],
     [3, '扑击终点'],
-    [4, '冲撞命中后封宝1秒'],
+    [4, '冲撞命中后封宝2秒'],
   ] as const)
     assert.ok(bestiaryPanel(stage).body.includes(words), words);
   for (const word of ['踏霜扑杀', '迸瘴扑杀', '封魂扑杀'])

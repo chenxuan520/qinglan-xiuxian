@@ -3,6 +3,11 @@ export { drawBossSummon, drawBossMotionCue } from './boss-mechanics-render.ts';
 export { drawRealmBreakthrough, drawBossEntrance } from './render-overlays.ts';
 export { drawBossField, drawBossShot } from './boss-effects.ts';
 export {
+  drawComboPlayer,
+  drawComboShot,
+  drawComboPickup,
+  drawComboPool,
+  drawComboSoul,
   hasArtifactField,
   drawArtifactField,
   drawArtifactObject,

@@ -259,3 +259,6 @@ export function drawBossShot(c: CanvasRenderingContext2D, shot: Shot) {
     }
   }
 }
+
+// 同一火焰笔画供组合魂火复用，颜色、缩放与寿命由调用处限定。
+export { flame as drawFlame };

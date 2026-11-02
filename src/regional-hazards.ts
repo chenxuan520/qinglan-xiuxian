@@ -22,8 +22,8 @@ export function slowingHazard(z: Zone) {
 
 export const ENEMY_CONTROL = {
   slow: 0.55,
-  bind: 0.65,
-  seal: 1,
+  bind: 1,
+  seal: 2,
   entangle: 3,
   corrode: 3,
   protection: 1,

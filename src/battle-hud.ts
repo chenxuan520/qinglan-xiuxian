@@ -176,7 +176,7 @@ export class BattleHud {
         const w = game!.weapons[i];
         if (!w)
           return '<div class="equipped-slot empty"><span>＋</span><small>待悟法宝</small></div>';
-        const t = comboTreasure(save, w.id);
+        const t = comboTreasure(save, w.id, true, w.evolved);
         return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}">${icon(t.id, t.color)}<div><strong>${w.evolved ? t.evolution : t.name}</strong><span>${w.evolved ? '仙器 · 觉醒' : `${['', '一', '二', '三', '四', '五', '六'][w.level]}重`}<i>${'·'.repeat(w.level)}</i></span></div></div>`;
       }).join('');
       document.getElementById('passive-slots')!.innerHTML = Object.entries(game.passives)

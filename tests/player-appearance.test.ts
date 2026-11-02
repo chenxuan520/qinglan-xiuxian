@@ -55,6 +55,7 @@ test('首页主体、元婴与实战读取各自道途，换道不改变旧局�
     height: 900,
     scale: 1,
     reducedMotion: { matches: false },
+    coarsePointer: { matches: false },
     sprite(...args: unknown[]) {
       calls.push(args);
     },

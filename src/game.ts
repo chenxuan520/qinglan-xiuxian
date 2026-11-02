@@ -8,7 +8,7 @@ import {
 import { enemyCombatStats } from './enemy-stats.ts';
 import { recordBestiarySeen } from './bestiary-seen.ts';
 import { ownsCurio, bossCurio, soulWoodMultiplier } from './curio-data.ts';
-import { curioCombo, treasureDisplayName } from './curio-combos.ts';
+import { curioCombo, treasureDisplayName, windThunderCombo } from './curio-combos.ts';
 import { powerTrainingEffect, trainingEffect } from './training.ts';
 import type {
   Point,
@@ -181,6 +181,7 @@ export class Game {
   #shownAilments = new Set<string>();
   #pendingAilmentNotices: string[] = [];
   #shownCombos = new Set<string>();
+  #buddhaCooldown = 0;
   #pendingComboNotices: string[] = [];
   tribulation = 0;
   tribulationStep = 0;
@@ -401,7 +402,7 @@ export class Game {
         (1 - (this.passives.bone || 0) * 0.01 * this.medicine.drawback) *
         (this.slowed > 0 ? 1 - 0.25 * this.medicine.drawback : 1) *
         this.medicine.speed *
-        (ownsCurio(this.save, 'wind-wings') ? 1.15 : 1),
+        (this.windThunderActive ? 1.2 : ownsCurio(this.save, 'wind-wings') ? 1.15 : 1),
       crit: Math.min(
         0.85,
         spiritRootInfo(this.spiritRoot).baseCrit +
@@ -652,6 +653,9 @@ export class Game {
       g.weapons = s.weapons.map((w) => ({ ...w }));
       // 提示不入快照；续局已有的组合视为已经提示，不重复打断战斗。
       for (const w of g.weapons) if (g.#activeCombo(w.id)) g.#shownCombos.add(w.id);
+      if (g.windThunderActive) g.#shownCombos.add('wind-thunder');
+      // 佛光冷却不入快照；恢复不赠送一次即时护盾。
+      g.#buddhaCooldown = g.#activeCombo('beads') ? 12 : 0;
       g.passives = { ...s.passives };
       const maxHp = g.#maximumHealth();
       if (
@@ -831,6 +835,7 @@ export class Game {
       this.#effect(this.player.x, this.player.y, 0.6, 180, '#b8e5ef', 'impact');
     }
     const progress = this.combatProgress;
+    this.#buddhaCooldown = this.#activeCombo('beads') ? Math.max(0, this.#buddhaCooldown - dt) : 0;
     this.noticeTime -= dt;
     this.slowed = Math.max(0, this.slowed - dt);
     this.immobilized = Math.max(0, this.immobilized - dt);
@@ -846,7 +851,7 @@ export class Game {
       const damage = this.burning.damage * (elapsed / this.burning.life);
       this.burning.damage -= damage;
       this.burning.life = Math.max(0, this.burning.life - elapsed);
-      p.hp = Math.max(0, p.hp - damage);
+      if (!this.#blockComboDamage(damage)) p.hp = Math.max(0, p.hp - damage);
       if (p.hp === 0) {
         this.state = 'lost';
         this.onEvent('lose');
@@ -900,6 +905,10 @@ export class Game {
         this.announce(`${STAGES[this.stage].boss}降临 · 小心红色预警`);
         this.onEvent('boss');
       }
+    }
+    if (this.windThunderActive && !this.#shownCombos.has('wind-thunder')) {
+      this.#shownCombos.add('wind-thunder');
+      this.#pendingComboNotices.push('风雷相生 · 身法更疾');
     }
     for (const w of this.weapons) {
       const combo = this.#activeCombo(w.id);
@@ -1388,7 +1397,7 @@ export class Game {
       }
       d = distance(e, p);
       if (d < e.radius + 13 && !e.dead) {
-        if (soulContact) this.enemySeal();
+        if (soulContact && !this.buddhaShieldReady) this.enemySeal();
         this.hurtPlayer(e.damage);
       }
       if (
@@ -1997,6 +2006,26 @@ export class Game {
     }
     return result;
   }
+  get windThunderActive() {
+    return (
+      ownsCurio(this.save, 'wind-wings') &&
+      windThunderCombo(
+        this.save,
+        this.weapons.map((w) => w.id),
+      )
+    );
+  }
+  get buddhaShieldReady() {
+    return !!this.#activeCombo('beads') && this.#buddhaCooldown <= 0;
+  }
+  #blockComboDamage(damage: number) {
+    if (damage <= 0 || !this.buddhaShieldReady) return false;
+    this.#buddhaCooldown = 12;
+    this.player.invincible = 0.8;
+    this.#effect(this.player.x, this.player.y, 0.35, 42, '#ead79c', 'pulse');
+    this.#effect(this.player.x, this.player.y - 22, 0.65, 0, '#ead79c', 'text', '佛光');
+    return true;
+  }
   #activeCombo(id: string) {
     return this.weapons.some((w) => w.id === id) ? curioCombo(this.save, id) : undefined;
   }
@@ -2129,14 +2158,15 @@ export class Game {
       return;
     }
     if (w.id === 'brush') {
-      for (let i = 1; i <= 3 + (w.evolved ? 2 : 0); i++)
+      const combo = !!this.#activeCombo('brush');
+      for (let i = 1; i <= 3 + (w.evolved ? 2 : 0) + Number(combo); i++)
         this.zone(
           p.x + Math.cos(a) * i * 85,
           p.y + Math.sin(a) * i * 85,
           68 * s.area,
           0.3,
           dmg,
-          t.color,
+          combo ? '#bfe6cf' : t.color,
           w.id,
           i * 0.18,
         );
@@ -2438,8 +2468,10 @@ export class Game {
       if (b.kind === 'hostile') {
         if (b.bossMotion && !bossShotPose(b).active) continue;
         if (distance(b, this.player) < b.radius + 12) {
-          if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
-          if (b.enemySkill === 'soul' || b.bossStage === 4) this.enemySeal();
+          if (!this.buddhaShieldReady) {
+            if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
+            if (b.enemySkill === 'soul' || b.bossStage === 4) this.enemySeal();
+          }
           this.hurtPlayer(
             b.damage * (b.bossStage === 3 ? this.medicine.poison : 1),
             !this.isFinalTrial && this.stage === 1 && b.enemySkill === 'firebolt',
@@ -2462,6 +2494,8 @@ export class Game {
           continue;
         b.hit.add(e.id);
         this.hitEnemy(e, b.damage, b.crit, b.kind, b.bossAttack);
+        if (b.kind === 'talisman' && this.#activeCombo('talisman') && this.effects.length < 100)
+          this.#effect(e.x, e.y, 0.32, 5, '#b9ead4', 'combo-soul');
         if (b.kind === 'sword' && this.#activeCombo('sword'))
           this.#effect(e.x, e.y, 0.45, 60, treasure('sword').color, 'lightning');
         b.pierce--;
@@ -2520,6 +2554,14 @@ export class Game {
         z.life = 0;
         continue;
       }
+      if (z.kind === 'brush') {
+        const combo = !!this.#activeCombo('brush');
+        if (!combo && (z.castDelay ?? 0) > (z.castEvolved ? 5 : 3) * 0.18) {
+          z.life = 0;
+          continue;
+        }
+        z.color = combo ? '#bfe6cf' : treasure('brush').color;
+      }
       if (z.delay > 0) {
         z.delay -= dt;
         continue;
@@ -2539,6 +2581,7 @@ export class Game {
         z.life > 0 &&
         (slowingHazard(z) || bindingHazard(z) || entanglingHazard(z)) &&
         this.player.invincible <= 0 &&
+        !(z.damage > 0 && this.buddhaShieldReady) &&
         hazardDistance(z, this.player) < z.radius + 8
       )
         bindingHazard(z)
@@ -2588,7 +2631,10 @@ export class Game {
           );
           this.areaDamage(z, z.radius, z.damage, z.kind);
           if (hits && (z.kind === 'cauldron' || z.kind === 'bloodpool'))
-            this.heal(this.player.maxHp * (z.kind === 'cauldron' ? 0.0015 : 0.001));
+            this.heal(
+              this.player.maxHp *
+                (z.kind === 'cauldron' ? 0.0015 : this.#activeCombo('bloodpool') ? 0.002 : 0.001),
+            );
         }
       }
     }
@@ -2695,12 +2741,13 @@ export class Game {
     this.nextEnemySlowAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemyBind() {
-    if (this.player.invincible > 0 || this.time < this.nextEnemyBindAt) return;
+    if (this.player.invincible > 0 || this.immobilized > 0 || this.time < this.nextEnemyBindAt)
+      return;
     this.immobilized = this.#ctl('bind');
     this.nextEnemyBindAt = this.time + ENEMY_CONTROL.protection;
   }
   private enemySeal() {
-    if (this.player.invincible > 0 || this.time < this.nextEnemySealAt) return;
+    if (this.player.invincible > 0 || this.sealed > 0 || this.time < this.nextEnemySealAt) return;
     this.sealed = this.#ctl('seal');
     this.nextEnemySealAt = this.time + ENEMY_CONTROL.protection;
   }
@@ -3192,6 +3239,7 @@ export class Game {
   hurtPlayer(damage: number, burn = false, poison = false) {
     if (this.player.invincible > 0 || this.state !== 'playing') return;
     const total = damage * this.stats.armor;
+    if (this.#blockComboDamage(total)) return;
     const delayed = burn && this.burning.life <= 0 ? total * 0.2 : 0;
     if (delayed > 0) this.burning = { life: 1.5, damage: delayed };
     this.player.hp -= total - delayed;

@@ -137,6 +137,7 @@ test('出场法阵逐帧扩散和重复登场不累积离屏画布缓存', async
       scale: 1,
       formations: new Map(),
       reducedMotion: { matches: false },
+      coarsePointer: { matches: false },
       sprite() {},
     });
     for (const still of [false, true]) {
@@ -275,6 +276,7 @@ test('七种登场在桌面、手机和横屏可绘制，减少动态效果停�
           width,
           height,
           reducedMotion: { matches: still },
+          coarsePointer: { matches: false },
           sprite() {},
         });
         const g = encounter(stage);

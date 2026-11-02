@@ -160,7 +160,12 @@ export function catalogEvolutionRecipe(t: Treasure) {
 export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: number) {
   const weapon =
     c.type === 'weapon' || c.type === 'evolve'
-      ? comboTreasure(save, c.id, game?.weapons.some((w) => w.id === c.id) ?? false)
+      ? comboTreasure(
+          save,
+          c.id,
+          game?.weapons.some((w) => w.id === c.id) ?? false,
+          game?.weapons.some((w) => w.id === c.id && w.evolved) ?? false,
+        )
       : null;
   const item =
     c.type === 'passive'

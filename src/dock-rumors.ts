@@ -18,7 +18,11 @@ export type DockRumorKey =
   | 'forecast-medicine'
   | 'combo-sword'
   | 'combo-fan'
-  | 'combo-soul';
+  | 'combo-soul'
+  | 'combo-beads'
+  | 'combo-wings'
+  | 'combo-brush'
+  | 'combo-spring';
 export interface DockRumor {
   key: DockRumorKey;
   text: string;
@@ -31,6 +35,16 @@ const ranking: DockRumor = {
   href: 'https://xiuxian.011203.xyz/leaderboard/',
 };
 const rumors: DockRumor[] = [
+  {
+    key: 'combo-beads',
+    text: '庙里的老和尚说，佛门的东西凑在一处，光就亮了一层，连刀都砍不进来。',
+  },
+  {
+    key: 'combo-wings',
+    text: '跑船的说，见过一个人背后生翅，走起来像一道雷，扇子一摇，人就到了跟前。',
+  },
+  { key: 'combo-brush', text: '说书先生讲，好笔遇上好书，落墨时会自己多写一笔。' },
+  { key: 'combo-spring', text: '有人在血池边看见过清泉的光，说那盏子里的血，是越流越活的。' },
   {
     key: 'combo-sword',
     text: '有人说，金雷竹的细叶落在剑上，那剑就再不肯叫原来的名字了。',

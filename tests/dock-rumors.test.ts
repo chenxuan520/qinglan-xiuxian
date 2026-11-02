@@ -112,7 +112,7 @@ test('已得掌天瓶不再进入池，预告无结果不入池且抽选不补�
   const before = structuredClone(save);
   assert.equal(forecastCurioConsignment(save), null);
   const pool = dockRumorPool(save);
-  assert.equal(pool.length, 11);
+  assert.equal(pool.length, 15);
   for (const key of ['bottle', 'forecast-curio', 'forecast-medicine'])
     assert.equal(
       pool.some((rumor) => rumor.key === key),

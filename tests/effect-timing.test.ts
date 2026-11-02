@@ -44,6 +44,7 @@ function draw(g: Game) {
     height: 800,
     scale: 1,
     reducedMotion: { matches: false },
+    coarsePointer: { matches: false },
     sprite() {},
     formation() {},
     playerFormation() {},

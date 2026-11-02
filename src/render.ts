@@ -1,3 +1,4 @@
+import { curioCombo } from './curio-combos.ts';
 import { resourceFailed } from './update-check.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
 import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
@@ -401,6 +402,15 @@ export class Renderer {
   private drawGame(game: Game, time: number) {
     const c = this.ctx,
       p = game.player;
+    const active = (id: string) =>
+      !!curioCombo(game.save, id) && game.weapons.some((w) => w.id === id);
+    const fanCombo = active('fan'),
+      soulCombo = active('talisman'),
+      springCombo = active('bloodpool');
+    const compact = this.coarsePointer.matches || this.width < 700;
+    let pickupBudget = compact ? 4 : 12,
+      shotBudget = compact ? 4 : 10,
+      soulBudget = compact ? 4 : 10;
     if (game.tribulation) {
       c.save();
       c.strokeStyle = '#d4adff';
@@ -413,8 +423,11 @@ export class Renderer {
     }
     // 先画地面底色；危险边界集中放在法宝、人物和装饰之后绘制。
     for (const z of game.zones)
-      if (this.battleArt!.hasArtifactField(z) && this.visible(z, p, z.radius + 50))
+      if (this.battleArt!.hasArtifactField(z) && this.visible(z, p, z.radius + 50)) {
         this.battleArt!.drawArtifactField(c, z, time, this.reducedMotion.matches);
+        if (springCombo && z.kind === 'bloodpool' && z.delay <= 0)
+          this.battleArt!.drawComboPool(c, z);
+      }
     for (const z of game.zones) {
       if (this.battleArt!.hasArtifactField(z) || !this.visible(z, p, hazardMargin(z))) continue;
       if (drawRegionalField(c, z, time, this.reducedMotion.matches)) continue;
@@ -445,6 +458,15 @@ export class Renderer {
     }
     for (const item of game.pickups) {
       if (!this.visible(item, p)) continue;
+      if (
+        fanCombo &&
+        item.pull &&
+        game.entangled <= 0 &&
+        !(game.corroded > 0 && item.kind === 'heal') &&
+        !this.reducedMotion.matches &&
+        pickupBudget-- > 0
+      )
+        this.battleArt!.drawComboPickup(c, item, p);
       c.save();
       c.translate(item.x, item.y);
       if (item.kind === 'xp') {
@@ -564,6 +586,8 @@ export class Renderer {
     for (const e of entities) {
       if (e.type === -1) {
         this.playerFormation(p.x, p.y + 9, game.realmIndex, time);
+        if (game.buddhaShieldReady || game.windThunderActive)
+          this.battleArt!.drawComboPlayer(c, game, time, this.reducedMotion.matches, compact);
         c.globalAlpha = p.invincible > 0 ? 0.5 + Math.sin(time * 35) * 0.3 : 1;
         this.sprite(
           0,
@@ -684,7 +708,10 @@ export class Renderer {
     for (const shot of game.shots) {
       if (!this.visible(shot, p)) continue;
       const a = Math.atan2(shot.vy, shot.vx);
-      if (shot.kind === 'sword') this.sword(shot.x, shot.y, a, shot.color, 0.8);
+      const shotColor = soulCombo && shot.kind === 'talisman' ? '#b9ead4' : shot.color;
+      if (fanCombo && shot.kind === 'fan' && shotBudget-- > 0)
+        this.battleArt!.drawComboShot(c, shot, time, compact, this.reducedMotion.matches);
+      if (shot.kind === 'sword') this.sword(shot.x, shot.y, a, shotColor, 0.8);
       else {
         c.save();
         c.translate(shot.x, shot.y);
@@ -699,13 +726,13 @@ export class Renderer {
           } else this.battleArt!.drawBossShot(c, shot);
         } else if (shot.kind === 'dragon') {
           const bend = this.reducedMotion.matches ? 0 : Math.sin(shot.age * 7) * 8;
-          c.strokeStyle = shot.color + '50';
+          c.strokeStyle = shotColor + '50';
           c.lineWidth = 15;
           c.beginPath();
           c.moveTo(-58, -bend);
           c.bezierCurveTo(-37, 21 + bend, -20, -22, 9, 0);
           c.stroke();
-          c.strokeStyle = shot.color;
+          c.strokeStyle = shotColor;
           c.lineWidth = 5;
           c.stroke();
           c.strokeStyle = '#f1e7c4';
@@ -730,7 +757,7 @@ export class Renderer {
           c.fillRect(9, -3, 3, 2);
         } else if (shot.kind === 'qin') {
           // 扩散音波的半径持续变化，直接画线，避免为每一帧建立纹理。
-          c.strokeStyle = shot.color;
+          c.strokeStyle = shotColor;
           c.lineWidth = 2;
           for (let i = 0; i < 3; i++) {
             c.beginPath();
@@ -738,11 +765,11 @@ export class Renderer {
             c.stroke();
           }
         } else
-          this.glowSprite(`shot:${shot.kind}:${shot.color}:${shot.radius}`, 144, 112, (c) => {
-            c.shadowColor = shot.color;
+          this.glowSprite(`shot:${shot.kind}:${shotColor}:${shot.radius}`, 144, 112, (c) => {
+            c.shadowColor = shotColor;
             c.shadowBlur = 12;
-            c.strokeStyle = shot.color;
-            c.fillStyle = shot.color;
+            c.strokeStyle = shotColor;
+            c.fillStyle = shotColor;
             if (shot.kind === 'arrow') {
               c.lineWidth = 2;
               c.beginPath();
@@ -757,7 +784,7 @@ export class Renderer {
               c.lineTo(9, 5);
               c.closePath();
               c.fill();
-              c.strokeStyle = shot.color;
+              c.strokeStyle = shotColor;
               c.lineWidth = 1;
               for (let i = 0; i < 3; i++) {
                 c.beginPath();
@@ -886,12 +913,19 @@ export class Renderer {
     }
     for (const e of game.effects) {
       if (e.kind === 'line') continue;
+      if (
+        e.kind === 'combo-soul' &&
+        (this.reducedMotion.matches || !soulCombo || soulBudget-- <= 0)
+      )
+        continue;
       if (!this.showDamageNumbers && e.kind === 'text' && /^\d/.test(e.text ?? '')) continue;
       c.save();
       c.globalAlpha = Math.min(1, (e.life / e.maxLife) * 1.8);
       c.strokeStyle = e.color;
       c.fillStyle = e.color;
-      if (e.kind === 'realm-breakthrough') {
+      if (e.kind === 'combo-soul') {
+        this.battleArt!.drawComboSoul(c, e);
+      } else if (e.kind === 'realm-breakthrough') {
         const progress = 1 - e.life / e.maxLife;
         const radius = this.reducedMotion.matches ? e.radius : 28 + e.radius * progress;
         // 跟随角色脚下扩散，直接绘制动态半径，不增加纹理缓存。
