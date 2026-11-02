@@ -304,7 +304,7 @@ test('蓄势续局不丢技能，无效技能状态拒绝恢复', () => {
     delete e.pendingSkill;
   }
   assert.equal(Game.restore(g.save, legacy)!.slowed, 0);
-  for (const value of [NaN, -1, Infinity, 2]) {
+  for (const value of [NaN, -1, Infinity, 2.01]) {
     const bad = g.snapshot();
     bad.slowed = value;
     assert.equal(Game.restore(g.save, bad), null);

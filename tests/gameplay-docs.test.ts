@@ -397,6 +397,7 @@ test('控制时长、漂移瘴云与人字场范围说明对照实际生效参�
     assert.ok(source.includes(`禁锢${ENEMY_CONTROL.bind}秒`));
     assert.ok(source.includes(`封宝${ENEMY_CONTROL.seal}秒`));
     assert.ok(source.includes(`${ENEMY_CONTROL.protection}秒再次触发间隔`));
+    assert.ok(source.includes(`额外灼烧${ENEMY_CONTROL.burn}秒`));
   }
   assert.ok(text.includes(`第二至第六境普通、精英与妖王伤害再乘${REGIONAL_DAMAGE_MULTIPLIER}`));
   const g = new Game(freshSave(), 3, 0),

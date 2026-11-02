@@ -139,7 +139,7 @@ test('九幽只在实际冲刺接触时封宝，普通碰撞/蓄势不封，护�
   assert.ok(Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot()))));
 });
 
-test('古墟火径沿用原伤害，拆两成为1.5秒灼烧；终关火径不新增灼烧', () => {
+test('古墟火径完整直击并额外灼烧20%共3秒；终关火径不新增灼烧', () => {
   for (const stage of [1, 6]) {
     const { g, e } = arena(stage, 31);
     g.addRegionalFields(e, regionalEnemyFields(e, 'firecharge', 1, 0)!);
@@ -148,8 +148,8 @@ test('古墟火径沿用原伤害，拆两成为1.5秒灼烧；终关火径不�
     z.delay = 0;
     const hp = g.player.hp;
     g.updateZones(0.01);
-    close(hp - g.player.hp, z.damage * g.stats.armor * (stage === 1 ? 0.8 : 1));
-    assert.equal(g.burning.life, stage === 1 ? 1.5 : 0);
+    close(hp - g.player.hp, z.damage * g.stats.armor);
+    assert.equal(g.burning.life, stage === 1 ? 3 : 0);
     if (stage === 1) close(g.burning.damage, z.damage * g.stats.armor * 0.2);
   }
 });
@@ -175,7 +175,7 @@ test('冰路和终点毒瘴均可被自动历练识别规避，不依赖伤害�
     assert.ok(Math.abs(input.y) > 0.1 || input.x < 0.9);
     if (stage === 2) {
       g.updateZones(0.01);
-      assert.equal(g.slowed, 0.55);
+      assert.equal(g.slowed, 2);
     }
   }
 });

@@ -24,12 +24,13 @@ function fire(g: Game, damage = 100) {
   g.updateShots(0.01);
 }
 
-test('第二关火球将两成伤害延后1.5秒烧完，总伤害不增加，不叠层或刷新持续时间', () => {
+test('第二关火球先完整直击，再额外灼烧20%伤害共3秒，不叠层或刷新持续时间', () => {
   const g = arena();
   const hp = g.player.hp,
     total = 100 * g.stats.armor;
   fire(g);
-  assert.ok(Math.abs(g.player.hp - (hp - total * 0.8)) < 1e-6);
+  assert.ok(Math.abs(g.player.hp - (hp - total)) < 1e-6);
+  assert.equal(g.burning.life, 3);
   assert.ok(Math.abs(g.burning.damage - total * 0.2) < 1e-6);
   g.update(0.05);
   g.player.invincible = 0;
@@ -39,8 +40,8 @@ test('第二关火球将两成伤害延后1.5秒烧完，总伤害不增加，�
   assert.deepEqual(g.burning, before);
   assert.ok(Math.abs(g.player.hp - (hpBefore - total)) < 1e-6);
   const regen = g.stats.regen;
-  for (let i = 0; i < 29; i++) g.update(0.05);
-  assert.ok(Math.abs(g.player.hp - (hp - total * 2 + regen * 1.5)) < 1e-6);
+  for (let i = 0; i < 60; i++) g.update(0.05);
+  assert.ok(Math.abs(g.player.hp - (hp - total * 2.2 + regen * 3.05)) < 1e-6);
   assert.equal(g.burning.life, 0);
   assert.equal(g.burning.damage, 0);
 });
@@ -108,7 +109,7 @@ test('致命灼烧立即落败，不在同一帧继续施法；快照拒绝非�
   for (const burning of [
     null,
     { life: -1, damage: 1 },
-    { life: 2, damage: 1 },
+    { life: 3.01, damage: 1 },
     { life: 0, damage: 1 },
     { life: 1, damage: -1 },
     { life: NaN, damage: 1 },

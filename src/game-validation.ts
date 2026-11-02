@@ -170,7 +170,7 @@ export function validateRunSnapshot(
       s.burning !== undefined &&
       (!numbers(s.burning, ['life', 'damage']) ||
         s.burning.life < 0 ||
-        s.burning.life > 1.5 ||
+        s.burning.life > ENEMY_CONTROL.burn ||
         s.burning.damage < 0 ||
         (s.burning.life === 0 && s.burning.damage !== 0) ||
         (s.burning.life > 0 && (s.stage !== 1 || !!s.tribulation)))
@@ -199,7 +199,8 @@ export function validateRunSnapshot(
     )
       return null;
     if (
-      (s.slowed !== undefined && (!Number.isFinite(s.slowed) || s.slowed < 0 || s.slowed > 0.65)) ||
+      (s.slowed !== undefined &&
+        (!Number.isFinite(s.slowed) || s.slowed < 0 || s.slowed > ENEMY_CONTROL.slow)) ||
       (s.nextEnemySkillAt !== undefined &&
         (!Number.isFinite(s.nextEnemySkillAt) || s.nextEnemySkillAt < 0))
     )

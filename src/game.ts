@@ -2736,7 +2736,7 @@ export class Game {
     return ENEMY_CONTROL[kind] * (this.medicine.poison < 1 ? 0.5 : 1);
   }
   private enemySlow() {
-    if (this.player.invincible > 0 || this.time < this.nextEnemySlowAt) return;
+    if (this.player.invincible > 0 || this.slowed > 0 || this.time < this.nextEnemySlowAt) return;
     this.slowed = this.#ctl('slow');
     this.nextEnemySlowAt = this.time + ENEMY_CONTROL.protection;
   }
@@ -3240,9 +3240,9 @@ export class Game {
     if (this.player.invincible > 0 || this.state !== 'playing') return;
     const total = damage * this.stats.armor;
     if (this.#blockComboDamage(total)) return;
-    const delayed = burn && this.burning.life <= 0 ? total * 0.2 : 0;
-    if (delayed > 0) this.burning = { life: 1.5, damage: delayed };
-    this.player.hp -= total - delayed;
+    const burning = burn && this.burning.life <= 0 ? total * 0.2 : 0;
+    if (burning > 0) this.burning = { life: ENEMY_CONTROL.burn, damage: burning };
+    this.player.hp -= total;
     this.player.invincible = 0.8;
     if (poison && total > 0) this.enemyCorrode();
     if (this.passives.bone && this.player.hp > 0) {

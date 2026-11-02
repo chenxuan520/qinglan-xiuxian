@@ -94,7 +94,7 @@ test('站在藤圈里不刷新当前藤缠，三秒结束后留出一秒拾取�
   }
 });
 
-test('藤圈仅藤缠，冰圈仍按原规则减速，终关旧王同样区分', () => {
+test('藤圈仅藤缠，冰圈减速两秒，终关旧王同样区分', () => {
   for (const stage of [0, 6])
     for (const kind of ['enemy-roots', 'boss-roots', 'enemy-frost', 'boss-frost']) {
       const g = arena(stage);
@@ -105,8 +105,71 @@ test('藤圈仅藤缠，冰圈仍按原规则减速，终关旧王同样区分',
       assert.equal(slowingHazard(z), !roots);
       assert.equal(entanglingHazard(z), roots);
       assert.equal(g.entangled, roots ? 3 : 0);
-      assert.equal(g.slowed, roots ? 0 : 0.55);
+      assert.equal(g.slowed, roots ? 0 : 2);
     }
+});
+
+test('冰弹与狼王弹减速两秒、降速25%，清灵散使持续时间减半', () => {
+  for (const stage of [2, 6])
+    for (const boss of [false, true])
+      for (const medicine of [false, true]) {
+        const g = arena(stage);
+        if (medicine) g.medicine.poison = 0.5;
+        const speed = g.stats.speed;
+        const shot = g.hostileShot(g.player, 1, 0, 1, 1);
+        if (boss) shot.bossStage = 2;
+        else shot.enemySkill = 'frostbolt';
+        g.updateShots(0.01);
+        assert.equal(g.slowed, medicine ? 1 : 2);
+        near(g.stats.speed, speed * 0.75);
+      }
+});
+
+test('冰路减速在两秒内不刷新，效果结束可再次施加，预警与护体不施加', () => {
+  const g = arena(2);
+  g.zones = [{ ...field('enemy-frost'), tick: 9999, delay: 1 }];
+  g.updateZones(0.01);
+  assert.equal(g.slowed, 0);
+  g.zones[0].delay = 0;
+  g.player.invincible = 1;
+  g.updateZones(0.01);
+  assert.equal(g.slowed, 0);
+  g.player.invincible = 0;
+  g.updateZones(0.01);
+  assert.equal(g.slowed, 2);
+  const next = g.nextEnemySlowAt;
+  advance(g, 1.5);
+  near(g.slowed, 0.5);
+  assert.equal(g.nextEnemySlowAt, next);
+  advance(g, 0.51);
+  assert.ok(g.slowed > 1.98);
+  g.zones = [];
+  advance(g, 2.01);
+  assert.equal(g.slowed, 0);
+});
+
+test('两秒减速暂停冻结、续局与导入保留，校验拒绝越界计时且不增加保存字段', () => {
+  const g = arena(2);
+  const keys = Object.keys(g.snapshot()).sort();
+  g.zones = [{ ...field('enemy-frost'), tick: 9999 }];
+  g.updateZones(0.01);
+  g.zones = [];
+  g.pause();
+  const raw = JSON.parse(JSON.stringify(g.snapshot()));
+  for (const h of [Game.restore(g.save, raw), importSave(exportSave(g.save, g)).run]) {
+    assert.ok(h);
+    assert.equal(h.slowed, 2);
+    assert.deepEqual(Object.keys(h.snapshot()).sort(), keys);
+    h.update(0.05);
+    assert.equal(h.slowed, 2);
+    h.resume();
+    advance(h, 1);
+    near(h.slowed, 1);
+    advance(h, 1.01);
+    assert.equal(h.slowed, 0);
+  }
+  for (const slowed of [-1, 2.01, NaN, Infinity, null])
+    assert.equal(Game.restore(g.save, { ...raw, slowed }), null);
 });
 
 test('只有实际正毒伤触发三秒蚀体，受击刷新；护体、零伤害和普通伤害不触发', () => {

@@ -96,14 +96,14 @@ test('普通与精英火弹霜弹可见飞行、锁定方向且有射程，星�
   }
 });
 
-test('霜弹命中减速0.55秒，1秒内不连控，无敌及暂停期间不被追加减速', () => {
+test('霜弹命中减速2秒，1秒触发保护，无敌及暂停期间不被追加减速', () => {
   const { g, e } = cast(45);
   g.fireEnemyVolley(e, 'frostbolt');
   const b = g.shots[0];
   b.x = g.player.x;
   b.y = g.player.y;
   g.updateShots(0);
-  assert.equal(g.slowed, 0.55);
+  assert.equal(g.slowed, 2);
   assert.equal(g.nextEnemySlowAt, 1);
   g.player.invincible = 0;
   g.slowed = 0;
@@ -116,12 +116,12 @@ test('霜弹命中减速0.55秒，1秒内不连控，无敌及暂停期间不被
   assert.equal(g.slowed, 0);
   g.player.invincible = 0;
   g.enemySlow();
-  assert.equal(g.slowed, 0.55);
+  assert.equal(g.slowed, 2);
   const snapshot = g.snapshot();
   const restored = Game.restore(g.save, snapshot)!;
   assert.ok(restored);
   restored.update(0.05);
-  assert.equal(restored.slowed, 0.55);
+  assert.equal(restored.slowed, 2);
   assert.equal(restored.nextEnemySlowAt, 2.1);
 });
 
