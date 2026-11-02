@@ -89,7 +89,7 @@ test('幽魂先转弯再直飞，暂停与续局保留弹幕轨迹；旧弹不�
   restored.updateShots(0.4);
   assert.deepEqual(restored.shots, g.shots);
   const speed = Math.hypot(g.shots[0].vx, g.shots[0].vy);
-  assert.ok(Math.abs(speed - 165) < 1e-8);
+  assert.ok(Math.abs(speed - 230) < 1e-8);
   g.updateShots(0.5);
   const velocity = [g.shots[0].vx, g.shots[0].vy];
   g.updateShots(0.3);
@@ -169,7 +169,7 @@ test('终关返回妖王召唤各自地域妖物，数量受同屏上限约束',
   for (const [stage, phase, count] of [
     [0, 2, 3],
     [3, 2, 4],
-    [4, 0, 4],
+    [4, 0, 6],
   ]) {
     const { g, e } = encounter(stage, 6);
     e.skillStep = phase;

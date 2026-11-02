@@ -36,9 +36,9 @@ const patterns = [
     [0, 0, 3],
   ],
   [
-    [0, 9, 0],
+    [0, 17, 0],
     [5, 0, 0],
-    [0, 16, 0],
+    [0, 40, 0],
   ],
   [
     [0, 0, 0],
@@ -51,7 +51,7 @@ const patterns = [
     [0, 0, 4],
   ],
   [
-    [0, 0, 4],
+    [0, 0, 6],
     [0, 20, 0],
     [7, 0, 0],
   ],
@@ -320,26 +320,29 @@ test('每个原生及终关圆阵按真实圆边界命中：预警无伤，圈�
 });
 
 test('原环射保持完整360度和均匀缺口，扇射不偷偷变成条带；弹丸命中才扣血', () => {
-  for (const [origin, phase, count, speed] of [
-    [1, 2, 16, 150],
-    [4, 1, 20, 165],
-    [5, 1, 22, 175],
-    [6, 0, 24, 185],
+  for (const [origin, phase, count, speeds] of [
+    [1, 2, 20, [190, 135]],
+    [4, 1, 20, [230]],
+    [5, 1, 22, [175]],
+    [6, 0, 24, [185]],
   ])
     for (const arena of origin === 6 ? [6] : [origin, 6]) {
       const { g, e } = encounter(origin, phase, arena);
       g.castBossSkill(e, 1, 0);
-      const angles = g.shots.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);
-      assert.equal(angles.length, count);
-      for (let i = 0; i < count; i++) {
-        const b = g.shots[i];
-        assert.ok(Math.abs(Math.hypot(b.vx, b.vy) - speed) < 1e-8);
-        const gap =
-          i === count - 1 ? angles[0] + 2 * Math.PI - angles[i] : angles[i + 1] - angles[i];
-        assert.ok(
-          Math.abs(gap - (2 * Math.PI) / count) < 1e-8,
-          `第${arena + 1}关第${origin}王每个弹幕缺口应均匀`,
-        );
+      assert.equal(g.shots.length, count * speeds.length);
+      for (const [layer, speed] of speeds.entries()) {
+        const shots = g.shots.slice(layer * count, (layer + 1) * count);
+        const angles = shots.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);
+        for (let i = 0; i < count; i++) {
+          const b = shots[i];
+          assert.ok(Math.abs(Math.hypot(b.vx, b.vy) - speed) < 1e-8);
+          const gap =
+            i === count - 1 ? angles[0] + 2 * Math.PI - angles[i] : angles[i + 1] - angles[i];
+          assert.ok(
+            Math.abs(gap - (2 * Math.PI) / count) < 1e-8,
+            `第${arena + 1}关第${origin}王每层弹幕缺口应均匀`,
+          );
+        }
       }
       const b = g.shots[0];
       g.shots = [b];

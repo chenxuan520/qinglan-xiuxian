@@ -58,7 +58,7 @@ for (let origin = 0; origin < 6; origin++)
         assert.ok(g.zones.every((z) => z.delay === R.heartGrow));
       }
       if (origin === 1) {
-        assert.equal(g.shots.length, 5);
+        assert.equal(g.shots.length, 7);
         assert.ok(g.shots.every((b) => b.bossMotion?.kind === 'return'));
       }
       if (origin === 2) {
@@ -76,7 +76,7 @@ for (let origin = 0; origin < 6; origin++)
         );
       }
       if (origin === 4) {
-        assert.equal(g.shots.length, 3);
+        assert.equal(g.shots.length, 5);
         assert.ok(g.shots.every((b) => b.bossMotion?.kind === 'memory'));
       }
       if (origin === 5) {
@@ -181,7 +181,7 @@ test('两猎狼从相反侧翼绕行，完整蓄势后各扑一次，锁向后�
 
 test('回焰预热无伤，去程与返程沿同一轨迹，转向短停，真实命中后只扣一次血', () => {
   const { g } = cast(1);
-  const b = g.shots[2];
+  const b = g.shots[3];
   g.shots = [b];
   Object.assign(g.player, { x: b.origin.x, y: b.origin.y });
   const hp = g.player.hp;
@@ -192,7 +192,7 @@ test('回焰预热无伤，去程与返程沿同一轨迹，转向短停，真�
   assert.equal(g.shots.length, 0);
   const { g: h } = cast(1);
   Object.assign(h.player, { x: 900, y: 900 });
-  const shot = h.shots[2];
+  const shot = h.shots[3];
   const out = bossShotPose(shot, R.returnWarmup + 0.5),
     back = bossShotPose(shot, R.returnWarmup + 2 * bossReturnOut(shot) + R.returnRest - 0.5);
   assert.ok(Math.abs(out.x - back.x) < 1e-9 && Math.abs(out.y - back.y) < 1e-9);

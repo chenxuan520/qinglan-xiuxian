@@ -126,6 +126,6 @@ export function validBossMotion(m: BossMotion, stage: number | undefined) {
     m.path.every(point) &&
     Number.isFinite(m.warmup) &&
     m.warmup >= 1 &&
-    m.warmup <= 1.8
+    m.warmup <= 2.4
   );
 }

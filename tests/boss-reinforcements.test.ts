@@ -29,7 +29,7 @@ function encounter(origin: number, phase: number, arena = origin) {
 for (const [origin, phase, count] of [
   [0, 2, 3],
   [3, 2, 4],
-  [4, 0, 4],
+  [4, 0, 6],
   [6, 4, 6],
 ])
   for (const arena of origin === 6 ? [6] : [origin, 6])
@@ -100,7 +100,7 @@ test('普通精英仍掉宝匣，召唤双狼自然到期或随主人消散不�
 test('古墟回焰单程534.75、往返232.5，预热/停驻不变；终关仍用178.25与155', () => {
   for (const arena of [1, 6]) {
     const { g } = encounter(1, 3, arena);
-    const b = g.shots[2],
+    const b = g.shots[3],
       duration = arena === 1 ? 2.3 : 1.15,
       speed = arena === 1 ? 232.5 : 155;
     assert.equal(bossReturnOut(b), duration);
@@ -126,7 +126,7 @@ test('古墟回焰单程534.75、往返232.5，预热/停驻不变；终关仍�
 test('新版本可恢复155旧回焰并保持原去返轨迹，232.5新回焰在转向后续局不瞬移', () => {
   for (const legacy of [false, true]) {
     const { g } = encounter(1, 3);
-    const b = g.shots[2];
+    const b = g.shots[3];
     g.shots = [b];
     Object.assign(g.player, { x: 2000, y: 2000 });
     if (legacy) {

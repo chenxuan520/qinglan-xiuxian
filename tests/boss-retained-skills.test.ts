@@ -88,7 +88,7 @@ for (const arena of [4, 6])
     assert.ok(shadows.every((c) => c.radius === e.radius));
     assert.deepEqual(
       shadows.map((c) => [c.hp, c.damage, c.speed, c.cooldown]),
-      Array(3).fill([1, 0, 0, 3]),
+      Array(3).fill([1, 0, 0, 0.8]),
     );
     const totals = [g.kills, g.xp, g.combatCultivation, g.iron, g.pickups.length];
     g.hitEnemy(shadows[0], 1, false, 'sword');
@@ -97,7 +97,7 @@ for (const arena of [4, 6])
     g.pause();
     const h = importSave(exportSave(g.save, g)).run;
     assert.ok(h);
-    assert.equal(h.enemies.filter((c) => c.illusionOf === e.id && !c.dead).length, 2);
+    assert.equal(h.enemies.filter((c) => c.illusionOf === e.id && !c.dead).length, 0);
     g.resume();
     g.hitEnemy(e, e.hp, false, 'sword');
     assert.ok(shadows.every((c) => c.dead));
@@ -182,8 +182,15 @@ test('所有妖王现有冷却再缩短30%，保留半血加速与完整蓄势',
   near(bossPursuitCooldown(true), 3.287);
 });
 
-test('第二境妖王气血再加20%，第三至六境再加10%，首境终关与伤害保持', () => {
-  const hp = [1.15, 2.145 * 1.2 * 1.2, 2.2 * 1.2 * 1.1, 2.4 * 1.2 * 1.1, 2.4 * 1.1, 2.4 * 1.1];
+test('各境基础气血强化保留，第五境再加20%，终关基础与伤害保持', () => {
+  const hp = [
+    1.15,
+    2.145 * 1.2 * 1.2,
+    2.2 * 1.2 * 1.1,
+    2.4 * 1.2 * 1.1,
+    2.4 * 1.2 * 1.1,
+    2.4 * 1.1,
+  ];
   BOSS_COMBAT.hp.forEach((n, i) => near(n, hp[i]));
   assert.equal(BOSS_COMBAT.trialHp, 1.1);
   assert.equal(BOSS_COMBAT.trialDamage, 1.08);

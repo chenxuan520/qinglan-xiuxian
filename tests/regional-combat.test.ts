@@ -34,7 +34,9 @@ function legacyShadows(g: Game, boss: Enemy) {
       maxHp: 1,
       damage: 0,
       speed: 0,
-      cooldown: 3,
+      cooldown: 0.8,
+      windup: 0.8,
+      pendingSkill: 'soul',
     });
     return shadow;
   });
@@ -183,7 +185,7 @@ test('藤枝随施法者死亡散去，幽冥主魂及嵌套护卫一起消散�
   assert.equal(g.kills, 1);
 });
 
-test('幻影可辨认、没有碰撞伤害及经验掉落，三秒后或本体倒下时消散', () => {
+test('幻影没有碰撞伤害及经验掉落，短暂蓄力后放弹消散，本体倒下即散', () => {
   const { g, boss } = encounter(4, true);
   const shadows = legacyShadows(g, boss);
   assert.equal(shadows.length, 3);

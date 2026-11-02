@@ -674,11 +674,14 @@ export class Game {
         1,
         Math.min(maxHp, g.player.hp + (g.corroded > 0 ? Math.min(0, growth) : growth)),
       );
-      g.enemies = s.enemies.map((e) => ({
-        ...e,
-        ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
-        ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
-      }));
+      // 幽影开火计时不另加存档字段，续局直接散去尚未开火的幻影。
+      g.enemies = s.enemies
+        .filter((e) => e.illusionOf === undefined)
+        .map((e) => ({
+          ...e,
+          ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+          ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
+        }));
       for (const e of g.enemies)
         if (e.boss) {
           const count = bossSkills(e.bossStage ?? s.stage, g.isFinalTrial).length;
@@ -1210,7 +1213,9 @@ export class Game {
     return regionalEnemyTactics(this.stage, type, ENEMY_TACTICS[type], ENEMIES[type].behavior);
   }
   usesRegionalSkill(e: Enemy) {
-    return this.stage < FINAL_TRIAL_STAGE || ENEMY_TACTICS[e.type].regional;
+    return (
+      e.illusionOf !== undefined || this.stage < FINAL_TRIAL_STAGE || ENEMY_TACTICS[e.type].regional
+    );
   }
   private updateEnemies(dt: number) {
     const p = this.player;
@@ -1223,11 +1228,24 @@ export class Game {
       }
       if (e.illusionOf !== undefined) {
         e.cooldown -= dt;
-        if (
-          e.cooldown <= 0 ||
-          !this.enemies.some((owner) => owner.id === e.illusionOf && !owner.dead)
-        )
+        e.windup = Math.max(0, e.cooldown);
+        const owner = this.enemies.find((owner) => owner.id === e.illusionOf && !owner.dead);
+        if (!owner) e.dead = true;
+        else if (e.cooldown <= 0) {
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * TAU;
+            const shot = this.hostileShot(
+              e,
+              Math.cos(angle),
+              Math.sin(angle),
+              170,
+              owner.damage * 0.5,
+            );
+            shot.enemySkill = 'soul';
+            shot.color = '#baa2d0';
+          }
           e.dead = true;
+        }
         continue;
       }
       e.slow -= dt;
@@ -1739,7 +1757,8 @@ export class Game {
         illusion.hp = illusion.maxHp = 1;
         illusion.damage = illusion.speed = 0;
         illusion.elite = false;
-        illusion.cooldown = 3;
+        illusion.cooldown = illusion.windup = 0.8;
+        illusion.pendingSkill = 'soul';
       }
       this.#effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
       e.x -= ny * 150;
@@ -1761,11 +1780,16 @@ export class Game {
         else summons(3);
         break;
       case 1:
-        if (phase === 0) fan(9, 1.5, 180);
-        else if (phase === 1)
+        if (phase === 0) {
+          fan(9, 1.5, 210);
+          fan(8, 1.5 * (7 / 8), 150);
+        } else if (phase === 1)
           for (let i = -2; i <= 2; i++)
             blast(p.x - ny * i * 85, p.y + nx * i * 85, 50, 3, 1.2 + Math.abs(i) * 0.18);
-        else ring(16, 150);
+        else {
+          ring(20, 190);
+          ring(20, 135);
+        }
         break;
       case 2:
         if (phase === 0) {
@@ -1786,8 +1810,8 @@ export class Game {
         else summons(4);
         break;
       case 4:
-        if (phase === 0) summons(4);
-        else if (phase === 1) ring(20, 165);
+        if (phase === 0) summons(6);
+        else if (phase === 1) ring(20, 230);
         else {
           ringZones(6, 165, 52, 2);
           blast(p.x, p.y, 60, 0.5, 1.8);
@@ -1894,12 +1918,15 @@ export class Game {
         }
       }
     } else if (stage === 1) {
-      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'return') >= 10) return;
-      for (let i = 0; i < 5; i++) {
-        const a = Math.atan2(ny, nx) + (i / 4 - 0.5) * 1.2;
+      const count = Math.min(
+        7,
+        14 - countMatching(this.shots, (b) => b.bossMotion?.kind === 'return'),
+      );
+      for (let i = 0; i < count; i++) {
+        const a = Math.atan2(ny, nx) + (i / 6 - 0.5) * 1.2;
         const speed =
           this.stage === 1 && !this.tribulation ? rules.nativeReturnSpeed : rules.returnSpeed;
-        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.55);
+        const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.7);
         shot.bossMotion = { kind: 'return', velocity: { x: shot.vx, y: shot.vy } };
         shot.life = rules.returnWarmup + 2 * bossReturnOut(shot) + rules.returnRest;
         shot.radius = 10;
@@ -1925,7 +1952,11 @@ export class Game {
         z.vy = nx * Math.sign(side || 1) * speed;
       }
     } else if (stage === 4) {
-      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'memory') >= 6) return;
+      const count = Math.min(
+        5,
+        10 - countMatching(this.shots, (b) => b.bossMotion?.kind === 'memory'),
+      );
+      if (count <= 0) return;
       const path = [
         { x: e.x, y: e.y },
         { x: this.player.x, y: this.player.y },
@@ -1936,8 +1967,8 @@ export class Game {
       ];
       let length = 0;
       for (let i = 1; i < path.length; i++) length += distance(path[i - 1], path[i]);
-      for (let i = 0; i < 3; i++) {
-        const shot = this.hostileShot(e, nx, ny, rules.memorySpeed, e.damage * 0.5);
+      for (let i = 0; i < count; i++) {
+        const shot = this.hostileShot(e, nx, ny, rules.memorySpeed, e.damage * 0.7);
         shot.bossMotion = {
           kind: 'memory',
           path: path.map((p) => ({ ...p })),
