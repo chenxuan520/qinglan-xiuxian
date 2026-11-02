@@ -397,7 +397,8 @@ export function bossReadiness(results: CampaignSample[]) {
         failures.push(
           `关卡 ${stage + 1}/妖王 ${king + 1}：存活过短（中位数 ${quantile(times, 0.5)!.toFixed(1)} 秒）`,
         );
-      if (quantile(times, 0.9)! > (king === 6 ? 180 : 90))
+      const lifetimeLimit = (king === 6 ? 180 : 90) * (stage === 6 ? 2 : 1);
+      if (quantile(times, 0.9)! > lifetimeLimit)
         failures.push(`关卡 ${stage + 1}/妖王 ${king + 1}：存活 P90 过长`);
     }
   }

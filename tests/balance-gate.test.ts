@@ -11,6 +11,7 @@ import {
 } from '../scripts/balance-policy.ts';
 import {
   acceptanceFailures,
+  bossReadiness,
   compareMetrics,
   growthReadiness,
   quantile,
@@ -207,6 +208,29 @@ test('终关必须实际覆盖七种妖王，不能拿七个同王记录充数�
   const wrongTime = structuredClone(row);
   wrongTime.battles[6].bosses[0].observedSeconds = 1;
   assert.throws(() => verifyCoverage([wrongTime], [row.case]), /存活时间计算/);
+});
+
+test('妖王存活P90仅终关阈值翻倍：旧王180秒、仙尊360秒，前六境仍90秒', () => {
+  for (let stage = 0; stage < 7; stage++) {
+    for (const king of stage === 6 ? [0, 1, 2, 3, 4, 5, 6] : [stage]) {
+      const limit = stage === 6 ? (king === 6 ? 360 : 180) : 90;
+      for (const seconds of [limit - 0.001, limit, limit + 0.001]) {
+        const rows = Array.from({ length: 10 }, () => {
+          const row = sample();
+          row.battles[0].stage = stage;
+          row.battles[0].bosses = [
+            { stage: king, at: 10, deadAt: 10 + seconds, observedSeconds: seconds, hpFraction: 0 },
+          ];
+          return row;
+        });
+        const warnings = bossReadiness(rows).filter((message) => message.includes('存活 P90 过长'));
+        assert.deepEqual(
+          warnings,
+          seconds > limit ? [`关卡 ${stage + 1}/妖王 ${king + 1}：存活 P90 过长`] : [],
+        );
+      }
+    }
+  }
 });
 
 test('模拟异常保留计划分母和异常数，不能从通关比例里偷偷删除', () => {
