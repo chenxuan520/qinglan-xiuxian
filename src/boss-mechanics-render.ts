@@ -1,5 +1,5 @@
 import type { Enemy, Shot } from './game-types.ts';
-import { BOSS_MECHANICS, bossReturnOut, bossShotPose } from './boss-mechanics.ts';
+import { BOSS_MECHANICS, SOVEREIGN_GOLD, bossReturnOut, bossShotPose } from './boss-mechanics.ts';
 import { TAU } from './data.ts';
 
 export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
@@ -9,7 +9,7 @@ export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
   if (state.kind === 'heart') {
     const grow = Math.min(1, state.age / BOSS_MECHANICS.heartGrow);
     c.fillStyle = '#173e2c';
-    c.strokeStyle = '#bcda8b';
+    c.strokeStyle = state.color ?? '#bcda8b';
     c.lineWidth = 2;
     c.beginPath();
     c.arc(0, 0, 20, 0, TAU);
@@ -36,7 +36,7 @@ export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
     c.fillStyle = '#c9da8a';
     c.fillRect(-23, -43, 46 * Math.max(0, e.hp / e.maxHp), 4);
   } else {
-    c.strokeStyle = '#a5e6fa';
+    c.strokeStyle = state.color ?? '#a5e6fa';
     c.lineWidth = 2;
     c.beginPath();
     c.arc(0, 5, e.radius + 5, 0, TAU);
@@ -66,7 +66,7 @@ export function drawBossMotionCue(c: CanvasRenderingContext2D, b: Shot) {
     pose = bossShotPose(b);
   c.save();
   if (!pose.active) c.globalAlpha = 0.55;
-  c.strokeStyle = pose.active ? '#ffe4ad' : '#f4d18e';
+  c.strokeStyle = b.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : pose.active ? '#ffe4ad' : '#f4d18e';
   c.lineWidth = 2;
   c.beginPath();
   c.arc(0, 0, b.radius + 5, 0, TAU);
@@ -87,12 +87,12 @@ export function drawBossMotionCue(c: CanvasRenderingContext2D, b: Shot) {
     c.restore();
   } else if (m.kind === 'star' && !pose.active) {
     const progress = Math.min(1, b.age / m.launchAt);
-    c.strokeStyle = '#e7efff';
+    c.strokeStyle = b.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : '#e7efff';
     c.beginPath();
     c.arc(0, 0, b.radius + 9, -Math.PI / 2, -Math.PI / 2 + progress * TAU);
     c.stroke();
   } else if (m.kind === 'memory') {
-    c.fillStyle = '#e5c8f5';
+    c.fillStyle = b.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : '#e5c8f5';
     for (let i = 1; i <= 3; i++) {
       c.beginPath();
       c.arc(-i * 9, 0, 3 - i * 0.5, 0, TAU);

@@ -49,7 +49,8 @@ for (let origin = 0; origin < 6; origin++)
         bossSkills(origin, arena === 6).length,
         4 + Number([2, 4].includes(origin)) + Number(arena === 6 && [3, 4].includes(origin)),
       );
-      assert.deepEqual(bossSkills(6, true), STAGES[6].skills);
+      assert.deepEqual(bossSkills(6, true).slice(0, 6), STAGES[6].skills);
+      assert.equal(bossSkills(6, true).length, 9);
       const { g, e } = cast(origin, arena);
       assert.ok(g.notice.includes(bossSkills(origin, true)[3]));
       if (origin === 0) {

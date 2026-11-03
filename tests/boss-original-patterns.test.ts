@@ -246,7 +246,7 @@ test('双王同帧圆阵完整保留，危险区可重叠，不额外增加互�
   assert.equal(other.cooldown, bossSkillCooldown(0, true, false));
 });
 
-test('原三招和新增第四招及仙尊六招每轮全部出齐且交界不连用，原冷却及半血强化保留', () => {
+test('原三招和新增第四招及仙尊九个抽招位置每轮全部出齐且交界不连用，原冷却及半血强化保留', () => {
   for (let origin = 0; origin < 7; origin++)
     for (const enraged of [false, true]) {
       const { g, e } = encounter(origin, 0);

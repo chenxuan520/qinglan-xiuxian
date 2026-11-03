@@ -78,6 +78,19 @@ function choiceScore(c: Choice, g: Game) {
   return g.passives[c.id] ? Math.max(32, score + 12) : score;
 }
 export function autoplayInput(g: Game) {
+  const direction = autoplayDirection(g);
+  const boss = g.gravityBoss;
+  if (!boss || g.immobilized > 0) return direction;
+  const distance = Math.hypot(g.player.x - boss.x, g.player.y - boss.y);
+  const away = distance
+    ? { x: (g.player.x - boss.x) / distance, y: (g.player.y - boss.y) / distance }
+    : { x: 1, y: 0 };
+  const x = direction.x + away.x,
+    y = direction.y + away.y;
+  const length = Math.hypot(x, y);
+  return length > 1e-8 ? { x: x / length, y: y / length } : away;
+}
+function autoplayDirection(g: Game) {
   if (g.immobilized > 0) return { x: 0, y: 0 };
   const p = g.player;
   let dx = 0,

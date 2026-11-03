@@ -1,5 +1,6 @@
 import {
   BOSS_MECHANICS,
+  SOVEREIGN_GOLD,
   bossReturnOut,
   bossShotPose,
   cloneBossMotion,
@@ -552,6 +553,7 @@ export class Game {
         .map((e) => ({
           ...e,
           ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+          ...(e.judgements ? { judgements: [...e.judgements] } : {}),
           ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
         })),
       bossVolleys: bossVolleys.map((v) => ({ weapon: v.weapon, hitBosses: [...v.hitBosses] })),
@@ -680,6 +682,7 @@ export class Game {
         .map((e) => ({
           ...e,
           ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
+          ...(e.judgements ? { judgements: [...e.judgements] } : {}),
           ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
         }));
       for (const e of g.enemies)
@@ -814,6 +817,11 @@ export class Game {
         this.save.age = this.save.nextTribulationAge;
         if (this.elapsedYears !== undefined)
           this.elapsedYears += Math.max(0, this.save.age - ageBefore);
+        // 此帧只推进了战斗时钟，尚未执行移动/招式；新计时保留中断前的剩余时间。
+        for (const e of this.enemies) {
+          if (e.judgements) e.judgements = e.judgements.map((at) => at + dt);
+          if (e.gravityUntil !== undefined) e.gravityUntil += dt;
+        }
         this.pause();
         return;
       }
@@ -824,6 +832,7 @@ export class Game {
         this.elapsedYears += Math.max(0, this.save.age - ageBefore);
       this.player.hp = 0;
       this.state = 'lost';
+      this.clearSovereignSkills();
       this.onEvent('lose');
       return;
     }
@@ -861,6 +870,7 @@ export class Game {
       if (!this.#blockComboDamage(damage)) p.hp = Math.max(0, p.hp - damage);
       if (p.hp === 0) {
         this.state = 'lost';
+        this.clearSovereignSkills();
         this.onEvent('lose');
         return;
       }
@@ -872,6 +882,7 @@ export class Game {
       p.y += (this.input.y / Math.max(1, length)) * stats.speed * dt;
       if (Math.abs(this.input.x) > 0.05) p.facing = this.input.x > 0 ? 1 : -1;
     }
+    this.updateSovereignSkills(dt);
     if (
       (this.stage === 4 || this.isFinalTrial) &&
       (!this.playerTrail.length ||
@@ -944,6 +955,7 @@ export class Game {
     if (this.player.hp <= 0) {
       this.player.hp = 0;
       this.state = 'lost';
+      this.clearSovereignSkills();
       this.onEvent('lose');
     }
     if (this.state === 'playing' && this.level < MAX_RUN_LEVEL && this.xp >= xpNeeded(this.level)) {
@@ -1679,11 +1691,12 @@ export class Game {
   }
   private castBossSkill(e: Enemy, nx: number, ny: number) {
     const stage = e.bossStage ?? this.stage;
-    const phase = e.skillStep ?? 0;
+    const selected = e.skillStep ?? 0;
+    const phase = stage === 6 && selected === 8 && e.hp >= e.maxHp / 2 ? 6 : selected;
     // 旧妖王保留已排定的下一招，再将本轮其余招式打乱。
     const remaining =
-      e.bossSkillQueue ?? this.shuffleBossSkills(stage).filter((skill) => skill !== phase);
-    const [next, ...queue] = remaining.length ? remaining : this.shuffleBossSkills(stage, phase);
+      e.bossSkillQueue ?? this.shuffleBossSkills(stage).filter((skill) => skill !== selected);
+    const [next, ...queue] = remaining.length ? remaining : this.shuffleBossSkills(stage, selected);
     e.skillStep = next;
     e.bossSkillQueue = queue;
     const enraged = e.hp < e.maxHp / 2;
@@ -1732,6 +1745,33 @@ export class Game {
           y: e.y + Math.sin((i / count) * TAU) * 90,
         }).summonedBy = e.id;
     };
+    if (stage === FINAL_TRIAL_STAGE && phase >= 6) {
+      if (phase === 6) {
+        const borrowed = Math.floor(this.random() * 6);
+        const shots = this.shots.length,
+          zones = this.zones.length,
+          enemies = this.enemies.length;
+        try {
+          e.bossStage = borrowed;
+          this.castBossMechanic(e, nx, ny);
+        } finally {
+          e.bossStage = FINAL_TRIAL_STAGE;
+        }
+        for (const shot of this.shots.slice(shots)) shot.color = SOVEREIGN_GOLD;
+        for (const zone of this.zones.slice(zones)) zone.color = SOVEREIGN_GOLD;
+        for (const child of this.enemies.slice(enemies))
+          if (child.bossSummon) child.bossSummon.color = SOVEREIGN_GOLD;
+        this.announce(`${STAGES[stage].boss} · 万劫归一 · ${bossSkills(borrowed, false)[3]}`);
+      } else if (phase === 7) {
+        (e.judgements ??= []).push(this.time + 3);
+        this.announce('九天执劫仙尊 · 天劫审判 · 三息之后雷落');
+      } else {
+        e.gravityUntil = this.time + 2;
+        this.gravityRing(e);
+        this.announce('九天执劫仙尊 · 归墟引力 · 逆着引力走出去');
+      }
+      return;
+    }
     this.announce(`${STAGES[stage].boss} · ${bossSkills(stage, this.isFinalTrial)[phase]}`);
     if (stage === 2 && phase === 4) {
       this.startBossCharge(e, nx, ny);
@@ -1845,6 +1885,69 @@ export class Game {
         break;
     }
   }
+  get gravityBoss() {
+    return this.isFinalTrial && this.state !== 'won' && this.state !== 'lost'
+      ? this.enemies.find(
+          (e) =>
+            !e.dead && e.hp > 0 && e.boss && e.bossStage === 6 && (e.gravityUntil ?? 0) > this.time,
+        )
+      : undefined;
+  }
+  private gravityRing(e: Enemy) {
+    for (let i = 0; i < 24; i++) {
+      const angle = this.time * 0.25 + (i / 23 - 0.5) * ((TAU * 23) / 24);
+      this.hostileShot(e, Math.cos(angle), Math.sin(angle), 170, e.damage * 0.75);
+    }
+  }
+  private clearSovereignSkills() {
+    for (const e of this.enemies) {
+      delete e.judgements;
+      delete e.gravityUntil;
+    }
+  }
+  private updateSovereignSkills(dt: number) {
+    if (!this.isFinalTrial) return;
+    for (const e of this.enemies) {
+      if (!e.boss || e.bossStage !== 6) continue;
+      if (e.dead || e.hp <= 0) {
+        delete e.judgements;
+        delete e.gravityUntil;
+        continue;
+      }
+      if (e.gravityUntil !== undefined) {
+        const before = this.time - dt;
+        const active = Math.min(dt, Math.max(0, e.gravityUntil - before));
+        const d = distance(e, this.player);
+        if (this.immobilized <= 0 && d > 0 && active > 0) {
+          const pull = Math.min(d, 90 * active);
+          this.player.x += ((e.x - this.player.x) / d) * pull;
+          this.player.y += ((e.y - this.player.y) / d) * pull;
+          this.player.moving = true;
+        }
+        // 由保存的战斗时刻推导跨过第1秒，续局不会重复或漏发第二环。
+        if (before < e.gravityUntil - 1 && this.time >= e.gravityUntil - 1) this.gravityRing(e);
+        if (this.time >= e.gravityUntil) delete e.gravityUntil;
+      }
+      if (e.judgements) {
+        for (const at of e.judgements)
+          if (this.time >= at)
+            for (let i = 0; i < 3; i++)
+              this.zone(
+                this.player.x + this.input.x * 65 * i,
+                this.player.y + this.input.y * 65 * i,
+                60,
+                0.5,
+                e.damage * 1.2,
+                '#d2b5ff',
+                'boss-judgement',
+                0.8 + i * 0.4,
+                true,
+              );
+        e.judgements = e.judgements.filter((at) => at > this.time);
+        if (!e.judgements.length) delete e.judgements;
+      }
+    }
+  }
   private castBossPursuit(e: Enemy, nx: number, ny: number) {
     if ((e.bossStage ?? this.stage) === 3) {
       const native = this.stage === 3 && !this.tribulation;
@@ -1895,6 +1998,7 @@ export class Game {
         );
         child.summonedBy = e.id;
         child.bossSummon = { kind, age: 0, side };
+        if (stage === 2) child.hp = child.maxHp = Math.max(child.maxHp, e.maxHp * 0.08);
         child.radius = stage === 0 ? 20 : 23;
         if (stage === 0) child.hp = child.maxHp *= 0.45;
         child.damage = stage === 0 ? 0 : Math.max(child.damage, e.damage * 0.65);
@@ -2636,7 +2740,10 @@ export class Game {
       if (z.tick <= 0) {
         z.tick = 0.5;
         if (z.hostile) {
-          if (this.tribulation && z.kind === 'blast' && z.life > 0)
+          if (
+            ((this.tribulation && z.kind === 'blast') || z.kind === 'boss-judgement') &&
+            z.life > 0
+          )
             this.#effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
           if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8) {
             const poison = poisonousHazard(z);
@@ -2847,6 +2954,8 @@ export class Game {
     );
   }
   private enemyDeath(e: Enemy) {
+    delete e.judgements;
+    delete e.gravityUntil;
     if (e.boss)
       for (const child of this.enemies)
         if (child.bossSummon && child.summonedBy === e.id) child.dead = true;
@@ -3251,6 +3360,7 @@ export class Game {
           (!this.isFinalTrial || this.trialBossesDefeated === TRIAL_BOSS_STAGES.length)
         ) {
           this.state = 'won';
+          this.clearSovereignSkills();
           this.onEvent('win');
         }
         this.onEvent('loot', collected);
@@ -3282,6 +3392,7 @@ export class Game {
     const burning = burn && this.burning.life <= 0 ? total * 0.2 : 0;
     if (burning > 0) this.burning = { life: ENEMY_CONTROL.burn, damage: burning };
     this.player.hp -= total;
+    if (this.player.hp <= 0) this.clearSovereignSkills();
     this.player.invincible = 0.8;
     if (poison && total > 0) this.enemyCorrode();
     if (this.passives.bone && this.player.hp > 0) {

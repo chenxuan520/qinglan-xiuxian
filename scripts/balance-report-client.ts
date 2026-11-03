@@ -14,6 +14,7 @@ export function installReportFilters(
   metadata: { commit?: string; generatedAt?: string },
   observedKeys: string[],
 ) {
+  document.getElementById('refresh-report')!.addEventListener('click', () => location.reload());
   const errorMessage = (error: unknown, fallback: string) =>
     error instanceof Error &&
     [
@@ -64,7 +65,7 @@ export function installReportFilters(
   const matches = (c: BalanceCase, filters: Record<string, string>) =>
     ids.every((id) => !filters[id] || String(c[id]) === filters[id]);
   const load = () =>
-    (data ??= fetch('results.json')
+    (data ??= fetch('results.json', { cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error('原始数据加载失败，请重试。');
         const report = await response.json();

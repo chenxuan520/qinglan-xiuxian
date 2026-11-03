@@ -1,5 +1,6 @@
-import type { Shot, Zone } from './game.ts';
+import type { Game, Shot, Zone } from './game.ts';
 import { TAU } from './data.ts';
+import { SOVEREIGN_GOLD } from './boss-mechanics.ts';
 
 export const BOSS_FIELDS = [
   'roots',
@@ -74,7 +75,8 @@ export function drawBossField(
   const stage = BOSS_FIELDS.findIndex((kind) => z.kind === `boss-${kind}`);
   if (!z.hostile || stage < 0) return false;
   const active = z.delay <= 0;
-  const color = COLORS[stage];
+  const golden = z.color === SOVEREIGN_GOLD;
+  const color = golden ? SOVEREIGN_GOLD : COLORS[stage];
   const motion = reduced ? 0 : Math.sin(time * 2.4 + z.x * 0.01);
   c.save();
   c.translate(z.x, z.y);
@@ -102,7 +104,7 @@ export function drawBossField(
         c.beginPath();
         c.moveTo(-r * 0.2, r * 0.3);
         c.bezierCurveTo(-r * 0.45, -r * 0.1, r * 0.35, -r * 0.3, 0, -r);
-        c.strokeStyle = '#355d39';
+        c.strokeStyle = golden ? '#6b5836' : '#355d39';
         c.lineWidth = 6;
         c.stroke();
         c.strokeStyle = color;
@@ -147,14 +149,14 @@ export function drawBossField(
     case 3:
       c.beginPath();
       c.ellipse(0, 0, r, r * 0.75, -0.3, 0, TAU);
-      c.fillStyle = '#556e3670';
+      c.fillStyle = golden ? '#87723d70' : '#556e3670';
       c.fill();
       for (let i = 0; i < 7; i++) {
         const x = Math.cos(i * 2.4) * r * 0.65;
         const y = Math.sin(i * 2.4) * r * 0.6;
         c.beginPath();
         c.ellipse(x, y, r * (0.12 + (i % 3) * 0.03), r * 0.09, -0.3, 0, TAU);
-        c.fillStyle = '#a0b85570';
+        c.fillStyle = golden ? SOVEREIGN_GOLD + '70' : '#a0b85570';
         c.fill();
         c.stroke();
         c.beginPath();
@@ -222,16 +224,17 @@ export function drawBossField(
 /** 在弹体自身坐标系内绘制，朝向 +x；亮色核心对应碰撞半径，尾迹仅作方向提示。 */
 export function drawBossShot(c: CanvasRenderingContext2D, shot: Shot) {
   const stage = shot.bossStage!;
-  c.strokeStyle = COLORS[stage];
-  c.fillStyle = COLORS[stage] + 'bb';
+  const color = shot.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : COLORS[stage];
+  c.strokeStyle = color;
+  c.fillStyle = color + 'bb';
   c.lineWidth = 1.5;
   c.beginPath();
   c.moveTo(-23, 0);
   c.lineTo(0, 0);
-  c.strokeStyle = COLORS[stage] + '50';
+  c.strokeStyle = color + '50';
   c.lineWidth = 4;
   c.stroke();
-  c.strokeStyle = COLORS[stage];
+  c.strokeStyle = color;
   c.lineWidth = 1;
   if (stage === 0) {
     c.beginPath();
@@ -289,3 +292,53 @@ export function drawBossShot(c: CanvasRenderingContext2D, shot: Shot) {
 
 // 同一火焰笔画供组合魂火复用，颜色、缩放与寿命由调用处限定。
 export { flame as drawFlame };
+
+// 直接绘制保存的劫印/引力状态，暂停与续局不依赖瞬时特效队列。
+export function drawSovereignWarnings(c: CanvasRenderingContext2D, game: Game, reduced: boolean) {
+  if (!game.isFinalTrial || game.state === 'won' || game.state === 'lost') return;
+  const p = game.player;
+  for (const e of game.enemies) {
+    if (e.dead || !e.boss || e.bossStage !== 6) continue;
+    if (e.judgements?.length) {
+      c.save();
+      c.translate(p.x, p.y);
+      c.strokeStyle = SOVEREIGN_GOLD;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(0, 0, 29, 0, TAU);
+      c.stroke();
+      c.beginPath();
+      c.arc(
+        0,
+        0,
+        34,
+        -Math.PI / 2,
+        -Math.PI / 2 + TAU * Math.max(0, 1 - (e.judgements[0] - game.time) / 3),
+      );
+      c.stroke();
+      c.beginPath();
+      c.moveTo(5, -16);
+      c.lineTo(-6, 1);
+      c.lineTo(4, -1);
+      c.lineTo(-5, 16);
+      c.stroke();
+      c.restore();
+    }
+    if ((e.gravityUntil ?? 0) <= game.time) continue;
+    c.save();
+    c.strokeStyle = SOVEREIGN_GOLD + '99';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(p.x, p.y);
+    c.lineTo(e.x, e.y);
+    c.stroke();
+    for (let i = 0; i < 3; i++) {
+      const phase = reduced ? (i + 0.5) / 3 : (game.time + i / 3) % 1;
+      c.globalAlpha = 0.35 + phase * 0.5;
+      c.beginPath();
+      c.arc(e.x, e.y, e.radius * 0.4 + (1 - phase) * 100, 0, TAU);
+      c.stroke();
+    }
+    c.restore();
+  }
+}

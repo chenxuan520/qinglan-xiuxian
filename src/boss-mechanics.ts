@@ -1,5 +1,7 @@
 import type { Point, Shot } from './game-types.ts';
 
+export const SOVEREIGN_GOLD = '#e8d69c';
+
 export const BOSS_MECHANICS = {
   heartGrow: 2.4,
   heartLife: 8,
@@ -31,6 +33,7 @@ export interface BossSummon {
   kind: 'heart' | 'wolf';
   age: number;
   side: number;
+  color?: string;
 }
 export interface TrailPoint extends Point {
   time: number;

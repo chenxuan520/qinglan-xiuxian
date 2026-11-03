@@ -41,7 +41,7 @@ const miasmaHint = (life: number) =>
 const bossHints = [
   '六处环形藤阵、七发荆棘扇射与三名山灵召唤，藤圈造成3秒藤缠，暂难拾取；木心生长2.4秒后成阵，可提前击碎。',
   '快慢两层炎扇（九发与八发）、五点火径与快慢两层轮舞（各二十发），离开火圈并穿过弹幕间隙；七道回焰短暂停留后沿原路折返。',
-  '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后；两头猎狼从侧翼绕行后蓄势合扑，另有重新锁向的两段连扑。',
+  '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后；两头猎狼从侧翼绕行后蓄势合扑，每只气血至少为施放妖王的8%，另有重新锁向的两段连扑。',
   miasmaHint(BOSS_MECHANICS.nativeMiasmaLife),
   '六名护卫召唤、更快的二十发摄魂环弹与六点鬼牢，留意中央落阵；魂弹命中封宝2秒；五道魂影沿你刚走过的路线逆行；还会瞬移留下三具幻影，幻影短暂蓄力后散出魂弹，可先击破，幻影不提供收获。',
   '十字天雷分两拍落下、二十二发星环与五点陨雷，观察圆形预警后换位；三颗星珠绕行后错拍向外飞出。',
@@ -52,7 +52,9 @@ const trialBossHints = bossHints
       (id === 3 ? miasmaHint(6) : hint) +
       (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
   )
-  .concat('环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。');
+  .concat(
+    '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。<span class="boss-skill-name">万劫归一：</span>借用前六位妖王之一的招牌，化为金色；<span class="boss-skill-name">天劫审判：</span>劫印三息后沿落脚点连劈三雷；<span class="boss-skill-name">归墟引力：</span>半血后将修士拉向自身，同时放出雷环。',
+  );
 export function bestiaryPanel(
   bestiaryStage: number,
   difficulty = 0,
@@ -143,7 +145,7 @@ export function bestiaryPanel(
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small>${bossSkills(
+        return `<article class="enemy-card${bossStage === FINAL_TRIAL_STAGE ? ' sovereign-card' : ''}" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}>${bossSkills(
           bossStage,
           trial,
         )
@@ -154,7 +156,7 @@ export function bestiaryPanel(
       })
       .join(
         '',
-      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有不同的圆阵、弹幕与特色招式，仙尊有六招。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋蓄力0.425秒，仙尊雷袭0.5秒。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
+      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有不同的圆阵、弹幕与特色招式，仙尊原六招保留，另有三招招牌技。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋蓄力0.425秒，仙尊雷袭0.5秒。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
     wide: true,
   };
 }

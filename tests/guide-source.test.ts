@@ -64,7 +64,8 @@ test('预警帮助区分前六境小怪、秘境妖王与独立天劫', () => {
   const combat = guide.guideContent('combat');
   assert.match(combat, /前六境普通与精英妖物的远程攻击出手前会蓄力约 0\.65 秒/);
   assert.match(combat, /前六境中，第二、六境妖王登场 1 秒后首次出招/);
-  assert.match(combat, /秘境妖王的地面落阵至少预警 1\.2 秒/);
+  assert.match(combat, /秘境妖王的地面落阵通常至少预警 1\.2 秒/);
+  assert.match(combat, /仙尊天劫审判的三道雷预警依次为0\.8、1\.2、1\.6秒/);
   assert.match(combat, /小怪和独立天劫按各自节奏，天劫预警逐次缩短/);
   assert.match(combat, /挑战最多 45 秒，且在妖王预定登场前 12 秒截止/);
   assert.match(combat, /第七境小怪随时间逐渐增强，5:00 达到/);

@@ -28,7 +28,7 @@ function trial() {
   return new Game(save, 6, 0, () => 0.5);
 }
 
-test('终关追击精英有冲刺；原生六境首领三招，仙尊六招每轮各释放一次', () => {
+test('终关追击精英有冲刺；原生六境首领三招，仙尊九招按半血条件轮换', () => {
   const g = trial();
   g.weapons = [];
   g.time = 60;
@@ -49,16 +49,20 @@ test('终关追击精英有冲刺；原生六境首领三招，仙尊六招每�
     const boss = h.spawnEnemy(10, false, true, { x: 300, y: 0 }, stage);
     assert.equal(STAGES[stage].skills.length, stage === 6 ? 6 : 3);
     const phases: number[] = [];
-    for (let i = 0; i < STAGES[stage].skills.length; i++) {
+    for (let i = 0; i < bossSkills(stage, h.isFinalTrial).length; i++) {
       const phase = boss.skillStep!;
       phases.push(phase);
       boss.charge = 0;
       boss.cooldown = 0;
       h.update(0.01);
-      assert.ok(h.notice.includes(bossSkills(stage, h.isFinalTrial)[phase]));
+      assert.ok(
+        h.notice.includes(
+          stage === 6 && phase === 8 ? '万劫归一' : bossSkills(stage, h.isFinalTrial)[phase],
+        ),
+      );
       assert.notEqual(boss.skillStep, phase);
     }
-    assert.equal(new Set(phases).size, STAGES[stage].skills.length);
+    assert.equal(new Set(phases).size, bossSkills(stage, h.isFinalTrial).length);
   }
 });
 

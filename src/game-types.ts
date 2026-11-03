@@ -24,6 +24,9 @@ export interface Enemy extends Point {
   bossStage?: number;
   skillStep?: number;
   bossSkillQueue?: number[];
+  // 绝对战斗时刻；多次劫印各自到期，暂停时随战斗时钟冻结。
+  judgements?: number[];
+  gravityUntil?: number;
   bossSummon?: BossSummon;
   pursuitCooldown?: number;
   windup?: number;

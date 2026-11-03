@@ -29,7 +29,13 @@ function cast(g: Game, boss = g.boss!) {
   const stage = boss.bossStage ?? g.stage;
   const phase = boss.skillStep ?? 0;
   g.castBossSkill(boss, 1, 0);
-  assert.ok(g.notice.includes(bossSkills(stage, g.isFinalTrial)[phase]));
+  assert.ok(
+    g.notice.includes(
+      stage === 6 && phase === 8 && boss.hp >= boss.maxHp / 2
+        ? '万劫归一'
+        : bossSkills(stage, g.isFinalTrial)[phase],
+    ),
+  );
   assert.notEqual(boss.skillStep, phase, '不能连续重复同一招');
   return phase;
 }
@@ -63,6 +69,15 @@ test('七王在本关和终关均洗牌：每轮不漏招，轮次交界不连�
           );
           orders.add(phases.join(','));
         }
+      }
+      // 首招可达性不用有限种子碰运气：逐一走实际出生洗牌的每个首位交换分支。
+      for (let first = 0; first < count; first++) {
+        const { g } = encounter(stage, arena);
+        let call = 0;
+        g.random = () => (count - call++ === first ? 0 : 0.999999);
+        const e = g.spawnEnemy(10, false, true, { x: -240, y: 0 }, stage);
+        assert.equal(e.skillStep, first);
+        starts.add(e.skillStep!);
       }
       assert.equal(starts.size, count, `${stage}/${arena} 的所有招式均能作为首招`);
       assert.ok(orders.size > 1, `${stage}/${arena} 不能固定同一轮顺序`);
@@ -118,7 +133,7 @@ test('刷新前的一次实际出招只消耗一招，旧队列耗尽后才抽�
   boss.cooldown = 0;
   boss.pursuitCooldown = 999;
   g.update(0.01);
-  assert.ok(g.notice.includes(STAGES[6].skills[before[0]]));
+  assert.ok(g.notice.includes(before[0] === 8 ? '万劫归一' : bossSkills(6, true)[before[0]]));
   assert.deepEqual([boss.skillStep, ...boss.bossSkillQueue!], before.slice(1));
   const h = Game.restore(g.save, JSON.parse(JSON.stringify(g.snapshot())))!;
   h.resume();
@@ -127,7 +142,7 @@ test('刷新前的一次实际出招只消耗一招，旧队列耗尽后才抽�
   e.charge = 0;
   e.cooldown = 0;
   h.update(0.01);
-  assert.ok(h.notice.includes(STAGES[6].skills[before[1]]));
+  assert.ok(h.notice.includes(before[1] === 8 ? '万劫归一' : bossSkills(6, true)[before[1]]));
   assert.deepEqual([e.skillStep, ...e.bossSkillQueue!], before.slice(2));
 });
 

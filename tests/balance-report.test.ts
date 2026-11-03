@@ -21,6 +21,7 @@ test('日报计划分母固定10080，失败/缺失不能显示通过，动态�
   assert.ok(!html.includes('<img onerror='));
   assert.ok(html.includes('0/120'));
   assert.ok(html.includes('第七关只展示实测'));
+  assert.ok(html.includes('<button id="refresh-report" type="button">刷新报告</button>'));
   assert.ok(html.includes('未击杀观测中位'));
   assert.ok(html.includes('value="maxed"'));
   for (const [id, label] of [

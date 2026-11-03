@@ -514,6 +514,16 @@
 .enemy-card .boss-skill-name {
   display: inline-block;
 }
+.enemy-card.sovereign-card {
+  grid-column: 1 / -1;
+}
+.enemy-card .sovereign-skills {
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.8;
+  color: #c6c8a9;
+  margin-top: 8px;
+}
 .enemy-card > div {
   min-width: 0;
 }

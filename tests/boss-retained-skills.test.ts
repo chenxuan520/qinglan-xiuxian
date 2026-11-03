@@ -143,7 +143,7 @@ test('七王旧圆阵与所有保留非条带技能均进入实际招式轮换�
       for (let phase = 0; phase < skills.length; phase++) {
         const { g, e } = encounter(origin, phase, arena);
         g.castBossSkill(e, 1, 0);
-        assert.ok(g.notice.includes(skills[phase]));
+        assert.ok(g.notice.includes(origin === 6 && phase === 8 ? '万劫归一' : skills[phase]));
         assert.ok(g.zones.every((z) => z.endX === undefined && z.endY === undefined));
       }
     }

@@ -1045,6 +1045,7 @@ export class Renderer {
       c.restore();
     }
     this.drawEnemyWarnings(game);
+    this.battleArt!.drawSovereignWarnings(c, game, this.reducedMotion.matches);
     // 状态文字最后绘制，避免危险区边线穿过禁锢或封宝提示。
     drawPlayerAilments(c, game, time, this.reducedMotion.matches);
   }

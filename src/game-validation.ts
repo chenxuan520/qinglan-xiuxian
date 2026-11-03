@@ -1,4 +1,4 @@
-import { BOSS_MECHANICS, validBossMotion } from './boss-mechanics.ts';
+import { BOSS_MECHANICS, SOVEREIGN_GOLD, validBossMotion } from './boss-mechanics.ts';
 import { bossSkills } from './boss-skills.ts';
 import { isCurio, acquiredCurio } from './curio-data.ts';
 import type { Game } from './game.ts';
@@ -262,6 +262,7 @@ export function validateRunSnapshot(
               !e.boss &&
               !s.tribulation &&
               ['heart', 'wolf'].includes(e.bossSummon.kind) &&
+              (e.bossSummon.color === undefined || e.bossSummon.color === SOVEREIGN_GOLD) &&
               Number.isFinite(e.bossSummon.age) &&
               e.bossSummon.age >= 0 &&
               e.bossSummon.age <= 8 &&
@@ -321,6 +322,40 @@ export function validateRunSnapshot(
       )
     )
       return null;
+    for (const e of s.enemies) {
+      if (e.judgements === undefined && e.gravityUntil === undefined) continue;
+      if (
+        s.stage !== FINAL_TRIAL_STAGE ||
+        s.tribulation ||
+        !e.boss ||
+        e.bossStage !== 6 ||
+        e.dead ||
+        e.hp <= 0 ||
+        s.state === 'lost'
+      )
+        return null;
+      if (
+        e.judgements !== undefined &&
+        (!Array.isArray(e.judgements) ||
+          !e.judgements.length ||
+          e.judgements.length > 6 ||
+          !e.judgements.every(
+            (at, i) =>
+              Number.isFinite(at) &&
+              at >= s.time &&
+              at <= s.time + 3 + 1e-8 &&
+              (i === 0 || at >= e.judgements![i - 1]),
+          ))
+      )
+        return null;
+      if (
+        e.gravityUntil !== undefined &&
+        (!Number.isFinite(e.gravityUntil) ||
+          e.gravityUntil < s.time ||
+          e.gravityUntil > s.time + 2 + 1e-8)
+      )
+        return null;
+    }
     const cache = s.cacheChallenge;
     if (
       s.enemies.some(
