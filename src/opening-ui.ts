@@ -1,6 +1,13 @@
 import { lifespanAdsRemaining } from './ad-reward-limits.ts';
 import { isExtremeLife, rewardDisabled } from './life-mode.ts';
-import { FINAL_TRIAL_STAGE, MAX_REVIVES, elementInfo, spiritRootInfo, treasure } from './data.ts';
+import {
+  FINAL_TRIAL_STAGE,
+  MAX_REVIVES,
+  ROOT_STARTERS,
+  elementInfo,
+  spiritRootInfo,
+  treasure,
+} from './data.ts';
 import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import type { Game } from './game.ts';
 import {
@@ -45,7 +52,15 @@ export function hometownChoicePanel(save: SaveData): PanelParts {
 
 export function rootRevealBody(save: SaveData): string {
   const starter = treasure(save.starter);
-  return `<div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside"><div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div><blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div>`;
+  let starterContent = `<div class="root-reveal-starter">${icon(starter.id, starter.color)}<div><small>本命法宝 · ${elementInfo(starter.element).name}系</small><strong>${starter.name}</strong></div></div>`;
+  if (save.rootElements.length) {
+    const element = save.rootElements[0] ?? 'metal';
+    const [orthodoxId, demonicId] = ROOT_STARTERS[element];
+    const orthodox = treasure(orthodoxId);
+    const demonic = treasure(demonicId);
+    starterContent = `<div class="root-reveal-starters"><small class="root-reveal-starters-title">本命法宝 · ${elementInfo(element).name}系</small><div class="root-reveal-starter${save.starter === orthodoxId ? ' is-current' : ''}">${icon(orthodox.id, orthodox.color)}<div><strong>${orthodox.name}</strong><small>正道 / 兼修</small></div></div><div class="root-reveal-starter${save.starter === demonicId ? ' is-current' : ''}">${icon(demonic.id, demonic.color)}<div><strong>${demonic.name}</strong><small>魔道</small></div></div></div>`;
+  }
+  return `<div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside">${starterContent}<blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div>`;
 }
 
 export function rootRevealPanel(

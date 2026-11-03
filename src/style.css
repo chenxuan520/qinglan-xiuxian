@@ -251,6 +251,43 @@ svg {
   align-items: center;
   gap: 12px;
 }
+.root-reveal-starters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.root-reveal-starters-title {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 10px;
+}
+.root-reveal-starters > .root-reveal-starter {
+  padding: 8px;
+  border: 1px solid var(--border);
+}
+.root-reveal-starter.is-current {
+  border-color: var(--gold);
+}
+@media (min-width: 801px) {
+  .root-reveal-layout:has(.root-reveal-starters) {
+    grid-template-columns: 280px minmax(0, 1fr) minmax(210px, 0.7fr);
+  }
+  .root-reveal-starters > .root-reveal-starter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+@media (min-width: 801px) and (max-width: 1200px) {
+  .root-reveal-layout:has(.root-reveal-starters) {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .root-reveal-layout:has(.root-reveal-starters) .root-reveal-disc {
+    grid-row: span 2;
+  }
+  .root-reveal-layout:has(.root-reveal-starters) .root-verdict p {
+    text-wrap: pretty;
+  }
+}
 .root-reveal-starter small,
 .root-reveal-starter strong {
   display: block;
@@ -303,6 +340,9 @@ svg {
   }
   .root-reveal-aside {
     gap: 12px;
+  }
+  .root-reveal-starters {
+    grid-template-columns: 1fr;
   }
   .root-reveal-effects h3 {
     margin-bottom: 6px;
