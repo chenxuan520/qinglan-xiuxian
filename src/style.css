@@ -265,9 +265,6 @@ svg {
   padding: 8px;
   border: 1px solid var(--border);
 }
-.root-reveal-starter.is-current {
-  border-color: var(--gold);
-}
 @media (min-width: 801px) {
   .root-reveal-layout:has(.root-reveal-starters) {
     grid-template-columns: 280px minmax(0, 1fr) minmax(210px, 0.7fr);

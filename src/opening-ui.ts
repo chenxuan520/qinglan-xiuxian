@@ -58,7 +58,7 @@ export function rootRevealBody(save: SaveData): string {
     const [orthodoxId, demonicId] = ROOT_STARTERS[element];
     const orthodox = treasure(orthodoxId);
     const demonic = treasure(demonicId);
-    starterContent = `<div class="root-reveal-starters"><small class="root-reveal-starters-title">本命法宝 · ${elementInfo(element).name}系</small><div class="root-reveal-starter${save.starter === orthodoxId ? ' is-current' : ''}">${icon(orthodox.id, orthodox.color)}<div><strong>${orthodox.name}</strong><small>正道 / 兼修</small></div></div><div class="root-reveal-starter${save.starter === demonicId ? ' is-current' : ''}">${icon(demonic.id, demonic.color)}<div><strong>${demonic.name}</strong><small>魔道</small></div></div></div>`;
+    starterContent = `<div class="root-reveal-starters"><small class="root-reveal-starters-title">本命法宝 · ${elementInfo(element).name}系</small><div class="root-reveal-starter">${icon(orthodox.id, orthodox.color)}<div><strong>${orthodox.name}</strong><small>正道</small></div></div><div class="root-reveal-starter">${icon(demonic.id, demonic.color)}<div><strong>${demonic.name}</strong><small>魔道</small></div></div></div>`;
   }
   return `<div class="root-reveal-disc">${spiritRootDiagram(save, true)}</div><div class="root-reveal-effects"><h3>${spiritRootInfo(save.spiritRoot).name}</h3><p>${spiritRootEffects(save)}</p></div><div class="root-reveal-aside">${starterContent}<blockquote class="root-verdict"><span>命批</span><p>${ROOT_IMPRESSIONS[save.spiritRoot].verse}</p></blockquote></div>`;
 }
