@@ -145,7 +145,7 @@ export function bestiaryPanel(
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card${bossStage === FINAL_TRIAL_STAGE ? ' sovereign-card' : ''}" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}>${bossSkills(
+        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}>${bossSkills(
           bossStage,
           trial,
         )

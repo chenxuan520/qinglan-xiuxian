@@ -514,7 +514,7 @@
 .enemy-card .boss-skill-name {
   display: inline-block;
 }
-.enemy-card.sovereign-card {
+.enemy-card[data-boss-stage='6'] {
   grid-column: 1 / -1;
 }
 .enemy-card .sovereign-skills {
