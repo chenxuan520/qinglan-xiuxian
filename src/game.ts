@@ -1700,13 +1700,21 @@ export class Game {
     e.skillStep = next;
     e.bossSkillQueue = queue;
     const enraged = e.hp < e.maxHp / 2;
-    e.cooldown = bossSkillCooldown(stage, this.isFinalTrial, enraged);
+    e.cooldown =
+      bossSkillCooldown(stage, this.isFinalTrial, enraged) *
+      (this.isFinalTrial || this.tribulation
+        ? 1
+        : DIFFICULTIES[this.difficulty].bossCooldown[stage]);
     const p = { x: this.player.x, y: this.player.y };
     const angle = Math.atan2(ny, nx);
+    const shotSpeed =
+      this.isFinalTrial || this.tribulation
+        ? 1
+        : DIFFICULTIES[this.difficulty].bossShotSpeed[stage];
     const fan = (count: number, spread: number, speed: number, center = angle) => {
       for (let i = 0; i < count; i++) {
         const a = center + (i / Math.max(1, count - 1) - 0.5) * spread;
-        this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.75);
+        this.hostileShot(e, Math.cos(a), Math.sin(a), speed * shotSpeed, e.damage * 0.75);
       }
     };
     const ring = (count: number, speed: number) =>
