@@ -1,4 +1,5 @@
 import { claimSuppliesReward, canClaimLifespanAd } from '../src/ad-reward-limits.ts';
+import { viewScale } from '../src/view-scale.ts';
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -132,7 +133,7 @@ export function initialSave(c: BalanceCase) {
   return loaded.save;
 }
 function viewport(g: Game, device: Device) {
-  const scale = device === 'phone' ? 0.76 : 900 / 860;
+  const scale = device === 'phone' ? viewScale(390, 844) : viewScale(1365, 900);
   g.viewport = {
     width: (device === 'phone' ? 390 : 1365) / scale,
     height: (device === 'phone' ? 844 : 900) / scale,

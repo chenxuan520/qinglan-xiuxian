@@ -1,4 +1,5 @@
 import { curioCombo } from './curio-combos.ts';
+import { viewScale } from './view-scale.ts';
 import { resourceFailed } from './update-check.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
 import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
@@ -131,7 +132,7 @@ export class Renderer {
   resize() {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
-    this.scale = this.width < 700 ? 0.76 : Math.min(1.1, Math.max(0.8, this.height / 860));
+    this.scale = viewScale(this.width, this.height);
     const dpr = Math.min(window.devicePixelRatio || 1, this.pixelRatio);
     this.canvas.width = Math.round(this.width * dpr);
     this.canvas.height = Math.round(this.height * dpr);

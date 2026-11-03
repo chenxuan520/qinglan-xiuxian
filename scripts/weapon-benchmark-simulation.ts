@@ -1,5 +1,6 @@
 // 测评夹具只包装真实Game的观测，不改变正式战斗方法；不由前端入口导入。
 import assert from 'node:assert/strict';
+import { viewScale } from '../src/view-scale.ts';
 import { appendFileSync } from 'node:fs';
 import { isMainThread, parentPort, workerData } from 'node:worker_threads';
 import { Game } from '../src/game.ts';
@@ -30,7 +31,7 @@ function withRandom<T>(random: () => number, fn: () => T) {
   }
 }
 function view(g: Game, device: string) {
-  const scale = device === 'phone' ? 0.76 : 900 / 860;
+  const scale = device === 'phone' ? viewScale(390, 844) : viewScale(1365, 900);
   g.viewport = {
     width: (device === 'phone' ? 390 : 1365) / scale,
     height: (device === 'phone' ? 844 : 900) / scale,
