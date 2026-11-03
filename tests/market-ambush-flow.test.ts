@@ -167,6 +167,7 @@ function harness(data = fixture()) {
     game: null,
     settled: false,
     ambushScene: null,
+    ambushAwaitingContinue: false,
     panel: '',
     modal: { innerHTML: '', querySelector: () => ({ remove: noop, removeAttribute: noop }) },
     MarketAmbushDuel,

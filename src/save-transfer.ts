@@ -65,21 +65,18 @@ export function backupUnreadableSave(
 }
 
 // 本机读档与文件导入共用迁移：通关后解除旧天劫，恢复被其暂停的原历练。
+// 极限模式只把真正的战败（lost 快照或劫修已判负）当作落幕；未完战斗一律等待主动继续。
 export function restoreSavedRun(save: SaveData, snapshot: unknown) {
   if (save.journeyEnded || save.pendingReincarnation) {
     save.tribulationReturn = null;
     return null;
   }
-  if (
-    isExtremeLife(save) &&
-    ((snapshot != null && (snapshot as { state?: string }).state !== 'won') ||
-      (save.tribulationReturn != null && snapshot == null) ||
-      (save.mortal.marketSocial?.ambush &&
-        (!save.mortal.marketSocial.ambush.snapshot.outcome ||
-          save.mortal.marketSocial.ambush.snapshot.outcome === 'defeat')))
-  ) {
-    endExtremeLife(save, 'interrupted');
-    return null;
+  if (isExtremeLife(save)) {
+    const state = (snapshot as { state?: unknown } | null)?.state;
+    if (state === 'lost' || save.mortal.marketSocial?.ambush?.snapshot.outcome === 'defeat') {
+      endExtremeLife(save, 'defeat');
+      return null;
+    }
   }
   if (
     save.completed.includes(FINAL_TRIAL_STAGE) &&
@@ -228,7 +225,15 @@ export function importSave(text: string) {
     throw new Error('存档中的本世落幕状态无效，当前进度未更改');
   // 老版本档的进行中对局格式不保证兼容，升级时直接放弃历练、保留永久进度。
   const legacyRun = data.schema !== SAVE_SCHEMA;
-  const run = restoreSavedRun(save, legacyRun && !isExtremeLife(save) ? null : data.activeRun);
+  let run;
+  try {
+    run = restoreSavedRun(save, legacyRun && !isExtremeLife(save) ? null : data.activeRun);
+  } catch (error) {
+    // 极限旧档：不因无法识别的未完对局拒绝整份导入，保留永久进度并放弃该局，不判死。
+    if (!isExtremeLife(save)) throw error;
+    save.tribulationReturn = null;
+    run = null;
+  }
   save.factsTampered ||= tampered;
   Object.assign(save, sealSaveSnapshot(save));
   return { save, run };

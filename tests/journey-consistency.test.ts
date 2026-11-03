@@ -240,8 +240,9 @@ test('旧极限寿尽误记只在有限寿元耗尽时校正，正常战败与�
   const interrupted = fixture();
   interrupted.lifeMode = 'extreme';
   interrupted.age = 100;
-  assert.equal(restoreSavedRun(interrupted, new Game(interrupted, 0, 1).snapshot()), null);
-  assertLifespan(interrupted);
+  const resumed = restoreSavedRun(interrupted, new Game(interrupted, 0, 1).snapshot());
+  assert.equal(resumed?.state, 'paused');
+  assert.equal(interrupted.pendingReincarnation, null, '未完战斗不再因寿限或刷新判死');
 });
 
 function chatHost() {

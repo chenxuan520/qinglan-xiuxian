@@ -28,6 +28,7 @@ export class MarketAmbushScene {
   private pointer: { id: number; x: number; y: number } | null = null;
   private touch = { x: 0, y: 0 };
   private notified = false;
+  private held = false;
   private assetAttempt = 0;
   private imageUrls: string[];
   private host: HTMLElement;
@@ -40,8 +41,10 @@ export class MarketAmbushScene {
     npc: MarketCultivator,
     finish: (outcome: AmbushOutcome) => void,
     saveCheckpoint: (snapshot: AmbushSnapshot) => boolean,
+    hold = false,
   ) {
     this.extreme = isExtremeLife(save);
+    this.held = hold;
     this.host = host;
     this.finish = finish;
     this.saveCheckpoint = saveCheckpoint;
@@ -55,7 +58,8 @@ export class MarketAmbushScene {
     this.duel = new MarketAmbushDuel(encounter.stats, encounter.snapshot);
     this.lastCheckpoint = this.duel.time;
     this.imageUrls = [...new Set([PLAYER_IMAGES[save.path], PLAYER_IMAGES[npc.path]])];
-    host.innerHTML = `<div class="market-ambush-stats"><span>你 <meter class="ambush-player-hp" min="0" max="${this.duel.player.maxHp}" value="${this.duel.player.hp}"></meter></span><span>劫修 <meter class="ambush-enemy-hp" min="0" max="${this.duel.enemy.maxHp}" value="${this.duel.enemy.hp}"></meter></span><small class="ambush-clock">护住退路</small></div><div class="market-ambush-controls"><button class="secondary-button" data-action="market-ambush-exit" ${this.extreme ? 'disabled title="极限模式不可退离"' : ''}>${this.extreme ? '极限模式 · 不可撤离' : '尝试撤离'}</button></div><div class="market-ambush-field" tabindex="0" role="region" aria-label="劫修遭遇，方向键或触屏拖动移动，自动攻击"><div class="ambush-exit" aria-label="左侧退路"><span>退路</span></div><div class="ambush-figure ambush-player" style="background:${playerSpriteBackground(save.path)}"><small>你</small></div><div class="ambush-figure ambush-enemy" style="background:${playerSpriteBackground(npc.path)}"><small>劫修</small></div><div class="ambush-warning" hidden></div><div class="ambush-shots"></div><div class="ambush-loading">辨清来路，护住行囊…</div></div><p class="panel-note">方向键 / WASD 或拖动走位，靠近自动出手，橙色预警要侧移。${this.extreme ? '极限模式不可撤离，倒下即此世落幕；未完战斗刷新或关闭后重开也将身陨。' : '撤离时自动退向左侧，手动走位可接管；在退路拉开距离保持两秒即可脱身。'}离开画面时战斗暂停。</p><p class="ambush-save-error" role="status" hidden>尚未保存当前战况，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-checkpoint">重试保存并继续</button></p><p class="ambush-result" role="status" hidden></p>`;
+    host.innerHTML = `<div class="market-ambush-stats"><span>你 <meter class="ambush-player-hp" min="0" max="${this.duel.player.maxHp}" value="${this.duel.player.hp}"></meter></span><span>劫修 <meter class="ambush-enemy-hp" min="0" max="${this.duel.enemy.maxHp}" value="${this.duel.enemy.hp}"></meter></span><small class="ambush-clock">护住退路</small></div><div class="market-ambush-controls"><button class="primary-button ambush-continue" data-action="market-ambush-continue" hidden>继续战斗</button><button class="secondary-button" data-action="market-ambush-exit" ${this.extreme ? 'disabled title="极限模式不可退离"' : ''}>${this.extreme ? '极限模式 · 不可撤离' : '尝试撤离'}</button></div>${this.held ? '<p class="panel-note ambush-resume-note">上次战况已保存，继续前不会推进。</p>' : ''}<div class="market-ambush-field" tabindex="0" role="region" aria-label="劫修遭遇，方向键或触屏拖动移动，自动攻击"><div class="ambush-exit" aria-label="左侧退路"><span>退路</span></div><div class="ambush-figure ambush-player" style="background:${playerSpriteBackground(save.path)}"><small>你</small></div><div class="ambush-figure ambush-enemy" style="background:${playerSpriteBackground(npc.path)}"><small>劫修</small></div><div class="ambush-warning" hidden></div><div class="ambush-shots"></div><div class="ambush-loading">辨清来路，护住行囊…</div></div><p class="panel-note">方向键 / WASD 或拖动走位，靠近自动出手，橙色预警要侧移。${this.extreme ? '极限模式不可撤离，倒下即此世落幕；未完成的战斗刷新后可从保存的战况继续。' : '撤离时自动退向左侧，手动走位可接管；在退路拉开距离保持两秒即可脱身。'}离开画面时战斗暂停。</p><p class="ambush-save-error" role="status" hidden>尚未保存当前战况，战斗已暂停。<button class="secondary-button" data-action="market-ambush-retry-checkpoint">重试保存并继续</button></p><p class="ambush-result" role="status" hidden></p>`;
+    this.syncContinue();
     const field = host.querySelector<HTMLElement>('.market-ambush-field')!;
     const options = { signal: this.events.signal };
     document.addEventListener(
@@ -255,6 +259,7 @@ export class MarketAmbushScene {
       this.fieldVisible &&
       !document.hidden &&
       this.ready &&
+      !this.held &&
       !this.checkpointBlocked &&
       !this.duel.outcome;
     const dt = this.last && this.enabled && running ? Math.max(0, (now - this.last) / 1000) : 0;
@@ -303,6 +308,7 @@ export class MarketAmbushScene {
     this.checkpoint();
   }
   private draw() {
+    this.syncContinue();
     for (const [name, actor] of [
       ['player', this.duel.player],
       ['enemy', this.duel.enemy],
@@ -326,9 +332,11 @@ export class MarketAmbushScene {
       .join('');
     this.host.querySelector('.ambush-clock')!.textContent = this.checkpointBlocked
       ? '保存后继续'
-      : this.duel.retreatRequested
-        ? `左侧退路 · 安全停留 ${this.duel.retreatProgress.toFixed(1)} / ${AMBUSH_RETREAT_SECONDS}秒`
-        : `${this.duel.time.toFixed(1)}秒 · ${this.enabled ? '自动攻守' : '暂歇'}`;
+      : this.held
+        ? '等待继续'
+        : this.duel.retreatRequested
+          ? `左侧退路 · 安全停留 ${this.duel.retreatProgress.toFixed(1)} / ${AMBUSH_RETREAT_SECONDS}秒`
+          : `${this.duel.time.toFixed(1)}秒 · ${this.enabled ? '自动攻守' : '暂歇'}`;
     const exit = this.host.querySelector<HTMLButtonElement>('[data-action="market-ambush-exit"]');
     if (exit && !this.duel.outcome) {
       exit.textContent = this.extreme
@@ -350,6 +358,33 @@ export class MarketAmbushScene {
     this.enabled = false;
     this.clear();
     return true;
+  }
+  // 从页面缓存或读档返回：保存当前战况并停下，等玩家点「继续战斗」。
+  hold() {
+    if (this.duel.outcome) return;
+    this.held = true;
+    this.suspend(false);
+    this.syncContinue();
+    this.draw();
+  }
+  resume() {
+    if (this.duel.outcome || !this.held) return false;
+    this.held = false;
+    this.last = 0;
+    this.host.querySelector('.ambush-resume-note')?.remove();
+    this.syncContinue();
+    this.draw();
+    return true;
+  }
+  private syncContinue() {
+    const button = this.host.querySelector<HTMLButtonElement>(
+      '[data-action="market-ambush-continue"]',
+    );
+    if (!button) return;
+    button.hidden = !this.held || !!this.duel.outcome;
+    this.host
+      .querySelector('.market-ambush-controls')
+      ?.classList.toggle('has-continue', !button.hidden);
   }
   destroy() {
     if (!this.events.signal.aborted) this.checkpoint();

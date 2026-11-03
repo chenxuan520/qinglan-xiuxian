@@ -1842,6 +1842,20 @@
     flex-basis: 100%;
   }
 }
+.market-ambush-controls {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.market-ambush-controls.has-continue {
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 420px) {
+  .market-ambush-controls.has-continue {
+    grid-template-columns: 1fr;
+  }
+}
 .market-ambush-rules {
   margin-top: 16px;
   color: var(--muted);

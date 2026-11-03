@@ -241,7 +241,7 @@ const saveRead = readSealedSave(raw);
 // 读不懂的存档先另存原文，玩家确认前不写入；来自新版本的存档只读不写。
 let saveLock: 'unreadable' | 'newer' | 'stale' | null =
   saveRead.status === 'unreadable' || saveRead.status === 'newer' ? saveRead.status : null;
-const unreadableBackedUp =
+let unreadableBackedUp =
   saveRead.status === 'unreadable' && raw !== null && backupUnreadableSave(localStorage, raw);
 let lastSaveText = raw;
 const save = saveRead.status === 'unreadable' ? parseSave(null) : saveRead.save;
@@ -285,7 +285,7 @@ function showRuntimeErrorNotice(updated = false) {
   if (updated) box.setAttribute('data-resource-update', '');
   const extremeWarning =
     isExtremeLife(save) && ((game && !settled) || pendingRun || save.mortal.marketSocial?.ambush)
-      ? ' 极限战斗尚未结束，刷新将结束此世。'
+      ? ' 极限战斗尚未结束，刷新后会回到暂停的战况。'
       : '';
   box.innerHTML = `${ERROR_NOTICE_TITLE}<p class="runtime-error-text">${updated ? '游戏已更新，请刷新后继续。' : ERROR_NOTICE_TEXT}${extremeWarning}</p>${ERROR_NOTICE_ACTIONS}`;
   box.querySelector('[data-error-action="refresh"]')?.addEventListener('click', () => {
@@ -336,14 +336,27 @@ catalogTreasures.splice(
   treasure('nail'),
 );
 let pendingRun: Game | null = null;
+let ambushAwaitingContinue = false;
 try {
   const stored = JSON.parse(raw || '{}');
   if (saveRead.status !== 'unreadable' && (stored.schema === SAVE_SCHEMA || isExtremeLife(save)))
     pendingRun = restoreSavedRun(save, stored.activeRun);
 } catch {
-  if (isExtremeLife(save)) endExtremeLife(save, 'interrupted');
-  /* 普通模式无有效对局时仍保留永久进度。 */
+  // 极限续局快照无法识别：保留永久进度与原文备份，停止写入并要求玩家先留底，不判死也不开新局。
+  // 普通模式保持原有行为：丢弃坏续局、保留永久进度。
+  if (isExtremeLife(save) && !saveLock) {
+    unreadableBackedUp = raw !== null && backupUnreadableSave(localStorage, raw);
+    saveLock = 'unreadable';
+  }
 }
+if (
+  isExtremeLife(save) &&
+  !pendingRun &&
+  save.mortal.marketSocial?.ambush &&
+  !save.mortal.marketSocial.ambush.snapshot.outcome &&
+  !saveLock
+)
+  ambushAwaitingContinue = true;
 let selectedStage = save.unlocked,
   difficulty = minimumDifficulty(save),
   game: Game | null = null;
@@ -437,7 +450,7 @@ let importReadEpoch = 0;
 let settlementRetryAt = 0;
 setResourceRefreshWarning(() =>
   isExtremeLife(save) && ((game && !settled) || pendingRun || save.mortal.marketSocial?.ambush)
-    ? '极限战斗尚未结束，刷新将结束此世。'
+    ? '极限战斗尚未结束，刷新后会回到暂停的战况。'
     : '',
 );
 // 只在存档仍是本页上次读写的内容时写入，其他窗口写过后本页停止保存。
@@ -889,7 +902,7 @@ function showMarketAmbush() {
   void loadAmbushFlow()
     .then((flow) => {
       if (!saveLock && save.mortal.marketSocial?.ambush && panel === 'market-ambush-loading')
-        flow.mountAmbush(shellBindings());
+        flow.mountAmbush(shellBindings(), ambushAwaitingContinue);
     })
     .catch(() => {
       if (saveLock || panel !== 'market-ambush-loading') return;
@@ -908,6 +921,7 @@ function showMarketAmbush() {
 }
 function handleMarketAmbushAction(action: string) {
   if (saveLock || !save.mortal.marketSocial?.ambush) return;
+  if (action === 'market-ambush-continue') ambushAwaitingContinue = false;
   if (action === 'market-ambush-recover') {
     showMarketAmbush();
     return;
@@ -2383,17 +2397,19 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pageshow', (event) => {
   renderer.restore();
-  if (
-    event.persisted &&
-    isExtremeLife(save) &&
-    ((game && !settled && game.state !== 'won') ||
-      pendingRun ||
-      (save.mortal.marketSocial?.ambush &&
-        !['victory', 'escaped'].includes(
-          ambushScene?.duel.outcome ?? save.mortal.marketSocial.ambush.snapshot.outcome ?? '',
-        )))
-  )
-    beginJourneyFarewell('extreme');
+  if (!event.persisted || !isExtremeLife(save) || save.pendingReincarnation || save.journeyEnded)
+    return;
+  // 从页面缓存返回：未完成的极限战斗先停下，等玩家主动继续；不判死、不自动推进。
+  if (game && !settled && game.state === 'playing') handleAction('pause');
+  if (ambushScene) {
+    ambushAwaitingContinue = true;
+    ambushScene.hold();
+  } else if (save.mortal.marketSocial?.ambush) {
+    if (save.mortal.marketSocial.ambush.snapshot.outcome == null) {
+      ambushAwaitingContinue = true;
+      showMarketAmbush();
+    }
+  }
 });
 const canvas = renderer.canvas;
 canvas.addEventListener('pointerdown', (e) => {

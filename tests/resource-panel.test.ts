@@ -139,7 +139,7 @@ test('未入场失败只显示一个重新加载，极限新版中心提示同�
   const html = resourceFailureContent('refresh-game', '尚未进入场景', '重新加载', false);
   assert.equal((html.match(/<button\b/g) ?? []).length, 1);
   assert.match(html, /data-action="refresh-game">重新加载/);
-  const warning = '极限战斗尚未结束，刷新将结束此世。';
+  const warning = '极限战斗尚未结束，刷新后会回到暂停的战况。';
   setResourceRefreshWarning(() => warning);
   try {
     let inserted = '';

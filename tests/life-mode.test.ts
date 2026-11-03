@@ -60,23 +60,33 @@ test('没有模式字段的当前档和旧档均默认普通，普通旧续局�
     assert.equal(readSave(JSON.stringify({ ...freshSave(), lifeMode: bad })).status, 'unreadable');
 });
 
-test('极限未完战斗的各状态和坏快照重开均落幕，普通暂停仍可续局', () => {
-  for (const state of ['playing', 'paused', 'upgrade', 'lost'] as const) {
+test('极限未完战斗读档后等待主动继续，只有真正战败仍落幕，普通暂停仍可续局', () => {
+  for (const state of ['playing', 'paused', 'upgrade'] as const) {
     const save = extreme();
     const run = new Game(save, 0, 1);
     run.state = state;
-    assert.equal(restoreSavedRun(save, run.snapshot()), null);
-    assert.equal(save.pendingReincarnation, 'extreme');
-    const entries = save.chronicle.entries.length;
-    restoreSavedRun(save, run.snapshot());
-    assert.equal(save.chronicle.entries.length, entries);
-    const loaded = importSave(exportSave(save, null));
-    assert.equal(loaded.save.pendingReincarnation, 'extreme');
-    assert.equal(loaded.run, null);
+    if (state === 'upgrade') run.choices = run.makeChoices();
+    const restored = restoreSavedRun(save, run.snapshot());
+    assert.ok(restored, state);
+    assert.equal(restored.state, state === 'upgrade' ? 'upgrade' : 'paused', state);
+    assert.equal(save.pendingReincarnation, null, state);
+    assert.equal(restored.time, run.time, state);
+    assert.equal(restored.player.hp, run.player.hp, state);
+    if (state === 'upgrade') assert.deepEqual(restored.choices, run.choices);
   }
+  const lost = extreme();
+  const lostRun = new Game(lost, 0, 1);
+  lostRun.state = 'lost';
+  lostRun.player.hp = 0;
+  assert.equal(restoreSavedRun(lost, lostRun.snapshot()), null);
+  assert.equal(lost.pendingReincarnation, 'extreme');
+  const entries = lost.chronicle.entries.length;
+  restoreSavedRun(lost, lostRun.snapshot());
+  assert.equal(lost.chronicle.entries.length, entries);
+  // 无法识别的快照交给读档保护处理，不判死也不覆盖原文。
   const corrupted = extreme();
-  assert.equal(restoreSavedRun(corrupted, { damaged: true }), null);
-  assert.equal(corrupted.pendingReincarnation, 'extreme');
+  assert.throws(() => restoreSavedRun(corrupted, { damaged: true }), /历练数据无法识别/);
+  assert.equal(corrupted.pendingReincarnation, null);
   const normal = freshSave();
   const run = new Game(normal, 0, 0);
   run.pause();
@@ -84,12 +94,15 @@ test('极限未完战斗的各状态和坏快照重开均落幕，普通暂停�
   assert.equal(normal.pendingReincarnation, null);
 });
 
-test('极限战斗外读档不死，未完战斗导入不能续命，已持久化胜利不误判', () => {
+test('极限战斗外读档不死，未完战斗导入可继续，已持久化胜利不误判', () => {
   const idle = extreme();
   assert.equal(importSave(exportSave(idle, null)).save.pendingReincarnation, null);
   const active = extreme();
   const run = new Game(active, 0, 1);
-  assert.equal(importSave(exportSave(active, run)).save.pendingReincarnation, 'extreme');
+  const imported = importSave(exportSave(active, run));
+  assert.equal(imported.save.pendingReincarnation, null);
+  assert.equal(imported.run?.state, 'paused');
+  assert.equal(imported.run?.time, run.time);
   // 胜局以完整结算后的永久存档为准，不写入原本就不支持恢复的 won 快照。
   settleRun(active, {
     stage: 0,
@@ -179,7 +192,8 @@ test('极限必须先写入初始快照再开战，存储失败或素材未就�
     if (stored) {
       assert.equal(stored.lifeMode, 'extreme');
       assert.equal(stored.activeRun.difficulty, 1);
-      assert.equal(importSave(JSON.stringify(stored)).save.pendingReincarnation, 'extreme');
+      assert.equal(importSave(JSON.stringify(stored)).save.pendingReincarnation, null);
+      assert.equal(importSave(JSON.stringify(stored)).run?.state, 'paused');
     }
   }
 });
@@ -273,7 +287,7 @@ test('极限天劫后待续原局仍禁止退场、导入、主动轮回；普�
   assert.equal(writes, 1);
 });
 
-test('极限周期天劫先保存入场，胜后原子保留原历练；保存失败可重试且刷新仍判中断', () => {
+test('极限周期天劫先保存入场，胜后原子保留原历练；保存失败可重试且刷新后等待继续', () => {
   const save = extreme();
   save.cultivation = 1e9;
   save.unlocked = 6;
@@ -328,7 +342,10 @@ test('极限周期天劫先保存入场，胜后原子保留原历练；保存�
   assert.equal(shell.game.difficulty, 0);
   assert.equal(stored.activeRun.tribulation, 1);
   assert.equal(stored.tribulationReturn.difficulty, 1);
-  assert.equal(importSave(JSON.stringify(stored)).save.pendingReincarnation, 'extreme');
+  const duringTribulation = importSave(JSON.stringify(stored));
+  assert.equal(duringTribulation.save.pendingReincarnation, null);
+  assert.equal(duringTribulation.run?.tribulation, 1);
+  assert.equal(duringTribulation.run?.state, 'paused');
   shell.game.state = 'won';
   blocked = true;
   const prior = structuredClone(save);
@@ -343,61 +360,80 @@ test('极限周期天劫先保存入场，胜后原子保留原历练；保存�
   assert.equal(shell.game, null);
   assert.equal(shell.pendingRun.state, 'paused');
   assert.equal(stored.activeRun.difficulty, 1);
-  assert.equal(importSave(JSON.stringify(stored)).save.pendingReincarnation, 'extreme');
+  const afterTribulation = importSave(JSON.stringify(stored));
+  assert.equal(afterTribulation.save.pendingReincarnation, null);
+  assert.equal(afterTribulation.run?.state, 'paused');
+  assert.equal(afterTribulation.save.tribulationReturn, null);
   finishTribulation(shell);
   assert.equal(save.tribulations, 1);
 });
 
-test('bfcache 保留内存胜利时继续结算，真正未完极限对局返回才死亡', () => {
+test('bfcache 返回：未完极限战斗暂停等待继续，不判死也不重复结算', () => {
   const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
   const start = source.indexOf("window.addEventListener('pageshow'");
   const end = source.indexOf('const canvas = renderer.canvas;', start);
   const code = new Script(stripTypeScriptTypes(source.slice(start, end)));
-  for (const example of [
-    { mode: 'normal', state: 'paused', dies: false },
-    { state: 'playing', dies: true },
-    { state: 'paused', dies: true },
-    { state: 'upgrade', dies: true },
-    { state: 'lost', dies: true },
-    { state: 'won', dies: false },
-    { pending: true, dies: true },
-    { ambush: true, dies: true },
-    { ambush: true, savedOutcome: 'victory', dies: false },
-    { ambush: true, memoryOutcome: 'victory', dies: false },
-    { ambush: true, memoryOutcome: 'escaped', dies: false },
-    { ambush: true, memoryOutcome: 'defeat', dies: true },
-  ] as any[]) {
+  const cases = [
+    { mode: 'normal', state: 'playing', pauses: 0 },
+    { state: 'playing', pauses: 1 },
+    { state: 'paused', pauses: 0 },
+    { state: 'upgrade', pauses: 0 },
+    { state: 'lost', pauses: 0 },
+    { state: 'won', pauses: 0 },
+    { pendingReincarnation: 'extreme', state: 'playing', pauses: 0 },
+    { journeyEnded: true, state: 'playing', pauses: 0 },
+    { ambushScene: true, holds: 1 },
+    { savedAmbush: true, shows: 1 },
+    { savedAmbush: true, outcome: 'defeat', shows: 0 },
+  ] as any[];
+  for (const example of cases) {
     const save = extreme();
     if (example.mode) save.lifeMode = example.mode;
-    if (example.ambush)
+    if (example.pendingReincarnation) save.pendingReincarnation = example.pendingReincarnation;
+    if (example.journeyEnded) save.journeyEnded = true;
+    if (example.savedAmbush)
       (save.mortal.marketSocial as any) = {
-        ambush: { snapshot: { outcome: example.savedOutcome ?? null } },
+        ambush: { snapshot: { outcome: example.outcome ?? null } },
       };
     let handler: (event: { persisted: boolean }) => void = () => {},
+      pauses = 0,
+      holds = 0,
+      shows = 0,
       deaths = 0;
-    code.runInContext(
-      createContext({
-        save,
-        game: example.state ? { state: example.state } : null,
-        settled: false,
-        pendingRun: example.pending ? {} : null,
-        ambushScene: example.memoryOutcome ? { duel: { outcome: example.memoryOutcome } } : null,
-        renderer: { restore() {} },
-        isExtremeLife: (save: typeof save) => save.lifeMode === 'extreme',
-        window: {
-          addEventListener(_: string, fn: typeof handler) {
-            handler = fn;
-          },
+    const context: any = {
+      save,
+      game: example.state ? { state: example.state } : null,
+      settled: false,
+      ambushScene: example.ambushScene ? { hold: () => holds++ } : null,
+      ambushAwaitingContinue: false,
+      renderer: { restore() {} },
+      isExtremeLife: (s: typeof save) => s.lifeMode === 'extreme',
+      handleAction(action: string) {
+        assert.equal(action, 'pause');
+        pauses++;
+      },
+      showMarketAmbush() {
+        shows++;
+      },
+      beginJourneyFarewell() {
+        deaths++;
+      },
+      window: {
+        addEventListener(_: string, fn: typeof handler) {
+          handler = fn;
         },
-        beginJourneyFarewell() {
-          deaths++;
-        },
-      }),
-    );
+      },
+    };
+    code.runInContext(createContext(context));
     handler({ persisted: false });
-    assert.equal(deaths, 0);
+    assert.equal(pauses + holds + shows + deaths, 0, JSON.stringify(example));
     handler({ persisted: true });
-    assert.equal(deaths, example.dies ? 1 : 0, JSON.stringify(example));
+    assert.equal(deaths, 0, JSON.stringify(example));
+    assert.equal(pauses, example.pauses ?? 0, JSON.stringify(example));
+    assert.equal(holds, example.holds ?? 0, JSON.stringify(example));
+    assert.equal(shows, example.shows ?? 0, JSON.stringify(example));
+    if ((example.holds ?? 0) + (example.shows ?? 0) > 0)
+      assert.equal(context.ambushAwaitingContinue, true, JSON.stringify(example));
   }
 });
 
@@ -499,11 +535,44 @@ test('普通和极限自动历练切后台均继续，手动暂停，主动暂�
       }
 });
 
-test('导入确认明确显示普通或极限及落幕状态，不把极限中断伪装成可继续', () => {
+test('续局快照损坏时备份原文并进入只读保护，不判死也不开新局', () => {
+  const source = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('let pendingRun: Game | null = null;');
+  const end = source.indexOf('let selectedStage = save.unlocked', start);
+  assert.ok(start >= 0 && end > start);
+  const block = source.slice(start, end);
+  assert.match(block, /backupUnreadableSave\(localStorage, raw\)/);
+  assert.match(block, /saveLock = 'unreadable'/);
+  assert.doesNotMatch(block, /endExtremeLife/);
+});
+
+test('极限旧档含无法识别的未完快照时保留永久进度并放弃该局，不判死', () => {
+  const save = extreme();
+  save.stones = 777;
+  const corrupted = JSON.parse(exportSave(save, new Game(save, 0, 1)));
+  corrupted.save.activeRun.weapons[0].id = 'bad';
+  const imported = importSave(JSON.stringify(corrupted));
+  assert.equal(imported.save.pendingReincarnation, null);
+  assert.equal(imported.save.stones, 777, '永久进度保留');
+  assert.equal(imported.run, null, '无法识别的未完对局被放弃');
+  assert.equal(imported.save.tribulationReturn, null);
+  const legacy = JSON.parse(exportSave(save, new Game(save, 0, 1)));
+  legacy.save.schema = SAVE_SCHEMA - 1;
+  const upgraded = importSave(JSON.stringify(legacy));
+  assert.equal(upgraded.save.pendingReincarnation, null, '旧版极限档不判死');
+  assert.equal(upgraded.save.stones, 777);
+  assert.equal(upgraded.run?.state, 'paused');
+});
+
+test('导入确认明确显示普通或极限及落幕状态，未完极限历练标注为可继续', () => {
   const save = extreme();
   const candidate = importSave(exportSave(save, new Game(save, 0, 1)));
   const html = importConfirmPanel(candidate)[2];
-  assert.match(html, /极限模式 · 此世已落幕/);
-  assert.doesNotMatch(html, /未完成历练：/);
+  assert.match(html, /极限模式/);
+  assert.doesNotMatch(html, /此世已落幕/);
+  assert.match(html, /未完成历练：/);
+  const ended = extreme();
+  ended.pendingReincarnation = 'extreme';
+  assert.match(importConfirmPanel(importSave(exportSave(ended, null)))[2], /极限模式 · 此世已落幕/);
   assert.match(importConfirmPanel({ save: freshSave(), run: null })[2], /普通模式/);
 });

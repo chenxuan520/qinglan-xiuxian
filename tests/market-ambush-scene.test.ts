@@ -24,6 +24,7 @@ async function harness(
   snapshot = initialAmbushSnapshot(stats),
   imageFailure = false,
   useObserver = false,
+  hold = false,
 ) {
   const names = ['document', 'window', 'Image', 'ResizeObserver', 'IntersectionObserver'] as const;
   const previous = names.map((name) => Object.getOwnPropertyDescriptor(globalThis, name));
@@ -97,6 +98,7 @@ async function harness(
     { path: 'demonic' } as MarketCultivator,
     (result) => finished.push(result),
     checkpoint,
+    hold,
   );
   await new Promise((resolve) => setImmediate(resolve));
   return {
@@ -164,6 +166,61 @@ test('场景从固定snapshot恢复，每秒、双方HP变化及撤离请求即�
       8123,
       '场景通过回调保存，不偷改外部save',
     );
+  } finally {
+    h.restore();
+  }
+});
+
+test('读档恢复的劫修战等待主动继续：hold 保存战况且不推进，resume 后承接原局', async () => {
+  const stored: AmbushSnapshot[] = [];
+  const initial = initialAmbushSnapshot(stats);
+  initial.time = 12;
+  initial.player.hp = 4321;
+  initial.enemy.hp = 6543;
+  const h = await harness(
+    (s) => {
+      stored.push(s);
+      return true;
+    },
+    initial,
+    false,
+    false,
+    true,
+  );
+  try {
+    assert.equal(h.scene.duel.time, 12);
+    h.scene.update(1000, true);
+    h.scene.update(6000, true);
+    assert.equal(h.scene.duel.time, 12, '等待继续时不推进');
+    assert.equal(h.scene.duel.player.hp, 4321);
+    h.scene.hold();
+    assert.ok(stored.length > 0);
+    assert.equal(stored.at(-1)!.time, 12);
+    assert.equal(stored.at(-1)!.enemy.hp, 6543);
+    h.scene.update(8000, true);
+    assert.equal(h.scene.duel.time, 12);
+    assert.deepEqual(h.finished, [], '等待继续不结算');
+    assert.equal(h.scene.resume(), true);
+    h.scene.update(9000, true);
+    h.scene.update(10000, true);
+    assert.ok(h.scene.duel.time > 12, '继续后承接原战况推进');
+    assert.ok(h.scene.duel.enemy.hp <= 6543);
+  } finally {
+    h.restore();
+  }
+});
+
+test('普通模式劫修战不显示等待续局说明，也不出现继续按钮', async () => {
+  const initial = initialAmbushSnapshot(stats);
+  initial.time = 12;
+  const h = await harness(() => true, initial);
+  try {
+    assert.doesNotMatch(h.host.innerHTML, /上次战况已保存/);
+    assert.match(h.host.innerHTML, /data-action="market-ambush-continue"/);
+    assert.equal(h.scene.duel.time, 12);
+    h.scene.update(1000, true);
+    h.scene.update(3000, true);
+    assert.ok(h.scene.duel.time > 12, '普通模式照常推进');
   } finally {
     h.restore();
   }

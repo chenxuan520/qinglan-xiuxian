@@ -13,7 +13,7 @@ test('帮助按器法、修行与操作问题归类，保留九类且常见问�
   assert.match(basics, /<details><summary>常见问题<\/summary>/);
   for (const topic of ['导出此世', '导入旧档', '缓存所有离线资源', '音乐', '音效'])
     assert.ok(basics.includes(topic), topic);
-  assert.match(basics, /极限模式未完战斗刷新或关闭后重开即身陨/);
+  assert.match(basics, /极限模式的未完战斗刷新或关闭后重开会回到保存的战况并暂停/);
   const cultivation = guide.guideContent('cultivation');
   for (const topic of [
     '境界突破与成仙',

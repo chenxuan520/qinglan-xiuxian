@@ -48,7 +48,7 @@ function showDefeat(shell: ActionShell) {
   );
   hideClose(shell);
 }
-export function mountAmbush(shell: ActionShell) {
+export function mountAmbush(shell: ActionShell, hold = false) {
   const encounter = shell.save.mortal.marketSocial?.ambush;
   if (!encounter || shell.saveLock) return;
   if (shell.save.pendingReincarnation) {
@@ -75,6 +75,7 @@ export function mountAmbush(shell: ActionShell) {
     encounter.npc,
     (outcome) => finishAmbush(shell, outcome),
     (snapshot) => checkpoint(shell, snapshot),
+    hold,
   );
 }
 export function finishAmbush(shell: ActionShell, outcome: AmbushOutcome) {
@@ -116,6 +117,10 @@ export function ambushAction(shell: ActionShell, action: string) {
     ['market-ambush-watch-ad', 'market-ambush-revive', 'market-ambush-exit'].includes(action)
   )
     return;
+  if (action === 'market-ambush-continue' && shell.panel === 'market-ambush') {
+    shell.ambushScene?.resume();
+    return;
+  }
   if (action === 'market-ambush-recover') {
     mountAmbush(shell);
     return;

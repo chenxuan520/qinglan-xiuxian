@@ -87,7 +87,7 @@ export function tribulationPendingPanel(
   return [
     '天劫将至',
     `第 ${save.tribulations + 1} 次天劫 · 两万年一劫`,
-    `<p class="pause-description">当前历练已保存。渡劫场只有一位「天劫」，看清预警、侧移避雷，在核心显露时反击。</p><p class="panel-note">携带当前搭配；无未完成历练时，本命在渡劫场临时觉醒。渡劫期间不计龄、不掉经验或回血宝物。${isExtremeLife(save) ? '极限修行不可退离或复活，战败即此世落幕；未完战斗刷新或关闭后重开也将身陨。' : `战败可使用本次天劫的 ${MAX_REVIVES} 次广告复活；放弃后可先留存此世，再确认轮回。`}</p><p class="boss-reward">渡劫成功：永久气血 +3% · 法宝伤害 +2%<small>劫印按次数累加，轮回清空；胜利后返回原历练。</small></p><div class="save-actions"><button class="primary-button" data-action="tribulation-start" ${assetsReady ? '' : 'disabled'}>${pendingTribulation ? '继续迎劫' : '迎战天劫'}</button><button class="secondary-button" data-action="tribulation-forfeit" ${isExtremeLife(save) ? 'disabled title="极限模式不可弃劫"' : ''}>放弃渡劫 · 此世落幕</button></div>`,
+    `<p class="pause-description">当前历练已保存。渡劫场只有一位「天劫」，看清预警、侧移避雷，在核心显露时反击。</p><p class="panel-note">携带当前搭配；无未完成历练时，本命在渡劫场临时觉醒。渡劫期间不计龄、不掉经验或回血宝物。${isExtremeLife(save) ? '极限修行不可退离或复活，战败即此世落幕；未完战斗刷新或关闭后重开会回到保存的战况并暂停。' : `战败可使用本次天劫的 ${MAX_REVIVES} 次广告复活；放弃后可先留存此世，再确认轮回。`}</p><p class="boss-reward">渡劫成功：永久气血 +3% · 法宝伤害 +2%<small>劫印按次数累加，轮回清空；胜利后返回原历练。</small></p><div class="save-actions"><button class="primary-button" data-action="tribulation-start" ${assetsReady ? '' : 'disabled'}>${pendingTribulation ? '继续迎劫' : '迎战天劫'}</button><button class="secondary-button" data-action="tribulation-forfeit" ${isExtremeLife(save) ? 'disabled title="极限模式不可弃劫"' : ''}>放弃渡劫 · 此世落幕</button></div>`,
   ];
 }
 
