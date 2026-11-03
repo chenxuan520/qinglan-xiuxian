@@ -1836,7 +1836,8 @@ export class Game {
             blast(p.x - ny * i * 85, p.y + nx * i * 85, 50, 3, 1.2 + Math.abs(i) * 0.18);
         else {
           ring(20, 180);
-          ring(20, 130);
+          // 慢环错开半个弹距，落在快环两发之间，避免同轨重叠。
+          fan(20, (TAU * 19) / 20, 130, this.time * 0.25 + TAU / 40);
         }
         break;
       case 2:

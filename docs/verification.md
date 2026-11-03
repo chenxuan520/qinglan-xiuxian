@@ -3990,3 +3990,8 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 - 劫修战读档恢复时先显示「继续战斗」并停在保存的战况，点击后才开始推进；普通模式劫修战保持原有行为。
 - 同步移除旧承诺：`life-mode-ui.ts`、`guide-content.ts` 的基础/战斗/人间/常见问题、`opening-ui.ts` 天劫待战提示、`market-ambush-scene.ts` 极限说明、`main.ts` 运行错误提示与 `setResourceRefreshWarning`、`docs/gameplay.md`、`AGENTS.md`。历史验证记录不追改。
 - 测试更新 `tests/life-mode.test.ts`（各状态读档、坏快照、导入、天劫、BFCache、导入确认、启动备份保护）、新增劫修 `hold()/resume()` 场景用例；`tests/guide-source.test.ts`、`tests/resource-panel.test.ts` 同步新文案。定向 25/25 通过，全量 `npm test` **2246/2246** 通过（0 失败/跳过/取消），文档 **38/38**、素材、格式、TypeScript 及根路径/Pages 子路径/单机构建与原体积预算通过；根构建标识 `f7b7614195778742a3e377f1`；三种入口 JS **572655 / 572767 / 564251 B**、CSS **161475 / 161667 / 161499 B**，单机 83 资源检查通过。
+
+## 2026-11-03 · 狐王赤焰轮舞慢环错开半格
+
+- 按用户指定，只改 `src/game.ts` 赤炎狐王 phase 2 的慢环：由 `ring(20, 130)` 改为 `fan(20, (TAU * 19) / 20, 130, this.time * 0.25 + TAU / 40)`，慢环整体多转 9°（20 发间距的一半），每发落在快环两发之间，不再同轨重叠。弹数、弹速、伤害与其他招式不变。
+- `tests/fox-soul-buffs.test.ts` 增补断言：一次仍 40 发、速度 180/130，且慢环每发与最近快环弹相差 `TAU / 40`。定向 7/7 通过。按用户要求不跑平衡实验。

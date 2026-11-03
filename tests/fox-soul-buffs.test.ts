@@ -49,6 +49,20 @@ test('狐王原生与终关炎扇9+8发、轮舞20+20发，速度与半间隔交
     const ring = cast(1, arena, 2);
     assert.equal(ring.g.shots.length, 40);
     ring.g.shots.forEach((shot, i) => near(Math.hypot(shot.vx, shot.vy), i < 20 ? 180 : 130));
+    // 慢环整体错开半格：每发都落在快环两发之间。
+    const angle = (shot: { vx: number; vy: number }) => Math.atan2(shot.vy, shot.vx);
+    const spacing = (Math.PI * 2) / 20;
+    const gap = (a: number, b: number) => {
+      const diff = Math.abs(a - b) % (Math.PI * 2);
+      return Math.min(diff, Math.PI * 2 - diff);
+    };
+    ring.g.shots.slice(20).forEach((slow) => {
+      const nearestFast = ring.g.shots
+        .slice(0, 20)
+        .map((fast) => gap(angle(slow), angle(fast)))
+        .reduce((a, b) => Math.min(a, b));
+      near(nearestFast, spacing / 2);
+    });
     const fire = cast(1, arena, 1);
     assert.equal(fire.g.zones.length, 5);
     assert.ok(fire.g.zones.every((zone) => zone.radius === 50 && zone.life === 3));
