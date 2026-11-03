@@ -7,6 +7,19 @@ import { join } from 'node:path';
 import { renderReport, reportHtml } from '../scripts/balance-report.ts';
 import { balanceCases, caseKey } from '../scripts/balance-policy.ts';
 import type { CampaignSample } from '../scripts/balance-simulation.ts';
+test('报告生成时间固定北京时间，跨日与零点正确，原始时间戳保持不变', () => {
+  for (const [generatedAt, expected] of [
+    ['2026-11-02T22:36:46.031Z', '2026-11-03 06:36:46'],
+    ['2026-11-02T16:00:00Z', '2026-11-03 00:00:00'],
+    ['2026-11-03T06:36:46+08:00', '2026-11-03 06:36:46'],
+    ['invalid', '未知'],
+    [undefined, '未知'],
+  ]) {
+    const report = { generatedAt };
+    assert.ok(reportHtml(report).includes(`生成时间（北京时间）：${expected}<br>`));
+    assert.equal(report.generatedAt, generatedAt);
+  }
+});
 test('日报计划分母固定10080，失败/缺失不能显示通过，动态错误按文本转义', () => {
   const html = reportHtml({
     commit: 'abc',
