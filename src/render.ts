@@ -1,5 +1,5 @@
 import { curioCombo } from './curio-combos.ts';
-import { viewScale } from './view-scale.ts';
+import { battleViewport, viewScale } from './view-scale.ts';
 import { resourceFailed } from './update-check.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
 import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
@@ -173,7 +173,7 @@ export class Renderer {
     const camera = game ? game.player : { x: now * 0.001 * 4, y: 0 };
     const cx = game ? w / 2 : w * (w < 700 ? 0.73 : 0.71),
       cy = game ? h / 2 : h * 0.44;
-    if (game) game.viewport = { width: w / s, height: h / s };
+    if (game) game.viewport = battleViewport(w, h);
     c.fillStyle = '#384d41';
     c.fillRect(0, 0, w, h);
     c.save();
