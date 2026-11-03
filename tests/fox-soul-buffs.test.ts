@@ -167,13 +167,13 @@ test('暂停冻结幻影蓄力，续局散去幻影、保留本体与已发魂�
   assert.equal(afterFire.shots.length, 24);
 });
 
-test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥主原生另加20%', () => {
+test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥主倍率 2.69', () => {
   const expected = [
     [1, 1.2, 1.2, 1.2, 1.2, 1.2, 1],
     [1.9, 2.9, 2.8, 2.2, 2.5, 2.3, 1],
     [2.2, 5, 4.2, 4.8, 5, 1.8, 1],
   ];
-  assert.equal(BOSS_COMBAT.hp[4], 2.4 * 1.2 * 1.1);
+  assert.equal(BOSS_COMBAT.hp[4], 2.69);
   assert.equal(BOSS_COMBAT.hp[1], 1.65 * 1.3 * 1.2 * 1.2 * 1.2);
   for (const [difficulty, rule] of DIFFICULTIES.entries()) {
     assert.deepEqual(rule.bossHp, expected[difficulty]);
