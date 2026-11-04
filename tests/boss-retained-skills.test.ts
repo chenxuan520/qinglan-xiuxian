@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 import { bossSkills, bossSkillCooldown, bossPursuitCooldown } from '../src/boss-skills.ts';
-import { BOSS_COMBAT, STAGES } from '../src/data.ts';
+import { BOSS_COMBAT, DIFFICULTIES, STAGES } from '../src/data.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 
 function encounter(origin: number, phase: number, arena = origin) {
@@ -176,7 +176,11 @@ test('所有妖王现有冷却再缩短30%，保留半血加速与完整蓄势',
         const { g, e } = encounter(origin, 1, final ? 6 : origin);
         if (half) e.hp = e.maxHp * 0.4;
         g.castBossSkill(e, 1, 0);
-        near(e.cooldown, bossSkillCooldown(origin, final, half));
+        near(
+          e.cooldown,
+          bossSkillCooldown(origin, final, half) *
+            (final ? 1 : DIFFICULTIES[0].bossCooldown[origin]),
+        );
       }
   near(bossPursuitCooldown(false), 5.355);
   near(bossPursuitCooldown(true), 3.287);

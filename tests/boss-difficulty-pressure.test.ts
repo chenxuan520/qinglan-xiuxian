@@ -32,8 +32,8 @@ function cast(c: ReturnType<typeof encounter>, phase: number, half = false) {
 test('三档七境妖王出招与弹速倍率符合方案，不新增伤害倍率', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
     for (const [field, factor] of [
-      ['bossCooldown', [1, 0.9, 0.8][difficulty]],
-      ['bossShotSpeed', [1, 1.1, 1.2][difficulty]],
+      ['bossCooldown', [0.9, 0.9, 0.8][difficulty]],
+      ['bossShotSpeed', [1.1, 1.1, 1.2][difficulty]],
     ] as const) {
       assert.deepEqual(
         rules[field],
@@ -62,8 +62,8 @@ test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七�
           const c = encounter(stage, difficulty, arena);
           cast(c, phase, half);
           const active = arena !== 6 && affected(stage);
-          const speedFactor = active ? [1, 1.1, 1.2][difficulty] : 1;
-          const cooldownFactor = active ? [1, 0.9, 0.8][difficulty] : 1;
+          const speedFactor = active ? [1.1, 1.1, 1.2][difficulty] : 1;
+          const cooldownFactor = active ? [0.9, 0.9, 0.8][difficulty] : 1;
           const expectedSpeeds = stage === 6 && half ? Array(32).fill(185) : speeds;
           assert.equal(c.g.shots.length, expectedSpeeds.length);
           c.g.shots.forEach((shot, i) => {
@@ -129,7 +129,7 @@ test('冲刺原蓄力和保护下限保留，追袭冷却不乘新常规间隔�
       near(c.boss.charge, 0.425 + 0.7);
       assert.equal(
         c.boss.cooldown,
-        Math.max(bossSkillCooldown(2, false, half) * [1, 0.9, 0.8][difficulty], 1.625),
+        Math.max(bossSkillCooldown(2, false, half) * [0.9, 0.9, 0.8][difficulty], 1.625),
       );
       assert.equal(c.boss.pursuitCooldown, bossPursuitCooldown(half));
       near(c.g.effects.find((effect) => effect.kind === 'line')!.maxLife, 0.425);

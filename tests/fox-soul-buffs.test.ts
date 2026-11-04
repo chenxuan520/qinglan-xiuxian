@@ -36,10 +36,11 @@ function cast(origin: number, arena: number, phase: number) {
 
 test('狐王原生与终关炎扇9+8发、轮舞20+20发，速度与半间隔交错正确', () => {
   for (const arena of [1, 6]) {
+    const speedFactor = arena === 6 ? 1 : DIFFICULTIES[0].bossShotSpeed[1];
     const { g, boss } = cast(1, arena, 0);
     assert.equal(g.shots.length, 17);
     g.shots.forEach((shot, i) => {
-      near(Math.hypot(shot.vx, shot.vy), i < 9 ? 200 : 145);
+      near(Math.hypot(shot.vx, shot.vy), (i < 9 ? 200 : 145) * speedFactor);
       near(
         Math.atan2(shot.vy, shot.vx),
         i < 9 ? (i / 8 - 0.5) * 1.5 : ((i - 9) / 7 - 0.5) * 1.5 * (7 / 8),
@@ -48,7 +49,9 @@ test('狐王原生与终关炎扇9+8发、轮舞20+20发，速度与半间隔交
     });
     const ring = cast(1, arena, 2);
     assert.equal(ring.g.shots.length, 40);
-    ring.g.shots.forEach((shot, i) => near(Math.hypot(shot.vx, shot.vy), i < 20 ? 180 : 130));
+    ring.g.shots.forEach((shot, i) =>
+      near(Math.hypot(shot.vx, shot.vy), (i < 20 ? 180 : 130) * speedFactor),
+    );
     // 慢环整体错开半格：每发都落在快环两发之间。
     const angle = (shot: { vx: number; vy: number }) => Math.atan2(shot.vy, shot.vx);
     const spacing = (Math.PI * 2) / 20;

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { STAGES } from '../src/data.ts';
+import { DIFFICULTIES, STAGES } from '../src/data.ts';
 import { bossSkills, bossSkillCooldown } from '../src/boss-skills.ts';
 import { freshSave } from '../src/progress.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
@@ -277,7 +277,10 @@ test('原三招和新增第四招及仙尊九个抽招位置每轮全部出齐�
         const native = encounter(origin, 1, origin);
         if (enraged) native.e.hp = native.e.maxHp * 0.4;
         native.g.castBossSkill(native.e, 1, 0);
-        assert.equal(native.e.cooldown, bossSkillCooldown(origin, false, enraged));
+        assert.equal(
+          native.e.cooldown,
+          bossSkillCooldown(origin, false, enraged) * DIFFICULTIES[0].bossCooldown[origin],
+        );
       }
     }
 });
@@ -330,12 +333,13 @@ test('原环射保持完整360度和均匀缺口，扇射不偷偷变成条带�
       const { g, e } = encounter(origin, phase, arena);
       g.castBossSkill(e, 1, 0);
       assert.equal(g.shots.length, count * speeds.length);
+      const speedFactor = arena === 6 ? 1 : DIFFICULTIES[0].bossShotSpeed[origin];
       for (const [layer, speed] of speeds.entries()) {
         const shots = g.shots.slice(layer * count, (layer + 1) * count);
         const angles = shots.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);
         for (let i = 0; i < count; i++) {
           const b = shots[i];
-          assert.ok(Math.abs(Math.hypot(b.vx, b.vy) - speed) < 1e-8);
+          assert.ok(Math.abs(Math.hypot(b.vx, b.vy) - speed * speedFactor) < 1e-8);
           const gap =
             i === count - 1 ? angles[0] + 2 * Math.PI - angles[i] : angles[i + 1] - angles[i];
           assert.ok(
