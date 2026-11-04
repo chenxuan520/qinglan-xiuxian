@@ -256,7 +256,7 @@
   padding-top: 26px;
   border-top: 1px solid var(--border);
 }
-.treasure-lore .guide-subheading {
+.treasure-lore h4 {
   margin: 0 0 10px;
 }
 .treasure-lore p {
