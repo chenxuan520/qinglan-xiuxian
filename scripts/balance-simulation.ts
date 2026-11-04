@@ -249,13 +249,20 @@ function prepare(
     }
     return;
   }
-  for (const kind of ['vitality', 'power', 'speed'] as const)
+  // 能修满的照旧修满；寿元不够修满时，为出发与战斗预留年岁，停在已修到的阶数。
+  const remainingLevels = 60 - (save.training.vitality + save.training.power + save.training.speed);
+  const canFinishTraining = lifespanInfo(save).remaining > remainingLevels * trainingYears(save);
+  const reserve = (STAGES[stage].minutes + 2) * STAGE_YEARS_PER_MINUTE[stage];
+  for (const kind of ['vitality', 'power', 'speed'] as const) {
     while (save.training[kind] < 20) {
-      if (!roomForYears(save, trainingYears(save), c, ledger, random))
-        throw new BudgetStop('training-lifespan');
+      if (!canFinishTraining && lifespanInfo(save).remaining - trainingYears(save) <= reserve + 5)
+        break;
       supplies(save, trainingCost(save.training[kind]), 0, ledger, c);
       assert.ok(train(save, kind));
     }
+    if (!canFinishTraining && lifespanInfo(save).remaining - trainingYears(save) <= reserve + 5)
+      break;
+  }
   // 只炼已收藏且本路线能用的法宝，不凭空解锁/加属性/修改资质。
   for (const id of save.artifacts.filter(
     (id) => c.path === 'dual' || treasure(id).school === c.path,
@@ -295,7 +302,7 @@ function prepare(
     supplies(save, medicineInfo(id)!.price, 0, ledger, c);
     if (buyMedicine(save, id)) assert.ok(useMedicine(save, id).ok);
   }
-  assert.ok(Object.values(save.training).every((n) => n === 20));
+  if (canFinishTraining) assert.ok(Object.values(save.training).every((n) => n === 20));
   assert.equal(save.forge[save.starter], MAX_FORGE_LEVEL);
   assert.ok(activeMedicines(save.medicine, save.age).length <= 3);
   assert.equal(save.spiritRoot, c.root);

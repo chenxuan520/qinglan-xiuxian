@@ -139,7 +139,7 @@ test('满投入按理论上限无限领物资，不再因广告冷却空跑', ()
   assert.equal(earned.ads.supplies, 0);
 });
 
-test('低资质满配仍受寿元限制：不再因冷却空跑，但可能未开打', () => {
+test('低资质满配预留出战寿元，至少开打一场且不再以寿尽空跑', () => {
   const base = {
     path: 'orthodox',
     starter: 'sword',
@@ -148,12 +148,15 @@ test('低资质满配仍受寿元限制：不再因冷却空跑，但可能未�
     seed: 41,
     profile: 'maxed',
   } as const;
-  for (const root of ['five', 'none'] as const) {
-    const row = simulateCampaign({ ...base, root });
+  for (const root of ['quad', 'five', 'none'] as const) {
+    const row = simulateCampaign({ ...base, root }, 1);
     assert.notEqual(row.stop, 'supplies-cooldown', root);
-    assert.equal(row.stop, 'expired', root);
-    assert.equal(row.battles.length, 0, root);
+    assert.notEqual(row.stop, 'expired', root);
+    assert.ok(row.battles.length >= 1, root);
   }
+  const heaven = simulateCampaign({ ...base, root: 'heaven' });
+  assert.equal(heaven.stop, 'won');
+  assert.equal(heaven.battles.length, 7, '天灵根满配结果保持修满并打满七关');
 });
 
 test('非整数年岁领取和整数冷却边界不因浮点误差多显示一年', () => {
