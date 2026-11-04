@@ -7,6 +7,7 @@ import { journeyAppraisalAiOrigin, resolveJourneyAppraisal } from '../src/journe
 import {
   extractJourneyAppraisal,
   journeyAppraisalMessages,
+  journeyAppraisalRetryMessage,
   validJourneyAppraisal,
 } from '../src/journey-appraisal-ai-protocol.ts';
 import { GAME_SITE_URL, JOURNEY_APPRAISAL_SETTINGS } from '../src/setting.ts';
@@ -344,8 +345,9 @@ test('Worker 主站预检与真实生成、来源限制、摘要验证和独立�
     calls++;
     assert.equal(model, JOURNEY_APPRAISAL_MODEL);
     assert.equal(options.chat_template_kwargs, undefined);
-    assert.ok(options.messages[0].content.endsWith('/no_think'));
-    assert.deepEqual(options.response_format, { type: 'json_object' });
+    assert.deepEqual(options.guided_json.required, ['title', 'ending', 'cultivation', 'ties']);
+    assert.equal(options.guided_json.properties.title.type, 'string');
+    assert.equal(options.response_format, undefined);
     assert.equal(options.messages.length, 2);
     return { response: JSON.stringify(aiParts) };
   });
@@ -581,4 +583,124 @@ test('并发评语失败各自保留拒绝原因和请求编号', async (t) => {
     assert.equal(log.outputIssue, issue);
   }
   assert.equal(warning.mock.callCount(), cases.length);
+});
+
+test('提示词按结局取材，不再让正在修行的人生写坊外刀光', () => {
+  const input = facts(30);
+  const line = (content: string) => content.split('\n').find((row) => row.startsWith('1. ending'))!;
+  const ongoing = journeyAppraisalMessages(input)[0].content;
+  assert.match(line(ongoing), /灯影/);
+  assert.doesNotMatch(line(ongoing), /坊外刀光/);
+  assert.doesNotMatch(ongoing, /万古独尊/);
+  assert.match(ongoing, /每句 20 至 25 个汉字/);
+  const ambush = journeyAppraisalMessages({ ...input, ending: 'ambush' })[0].content;
+  assert.match(line(ambush), /坊外刀光/);
+});
+
+test('长度纠正会带出上次实际字数与下限', () => {
+  const message = journeyAppraisalRetryMessage(
+    'detail-format',
+    '{"ending":"短句。","cultivation":"也短。","ties":""}',
+  );
+  assert.match(message, /只有 4 个汉字/);
+  assert.match(message, /至少需要 32 个/);
+  assert.match(journeyAppraisalRetryMessage('title-format'), /title 必须是单个/);
+  const longDraft = JSON.stringify({
+    ending: '长'.repeat(40),
+    cultivation: '长'.repeat(40),
+    ties: '',
+  });
+  assert.match(journeyAppraisalRetryMessage('detail-format', longDraft), /超过上限/);
+});
+
+test('非寿终结局不得写寿尽，非死亡结局不得写殒命', () => {
+  const input = facts(93);
+  const base = {
+    title: '青岚初问道',
+    ending: '此世仍在修行，青岚之外尚有远山。',
+    cultivation: '青霄剑随身，初境的功业正在写下。',
+  };
+  for (const detail of ['寿尽，灯油燃尽。', '此行殒命，山河无声。', '此世止于岁月。']) {
+    assert.equal(
+      validJourneyAppraisal(
+        { title: base.title, detail: base.ending + detail + base.cultivation },
+        input,
+      ),
+      false,
+    );
+  }
+  assert.equal(
+    validJourneyAppraisal(
+      {
+        title: '此世寿终',
+        detail: '寿元行尽，灯油燃到了最后一寸。青霄剑随身，初境的功业正在写下。',
+      },
+      { ...input, ending: 'lifespan' },
+    ),
+    true,
+  );
+});
+
+test('guided_json 直接返回对象时按同一套规则校验并序列化重试草稿', async () => {
+  let calls = 0;
+  const service = env(async () => {
+    calls++;
+    return calls === 1
+      ? { response: { title: '青岚初问道', ending: '短。', cultivation: '短。', ties: '' } }
+      : { response: aiParts };
+  });
+  const result = await worker.fetch(request(facts(93)), service);
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { appraisal: aiAppraisal });
+  assert.equal(calls, 2);
+});
+
+test('评语过短时带草稿重试，第一次不合约也能成功返回', async () => {
+  const messages: unknown[] = [];
+  const service = env(async (_model, options) => {
+    messages.push(structuredClone(options.messages));
+    return messages.length === 1
+      ? {
+          response: JSON.stringify({
+            title: '青岚初问道',
+            ending: '灯影未熄。',
+            cultivation: '道心不灭。',
+            ties: '',
+          }),
+        }
+      : { response: JSON.stringify(aiParts) };
+  });
+  const result = await worker.fetch(request(facts(93)), service);
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { appraisal: aiAppraisal });
+  assert.equal(messages.length, 2);
+  const retry = messages[1] as { role: string; content: string }[];
+  assert.equal(retry.length, 4);
+  assert.equal(retry[2].role, 'assistant');
+  assert.match(retry[2].content, /灯影未熄/);
+  assert.equal(retry[3].role, 'user');
+  assert.match(retry[3].content, /只有 8 个汉字/);
+  assert.match(retry[3].content, /至少需要 32 个/);
+});
+
+test('评语连续不合约时重试用尽才兜底，且只记录一次原因', async (t) => {
+  const warning = t.mock.method(console, 'warn', () => {});
+  let calls = 0;
+  const result = await worker.fetch(
+    request(),
+    env(async () => {
+      calls++;
+      return {
+        response: JSON.stringify({
+          title: '青岚初问道',
+          ending: '短。',
+          cultivation: '短。',
+          ties: '',
+        }),
+      };
+    }),
+  );
+  assert.equal(result.status, 502);
+  assert.equal(calls, JOURNEY_APPRAISAL_SETTINGS.maxAttempts);
+  assert.equal(warning.mock.callCount(), 1);
 });

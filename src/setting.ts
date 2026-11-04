@@ -67,12 +67,13 @@ export const TEA_STORY_IMAGE_SETTINGS = {
 
 // 留影评语复用文字 AI binding，官网优先生成；其他静态站和离线使用组合式兜底。
 export const JOURNEY_APPRAISAL_SETTINGS = {
-  model: '@cf/qwen/qwen3-30b-a3b-fp8',
+  model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
   path: '/journey-appraisal',
-  requestTimeoutMs: 15000,
-  inferenceTimeoutMs: 12000,
+  requestTimeoutMs: 30000,
+  inferenceTimeoutMs: 8000,
   maxOutputTokens: 512,
   maxDetailLength: 80,
+  maxAttempts: 3,
   maxRequestBytes: 4096,
   cacheEntries: 16,
 } as const;

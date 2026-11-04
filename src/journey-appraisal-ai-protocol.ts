@@ -85,9 +85,11 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
       ))
   )
     return false;
+  if (facts.ending !== 'lifespan' && /寿尽|寿终|寿元(?:已尽|行尽|耗尽|尽)|止于岁月/.test(text))
+    return false;
   if (
-    facts.ending !== 'lifespan' &&
-    /此(?:世|生)(?:寿终|寿尽|寿元已尽|止于岁月)|寿元(?:已尽|行尽|耗尽)|此身寿终/.test(text)
+    !['ambush', 'tribulation', 'extreme'].includes(facts.ending) &&
+    /殒命|殒落|身陨|身亡|丧命|殒于/.test(text)
   )
     return false;
   if (
@@ -156,17 +158,25 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
       '此世选择一命问道的极限修行，已在险境中落幕；不编造具体死因，不是寿尽，也不能说仍可继续修行',
     immortal: '已证真仙并叩入仙门，此世圆满结束',
   }[facts.ending];
-  const messages = [
+  const imagery = {
+    ongoing: '灯影、霜晨、云山、长路等尚未收束的意象',
+    lifespan: '灯尽、霜寒、渡口等岁月收束的意象',
+    tribulation: '雷歇、劫云、仙关等收束的意象',
+    ambush: '坊外刀光、劫修、山路等收束的意象',
+    extreme: '险境、孤注、未竟之路等收束的意象',
+    immortal: '仙门云散、长生、归途等收束的意象',
+  }[facts.ending];
+  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     {
       role: 'system' as const,
       content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、典雅、有温度的古风白话回望角色走过的路，像一段空灵沉郁的古典题跋，绝不写资料说明、数据汇报或公文清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，将事实熔铸为一气呵成的仙途绝唱。
 
 输出规范：
-只输出 JSON 对象，恰好四个字段：title（2至6个纯汉字成语或典雅题名，如「凡骨登仙」「万古独尊」「一念问天」等，严禁带括号或标点）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。
-1. ending 写结局收笔与岁月意味：融入灯尽、霜寒、雷歇、坊外刀光或仙关云散等山河意象，不照抄 outcome 与参考字句。
-2. cultivation 写修行风骨与道行气象：将灵根、本命法宝、秘境大关化为求道的生动画卷（如剑意啸大荒、凡火淬真性），严禁干瘪报表化地罗列「几境已破、已炼几阶、已历几次、修行已有实迹」！
-3. ties 写人间温情或离别回望：有道侣写檐下同心相守，有家书写见字如面纸短情长；严禁使用「皆是问道之外的此世来路」等死板套话。输入的 ties 数组为空时，输出 ties 必须严格为空字符串 ""，绝对不补任何牵挂句；有牵挂事实时必须写对应句。
-4. 各非空字段各写一句话，以中文句号「。」收尾。合起来（ending+cultivation+ties）总字数严格控制在 35 至 70 字（绝不可少于 30 字，也绝不可超过 78 字）。无牵挂时仅用 ending 与 cultivation 组成完整短评（每句约 16 至 25 字），绝不凑字数补写第三句。
+只输出 JSON 对象，恰好四个字段：title（2至6个纯汉字成语或典雅题名，须依本世事实自拟，是一个字符串而不是数组或备选列表，严禁带括号或标点）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。
+1. ending 只按本世结局取材：${imagery}。不得写未发生的死因或别的结局意象；正在修行时尤其不写刀光、殒命、寿尽、雷收笔。不照抄 outcome 与参考字句。
+2. cultivation 写修行风骨与道行气象：将灵根、本命法宝、秘境大关化为求道的生动画卷（用具体物象与动作落笔，不用固定套语），严禁干瘪报表化地罗列「几境已破、已炼几阶、已历几次、修行已有实迹」！
+3. ties 写人间温情或离别回望：有道侣写檐下同心相守，有家书写见字如面纸短情长；严禁使用「皆是问道之外的此世来路」等死板套话。输入的 ties 数组为空时，输出 ties 必须严格为空字符串 ""，正文也不得出现孑然、孤身、独行、孤影、孤独、无人相伴等词，绝对不补任何牵挂句；有牵挂事实时必须写对应句。
+4. ending 与 cultivation 各写一句、每句 20 至 25 个汉字（不含标点），两句合计不得少于 40 字；每句以中文句号「。」收尾。有牵挂时再加一句 ties。ending+cultivation+ties 总字数严格控制在 35 至 70 字（绝不可少于 30 字，也绝不可超过 78 字）。无牵挂时绝不凑字数补写第三句。
 
 文风与真实性红线：
 严禁公文化、通告感与机械汇报：不得出现「此世已因……落幕」「圆满结束」「修行已有实迹」「皆为此身亲证」等僵硬短语，不得照抄参考文本的现成字句。不得出现「尚无记载」「暂无记录」「缘簿留白」等缺项说明，不提存档、数据、记录或留白。缺少牵挂事实不等于孤独，不编造悲情或亲友死亡。
@@ -183,14 +193,51 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
         weaponName: treasure(facts.weapon).name,
         clearedStages: facts.stages.map((index) => STAGES[index].name),
         groundedReference: localJourneyAppraisal(facts),
-        tieMeaning:
-          'home=故乡；letter-found/unread=尚未展读；letter-read=已读；met=仅相识；bond=道侣；friendship=知己；river=劝渔夫远行；harbor=陪他守渡；teach=劝游学少年授业；travel=赠言送行。',
+        ...(facts.ties.length
+          ? {
+              tieMeaning:
+                'home=故乡；letter-found/unread=尚未展读；letter-read=已读；met=仅相识；bond=道侣；friendship=知己；river=劝渔夫远行；harbor=陪他守渡；teach=劝游学少年授业；travel=赠言送行。',
+            }
+          : {}),
       }),
     },
   ];
-  // Qwen3 原生支持的短答开关；不传该模型 schema 不支持的模板参数。
-  messages[0].content += '\n/no_think';
   return messages;
+}
+
+export function journeyAppraisalRetryMessage(reason: string, draft = '') {
+  let draftLength = 0;
+  try {
+    const parsed: unknown = JSON.parse(draft);
+    if (record(parsed))
+      draftLength = ['ending', 'cultivation', 'ties']
+        .map((key) => (typeof parsed[key] === 'string' ? parsed[key] : ''))
+        .join('')
+        .replace(/[^\p{Script=Han}]/gu, '').length;
+  } catch {}
+  const hint =
+    reason === 'detail-format'
+      ? draftLength > 70
+        ? `上次正文 ${draftLength} 个汉字，超过上限，请压到 35 至 70 个汉字。`
+        : `上次正文只有 ${draftLength} 个汉字，至少需要 32 个。ending 与 cultivation 各写 20 至 25 个汉字，合计至少 40 字，句子要完整具体，不要只写半句。`
+      : reason === 'section-ties-unexpected'
+        ? 'ties 必须为空字符串 ""，不得编造任何牵挂句。'
+        : reason === 'title-format'
+          ? 'title 必须是单个 2 至 6 个纯汉字的字符串，不能是数组或备选列表。'
+          : '只能写这次事实中确实发生的结局，不得写别的结局意象；ties 为空时也不得写孤身、独行、孤影等孤独词。';
+  return `${hint}请保持原意重新输出完整 JSON，字段仍为 title、ending、cultivation、ties。`;
+}
+
+export function journeyAppraisalDraft(output: unknown) {
+  if (!record(output)) return '';
+  const content = Array.isArray(output.choices)
+    ? record(output.choices[0]) && record(output.choices[0].message)
+      ? output.choices[0].message.content
+      : undefined
+    : record(output.response)
+      ? JSON.stringify(output.response)
+      : output.response;
+  return typeof content === 'string' ? content : '';
 }
 
 export function extractJourneyAppraisal(
@@ -203,7 +250,8 @@ export function extractJourneyAppraisal(
     return null;
   };
   if (!record(output)) return reject('envelope');
-  let content = output.response;
+  // guided_json 会直接返回已解析的对象；统一序列化后走同一套文本校验。
+  let content = record(output.response) ? JSON.stringify(output.response) : output.response;
   if (Array.isArray(output.choices)) {
     const choice = output.choices[0];
     if (!record(choice) || !record(choice.message)) return reject('choice');

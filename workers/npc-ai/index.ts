@@ -33,7 +33,9 @@ import {
 import { validJourneyAppraisalFacts } from '../../src/journey-appraisal.ts';
 import {
   extractJourneyAppraisal,
+  journeyAppraisalDraft,
   journeyAppraisalMessages,
+  journeyAppraisalRetryMessage,
 } from '../../src/journey-appraisal-ai-protocol.ts';
 import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town-story.ts';
 import { hometownParents, validHometown } from '../../src/hometown.ts';
@@ -610,26 +612,46 @@ export default {
           key: `journey:${request.headers.get('CF-Connecting-IP') || 'unknown'}`,
         });
         if (!limit.success) return fail('busy', 429, '请求过于频繁，请稍后重试。', true);
-        stage = 'inference';
-        const output = await runInference(
-          request.signal,
-          JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs,
-          (signal) =>
-            env.AI.run(
-              JOURNEY_APPRAISAL_MODEL,
-              {
-                messages: journeyAppraisalMessages(input),
-                response_format: { type: 'json_object' },
-                max_tokens: JOURNEY_APPRAISAL_SETTINGS.maxOutputTokens,
-                temperature: 0.7,
-              },
-              { signal },
-            ),
-        );
-        stage = 'output';
-        const appraisal = extractJourneyAppraisal(output, input, (reason) => {
-          outputIssue = reason;
-        });
+        const messages = journeyAppraisalMessages(input);
+        let appraisal = null;
+        for (let attempt = 0; attempt < JOURNEY_APPRAISAL_SETTINGS.maxAttempts; attempt++) {
+          stage = 'inference';
+          const output = await runInference(
+            request.signal,
+            JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs,
+            (signal) =>
+              env.AI.run(
+                JOURNEY_APPRAISAL_MODEL,
+                {
+                  messages,
+                  guided_json: {
+                    type: 'object',
+                    properties: {
+                      title: { type: 'string' },
+                      ending: { type: 'string' },
+                      cultivation: { type: 'string' },
+                      ties: { type: 'string' },
+                    },
+                    required: ['title', 'ending', 'cultivation', 'ties'],
+                  },
+                  max_tokens: JOURNEY_APPRAISAL_SETTINGS.maxOutputTokens,
+                  temperature: 0.7,
+                },
+                { signal },
+              ),
+          );
+          stage = 'output';
+          appraisal = extractJourneyAppraisal(output, input, (reason) => {
+            outputIssue = reason;
+          });
+          if (appraisal) break;
+          const draft = journeyAppraisalDraft(output);
+          messages.push({ role: 'assistant', content: draft || '{}' });
+          messages.push({
+            role: 'user',
+            content: journeyAppraisalRetryMessage(outputIssue, draft),
+          });
+        }
         if (!appraisal) {
           const failed = fail(
             'invalid-appraisal-output',
