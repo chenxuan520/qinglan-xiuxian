@@ -32,7 +32,11 @@ test('法宝详情在按钮之后显示器物来历，未收藏的法宝同样�
   for (const t of TREASURES) {
     const body = detail(save, t.id);
     assert.ok(body.includes(TREASURE_LORE[t.id]), t.id);
-    assert.match(body, /<section class="treasure-lore"><h4>器物来历<\/h4>/, t.id);
+    assert.match(
+      body,
+      /<section class="treasure-lore"><h4 class="guide-subheading">器物来历<\/h4>/,
+      t.id,
+    );
     assert.ok(
       body.indexOf('class="treasure-lore"') > body.indexOf('class="detail-actions"'),
       `${t.id} 的来历应在按钮行之后`,
