@@ -2551,7 +2551,10 @@ export class Game {
       this.zone(
         target.x,
         target.y,
-        (w.id === 'meteor' ? 75 : 90) * s.area * (w.evolved ? 1.45 : 1),
+        (w.id === 'meteor' ? 75 : 90) *
+          s.area *
+          (w.evolved ? 1.45 : 1) *
+          (w.id === 'vortex' && this.#activeCombo('vortex') ? 1.25 : 1),
         (w.id === 'meteor' ? 0.25 : 3.5) * s.duration,
         dmg,
         t.color,
@@ -2790,14 +2793,16 @@ export class Game {
           : entanglingHazard(z)
             ? this.enemyEntangle()
             : this.enemySlow();
-      if (z.kind === 'vortex')
+      if (z.kind === 'vortex') {
+        const pull = this.#activeCombo('vortex') ? 75 : 60;
         for (const e of this.enemies) {
           const d = distance(e, z);
           if (d < z.radius && d > 10 && !e.boss) {
-            e.x += ((z.x - e.x) / d) * 60 * dt;
-            e.y += ((z.y - e.y) / d) * 60 * dt;
+            e.x += ((z.x - e.x) / d) * pull * dt;
+            e.y += ((z.y - e.y) / d) * pull * dt;
           }
         }
+      }
       if (z.tick <= 0) {
         z.tick = 0.5;
         if (z.hostile) {

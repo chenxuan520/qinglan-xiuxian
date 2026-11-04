@@ -12,6 +12,7 @@ export {
   drawComboShot,
   drawComboPickup,
   drawComboPool,
+  drawComboVortex,
   drawComboSoul,
   hasArtifactField,
   drawArtifactField,

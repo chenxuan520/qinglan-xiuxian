@@ -407,7 +407,8 @@ export class Renderer {
       !!curioCombo(game.save, id) && game.weapons.some((w) => w.id === id);
     const fanCombo = active('fan'),
       soulCombo = active('talisman'),
-      springCombo = active('bloodpool');
+      springCombo = active('bloodpool'),
+      houseCombo = active('vortex');
     const compact = this.coarsePointer.matches || this.width < 700;
     let pickupBudget = compact ? 4 : 12,
       shotBudget = compact ? 4 : 10,
@@ -428,6 +429,8 @@ export class Renderer {
         this.battleArt!.drawArtifactField(c, z, time, this.reducedMotion.matches);
         if (springCombo && z.kind === 'bloodpool' && z.delay <= 0)
           this.battleArt!.drawComboPool(c, z);
+        if (houseCombo && z.kind === 'vortex' && z.delay <= 0)
+          this.battleArt!.drawComboVortex(c, z, game.time, this.reducedMotion.matches);
       }
     for (const z of game.zones) {
       if (this.battleArt!.hasArtifactField(z) || !this.visible(z, p, hazardMargin(z))) continue;

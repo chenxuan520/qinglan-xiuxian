@@ -34,6 +34,11 @@ const COMBOS: Record<string, { curio: CurioId; notice: string; desc: string; nam
     notice: '魂木生息 · 镇魂符更盛',
     desc: '养魂木温养符中魂意，镇魂符可多穿透一只妖物，伤害提高 15%。',
   },
+  vortex: {
+    curio: 'heaven-house',
+    notice: '天机入阵 · 阴阳流转',
+    desc: '天机屋的推演之术映入阵盘，阴阳法阵更广，牵引更急。',
+  },
 };
 
 // 调用者须传入本局已取得的法宝；永久收藏不代表本局已经取得。

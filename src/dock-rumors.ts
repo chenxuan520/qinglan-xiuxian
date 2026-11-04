@@ -22,7 +22,8 @@ export type DockRumorKey =
   | 'combo-beads'
   | 'combo-wings'
   | 'combo-brush'
-  | 'combo-spring';
+  | 'combo-spring'
+  | 'combo-house';
 export interface DockRumor {
   key: DockRumorKey;
   text: string;
@@ -35,6 +36,10 @@ const ranking: DockRumor = {
   href: 'https://xiuxian.011203.xyz/leaderboard/',
 };
 const rumors: DockRumor[] = [
+  {
+    key: 'combo-house',
+    text: '有个算命的说，屋子里算得清天机的人，摆起阵来，连妖物都绕不出去。',
+  },
   {
     key: 'combo-beads',
     text: '庙里的老和尚说，佛门的东西凑在一处，光就亮了一层，连刀都砍不进来。',

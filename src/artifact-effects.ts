@@ -1091,6 +1091,47 @@ export function drawComboPool(c: CanvasRenderingContext2D, z: Zone) {
   c.restore();
 }
 
+export function drawComboVortex(
+  c: CanvasRenderingContext2D,
+  z: Zone,
+  time: number,
+  reduced = false,
+) {
+  c.save();
+  c.translate(z.x, z.y);
+  c.rotate(reduced ? 0 : time * 0.4);
+  c.globalAlpha *= 0.5;
+  c.strokeStyle = c.fillStyle = z.color;
+  c.lineWidth = 1.5;
+  const r = z.radius * 0.35,
+    fish = r * 0.58;
+  for (let i = 0; i < 8; i++) {
+    c.save();
+    c.rotate((i / 8) * TAU);
+    c.beginPath();
+    c.moveTo(r, -r * 0.16);
+    c.lineTo(r, r * 0.16);
+    c.stroke();
+    c.restore();
+  }
+  c.beginPath();
+  c.arc(0, 0, fish, 0, TAU);
+  c.stroke();
+  c.beginPath();
+  c.arc(0, 0, fish, -Math.PI / 2, Math.PI / 2);
+  c.arc(0, fish / 2, fish / 2, Math.PI / 2, -Math.PI / 2);
+  c.arc(0, -fish / 2, fish / 2, Math.PI / 2, -Math.PI / 2, true);
+  c.closePath();
+  c.fill();
+  for (const side of [-1, 1]) {
+    c.beginPath();
+    c.arc(0, (side * fish) / 2, fish * 0.12, 0, TAU);
+    if (side < 0) c.fill();
+    else c.stroke();
+  }
+  c.restore();
+}
+
 export function drawComboSoul(c: CanvasRenderingContext2D, e: Effect) {
   const progress = 1 - e.life / e.maxLife;
   c.save();

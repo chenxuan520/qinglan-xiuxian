@@ -57,6 +57,7 @@ export function immortalEncounterPanel(
 }
 
 const rumorSpeakers: Record<DockRumor['key'], string> = {
+  'combo-house': '林问策',
   ranking: '陈砚',
   immortal: '许长庚',
   ambush: '乔平川',
