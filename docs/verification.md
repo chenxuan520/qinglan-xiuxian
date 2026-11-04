@@ -2,6 +2,14 @@
 
 本文按日期记录当时的实现与验证结果，历史数值、结构版本和测试结论不代表当前规则。现行玩法见 [玩法详解](gameplay.md)，自动测试的最新源版本与结果见 [运行监控](https://xiuxian.011203.xyz/monitor/)。
 
+## 留影评语 AI 提示词文学意境优化（2026-11-04）
+
+- 基线 `6491c20`。按用户要求，优化留影卡片「此世评语」的 Cloudflare Workers AI（Qwen3-30B）System Prompt（`src/journey-appraisal-ai-protocol.ts`）：
+  1. **剔除公文与数据报表感**：严禁出现「此世已因……落幕」「圆满结束」「修行已有实迹」「皆为此身亲证」「皆是问道之外的此世来路」等陈词套话，禁止「几境已破、青霄剑已炼几阶」式机械罗列。
+  2. **提升魏晋六朝与古典题跋意境**：`ending` 写山河意象与长生之叹（灯尽、霜寒、雷歇、刀光或仙关云散）；`cultivation` 将灵根、法宝、境界化为求道画卷（剑啸大荒、凡火淬真）；`ties` 写人间温情与羁绊回望（檐下同心、纸短情长），无牵挂时严格输出空字符串 `""` 避免校验中断。
+  3. **四字题名与事实校验 100% 保留**：`appraisalTitle`、`fitsFacts` 逻辑未动，「凡骨登仙」「万古独尊」「生死证道」「一念问天」等四字题名完全不受影响。
+- 定向测试 `tests/journey-appraisal-ai.test.ts`、`tests/ambush-ending.test.ts`、`tests/journey-consistency.test.ts` 共 **23/23** 通过；`npm run check:npc-ai` Worker 类型检查通过；`npm run build` 与 `npm run build:standalone` 顺利通过；`npm run docs:check`（**38/38**）、`npm run assets:check` 全部通过。由独立代码审查子 agent 完成完整通读与逻辑核验。
+
 ## 《不系舟》器物共鸣彩蛋与在线闲谈行话（2026-10-31）
 
 - 初始基线 `fe2cee2`，推前同步远端 `04109bb`。按用户确认，新增两处《不系舟》器物共鸣彩蛋（`src/novel-resonance.ts`，随城镇按需模块 `town-scene.ts` 加载）：
