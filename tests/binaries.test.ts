@@ -19,6 +19,22 @@ const approval = (data: Buffer) => ({
   sha256: createHash('sha256').update(data).digest('hex'),
 });
 
+test('逐提交检查可读超过1MiB的文本，末尾的未授权二进制字节仍拒绝', () => {
+  const r = repository();
+  try {
+    r.write('large.md', '记录'.repeat(200_000));
+    r.commit();
+    assert.deepEqual(r.check(), []);
+    const hidden = Buffer.from('a'.repeat(1_200_000));
+    hidden[hidden.length - 1] = 0;
+    r.write('hidden.md', hidden);
+    r.commit();
+    assert.ok(r.check().some((message) => message.includes('禁止新增二进制文件：hidden.md')));
+  } finally {
+    rmSync(r.cwd, { recursive: true, force: true });
+  }
+});
+
 function repository(withLegacyCommit = false) {
   const cwd = mkdtempSync(join(tmpdir(), 'qinglan-binary-gate-'));
   const git = (...args: string[]) =>

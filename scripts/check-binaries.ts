@@ -100,7 +100,11 @@ export function commitBinaryBreaches(
   event: CommitEvent,
 ) {
   const git = (args: string[]) =>
-    execFileSync('git', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    execFileSync('git', args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      maxBuffer: 32 * 1024 * 1024,
+    });
   const policyPath = 'scripts/approved-binaries.json';
   const bootstrap = git(['log', '--reverse', '--format=%H', 'HEAD', '--', policyPath])
     .toString()
