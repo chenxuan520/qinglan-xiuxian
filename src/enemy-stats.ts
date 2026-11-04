@@ -47,7 +47,7 @@ export function enemyCombatStats(
       (tribulation
         ? 1
         : isFinalTrial
-          ? BOSS_COMBAT.trialHp
+          ? BOSS_COMBAT.trialHp * BOSS_COMBAT.trialKingHp[bossStage]
           : BOSS_COMBAT.hp[stage] * difficulty.bossHp[stage])
     : template.hp *
       strength *

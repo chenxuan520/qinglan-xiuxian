@@ -252,7 +252,8 @@ test('最终仙尊拥有独立立绘、更强属性与二阶段弹幕，落雷�
   g.weapons = [];
   const king = g.spawnEnemy(10, false, true, { x: 350, y: 0 }, 4);
   const immortal = g.spawnEnemy(10, false, true, { x: 350, y: 0 }, 6);
-  assert.ok(immortal.maxHp > king.maxHp * 2);
+  // 旧王加血后仙尊仍明显更强，但不再保持两倍以上。
+  assert.ok(immortal.maxHp > king.maxHp * 1.5);
   assert.ok(immortal.damage > king.damage);
   assert.equal(STAGES[6].sprite, 80);
   g.enemies = [immortal];

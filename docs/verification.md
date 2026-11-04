@@ -4008,3 +4008,8 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 - 按用户确认只改 `src/data.ts` 的 `DIFFICULTIES[0]`（初入仙途）三行：`bossCooldown` 为 `[1, 0.9, 0.9, 0.9, 1, 0.9, 1]`、`bossShotSpeed` 为 `[1, 1.1, 1.1, 1.1, 1, 1.1, 1]`、`stageRamp` 为 `[1, 1.15, 1.2, 1.25, 1, 1.2, 1]`。第二、三、四、六境的普通妖物与精英血量/伤害分别 ×1.15／1.2／1.25／1.2，同四境原生妖王出招间隔 ×0.9、普通弹速 ×1.1；第一、第五境、终关与另外两档难度不变，妖王血量不变。
 - 同步 `docs/gameplay.md`、`docs/rules/combat.md` 与游戏内指南难度说明；测试把写死的初入旧期望改为新倍率（图鉴实战数值、妖王冷却/弹速、环射/扇射、狐王轮舞），问道与天劫期望保持原值。
 - 本机 `npm run balance:ci` 通过（exit 0、异常 0）：初入前六关连通率天灵根 95.0%、异灵根 75.0%、双灵根 36.7%、三灵根 11.7%、四/五/无灵根 0%，均在用户确认区间内。全量 `npm test` **2246/2246** 通过。按要求不跑长平衡实验、不设撤回条件。
+
+## 2026-11-04 · 终关中段四位旧王加血
+
+- 按用户确认只改两处：`src/data.ts` 的 `BOSS_COMBAT` 新增 `trialKingHp: [1, 1, 1.3, 1.4, 1.25, 1.25, 1]`，`src/enemy-stats.ts` 的终关旧王血量在 `trialHp` 基础上再乘 `trialKingHp[bossStage]`。只作用于终关旧王，三档难度通用；苍木、狐王、仙尊、各境原生妖王、天劫事件、普通妖物、登场时间、技能与伤害均不变，`trialHp` 仍为标量 1.1。
+- 测试同步：`tests/late-boss.test.ts` 与 `tests/fox-soul-buffs.test.ts` 的终关期望乘上新倍率；`tests/boss-retained-skills.test.ts` 保留 `trialHp === 1.1` 并新增 `trialKingHp` 数组断言；`tests/final-trial.test.ts` 中「仙尊血量超过旧王两倍」改为超过 1.5 倍（加血后实际约 1.71 倍，仙尊仍最强）。定向 20/20 与 final-trial 9/9、全量 `npm test` 通过；`docs/gameplay.md` 终关说明补充狼王、毒君、冥主、劫灵的额外血量倍率。按要求不跑平衡实验、不设撤回条件。

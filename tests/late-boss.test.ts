@@ -33,7 +33,7 @@ test('三难度七境妖王使用固定强化倍率，移动速度提高30%，�
           baseHp *
             rules.hp *
             (stage === FINAL_TRIAL_STAGE
-              ? BOSS_COMBAT.trialHp
+              ? BOSS_COMBAT.trialHp * BOSS_COMBAT.trialKingHp[bossStage]
               : BOSS_COMBAT.hp[stage] * rules.bossHp[stage]) *
             scaling.hp *
             realmDamageMultiplier(STAGE_REALM_STEPS[stage]),

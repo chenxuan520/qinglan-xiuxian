@@ -202,7 +202,9 @@ test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥�
       const hp =
         base *
         rule.hp *
-        (stage === 6 ? BOSS_COMBAT.trialHp : BOSS_COMBAT.hp[stage] * expected[difficulty][stage]) *
+        (stage === 6
+          ? BOSS_COMBAT.trialHp * BOSS_COMBAT.trialKingHp[stage]
+          : BOSS_COMBAT.hp[stage] * expected[difficulty][stage]) *
         STAGE_COMBAT_SCALING[stage].hp *
         realmDamageMultiplier(STAGE_REALM_STEPS[stage]);
       assert.equal(boss.hp, hp);

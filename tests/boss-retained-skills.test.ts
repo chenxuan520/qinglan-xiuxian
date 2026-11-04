@@ -190,6 +190,7 @@ test('各境基础气血强化保留，第三至五境按目标血量，终关�
   const hp = [1.15, 2.145 * 1.2 * 1.2 * 1.2, 3.42, 3.47, 2.69, 2.4 * 1.1];
   BOSS_COMBAT.hp.forEach((n, i) => near(n, hp[i]));
   assert.equal(BOSS_COMBAT.trialHp, 1.1);
+  assert.deepEqual(BOSS_COMBAT.trialKingHp, [1, 1, 1.3, 1.4, 1.25, 1.25, 1]);
   assert.equal(BOSS_COMBAT.trialDamage, 1.08);
   assert.deepEqual(BOSS_COMBAT.damage, [1.1, 1.15, 1.15, 1.15, 1.18, 1.18]);
 });
