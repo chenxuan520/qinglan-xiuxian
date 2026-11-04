@@ -117,21 +117,43 @@ test('所有补给与借寿入口共享额度；禁用状态不启动供给或�
   assert.equal(canClaimLifespanAd(s), false);
   assert.match(lifespanEndPanel(s).join(''), /极限模式不可借寿/);
 });
-test('满投入模拟遵守真实补给冷却，不能在同一年反复领取无限强化', () => {
-  const c = {
+test('满投入按理论上限无限领物资，不再因广告冷却空跑', () => {
+  const base = {
     root: 'heaven',
     path: 'orthodox',
     starter: 'sword',
     device: 'phone',
-    profile: 'maxed',
     difficulty: 0,
     seed: 41,
   } as const;
-  const row = simulateCampaign(c);
-  assert.equal(row.stop, 'supplies-cooldown');
-  assert.equal(row.ads.supplies, 1);
-  assert.equal(row.ads.borrow, 0);
-  assert.equal(row.ads.revive, 0);
+  const maxed = simulateCampaign({ ...base, profile: 'maxed' });
+  assert.notEqual(maxed.stop, 'supplies-cooldown');
+  assert.ok(maxed.battles.length >= 1, '满投入必须真的开打');
+  assert.ok(maxed.ads.supplies > 100, '多次领取后才可能修满三项根基与炼器');
+  // 模拟内部在准备阶段断言三项根基均为 20 阶、本命炼器满阶，能开打即说明达到上限。
+  const adsOnly = simulateCampaign({ ...base, profile: 'ads-only' });
+  assert.equal(adsOnly.ads.supplies, 0, '仅广告组仍受真实冷却约束，不走理论上限发放');
+  const bare = simulateCampaign({ ...base, profile: 'bare' });
+  assert.equal(bare.ads.supplies, 0);
+  const earned = simulateCampaign({ ...base, profile: 'earned' });
+  assert.equal(earned.ads.supplies, 0);
+});
+
+test('低资质满配仍受寿元限制：不再因冷却空跑，但可能未开打', () => {
+  const base = {
+    path: 'orthodox',
+    starter: 'sword',
+    device: 'phone',
+    difficulty: 0,
+    seed: 41,
+    profile: 'maxed',
+  } as const;
+  for (const root of ['five', 'none'] as const) {
+    const row = simulateCampaign({ ...base, root });
+    assert.notEqual(row.stop, 'supplies-cooldown', root);
+    assert.equal(row.stop, 'expired', root);
+    assert.equal(row.battles.length, 0, root);
+  }
 });
 
 test('非整数年岁领取和整数冷却边界不因浮点误差多显示一年', () => {

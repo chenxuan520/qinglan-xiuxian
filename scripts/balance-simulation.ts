@@ -15,6 +15,7 @@ import {
   STAGES,
   STAGE_YEARS_PER_MINUTE,
   treasure,
+  adSupplies,
 } from '../src/data.ts';
 import { AD_SECONDS } from '../src/ad-rules.ts';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
@@ -169,10 +170,16 @@ function trial(
   assert.ok(completeTribulation(save, g.tribulation));
   return row;
 }
-function supplies(save: SaveData, stones: number, iron: number, ledger: Ledger) {
+function supplies(save: SaveData, stones: number, iron: number, ledger: Ledger, c: BalanceCase) {
   while (save.stones < stones || save.iron < iron) {
     if (ledger.supplies >= LIMITS.supplies) throw new BudgetStop('supplies-budget');
-    if (!claimSuppliesReward(save)) throw new BudgetStop('supplies-cooldown');
+    if (c.profile === 'maxed') {
+      // 理论上限：不受广告物资冷却，按当前解锁进度发放同额物资，并照常计入广告使用次数。
+      const reward = adSupplies(save.unlocked);
+      save.stones += reward.stones;
+      save.iron += reward.iron;
+      save.adUsage.supplies++;
+    } else if (!claimSuppliesReward(save)) throw new BudgetStop('supplies-cooldown');
     ledger.supplies++;
   }
 }
@@ -192,7 +199,7 @@ function boundaries(save: SaveData, c: BalanceCase, ledger: Ledger, random: () =
       continue;
     }
     if (sectDuesPending(save)) {
-      supplies(save, save.mortal.member!.dues, 0, ledger);
+      supplies(save, save.mortal.member!.dues, 0, ledger, c);
       assert.ok(settleSectDues(save, false, random));
       continue;
     }
@@ -246,7 +253,7 @@ function prepare(
     while (save.training[kind] < 20) {
       if (!roomForYears(save, trainingYears(save), c, ledger, random))
         throw new BudgetStop('training-lifespan');
-      supplies(save, trainingCost(save.training[kind]), 0, ledger);
+      supplies(save, trainingCost(save.training[kind]), 0, ledger, c);
       assert.ok(train(save, kind));
     }
   // 只炼已收藏且本路线能用的法宝，不凭空解锁/加属性/修改资质。
@@ -255,21 +262,21 @@ function prepare(
   ))
     while ((save.forge[id] ?? 0) < MAX_FORGE_LEVEL) {
       const cost = forgeCost(save.forge[id] ?? 0);
-      supplies(save, cost.stones, cost.iron, ledger);
+      supplies(save, cost.stones, cost.iron, ledger, c);
       assert.ok(forge(save, id));
     }
   if (!save.mortal.member) {
     const passive = new Game(save, stage, c.difficulty, random).evolutionRequirements(
       save.starter,
     )[0];
-    supplies(save, entryCost(save), 0, ledger);
+    supplies(save, entryCost(save), 0, ledger, c);
     assert.ok(joinSect(save, passive));
   }
   for (let guard = 0; studyPlan(save).eligible; guard++) {
     if (guard >= LIMITS.preparationOperations) throw new BudgetStop('study-budget');
     const plan = studyPlan(save);
     if (!roomForYears(save, plan.years, c, ledger, random)) throw new BudgetStop('study-lifespan');
-    supplies(save, plan.stones, 0, ledger);
+    supplies(save, plan.stones, 0, ledger, c);
     assert.ok(startActivity(save, 'study', random));
     for (let i = 0; save.mortal.activity; i++) {
       if (i >= LIMITS.preparationOperations) throw new BudgetStop('activity-budget');
@@ -285,7 +292,7 @@ function prepare(
   for (const id of ['jinsui', 'bigu', 'huanglong', 'huxin', 'yangjing', 'yingxiang']) {
     if (!shop.ids.includes(id) || activeMedicines(save.medicine, save.age).length >= 3) continue;
     if ((save.medicine.active[id] ?? 0) > save.age) continue;
-    supplies(save, medicineInfo(id)!.price, 0, ledger);
+    supplies(save, medicineInfo(id)!.price, 0, ledger, c);
     if (buyMedicine(save, id)) assert.ok(useMedicine(save, id).ok);
   }
   assert.ok(Object.values(save.training).every((n) => n === 20));

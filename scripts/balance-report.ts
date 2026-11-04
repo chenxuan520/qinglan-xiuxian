@@ -39,7 +39,7 @@ const profiles: Record<string, string> = {
   bare: '无辅助',
   earned: '收益养成',
   'ads-only': '仅广告',
-  maxed: '广告与根基满级',
+  maxed: '理论上限（广告不计冷却、根基满级）',
 };
 const seconds = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(1)}秒`);
 export interface DailyReport {
@@ -161,7 +161,7 @@ export function reportHtml(report: DailyReport) {
     'difficulty',
     '难度',
     DIFFICULTIES.map((d, i) => [String(i), d.name]),
-  )}<button id="reset-filters" type="button">重置筛选</button></div><p id="filter-status" role="status">返回 ${rows.length}/${plan.length} 条。</p><p><small>未返回样本仍保留在计划分母中。空观测显示「—」。本命法宝指测试开局使用的法宝；路线、本命及场地筛选会重新统计，通过率不会沿用整体结果。</small></p>
+  )}<button id="reset-filters" type="button">重置筛选</button></div><p id="filter-status" role="status">返回 ${rows.length}/${plan.length} 条。</p><p><small>未返回样本仍保留在计划分母中。空观测显示「—」。本命法宝指测试开局使用的法宝；路线、本命及场地筛选会重新统计，通过率不会沿用整体结果。</small></p><p><small>理论上限参照：假设广告物资不受冷却、开局根基与法宝炼满，无对应的真人玩法，仅用于观察资质上限。</small></p>
   <h2>筛选统计图</h2><fieldset id="chart-grouping" class="chart-grouping"><legend>汇总维度（可多选）</legend><div class="chart-group-options">${[
     ['root', '灵根'],
     ['path', '路线'],
