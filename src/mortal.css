@@ -1843,18 +1843,13 @@
   }
 }
 .market-ambush-controls {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 4px;
 }
-.market-ambush-controls.has-continue {
-  grid-template-columns: 1fr 1fr;
-}
-@media (max-width: 420px) {
-  .market-ambush-controls.has-continue {
-    grid-template-columns: 1fr;
-  }
+.market-ambush-controls > button {
+  flex: 1 1 170px;
 }
 .market-ambush-rules {
   margin-top: 16px;

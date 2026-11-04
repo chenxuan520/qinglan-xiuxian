@@ -253,7 +253,8 @@
   color: #acbba4;
 }
 .treasure-lore {
-  padding-top: 26px;
+  margin-top: 14px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
 }
 .treasure-lore h4 {

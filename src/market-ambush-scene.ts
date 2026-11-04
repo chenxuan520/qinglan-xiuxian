@@ -380,11 +380,7 @@ export class MarketAmbushScene {
     const button = this.host.querySelector<HTMLButtonElement>(
       '[data-action="market-ambush-continue"]',
     );
-    if (!button) return;
-    button.hidden = !this.held || !!this.duel.outcome;
-    this.host
-      .querySelector('.market-ambush-controls')
-      ?.classList.toggle('has-continue', !button.hidden);
+    if (button) button.hidden = !this.held || !!this.duel.outcome;
   }
   destroy() {
     if (!this.events.signal.aborted) this.checkpoint();
