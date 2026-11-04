@@ -162,11 +162,11 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
       content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、典雅、有温度的古风白话回望角色走过的路，像一段空灵沉郁的古典题跋，绝不写资料说明、数据汇报或公文清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，将事实熔铸为一气呵成的仙途绝唱。
 
 输出规范：
-只输出 JSON 对象，恰好四个字段：title（2至10个汉字的典雅题名）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。
-1. ending 写结局收笔与岁月意味：融入灯尽、霜寒、雷歇、刀光或仙关云散等山河意象，不照抄 outcome 与参考字句。
+只输出 JSON 对象，恰好四个字段：title（2至6个纯汉字成语或典雅题名，如「凡骨登仙」「万古独尊」「一念问天」等，严禁带括号或标点）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。
+1. ending 写结局收笔与岁月意味：融入灯尽、霜寒、雷歇、坊外刀光或仙关云散等山河意象，不照抄 outcome 与参考字句。
 2. cultivation 写修行风骨与道行气象：将灵根、本命法宝、秘境大关化为求道的生动画卷（如剑意啸大荒、凡火淬真性），严禁干瘪报表化地罗列「几境已破、已炼几阶、已历几次、修行已有实迹」！
 3. ties 写人间温情或离别回望：有道侣写檐下同心相守，有家书写见字如面纸短情长；严禁使用「皆是问道之外的此世来路」等死板套话。输入的 ties 数组为空时，输出 ties 必须严格为空字符串 ""，绝对不补任何牵挂句；有牵挂事实时必须写对应句。
-4. 全文各段以中文句号「。」收尾，合起来（ending+cultivation+ties）文气贯通、自然呼应，总计 35 至 76 字（绝不能超过 80 字）。无牵挂时用结局和修行成果写完整短评，绝不凑字数编造第三段。
+4. 全文各段以中文句号「。」收尾，合起来（ending+cultivation+ties）文气贯通、自然呼应，总计 35 至 76 字（必须在 30 字以上、且绝不能超过 80 字）。无牵挂时仅用 ending 和 cultivation 写完整短评，两句字数需充实舒展（每句约18-28字），绝不凑字数编造第三段。
 
 文风与真实性红线：
 严禁公文化、通告感与机械汇报：不得出现「此世已因……落幕」「圆满结束」「修行已有实迹」「皆为此身亲证」等僵硬短语，不得照抄参考文本的现成字句。不得出现「尚无记载」「暂无记录」「缘簿留白」等缺项说明，不提存档、数据、记录或留白。缺少牵挂事实不等于孤独，不编造悲情或亲友死亡。
@@ -221,7 +221,12 @@ export function extractJourneyAppraisal(
       return reject('fields');
     for (const key of ['ending', 'cultivation', 'ties']) {
       if (typeof parsed[key] !== 'string') return reject(`section-${key}-type`);
-      parsed[key] = (parsed[key] as string).replace(/\s/g, '');
+      parsed[key] = (parsed[key] as string)
+        .replace(/\s/g, '')
+        .replace(/,/g, '，')
+        .replace(/\./g, '。')
+        .replace(/;/g, '；')
+        .replace(/:/g, '：');
       if (key === 'ties' && !facts.ties.length) {
         if (parsed[key] !== '') return reject('section-ties-unexpected');
         continue;
@@ -233,7 +238,8 @@ export function extractJourneyAppraisal(
       if (!plain(parsed[key], 4, 64) || !/[\p{Script=Han}]/u.test(parsed[key] as string))
         return reject(`section-${key}-format`);
     }
-    if (typeof parsed.title === 'string') parsed.title = parsed.title.replace(/\s/g, '');
+    if (typeof parsed.title === 'string')
+      parsed.title = parsed.title.replace(/\s|[【】「」《》“”‘’（）·:：]/g, '');
     const appraisal = {
       title: parsed.title,
       detail: `${parsed.ending}${parsed.cultivation}${parsed.ties}`,
