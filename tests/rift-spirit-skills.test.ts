@@ -4,7 +4,12 @@ import { Game } from '../src/game.ts';
 import { freshSave } from '../src/progress.ts';
 import { bossSkills } from '../src/boss-skills.ts';
 import { STAGES, TAU } from '../src/data.ts';
-import { hazardDistance, ENEMY_CONTROL } from '../src/regional-hazards.ts';
+import {
+  hazardDistance,
+  regionalExposure,
+  rotateZone,
+  ENEMY_CONTROL,
+} from '../src/regional-hazards.ts';
 import { autoplayInput } from '../src/autoplay.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 
@@ -241,7 +246,7 @@ for (const arena of [5, 6]) {
   }
 }
 
-test('仙尊借用星珠仍保留三星与原释放间隔，不随劫灵加强', () => {
+test('仙尊星位轮转共用最新五星、十星上限和0.35秒释放间隔', () => {
   const { g } = encounter(6);
   g.zones = [];
   g.enemies = [];
@@ -249,11 +254,21 @@ test('仙尊借用星珠仍保留三星与原释放间隔，不随劫灵加强',
   e.skillStep = 6;
   g.random = () => 0.99;
   g.castBossSkill(e, 1, 0);
-  assert.equal(g.shots.length, 3);
+  assert.equal(g.shots.length, 5);
   g.shots.forEach((b, i) => {
     assert.equal(b.bossMotion?.kind, 'star');
-    if (b.bossMotion?.kind === 'star') near(b.bossMotion.launchAt, 1.3 + i * 0.45);
+    if (b.bossMotion?.kind === 'star') {
+      near(b.bossMotion.launchAt, 1.3 + i * 0.35);
+      near(b.bossMotion.angle, (i / 5) * TAU);
+    }
+    assert.equal(b.damage, e.damage * 0.85);
+    assert.equal(b.radius, 12);
   });
+  for (let i = 0; i < 3; i++) {
+    e.skillStep = 6;
+    g.castBossSkill(e, 1, 0);
+  }
+  assert.equal(g.shots.length, 10);
 });
 
 test('五星续局发射时间仍拒绝字符串、非有限值和不在新旧节奏中的数值', () => {
@@ -265,39 +280,59 @@ test('五星续局发射时间仍拒绝字符串、非有限值和不在新旧�
   }
 });
 
-test('周天星轨自动历练远处顺旋向切行、近处叠加向心，预警不启用且不抵消为零', () => {
-  for (const roll of [0, 0.99]) {
-    const { g } = encounter(5, 4, () => roll);
-    g.enemies = [];
-    g.pickups = [{ x: 1000, y: 0, kind: 'xp', value: 1, pull: false }];
-    const zones = g.zones;
-    for (const z of zones) {
-      const shift = { x: -200 - z.spinCenter!.x, y: -z.spinCenter!.y };
-      z.x += shift.x;
-      z.y += shift.y;
-      z.endX! += shift.x;
-      z.endY! += shift.y;
-      z.spinCenter = { x: -200, y: 0 };
-      z.delay = 0;
-      // 把当前星轨置于玩家侧面，既有安全点搜索不改变原目标方向。
-      z.x = -200;
-      z.y = 40;
-      z.endX = -200;
-      z.endY = 900;
+test('周天星轨按未来旋转逐帧预测，预警冻结与贴身安全区均按真实规则处理', () => {
+  const { g } = encounter(5, 4, () => 0.99);
+  const z = g.zones[0];
+  const c = z.spinCenter!;
+  const p = { x: c.x + 150, y: c.y };
+  z.spinAngle = Math.PI / 2;
+  z.delay = 0;
+  rotateZone(z);
+  assert.ok(hazardDistance(z, p) > 150 - 1e-7);
+  assert.ok(regionalExposure(z, p, 0, 0, 180) > 0);
+  assert.equal(regionalExposure(z, c, 0, 0, 180), 0);
+  z.delay = 2;
+  assert.equal(regionalExposure(z, p, 0, 0, 180), 0);
+});
+
+test('自动历练预警即靠近，旋转两向均动态避让，不被远处拾取拉回星轨或原地卡住', () => {
+  for (const roll of [0, 0.99])
+    for (const radius of [90, 180, 400]) {
+      const { g } = encounter(5, 4, () => roll);
+      const center = g.zones[0].spinCenter!;
+      g.enemies = [];
+      g.pickups = [{ x: center.x + 2000, y: center.y, kind: 'xp', value: 1, pull: false }];
+      Object.assign(g.player, {
+        x: center.x + radius,
+        y: center.y,
+        hp: 10000,
+        maxHp: 10000,
+        invincible: 0,
+      });
+      // 将实际施放的两条星轨旋至与当前落脚点垂直，保留真实的警示、旋向和伤害。
+      for (const z of g.zones) {
+        z.spinAngle = Math.PI / 2 + (z === g.zones[0] ? 0 : Math.PI);
+        z.x = center.x;
+        z.y = center.y + Math.sin(z.spinAngle) * 40;
+        z.endX = center.x;
+        z.endY = center.y + Math.sin(z.spinAngle) * 900;
+      }
+      assert.ok(autoplayInput(g).x < -0.9, '预警时提前接近圆心，不追逐外侧掉落');
+      let travelled = 0;
+      const hp = g.player.hp;
+      for (let t = 0; t < 4.05; t += 0.01) {
+        if (Math.round(t * 100) % 12 === 0) g.input = autoplayInput(g);
+        assert.ok(Number.isFinite(g.input.x + g.input.y));
+        const step = g.stats.speed * 0.01;
+        g.player.x += g.input.x * step;
+        g.player.y += g.input.y * step;
+        travelled += Math.hypot(g.input.x, g.input.y) * step;
+        g.player.invincible = Math.max(0, g.player.invincible - 0.01);
+        g.updateZones(0.01);
+      }
+      assert.ok(travelled > 50, '危险期间实际移动');
+      assert.equal(g.player.hp, hp, `半径${radius}、旋向${roll}应能避开独立星轨`);
+      assert.equal(g.zones.length, 0);
+      assert.ok(Math.hypot(autoplayInput(g).x, autoplayInput(g).y) > 0.99, '星轨结束恢复正常拾取');
     }
-    const far = autoplayInput(g);
-    near(far.x, Math.SQRT1_2);
-    near(far.y, Math.SQRT1_2 * Math.sign(zones[0].spinSpeed!));
-    g.pickups[0] = { x: 0, y: 1000, kind: 'xp', value: 1, pull: false };
-    zones.forEach((z) => {
-      z.spinCenter!.x = -100;
-      z.x = z.endX = -100;
-    });
-    const close = autoplayInput(g);
-    near(close.x, -0.6 / Math.hypot(0.6, 1));
-    near(close.y, 1 / Math.hypot(0.6, 1));
-    zones.forEach((z) => (z.delay = 1));
-    near(autoplayInput(g).x, 0);
-    assert.ok(Math.hypot(far.x, far.y) > 0.99 && Math.hypot(close.x, close.y) > 0.99);
-  }
 });

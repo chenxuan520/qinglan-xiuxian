@@ -84,20 +84,8 @@ function steer(direction: Point, follow: Point, weight = 1) {
   return length > 1e-8 ? { x: x / length, y: y / length } : follow;
 }
 export function autoplayInput(g: Game) {
-  let direction = autoplayDirection(g);
+  const direction = autoplayDirection(g);
   if (g.immobilized > 0) return direction;
-  const sweep = g.zones.find((z) => z.kind === 'boss-sweep' && z.delay <= 0 && z.life > 0);
-  if (sweep?.spinCenter) {
-    const dx = g.player.x - sweep.spinCenter.x,
-      dy = g.player.y - sweep.spinCenter.y,
-      distance = Math.hypot(dx, dy) || 1,
-      sign = Math.sign(sweep.spinSpeed!);
-    const follow =
-      distance > 120
-        ? { x: (-dy / distance) * sign, y: (dx / distance) * sign }
-        : { x: -dx / distance, y: -dy / distance };
-    direction = steer(direction, follow, distance > 120 ? 1 : 0.6);
-  }
   const boss = g.gravityBoss;
   if (!boss) return direction;
   const distance = Math.hypot(g.player.x - boss.x, g.player.y - boss.y);
@@ -187,7 +175,22 @@ function autoplayDirection(g: Game) {
     dy = ny * radial + nx * 0.7;
   }
   const norm = Math.hypot(dx, dy) || 1;
-  const preferred = { x: dx / norm, y: dy / norm };
+  let preferred = { x: dx / norm, y: dy / norm };
+  const sweep = g.zones.find((z) => z.kind === 'boss-sweep' && z.life > 0 && z.spinCenter);
+  if (sweep?.spinCenter) {
+    const sx = p.x - sweep.spinCenter.x,
+      sy = p.y - sweep.spinCenter.y,
+      distance = Math.hypot(sx, sy) || 1;
+    // 预警时就靠近；远处线速度快，先收小绕行半径再顺轨走。
+    const inward = Math.max(0, Math.min(1, (distance - 80) / 80));
+    const tangent = sweep.delay > 0 ? 0 : Math.sign(sweep.spinSpeed!);
+    preferred = {
+      x: (-sx * inward - sy * tangent) / distance,
+      y: (-sy * inward + sx * tangent) / distance,
+    };
+    const length = Math.hypot(preferred.x, preferred.y);
+    if (length) preferred = { x: preferred.x / length, y: preferred.y / length };
+  }
   const movingShots = g.shots.filter(
     (b) =>
       b.kind === 'hostile' &&
@@ -205,7 +208,10 @@ function autoplayDirection(g: Game) {
     (z) =>
       z.hostile &&
       z.life > 0 &&
-      hazardDistance(z, p) < z.radius + 8 + speed * 1.6 + Math.hypot(z.vx || 0, z.vy || 0) * 1.6,
+      (z.kind === 'boss-sweep'
+        ? Math.hypot(p.x - z.spinCenter!.x, p.y - z.spinCenter!.y) < z.spinOuter! + speed * 1.6
+        : hazardDistance(z, p) <
+          z.radius + 8 + speed * 1.6 + Math.hypot(z.vx || 0, z.vy || 0) * 1.6),
   );
   if (!charges.length && !zones.length && !movingShots.length) return preferred;
   // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。

@@ -117,6 +117,24 @@ export function hazardCrossing(
 
 export function regionalExposure(z: Zone, p: Point, x: number, y: number, speed: number) {
   const delay = Math.max(0, z.delay);
+  if (z.kind === 'boss-sweep' && z.spinCenter) {
+    // 星轨逐帧命中；按实际旋转预测，不能套用静止线段的半秒伤害tick。
+    const horizon = Math.min(1.6, delay + z.life);
+    const step = 0.04;
+    let exposure = 0;
+    for (let t = delay; t < horizon; t += step) {
+      const px = p.x + x * speed * t - z.spinCenter.x,
+        py = p.y + y * speed * t - z.spinCenter.y;
+      if (Math.hypot(px, py) < z.spinInner!) continue;
+      const angle = z.spinAngle! + z.spinSpeed! * (t - delay),
+        ux = Math.cos(angle),
+        uy = Math.sin(angle),
+        along = Math.max(z.spinInner!, Math.min(z.spinOuter!, px * ux + py * uy));
+      if (Math.hypot(px - ux * along, py - uy * along) < z.radius + 8 + speed * step)
+        exposure += Math.min(step, horizon - t);
+    }
+    return exposure;
+  }
   const crossing = hazardCrossing(
     z,
     { x: p.x + x * speed * delay, y: p.y + y * speed * delay },

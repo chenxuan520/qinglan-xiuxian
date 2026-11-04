@@ -92,7 +92,7 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
         [0, 0, 2],
         [0, 3, 0],
         [5, 0, 0],
-        [3, 0, 0],
+        [5, 0, 0],
       ][borrowed],
     );
     if (borrowed === 0) assert.ok(zones.every((z) => z.damage === c.e.damage * 0.55));
@@ -116,7 +116,7 @@ test('万劫归一异常路径仍恢复仙尊身份；回焰/魂影/星位及召
     [1, 14],
     [2, 2],
     [4, 10],
-    [5, 6],
+    [5, 10],
   ]) {
     const h = encounter();
     for (let i = 0; i < 5; i++) cast(h, 6, borrowed);

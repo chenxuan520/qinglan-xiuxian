@@ -730,13 +730,22 @@ export class Game {
       g.trialBossesSpawned = s.trialBossesSpawned;
       const scheduled = TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? g.stageDuration;
       // 清除旧的累积顺延；仅保留刚登场后尚未走完的三秒最小间隔。
-      g.nextTrialBossAt = Math.max(
-        scheduled,
-        !g.isFinalTrial ||
-          (s.nextTrialBossAt > s.time && s.nextTrialBossAt <= s.time + TRIAL_BOSS_MIN_INTERVAL)
-          ? s.nextTrialBossAt
-          : scheduled,
-      );
+      let next = s.nextTrialBossAt;
+      if (g.isFinalTrial) {
+        const previous = TRIAL_BOSS_TIMES[g.trialBossesSpawned - 1];
+        const oldInterval = scheduled - previous;
+        const oldArrival = next - oldInterval;
+        if (
+          g.trialBossesSpawned >= TRIAL_BOSS_CAP + 1 &&
+          next > scheduled &&
+          oldInterval > TRIAL_BOSS_MIN_INTERVAL &&
+          oldArrival <= s.time &&
+          s.time - oldArrival < TRIAL_BOSS_MIN_INTERVAL
+        )
+          next = oldArrival + TRIAL_BOSS_MIN_INTERVAL;
+        else if (next <= s.time || next > s.time + TRIAL_BOSS_MIN_INTERVAL) next = scheduled;
+      }
+      g.nextTrialBossAt = Math.max(scheduled, next);
       g.nextElite = s.nextElite;
       g.damageDealt = s.damageDealt;
       if (s.damageBySource !== undefined) {
@@ -1766,7 +1775,7 @@ export class Game {
           enemies = this.enemies.length;
         try {
           e.bossStage = borrowed;
-          this.castBossMechanic(e, nx, ny, true);
+          this.castBossMechanic(e, nx, ny);
         } finally {
           e.bossStage = FINAL_TRIAL_STAGE;
         }
@@ -2035,7 +2044,7 @@ export class Game {
       e.y = this.player.y - ny * 260;
     }
   }
-  private castBossMechanic(e: Enemy, nx: number, ny: number, borrowed = false) {
+  private castBossMechanic(e: Enemy, nx: number, ny: number) {
     const stage = e.bossStage ?? this.stage,
       rules = BOSS_MECHANICS;
     if (stage === 0 || stage === 2) {
@@ -2145,17 +2154,15 @@ export class Game {
         shot.radius = 10;
       }
     } else if (stage === 5) {
-      // 仙尊借用仍保留原三星；本次只加强劫灵及其旧王劫相。
-      const count = borrowed ? 3 : 5;
-      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'star') >= (borrowed ? 6 : 10))
-        return;
+      const count = 5;
+      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'star') >= 10) return;
       for (let i = 0; i < count; i++) {
         const shot = this.hostileShot(e, 1, 0, 220, e.damage * 0.85);
         shot.bossMotion = {
           kind: 'star',
           center: { x: e.x, y: e.y },
           angle: (i / count) * TAU,
-          launchAt: 1.3 + i * (borrowed ? 0.45 : 0.35),
+          launchAt: 1.3 + i * 0.35,
         };
         shot.life = shot.bossMotion.launchAt + 1.8;
         shot.radius = 12;

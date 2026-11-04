@@ -19,7 +19,14 @@ export function drawEnemyWarnings(
         c.fillStyle = z.color;
         c.font = 'bold 16px serif';
         c.textAlign = 'center';
-        c.fillText('星', (z.x + z.endX!) / 2, (z.y + z.endY!) / 2 + 6);
+        const dx = z.endX! - z.x,
+          dy = z.endY! - z.y,
+          length = Math.hypot(dx, dy),
+          mark = Math.max(
+            110 / length,
+            Math.min(1 - 30 / length, ((p.x - z.x) * dx + (p.y - z.y) * dy) / (length * length)),
+          );
+        c.fillText('星', z.x + dx * mark, z.y + dy * mark + 6);
         c.restore();
       }
       continue;

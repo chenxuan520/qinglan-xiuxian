@@ -25,6 +25,19 @@ export function drawRegionalField(
   c.translate(z.x, z.y);
   const length = z.endX === undefined ? 0 : Math.hypot(z.endX - z.x, z.endY! - z.y);
   if (z.endX !== undefined) c.rotate(Math.atan2(z.endY! - z.y, z.endX - z.x));
+  if (z.kind === 'boss-sweep' && z.delay > 0) {
+    if (warning) {
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.lineTo(length, 0);
+      c.strokeStyle = z.color;
+      c.lineWidth = 2;
+      c.setLineDash([8, 5]);
+      c.stroke();
+    }
+    c.restore();
+    return true;
+  }
   if (warning) {
     capsule(c, length, z.radius);
     c.strokeStyle = '#301c22b3';

@@ -119,6 +119,30 @@ test('续局清除旧累积顺延、原定时间已到立即补位，并保留�
   );
 });
 
+test('旧版严重延期快照清除四十五秒等待时，仍补齐刚登场的三秒间隔', () => {
+  const g = trial();
+  advance(g, 60);
+  advance(g, 105);
+  const first = g.enemies.find((e) => e.bossStage === 0)!;
+  g.hitEnemy(first, first.maxHp);
+  g.xp = 0;
+  advance(g, 905.01);
+  assert.equal(g.trialBossesSpawned, 3);
+  const second = g.enemies.find((e) => e.bossStage === 1 && !e.dead)!;
+  g.hitEnemy(second, second.maxHp);
+  g.xp = 0;
+  g.time = 905.51;
+  g.nextTrialBossAt = 950.01; // 真实旧版：905.01 登场后再排45秒。
+  const restored = Game.restore(g.save, g.snapshot())!;
+  assert.ok(restored);
+  assert.ok(Math.abs(restored.nextTrialBossAt - 908.01) < 1e-8);
+  restored.resume();
+  advance(restored, 908.009);
+  assert.equal(restored.trialBossesSpawned, 3);
+  advance(restored, 908.01);
+  assert.equal(restored.trialBossesSpawned, 4);
+});
+
 test('只有第二、第六境妖王首招提前到1秒，独立天劫首招不变', () => {
   for (let stage = 0; stage <= 6; stage++) {
     const save = freshSave();
