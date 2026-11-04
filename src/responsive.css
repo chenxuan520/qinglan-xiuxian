@@ -588,6 +588,9 @@
   .detail-copy p {
     font-size: 10px;
   }
+  .treasure-lore p {
+    font-size: 9px;
+  }
   .detail-actions {
     display: grid;
     grid-template-columns: 1fr;
