@@ -104,6 +104,46 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
     assert.ok(Game.restore(c.g.save, c.g.snapshot()));
   });
 
+for (let origin = 0; origin < 6; origin++)
+  test(`万劫归一与旧王${origin}共用同一完整招式，连续施法上限及动态推进一致`, () => {
+    const native = encounter(origin);
+    const sovereign = encounter();
+    for (const c of [native, sovereign]) {
+      c.e.damage = 100;
+      c.e.hp = c.e.maxHp = 300000;
+      c.g.playerTrail = [
+        { x: 40, y: 20 },
+        { x: 100, y: 50 },
+      ];
+    }
+    const mechanics = (c: ReturnType<typeof encounter>) => ({
+      shots: c.g.shots.map(({ color, ...shot }) => shot),
+      zones: c.g.zones.map(({ color, ...zone }) => zone),
+      summons: c.g.enemies.slice(1).map(({ bossSummon, ...enemy }) => ({
+        ...enemy,
+        bossSummon: bossSummon && (({ color, ...state }) => state)(bossSummon),
+      })),
+    });
+    for (let castIndex = 0; castIndex < 4; castIndex++) {
+      cast(native, 3, origin);
+      cast(sovereign, 6, origin);
+      assert.deepEqual(
+        mechanics(sovereign),
+        mechanics(native),
+        '数量、速度、伤害、持续、延迟、轨迹、控制类型和上限必须一致',
+      );
+    }
+    for (const seconds of [0.2, 0.7, 1.4]) {
+      advance(native.g, seconds);
+      advance(sovereign.g, seconds);
+      assert.deepEqual(
+        mechanics(sovereign),
+        mechanics(native),
+        '推进后的弹丸、区域与召物仍共用机制',
+      );
+    }
+  });
+
 test('万劫归一异常路径仍恢复仙尊身份；回焰/魂影/星位及召物保留各自上限', () => {
   const c = encounter();
   c.g.castBossMechanic = () => {
