@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 export const SIZE_BUDGET = {
   jsBytes: 600_000,
-  jsGzip: 212_000,
+  jsGzip: 213_000,
   cssBytes: 170_000,
   cssGzip: 35_000,
   distBytes: 18_000_000,

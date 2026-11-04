@@ -32,6 +32,7 @@ export type BossMotion =
 export interface BossSummon {
   kind: 'heart' | 'wolf';
   age: number;
+  round?: number;
   side: number;
   color?: string;
 }

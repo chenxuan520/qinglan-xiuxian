@@ -47,6 +47,7 @@ for (const arena of [5, 6]) {
       const initial = structuredClone(zones);
       const toward = Math.atan2(g.player.y - e.y, g.player.x - e.x);
       near(Math.cos(zones[0].spinAngle! - toward), 0);
+      near(zones[0].spinStart!, zones[0].spinAngle!);
       near(zones[1].spinAngle! - zones[0].spinAngle!, Math.PI);
       assert.ok(Math.min(...zones.map((z) => hazardDistance(z, g.player))) > 100);
       for (const z of zones) {
@@ -140,7 +141,7 @@ for (const arena of [5, 6]) {
     assert.equal(g.snapshot().zones.length, 0);
     assert.doesNotMatch(
       JSON.stringify(g.snapshot()),
-      /spinCenter|spinAngle|spinSpeed|hitCooldown|boss-sweep/,
+      /spinCenter|spinAngle|spinStart|spinSpeed|hitCooldown|boss-sweep/,
     );
   });
   test(`第${arena + 1}关雷网三墙各留130缺口、间距140，预警冻结、朝王移动、命中定身、到期消失`, () => {
@@ -297,7 +298,7 @@ test('周天星轨按未来旋转逐帧预测，预警冻结与贴身安全区�
 
 test('自动历练预警即靠近，旋转两向均动态避让，不被远处拾取拉回星轨或原地卡住', () => {
   for (const roll of [0, 0.99])
-    for (const radius of [90, 180, 400]) {
+    for (const radius of [90, 180, 300, 450, 700]) {
       const { g } = encounter(5, 4, () => roll);
       const center = g.zones[0].spinCenter!;
       g.enemies = [];
@@ -312,12 +313,16 @@ test('自动历练预警即靠近，旋转两向均动态避让，不被远处�
       // 将实际施放的两条星轨旋至与当前落脚点垂直，保留真实的警示、旋向和伤害。
       for (const z of g.zones) {
         z.spinAngle = Math.PI / 2 + (z === g.zones[0] ? 0 : Math.PI);
+        z.spinStart = z.spinAngle;
         z.x = center.x;
         z.y = center.y + Math.sin(z.spinAngle) * 40;
         z.endX = center.x;
         z.endY = center.y + Math.sin(z.spinAngle) * 900;
       }
-      assert.ok(autoplayInput(g).x < -0.9, '预警时提前接近圆心，不追逐外侧掉落');
+      assert.ok(
+        autoplayInput(g).x * (radius > 500 ? 1 : -1) > 0,
+        '预警时朝更近的安全路线移动，不被掉落拉偏',
+      );
       let travelled = 0;
       const hp = g.player.hp;
       for (let t = 0; t < 4.05; t += 0.01) {

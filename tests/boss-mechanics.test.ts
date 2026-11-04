@@ -156,7 +156,7 @@ test('木心每王最多三枚，不叠加刷屏，主人倒下或八秒到期�
   assert.ok(g.enemies.filter((c) => c.bossSummon).every((c) => c.dead));
 });
 
-test('两猎狼从相反侧翼绕行，完整蓄势后各扑一次，锁向后不追踪、自然消散不结算', () => {
+test('两猎狼从相反侧翼绕行、完整蓄势锁向，扑后再包抄、六秒消散不结算', () => {
   const { g } = cast(2);
   const wolves = actors(g);
   assert.equal(wolves.length, 2);
@@ -173,6 +173,8 @@ test('两猎狼从相反侧翼绕行，完整蓄势后各扑一次，锁向后�
     assert.equal(wolves[i].dy, before[i].dy);
   }
   advance(g, 1.1);
+  assert.equal(actors(g).length, 2);
+  advance(g, 3.3);
   assert.equal(actors(g).length, 0);
   assert.equal(g.kills, 0);
   assert.equal(g.pickups.length, 0);

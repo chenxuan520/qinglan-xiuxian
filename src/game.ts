@@ -1842,6 +1842,7 @@ export class Game {
         Object.assign(this.zones.at(-1)!, {
           spinCenter: { ...center },
           spinAngle: angle,
+          spinStart: angle,
           spinSpeed: speed,
           spinInner: 40,
           spinOuter: 900,
@@ -2071,7 +2072,7 @@ export class Game {
           false,
         );
         child.summonedBy = e.id;
-        child.bossSummon = { kind, age: 0, side };
+        child.bossSummon = { kind, age: 0, side, ...(kind === 'wolf' ? { round: 0 } : {}) };
         if (stage === 2) child.hp = child.maxHp = Math.max(child.maxHp, e.maxHp * 0.08);
         child.radius = stage === 0 ? 20 : 23;
         child.damage = stage === 0 ? 0 : Math.max(child.damage, e.damage * 0.65);
@@ -2172,8 +2173,8 @@ export class Game {
     }
   }
   private updateBossSummon(e: Enemy, dt: number) {
-    const state = e.bossSummon!,
-      before = state.age;
+    const state = e.bossSummon!;
+    const before = state.round ?? state.age % (BOSS_MECHANICS.wolfFlank + 1.4);
     state.age += dt;
     e.flash = Math.max(0, e.flash - dt);
     const owner = this.enemies.find((b) => b.id === e.summonedBy && !b.dead);
@@ -2185,26 +2186,28 @@ export class Game {
       return;
     }
     if (state.kind === 'heart') return;
-    if (state.age < BOSS_MECHANICS.wolfFlank) {
+    state.round = before + dt;
+    if (state.round < BOSS_MECHANICS.wolfFlank) {
       const tx = this.player.x - e.dy * state.side * 145,
         ty = this.player.y + e.dx * state.side * 145;
       const d = Math.hypot(tx - e.x, ty - e.y) || 1,
         travel = Math.min(d, e.speed * dt);
       e.x += ((tx - e.x) / d) * travel;
       e.y += ((ty - e.y) / d) * travel;
-    } else if (before < BOSS_MECHANICS.wolfFlank) {
-      const d = distance(e, this.player) || 1;
-      e.dx = (this.player.x - e.x) / d;
-      e.dy = (this.player.y - e.y) / d;
-      e.charge = 1.4;
-    } else if (e.charge > 0) {
-      const previous = e.charge;
-      e.charge = Math.max(0, e.charge - dt);
+    } else {
+      if (before < BOSS_MECHANICS.wolfFlank) {
+        const d = distance(e, this.player) || 1;
+        e.dx = (this.player.x - e.x) / d;
+        e.dy = (this.player.y - e.y) / d;
+      }
+      const previous = 1.4 - Math.max(0, before - BOSS_MECHANICS.wolfFlank);
+      e.charge = Math.max(0, 1.4 - (state.round - BOSS_MECHANICS.wolfFlank));
+      if (e.charge < 1e-9) e.charge = 0;
       const travel = (Math.min(0.55, previous) - Math.min(0.55, e.charge)) * 380;
       e.x += e.dx * travel;
       e.y += e.dy * travel;
       if (e.charge <= 0.55 && distance(e, this.player) < e.radius + 13) this.hurtPlayer(e.damage);
-      if (e.charge === 0) e.dead = true;
+      if (e.charge === 0) state.round = 0;
     }
   }
   #nearest(at: Point, excluded = new Set<number>(), range = 950) {

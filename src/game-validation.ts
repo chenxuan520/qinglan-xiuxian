@@ -265,7 +265,12 @@ export function validateRunSnapshot(
               (e.bossSummon.color === undefined || e.bossSummon.color === SOVEREIGN_GOLD) &&
               Number.isFinite(e.bossSummon.age) &&
               e.bossSummon.age >= 0 &&
-              e.bossSummon.age <= 8 &&
+              e.bossSummon.age <= (e.bossSummon.kind === 'wolf' ? 6 : 8) &&
+              (e.bossSummon.round === undefined ||
+                (e.bossSummon.kind === 'wolf' &&
+                  Number.isFinite(e.bossSummon.round) &&
+                  e.bossSummon.round >= 0 &&
+                  e.bossSummon.round <= 2.6)) &&
               [-1, 1].includes(e.bossSummon.side) &&
               Number.isSafeInteger(e.summonedBy) &&
               e.summonedBy! > 0)) &&

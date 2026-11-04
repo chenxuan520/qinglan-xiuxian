@@ -1,5 +1,5 @@
 import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
-import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
+import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL, TAU } from './data.ts';
 import type { Choice, Game, Point } from './game.ts';
 import {
   hazardDistance,
@@ -82,6 +82,57 @@ function steer(direction: Point, follow: Point, weight = 1) {
     y = direction.y + follow.y * weight,
     length = Math.hypot(x, y);
   return length > 1e-8 ? { x: x / length, y: y / length } : follow;
+}
+const sweepFollowing = new WeakSet<Game['zones'][number]>();
+function sweepTarget(g: Game) {
+  const first = g.zones.find((z) => z.kind === 'boss-sweep' && z.life > 0 && z.spinCenter);
+  const second =
+    first &&
+    g.zones.find(
+      (z) =>
+        z !== first &&
+        z.kind === 'boss-sweep' &&
+        z.spinCenter?.x === first.spinCenter!.x &&
+        z.spinCenter?.y === first.spinCenter!.y &&
+        z.delay === first.delay &&
+        z.life === first.life,
+    );
+  if (!first || !second) return;
+  const center = first.spinCenter!,
+    dir = Math.sign(first.spinSpeed!);
+  const sx = g.player.x - center.x,
+    sy = g.player.y - center.y;
+  const distance = Math.hypot(sx, sy) || 1;
+  const outer = first.spinOuter! + first.radius + 8;
+  if (outer - distance < distance - first.spinInner!) {
+    const radius = outer + g.stats.speed * 0.24;
+    return { x: center.x + (sx / distance) * radius, y: center.y + (sy / distance) * radius };
+  }
+  if (distance < 120) {
+    const inward = Math.max(0, (distance - 80) / 80);
+    const tangent = first.delay > 0 ? 0 : dir;
+    return {
+      x: g.player.x - (sx * inward + sy * tangent) / distance,
+      y: g.player.y + (sx * tangent - sy * inward) / distance,
+    };
+  }
+  const theta = Math.atan2(g.player.y - center.y, g.player.x - center.x);
+  const ahead = (angle: number) => ((((theta - angle) * dir) % TAU) + TAU) % TAU;
+  const back = ahead(first.spinAngle!) < ahead(second.spinAngle!) ? second : first;
+  const start = back.spinStart ?? back.spinAngle!,
+    offset = Math.PI / 12;
+  const point = (angle: number) => ({
+    x: center.x + Math.cos(angle) * 160,
+    y: center.y + Math.sin(angle) * 160,
+  });
+  const angle =
+    (back.spinAngle! - start) * dir > offset
+      ? back.spinAngle! - dir * offset
+      : start + dir * offset;
+  let target = point(angle);
+  if (Math.hypot(target.x - g.player.x, target.y - g.player.y) <= 30) sweepFollowing.add(first);
+  if (sweepFollowing.has(first)) target = point(back.spinAngle! - dir * offset);
+  return target;
 }
 export function autoplayInput(g: Game) {
   const direction = autoplayDirection(g);
@@ -176,20 +227,12 @@ function autoplayDirection(g: Game) {
   }
   const norm = Math.hypot(dx, dy) || 1;
   let preferred = { x: dx / norm, y: dy / norm };
-  const sweep = g.zones.find((z) => z.kind === 'boss-sweep' && z.life > 0 && z.spinCenter);
-  if (sweep?.spinCenter) {
-    const sx = p.x - sweep.spinCenter.x,
-      sy = p.y - sweep.spinCenter.y,
-      distance = Math.hypot(sx, sy) || 1;
-    // 预警时就靠近；远处线速度快，先收小绕行半径再顺轨走。
-    const inward = Math.max(0, Math.min(1, (distance - 80) / 80));
-    const tangent = sweep.delay > 0 ? 0 : Math.sign(sweep.spinSpeed!);
-    preferred = {
-      x: (-sx * inward - sy * tangent) / distance,
-      y: (-sy * inward + sx * tangent) / distance,
-    };
-    const length = Math.hypot(preferred.x, preferred.y);
-    if (length) preferred = { x: preferred.x / length, y: preferred.y / length };
+  const sweep = sweepTarget(g);
+  if (sweep) {
+    const sx = sweep.x - p.x,
+      sy = sweep.y - p.y;
+    const length = Math.hypot(sx, sy) || 1;
+    preferred = { x: sx / length, y: sy / length };
   }
   const movingShots = g.shots.filter(
     (b) =>
