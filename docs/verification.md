@@ -4013,3 +4013,9 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 
 - 按用户确认只改两处：`src/data.ts` 的 `BOSS_COMBAT` 新增 `trialKingHp: [1, 1, 1.3, 1.4, 1.25, 1.25, 1]`，`src/enemy-stats.ts` 的终关旧王血量在 `trialHp` 基础上再乘 `trialKingHp[bossStage]`。只作用于终关旧王，三档难度通用；苍木、狐王、仙尊、各境原生妖王、天劫事件、普通妖物、登场时间、技能与伤害均不变，`trialHp` 仍为标量 1.1。
 - 测试同步：`tests/late-boss.test.ts` 与 `tests/fox-soul-buffs.test.ts` 的终关期望乘上新倍率；`tests/boss-retained-skills.test.ts` 保留 `trialHp === 1.1` 并新增 `trialKingHp` 数组断言；`tests/final-trial.test.ts` 中「仙尊血量超过旧王两倍」改为超过 1.5 倍（加血后实际约 1.71 倍，仙尊仍最强）。定向 20/20 与 final-trial 9/9、全量 `npm test` 通过；`docs/gameplay.md` 终关说明补充狼王、毒君、冥主、劫灵的额外血量倍率。按要求不跑平衡实验、不设撤回条件。
+
+## 2026-11-04 · 成就排序与分数调整
+
+- 按用户确认只改四个数值：`src/chronicle-achievements.ts` 的 `level-100`（百炼归真）难度 50→98、`curio-three`（奇珍有缘）80→101；`src/journey-score.ts` 的 `ACHIEVEMENT_SCORES` 对应改为 48 与 51。其余成就、达成条件与触发逻辑不变，已上榜成绩不重算、不写迁移。
+- 改后由易到难为：尘缘初结、三道皆证、丹成造化、一脉真传、万宝归藏、百炼归真、六仙同御、奇珍有缘、炉火纯青、三元归一、五劫不灭、逆天改命、生死证道、凡骨登仙、万古独尊；分数 45（万宝归藏）< 48（百炼归真）< 50（六仙同御）< 51（奇珍有缘）< 53（炉火纯青）。
+- `tests/chronicle.test.ts` 的成就顺序期望同步为新顺序；定向 chronicle/journey-score/journey-card-generation/文档 43/43、全量 `npm test` 通过。按用户要求不跑平衡实验。

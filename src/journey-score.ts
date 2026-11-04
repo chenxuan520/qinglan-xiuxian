@@ -32,10 +32,10 @@ export const ROOT_REVERSE_RATES: Record<SpiritRootId, number> = {
 export const ACHIEVEMENT_SCORES: Record<string, number> = {
   story: 15,
   'permanent-medicine': 20,
-  'curio-three': 40,
+  'curio-three': 51,
   mastery: 30,
   'three-paths': 18,
-  'level-100': 25,
+  'level-100': 48,
   collection: 45,
   'six-immortals': 50,
   forge: 53,

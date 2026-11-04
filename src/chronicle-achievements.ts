@@ -63,7 +63,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'level-100',
-      difficulty: 50,
+      difficulty: 98,
       title: '百炼归真',
       detail: '单局达到一百级',
       verse: '千回吐纳，铅华散尽始归真。',
@@ -112,7 +112,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'curio-three',
-      difficulty: 80,
+      difficulty: 101,
       title: '奇珍有缘',
       detail: '本世先后获得三件不同奇物',
       verse: '世外遗珍，袖底自藏乾坤。',
