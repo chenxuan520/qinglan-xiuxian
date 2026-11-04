@@ -104,7 +104,7 @@ for (const arena of [4, 6])
     assert.ok(g.zones.every((z) => z.endX === undefined));
   });
 
-test('原生远距十二秒追云与终关六秒追云保留独立参数，冥主瞬移不变，均无条带', () => {
+test('原生与终关远距十二秒追云使用相同参数，冥主瞬移不变，均无条带', () => {
   for (const origin of [3, 4])
     for (const arena of [origin, 6]) {
       const { g, e } = encounter(origin, arena === 6 ? (origin === 3 ? 4 : 5) : 0, arena);
@@ -118,9 +118,9 @@ test('原生远距十二秒追云与终关六秒追云保留独立参数，冥�
       if (origin === 3) {
         const z = g.zones[0];
         assert.ok(z);
-        assert.equal(z.life, arena === 3 ? 12 : 6);
+        assert.equal(z.life, 12);
         assert.equal(z.radius, 58);
-        assert.equal(z.vx, arena === 3 ? 96 : 32);
+        assert.equal(z.vx, 96);
         assert.equal(z.vy, 0);
         assert.ok(z.delay >= 1.18);
         assert.equal(z.damage, e.damage * 0.8);
@@ -145,7 +145,7 @@ test('七王旧圆阵与保留技能均进入实际轮换，仅劫灵新增两�
         g.castBossSkill(e, 1, 0);
         assert.ok(g.notice.includes(origin === 6 && phase === 8 ? '万劫归一' : skills[phase]));
         if (origin === 5 && phase >= 4) {
-          assert.equal(g.zones.length, phase === 4 ? 5 : 6);
+          assert.equal(g.zones.length, phase === 4 ? 2 : 6);
           assert.ok(g.zones.every((z) => Number.isFinite(z.endX) && Number.isFinite(z.endY)));
         } else assert.ok(g.zones.every((z) => z.endX === undefined && z.endY === undefined));
       }

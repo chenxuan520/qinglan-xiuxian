@@ -472,11 +472,9 @@
 .leaderboard-unavailable {
   margin-top: 16px;
 }
-.ranking-retry {
-  padding: 12px 0;
-  color: var(--muted);
-  font-size: 13px;
-  text-decoration: underline;
+.leaderboard-unavailable .save-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
 }
 .panel [data-import-ranking-warning],
 .leaderboard-unavailable > .panel-note {

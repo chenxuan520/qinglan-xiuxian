@@ -98,7 +98,7 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
     if (borrowed === 0) assert.ok(zones.every((z) => z.damage === c.e.damage * 0.55));
     if ([1, 4].includes(borrowed)) assert.ok(shots.every((b) => b.damage === c.e.damage * 0.6));
     if (borrowed === 2) assert.ok(children.every((e) => e.maxHp >= c.e.maxHp * 0.08));
-    if (borrowed === 3) assert.ok(zones.every((z) => z.damage === c.e.damage && z.life === 6));
+    if (borrowed === 3) assert.ok(zones.every((z) => z.damage === c.e.damage && z.life === 12));
     if (borrowed === 5) assert.ok(shots.every((b) => b.damage === c.e.damage * 0.85));
     for (const shot of shots) assert.ok(Number.isFinite(bossShotPose(shot).x));
     assert.ok(Game.restore(c.g.save, c.g.snapshot()));
