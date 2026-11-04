@@ -39,7 +39,7 @@ export interface TrailPoint extends Point {
   time: number;
 }
 
-// 速度已保存在弹丸中：原生古墟新回焰走新时长，旧续局及终关回焰保留原轨迹。
+// 速度已保存在弹丸中：原生与终关新回焰同轨，旧续局及天劫事件保留原轨迹。
 export function bossReturnOut(b: Shot) {
   const m = b.bossMotion;
   return m?.kind === 'return' &&

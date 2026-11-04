@@ -486,7 +486,7 @@ export function validateRunSnapshot(
               Number.isFinite(z.vx) &&
               Number.isFinite(z.vy) &&
               Math.hypot(z.vx!, z.vy!) <=
-                (s.stage === 3 && !s.tribulation && z.kind === 'boss-miasma'
+                ([3, 6].includes(s.stage) && !s.tribulation && z.kind === 'boss-miasma'
                   ? BOSS_MECHANICS.nativePursuitMiasmaSpeed + 1e-8
                   : !s.tribulation && s.stage >= 5 && z.kind === 'enemy-thunderpath'
                     ? 90 + 1e-8

@@ -70,8 +70,7 @@ import {
   TRIAL_BOSS_TIMES,
   TRIAL_PRESSURE_SECONDS,
   TRIAL_BOSS_CAP,
-  TRIAL_BOSS_BUFFER_SECONDS,
-  TRIAL_BOSS_INTERVAL,
+  TRIAL_BOSS_MIN_INTERVAL,
   DIFFICULTIES,
   ENEMIES,
   ENEMY_TACTICS,
@@ -729,9 +728,14 @@ export class Game {
       )
         return null;
       g.trialBossesSpawned = s.trialBossesSpawned;
+      const scheduled = TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? g.stageDuration;
+      // 清除旧的累积顺延；仅保留刚登场后尚未走完的三秒最小间隔。
       g.nextTrialBossAt = Math.max(
-        s.nextTrialBossAt,
-        TRIAL_BOSS_TIMES[g.trialBossesSpawned] ?? g.stageDuration,
+        scheduled,
+        !g.isFinalTrial ||
+          (s.nextTrialBossAt > s.time && s.nextTrialBossAt <= s.time + TRIAL_BOSS_MIN_INTERVAL)
+          ? s.nextTrialBossAt
+          : scheduled,
       );
       g.nextElite = s.nextElite;
       g.damageDealt = s.damageDealt;
@@ -1084,7 +1088,11 @@ export class Game {
     if (this.time < this.nextElite) return;
     if (
       (this.usesElitePacing || this.cacheChallenge?.phase === 'active') &&
-      countMatching(this.enemies, (e) => e.elite && !e.boss && !e.dead) + (late ? 2 : 1) >
+      countMatching(
+        this.enemies,
+        (e) => e.elite && !e.boss && !e.dead && e.bossSummon?.kind !== 'heart',
+      ) +
+        (late ? 2 : 1) >
         ELITE_PACING.maxAlive
     ) {
       // 满额时只延后一秒再尝试，不积攒波次等清场后一口气补齐。
@@ -1123,11 +1131,7 @@ export class Game {
       if (this.time >= this.nextTrialBossAt) this.trialBossBlocked = true;
       return;
     }
-    if (this.trialBossBlocked) {
-      this.trialBossBlocked = false;
-      this.nextTrialBossAt = Math.max(this.nextTrialBossAt, this.time + TRIAL_BOSS_BUFFER_SECONDS);
-      return;
-    }
+    this.trialBossBlocked = false;
     if (this.time < this.nextTrialBossAt) return;
     const bossStage = TRIAL_BOSS_STAGES[this.trialBossesSpawned];
     this.bossSpawned = true;
@@ -1135,7 +1139,7 @@ export class Game {
     this.trialBossesSpawned++;
     this.nextTrialBossAt = Math.max(
       TRIAL_BOSS_TIMES[this.trialBossesSpawned] ?? this.stageDuration,
-      this.time + TRIAL_BOSS_INTERVAL,
+      this.time + TRIAL_BOSS_MIN_INTERVAL,
     );
     this.announce(`第 ${this.trialBossesSpawned} / 7 劫 · ${STAGES[bossStage].boss}降临`);
     this.onEvent('boss');
@@ -2011,7 +2015,7 @@ export class Game {
   }
   private castBossPursuit(e: Enemy, nx: number, ny: number) {
     if ((e.bossStage ?? this.stage) === 3) {
-      const native = this.stage === 3 && !this.tribulation;
+      const native = !this.tribulation;
       const speed = native ? BOSS_MECHANICS.nativePursuitMiasmaSpeed : 32;
       this.zone(
         e.x + nx * 165,
@@ -2048,7 +2052,7 @@ export class Game {
         const center = stage === 0 ? this.player : e;
         const child = this.spawnEnemy(
           stage === 0 ? 10 : 41,
-          stage === 2,
+          stage === 0 || stage === 2,
           false,
           {
             x: center.x + Math.cos(angle) * 145,
@@ -2061,7 +2065,6 @@ export class Game {
         child.bossSummon = { kind, age: 0, side };
         if (stage === 2) child.hp = child.maxHp = Math.max(child.maxHp, e.maxHp * 0.08);
         child.radius = stage === 0 ? 20 : 23;
-        if (stage === 0) child.hp = child.maxHp *= 0.45;
         child.damage = stage === 0 ? 0 : Math.max(child.damage, e.damage * 0.65);
         child.speed = stage === 0 ? 0 : Math.max(child.speed, 210);
         child.dx = nx;
@@ -2089,16 +2092,15 @@ export class Game {
       );
       for (let i = 0; i < count; i++) {
         const a = Math.atan2(ny, nx) + (i / 6 - 0.5) * 1.2;
-        const speed =
-          this.stage === 1 && !this.tribulation ? rules.nativeReturnSpeed : rules.returnSpeed;
+        const speed = !this.tribulation ? rules.nativeReturnSpeed : rules.returnSpeed;
         const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.6);
         shot.bossMotion = { kind: 'return', velocity: { x: shot.vx, y: shot.vy } };
         shot.life = rules.returnWarmup + 2 * bossReturnOut(shot) + rules.returnRest;
         shot.radius = 10;
       }
     } else if (stage === 3) {
-      // 只加强第四境原生毒瘴，终关劫相保留原参数与圆形攻击。
-      const native = this.stage === 3 && !this.tribulation;
+      // 原生与终关一致；天劫事件保持原参数。
+      const native = !this.tribulation;
       const speed = native ? rules.nativeMiasmaSpeed : 24;
       for (const side of [-105, 0, 105]) {
         this.zone(
@@ -3093,7 +3095,10 @@ export class Game {
       this.player.hp <= 0 ||
       !this.cacheNearby ||
       !c ||
-      countMatching(this.enemies, (e) => !e.dead && e.elite && !e.boss) > 2
+      countMatching(
+        this.enemies,
+        (e) => !e.dead && e.elite && !e.boss && e.bossSummon?.kind !== 'heart',
+      ) > 2
     )
       return false;
     c.phase = 'active';
@@ -3152,7 +3157,10 @@ export class Game {
     } else if (c.phase === 'offered') {
       if (
         !this.cacheNearby ||
-        countMatching(this.enemies, (e) => !e.dead && e.elite && !e.boss) > 2
+        countMatching(
+          this.enemies,
+          (e) => !e.dead && e.elite && !e.boss && e.bossSummon?.kind !== 'heart',
+        ) > 2
       )
         this.cacheApproachStartedAt = null;
       else {

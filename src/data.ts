@@ -910,8 +910,7 @@ export const TRIAL_BOSS_STAGES = [0, 1, 2, 3, 4, 5, 6];
 export const TRIAL_BOSS_TIMES = [60, 105, 150, 195, 240, 285, 330];
 export const TRIAL_PRESSURE_SECONDS = 300;
 export const TRIAL_BOSS_CAP = 2;
-export const TRIAL_BOSS_BUFFER_SECONDS = 5;
-export const TRIAL_BOSS_INTERVAL = 45;
+export const TRIAL_BOSS_MIN_INTERVAL = 3;
 export const TRIAL_ENEMY_TIMES = [0, 45, 90, 150];
 // 首境保留入门强度；后续秘境按天灵根逐关积累的境界定标，不追随玩家属性。
 export const STAGE_REALM_STEPS = [0, 6, 10, 13, 16, 19, 22];

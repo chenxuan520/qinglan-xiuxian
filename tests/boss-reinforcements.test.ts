@@ -97,20 +97,16 @@ test('普通精英仍掉宝匣，召唤双狼自然到期或随主人消散不�
   assert.ok(h.g.enemies.filter((e) => e.bossSummon?.kind === 'wolf').every((e) => e.dead));
 });
 
-test('古墟回焰单程534.75、往返232.5，预热/停驻不变；终关仍用178.25与155', () => {
+test('古墟回焰单程534.75、往返232.5，预热/停驻不变；终关同值', () => {
   for (const arena of [1, 6]) {
     const { g } = encounter(1, 3, arena);
     const b = g.shots[3],
-      duration = arena === 1 ? 2.3 : 1.15,
-      speed = arena === 1 ? 232.5 : 155;
+      duration = 2.3,
+      speed = 232.5;
     assert.equal(bossReturnOut(b), duration);
     assert.ok(validBossMotion(b.bossMotion!, 1));
     const edge = bossShotPose(b, R.returnWarmup + duration);
-    assert.ok(
-      Math.abs(
-        Math.hypot(edge.x - b.origin.x, edge.y - b.origin.y) - (arena === 1 ? 534.75 : 178.25),
-      ) < 1e-9,
-    );
+    assert.ok(Math.abs(Math.hypot(edge.x - b.origin.x, edge.y - b.origin.y) - 534.75) < 1e-9);
     for (const [age, direction] of [
       [R.returnWarmup + 0.5, 1],
       [R.returnWarmup + duration + R.returnRest + 0.5, -1],
@@ -161,4 +157,56 @@ test('普通小兵召唤的精英保留原宝匣规则，妖王已离场的精�
     false,
   );
   assert.ok(g.pickups.some((p) => p.kind === 'xp'));
+});
+
+for (const arena of [0, 6])
+  test(`第${arena + 1}境木心气血等于同类型精英，静止不攻击，无击杀与精英掉落`, () => {
+    const { g } = encounter(0, 3, arena);
+    const hearts = g.enemies.filter((e) => e.bossSummon?.kind === 'heart');
+    assert.equal(hearts.length, 3);
+    const events = [];
+    g.onEvent = (event) => events.push(event);
+    for (const heart of hearts) {
+      const standard = enemyCombatStats(arena, 0, g.time, heart.type, true, false);
+      assert.equal(heart.elite, true);
+      assert.equal(heart.maxHp, standard.hp);
+      assert.equal(heart.hp, standard.hp);
+      assert.equal(heart.speed, 0);
+      assert.equal(heart.damage, 0);
+      const before = { x: heart.x, y: heart.y };
+      g.updateBossSummon(heart, 0.5);
+      assert.deepEqual({ x: heart.x, y: heart.y }, before);
+    }
+    const before = [g.kills, g.combatCultivation, g.pickups.length, g.iron];
+    g.hitEnemy(hearts[0], hearts[0].maxHp * 100, false, 'sword');
+    assert.deepEqual([g.kills, g.combatCultivation, g.pickups.length, g.iron], before);
+    assert.ok(!events.includes('elite'));
+    if (arena === 0) {
+      g.cacheChallenge = {
+        x: g.player.x,
+        y: g.player.y,
+        phase: 'offered',
+        deadline: 100,
+        guardians: [],
+      };
+      assert.equal(g.beginCacheChallenge(), true, '木心不占用精英计数或阻止守匣');
+    }
+  });
+
+test('天劫事件的回焰、漂移毒瘴与追云保持旧参数', () => {
+  const source = encounter(1, 3).g;
+  const g = Game.createTribulation(source.save, source),
+    boss = g.boss!;
+  boss.bossStage = 1;
+  g.castBossMechanic(boss, 1, 0);
+  const flame = g.shots.find((b) => b.bossMotion?.kind === 'return')!;
+  assert.equal(Math.hypot(flame.vx, flame.vy), 155);
+  assert.equal(bossReturnOut(flame), 1.15);
+  boss.bossStage = 3;
+  g.castBossMechanic(boss, 1, 0);
+  assert.ok(g.zones.every((z) => z.life === 6 && Math.hypot(z.vx!, z.vy!) === 24));
+  g.zones = [];
+  g.castBossPursuit(boss, 1, 0);
+  assert.equal(g.zones[0].life, 6);
+  assert.equal(Math.hypot(g.zones[0].vx!, g.zones[0].vy!), 32);
 });

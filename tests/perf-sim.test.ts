@@ -15,7 +15,7 @@ import {
   advanceScenarioStep,
   type ScenarioResult,
 } from '../scripts/perf-sim.ts';
-import { FINAL_TRIAL_STAGE, TRIAL_BOSS_TIMES, TRIAL_BOSS_INTERVAL } from '../src/data.ts';
+import { FINAL_TRIAL_STAGE, TRIAL_BOSS_TIMES, TRIAL_BOSS_MIN_INTERVAL } from '../src/data.ts';
 
 test('percentile 取排序后向上取整位置，空序列为 NaN', () => {
   assert.ok(Number.isNaN(percentile([], 95)));
@@ -138,7 +138,7 @@ test('保留终关前段对照；后期样本从0秒自然排程到仙尊，包�
     assert.equal(spawn.count, index + 1);
     assert.ok(spawn.time >= TRIAL_BOSS_TIMES[index]);
     if (index)
-      assert.ok(spawn.time - result.bossSpawns[index - 1].time + 1e-6 >= TRIAL_BOSS_INTERVAL);
+      assert.ok(spawn.time - result.bossSpawns[index - 1].time + 1e-6 >= TRIAL_BOSS_MIN_INTERVAL);
   }
   assert.ok(result.bossStages.includes(FINAL_TRIAL_STAGE));
   assert.ok(result.finalBossFrames > 0);

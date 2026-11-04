@@ -85,7 +85,9 @@ export class BattleHud {
           c.phase === 'active'
             ? `守匣挑战 · 剩余 ${Math.max(0, Math.ceil(c.deadline - game.time))} 秒`
             : game.cacheNearby
-              ? game.enemies.filter((e) => !e.dead && e.elite && !e.boss).length > 2
+              ? game.enemies.filter(
+                  (e) => !e.dead && e.elite && !e.boss && e.bossSummon?.kind !== 'heart',
+                ).length > 2
                 ? '附近精英过多 · 清理后自动开阵'
                 : `正在开阵 · ${Math.round(game.cacheApproachProgress * 100)}%`
               : `守匣灵阵 ${direction} ${Math.round(Math.hypot(dx, dy))} 步 · 入阵停留自动挑战`,

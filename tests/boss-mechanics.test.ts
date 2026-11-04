@@ -17,7 +17,8 @@ function encounter(origin: number, arena = origin) {
   const g = new Game(s, arena, 0, () => 0.5);
   g.weapons[0].timer = 99999;
   g.spawnBudget = -10000;
-  g.nextElite = g.nextTrialBossAt = 99999;
+  g.nextElite = 99999;
+  g.nextTrialBossAt = arena === 6 ? 60 : 99999;
   g.bossSpawned = true;
   const e = g.spawnEnemy(10, false, true, { x: -180, y: 0 }, origin);
   Object.assign(e, {
@@ -71,13 +72,7 @@ for (let origin = 0; origin < 6; origin++)
       }
       if (origin === 3) {
         assert.equal(g.zones.length, 3);
-        assert.ok(
-          g.zones.every(
-            (z) =>
-              z.life === (arena === 3 ? 12 : 6) &&
-              Math.hypot(z.vx!, z.vy!) === (arena === 3 ? 72 : 24),
-          ),
-        );
+        assert.ok(g.zones.every((z) => z.life === 12 && Math.hypot(z.vx!, z.vy!) === 72));
       }
       if (origin === 4) {
         assert.equal(g.shots.length, 5);

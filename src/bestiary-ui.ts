@@ -6,7 +6,6 @@ import {
   STAGES,
   DIFFICULTIES,
   TRIAL_BOSS_CAP,
-  TRIAL_BOSS_BUFFER_SECONDS,
   ENEMIES,
   ENEMY_TACTICS,
   STAGE_ENEMIES,
@@ -39,7 +38,7 @@ function statLine(
 const miasmaHint = (life: number) =>
   `五处固定瘴池、五道毒矢与四名护卫召唤，另有三团持续${life}秒的漂移毒瘴；毒伤命中后3秒无法回复，清灵散可减伤并缩短蚀体。`;
 const bossHints = [
-  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，藤圈造成3秒藤缠，暂难拾取；木心生长2.4秒后成阵，可提前击碎。',
+  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，藤圈造成3秒藤缠，暂难拾取；木心坚韧如精英，生长2.4秒后成阵，可提前击碎。',
   '快慢两层炎扇（九发与八发）、五点火径与快慢两层轮舞（各二十发），离开火圈并穿过弹幕间隙；七道回焰短暂停留后沿原路折返。',
   '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后；两头猎狼从侧翼绕行后蓄势合扑，每只气血至少为施放妖王的8%，另有重新锁向的两段连扑。',
   miasmaHint(BOSS_MECHANICS.nativeMiasmaLife),
@@ -49,8 +48,7 @@ const bossHints = [
 const trialBossHints = bossHints
   .map(
     (hint, id) =>
-      (id === 3 ? miasmaHint(6) : hint) +
-      (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
+      hint + (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
   )
   .concat(
     '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。<span class="boss-skill-name">万劫归一：</span>借用前六位妖王之一的招牌，化为金色；<span class="boss-skill-name">天劫审判：</span>劫印三息后沿落脚点连劈三雷；<span class="boss-skill-name">归墟引力：</span>半血后将修士拉向自身，同时放出雷环。',
@@ -156,7 +154,7 @@ export function bestiaryPanel(
       })
       .join(
         '',
-      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有不同的圆阵、弹幕与特色招式，仙尊原六招保留，另有三招招牌技。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋蓄力0.425秒，仙尊雷袭0.5秒。双王独立施法，危险区可重叠。终关首王最早1:00出现，此后至少间隔45秒；同时最多${TRIAL_BOSS_CAP}王，满额时顺延并留${TRIAL_BOSS_BUFFER_SECONDS}秒缓冲，全部击败才通关。</div>`,
+      )}</div><div class="boss-note">${smallIcon('book')} 前六境与终关的六位旧王各有不同的圆阵、弹幕与特色招式，仙尊原六招保留，另有三招招牌技。每轮随机轮换，远离妖王时还会招来追袭。终关旧王出招间隔${bossSkillCooldown(0, true, false)}秒、半血${bossSkillCooldown(0, true, true)}秒；仙尊${bossSkillCooldown(6, true, false)}秒、半血${bossSkillCooldown(6, true, true)}秒，冲锋蓄力0.425秒，仙尊雷袭0.5秒。双王独立施法，危险区可重叠。终关妖王按60秒起每45秒的原定时间登场，同时最多${TRIAL_BOSS_CAP}位；腾出位置时若已到时间立即登场，不再顺延，相邻登场至少间隔3秒，全部击败才通关。</div>`,
     wide: true,
   };
 }

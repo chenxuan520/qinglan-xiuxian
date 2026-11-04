@@ -32,7 +32,7 @@ function encounter(arena = 3, difficulty = 0) {
   return { g, boss };
 }
 
-test('第四境三团毒瘴持续十二秒、速度七十二，三种难度与各方向相同；终关保留原值', () => {
+test('第四境三团毒瘴持续十二秒、速度七十二，三种难度与各方向相同，终关同值', () => {
   for (const difficulty of [0, 1, 2])
     for (const [nx, ny] of [
       [1, 0],
@@ -49,9 +49,9 @@ test('第四境三团毒瘴持续十二秒、速度七十二，三种难度与�
           [1.45, 1.2, 1.45],
         );
         for (const z of g.zones) {
-          assert.equal(z.life, arena === 3 ? 12 : 6);
+          assert.equal(z.life, 12);
           assert.equal(z.maxLife, z.life);
-          assert.ok(Math.abs(Math.hypot(z.vx!, z.vy!) - (arena === 3 ? 72 : 24)) < 1e-8);
+          assert.ok(Math.abs(Math.hypot(z.vx!, z.vy!) - 72) < 1e-8);
           assert.equal(z.damage, boss.damage);
           assert.equal(z.radius, 62);
           assert.equal(z.endX, undefined);
@@ -59,7 +59,7 @@ test('第四境三团毒瘴持续十二秒、速度七十二，三种难度与�
       }
 });
 
-test('第四境真实远距追袭生成十二秒、九十六速度的追云，终关追云仍为六秒与三十二', () => {
+test('第四境真实远距追袭生成十二秒、九十六速度的追云，终关同值', () => {
   for (const difficulty of [0, 1, 2]) {
     const { g, boss } = encounter(3, difficulty);
     boss.pursuitCooldown = 0;
@@ -77,8 +77,8 @@ test('第四境真实远距追袭生成十二秒、九十六速度的追云，�
     trial.boss.skillStep = 4;
     trial.g.castBossSkill(trial.boss, 0.6, 0.8);
     const old = trial.g.zones[0];
-    assert.equal(old.life, 6);
-    assert.ok(Math.abs(Math.hypot(old.vx!, old.vy!) - 32) < 1e-8);
+    assert.equal(old.life, 12);
+    assert.ok(Math.abs(Math.hypot(old.vx!, old.vy!) - 96) < 1e-8);
   }
 });
 
@@ -132,12 +132,12 @@ test('两种加速毒瘴暂停、刷新续局和导入往返保留速度与剩�
   }
 });
 
-test('续局只扩大第四境妖王毒瘴的合法速度，不放行其他危险区与非有限速度', () => {
+test('续局只允许第四境与终关妖王毒瘴的合法速度，不放行其他危险区与非有限速度', () => {
   for (const [arena, kind, speed] of [
     [3, 'boss-miasma', 96.01],
-    [6, 'boss-miasma', 72],
+    [6, 'boss-miasma', 96.01],
     [3, 'enemy-miasma', 72],
-    [2, 'boss-frost', 72],
+    [3, 'boss-frost', 72],
     [3, 'boss-miasma', Infinity],
     [3, 'boss-miasma', NaN],
   ] as const) {
@@ -150,7 +150,7 @@ test('续局只扩大第四境妖王毒瘴的合法速度，不放行其他危�
   }
 });
 
-test('固定毒池保持，小怪瘴云提速150%，图鉴区分第四境和终关时长', () => {
+test('固定毒池保持，小怪瘴云提速150%，图鉴中第四境和终关时长一致', () => {
   const { g, boss } = encounter();
   boss.skillStep = 0;
   g.castBossSkill(boss, 1, 0);
@@ -161,12 +161,12 @@ test('固定毒池保持，小怪瘴云提速150%，图鉴区分第四境和终�
   assert.ok(Math.abs(cloud.life - 4.8) < 1e-8);
   assert.equal(cloud.vx, 30);
   assert.match(bestiaryPanel(3).body, /三团持续12秒的漂移毒瘴/);
-  assert.match(bestiaryPanel(6).body, /三团持续6秒的漂移毒瘴/);
-  assert.doesNotMatch(bestiaryPanel(6).body, /三团持续12秒的漂移毒瘴/);
+  assert.match(bestiaryPanel(6).body, /三团持续12秒的漂移毒瘴/);
+  assert.doesNotMatch(bestiaryPanel(6).body, /三团持续6秒的漂移毒瘴/);
   const guide = guideContent('combat');
   const gameplay = readFileSync(new URL('../docs/gameplay.md', import.meta.url), 'utf8');
   assert.match(guide, /第四境毒君另有三团持续12秒的漂移毒瘴，追云同样持续12秒/);
-  assert.match(guide, /终关毒君的漂移毒瘴与追云持续6秒/);
+  assert.match(guide, /终关毒君的漂移毒瘴与追云同样持续12秒/);
   assert.match(gameplay, /第四境毒君的三团漂移毒瘴与远距追云持续12秒/);
-  assert.match(gameplay, /终关毒君的两种移动毒瘴持续6秒/);
+  assert.match(gameplay, /终关毒君的两种移动毒瘴同样持续12秒/);
 });

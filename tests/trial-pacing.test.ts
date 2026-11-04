@@ -36,61 +36,83 @@ test('新终关首分钟完整、正常出王间隔45秒，全部七王清完才
   }
 });
 
-test('满两王不预告或叠王，释放名额留5秒，延期后仍隔45秒而不密集追赶', () => {
+test('满两王不叠王，170秒腾出位置立即出第三王，第四王仍按195秒原表登场', () => {
   const g = trial();
   advance(g, 60);
   advance(g, 105);
   g.effects = [];
   g.time = 149.6;
   assert.equal(bossEntranceCue(g), null);
-  advance(g, 200);
+  advance(g, 170);
   assert.equal(g.trialBossesSpawned, 2);
-  assert.equal(g.trialBossBlocked, true);
-  const restored = Game.restore(g.save, structuredClone(g.snapshot()))!;
-  restored.resume();
-  const beforeKills = restored.kills;
-  restored.hitEnemy(restored.boss!, restored.boss!.maxHp);
-  restored.xp = 0;
-  restored.update(0.01);
-  const due = restored.nextTrialBossAt;
-  assert.ok(due >= 205);
-  assert.equal(restored.kills, beforeKills + 1);
-  const twice = Game.restore(restored.save, structuredClone(restored.snapshot()))!;
-  twice.resume();
-  assert.equal(twice.nextTrialBossAt, due);
-  advance(twice, due - 0.01);
-  assert.equal(twice.trialBossesSpawned, 2);
-  assert.equal(bossEntranceCue(twice)!.arriving, false);
-  advance(twice, due);
-  assert.equal(twice.trialBossesSpawned, 3);
-  assert.ok(Math.abs(twice.nextTrialBossAt - due - 45) < 1e-8);
-  assert.equal(twice.enemies.filter((e) => e.boss && !e.dead).length, 2);
+  g.hitEnemy(g.boss!, g.boss!.maxHp);
+  g.xp = 0;
+  g.update(0.001);
+  assert.equal(g.trialBossesSpawned, 3);
+  assert.equal(g.nextTrialBossAt, 195);
+  assert.equal(g.enemies.filter((e) => e.boss && !e.dead).length, 2);
+  g.hitEnemy(g.boss!, g.boss!.maxHp);
+  g.xp = 0;
+  advance(g, 194.99);
+  assert.equal(g.trialBossesSpawned, 3);
+  advance(g, 195);
+  assert.equal(g.trialBossesSpawned, 4);
+  assert.equal(g.nextTrialBossAt, 240);
 });
 
-test('时间已过很久也不在同帧补出多王，暂停、复活不重置顺延时间', () => {
+test('严重延误按原表补位但同帧只出一王，间隔至少3秒，暂停复活保留', () => {
   const g = trial();
   advance(g, 900);
   assert.equal(g.trialBossesSpawned, 1);
-  assert.equal(g.nextTrialBossAt, 945);
+  assert.equal(g.nextTrialBossAt, 903);
+  g.update(0);
+  assert.equal(g.trialBossesSpawned, 1);
   g.pause();
   g.update(1);
-  assert.equal(g.nextTrialBossAt, 945);
+  assert.equal(g.nextTrialBossAt, 903);
   assert.equal(g.time, 900);
   g.state = 'lost';
   g.revive();
-  assert.equal(g.nextTrialBossAt, 945);
+  assert.equal(g.nextTrialBossAt, 903);
+  advance(g, 902.999);
   assert.equal(g.trialBossesSpawned, 1);
+  advance(g, 903);
+  assert.equal(g.trialBossesSpawned, 2);
+  for (const e of g.enemies.filter((e) => e.boss && !e.dead)) g.hitEnemy(e, e.maxHp);
+  g.xp = 0;
+  advance(g, 905.999);
+  assert.equal(g.trialBossesSpawned, 2);
+  advance(g, 906);
+  assert.equal(g.trialBossesSpawned, 3);
 });
 
-test('延期状态跨续局保存，损坏状态拒绝恢复', () => {
+test('续局清除旧累积顺延、原定时间已到立即补位，并保留刚登场的3秒间隔', () => {
   const current = trial();
-  current.time = 310;
-  current.nextTrialBossAt = 380;
+  advance(current, 60);
+  advance(current, 105);
+  advance(current, 170);
+  current.nextTrialBossAt = 215;
   current.trialBossBlocked = true;
   const restored = Game.restore(current.save, structuredClone(current.snapshot()))!;
-  assert.equal(restored.time, 310);
-  assert.equal(restored.nextTrialBossAt, 380);
-  assert.equal(restored.trialBossBlocked, true);
+  assert.ok(restored);
+  assert.equal(restored.nextTrialBossAt, 150);
+  restored.resume();
+  restored.hitEnemy(restored.boss!, restored.boss!.maxHp);
+  restored.xp = 0;
+  restored.update(0.001);
+  assert.equal(restored.trialBossesSpawned, 3);
+  assert.equal(restored.nextTrialBossAt, 195);
+  const late = trial();
+  advance(late, 900);
+  late.pause();
+  const again = Game.restore(late.save, structuredClone(late.snapshot()))!;
+  assert.ok(again);
+  assert.equal(again.nextTrialBossAt, 903);
+  again.resume();
+  advance(again, 902.99);
+  assert.equal(again.trialBossesSpawned, 1);
+  advance(again, 903);
+  assert.equal(again.trialBossesSpawned, 2);
   assert.equal(
     Game.restore(current.save, { ...current.snapshot(), trialBossBlocked: 'true' }),
     null,
