@@ -107,7 +107,7 @@
 }
 .collection-card.is-forged-max strong,
 .collection-card.is-forged-max .forge-dots,
-.treasure-detail.is-forged-max .detail-copy h3 {
+.treasure-detail.is-forged-max .detail-forge {
   color: #efd18b;
 }
 .treasure-detail.is-forged-max .detail-emblem {
@@ -190,20 +190,14 @@
   letter-spacing: 2px;
   color: #a8bda5;
 }
-.detail-copy h3 {
-  font-size: 22px;
-  font-weight: 400;
-  letter-spacing: 2px;
-  margin-top: 6px;
-}
-.detail-copy h3 small {
-  display: inline-flex;
+.detail-forge {
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 8px;
   font-size: 10px;
   color: #b6bd9b;
-  margin-left: 14px;
-  letter-spacing: 0;
+  margin-top: 6px;
 }
 .detail-copy p {
   font-size: 11px;
