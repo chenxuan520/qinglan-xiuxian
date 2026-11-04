@@ -4060,3 +4060,8 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 - 新建 `src/treasure-lore.ts`，按用户确认的 36 条文案逐字收录 `TREASURE_LORE`（键为法宝 id，与 `TREASURES` 的 36 件一一对应），仅由藏器阁按需模块 `catalog-ui.ts` 引入。
 - 法宝详情在 `.detail-actions` 按钮行之后追加「器物来历」小节，未收藏的法宝同样显示；局内升级卡片、HUD、妖物志不显示。`src/catalog.css` 增加细分隔线，标题复用现有 `.guide-subheading`（上下边距收窄为 0 / 10px），正文只覆盖字号与次要文字色、行高沿用详情说明的 1.8（桌面说明 11px / 来历 10px；手机 650px 断点内说明 10px / 来历 9px）。样式压缩后根路径 CSS 161,797 字节、Pages 子路径 161,989 字节，均在 162,000 预算内。
 - 测试新增 `tests/treasure-lore.test.ts`：36 个键与 `TREASURES` 完全一致、无空文案；每件详情含对应文案且位于按钮之后；图鉴列表不出现来历。构建核对器物来历只出现在按需 chunk（`assets/CZRQY_LL.js`），入口包无「器物来历」「青寒冷铁」字样；`npm run size:check` 通过。全量 `npm test` **2274/2274**、文档 38/38、类型检查通过。文案未做任何改写。
+
+## 2026-11-04 · 入口 CSS 预算调整为 170000
+
+- 法宝详情新增「器物来历」后入口 CSS 一度贴近 162,000 上限，根路径压缩到 161,797、Pages 子路径 161,989 才勉强通过。按用户明确要求，将 `scripts/size-check.ts` 的 `cssBytes` 由 162,000 调整为 170,000；JS、gzip 与 18MB 整包上限不变，不放宽素材、样本或文档门禁。
+- 同步 `docs/development.md` 的预算沿革记录。`npm run size:check`（根路径与 Pages 子路径）通过，骨架样式不再需要为字节数做压缩。
