@@ -58,6 +58,19 @@ for (const [origin, arena] of [
     assert.equal(g.pickups.length, 0);
     assert.equal(BOSS_MECHANICS.wolfLife, 6);
   });
+  test(`狼${origin}/${arena}第二轮仍占据相反侧翼，不会沿各自旧冲向挤成一只`, () => {
+    const { g, wolves } = encounter(origin, arena);
+    for (let frame = 0; frame < 380; frame++) {
+      for (const wolf of wolves) g.updateBossSummon(wolf, 0.01);
+    }
+    assert.ok(wolves.every((e) => !e.dead && e.bossSummon!.age > 3.7));
+    assert.ok(wolves[0].y * wolves[1].y < 0);
+    assert.ok(Math.hypot(wolves[0].x - wolves[1].x, wolves[0].y - wolves[1].y) > 200);
+    assert.deepEqual(
+      wolves.map((e) => e.bossSummon!.side),
+      [1, -1],
+    );
+  });
   test(`狼${origin}/${arena}受杀与随主人消散，补召仍各主人最多两只`, () => {
     const { g, wolves, boss, cast } = encounter(origin, arena);
     for (let i = 0; i < 3; i++) cast();

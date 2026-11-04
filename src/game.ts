@@ -2188,8 +2188,9 @@ export class Game {
     if (state.kind === 'heart') return;
     state.round = before + dt;
     if (state.round < BOSS_MECHANICS.wolfFlank) {
-      const tx = this.player.x - e.dy * state.side * 145,
-        ty = this.player.y + e.dx * state.side * 145;
+      const angle = Math.atan2(this.player.y - owner.y, this.player.x - owner.x);
+      const tx = this.player.x - Math.sin(angle) * state.side * 145,
+        ty = this.player.y + Math.cos(angle) * state.side * 145;
       const d = Math.hypot(tx - e.x, ty - e.y) || 1,
         travel = Math.min(d, e.speed * dt);
       e.x += ((tx - e.x) / d) * travel;
