@@ -430,7 +430,7 @@ test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际�
   assert.ok(book.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(text.includes('保留原本三招与非条带特色招式'));
   for (const source of [combat, book, text]) {
-    for (const name of ['星轨连珠', '雷网横移', '五星依次离轨'])
+    for (const name of ['周天星轨', '雷网横移', '五星依次离轨'])
       assert.ok(source.includes(name), name);
     assert.ok(!source.includes('劫灵三颗星珠'));
   }

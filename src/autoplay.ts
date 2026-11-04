@@ -1,6 +1,6 @@
 import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
 import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL } from './data.ts';
-import type { Choice, Game } from './game.ts';
+import type { Choice, Game, Point } from './game.ts';
 import {
   hazardDistance,
   regionalExposure,
@@ -77,18 +77,34 @@ function choiceScore(c: Choice, g: Game) {
   // 功法只能靠升级修习；已学功法优先升重，法宝仍可由宝匣提升。
   return g.passives[c.id] ? Math.max(32, score + 12) : score;
 }
+function steer(direction: Point, follow: Point, weight = 1) {
+  const x = direction.x + follow.x * weight,
+    y = direction.y + follow.y * weight,
+    length = Math.hypot(x, y);
+  return length > 1e-8 ? { x: x / length, y: y / length } : follow;
+}
 export function autoplayInput(g: Game) {
-  const direction = autoplayDirection(g);
+  let direction = autoplayDirection(g);
+  if (g.immobilized > 0) return direction;
+  const sweep = g.zones.find((z) => z.kind === 'boss-sweep' && z.delay <= 0 && z.life > 0);
+  if (sweep?.spinCenter) {
+    const dx = g.player.x - sweep.spinCenter.x,
+      dy = g.player.y - sweep.spinCenter.y,
+      distance = Math.hypot(dx, dy) || 1,
+      sign = Math.sign(sweep.spinSpeed!);
+    const follow =
+      distance > 120
+        ? { x: (-dy / distance) * sign, y: (dx / distance) * sign }
+        : { x: -dx / distance, y: -dy / distance };
+    direction = steer(direction, follow, distance > 120 ? 1 : 0.6);
+  }
   const boss = g.gravityBoss;
-  if (!boss || g.immobilized > 0) return direction;
+  if (!boss) return direction;
   const distance = Math.hypot(g.player.x - boss.x, g.player.y - boss.y);
   const away = distance
     ? { x: (g.player.x - boss.x) / distance, y: (g.player.y - boss.y) / distance }
     : { x: 1, y: 0 };
-  const x = direction.x + away.x,
-    y = direction.y + away.y;
-  const length = Math.hypot(x, y);
-  return length > 1e-8 ? { x: x / length, y: y / length } : away;
+  return steer(direction, away);
 }
 function autoplayDirection(g: Game) {
   if (g.immobilized > 0) return { x: 0, y: 0 };

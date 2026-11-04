@@ -44,12 +44,6 @@ export function drawRegionalField(
         c.stroke();
       }
     }
-    if (length && z.kind === 'boss-rift' && z.delay > 0) {
-      c.strokeStyle = z.color;
-      c.beginPath();
-      c.arc(0, 0, z.radius, 0, Math.PI * 2);
-      c.stroke();
-    }
     if (z.kind === 'enemy-thunderpath' && z.vx !== undefined) {
       c.save();
       c.translate(length / 2 - 16, 0);

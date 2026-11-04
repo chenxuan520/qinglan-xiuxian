@@ -29,51 +29,114 @@ for (const arena of [5, 6]) {
     assert.deepEqual(bossSkills(5, arena === 6), [
       ...STAGES[5].skills,
       '星位轮转',
-      '星轨连珠',
+      '周天星轨',
       '雷网横移',
     ]);
   });
-  test(`第${arena + 1}关星轨五线按i→i+2连接，脚下必中、星心安全，预警后才伤人`, () => {
+  test(`第${arena + 1}关周天星轨固定圆心，两线垂直起手，预警冻结后旋转半周`, () => {
     for (const roll of [0, 0.23, 0.5, 0.99]) {
       const { g, e } = encounter(arena, 4, () => roll);
-      assert.equal(g.zones.length, 5);
-      const vertices = g.zones.map(({ x, y }) => ({ x, y }));
-      const center = {
-        x: vertices.reduce((s, v) => s + v.x, 0) / 5,
-        y: vertices.reduce((s, v) => s + v.y, 0) / 5,
-      };
-      near(Math.min(...g.zones.map((z) => hazardDistance(z, g.player))), 0);
-      near((vertices[0].x + vertices[2].x) / 2, g.player.x);
-      near((vertices[0].y + vertices[2].y) / 2, g.player.y);
-      g.zones.forEach((z, i) => {
-        near(Math.hypot(z.x - center.x, z.y - center.y), 170);
-        near(hazardDistance(z, center), 170 * Math.cos(TAU / 5));
-        assert.equal(z.endX, vertices[(i + 2) % 5].x);
-        assert.equal(z.endY, vertices[(i + 2) % 5].y);
-        assert.equal(z.radius, 18);
+      const center = { x: e.x, y: e.y },
+        zones = [...g.zones];
+      assert.equal(zones.length, 2);
+      const initial = structuredClone(zones);
+      const toward = Math.atan2(g.player.y - e.y, g.player.x - e.x);
+      near(Math.cos(zones[0].spinAngle! - toward), 0);
+      near(zones[1].spinAngle! - zones[0].spinAngle!, Math.PI);
+      assert.ok(Math.min(...zones.map((z) => hazardDistance(z, g.player))) > 100);
+      for (const z of zones) {
+        assert.equal(z.kind, 'boss-sweep');
+        assert.deepEqual(z.spinCenter, center);
+        assert.equal(z.radius, 16);
         assert.equal(z.delay, 1);
-        assert.equal(z.life, 0.5);
+        assert.equal(z.life, 3);
         assert.equal(z.damage, e.damage);
-        assert.equal(z.kind, 'boss-rift');
+        assert.equal(z.color, STAGES[5].color);
+        near(Math.abs(z.spinSpeed!), Math.PI / 3);
+        near(Math.hypot(z.x - center.x, z.y - center.y), 40);
+        near(Math.hypot(z.endX! - center.x, z.endY! - center.y), 900);
+      }
+      // 预警时站在线上也不受伤；圆心不跟随后续妖王移动。
+      Object.assign(g.player, {
+        x: (zones[0].x + zones[0].endX!) / 2,
+        y: (zones[0].y + zones[0].endY!) / 2,
       });
       const hp = g.player.hp;
-      g.updateZones(1);
-      assert.equal(g.player.hp, hp);
-      g.updateZones(0.01);
-      assert.ok(g.player.hp < hp);
+      e.x += 100;
+      e.y -= 100;
       g.updateZones(0.5);
+      g.updateZones(0.5);
+      assert.deepEqual(
+        zones,
+        initial.map((z) => ({ ...z, delay: 0 })),
+      );
+      assert.equal(g.player.hp, hp);
+      g.updateZones(3);
+      zones.forEach((z, i) => {
+        near(z.spinAngle! - initial[i].spinAngle!, z.spinSpeed! * 3);
+        assert.deepEqual(z.spinCenter, center);
+      });
       assert.equal(g.zones.length, 0);
     }
+  });
+  test(`第${arena + 1}关星轨逐帧扫中过静止玩家，绕过半秒tick且不附加控制`, () => {
+    for (const roll of [0, 0.99]) {
+      const { g } = encounter(arena, 4, () => roll);
+      g.zones.forEach((z) => (z.tick = 999));
+      let hits = 0;
+      const hurt = g.hurtPlayer.bind(g);
+      g.hurtPlayer = (...args) => {
+        hits++;
+        hurt(...args);
+      };
+      const hp = g.player.hp;
+      for (let i = 0; i < 250; i++) g.update(1 / 60);
+      assert.equal(hits, 1);
+      assert.ok(g.player.hp < hp);
+      assert.equal(g.immobilized, 0);
+      assert.equal(g.slowed, 0);
+      assert.equal(g.sealed, 0);
+    }
+  });
+  test(`第${arena + 1}关星轨每区0.6秒命中冷却并遵守无敌帧`, () => {
     const { g } = encounter(arena);
-    const center = {
-      x: g.zones.reduce((s, z) => s + z.x, 0) / 5,
-      y: g.zones.reduce((s, z) => s + z.y, 0) / 5,
-    };
-    Object.assign(g.player, center);
+    const z = g.zones[0];
+    g.zones = [z];
+    z.delay = 0;
+    z.spinSpeed = 0;
+    z.tick = 999;
+    Object.assign(g.player, { x: (z.x + z.endX!) / 2, y: (z.y + z.endY!) / 2 });
+    g.player.invincible = 1;
     const hp = g.player.hp;
-    g.updateZones(1);
     g.updateZones(0.01);
     assert.equal(g.player.hp, hp);
+    g.player.invincible = 0;
+    g.updateZones(0.6);
+    assert.ok(g.player.hp < hp);
+    const after = g.player.hp;
+    for (let i = 0; i < 5; i++) {
+      g.player.invincible = 0;
+      g.updateZones(0.1);
+    }
+    g.updateZones(0.099);
+    assert.equal(g.player.hp, after);
+    g.updateZones(0.0011);
+    assert.ok(g.player.hp < after);
+  });
+  test(`第${arena + 1}关星轨的40以内圆心安全区不被线段圆帽侵入，快照不含旋转字段`, () => {
+    for (const radius of [0, 20, 39.99]) {
+      const { g, e } = encounter(arena);
+      Object.assign(g.player, { x: e.x + radius, y: e.y });
+      const hp = g.player.hp;
+      for (let i = 0; i < 250; i++) g.updateZones(1 / 60);
+      assert.equal(g.player.hp, hp);
+    }
+    const { g } = encounter(arena);
+    assert.equal(g.snapshot().zones.length, 0);
+    assert.doesNotMatch(
+      JSON.stringify(g.snapshot()),
+      /spinCenter|spinAngle|spinSpeed|hitCooldown|boss-sweep/,
+    );
   });
   test(`第${arena + 1}关雷网三墙各留130缺口、间距140，预警冻结、朝王移动、命中定身、到期消失`, () => {
     const { g, e } = encounter(arena, 5);
@@ -172,7 +235,8 @@ for (const arena of [5, 6]) {
       }
       assert.equal(g.state, 'playing');
       assert.ok(Math.hypot(g.player.x - start.x, g.player.y - start.y) > 40);
-      assert.equal(g.player.hp, hp);
+      if (phase === 5) assert.equal(g.player.hp, hp);
+      else assert.ok(g.player.hp > 0);
     });
   }
 }
@@ -198,5 +262,42 @@ test('五星续局发射时间仍拒绝字符串、非有限值和不在新旧�
     const raw = g.snapshot();
     Object.assign(raw.shots[0].bossMotion!, { launchAt });
     assert.equal(Game.restore(g.save, raw), null);
+  }
+});
+
+test('周天星轨自动历练远处顺旋向切行、近处叠加向心，预警不启用且不抵消为零', () => {
+  for (const roll of [0, 0.99]) {
+    const { g } = encounter(5, 4, () => roll);
+    g.enemies = [];
+    g.pickups = [{ x: 1000, y: 0, kind: 'xp', value: 1, pull: false }];
+    const zones = g.zones;
+    for (const z of zones) {
+      const shift = { x: -200 - z.spinCenter!.x, y: -z.spinCenter!.y };
+      z.x += shift.x;
+      z.y += shift.y;
+      z.endX! += shift.x;
+      z.endY! += shift.y;
+      z.spinCenter = { x: -200, y: 0 };
+      z.delay = 0;
+      // 把当前星轨置于玩家侧面，既有安全点搜索不改变原目标方向。
+      z.x = -200;
+      z.y = 40;
+      z.endX = -200;
+      z.endY = 900;
+    }
+    const far = autoplayInput(g);
+    near(far.x, Math.SQRT1_2);
+    near(far.y, Math.SQRT1_2 * Math.sign(zones[0].spinSpeed!));
+    g.pickups[0] = { x: 0, y: 1000, kind: 'xp', value: 1, pull: false };
+    zones.forEach((z) => {
+      z.spinCenter!.x = -100;
+      z.x = z.endX = -100;
+    });
+    const close = autoplayInput(g);
+    near(close.x, -0.6 / Math.hypot(0.6, 1));
+    near(close.y, 1 / Math.hypot(0.6, 1));
+    zones.forEach((z) => (z.delay = 1));
+    near(autoplayInput(g).x, 0);
+    assert.ok(Math.hypot(far.x, far.y) > 0.99 && Math.hypot(close.x, close.y) > 0.99);
   }
 });

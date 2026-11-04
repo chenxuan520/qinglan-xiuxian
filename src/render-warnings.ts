@@ -13,7 +13,17 @@ export function drawEnemyWarnings(
   // 仅重绘清晰的边界与标记，不叠加第二层红色底色。
   for (const z of game.zones) {
     if (!z.hostile || !visible(z, p, hazardMargin(z))) continue;
-    if (drawRegionalField(c, z, game.time, true, true)) continue;
+    if (drawRegionalField(c, z, game.time, true, true)) {
+      if (z.kind === 'boss-sweep') {
+        c.save();
+        c.fillStyle = z.color;
+        c.font = 'bold 16px serif';
+        c.textAlign = 'center';
+        c.fillText('星', (z.x + z.endX!) / 2, (z.y + z.endY!) / 2 + 6);
+        c.restore();
+      }
+      continue;
+    }
     c.save();
     c.translate(z.x, z.y);
     c.setLineDash(z.delay > 0 ? [7, 5] : []);

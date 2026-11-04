@@ -47,6 +47,7 @@ import {
 } from './regional-combat.ts';
 import {
   hazardDistance,
+  rotateZone,
   slowingHazard,
   bindingHazard,
   entanglingHazard,
@@ -570,7 +571,7 @@ export class Game {
             }
           : {}),
       })),
-      zones: this.zones.map((z) => ({ ...z })),
+      zones: this.zones.filter((z) => z.kind !== 'boss-sweep').map((z) => ({ ...z })),
       pickups: this.pickups.map((p) => ({ ...p })),
       choices: this.choices.map((c) => ({ ...c })),
       bossSpawned: this.bossSpawned,
@@ -1818,21 +1819,23 @@ export class Game {
       return;
     }
     if (stage === 5 && phase === 4) {
-      const theta = this.random() * TAU;
-      const radius = 170,
-        inset = radius * Math.cos(TAU / 5);
-      const center = { x: p.x - Math.cos(theta) * inset, y: p.y - Math.sin(theta) * inset };
-      const vertices = Array.from({ length: 5 }, (_, i) => {
-        const a = theta - TAU / 5 + (i / 5) * TAU;
-        return { x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius };
-      });
-      for (let i = 0; i < 5; i++) {
-        const from = vertices[i],
-          to = vertices[(i + 2) % 5];
-        this.zone(from.x, from.y, 18, 0.5, e.damage, STAGES[5].color, 'boss-rift', 1, true);
-        Object.assign(this.zones.at(-1)!, { endX: to.x, endY: to.y });
+      const center = { x: e.x, y: e.y };
+      const start =
+        Math.atan2(p.y - e.y, p.x - e.x) + ((this.random() < 0.5 ? 1 : -1) * Math.PI) / 2;
+      const speed = ((this.random() < 0.5 ? 1 : -1) * Math.PI) / 3;
+      for (let i = 0; i < 2; i++) {
+        const angle = start + i * Math.PI;
+        this.zone(center.x, center.y, 16, 3, e.damage, STAGES[5].color, 'boss-sweep', 1, true);
+        Object.assign(this.zones.at(-1)!, {
+          spinCenter: { ...center },
+          spinAngle: angle,
+          spinSpeed: speed,
+          spinInner: 40,
+          spinOuter: 900,
+        });
+        rotateZone(this.zones.at(-1)!);
       }
-      this.announce('太虚劫灵 · 星轨连珠 · 离开脚下星线');
+      this.announce('太虚劫灵 · 周天星轨 · 贴身或随轨而行');
       return;
     }
     if (stage === 5 && phase === 5) {
@@ -2778,8 +2781,24 @@ export class Game {
           z.endY! += z.vy! * dt;
         }
       }
+      rotateZone(z, dt);
       z.life -= dt;
       z.tick -= dt;
+      if (z.kind === 'boss-sweep') {
+        z.hitCooldown = Math.max(0, (z.hitCooldown ?? 0) - dt);
+        // 线段圆帽与角色碰撞余量不得侵入贴身安全区。
+        if (
+          z.life > 0 &&
+          z.hitCooldown <= 0 &&
+          Math.hypot(this.player.x - z.spinCenter!.x, this.player.y - z.spinCenter!.y) >=
+            z.spinInner! &&
+          hazardDistance(z, this.player) < z.radius + 8
+        ) {
+          this.hurtPlayer(z.damage);
+          z.hitCooldown = 0.6;
+        }
+        continue;
+      }
       if (
         z.hostile &&
         z.life > 0 &&

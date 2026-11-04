@@ -72,6 +72,12 @@ export interface Zone extends Point {
   vx?: number;
   vy?: number;
   sourceId?: number;
+  spinCenter?: Point;
+  spinAngle?: number;
+  spinSpeed?: number;
+  spinInner?: number;
+  spinOuter?: number;
+  hitCooldown?: number;
   radius: number;
   life: number;
   maxLife: number;

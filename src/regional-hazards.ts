@@ -1,5 +1,19 @@
 import type { Point, Zone } from './game-types.ts';
 
+// 生成和逐帧推进共用端点计算，圆心始终取施法时的副本。
+export function rotateZone(z: Zone, dt = 0) {
+  const center = z.spinCenter;
+  if (!center) return;
+  const angle = z.spinAngle! + z.spinSpeed! * Math.min(dt, z.life),
+    x = Math.cos(angle),
+    y = Math.sin(angle);
+  z.spinAngle = angle;
+  z.x = center.x + x * z.spinInner!;
+  z.y = center.y + y * z.spinInner!;
+  z.endX = center.x + x * z.spinOuter!;
+  z.endY = center.y + y * z.spinOuter!;
+}
+
 // 条状攻击是两端带圆帽的危险带。渲染、命中和自动走位共用同一几何。
 export function hazardDistance(z: Zone, p: Point) {
   if (z.endX === undefined || z.endY === undefined) return Math.hypot(p.x - z.x, p.y - z.y);
