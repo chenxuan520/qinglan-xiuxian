@@ -44,6 +44,22 @@ export function drawRegionalField(
         c.stroke();
       }
     }
+    if (length && z.kind === 'boss-rift' && z.delay > 0) {
+      c.strokeStyle = z.color;
+      c.beginPath();
+      c.arc(0, 0, z.radius, 0, Math.PI * 2);
+      c.stroke();
+    }
+    if (z.kind === 'enemy-thunderpath' && z.vx !== undefined) {
+      c.save();
+      c.translate(length / 2 - 16, 0);
+      c.rotate(-Math.atan2(z.endY! - z.y, z.endX! - z.x));
+      c.fillStyle = z.color;
+      c.font = 'bold 16px serif';
+      c.textAlign = 'center';
+      c.fillText('雷', 0, 6);
+      c.restore();
+    }
     if (z.vx !== undefined && (z.vx || z.vy)) {
       c.save();
       c.translate(length / 2, 0);

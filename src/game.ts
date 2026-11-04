@@ -1761,7 +1761,7 @@ export class Game {
           enemies = this.enemies.length;
         try {
           e.bossStage = borrowed;
-          this.castBossMechanic(e, nx, ny);
+          this.castBossMechanic(e, nx, ny, true);
         } finally {
           e.bossStage = FINAL_TRIAL_STAGE;
         }
@@ -1815,6 +1815,55 @@ export class Game {
     }
     if (this.isFinalTrial && ((stage === 3 && phase === 4) || (stage === 4 && phase === 5))) {
       this.castBossPursuit(e, nx, ny);
+      return;
+    }
+    if (stage === 5 && phase === 4) {
+      const theta = this.random() * TAU;
+      const radius = 170,
+        inset = radius * Math.cos(TAU / 5);
+      const center = { x: p.x - Math.cos(theta) * inset, y: p.y - Math.sin(theta) * inset };
+      const vertices = Array.from({ length: 5 }, (_, i) => {
+        const a = theta - TAU / 5 + (i / 5) * TAU;
+        return { x: center.x + Math.cos(a) * radius, y: center.y + Math.sin(a) * radius };
+      });
+      for (let i = 0; i < 5; i++) {
+        const from = vertices[i],
+          to = vertices[(i + 2) % 5];
+        this.zone(from.x, from.y, 18, 0.5, e.damage, STAGES[5].color, 'boss-rift', 1, true);
+        Object.assign(this.zones.at(-1)!, { endX: to.x, endY: to.y });
+      }
+      this.announce('太虚劫灵 · 星轨连珠 · 离开脚下星线');
+      return;
+    }
+    if (stage === 5 && phase === 5) {
+      for (let i = 0; i < 3; i++) {
+        const x = p.x + nx * (260 + i * 140),
+          y = p.y + ny * (260 + i * 140);
+        const gap = (this.random() - 0.5) * 440;
+        for (const [from, to] of [
+          [-320, gap - 65],
+          [gap + 65, 320],
+        ]) {
+          this.zone(
+            x - ny * from,
+            y + nx * from,
+            16,
+            4,
+            e.damage * 0.6,
+            STAGES[5].color,
+            'enemy-thunderpath',
+            0.8,
+            true,
+          );
+          Object.assign(this.zones.at(-1)!, {
+            endX: x - ny * to,
+            endY: y + nx * to,
+            vx: -nx * 90,
+            vy: -ny * 90,
+          });
+        }
+      }
+      this.announce('太虚劫灵 · 雷网横移 · 寻缺口穿过');
       return;
     }
     if (stage < 6 && phase === 3) {
@@ -1979,7 +2028,7 @@ export class Game {
       e.y = this.player.y - ny * 260;
     }
   }
-  private castBossMechanic(e: Enemy, nx: number, ny: number) {
+  private castBossMechanic(e: Enemy, nx: number, ny: number, borrowed = false) {
     const stage = e.bossStage ?? this.stage,
       rules = BOSS_MECHANICS;
     if (stage === 0 || stage === 2) {
@@ -2091,14 +2140,17 @@ export class Game {
         shot.radius = 10;
       }
     } else if (stage === 5) {
-      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'star') >= 6) return;
-      for (let i = 0; i < 3; i++) {
+      // 仙尊借用仍保留原三星；本次只加强劫灵及其旧王劫相。
+      const count = borrowed ? 3 : 5;
+      if (countMatching(this.shots, (b) => b.bossMotion?.kind === 'star') >= (borrowed ? 6 : 10))
+        return;
+      for (let i = 0; i < count; i++) {
         const shot = this.hostileShot(e, 1, 0, 220, e.damage * 0.85);
         shot.bossMotion = {
           kind: 'star',
           center: { x: e.x, y: e.y },
-          angle: (i / 3) * TAU,
-          launchAt: 1.3 + i * 0.45,
+          angle: (i / count) * TAU,
+          launchAt: 1.3 + i * (borrowed ? 0.45 : 0.35),
         };
         shot.life = shot.bossMotion.launchAt + 1.8;
         shot.radius = 12;

@@ -118,7 +118,10 @@ export function validBossMotion(m: BossMotion, stage: number | undefined) {
       stage === 5 &&
       point(m.center) &&
       Number.isFinite(m.angle) &&
-      [1.3, 1.75, 2.2].includes(m.launchAt)
+      Number.isFinite(m.launchAt) &&
+      [1.3, 1.75, 2.2, ...Array.from({ length: 5 }, (_, i) => 1.3 + i * 0.35)].some(
+        (launchAt) => Math.abs(launchAt - m.launchAt) < 1e-8,
+      )
     );
   return (
     m.kind === 'memory' &&

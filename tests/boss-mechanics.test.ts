@@ -47,7 +47,10 @@ for (let origin = 0; origin < 6; origin++)
       assert.deepEqual(bossSkills(origin, arena === 6).slice(0, 3), STAGES[origin].skills);
       assert.equal(
         bossSkills(origin, arena === 6).length,
-        4 + Number([2, 4].includes(origin)) + Number(arena === 6 && [3, 4].includes(origin)),
+        4 +
+          Number([2, 4].includes(origin)) +
+          (origin === 5 ? 2 : 0) +
+          Number(arena === 6 && [3, 4].includes(origin)),
       );
       assert.deepEqual(bossSkills(6, true).slice(0, 6), STAGES[6].skills);
       assert.equal(bossSkills(6, true).length, 9);
@@ -81,7 +84,7 @@ for (let origin = 0; origin < 6; origin++)
         assert.ok(g.shots.every((b) => b.bossMotion?.kind === 'memory'));
       }
       if (origin === 5) {
-        assert.equal(g.shots.length, 3);
+        assert.equal(g.shots.length, 5);
         assert.ok(g.shots.every((b) => b.bossMotion?.kind === 'star'));
       }
       assert.ok(
@@ -256,14 +259,14 @@ test('逆行魂影只走施法前记录的路线，拐弯和停驻都不读取�
   assert.ok(Math.hypot(pose.x - p1.x, pose.y - p1.y) < 1e-7);
 });
 
-test('星珠绕固定星位旋转，三颗按1.3/1.75/2.2秒错拍释放，蓄势时不造成碰撞伤害', () => {
+test('星珠绕固定星位旋转，五颗按1.3/1.65/2/2.35/2.7秒错拍释放，蓄势时不造成碰撞伤害', () => {
   const { g } = cast(5);
   const b = g.shots[0];
   const m = b.bossMotion!;
   if (m.kind !== 'star') throw Error('star');
   assert.deepEqual(
-    g.shots.map((b) => b.bossMotion!.kind === 'star' && b.bossMotion!.launchAt),
-    [1.3, 1.75, 2.2],
+    g.shots.map((b) => b.bossMotion!.kind === 'star' && Number(b.bossMotion!.launchAt.toFixed(2))),
+    [1.3, 1.65, 2, 2.35, 2.7],
   );
   const p = bossShotPose(b, 0.7);
   assert.ok(Math.abs(Math.hypot(p.x - m.center.x, p.y - m.center.y) - R.orbitRadius) < 1e-8);

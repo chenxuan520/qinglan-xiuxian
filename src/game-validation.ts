@@ -462,6 +462,7 @@ export function validateRunSnapshot(
           'boss-miasma',
           'boss-soul',
           'boss-rift',
+          'enemy-thunderpath',
         ].includes(kind));
     if (
       !Array.isArray(s.zones) ||
@@ -487,7 +488,9 @@ export function validateRunSnapshot(
               Math.hypot(z.vx!, z.vy!) <=
                 (s.stage === 3 && !s.tribulation && z.kind === 'boss-miasma'
                   ? BOSS_MECHANICS.nativePursuitMiasmaSpeed + 1e-8
-                  : 40))) &&
+                  : !s.tribulation && s.stage >= 5 && z.kind === 'enemy-thunderpath'
+                    ? 90 + 1e-8
+                    : 40))) &&
           (z.sourceId === undefined ||
             (z.hostile === true &&
               regionalZone(z.kind) &&

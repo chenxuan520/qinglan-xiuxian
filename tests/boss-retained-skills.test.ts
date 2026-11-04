@@ -135,7 +135,7 @@ test('原生远距十二秒追云与终关六秒追云保留独立参数，冥�
     }
 });
 
-test('七王旧圆阵与所有保留非条带技能均进入实际招式轮换，不把恢复名额给条带', () => {
+test('七王旧圆阵与保留技能均进入实际轮换，仅劫灵新增两招使用线段', () => {
   for (let origin = 0; origin < 7; origin++)
     for (const arena of new Set([origin, 6])) {
       const skills = bossSkills(origin, arena === 6);
@@ -144,7 +144,10 @@ test('七王旧圆阵与所有保留非条带技能均进入实际招式轮换�
         const { g, e } = encounter(origin, phase, arena);
         g.castBossSkill(e, 1, 0);
         assert.ok(g.notice.includes(origin === 6 && phase === 8 ? '万劫归一' : skills[phase]));
-        assert.ok(g.zones.every((z) => z.endX === undefined && z.endY === undefined));
+        if (origin === 5 && phase >= 4) {
+          assert.equal(g.zones.length, phase === 4 ? 5 : 6);
+          assert.ok(g.zones.every((z) => Number.isFinite(z.endX) && Number.isFinite(z.endY)));
+        } else assert.ok(g.zones.every((z) => z.endX === undefined && z.endY === undefined));
       }
     }
   assert.ok(bossSkills(2, true).includes('踏雪连袭'));

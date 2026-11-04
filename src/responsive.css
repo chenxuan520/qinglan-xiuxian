@@ -721,6 +721,15 @@
   .enemy-card small {
     font-size: 7px;
   }
+  .enemy-card[data-boss-stage='5'] {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+  .enemy-card[data-boss-stage='5'] small {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #bacbb5;
+  }
   .boss-note {
     font-size: 9px;
     padding: 10px;

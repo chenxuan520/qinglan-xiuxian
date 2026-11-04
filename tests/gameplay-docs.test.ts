@@ -425,10 +425,15 @@ test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际�
   const text = compact(gameplay);
   const book = bestiaryPanel(6).body;
   const counts = Array.from({ length: 6 }, (_, origin) => bossSkills(origin, true).length);
-  assert.deepEqual(counts, [4, 4, 5, 5, 6, 4]);
+  assert.deepEqual(counts, [4, 4, 5, 5, 6, 6]);
   assert.ok(combat.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(book.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(text.includes('保留原本三招与非条带特色招式'));
+  for (const source of [combat, book, text]) {
+    for (const name of ['星轨连珠', '雷网横移', '五星依次离轨'])
+      assert.ok(source.includes(name), name);
+    assert.ok(!source.includes('劫灵三颗星珠'));
+  }
   for (const removed of ['三路藤牢', '离火横径', '三叠焰路', '三叠天雷', '游魂双障'])
     for (const source of [combat, book, text]) assert.ok(!source.includes(removed), removed);
   for (let origin = 0; origin < 7; origin++) {
