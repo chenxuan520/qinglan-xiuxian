@@ -39,7 +39,7 @@ const profiles: Record<string, string> = {
   bare: '无辅助',
   earned: '收益养成',
   'ads-only': '仅广告',
-  maxed: '理论上限（广告不计冷却、根基满级）',
+  maxed: '理论上限',
 };
 const seconds = (n: number | null | undefined) => (n == null ? '—' : `${n.toFixed(1)}秒`);
 export interface DailyReport {

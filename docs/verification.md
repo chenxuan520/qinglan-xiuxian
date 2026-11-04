@@ -4008,7 +4008,7 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 
 - 每日完整矩阵的 `maxed`（旧报告名「广告与根基满级」）在 2026-10-29 给广告物资加冷却后，第二次领取返回 `null` 并抛 `supplies-cooldown`，2520 条样本全部 0 场战斗，还拉低了汇总。定位到 `scripts/balance-simulation.ts` 的 `supplies()` 共用真实领取函数。
 - 按用户确认改为纯模拟侧的理论上限：`supplies()` 增加 `BalanceCase` 参数，`maxed` 直接按 `adSupplies(save.unlocked)` 发放并照常累加 `adUsage.supplies`，不写 `suppliesReadyAt`；其余三组仍走 `claimSuppliesReward` 的真实冷却，`LIMITS.supplies`（2000）照旧生效。不改游戏本体、门禁目标或其他投入方式。
-- 报告标签改为「理论上限（广告不计冷却、根基满级）」，并在筛选说明下补充「无对应真人玩法，仅用于观察资质上限」。同步 `docs/rules/balance-ci.md`、`docs/development.md`。
+- 报告标签改为「理论上限」（简称，避免下拉框过长），并在筛选说明下补充「理论上限参照：假设广告物资不受冷却、开局根基与法宝炼满，无对应的真人玩法，仅用于观察资质上限」。同步 `docs/rules/balance-ci.md`、`docs/development.md`。
 - 验证：同一固定种子下单条 `maxed` 由「0 场 + supplies-cooldown」变为通关 7 关、465 次广告物资；`ads-only`、`bare`、`earned` 的广告物资次数仍为 0，未走上限分支。经用户确认，低资质仍按正常广告与寿元规则测试：五灵根、无灵根在准备阶段修满三项根基需约 198／300 年，超过初始 100 年加三次借寿共 190 年，因此这 720 条仍以 `expired` 结束、不开打；这不是补给冷却空跑，也不再计入 `supplies-cooldown`，作为已知结构限制记录，本轮不新增寿元豁免。定向 `tests/ad-reward-limits.test.ts` 15/15、全量 `npm test` **2247/2247** 通过（0 失败/跳过/取消）。完整矩阵由次日定时任务重跑，按要求不做本机全量或额外回调。
 
 ## 2026-11-03 · 初入仙途第二、三、四、六境加难
