@@ -84,8 +84,8 @@ test('入门费随资质变化，天灵根最低；只能加入一个宗门', ()
   rootless.starter = 'ice';
   rootless.stones = entryCost(rootless);
   assert.equal(joinSect(rootless, 'blood'), true);
-  assert.equal(rootless.starter, 'bloodpool');
-  assert.ok(rootless.artifacts.includes('bloodpool'));
+  assert.equal(rootless.starter, 'brush');
+  assert.ok(rootless.artifacts.includes('brush'));
 });
 
 test('十六宗门成功拜入随机赠一枚凡品，药名记入见闻且同档保存', () => {

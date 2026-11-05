@@ -51,7 +51,7 @@ function strike(g: Game, shot: Shot, e: Enemy) {
 const projectiles = [
   ['sword', 0.45, 7],
   ['fire', 0.45, 7],
-  ['fan', 0.45, 7],
+  ['fan', 0.45, 9],
   ['blade', 0.45, 7],
   ['pearl', 0.45, 7],
   ['dragon', 0.45, 7],
@@ -64,6 +64,31 @@ const projectiles = [
   ['nail', 0.6, 8],
   ['skull', 0.6, 8],
 ] as const;
+
+test('芭蕉扇一重三道、六重六道、觉醒九道风刃，夹角0.24且青霄剑和镇魂幡弹数不变', () => {
+  for (const [id, level, evolved, count] of [
+    ['fan', 1, false, 3],
+    ['fan', 6, false, 6],
+    ['fan', 6, true, 9],
+    ['sword', 1, false, 1],
+    ['sword', 6, true, 7],
+    ['talisman', 1, false, 4],
+    ['talisman', 6, true, 10],
+  ] as const) {
+    const g = game(id, evolved);
+    g.weapons[0].level = level;
+    target(g);
+    g.cast(g.weapons[0]);
+    assert.equal(g.shots.length, count, `${id} ${level} ${evolved}`);
+    if (id !== 'fan') continue;
+    for (const [i, shot] of g.shots.entries()) {
+      close(Math.atan2(shot.vy, shot.vx), (i - (count - 1) / 2) * 0.24, '扇形角度');
+      close(Math.hypot(shot.vx, shot.vy), 380, '风刃速度');
+      close(shot.damage, g.weaponHitDamage(g.weapons[0]), '风刃伤害');
+      assert.equal(shot.pierce, 2 + level);
+    }
+  }
+});
 
 for (const [id, factor, evolvedCount] of projectiles) {
   test(`${id}：仅觉醒后对同一 Boss 后续子弹衰减至 ${factor}，弹数、基础伤害及冷却不变`, () => {

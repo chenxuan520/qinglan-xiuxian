@@ -170,7 +170,7 @@ export type WeaponKind =
 export const ROOT_STARTERS: Record<ElementId, [WeaponKind, WeaponKind]> = {
   metal: ['sword', 'nail'],
   wood: ['fan', 'chain'],
-  water: ['ice', 'bloodpool'],
+  water: ['pearl', 'brush'],
   fire: ['lightning', 'fire'],
   earth: ['pagoda', 'skull'],
 };
@@ -297,7 +297,7 @@ export const TREASURES: Treasure[] = [
     mark: '扇',
     color: '#addec2',
     tag: '风法 · 扇射',
-    desc: '朝妖群挥出扇形风刃，覆盖宽阔战线。',
+    desc: '朝妖群挥出扇形风刃，比寻常法宝多出两道，覆盖宽阔战线。',
     evolution: '九天罡风',
     passive: 'crit',
     damage: 19,
@@ -356,7 +356,7 @@ export const TREASURES: Treasure[] = [
     desc: '金索在妖物间弹射，以灵力束缚目标。',
     evolution: '天罗地网',
     passive: 'area',
-    damage: 23,
+    damage: 29,
     cooldown: 2,
   },
   {

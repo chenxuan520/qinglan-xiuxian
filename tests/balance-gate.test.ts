@@ -386,13 +386,13 @@ test('天灵根总体九成通关仍不能掩盖某一种本命全部失败', ()
     (c) => c.root === 'heaven' && c.profile === 'bare' && c.difficulty === 0,
   );
   const rows = cases.map((c) => {
-    const complete = c.starter !== 'ice';
+    const complete = c.starter !== 'pearl';
     return { ...sample(), case: c, key: caseKey(c), complete, cleared: complete ? 7 : 1 };
   });
   assert.equal(rows.filter((r) => r.complete).length / rows.length, 0.9);
   const failures = acceptanceFailures(rows);
   assert.ok(!failures.some((f) => f.startsWith('heaven：')));
-  assert.ok(failures.some((f) => f.startsWith('heaven/ice：')));
+  assert.ok(failures.some((f) => f.startsWith('heaven/pearl：')));
 });
 
 test('实际裸开荒复跑可复现，禁止预算、强化和重试混入默认胜率', () => {

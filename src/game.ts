@@ -2616,7 +2616,7 @@ export class Game {
       }
       return;
     }
-    const number = w.id === 'talisman' ? count + 3 : count;
+    const number = w.id === 'talisman' ? count + 3 : w.id === 'fan' ? count + 2 : count;
     for (let i = 0; i < number; i++) {
       const angle =
         w.id === 'talisman'

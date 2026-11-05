@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import { GuideSource } from '../src/guide-source.ts';
 import * as guide from '../src/guide.ts';
 
+test('灵根与法宝指南自动展示水系沧海珠 / 判天笔及当前配套功法', () => {
+  assert.match(
+    guide.guideContent('roots'),
+    /<strong>水灵根<\/strong>正道 \/ 兼修：沧海珠；魔道：判天笔/,
+  );
+  assert.match(
+    guide.guideContent('builds'),
+    /<td>沧海珠<br>吞天纳灵<\/td><td>判天笔<br>逆命魔典<\/td>/,
+  );
+});
+
 test('帮助按器法、修行与操作问题归类，保留九类且常见问题默认折叠', () => {
   assert.equal(guide.GUIDE_TABS.length, 9);
   const roots = guide.GUIDE_TABS.findIndex((tab) => tab.id === 'roots');

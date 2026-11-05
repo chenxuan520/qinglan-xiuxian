@@ -537,12 +537,14 @@ export function readSave(
             ...validIds([s.starter]),
           ]
         : validIds(s.artifacts);
-    // 无灵根不赠送入门法宝；有灵根时确保首位五行入门法宝在收藏中，拍卖放出的除外。
+    // 已有收藏原样恢复，不因入门表调整补发法宝；缺收藏字段的旧档才补首位五行入门。
     const released = base.mortal.auction?.releasedArtifacts ?? [];
     const initialRoot = base.rootElements.length ? base.rootElements[0] : undefined;
     base.artifacts = [
       ...new Set([
-        ...(initialRoot ? ROOT_STARTERS[initialRoot].filter((id) => !released.includes(id)) : []),
+        ...(s.artifacts === undefined && initialRoot
+          ? ROOT_STARTERS[initialRoot].filter((id) => !released.includes(id))
+          : []),
         ...legacy,
       ]),
     ];

@@ -106,9 +106,10 @@ export function validAuction(
         amount(n) && n < (legacy ? AUCTION_LOTS : AUCTION_CURIO_LOT) && n !== AUCTION_CURIO_LOT,
     ) &&
     Array.isArray(s.releasedArtifacts) &&
-    s.releasedArtifacts.length <= 10 &&
+    s.releasedArtifacts.length <= TREASURES.length &&
     new Set(s.releasedArtifacts).size === s.releasedArtifacts.length &&
-    s.releasedArtifacts.every(freeStarter) &&
+    // 历史已售标记按法宝全集校验，不随当前入门表调整而失效。
+    s.releasedArtifacts.every((id) => TREASURES.some((t) => t.id === id)) &&
     Array.isArray(s.history) &&
     s.history.length <= 12 &&
     s.history.every((r) => {

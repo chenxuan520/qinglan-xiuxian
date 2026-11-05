@@ -204,6 +204,7 @@
   line-height: 1.8;
   color: #b5c4ab;
   margin-top: 8px;
+  text-wrap: pretty;
 }
 .evolution-recipe {
   font-size: 11px;

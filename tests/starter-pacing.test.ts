@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game } from '../src/game.ts';
-import { freshSave, parseSave } from '../src/progress.ts';
+import { freshSave, readSave, attuneSpiritRoot } from '../src/progress.ts';
 import {
   ROOT_STARTERS,
   TREASURES,
@@ -13,12 +13,14 @@ import { choiceCard } from '../src/common-ui.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { autoplayChoice } from '../src/autoplay.ts';
 import { joinSect } from '../src/mortal.ts';
+import { validAuction, freeStarter } from '../src/auction-data.ts';
+import { exportSave, importSave } from '../src/save-transfer.ts';
 
-test('十种五行本命符合路线，各路线配套功法不重复，水魔保留化血盏', () => {
+test('十种五行本命符合路线，各路线配套功法不重复，水系入门为沧海珠 / 判天笔', () => {
   assert.deepEqual(ROOT_STARTERS, {
     metal: ['sword', 'nail'],
     wood: ['fan', 'chain'],
-    water: ['ice', 'bloodpool'],
+    water: ['pearl', 'brush'],
     fire: ['lightning', 'fire'],
     earth: ['pagoda', 'skull'],
   });
@@ -35,6 +37,108 @@ test('十种五行本命符合路线，各路线配套功法不重复，水魔�
     assert.equal(recipes.length, 5);
     assert.equal(new Set(recipes).size, 5);
   }
+});
+
+test('水系新角色及主动重选使用沧海珠 / 判天笔并收藏两件，配套功法随路线变化', () => {
+  for (const [path, id, passive] of [
+    ['orthodox', 'pearl', 'magnet'],
+    ['demonic', 'brush', 'forbidden'],
+    ['dual', 'pearl', 'magnet'],
+  ] as const) {
+    const save = freshSave('heaven', ['water'], path);
+    assert.equal(save.starter, id);
+    assert.deepEqual(save.artifacts, ['pearl', 'brush']);
+    const g = new Game(save, 0, 0);
+    assert.equal(g.weapons[0].id, id);
+    assert.ok(g.evolutionRequirements(id).includes(passive));
+    const attuned = freshSave('heaven', ['metal'], path);
+    assert.equal(attuneSpiritRoot(attuned, 'heaven', ['water']), true);
+    assert.equal(attuned.starter, id);
+    assert.ok(['pearl', 'brush'].every((weapon) => attuned.artifacts.includes(weapon)));
+  }
+});
+
+test('旧水系玄冰镜 / 化血盏本命、收藏及炼器原样读回，续局与新历练仍能使用', () => {
+  for (const [id, path] of [
+    ['ice', 'orthodox'],
+    ['bloodpool', 'demonic'],
+    ['ice', 'dual'],
+    ['bloodpool', 'dual'],
+  ] as const) {
+    let save = freshSave('heaven', ['water'], path);
+    save.starter = id;
+    save.artifacts = ['ice', 'bloodpool', 'orbit'];
+    save.forge[id] = 4;
+    const snapshot = new Game(save, 0, 0).snapshot();
+    for (let reload = 0; reload < 3; reload++) {
+      const loaded = readSave(JSON.stringify(save));
+      assert.equal(loaded.status, 'ok');
+      assert.equal(loaded.save.starter, id);
+      assert.deepEqual(loaded.save.artifacts, ['ice', 'bloodpool', 'orbit']);
+      assert.equal(loaded.save.forge[id], 4);
+      assert.equal(new Game(loaded.save, 0, 0).weapons[0].id, id);
+      assert.equal(Game.restore(loaded.save, structuredClone(snapshot))!.weapons[0].id, id);
+      save = loaded.save;
+    }
+  }
+});
+
+test('缚妖索基础伤害为29，施法命中按新基础结算且仍束缚目标', () => {
+  const g = new Game(
+    freshSave('none', [], 'demonic', () => 0.2),
+    0,
+    0,
+    () => 0.99,
+  );
+  g.weapons = [{ id: 'chain', level: 1, evolved: false, timer: 0 }];
+  const enemy = g.spawnEnemy(0, false, false, { x: 100, y: 0 });
+  enemy.hp = enemy.maxHp = 1e6;
+  g.cast(g.weapons[0]);
+  assert.equal(treasure('chain').damage, 29);
+  assert.ok(Math.abs(enemy.maxHp - enemy.hp - 29 * g.stats.damage) < 1e-8);
+  assert.equal(enemy.slow, 2);
+});
+
+test('旧水系已售入门标记可读回和导入，历次合法标记不受当前入门表限制', () => {
+  for (const [starter, path, released] of [
+    ['ice', 'orthodox', 'bloodpool'],
+    ['bloodpool', 'demonic', 'ice'],
+    ['ice', 'dual', 'bloodpool'],
+  ] as const) {
+    const save = freshSave('heaven', ['water'], path);
+    save.starter = starter;
+    save.artifacts = [starter];
+    save.mortal.auction = {
+      hall: 0,
+      visit: 0,
+      closed: [],
+      releasedArtifacts: [released],
+      history: [],
+    };
+    for (const loaded of [
+      readSave(JSON.stringify(save)).save,
+      importSave(exportSave(save, null)).save,
+    ]) {
+      assert.equal(loaded.starter, starter);
+      assert.deepEqual(loaded.artifacts, [starter]);
+      assert.deepEqual(loaded.mortal.auction, save.mortal.auction);
+    }
+  }
+  const save = freshSave();
+  const auction = {
+    hall: 0,
+    visit: 0,
+    closed: [],
+    releasedArtifacts: [...Object.values(ROOT_STARTERS).flat(), 'ice', 'bloodpool'],
+    history: [],
+  };
+  assert.equal(auction.releasedArtifacts.length, 12);
+  assert.equal(validAuction(auction, save.age, undefined), true);
+  for (const releasedArtifacts of [['invalid'], ['ice', 'ice'], [1], Array(37).fill('ice')]) {
+    assert.equal(validAuction({ ...auction, releasedArtifacts }, save.age, undefined), false);
+  }
+  for (const id of ['ice', 'bloodpool']) assert.equal(freeStarter(id), false);
+  for (const id of ['pearl', 'brush']) assert.equal(freeStarter(id), true);
 });
 
 test('芭蕉扇和缚妖索的待觉醒选项、自动选技均使用当前配方', () => {

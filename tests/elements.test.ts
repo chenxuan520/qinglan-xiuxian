@@ -145,7 +145,7 @@ test('五行对应不同正魔入门本命，自选可切换且不扣除已有�
   }
   const save = freshSave();
   assert.equal(attuneSpiritRoot(save, 'dual', ['water', 'fire']), true);
-  assert.equal(save.starter, 'ice');
+  assert.equal(save.starter, 'pearl');
   const before = JSON.stringify(save);
   assert.equal(attuneSpiritRoot(save, 'triple', ['water', 'fire']), false);
   assert.equal(attuneSpiritRoot(save, 'dual', ['water', 'water']), false);
@@ -177,7 +177,7 @@ test('无灵根从当前路线的五行入门法宝中随机本命', () => {
   assert.equal(save.starter, 'skull');
   assert.equal(
     freshSave('five', ['water', 'earth', 'fire', 'wood', 'metal'], 'dual', () => 0.99).starter,
-    'ice',
+    'pearl',
   );
 });
 
@@ -187,17 +187,15 @@ test('无灵根跨路线时解锁并使用原本命五行的配对法宝', () =>
   save.starter = 'ice';
   save.path = 'demonic';
   assert.equal(alignStarterWithPath(save), true);
-  assert.equal(save.starter, 'bloodpool');
-  assert.ok(save.artifacts.includes('bloodpool'));
-  assert.equal(new Game(save, 0, 0).weapons[0].id, 'bloodpool');
+  assert.equal(save.starter, 'brush');
+  assert.ok(save.artifacts.includes('brush'));
+  assert.equal(new Game(save, 0, 0).weapons[0].id, 'brush');
   const restored = parseSave(JSON.stringify(save));
-  assert.equal(restored.starter, 'bloodpool');
-  assert.equal(new Game(restored, 0, 0).weapons[0].id, 'bloodpool');
+  assert.equal(restored.starter, 'brush');
+  assert.equal(new Game(restored, 0, 0).weapons[0].id, 'brush');
 
   const almostComplete = freshSave('none', [], 'dual', () => 0);
-  almostComplete.artifacts = TREASURES.filter((item) => item.id !== 'bloodpool').map(
-    (item) => item.id,
-  );
+  almostComplete.artifacts = TREASURES.filter((item) => item.id !== 'brush').map((item) => item.id);
   almostComplete.starter = 'ice';
   almostComplete.path = 'demonic';
   assert.equal(alignStarterWithPath(almostComplete), true);
