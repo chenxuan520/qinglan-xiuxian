@@ -1,6 +1,7 @@
 import { BARE_CLEAR_TARGETS, caseKey, LIMITS } from './balance-policy.ts';
 import type { BalanceCase } from './balance-policy.ts';
 import type { CampaignSample } from './balance-simulation.ts';
+import { TRIAL_BOSS_MIN_INTERVAL, TRIAL_BOSS_TIMES } from '../src/data.ts';
 
 export function quantile(values: number[], p: number) {
   if (!values.length) return null;
@@ -100,9 +101,15 @@ export function verifyCoverage(results: CampaignSample[], cases: BalanceCase[]) 
       )
         throw new Error(`胜利却没有击败全部妖王：${result.key}`);
       if (battle.stage === 6)
-        for (let i = 1; i < battle.bosses.length; i++)
-          if (battle.bosses[i].at - battle.bosses[i - 1].at < 45 - 0.04)
-            throw new Error(`终关实际出王间隔不足 45 秒：${result.key}`);
+        for (let i = 0; i < battle.bosses.length; i++) {
+          if (battle.bosses[i].at < TRIAL_BOSS_TIMES[i] - 0.04)
+            throw new Error(`终关出王早于原定时间：${result.key}`);
+          if (
+            i > 0 &&
+            battle.bosses[i].at - battle.bosses[i - 1].at < TRIAL_BOSS_MIN_INTERVAL - 0.04
+          )
+            throw new Error(`终关相邻出王间隔小于最小间隔：${result.key}`);
+        }
     }
     const won = new Set(result.battles.filter((b) => b.state === 'won').map((b) => b.stage));
     if (won.size !== result.cleared || [...won].some((stage) => stage >= won.size))

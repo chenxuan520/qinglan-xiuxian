@@ -39,7 +39,14 @@ test('历史对照仍能从清理后的同一已确认提交生成独立源码',
   }
 });
 import type { BalanceCase } from '../scripts/balance-policy.ts';
-import { CULTIVATION_PATHS, ROOT_STARTERS, SPIRIT_ROOTS, treasure } from '../src/data.ts';
+import {
+  CULTIVATION_PATHS,
+  ROOT_STARTERS,
+  SPIRIT_ROOTS,
+  TRIAL_BOSS_MIN_INTERVAL,
+  TRIAL_BOSS_TIMES,
+  treasure,
+} from '../src/data.ts';
 
 function sample(index = 0): CampaignSample {
   const c: BalanceCase = {
@@ -208,6 +215,57 @@ test('终关必须实际覆盖七种妖王，不能拿七个同王记录充数�
   const wrongTime = structuredClone(row);
   wrongTime.battles[6].bosses[0].observedSeconds = 1;
   assert.throws(() => verifyCoverage([wrongTime], [row.case]), /存活时间计算/);
+});
+
+function trialScheduleSample(times: readonly number[]) {
+  const row = sample();
+  row.complete = true;
+  row.cleared = 7;
+  row.battles = Array.from({ length: 7 }, (_, stage) => ({
+    ...structuredClone(sample().battles[0]),
+    stage,
+    seconds: 400,
+    maxAliveBosses: stage === 6 ? 2 : 1,
+    bosses: (stage === 6 ? times : [180]).map((at, index) => ({
+      stage: stage === 6 ? index : stage,
+      at,
+      deadAt: at + 10,
+      observedSeconds: 10,
+      hpFraction: 0,
+    })),
+  }));
+  row.seconds = row.battles.reduce((total, battle) => total + battle.seconds, 0);
+  return row;
+}
+
+test('终关第三王延至170秒、第四王按原表195秒登场，不再误报45秒间隔', () => {
+  const times = [...TRIAL_BOSS_TIMES];
+  times[2] = 170;
+  const row = trialScheduleSample(times);
+  assert.doesNotThrow(() => verifyCoverage([row], [row.case]));
+});
+
+test('终关首王及后续旧王早于原定时间均报错，保留0.04秒容差', () => {
+  for (const index of [0, 3, 6]) {
+    for (const early of [0.03, 0.05]) {
+      const times = [...TRIAL_BOSS_TIMES];
+      times[index] -= early;
+      const row = trialScheduleSample(times);
+      if (early < 0.04) assert.doesNotThrow(() => verifyCoverage([row], [row.case]));
+      else assert.throws(() => verifyCoverage([row], [row.case]), /终关出王早于原定时间：/);
+    }
+  }
+});
+
+test('终关延期补位仍检查共享最小间隔及0.04秒容差', () => {
+  for (const early of [0.03, 0.05]) {
+    const times = [...TRIAL_BOSS_TIMES];
+    times[2] = 200;
+    times[3] = times[2] + TRIAL_BOSS_MIN_INTERVAL - early;
+    const row = trialScheduleSample(times);
+    if (early < 0.04) assert.doesNotThrow(() => verifyCoverage([row], [row.case]));
+    else assert.throws(() => verifyCoverage([row], [row.case]), /终关相邻出王间隔小于最小间隔：/);
+  }
 });
 
 test('妖王存活P90仅终关阈值翻倍：旧王180秒、仙尊360秒，前六境仍90秒', () => {
