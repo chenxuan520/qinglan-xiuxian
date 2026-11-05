@@ -114,6 +114,14 @@ export interface AnalysisInput {
   signals: Signal[];
   evidence: { id: string; text: string }[];
 }
+export interface AnalysisDiagnostics {
+  stage: 'setup' | 'pi' | 'request' | 'fetch' | 'response' | 'response-body' | 'parse' | 'complete';
+  elapsedMs: number;
+  endpoint?: { origin: string; path: string };
+  httpStatus?: number;
+  errorName?: string;
+  causeCode?: string;
+}
 export interface AnalysisResult {
   engine: AnalysisConfig['engine'];
   model: string;
@@ -122,4 +130,6 @@ export interface AnalysisResult {
   findings: { signalId: string; explanation: string; nextSteps: string[] }[];
   usage?: { inputTokens: number; outputTokens: number };
   error?: string;
+  diagnostics?: AnalysisDiagnostics;
+  reanalyzed?: boolean;
 }

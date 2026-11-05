@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
+    inputs:
+      reanalyze:
+        description: '重分析当前候选异常，不重复提醒或清除去重历史'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -39,6 +44,7 @@ jobs:
           OBSERVER_MODEL: ${{ vars.OBSERVER_MODEL }}
           OBSERVER_BASE_URL: ${{ vars.OBSERVER_BASE_URL }}
           OBSERVER_PROTOCOL: ${{ vars.OBSERVER_PROTOCOL }}
+          OBSERVER_REANALYZE: ${{ github.event_name == 'workflow_dispatch' && inputs.reanalyze == true }}
           OBSERVER_PI_PACKAGE_ROOT: ${{ runner.temp }}/observer-pi/node_modules/@earendil-works/pi-ai
         run: node scripts/observer.ts
       - name: Preserve evidence and state before notification

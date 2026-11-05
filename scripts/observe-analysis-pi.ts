@@ -11,11 +11,16 @@ import {
   analysisRecord,
   analysisRequest,
   boundedAnalysisFetch,
+  createAnalysisTrace,
+  finishAnalysisTrace,
   parseAnalysisAnswers,
   parseAnalysisJson,
   requireAnalysis,
   responseByteLimit,
 } from './observe-analysis.ts';
+import type { AnalysisTrace } from './observe-analysis.ts';
+
+let trace: AnalysisTrace | undefined;
 
 async function main() {
   const root = process.env.OBSERVER_PI_PACKAGE_ROOT;
@@ -58,6 +63,7 @@ async function main() {
   const config = request.config as AnalysisConfig;
   const key = process.env.OBSERVER_ANALYSIS_KEY;
   requireAnalysis(key, 'key');
+  trace = createAnalysisTrace(config, key);
   requireAnalysis(config.engine === 'pi', 'config');
   const endpoint = analysisEndpoint(config);
   const ids = input.signals.map((signal) => signal.id);
@@ -65,6 +71,7 @@ async function main() {
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   let transportError: AnalysisError | undefined;
   const transport: typeof globalThis.fetch = async (resource, init) => {
+    trace!.diagnostics.stage = 'request';
     try {
       const http = new Request(resource, init);
       requireAnalysis(http.url === endpoint.href && http.method === 'POST', 'config');
@@ -83,7 +90,9 @@ async function main() {
           signal: controller.signal,
         },
         responseByteLimit(config.maxOutputTokens),
+        trace,
       );
+      trace!.diagnostics.stage = 'parse';
       if (config.protocol !== 'decisions') return response;
       const text = await response.text();
       const raw = parseAnalysisJson(text);
@@ -92,6 +101,7 @@ async function main() {
       parseAnalysisAnswers(raw, ids, config.maxOutputTokens);
       return new Response(text, { headers: { 'content-type': 'application/json' } });
     } catch (error) {
+      finishAnalysisTrace(trace!, error);
       transportError = error instanceof AnalysisError ? error : new AnalysisError('network');
       throw transportError;
     }
@@ -138,7 +148,8 @@ async function main() {
           : {}),
       };
       parseAnalysisAnswers(raw, ids, config.maxOutputTokens);
-      return raw;
+      trace.diagnostics.stage = 'complete';
+      return { ...raw, diagnostics: finishAnalysisTrace(trace) };
     }
 
     requireAnalysis(!catalog.OPENAI_CLASSIFIER_MODELS[config.model], 'pi');
@@ -189,7 +200,8 @@ async function main() {
       result.content.map((part: { text: string }) => part.text).join(''),
     );
     raw.usage = { input_tokens: result.usage.input, output_tokens: result.usage.output };
-    return raw;
+    trace.diagnostics.stage = 'complete';
+    return { ...raw, diagnostics: finishAnalysisTrace(trace) };
   } finally {
     clearTimeout(timer);
   }
@@ -199,6 +211,9 @@ main()
   .then((result) => process.stdout.write(JSON.stringify(result)))
   .catch((error) => {
     process.stdout.write(
-      JSON.stringify({ analysisError: error instanceof AnalysisError ? error.code : 'pi' }),
+      JSON.stringify({
+        analysisError: error instanceof AnalysisError ? error.code : 'pi',
+        ...(trace ? { diagnostics: finishAnalysisTrace(trace, error) } : {}),
+      }),
     );
   });

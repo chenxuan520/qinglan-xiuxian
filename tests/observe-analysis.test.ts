@@ -5,7 +5,11 @@ import { existsSync, readdirSync } from 'node:fs';
 import { PassThrough, Writable } from 'node:stream';
 import { analyzeEvidence, responseByteLimit } from '../scripts/observe-analysis.ts';
 import type { AnalysisOptions } from '../scripts/observe-analysis.ts';
-import type { AnalysisConfig, AnalysisInput } from '../scripts/observe-types.ts';
+import type {
+  AnalysisConfig,
+  AnalysisDiagnostics,
+  AnalysisInput,
+} from '../scripts/observe-types.ts';
 
 const key = 'observer-fixture-secret-TEST-only';
 const config: AnalysisConfig = {
@@ -105,7 +109,7 @@ test('Decisions按官方predicate请求，只发归一化证据，中文说明�
   assert.equal(mock.calls.length, 1);
   const call = mock.calls[0];
   assert.equal(call.url, 'https://api.example.invalid/v1/decisions');
-  assert.equal(call.init.redirect, 'error');
+  assert.equal(call.init.redirect, 'manual');
   assert.equal(new Headers(call.init.headers).get('authorization'), `Bearer ${key}`);
   assert.equal(call.body.model, 'gpt-6-luna');
   assert.equal('max_output_tokens' in call.body, false);
@@ -231,6 +235,9 @@ test('重定向拒绝且不跟随，网络异常文本不泄漏', async () => {
   assert.equal(redirected.status, 'failed');
   assert.match(redirected.error!, /重定向/);
   assert.equal(mock.calls.length, 1);
+  assert.equal(mock.calls[0].init.redirect, 'manual');
+  assert.equal(redirected.diagnostics?.stage, 'response');
+  assert.equal(redirected.diagnostics?.httpStatus, 302);
   const failed = await analyzeEvidence(evidence(), config, {
     env: { OBSERVER_API_KEY: key },
     fetch: async () => {
@@ -239,6 +246,117 @@ test('重定向拒绝且不跟随，网络异常文本不泄漏', async () => {
   });
   assert.equal(failed.status, 'failed');
   assert.ok(!JSON.stringify(failed).includes(key));
+});
+
+for (const code of [
+  'ENOTFOUND',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'ERR_INVALID_ARG_TYPE',
+  'ERR_STREAM_PREMATURE_CLOSE',
+  'ABORT_ERR',
+]) {
+  test(`安全诊断保留 ${code} 和阶段，不带原始异常、凭据或任意cause字段`, async () => {
+    const error = new TypeError(`private-message ${key}`, {
+      cause: {
+        code,
+        message: 'private-cause',
+        headers: { authorization: key },
+        body: 'private-body',
+      },
+    });
+    const output = await analyzeEvidence(evidence(), config, {
+      env: { OBSERVER_API_KEY: key },
+      fetch: async () => {
+        throw error;
+      },
+    });
+    assert.equal(output.status, 'failed');
+    assert.equal(output.diagnostics?.stage, 'fetch');
+    assert.equal(output.diagnostics?.errorName, 'TypeError');
+    assert.equal(output.diagnostics?.causeCode, code);
+    assert.deepEqual(output.diagnostics?.endpoint, {
+      origin: 'https://api.example.invalid',
+      path: '/v1/decisions',
+    });
+    assert.ok(Number.isSafeInteger(output.diagnostics?.elapsedMs));
+    assert.ok(output.diagnostics!.elapsedMs >= 0);
+    assert.doesNotMatch(
+      JSON.stringify(output),
+      /private-message|private-cause|private-body|authorization/,
+    );
+    assert.ok(!JSON.stringify(output).includes(key));
+  });
+}
+
+test('响应流中途失败保留HTTP状态、读流阶段及白名单代码，不伪装完成', async () => {
+  const error = Object.assign(new Error(`private-stream-message ${key}`), { code: 'ECONNRESET' });
+  const response = new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"answers":'));
+        controller.error(error);
+      },
+    }),
+    { status: 200 },
+  );
+  const output = await analyzeEvidence(evidence(), config, http(response).options);
+  assert.equal(output.status, 'failed');
+  assert.deepEqual(output.findings, []);
+  assert.equal(output.diagnostics?.stage, 'response-body');
+  assert.equal(output.diagnostics?.httpStatus, 200);
+  assert.equal(output.diagnostics?.errorName, 'Error');
+  assert.equal(output.diagnostics?.causeCode, 'ECONNRESET');
+  assert.doesNotMatch(JSON.stringify(output), /private-stream-message/);
+  assert.ok(!JSON.stringify(output).includes(key));
+});
+
+test('诊断只允许固定异常名称及代码，不接受响应伪造的diagnostics', async () => {
+  const output = await analyzeEvidence(evidence(), config, {
+    env: { OBSERVER_API_KEY: key },
+    fetch: async () => {
+      throw {
+        name: `private-name-${key}`,
+        cause: { code: 'private-code' },
+        message: 'private-message',
+      };
+    },
+  });
+  assert.equal(output.diagnostics?.errorName, 'Error');
+  assert.equal(output.diagnostics?.causeCode, undefined);
+  assert.doesNotMatch(JSON.stringify(output), /private-name|private-code|private-message/);
+  const success = await analyzeEvidence(
+    evidence(),
+    config,
+    http({ ...wire(), diagnostics: { message: key, headers: 'private-header' } }).options,
+  );
+  assert.equal(success.status, 'complete');
+  assert.equal(success.diagnostics?.stage, 'complete');
+  assert.doesNotMatch(JSON.stringify(success), /private-header/);
+  assert.ok(!JSON.stringify(success).includes(key));
+});
+
+test('无效配置的诊断地址也剥离query、hash、userinfo并脱敏编码后的key', async () => {
+  const mock = http(wire());
+  const output = await analyzeEvidence(
+    evidence(),
+    {
+      ...config,
+      baseUrl: `https://private-user:private-password@api.example.invalid/v1/${encodeURIComponent(key)}?token=private-query#private-hash`,
+    },
+    mock.options,
+  );
+  assert.equal(output.status, 'failed');
+  assert.equal(mock.calls.length, 0);
+  assert.deepEqual(output.diagnostics?.endpoint, {
+    origin: 'https://api.example.invalid',
+    path: '/v1/[已脱敏]/decisions',
+  });
+  assert.doesNotMatch(
+    JSON.stringify(output),
+    /private-user|private-password|private-query|private-hash/,
+  );
+  assert.ok(!JSON.stringify(output).includes(key));
 });
 
 test('请求和响应体停滞都受总超时约束，fetch不响应abort也不会无限等', async () => {
@@ -320,8 +438,10 @@ for (const protocol of ['responses', 'chat-completions'] as const) {
       'failed',
     );
     const tools = structuredClone(body);
-    if ('output' in tools) tools.output[0].type = 'function_call';
-    else Object.assign(tools.choices[0].message, { tool_calls: [{ name: 'bash' }] });
+    if ('output' in tools) {
+      assert.ok(tools.output);
+      tools.output[0].type = 'function_call';
+    } else Object.assign(tools.choices[0].message, { tool_calls: [{ name: 'bash' }] });
     assert.equal(
       (await analyzeEvidence(evidence(), selected, http(tools).options)).status,
       'failed',
@@ -455,6 +575,65 @@ test('Pi使用Node SDK子进程：独立空cwd、无secret argv/文件，仅单k
   assert.equal(existsSync(mock.directory), false);
   assert.equal(mock.calls, 1);
 });
+
+const piDiagnostic: AnalysisDiagnostics = {
+  stage: 'fetch',
+  elapsedMs: 23,
+  endpoint: { origin: 'https://api.example.invalid', path: '/v1/decisions' },
+  errorName: 'TypeError',
+  causeCode: 'ENOTFOUND',
+};
+test('Pi桥完整保留已校验的失败和成功诊断', async () => {
+  const failed = await analyzeEvidence(
+    evidence(),
+    { ...config, engine: 'pi' },
+    piMock({ analysisError: 'network', diagnostics: piDiagnostic }).options,
+  );
+  assert.equal(failed.status, 'failed');
+  assert.deepEqual(failed.diagnostics, piDiagnostic);
+  const diagnostics = { ...piDiagnostic, stage: 'complete', httpStatus: 200 };
+  delete (diagnostics as Partial<AnalysisDiagnostics>).errorName;
+  delete (diagnostics as Partial<AnalysisDiagnostics>).causeCode;
+  const success = await analyzeEvidence(
+    evidence(),
+    { ...config, engine: 'pi' },
+    piMock({ ...wire(), diagnostics }).options,
+  );
+  assert.equal(success.status, 'complete');
+  assert.deepEqual(success.diagnostics, diagnostics);
+});
+
+for (const [name, diagnostics] of [
+  ['未知字段', { ...piDiagnostic, headers: { authorization: key } }],
+  ['原始message', { ...piDiagnostic, message: `private-message ${key}` }],
+  ['未知阶段', { ...piDiagnostic, stage: key }],
+  ['未知name', { ...piDiagnostic, errorName: key }],
+  ['未知code', { ...piDiagnostic, causeCode: key }],
+  ['负耗时', { ...piDiagnostic, elapsedMs: -1 }],
+  ['字符串耗时', { ...piDiagnostic, elapsedMs: '23' }],
+  ['非法HTTP', { ...piDiagnostic, httpStatus: 999 }],
+  [
+    '不同地址',
+    { ...piDiagnostic, endpoint: { origin: 'https://private-other.invalid', path: key } },
+  ],
+  [
+    '地址query',
+    { ...piDiagnostic, endpoint: { ...piDiagnostic.endpoint, path: `/v1/decisions?token=${key}` } },
+  ],
+] as const) {
+  test(`Pi桥拒绝${name}诊断，不把子进程任意内容放进结果`, async () => {
+    const output = await analyzeEvidence(
+      evidence(),
+      { ...config, engine: 'pi' },
+      piMock({ analysisError: 'network', diagnostics }).options,
+    );
+    assert.equal(output.status, 'failed');
+    assert.match(output.error!, /Pi SDK/);
+    assert.equal(output.diagnostics?.stage, 'pi');
+    assert.ok(!JSON.stringify(output).includes(key));
+    assert.doesNotMatch(JSON.stringify(output), /private-message|private-other|authorization/);
+  });
+}
 
 for (const mode of ['timeout', 'overflow', 'exit', 'stderr', 'partial', 'sdk-failed']) {
   test(`Pi ${mode}失败不假绿、不输出stderr，终止并清理自己的临时目录`, async () => {

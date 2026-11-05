@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { analyzeEvidence } from './observe-analysis.ts';
+import { analyzeEvidence, redactAnalysisText } from './observe-analysis.ts';
 import { collectSource, githubJson, safeText } from './observe-collect.ts';
 import {
   emptyObserverState,
@@ -97,7 +97,13 @@ export function observerSummary(
     (i) => !i.resolvedAt && i.notifiedAt,
   ).length;
   const pending = snapshot.observations.filter((o) => o.status === 'pending').length;
-  if (!decision.signals.length && !decision.recovered.length && !unresolved && !pending)
+  if (
+    !decision.signals.length &&
+    !decision.recovered.length &&
+    !unresolved &&
+    !pending &&
+    !analysis.reanalyzed
+  )
     return `观察完成（北京时间 ${at}）：未发现异常；${snapshot.observations.length} 个来源。\n`;
   const lines = [
     `运行观察（北京时间 ${at}）`,
@@ -105,6 +111,11 @@ export function observerSummary(
     `新提醒 ${decision.notifications.length}，当前候选 ${decision.signals.length}，恢复 ${decision.recovered.length}。`,
     '',
   ];
+  if (analysis.reanalyzed)
+    lines.push(
+      `手动重分析：当前 ${decision.signals.length} 个候选，AI 状态 ${analysis.status}；去重与新增提醒规则保持。`,
+      '',
+    );
   if (pending) lines.push(`后台任务执行中 ${pending} 项；尚未生成的新结果不判失败或恢复。`, '');
   if (unresolved && !decision.signals.length)
     lines.push(`仍有 ${unresolved} 项已提醒事件待核实，当前没有足够证据确认恢复。`, '');
@@ -125,11 +136,35 @@ export function observerSummary(
     lines.push(`- 已恢复：${markdown(incident.signal.title)}。`);
   if (!decision.notifications.length && decision.signals.length)
     lines.push('已有异常保持记录；未重复提醒。');
+  if (analysis.reanalyzed)
+    for (const finding of analysis.findings)
+      if (
+        !decision.notifications.some(
+          (signal) => `${signal.sourceId}/${signal.id}` === finding.signalId,
+        )
+      )
+        lines.push(
+          `重分析：${markdown(finding.explanation)} ${finding.nextSteps.map(markdown).join(' ')}`,
+        );
   if (analysis.status === 'failed' || analysis.status === 'unavailable')
     lines.push(
       '',
       `AI 分析不可用：${markdown(analysis.error ?? analysis.summary)}。现有证据与异常结论仍保留。`,
     );
+  if (analysis.diagnostics) {
+    const diagnostic = analysis.diagnostics;
+    lines.push(
+      '',
+      `AI 诊断：阶段 ${markdown(diagnostic.stage)}；耗时 ${diagnostic.elapsedMs} ms` +
+        (diagnostic.endpoint
+          ? `；地址 ${redactAnalysisText(diagnostic.endpoint.origin + diagnostic.endpoint.path).replace(/[\\`*_{}\[\]<>#|]/g, '\\$&')}`
+          : '') +
+        (diagnostic.httpStatus === undefined ? '' : `；HTTP ${diagnostic.httpStatus}`) +
+        (diagnostic.errorName ? `；error.name ${markdown(diagnostic.errorName)}` : '') +
+        (diagnostic.causeCode ? `；cause.code ${markdown(diagnostic.causeCode)}` : '') +
+        '。',
+    );
+  }
   return lines.join('\n') + '\n';
 }
 
@@ -172,10 +207,14 @@ export async function runObserver(
   }
   const snapshot: Snapshot = { schemaVersion: 1, at, observations };
   const decision = evaluateSnapshot(snapshot, previous, config.policy);
-  const analysis = await (deps.analyze ?? analyzeEvidence)(
+  const reanalyze = (deps.env ?? process.env).OBSERVER_REANALYZE === 'true';
+  const result = await (deps.analyze ?? analyzeEvidence)(
     {
       at,
-      signals: decision.notifications.map((s) => ({ ...s, id: `${s.sourceId}/${s.id}` })),
+      signals: (reanalyze ? decision.signals : decision.notifications).map((s) => ({
+        ...s,
+        id: `${s.sourceId}/${s.id}`,
+      })),
       evidence: observations.map((o) => ({
         id: o.id,
         text: JSON.stringify({
@@ -190,6 +229,7 @@ export async function runObserver(
     },
     config.analysis,
   );
+  const analysis: AnalysisResult = { ...result, ...(reanalyze ? { reanalyzed: true } : {}) };
   mkdirSync(output, { recursive: true });
   const write = (name: string, data: string) => {
     writeFileSync(join(output, `${name}.tmp`), data, { mode: 0o600 });

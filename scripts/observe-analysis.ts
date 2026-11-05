@@ -4,7 +4,12 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AnalysisConfig, AnalysisInput, AnalysisResult } from './observe-types.ts';
+import type {
+  AnalysisConfig,
+  AnalysisDiagnostics,
+  AnalysisInput,
+  AnalysisResult,
+} from './observe-types.ts';
 
 export interface AnalysisOptions {
   fetch?: typeof globalThis.fetch;
@@ -34,9 +39,11 @@ const errors: Record<string, string> = {
 
 export class AnalysisError extends Error {
   code: keyof typeof errors;
-  constructor(code: keyof typeof errors) {
+  diagnostics?: AnalysisDiagnostics;
+  constructor(code: keyof typeof errors, diagnostics?: AnalysisDiagnostics) {
     super(errors[code]);
     this.code = code;
+    this.diagnostics = diagnostics;
   }
 }
 export function requireAnalysis(value: unknown, code: keyof typeof errors): asserts value {
@@ -71,6 +78,167 @@ export function redactAnalysisText(text: string, apiKey = '') {
       '$1"[已脱敏]"',
     )
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[已脱敏邮箱]');
+}
+
+const diagnosticStages = new Set([
+  'setup',
+  'pi',
+  'request',
+  'fetch',
+  'response',
+  'response-body',
+  'parse',
+  'complete',
+]);
+const diagnosticNames = new Set([
+  'Error',
+  'TypeError',
+  'RangeError',
+  'SyntaxError',
+  'AbortError',
+  'TimeoutError',
+  'AggregateError',
+]);
+const diagnosticCodes = new Set([
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ETIMEDOUT',
+  'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'UND_ERR_SOCKET',
+  'UND_ERR_ABORTED',
+  'UND_ERR_REQ_CONTENT_LENGTH_MISMATCH',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_HANDSHAKE_TIMEOUT',
+  'ERR_INVALID_CHAR',
+  'ERR_INVALID_HTTP_TOKEN',
+  'ERR_INVALID_URL',
+  'ERR_INVALID_ARG_TYPE',
+  'ERR_STREAM_PREMATURE_CLOSE',
+  'ABORT_ERR',
+]);
+
+function diagnosticEndpoint(config: AnalysisConfig, key: string) {
+  try {
+    const base = new URL(config.baseUrl);
+    base.username = base.password = base.search = base.hash = '';
+    const suffix = config.protocol === 'chat-completions' ? 'chat/completions' : config.protocol;
+    const endpoint = new URL(suffix, base.href.replace(/\/+$/, '') + '/');
+    const decode = (value: string) => {
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return value;
+      }
+    };
+    const origin = redactAnalysisText(decode(endpoint.origin), key).replace(/\/$/, '');
+    const path = redactAnalysisText(decode(endpoint.pathname), key);
+    return origin.length <= 2048 && path.length <= 4096 ? { origin, path } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface AnalysisTrace {
+  startedAt: number;
+  diagnostics: AnalysisDiagnostics;
+}
+export function createAnalysisTrace(config: AnalysisConfig, key: string): AnalysisTrace {
+  const endpoint = diagnosticEndpoint(config, key);
+  return {
+    startedAt: performance.now(),
+    diagnostics: {
+      stage: 'setup',
+      elapsedMs: 0,
+      ...(endpoint ? { endpoint } : {}),
+    },
+  };
+}
+export function finishAnalysisTrace(trace: AnalysisTrace, error?: unknown): AnalysisDiagnostics {
+  const diagnostics = trace.diagnostics;
+  diagnostics.elapsedMs = Math.max(0, Math.round(performance.now() - trace.startedAt));
+  if (error && typeof error === 'object') {
+    const failure = error as { name?: unknown; cause?: { code?: unknown }; code?: unknown };
+    if (
+      !diagnostics.errorName &&
+      typeof failure.name === 'string' &&
+      diagnosticNames.has(failure.name)
+    )
+      diagnostics.errorName = failure.name;
+    const code = failure.cause?.code ?? failure.code;
+    if (!diagnostics.causeCode && typeof code === 'string' && diagnosticCodes.has(code))
+      diagnostics.causeCode = code;
+  }
+  return { ...diagnostics };
+}
+
+// 子进程仅能传固定字段；地址必须与父进程独立脱敏后的配置一致，绝不转发任意元数据。
+export function validateAnalysisDiagnostics(
+  value: unknown,
+  config: AnalysisConfig,
+  key: string,
+): AnalysisDiagnostics {
+  requireAnalysis(value && typeof value === 'object' && !Array.isArray(value), 'pi');
+  const raw = value as Record<string, unknown>;
+  requireAnalysis(
+    Object.keys(raw).every((name) =>
+      ['stage', 'elapsedMs', 'endpoint', 'httpStatus', 'errorName', 'causeCode'].includes(name),
+    ),
+    'pi',
+  );
+  requireAnalysis(typeof raw.stage === 'string' && diagnosticStages.has(raw.stage), 'pi');
+  requireAnalysis(
+    Number.isSafeInteger(raw.elapsedMs) &&
+      (raw.elapsedMs as number) >= 0 &&
+      (raw.elapsedMs as number) <= 3600000,
+    'pi',
+  );
+  const expected = diagnosticEndpoint(config, key);
+  if (expected) {
+    requireAnalysis(
+      raw.endpoint && typeof raw.endpoint === 'object' && !Array.isArray(raw.endpoint),
+      'pi',
+    );
+    const endpoint = raw.endpoint as Record<string, unknown>;
+    requireAnalysis(
+      Object.keys(endpoint).length === 2 &&
+        endpoint.origin === expected.origin &&
+        endpoint.path === expected.path,
+      'pi',
+    );
+  } else requireAnalysis(raw.endpoint === undefined, 'pi');
+  if (raw.httpStatus !== undefined)
+    requireAnalysis(
+      Number.isSafeInteger(raw.httpStatus) &&
+        (raw.httpStatus as number) >= 100 &&
+        (raw.httpStatus as number) <= 599,
+      'pi',
+    );
+  for (const [name, whitelist] of [
+    ['errorName', diagnosticNames],
+    ['causeCode', diagnosticCodes],
+  ] as const)
+    if (raw[name] !== undefined)
+      requireAnalysis(typeof raw[name] === 'string' && whitelist.has(raw[name] as string), 'pi');
+  return {
+    stage: raw.stage as AnalysisDiagnostics['stage'],
+    elapsedMs: raw.elapsedMs as number,
+    ...(expected ? { endpoint: expected } : {}),
+    ...(raw.httpStatus === undefined ? {} : { httpStatus: raw.httpStatus as number }),
+    ...(raw.errorName === undefined ? {} : { errorName: raw.errorName as string }),
+    ...(raw.causeCode === undefined ? {} : { causeCode: raw.causeCode as string }),
+  };
 }
 
 function validateConfig(config: AnalysisConfig) {
@@ -215,12 +383,19 @@ export async function boundedAnalysisFetch(
   url: string | URL,
   init: RequestInit,
   maxBytes: number,
+  trace?: AnalysisTrace,
 ) {
   let response: Response;
+  if (trace) trace.diagnostics.stage = 'fetch';
   try {
-    response = await requestFetch(url, { ...init, redirect: 'error' });
-  } catch {
+    response = await requestFetch(url, { ...init, redirect: 'manual' });
+  } catch (error) {
+    if (trace) finishAnalysisTrace(trace, error);
     throw new AnalysisError(init.signal?.aborted ? 'timeout' : 'network');
+  }
+  if (trace) {
+    trace.diagnostics.stage = 'response';
+    trace.diagnostics.httpStatus = response.status;
   }
   if (response.status >= 300 && response.status < 400) {
     await response.body?.cancel();
@@ -243,6 +418,7 @@ export async function boundedAnalysisFetch(
     void reader.cancel().catch(() => {});
   };
   init.signal?.addEventListener('abort', abort, { once: true });
+  if (trace) trace.diagnostics.stage = 'response-body';
   try {
     while (true) {
       const chunk = await reader.read();
@@ -261,6 +437,9 @@ export async function boundedAnalysisFetch(
         'content-type': response.headers.get('content-type') ?? 'application/json',
       },
     });
+  } catch (error) {
+    if (trace) finishAnalysisTrace(trace, error);
+    throw error;
   } finally {
     init.signal?.removeEventListener('abort', abort);
     reader.releaseLock();
@@ -377,7 +556,9 @@ async function runPi(
   options: AnalysisOptions,
   env: NonNullable<AnalysisOptions['env']>,
   signal: AbortSignal,
+  trace: AnalysisTrace,
 ) {
+  trace.diagnostics.stage = 'pi';
   const packageRoot = piRoot(options, env);
   const temporary = mkdtempSync(join(tmpdir(), 'qinglan-observe-analysis-'));
   try {
@@ -459,15 +640,20 @@ async function runPi(
           const value = parseAnalysisJson(
             new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)),
           );
+          const diagnostics =
+            value.diagnostics === undefined
+              ? undefined
+              : validateAnalysisDiagnostics(value.diagnostics, config, key);
           if (typeof value.analysisError === 'string') {
             finish(
               new AnalysisError(
                 Object.hasOwn(errors, value.analysisError) ? value.analysisError : 'pi',
+                diagnostics,
               ),
             );
-          } else finish(undefined, value);
-        } catch {
-          finish(new AnalysisError('output'));
+          } else finish(undefined, { ...value, ...(diagnostics ? { diagnostics } : {}) });
+        } catch (error) {
+          finish(error instanceof AnalysisError ? error : new AnalysisError('output'));
         }
       });
       if (signal.aborted) {
@@ -508,11 +694,13 @@ export async function analyzeEvidence(
   if (config.engine === 'none')
     return { ...base, status: 'skipped', summary: 'AI 分析未启用，原有规则告警保持。' };
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let trace: AnalysisTrace | undefined;
   const controller = new AbortController();
   try {
-    validateConfig(config);
     const env = options.env ?? process.env;
     const key = env[config.apiKeyEnv];
+    trace = createAnalysisTrace(config, key ?? '');
+    validateConfig(config);
     const safe = normalize(input, config, key ?? '');
     if (!safe.signals.length) return { ...base, status: 'skipped', summary: '无待分析信号。' };
     requireAnalysis(key && !/[\r\n]/.test(key), 'key');
@@ -528,7 +716,7 @@ export async function analyzeEvidence(
     });
     const operation =
       config.engine === 'pi'
-        ? runPi(safe, config, key, options, env, controller.signal)
+        ? runPi(safe, config, key, options, env, controller.signal, trace)
         : (async () => {
             const response = await boundedAnalysisFetch(
               options.fetch ?? globalThis.fetch,
@@ -540,25 +728,32 @@ export async function analyzeEvidence(
                 signal: controller.signal,
               },
               responseByteLimit(config.maxOutputTokens),
+              trace,
             );
+            trace!.diagnostics.stage = 'parse';
             const raw = parseAnalysisJson(
               new TextDecoder('utf-8', { fatal: true }).decode(await response.arrayBuffer()),
             );
             if (raw.model !== undefined) requireAnalysis(raw.model === config.model, 'output');
             return config.protocol === 'decisions' ? raw : chatAnswers(raw, config.protocol);
           })();
-    const raw = await Promise.race([operation, deadline]);
+    const raw: Record<string, unknown> = await Promise.race([operation, deadline]);
     const { answers, usage } = parseAnalysisAnswers(
       raw,
       safe.signals.map((signal) => signal.id),
       config.maxOutputTokens,
     );
+    trace.diagnostics.stage = 'complete';
     return {
       ...base,
       status: 'complete',
       summary: `已为 ${safe.signals.length} 个信号完成证据分类，其中 ${safe.signals.filter((signal) => signal.severity === 'critical').length} 个原有严重告警保持；中文说明直接来自归一化证据，不推断根因。`,
       findings: explain(safe, answers),
       ...(usage ? { usage } : {}),
+      diagnostics:
+        config.engine === 'pi' && raw.diagnostics !== undefined
+          ? (raw.diagnostics as AnalysisDiagnostics)
+          : finishAnalysisTrace(trace),
     };
   } catch (error) {
     const code = error instanceof AnalysisError ? error.code : 'network';
@@ -567,6 +762,11 @@ export async function analyzeEvidence(
       status: code === 'key' || code === 'pi_missing' ? 'unavailable' : 'failed',
       summary: 'AI 分析未完成，原有规则告警保持。',
       error: errors[code],
+      ...(error instanceof AnalysisError && error.diagnostics
+        ? { diagnostics: error.diagnostics }
+        : trace
+          ? { diagnostics: finishAnalysisTrace(trace, error) }
+          : {}),
     };
   } finally {
     if (timer) clearTimeout(timer);

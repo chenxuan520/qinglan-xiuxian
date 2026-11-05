@@ -13,7 +13,7 @@ import {
   restoreObserverState,
   runObserver,
 } from '../scripts/observer.ts';
-import type { AnalysisResult, SourceSpec } from '../scripts/observe-types.ts';
+import type { AnalysisInput, AnalysisResult, SourceSpec } from '../scripts/observe-types.ts';
 
 const at = '2026-11-05T12:00:00.000Z';
 const spec: SourceSpec = {
@@ -437,6 +437,121 @@ test('end-to-end observer preserves state before failure and suppresses repeat n
   }
 });
 
+for (const status of ['failed', 'complete'] as const) {
+  test(`手动重分析${status}只复查当前候选，与正常运行的去重、状态和退出完全一致`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'observer-reanalyze-'));
+    try {
+      const c = config();
+      c.sources = [spec];
+      c.analysis.engine = 'openai';
+      const inputs: AnalysisInput[] = [];
+      const collect = async (_source: SourceSpec, time: string) => ({
+        ...normalizeSource(spec, { ...report, generatedAt: time }, time),
+        status: 'failed' as const,
+        signals: [
+          {
+            id: 'failure',
+            sourceId: spec.id,
+            severity: 'critical' as const,
+            title: '已有硬失败',
+            detail: '确定错误不因AI结果消失',
+            evidenceIds: [spec.id],
+            immediate: true,
+          },
+        ],
+      });
+      const analyze = async (input: AnalysisInput): Promise<AnalysisResult> => {
+        inputs.push(structuredClone(input));
+        return {
+          engine: 'openai',
+          model: c.analysis.model,
+          status,
+          summary: '合成诊断结果',
+          findings:
+            status === 'complete'
+              ? input.signals.map((signal) => ({
+                  signalId: signal.id,
+                  explanation: '合成证据分类',
+                  nextSteps: ['核对原始证据'],
+                }))
+              : [],
+          ...(status === 'failed' ? { error: 'AI 请求失败，未转发原始错误内容' } : {}),
+          diagnostics: {
+            stage: status === 'complete' ? 'complete' : 'fetch',
+            elapsedMs: 23,
+            endpoint: { origin: 'https://api.openai.com', path: '/v1/decisions' },
+            ...(status === 'failed'
+              ? { errorName: 'TypeError', causeCode: 'ENOTFOUND' }
+              : { httpStatus: 200 }),
+          },
+        };
+      };
+      const env = { OBSERVER_API_KEY: 'explicit-fake-test-key' };
+      const first = await runObserver(c, emptyObserverState(), join(directory, 'first'), at, {
+        collect,
+        analyze,
+        env,
+      });
+      assert.equal(first.failed, true);
+      assert.equal(inputs[0].signals.length, 1);
+      const previous = readObserverState(join(directory, 'first/state.json'));
+      const before = structuredClone(previous);
+      const time = '2026-11-05T13:00:00Z';
+      const normal = await runObserver(c, previous, join(directory, 'normal'), time, {
+        collect,
+        analyze,
+        env: { ...env, OBSERVER_REANALYZE: 'false' },
+      });
+      const manual = await runObserver(c, previous, join(directory, 'manual'), time, {
+        collect,
+        analyze,
+        env: { ...env, OBSERVER_REANALYZE: 'true' },
+      });
+      assert.equal(inputs[1].signals.length, 0);
+      assert.deepEqual(
+        inputs[2].signals.map((signal) => signal.id),
+        ['test/failure'],
+      );
+      assert.equal(manual.failed, false);
+      assert.equal(manual.analysis.reanalyzed, true);
+      assert.equal(normal.analysis.reanalyzed, undefined);
+      assert.deepEqual(manual.decision, normal.decision);
+      assert.deepEqual(previous, before);
+      assert.equal(
+        readFileSync(join(directory, 'manual/state.json'), 'utf8'),
+        readFileSync(join(directory, 'normal/state.json'), 'utf8'),
+      );
+      assert.deepEqual(JSON.parse(readFileSync(join(directory, 'manual/exit.json'), 'utf8')), {
+        failed: false,
+        newIncidents: 0,
+      });
+      const saved = JSON.parse(readFileSync(join(directory, 'manual/result.json'), 'utf8'));
+      assert.deepEqual(saved.notifications, []);
+      assert.equal(saved.analysis.reanalyzed, true);
+      assert.equal(saved.analysis.diagnostics.elapsedMs, 23);
+      const summary = readFileSync(join(directory, 'manual/summary.md'), 'utf8');
+      assert.match(summary, /手动重分析：当前 1 个候选/);
+      assert.match(summary, /未重复提醒/);
+      assert.match(summary, /AI 诊断：阶段/);
+      assert.match(summary, /https:\/\/api.openai.com\/v1\/decisions/);
+      if (status === 'failed') assert.match(summary, /cause.code ENOTFOUND/);
+      else assert.match(summary, /重分析：合成证据分类/);
+      const after = await runObserver(
+        c,
+        manual.decision.state,
+        join(directory, 'after'),
+        '2026-11-05T14:00:00Z',
+        { collect, analyze, env },
+      );
+      assert.equal(after.failed, false);
+      assert.equal(after.analysis.reanalyzed, undefined);
+      assert.deepEqual(inputs[3].signals, []);
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+}
+
 test('healthy runs and confirmed recovery summaries are concise', () => {
   const text = observerSummary(
     { schemaVersion: 1, at, observations: [] },
@@ -473,6 +588,11 @@ test('workflow keeps observer isolated from deployments and simulation jobs', ()
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /actions: read/);
   assert.match(workflow, /secrets\.OBSERVER_API_KEY/);
+  assert.match(workflow, /reanalyze:[\s\S]*?type: boolean\s+default: false/);
+  assert.match(
+    workflow,
+    /OBSERVER_REANALYZE: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.reanalyze == true \}\}/,
+  );
   assert.doesNotMatch(
     workflow,
     /contents: write|issues: write|pull-requests: write|balance:ci|balance:gate|deploy:|--api-key/,

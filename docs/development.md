@@ -445,6 +445,14 @@ gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master
 
 观察器单独使用 Node 24（含 Pi 子进程的代理支持），游戏原有 Node 版本要求不变。`npm run observe` 本地执行同一入口，结果写到忽略目录 `artifacts/observer/`。CLI 可依次传配置路径与输出目录。请求有超时、响应大小和模型输入/输出限制；原始认证错误不进入日志。只有新的确认异常才调用模型，AI超时或认证失败仍保留原始规则证据。`observer-state` artifact 保存有限历史、已通知身份与恢复状态；下一次只恢复本仓库 master 的该工作流产物，失败运行也保留状态。状态缺失或损坏会明确失败，不能静默清空去重历史；首次运行没有历史则建立基线。Artifact 默认保留30天、最多72批历史，长期停用后重建基线须先确认历史过期原因。
 
+AI 诊断保存在 `result.json` 的 `analysis.diagnostics` 和 Actions 摘要中：仅含阶段、耗时、脱敏后的 endpoint origin/path、HTTP 状态及白名单异常名称/原因代码，不记录原始错误 message、请求头、响应正文或凭据；重定向只报告、不跟随。排查首次连接失败时可手动重分析当前候选，无需删除历史：
+
+```bash
+gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master -f reanalyze=true
+```
+
+`reanalyze` 默认为 `false`，定时运行始终只分析新增通知；手动 `true` 通过 `OBSERVER_REANALYZE=true` 重分析当前候选，摘要明确标注。它不改变去重状态、notifications 或退出规则，没有新增确认异常便不重复通知；本地同名环境变量可验证同一流程。
+
 ## GitHub Pages · 平台部署
 
 平台部署地址：`https://chenxuan520.github.io/qinglan-xiuxian/`，不作为对外游玩入口。
