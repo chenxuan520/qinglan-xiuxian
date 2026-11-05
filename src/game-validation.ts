@@ -117,6 +117,8 @@ export function validateRunSnapshot(
     )
       return null;
     if (typeof s.trialBossBlocked !== 'boolean') return null;
+    for (const key of ['sovereignRecoveryAnnounced', 'sovereignRecoveryPending'] as const)
+      if (s[key] !== undefined && typeof s[key] !== 'boolean') return null;
     if (
       s.nextEnemySlowAt !== undefined &&
       (!Number.isFinite(s.nextEnemySlowAt) || s.nextEnemySlowAt < 0)
@@ -173,7 +175,8 @@ export function validateRunSnapshot(
         s.burning.life > ENEMY_CONTROL.burn ||
         s.burning.damage < 0 ||
         (s.burning.life === 0 && s.burning.damage !== 0) ||
-        (s.burning.life > 0 && (s.stage !== 1 || !!s.tribulation)))
+        (s.burning.life > 0 &&
+          ((s.stage !== 1 && s.stage !== FINAL_TRIAL_STAGE) || !!s.tribulation)))
     )
       return null;
     if (
@@ -257,6 +260,7 @@ export function validateRunSnapshot(
             'dy',
           ]) &&
           ENEMIES[e.type] &&
+          (e.lastHurtAt === undefined || Number.isFinite(e.lastHurtAt)) &&
           (e.bossSummon === undefined ||
             (!!e.bossSummon &&
               !e.boss &&
@@ -402,6 +406,17 @@ export function validateRunSnapshot(
               validBossMotion(b.bossMotion, b.bossStage))) &&
           (b.enemySkill === undefined ||
             ['firebolt', 'frostbolt', 'soul'].includes(b.enemySkill)) &&
+          (((b.miasmaArrow === undefined || b.miasmaArrow === false) &&
+            b.miasmaDamage === undefined) ||
+            (b.miasmaArrow === true &&
+              b.kind === 'hostile' &&
+              b.bossStage === 3 &&
+              !s.tribulation &&
+              b.bossMotion === undefined &&
+              b.enemySkill === undefined &&
+              Number.isFinite(b.miasmaDamage) &&
+              b.miasmaDamage! >= 0 &&
+              numbers(b.origin, ['x', 'y']))) &&
           (b.bossStage === undefined ||
             (b.kind === 'hostile' &&
               Number.isInteger(b.bossStage) &&

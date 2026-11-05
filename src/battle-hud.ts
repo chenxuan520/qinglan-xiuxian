@@ -22,12 +22,123 @@ import type { MobileDisplay } from './mobile-display.ts';
 import { HudLayout } from './hud-layout.ts';
 import { comboTreasure, curioCombo } from './curio-combos.ts';
 
+// 只承接仙尊首次回元：模拟步不能替代前台绘制确认，正常提示保持独立。
+export class SovereignRecoveryNotice {
+  private active: {
+    game: Game;
+    element: HTMLElement;
+    text: string;
+    remaining: number;
+    lastVisibleAt: number | null;
+    acknowledged: boolean;
+  } | null = null;
+  private frame: number | null = null;
+
+  constructor() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.hide();
+    });
+    window.addEventListener('blur', () => this.hide());
+  }
+
+  reset() {
+    this.hide();
+    if (this.frame !== null) cancelAnimationFrame(this.frame);
+    this.frame = null;
+    this.active = null;
+  }
+
+  update(game: Game, element: HTMLElement) {
+    if (this.active && this.active.game !== game) this.reset();
+    if (!this.active && game.pendingSovereignRecoveryNotice)
+      this.active = {
+        game,
+        element,
+        text: game.pendingSovereignRecoveryNotice,
+        remaining: 3000,
+        lastVisibleAt: null,
+        acknowledged: false,
+      };
+    if (!this.active) return;
+    if (this.active.element !== element) {
+      this.hide();
+      if (this.frame !== null) cancelAnimationFrame(this.frame);
+      this.frame = null;
+      this.active = { ...this.active, element };
+    }
+    this.schedule();
+  }
+
+  private hide() {
+    const active = this.active;
+    if (!active) return;
+    active.lastVisibleAt = null;
+    active.element.hidden = true;
+    active.element.textContent = '';
+    this.updateVisibility(active.element);
+  }
+
+  private updateVisibility(element: HTMLElement) {
+    const host = element.parentElement;
+    host?.classList.toggle('visible', !element.hidden || !!host.firstElementChild?.textContent);
+  }
+
+  private schedule() {
+    if (this.frame !== null || !this.active) return;
+    const expected = this.active;
+    this.frame = requestAnimationFrame((now) => {
+      if (this.active !== expected) return;
+      this.frame = null;
+      const active = this.active;
+      if (!active) return;
+      const { game, element } = active;
+      if (
+        !element.isConnected ||
+        document.hidden ||
+        !document.hasFocus() ||
+        game.state !== 'playing' ||
+        document.getElementById('modal-root')?.childElementCount
+      ) {
+        this.hide();
+        this.schedule();
+        return;
+      }
+      element.textContent = active.text;
+      element.hidden = false;
+      this.updateVisibility(element);
+      const host = element.parentElement;
+      if (
+        !host ||
+        !element.getClientRects().length ||
+        getComputedStyle(element).visibility !== 'visible' ||
+        Number(getComputedStyle(host).opacity) <= 0
+      ) {
+        active.lastVisibleAt = null;
+        this.schedule();
+        return;
+      }
+      if (active.lastVisibleAt !== null) {
+        active.remaining -= Math.max(0, now - active.lastVisibleAt);
+        // 两次可见前台RAF之间已有绘制机会；确认只作用于此实例。
+        if (!active.acknowledged) {
+          game.acknowledgeSovereignRecoveryNotice();
+          active.acknowledged = true;
+        }
+      }
+      active.lastVisibleAt = now;
+      if (active.remaining <= 0) this.reset();
+      else this.schedule();
+    });
+  }
+}
+
 export class BattleHud {
   private lastLoadout = '';
   private readonly ui: HTMLDivElement;
   private readonly save: SaveData;
   private readonly mobileDisplay: MobileDisplay;
   private readonly layout: HudLayout;
+  private readonly recoveryNotice = new SovereignRecoveryNotice();
   constructor(ui: HTMLDivElement, save: SaveData, mobileDisplay: MobileDisplay) {
     this.ui = ui;
     this.save = save;
@@ -37,6 +148,7 @@ export class BattleHud {
   reset() {
     this.lastLoadout = '';
     this.layout.reset();
+    this.recoveryNotice.reset();
   }
   render(game: Game, volumeOpen: boolean, touchHintDismissed: boolean) {
     const { ui, save, mobileDisplay } = this;
@@ -150,10 +262,19 @@ export class BattleHud {
               ][enemyWave(game.stage, game.time)],
     );
     const notice = document.getElementById('notice')!;
+    if (!notice.firstElementChild) {
+      const current = document.createElement('div');
+      const recovery = document.createElement('div');
+      recovery.hidden = true;
+      notice.replaceChildren(current, recovery);
+    }
+    const currentNotice = notice.firstElementChild!;
+    const recoveryNotice = notice.lastElementChild as HTMLElement;
     const showNotice = game.noticeTime > 0 && !game.notice.includes('降临');
     const noticeText = showNotice ? game.notice : '';
-    if (notice.textContent !== noticeText) notice.textContent = noticeText;
-    notice.classList.toggle('visible', showNotice);
+    if (currentNotice.textContent !== noticeText) currentNotice.textContent = noticeText;
+    notice.classList.toggle('visible', showNotice || !recoveryNotice.hidden);
+    this.recoveryNotice.update(game, recoveryNotice);
     const aliveBosses = game.enemies.filter((e) => e.boss && !e.dead);
     const bossBar = document.querySelector<HTMLElement>('#boss-bar')!;
     bossBar.hidden = !game.boss;

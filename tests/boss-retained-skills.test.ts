@@ -119,8 +119,8 @@ test('原生与终关远距十二秒追云使用相同参数，冥主瞬移不�
         const z = g.zones[0];
         assert.ok(z);
         assert.equal(z.life, 12);
-        assert.equal(z.radius, 58);
-        assert.equal(z.vx, 96);
+        assert.equal(z.radius, 70);
+        assert.equal(z.vx, 120);
         assert.equal(z.vy, 0);
         assert.ok(z.delay >= 1.18);
         assert.equal(z.damage, e.damage * 0.8);
@@ -190,7 +190,7 @@ test('所有妖王现有冷却再缩短30%，保留半血加速与完整蓄势',
 });
 
 test('各境基础气血强化保留，第三至五境按目标血量，终关基础与伤害保持', () => {
-  const hp = [1.15, 2.145 * 1.2 * 1.2 * 1.2, 3.42, 3.47, 2.69, 2.4 * 1.1];
+  const hp = [1.15, 2.145 * 1.2 * 1.2 * 1.2, 3.42, 3.8, 2.69, 2.4 * 1.1];
   BOSS_COMBAT.hp.forEach((n, i) => near(n, hp[i]));
   assert.equal(BOSS_COMBAT.trialHp, 1.1);
   assert.deepEqual(BOSS_COMBAT.trialKingHp, [1, 1, 1.3, 1.4, 1.25, 1.25, 1]);

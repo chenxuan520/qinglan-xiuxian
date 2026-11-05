@@ -16,6 +16,7 @@ export interface Enemy extends Point {
   type: number;
   hp: number;
   maxHp: number;
+  lastHurtAt?: number;
   radius: number;
   speed: number;
   damage: number;
@@ -65,6 +66,8 @@ export interface Shot extends Point {
   bossAttack?: BossAttack;
   enemySkill?: 'firebolt' | 'frostbolt' | 'soul';
   bossStage?: number;
+  miasmaArrow?: boolean;
+  miasmaDamage?: number;
 }
 export interface Zone extends Point {
   endX?: number;

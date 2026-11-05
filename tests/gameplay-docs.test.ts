@@ -391,7 +391,7 @@ test('急需互换的让利说明保持8%设计上限，并能找到实际小赚
 });
 
 test('控制时长、漂移瘴云与人字场范围说明对照实际生效参数', () => {
-  const guide = compact(guideContent('combat')),
+  const guide = compact(guideContent('combat').replace(/<[^>]*>/g, '')),
     text = compact(gameplay);
   for (const source of [guide, text]) {
     assert.ok(source.includes(`禁锢${ENEMY_CONTROL.bind}秒`));

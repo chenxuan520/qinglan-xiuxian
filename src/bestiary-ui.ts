@@ -36,10 +36,10 @@ function statLine(
   return `<small class="enemy-stats"><b>${label}</b><br>气血 约${numberRange(stats.hp)}<br>触碰伤害 约${numberRange(stats.damage)}</small>`;
 }
 const miasmaHint = (life: number) =>
-  `五处固定瘴池、五道毒矢与四名护卫召唤，另有三团持续${life}秒的漂移毒瘴；毒伤命中后3秒无法回复，清灵散可减伤并缩短蚀体。`;
+  `五处固定瘴池、五道毒矢与四名护卫召唤，毒矢落地化瘴；另有三团持续${life}秒的漂移毒瘴，游瘴更大更快；毒伤命中后3秒无法回复，清灵散可减伤并缩短蚀体。`;
 const bossHints = [
-  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，藤圈造成3秒藤缠，暂难拾取；木心坚韧如精英，生长2.4秒后成阵，可提前击碎。',
-  '快慢两层炎扇（九发与八发）、五点火径与快慢两层轮舞（各二十发），离开火圈并穿过弹幕间隙；七道回焰短暂停留后沿原路折返。',
+  '六处环形藤阵、七发荆棘扇射与三名山灵召唤，弹幕附藤缠，藤圈与弹幕造成3秒藤缠，暂难拾取；木心坚韧如精英，生长<span class="combat-unit">2.4秒</span>后成阵，可提前击碎。',
+  '快慢两层炎扇（九发与八发）、五点火径与快慢两层轮舞（各二十发），弹幕附灼烧，离开火圈并穿过弹幕间隙；七道回焰短暂停留后沿原路折返。',
   '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后；两狼左右夹击，可反复扑击，至多存续六息；每只气血至少为施放妖王的8%，另有重新锁向的两段连扑。',
   miasmaHint(BOSS_MECHANICS.nativeMiasmaLife),
   '六名护卫召唤、更快的二十发摄魂环弹与六点鬼牢，留意中央落阵；魂弹命中封宝2秒；五道魂影沿你刚走过的路线逆行；还会瞬移留下三具幻影，幻影短暂蓄力后散出魂弹，可先击破，幻影不提供收获。',
@@ -51,7 +51,7 @@ const trialBossHints = bossHints
       hint + (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
   )
   .concat(
-    '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。<span class="boss-skill-name">万劫归一：</span>随机借用苍木落种成林、狐王九尾回焰、狼王双狼合猎、毒君五毒游瘴、冥主幽影换形、劫灵周天星轨之一，化为金色；<span class="boss-skill-name">天劫审判：</span>劫印三息后沿落脚点连劈三雷；<span class="boss-skill-name">归墟引力：</span>半血后将修士拉向自身，同时放出雷环。',
+    '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。<span class="boss-skill-name">万劫随身：</span>弹幕暗藏六境劫数；<span class="boss-skill-name">劫息回元：</span>连续<span class="combat-unit">3秒</span>未受伤害则每秒回复<span class="combat-unit">1%</span>气血。<span class="boss-skill-name">万劫归一：</span>随机借用苍木落种成林、狐王九尾回焰、狼王双狼合猎、毒君五毒游瘴、冥主幽影换形、劫灵周天星轨之一，化为金色；<span class="boss-skill-name">天劫审判：</span>劫印三息后沿落脚点连劈三雷；<span class="boss-skill-name">归墟引力：</span>半血后将修士拉向自身，同时放出雷环。',
   );
 export function bestiaryPanel(
   bestiaryStage: number,

@@ -62,8 +62,14 @@ test('出场效果消散后旧降临提示不回显，其他战斗提示仍正�
     const g = encounter(stage);
     const waves = stage === 6 ? TRIAL_BOSS_TIMES : [STAGES[stage].minutes * 60];
     let visible = false;
+    const currentNotice = { textContent: '' };
+    const recoveryNotice = { textContent: '', hidden: true };
     const notice = {
-      textContent: '',
+      firstElementChild: currentNotice,
+      lastElementChild: recoveryNotice,
+      get textContent() {
+        return currentNotice.textContent + recoveryNotice.textContent;
+      },
       classList: { toggle: (_name: string, value: boolean) => (visible = value) },
     };
     const drawNotice = () =>
@@ -71,6 +77,8 @@ test('出场效果消散后旧降临提示不回显，其他战斗提示仍正�
         game: g,
         bossEntranceCue,
         document: { getElementById: () => notice },
+        // 本用例只验证即时提示的降临过滤；回元呈现由真实HUD/RAF回归覆盖。
+        recoveryNotice: { update() {} },
       });
     for (const nominal of waves) {
       const at = stage === 6 ? g.nextTrialBossAt : nominal;

@@ -126,6 +126,7 @@ import { REALM_BREAKTHROUGH_COLORS, REALM_BREAKTHROUGH_DURATION } from './realm-
 
 const distanceSquared = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const SOVEREIGN_RECOVERY_NOTICE = '九天执劫仙尊 · 劫息回元';
 
 // 只计数，不分配临时筛选数组；每次仍按原顺序完整扫描当前集合。
 function countMatching<T>(items: T[], matches: (item: T) => boolean) {
@@ -177,6 +178,9 @@ export class Game {
   trialBossesSpawned = 0;
   nextTrialBossAt = TRIAL_BOSS_TIMES[0];
   trialBossBlocked = false;
+  // once 表示已触发；pending 表示尚未前台呈现，续局保留这一事实。
+  private sovereignRecoveryAnnounced = false;
+  private sovereignRecoveryPending = false;
   damageDealt = 0;
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
@@ -460,6 +464,12 @@ export class Game {
     this.notice = message;
     this.noticeTime = 3;
   }
+  get pendingSovereignRecoveryNotice() {
+    return this.sovereignRecoveryPending ? SOVEREIGN_RECOVERY_NOTICE : null;
+  }
+  acknowledgeSovereignRecoveryNotice() {
+    this.sovereignRecoveryPending = false;
+  }
   private recordRunAchievements() {
     if (this.level >= MAX_RUN_LEVEL)
       recordChronicle(this.save, '百炼归真', '一场历练中修至一百级。', 'level-100');
@@ -578,6 +588,8 @@ export class Game {
       trialBossesSpawned: this.trialBossesSpawned,
       nextTrialBossAt: this.nextTrialBossAt,
       trialBossBlocked: this.trialBossBlocked,
+      ...(this.sovereignRecoveryAnnounced ? { sovereignRecoveryAnnounced: true } : {}),
+      ...(this.sovereignRecoveryPending ? { sovereignRecoveryPending: true } : {}),
       nextElite: this.nextElite,
       damageDealt: this.damageDealt,
       damageBySource: { ...this.damageBySource },
@@ -628,6 +640,11 @@ export class Game {
       g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       g.time = s.time;
+      g.sovereignRecoveryAnnounced = s.sovereignRecoveryAnnounced ?? false;
+      g.sovereignRecoveryPending = s.sovereignRecoveryPending ?? false;
+      if (g.sovereignRecoveryPending) {
+        g.sovereignRecoveryAnnounced = true;
+      }
       g.playerTrail = (s.playerTrail ?? []).map((p) => ({ ...p }));
       g.nextEnemySlowAt = s.nextEnemySlowAt ?? 0;
       g.nextEnemyBindAt = s.nextEnemyBindAt ?? 0;
@@ -681,6 +698,9 @@ export class Game {
         .filter((e) => e.illusionOf === undefined)
         .map((e) => ({
           ...e,
+          ...(g.isFinalTrial && e.boss && e.bossStage === FINAL_TRIAL_STAGE
+            ? { lastHurtAt: e.lastHurtAt ?? g.time }
+            : {}),
           ...(e.bossSkillQueue ? { bossSkillQueue: [...e.bossSkillQueue] } : {}),
           ...(e.judgements ? { judgements: [...e.judgements] } : {}),
           ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
@@ -1193,6 +1213,9 @@ export class Game {
       y: at?.y ?? this.player.y + Math.sin(angle) * (this.viewport.height / 2 + 70),
       hp: combat.hp,
       maxHp: combat.hp,
+      ...(this.isFinalTrial && boss && bossStage === FINAL_TRIAL_STAGE
+        ? { lastHurtAt: this.time }
+        : {}),
       radius: boss
         ? bossStage === FINAL_TRIAL_STAGE
           ? 62
@@ -1248,6 +1271,21 @@ export class Game {
     const progress = this.combatProgress;
     for (const e of this.enemies) {
       if (e.dead) continue;
+      if (
+        this.isFinalTrial &&
+        e.boss &&
+        e.bossStage === FINAL_TRIAL_STAGE &&
+        e.hp > 0 &&
+        e.hp < e.maxHp &&
+        this.time - (e.lastHurtAt ?? this.time) >= 3
+      ) {
+        const hp = e.hp;
+        e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.01 * dt);
+        if (e.hp > hp && !this.sovereignRecoveryAnnounced) {
+          this.sovereignRecoveryAnnounced = true;
+          this.sovereignRecoveryPending = true;
+        }
+      }
       if (e.bossSummon) {
         this.updateBossSummon(e, dt);
         continue;
@@ -1726,10 +1764,14 @@ export class Game {
         ? 1
         : DIFFICULTIES[this.difficulty].bossShotSpeed[stage];
     const fan = (count: number, spread: number, speed: number, center = angle) => {
+      const shots: Shot[] = [];
       for (let i = 0; i < count; i++) {
         const a = center + (i / Math.max(1, count - 1) - 0.5) * spread;
-        this.hostileShot(e, Math.cos(a), Math.sin(a), speed * shotSpeed, e.damage * 0.75);
+        shots.push(
+          this.hostileShot(e, Math.cos(a), Math.sin(a), speed * shotSpeed, e.damage * 0.75),
+        );
       }
+      return shots;
     };
     const ring = (count: number, speed: number) =>
       fan(count, (TAU * (count - 1)) / count, speed, this.time * 0.25);
@@ -1885,8 +1927,14 @@ export class Game {
           blast(p.x, p.y, 62, 5);
           for (const x of [-100, 100])
             for (const y of [-75, 75]) blast(p.x + x, p.y + y, 62, 5, 1.45);
-        } else if (phase === 1) fan(5, 0.75, 160);
-        else summons(4);
+        } else if (phase === 1) {
+          const shots = fan(5, 0.75, this.tribulation ? 160 : 190);
+          if (!this.tribulation)
+            for (const shot of shots) {
+              shot.miasmaArrow = true;
+              shot.miasmaDamage = e.damage;
+            }
+        } else summons(4);
         break;
       case 4:
         if (phase === 0) summons(6);
@@ -2039,7 +2087,7 @@ export class Game {
       this.zone(
         e.x + nx * 165,
         e.y + ny * 165,
-        58,
+        native ? 70 : 58,
         native ? BOSS_MECHANICS.nativeMiasmaLife : 6,
         e.damage * 0.8,
         STAGES[3].color,
@@ -2125,7 +2173,7 @@ export class Game {
         this.zone(
           this.player.x + nx * (side ? 60 : 0) - ny * side,
           this.player.y + ny * (side ? 60 : 0) + nx * side,
-          62,
+          native ? 75 : 62,
           native ? rules.nativeMiasmaLife : 6,
           e.damage,
           STAGES[3].color,
@@ -2697,15 +2745,22 @@ export class Game {
       if (b.kind === 'hostile') {
         if (b.bossMotion && !bossShotPose(b).active) continue;
         if (distance(b, this.player) < b.radius + 12) {
+          const effect =
+            b.bossStage === FINAL_TRIAL_STAGE ? Math.floor(this.random() * 6) : b.bossStage;
           if (!this.buddhaShieldReady) {
-            if (b.enemySkill === 'frostbolt' || b.bossStage === 2) this.enemySlow();
-            if (b.enemySkill === 'soul' || b.bossStage === 4) this.enemySeal();
+            if (effect === 0) this.enemyEntangle();
+            if (b.enemySkill === 'frostbolt' || effect === 2) this.enemySlow();
+            if (b.enemySkill === 'soul' || effect === 4) this.enemySeal();
+            if (b.bossStage === FINAL_TRIAL_STAGE && effect === 5) this.enemyBind();
           }
           this.hurtPlayer(
             b.damage * (b.bossStage === 3 ? this.medicine.poison : 1),
-            !this.isFinalTrial && this.stage === 1 && b.enemySkill === 'firebolt',
-            b.bossStage === 3,
+            effect === 1 || (!this.isFinalTrial && this.stage === 1 && b.enemySkill === 'firebolt'),
+            b.bossStage === 3 || (b.bossStage === FINAL_TRIAL_STAGE && effect === 3),
           );
+          b.life = 0;
+        } else if (b.miasmaArrow && !this.tribulation && distance(b, b.origin) >= 280) {
+          this.zone(b.x, b.y, 28, 2.5, b.miasmaDamage!, STAGES[3].color, 'boss-miasma', 0.3, true);
           b.life = 0;
         }
         continue;
@@ -3328,6 +3383,7 @@ export class Game {
     if (this.passives.abyss) e.slow = Math.max(e.slow, this.passivePower('abyss') * 0.15);
     if (!e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5) damage *= 0.45;
     const actual = Math.min(e.hp, damage);
+    if (actual > 0) e.lastHurtAt = this.time;
     e.hp -= damage;
     e.flash = 0.12;
     this.damageDealt += actual;

@@ -4,7 +4,7 @@ import { resourceFailed } from './update-check.ts';
 import { drawEnemyWarnings } from './render-warnings.ts';
 import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
 import { hazardMargin } from './regional-hazards.ts';
-import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, STAGES, TAU } from './data.ts';
+import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, FINAL_TRIAL_STAGE, STAGES, TAU } from './data.ts';
 import type { CultivationPath, ElementId } from './data.ts';
 import type { Game, Point } from './game.ts';
 import { spriteFrame } from './sprites.ts';
@@ -671,6 +671,32 @@ export class Renderer {
             : e.boss
               ? STAGES[e.bossStage ?? game.stage].sprite
               : ENEMIES[e.type].sprite;
+        if (
+          game.isFinalTrial &&
+          e.boss &&
+          e.bossStage === FINAL_TRIAL_STAGE &&
+          e.hp > 0 &&
+          e.hp < e.maxHp &&
+          e.lastHurtAt !== undefined &&
+          time - e.lastHurtAt >= 3
+        ) {
+          c.save();
+          c.translate(e.x, e.y - e.radius);
+          c.globalAlpha = this.reducedMotion.matches
+            ? 0.35
+            : 0.35 + 0.1 * Math.sin((time * TAU) / 1.6);
+          this.glowSprite(`sovereign-recovery:${e.radius}`, e.radius * 4, e.radius * 4, (c) => {
+            const glow = c.createRadialGradient(0, 0, e.radius * 0.4, 0, 0, e.radius * 1.8);
+            glow.addColorStop(0, '#e8d69c');
+            glow.addColorStop(0.55, '#e8d69c99');
+            glow.addColorStop(1, '#e8d69c00');
+            c.fillStyle = glow;
+            c.beginPath();
+            c.arc(0, 0, e.radius * 1.8, 0, TAU);
+            c.fill();
+          });
+          c.restore();
+        }
         this.sprite(
           sprite,
           e.x,

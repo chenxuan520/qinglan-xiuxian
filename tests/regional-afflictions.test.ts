@@ -118,10 +118,12 @@ test('致命灼烧立即落败，不在同一帧继续施法；快照拒绝非�
     assert.equal(Game.restore(run.save, { ...run.snapshot(), burning }), null);
   }
   const final = arena(6);
-  assert.equal(
-    Game.restore(final.save, { ...final.snapshot(), burning: { life: 1, damage: 1 } }),
-    null,
-  );
+  const restoredFinal = Game.restore(final.save, {
+    ...final.snapshot(),
+    burning: { life: 1, damage: 1 },
+  });
+  assert.ok(restoredFinal);
+  assert.deepEqual(restoredFinal.burning, { life: 1, damage: 1 });
 });
 
 test('第六关雷兽与错拍雷路全在自身200像素内，击杀施法者可散雷，第七关不变', () => {

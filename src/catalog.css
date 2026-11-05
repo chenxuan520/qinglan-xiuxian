@@ -522,6 +522,12 @@
 .enemy-card .boss-skill-name {
   display: inline-block;
 }
+.combat-unit {
+  white-space: nowrap;
+}
+.guide-steps .combat-copy {
+  text-wrap: pretty;
+}
 .enemy-card[data-boss-stage='6'] {
   grid-column: 1 / -1;
 }

@@ -50,7 +50,7 @@ test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七�
     [1, 0, [...Array(9).fill(200), ...Array(8).fill(145)]],
     [1, 2, [...Array(20).fill(180), ...Array(20).fill(130)]],
     [2, 1, [...Array(3).fill(240), ...Array(2).fill(180), ...Array(2).fill(130)]],
-    [3, 1, Array(5).fill(160)],
+    [3, 1, Array(5).fill(190)],
     [4, 1, Array(20).fill(200)],
     [5, 1, Array(22).fill(175)],
     [6, 0, Array(24).fill(185)],

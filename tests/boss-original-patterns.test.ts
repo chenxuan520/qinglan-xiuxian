@@ -162,7 +162,7 @@ test('原生毒君与冥主保留特色追袭，其余远距蓄势冲锋，没�
         assert.equal(e.charge, 0);
         assert.equal(g.zones.length, 1);
         assert.equal(g.zones[0].life, 12);
-        assert.equal(g.zones[0].vx, 96);
+        assert.equal(g.zones[0].vx, 120);
         assert.equal(g.zones[0].endX, undefined);
         continue;
       }
