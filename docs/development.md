@@ -443,6 +443,8 @@ gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master
 
 默认 `engine: pi`、模型 `gpt-6-luna`、协议 `decisions`。Luna 是分类模型；通过 Pi 官方分类器对候选异常的证据充分性评分，中文说明来自实际聚合事实，不能凭评分删除既有失败或生成无依据的根因。Pi 1.5.0 在 Runner 临时目录隔离安装，不进入游戏依赖和构建，不加载仓库指令、扩展、会话或文件修改工具。支持 `engine: openai` 直接接入 OpenAI 格式的 `responses`、`chat-completions` 或 `decisions` 服务；`engine: none` 只做规则观察。模型、服务根地址、协议、引擎可通过仓库 Variables `OBSERVER_MODEL`、`OBSERVER_BASE_URL`、`OBSERVER_PROTOCOL`、`OBSERVER_ENGINE` 覆盖。地址填写 API 根路径（默认 `https://api.openai.com/v1`），不能夹带凭据。自建本机服务允许 loopback HTTP，其他地址须 HTTPS。不会静默切换模型。
 
+API key 只整理复制时的首尾空白和一对匹配的外层单双引号（含中文引号），不修补内部字符；非法格式在请求前明确失败。原值及整理后的值均从证据、诊断和结果中脱敏，只将整理并预检后的凭据通过环境变量交给 Pi 子进程，不写入文件或命令参数。
+
 观察器单独使用 Node 24（含 Pi 子进程的代理支持），游戏原有 Node 版本要求不变。`npm run observe` 本地执行同一入口，结果写到忽略目录 `artifacts/observer/`。CLI 可依次传配置路径与输出目录。请求有超时、响应大小和模型输入/输出限制；原始认证错误不进入日志。只有新的确认异常才调用模型，AI超时或认证失败仍保留原始规则证据。`observer-state` artifact 保存有限历史、已通知身份与恢复状态；下一次只恢复本仓库 master 的该工作流产物，失败运行也保留状态。状态缺失或损坏会明确失败，不能静默清空去重历史；首次运行没有历史则建立基线。Artifact 默认保留30天、最多72批历史，长期停用后重建基线须先确认历史过期原因。
 
 AI 诊断保存在 `result.json` 的 `analysis.diagnostics` 和 Actions 摘要中：仅含阶段、耗时、脱敏后的 endpoint origin/path、HTTP 状态及白名单异常名称/原因代码，不记录原始错误 message、请求头、响应正文或凭据；重定向只报告、不跟随。排查首次连接失败时可手动重分析当前候选，无需删除历史：

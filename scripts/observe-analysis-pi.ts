@@ -7,6 +7,7 @@ import type { AnalysisConfig, AnalysisInput } from './observe-types.ts';
 import {
   AnalysisError,
   analysisEndpoint,
+  analysisHeaders,
   analysisQuestions,
   analysisRecord,
   analysisRequest,
@@ -64,6 +65,7 @@ async function main() {
   const key = process.env.OBSERVER_ANALYSIS_KEY;
   requireAnalysis(key, 'key');
   trace = createAnalysisTrace(config, key);
+  analysisHeaders(key);
   requireAnalysis(config.engine === 'pi', 'config');
   const endpoint = analysisEndpoint(config);
   const ids = input.signals.map((signal) => signal.id);

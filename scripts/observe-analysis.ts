@@ -33,6 +33,7 @@ const errors: Record<string, string> = {
   auth: 'AI 服务认证失败（401/403）',
   http: 'AI 服务返回失败状态，未读取原始错误内容',
   key: '未配置本次分析所需的 API key',
+  key_format: 'AI API key 配置格式无效，请重新配置',
   pi_missing: '未找到官方 Pi 1.5.0 SDK，请配置 OBSERVER_PI_PACKAGE_ROOT',
   pi: 'Pi SDK 执行失败或版本、模型、协议不受支持',
 };
@@ -55,8 +56,12 @@ export function analysisRecord(value: unknown): Record<string, unknown> {
 }
 
 /** 只处理调用方传入的公共事实；不读取凭据文件、存档或环境变量全集。 */
-export function redactAnalysisText(text: string, apiKey = '') {
-  let result = apiKey ? text.split(apiKey).join('[已脱敏]') : text;
+type RedactionKeys = string | readonly string[];
+export function redactAnalysisText(text: string, apiKey: RedactionKeys = '') {
+  let result = text;
+  const keys = typeof apiKey === 'string' ? [apiKey] : [...apiKey];
+  for (const key of keys.filter(Boolean).sort((a, b) => b.length - a.length))
+    result = result.split(key).join('[已脱敏]');
   result = result.replace(/https?:\/\/[^\s<>"']+/gi, (raw) => {
     try {
       const url = new URL(raw);
@@ -78,6 +83,23 @@ export function redactAnalysisText(text: string, apiKey = '') {
       '$1"[已脱敏]"',
     )
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[已脱敏邮箱]');
+}
+
+function cleanAnalysisKey(raw: string) {
+  let key = raw.trim();
+  const pairs: Record<string, string> = { '"': '"', "'": "'", '‘': '’', '“': '”' };
+  if (key.length >= 2 && pairs[key[0]] === key.at(-1)) key = key.slice(1, -1).trim();
+  return key;
+}
+
+// 只容忍粘贴时的外层包装；不修补凭据内部内容，也不把Headers的原始异常向外转发。
+export function analysisHeaders(key: string) {
+  requireAnalysis(key && /^[\x21-\x7e]+$/.test(key) && !/["']/.test(key), 'key_format');
+  try {
+    return new Headers({ authorization: `Bearer ${key}`, 'content-type': 'application/json' });
+  } catch {
+    throw new AnalysisError('key_format');
+  }
 }
 
 const diagnosticStages = new Set([
@@ -129,7 +151,7 @@ const diagnosticCodes = new Set([
   'ABORT_ERR',
 ]);
 
-function diagnosticEndpoint(config: AnalysisConfig, key: string) {
+function diagnosticEndpoint(config: AnalysisConfig, key: RedactionKeys) {
   try {
     const base = new URL(config.baseUrl);
     base.username = base.password = base.search = base.hash = '';
@@ -154,7 +176,7 @@ export interface AnalysisTrace {
   startedAt: number;
   diagnostics: AnalysisDiagnostics;
 }
-export function createAnalysisTrace(config: AnalysisConfig, key: string): AnalysisTrace {
+export function createAnalysisTrace(config: AnalysisConfig, key: RedactionKeys): AnalysisTrace {
   const endpoint = diagnosticEndpoint(config, key);
   return {
     startedAt: performance.now(),
@@ -275,7 +297,11 @@ export function analysisEndpoint(config: Pick<AnalysisConfig, 'baseUrl' | 'proto
   return new URL(suffix, base.href.replace(/\/+$/, '') + '/');
 }
 
-function normalize(input: AnalysisInput, config: AnalysisConfig, key: string): AnalysisInput {
+function normalize(
+  input: AnalysisInput,
+  config: AnalysisConfig,
+  key: RedactionKeys,
+): AnalysisInput {
   requireAnalysis(
     input &&
       typeof input.at === 'string' &&
@@ -698,12 +724,15 @@ export async function analyzeEvidence(
   const controller = new AbortController();
   try {
     const env = options.env ?? process.env;
-    const key = env[config.apiKeyEnv];
-    trace = createAnalysisTrace(config, key ?? '');
+    const rawKey = env[config.apiKeyEnv];
+    const key = cleanAnalysisKey(rawKey ?? '');
+    const redactionKeys = [rawKey ?? '', key];
+    trace = createAnalysisTrace(config, redactionKeys);
     validateConfig(config);
-    const safe = normalize(input, config, key ?? '');
+    const safe = normalize(input, config, redactionKeys);
     if (!safe.signals.length) return { ...base, status: 'skipped', summary: '无待分析信号。' };
-    requireAnalysis(key && !/[\r\n]/.test(key), 'key');
+    requireAnalysis(rawKey, 'key');
+    const headers = analysisHeaders(key);
     // Decisions 无自由生成 token 参数；用问题数量限制固定答案预算，不传不支持的参数。
     requireAnalysis(safe.signals.length * 64 <= config.maxOutputTokens, 'output_budget');
     const request = analysisRequest(safe, config);
@@ -723,7 +752,7 @@ export async function analyzeEvidence(
               analysisEndpoint(config),
               {
                 method: 'POST',
-                headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+                headers,
                 body: JSON.stringify(request),
                 signal: controller.signal,
               },
