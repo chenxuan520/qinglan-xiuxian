@@ -613,33 +613,36 @@ export default {
         });
         if (!limit.success) return fail('busy', 429, '请求过于频繁，请稍后重试。', true);
         const messages = journeyAppraisalMessages(input);
+        // 单次推理超时只是这一次失败，应在总预算内继续重试；用户取消仍立即终止。
+        const deadline = Date.now() + JOURNEY_APPRAISAL_SETTINGS.requestTimeoutMs - 2000;
         let appraisal = null;
         for (let attempt = 0; attempt < JOURNEY_APPRAISAL_SETTINGS.maxAttempts; attempt++) {
+          if (Date.now() >= deadline) break;
           stage = 'inference';
-          const output = await runInference(
-            request.signal,
-            JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs,
-            (signal) =>
-              env.AI.run(
-                JOURNEY_APPRAISAL_MODEL,
-                {
-                  messages,
-                  guided_json: {
-                    type: 'object',
-                    properties: {
-                      title: { type: 'string' },
-                      ending: { type: 'string' },
-                      cultivation: { type: 'string' },
-                      ties: { type: 'string' },
-                    },
-                    required: ['title', 'ending', 'cultivation', 'ties'],
+          let output: unknown;
+          try {
+            output = await runInference(
+              request.signal,
+              JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs,
+              (signal) =>
+                env.AI.run(
+                  JOURNEY_APPRAISAL_MODEL,
+                  {
+                    messages,
+                    response_format: { type: 'json_object' },
+                    max_tokens: JOURNEY_APPRAISAL_SETTINGS.maxOutputTokens,
+                    chat_template_kwargs: { enable_thinking: NPC_AI_SETTINGS.enableThinking },
+                    temperature: 0.7,
                   },
-                  max_tokens: JOURNEY_APPRAISAL_SETTINGS.maxOutputTokens,
-                  temperature: 0.7,
-                },
-                { signal },
-              ),
-          );
+                  { signal },
+                ),
+            );
+          } catch (error) {
+            if (!(error instanceof InferenceAbort && error.name === 'TimeoutError')) throw error;
+            if (request.signal.aborted) throw error;
+            outputIssue = 'timeout';
+            continue;
+          }
           stage = 'output';
           appraisal = extractJourneyAppraisal(output, input, (reason) => {
             outputIssue = reason;

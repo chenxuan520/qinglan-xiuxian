@@ -10,7 +10,7 @@ import {
   journeyAppraisalRetryMessage,
   validJourneyAppraisal,
 } from '../src/journey-appraisal-ai-protocol.ts';
-import { GAME_SITE_URL, JOURNEY_APPRAISAL_SETTINGS } from '../src/setting.ts';
+import { GAME_SITE_URL, JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../src/setting.ts';
 
 const origin = new URL(GAME_SITE_URL).origin;
 const aiParts = {
@@ -344,10 +344,11 @@ test('Worker 主站预检与真实生成、来源限制、摘要验证和独立�
   const service = env(async (model, options) => {
     calls++;
     assert.equal(model, JOURNEY_APPRAISAL_MODEL);
-    assert.equal(options.chat_template_kwargs, undefined);
-    assert.deepEqual(options.guided_json.required, ['title', 'ending', 'cultivation', 'ties']);
-    assert.equal(options.guided_json.properties.title.type, 'string');
-    assert.equal(options.response_format, undefined);
+    assert.deepEqual(options.chat_template_kwargs, {
+      enable_thinking: NPC_AI_SETTINGS.enableThinking,
+    });
+    assert.equal(options.guided_json, undefined);
+    assert.deepEqual(options.response_format, { type: 'json_object' });
     assert.equal(options.messages.length, 2);
     return { response: JSON.stringify(aiParts) };
   });
@@ -407,12 +408,50 @@ test('Worker 评语也受推理超时和用户取消控制，binding 不响应�
       }),
     );
     await started.promise;
-    if (closing) controller.abort();
-    else t.mock.timers.tick(JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs);
+    if (closing) {
+      controller.abort();
+    } else {
+      // 单次推理超时不再直接 504，而是在总预算内重试到次数用尽。
+      for (let attempt = 0; attempt < JOURNEY_APPRAISAL_SETTINGS.maxAttempts; attempt++) {
+        await new Promise((resolve) => setImmediate(resolve));
+        t.mock.timers.tick(JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs);
+      }
+    }
     const result = await pending;
-    assert.equal(result.status, closing ? 499 : 504);
+    assert.equal(result.status, closing ? 499 : 502);
+    if (!closing) assert.equal((await result.json()).outputIssue, 'timeout');
     assert.equal(signal.aborted, true);
   }
+});
+
+test('单次推理超时后在总预算内重试，第二次成功即返回', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
+  let calls = 0;
+  let started = Promise.withResolvers();
+  const pending = worker.fetch(
+    request(facts(94)),
+    env(async () => {
+      calls++;
+      started.resolve();
+      if (calls === 1) return new Promise(() => {});
+      return { response: JSON.stringify(aiParts) };
+    }),
+  );
+  await started.promise;
+  t.mock.timers.tick(JOURNEY_APPRAISAL_SETTINGS.inferenceTimeoutMs);
+  const result = await pending;
+  assert.equal(result.status, 200);
+  assert.equal(calls, 2);
+  assert.deepEqual(await result.json(), { appraisal: aiAppraisal });
+});
+
+test('人间知己有 friend-met 时不算编造，无牵挂时仍拒绝', () => {
+  const input = facts(50);
+  const detail = `此生修行未完结，云山长路仍在脚下。檐下曾有知己，共话旧年风雪。`;
+  const appraisal = { title: '青岚问道', detail };
+  assert.equal(validJourneyAppraisal(appraisal, input), false);
+  assert.equal(validJourneyAppraisal(appraisal, { ...input, ties: ['friend-met'] }), true);
 });
 
 test('普通真仙评语不能编造一命通关，真实成就和极限落幕分别照实表达', () => {
@@ -585,16 +624,10 @@ test('并发评语失败各自保留拒绝原因和请求编号', async (t) => {
   assert.equal(warning.mock.callCount(), cases.length);
 });
 
-test('提示词按结局取材，不再让正在修行的人生写坊外刀光', () => {
+test('提示词回滚后仍由校验兜住结局错配：正在修行不得写坊外刀光', () => {
   const input = facts(30);
-  const line = (content: string) => content.split('\n').find((row) => row.startsWith('1. ending'))!;
-  const ongoing = journeyAppraisalMessages(input)[0].content;
-  assert.match(line(ongoing), /灯影/);
-  assert.doesNotMatch(line(ongoing), /坊外刀光/);
-  assert.doesNotMatch(ongoing, /万古独尊/);
-  assert.match(ongoing, /每句 20 至 25 个汉字/);
-  const ambush = journeyAppraisalMessages({ ...input, ending: 'ambush' })[0].content;
-  assert.match(line(ambush), /坊外刀光/);
+  const detail = '此世仍在修行，云山长路尚在前方。坊外刀光乍起，却只是过路风波。';
+  assert.equal(validJourneyAppraisal({ title: '青岚问道', detail }, input), false);
 });
 
 test('长度纠正会带出上次实际字数与下限', () => {
@@ -603,7 +636,7 @@ test('长度纠正会带出上次实际字数与下限', () => {
     '{"ending":"短句。","cultivation":"也短。","ties":""}',
   );
   assert.match(message, /只有 4 个汉字/);
-  assert.match(message, /至少需要 32 个/);
+  assert.match(message, /至少需要 30 个/);
   assert.match(journeyAppraisalRetryMessage('title-format'), /title 必须是单个/);
   const longDraft = JSON.stringify({
     ending: '长'.repeat(40),
@@ -641,7 +674,7 @@ test('非寿终结局不得写寿尽，非死亡结局不得写殒命', () => {
   );
 });
 
-test('guided_json 直接返回对象时按同一套规则校验并序列化重试草稿', async () => {
+test('模型直接返回对象时按同一套规则校验并序列化重试草稿', async () => {
   let calls = 0;
   const service = env(async () => {
     calls++;
@@ -680,7 +713,7 @@ test('评语过短时带草稿重试，第一次不合约也能成功返回', as
   assert.match(retry[2].content, /灯影未熄/);
   assert.equal(retry[3].role, 'user');
   assert.match(retry[3].content, /只有 8 个汉字/);
-  assert.match(retry[3].content, /至少需要 32 个/);
+  assert.match(retry[3].content, /至少需要 30 个/);
 });
 
 test('评语连续不合约时重试用尽才兜底，且只记录一次原因', async (t) => {

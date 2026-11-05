@@ -67,7 +67,7 @@ export const TEA_STORY_IMAGE_SETTINGS = {
 
 // 留影评语复用文字 AI binding，官网优先生成；其他静态站和离线使用组合式兜底。
 export const JOURNEY_APPRAISAL_SETTINGS = {
-  model: '@cf/mistralai/mistral-small-3.1-24b-instruct',
+  model: '@cf/zai-org/glm-4.7-flash',
   path: '/journey-appraisal',
   requestTimeoutMs: 30000,
   inferenceTimeoutMs: 8000,

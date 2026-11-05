@@ -4169,3 +4169,11 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 - 候选相关74项定向测试通过，覆盖原0–3机制、两新借招、金色、连续施法无额外限制、异常仍恢复身份、星轨及区域渲染；随后追加保留原生魂弹笔画颜色的回归，最终主树相关104/104、全量2329/2329、TypeScript全部通过。抽取前后原生/终关旧王冥主与劫灵×双旋向8组逐帧全实体状态深相等，验证预警、出弹、旋转与结束；证据/tmp/sovereign-native-equivalence.json，属于行为回归，不是胜率实验。候选TypeScript、构建与原体积预算通过：入口JS578102、gzip212455，CSS161596、gzip34189，整包17210144字节。主实施者本人完成正常5173首页、隔离合法待施法存档的四尺寸×两新借招，以及仙尊图鉴/战斗指南/返回，逐张查看全部截图；金色魂弹和星轨箭头/残影均已实测，证据/tmp/sovereign-borrow-main。独立代码与视觉审查已复核通过，无未解决问题；最终提交的GitHub门禁待推送后核验。
 
 - 独立代码reviewer本人130/130定向测试、8组共3224次逐帧原生行为比较通过；独立MCP四尺寸与双旋向、两新借招及帮助操作完成，112张正式截图逐张查看。独立UI reviewer完成最终四尺寸60张截图逐张视检，星轨提示、幻影与金弹、图鉴/指南及返回视觉通过。两位均发现gameplay末段残留仙尊借用星位轮转的旧句，本次已改为借用幽影换形或周天星轨、魂弹或星轨化为金色，已由原两位复核通过；游戏源码和测试未改。完整审查证据/tmp/sweep75-code-review/review-final.md及/tmp/sweep75-ui-review/report.md。
+
+## 留影评语提示词回滚与 glm-4.7-flash 复核（2026-11-05）
+
+- 提示词回滚到 `071fb78^` 的原文：三段式、题名 2–10 个汉字、一组通用山河意象（灯尽、霜寒、雷歇、刀光、仙关云散）、正文总计 30–78 字，恢复 `tieMeaning` 与 `groundedReference` 的原有发送方式；回滚时移除 Qwen 专用的 `/no_think`，因为当前模型不是 Qwen。
+- 重试口径与回滚后的提示词对齐：短稿提示「至少需要 30 个」，超长阈值由 70 改为 78。
+- 模型改为 `@cf/zai-org/glm-4.7-flash`，与本 Worker 的闲谈、指南同款；按 `NPC_AI_SETTINGS.enableThinking` 传 `chat_template_kwargs: { enable_thinking: false }` 关闭思考。该模型类型支持 `response_format` 而不支持 `guided_json`，评语分支改用 `response_format: { type: 'json_object' }`，对象响应的序列化校验保留。
+- 关闭思考前后的真实调用对比（同一旧提示词、同一账号，`max_tokens` 分别为 512 和 2048）：不关思考时 4 条样本里 2 条 `finish_reason=length`、`content` 为空，单次 29.7–46.5 秒、64–79 neurons；关闭思考后 4 条样本 3 条一次通过，单次 1.4–3.1 秒、6.2–7.7 neurons，未通过的一条是正文过短（`detail-format`）。结论：思考必须关闭，否则 token 全耗在 `reasoning` 上。
+- 定向 `tests/journey-appraisal-ai.test.ts` 20/20、TypeScript、`npm run check:npc-ai` 通过。真实调用只覆盖 4 条样本，尚未做全量与线上部署验证。

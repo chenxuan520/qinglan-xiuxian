@@ -57,7 +57,9 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
   // 这里只记录当前灵根，不能倒推启程时的资质。
   if (/(?:生来|天生|起初|生而|出生).{0,6}(?:灵根|凡骨|资质)/.test(text)) return false;
   if (!tie('companion-bond') && /道侣|同心旧结|结为伴侣/.test(text)) return false;
-  if (!tie('companion-met') && /知己|檐下相逢|春灯相伴/.test(text)) return false;
+  if (!tie('companion-met') && /檐下相逢|春灯相伴/.test(text)) return false;
+  // 知己可指道侣，也可指人间知己；有 friend-met 时不算编造。
+  if (!tie('companion-met') && !tie('friend-met') && /知己/.test(text)) return false;
   if (
     !tie('home-letter-read') &&
     /(?:读过|曾展读|展读过|读罢|读懂|已读|读完).{0,4}家书|家书.{0,4}(?:已读|已展|已阅|读过|读罢|读完)|曾展读故乡家书/.test(
@@ -158,29 +160,10 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
       '此世选择一命问道的极限修行，已在险境中落幕；不编造具体死因，不是寿尽，也不能说仍可继续修行',
     immortal: '已证真仙并叩入仙门，此世圆满结束',
   }[facts.ending];
-  const imagery = {
-    ongoing: '灯影、霜晨、云山、长路等尚未收束的意象',
-    lifespan: '灯尽、霜寒、渡口等岁月收束的意象',
-    tribulation: '雷歇、劫云、仙关等收束的意象',
-    ambush: '坊外刀光、劫修、山路等收束的意象',
-    extreme: '险境、孤注、未竟之路等收束的意象',
-    immortal: '仙门云散、长生、归途等收束的意象',
-  }[facts.ending];
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     {
       role: 'system' as const,
-      content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、典雅、有温度的古风白话回望角色走过的路，像一段空灵沉郁的古典题跋，绝不写资料说明、数据汇报或公文清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，将事实熔铸为一气呵成的仙途绝唱。
-
-输出规范：
-只输出 JSON 对象，恰好四个字段：title（2至6个纯汉字成语或典雅题名，须依本世事实自拟，是一个字符串而不是数组或备选列表，严禁带括号或标点）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。
-1. ending 只按本世结局取材：${imagery}。不得写未发生的死因或别的结局意象；正在修行时尤其不写刀光、殒命、寿尽、雷收笔。不照抄 outcome 与参考字句。
-2. cultivation 写修行风骨与道行气象：将灵根、本命法宝、秘境大关化为求道的生动画卷（用具体物象与动作落笔，不用固定套语），严禁干瘪报表化地罗列「几境已破、已炼几阶、已历几次、修行已有实迹」！
-3. ties 写人间温情或离别回望：有道侣写檐下同心相守，有家书写见字如面纸短情长；严禁使用「皆是问道之外的此世来路」等死板套话。输入的 ties 数组为空时，输出 ties 必须严格为空字符串 ""，正文也不得出现孑然、孤身、独行、孤影、孤独、无人相伴等词，绝对不补任何牵挂句；有牵挂事实时必须写对应句。
-4. ending 与 cultivation 各写一句、每句 20 至 25 个汉字（不含标点），两句合计不得少于 40 字；每句以中文句号「。」收尾。有牵挂时再加一句 ties。ending+cultivation+ties 总字数严格控制在 35 至 70 字（绝不可少于 30 字，也绝不可超过 78 字）。无牵挂时绝不凑字数补写第三句。
-
-文风与真实性红线：
-严禁公文化、通告感与机械汇报：不得出现「此世已因……落幕」「圆满结束」「修行已有实迹」「皆为此身亲证」等僵硬短语，不得照抄参考文本的现成字句。不得出现「尚无记载」「暂无记录」「缘簿留白」等缺项说明，不提存档、数据、记录或留白。缺少牵挂事实不等于孤独，不编造悲情或亲友死亡。
-只能引用提供的事实。成就id未列出的不能补写；灵根只是当前资质，不言生来如此；未全通七境不能言踏破七境。真仙未叩门不可言仙门已开；未证仙不能称得证长生；寿尽、天劫与劫杀均为已结束的人生，劫杀必写坊外刀光或劫修，不得写成寿终或逃生。正文只用中文、数字和中文标点，不输出 Markdown 或标签。`,
+      content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、有温度的中文古风白话回望角色走过的路，像一段完整的题跋，不写资料说明、评语生成过程、人格评分或数据清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，不能因一项成就忽略其他已知经历。人间选择有事实才写，并写出对应意味；道侣与家书同时存在时尽量兼顾。事实未提供就直接省略，不能把缺项写成人生：不得出现「尚无记载」「暂无记录」「缘簿留白」「这页空白也属于真实的此世」等表述，也不提存档、记录、数据、字段、摘要、档案、纪事、留白或空白。缺少牵挂事实不等于孤独、没有故事、没有旧缘或没有归处，不能如此推断；不编造遗憾、爱人、弟子或亲人死亡。\n只输出 JSON 对象，恰好四个字段：title（2至10个汉字的题名）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。输入的 ties 数组为空时，输出 ties 必须是空字符串，不补任何牵挂句；有牵挂事实时必须写对应句。ending 写结局与意味；cultivation 写具体成果，不重述同一句结局。outcome 仅供辨认状态，groundedReference 仅供事实校对，不照抄参考全文；将事实融成一段短评，避免连续重复相同信息，并保留无灵根或最险历练等具体修行经历。非空段落以中文句末标点结束，合起来自然、有相互呼应，总计30至78字，绝不能超过80字；无牵挂时用结局和修行成果写完整短评，不为了凑字数编造第三段。正文只用中文、数字和中文标点，不输出Markdown、解释、推理或标签。\n只能引用提供的事实。成就id是已达成经历，未列出的成就不能补写。灵根只是当前资质，不能说天生如此。已通关秘境是精确列表，全部七境都有才可说踏破七境。正在修行不能写成此生已落幕，真仙尚未叩门不能写仙门已开；寿尽、天劫殒命与劫杀身陨均为已经结束的人生；劫杀不能写成寿尽、天劫殒命或平安脱身，不能写成仍可继续修行，尚未证仙时不能写成已得长生。没有道侣事实不能写道侣；有相识未结缘只写相逢；旧信尚未读不能说读过。故乡家书展读不代表亲历归乡相见。结局、境界和成就以事实为准。`,
     },
     {
       role: 'user' as const,
@@ -193,12 +176,8 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
         weaponName: treasure(facts.weapon).name,
         clearedStages: facts.stages.map((index) => STAGES[index].name),
         groundedReference: localJourneyAppraisal(facts),
-        ...(facts.ties.length
-          ? {
-              tieMeaning:
-                'home=故乡；letter-found/unread=尚未展读；letter-read=已读；met=仅相识；bond=道侣；friendship=知己；river=劝渔夫远行；harbor=陪他守渡；teach=劝游学少年授业；travel=赠言送行。',
-            }
-          : {}),
+        tieMeaning:
+          'home=故乡；letter-found/unread=尚未展读；letter-read=已读；met=仅相识；bond=道侣；friendship=知己；river=劝渔夫远行；harbor=陪他守渡；teach=劝游学少年授业；travel=赠言送行。',
       }),
     },
   ];
@@ -217,9 +196,9 @@ export function journeyAppraisalRetryMessage(reason: string, draft = '') {
   } catch {}
   const hint =
     reason === 'detail-format'
-      ? draftLength > 70
-        ? `上次正文 ${draftLength} 个汉字，超过上限，请压到 35 至 70 个汉字。`
-        : `上次正文只有 ${draftLength} 个汉字，至少需要 32 个。ending 与 cultivation 各写 20 至 25 个汉字，合计至少 40 字，句子要完整具体，不要只写半句。`
+      ? draftLength > 78
+        ? `上次正文 ${draftLength} 个汉字，超过上限，请压到 78 个汉字以内。`
+        : `上次正文只有 ${draftLength} 个汉字，至少需要 30 个，请把结局与修行成果各写完整一句。`
       : reason === 'section-ties-unexpected'
         ? 'ties 必须为空字符串 ""，不得编造任何牵挂句。'
         : reason === 'title-format'
