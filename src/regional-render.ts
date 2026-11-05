@@ -34,9 +34,33 @@ export function drawRegionalField(
       c.lineWidth = 2;
       c.setLineDash([8, 5]);
       c.stroke();
+      c.setLineDash([]);
+      c.beginPath();
+      const direction = Math.sign(z.spinSpeed!);
+      for (const distance of [200, 350, 500]) {
+        const x = distance - z.spinInner!;
+        c.moveTo(x - 7, -direction * 10);
+        c.lineTo(x, 0);
+        c.lineTo(x + 7, -direction * 10);
+      }
+      c.stroke();
     }
     c.restore();
     return true;
+  }
+  if (z.kind === 'boss-sweep' && !warning) {
+    c.save();
+    c.translate(-z.spinInner!, 0);
+    c.rotate((-Math.sign(z.spinSpeed!) * Math.PI) / 12);
+    c.globalAlpha = 0.25;
+    c.strokeStyle = z.color;
+    c.lineWidth = 2;
+    c.setLineDash([]);
+    c.beginPath();
+    c.moveTo(z.spinInner!, 0);
+    c.lineTo(z.spinOuter!, 0);
+    c.stroke();
+    c.restore();
   }
   if (warning) {
     capsule(c, length, z.radius);

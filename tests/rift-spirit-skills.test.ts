@@ -44,6 +44,7 @@ for (const arena of [5, 6]) {
       const center = { x: e.x, y: e.y },
         zones = [...g.zones];
       assert.equal(zones.length, 2);
+      assert.equal(g.notice, '太虚劫灵 · 周天星轨 · 看箭头，随轨而行');
       const initial = structuredClone(zones);
       const toward = Math.atan2(g.player.y - e.y, g.player.x - e.x);
       near(Math.cos(zones[0].spinAngle! - toward), 0);
@@ -59,7 +60,7 @@ for (const arena of [5, 6]) {
         assert.equal(z.damage, e.damage);
         assert.equal(z.color, STAGES[5].color);
         near(Math.abs(z.spinSpeed!), Math.PI / 3);
-        near(Math.hypot(z.x - center.x, z.y - center.y), 40);
+        near(Math.hypot(z.x - center.x, z.y - center.y), 75);
         near(Math.hypot(z.endX! - center.x, z.endY! - center.y), 900);
       }
       // 预警时站在线上也不受伤；圆心不跟随后续妖王移动。
@@ -129,8 +130,8 @@ for (const arena of [5, 6]) {
     g.updateZones(0.0011);
     assert.ok(g.player.hp < after);
   });
-  test(`第${arena + 1}关星轨的40以内圆心安全区不被线段圆帽侵入，快照不含旋转字段`, () => {
-    for (const radius of [0, 20, 39.99]) {
+  test(`第${arena + 1}关星轨的75以内圆心安全区不被线段圆帽侵入，快照不含旋转字段`, () => {
+    for (const radius of [0, 20, 50, 74.99]) {
       const { g, e } = encounter(arena);
       Object.assign(g.player, { x: e.x + radius, y: e.y });
       const hp = g.player.hp;
@@ -143,6 +144,24 @@ for (const arena of [5, 6]) {
       JSON.stringify(g.snapshot()),
       /spinCenter|spinAngle|spinStart|spinSpeed|hitCooldown|boss-sweep/,
     );
+  });
+  test(`第${arena + 1}关75边界外星轨仍命中，内侧不免除劫灵接触伤害`, () => {
+    const { g, e } = encounter(arena);
+    const z = g.zones[0];
+    z.delay = 0;
+    z.spinSpeed = 0;
+    Object.assign(g.player, {
+      x: e.x + Math.cos(z.spinAngle!) * 75.01,
+      y: e.y + Math.sin(z.spinAngle!) * 75.01,
+    });
+    const hp = g.player.hp;
+    g.updateZones(0.01);
+    assert.ok(g.player.hp < hp);
+    const contact = encounter(arena);
+    Object.assign(contact.g.player, { x: contact.e.x + 50, y: contact.e.y, invincible: 0 });
+    const before = contact.g.player.hp;
+    contact.g.updateEnemies(0.01);
+    assert.ok(contact.g.player.hp < before);
   });
   test(`第${arena + 1}关雷网三墙各留130缺口、间距140，预警冻结、朝王移动、命中定身、到期消失`, () => {
     const { g, e } = encounter(arena, 5);
@@ -247,7 +266,7 @@ for (const arena of [5, 6]) {
   }
 }
 
-test('仙尊星位轮转共用最新五星、十星上限和0.35秒释放间隔', () => {
+test('仙尊万劫归一改借最新周天星轨，保留双线、75内侧与原生参数', () => {
   const { g } = encounter(6);
   g.zones = [];
   g.enemies = [];
@@ -255,21 +274,19 @@ test('仙尊星位轮转共用最新五星、十星上限和0.35秒释放间隔'
   e.skillStep = 6;
   g.random = () => 0.99;
   g.castBossSkill(e, 1, 0);
-  assert.equal(g.shots.length, 5);
-  g.shots.forEach((b, i) => {
-    assert.equal(b.bossMotion?.kind, 'star');
-    if (b.bossMotion?.kind === 'star') {
-      near(b.bossMotion.launchAt, 1.3 + i * 0.35);
-      near(b.bossMotion.angle, (i / 5) * TAU);
-    }
-    assert.equal(b.damage, e.damage * 0.85);
-    assert.equal(b.radius, 12);
-  });
-  for (let i = 0; i < 3; i++) {
-    e.skillStep = 6;
-    g.castBossSkill(e, 1, 0);
+  assert.equal(g.shots.length, 0);
+  assert.equal(g.zones.length, 2);
+  assert.equal(g.notice, '九天执劫仙尊 · 万劫归一 · 周天星轨');
+  for (const z of g.zones) {
+    assert.equal(z.kind, 'boss-sweep');
+    assert.equal(z.spinInner, 75);
+    assert.equal(z.spinOuter, 900);
+    assert.equal(z.radius, 16);
+    assert.equal(z.delay, 1);
+    assert.equal(z.life, 3);
+    assert.equal(z.damage, e.damage);
+    near(Math.abs(z.spinSpeed!), Math.PI / 3);
   }
-  assert.equal(g.shots.length, 10);
 });
 
 test('五星续局发射时间仍拒绝字符串、非有限值和不在新旧节奏中的数值', () => {
@@ -315,7 +332,7 @@ test('自动历练预警即靠近，旋转两向均动态避让，不被远处�
         z.spinAngle = Math.PI / 2 + (z === g.zones[0] ? 0 : Math.PI);
         z.spinStart = z.spinAngle;
         z.x = center.x;
-        z.y = center.y + Math.sin(z.spinAngle) * 40;
+        z.y = center.y + Math.sin(z.spinAngle) * z.spinInner!;
         z.endX = center.x;
         z.endY = center.y + Math.sin(z.spinAngle) * 900;
       }

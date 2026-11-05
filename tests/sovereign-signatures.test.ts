@@ -7,8 +7,14 @@ import { SOVEREIGN_GOLD, bossShotPose } from '../src/boss-mechanics.ts';
 import { autoplayInput } from '../src/autoplay.ts';
 import { exportSave, importSave } from '../src/save-transfer.ts';
 import { STAGES } from '../src/data.ts';
-import { drawBossField, drawBossShot, drawSovereignWarnings } from '../src/boss-effects.ts';
+import {
+  drawBossField,
+  drawBossShot,
+  drawSovereignWarnings,
+  drawSoulShot,
+} from '../src/boss-effects.ts';
 import { drawBossSummon } from '../src/boss-mechanics-render.ts';
+import { drawRegionalField } from '../src/regional-render.ts';
 
 const near = (a: number, b: number, tolerance = 1e-7) =>
   assert.ok(Math.abs(a - b) < tolerance, `${a} != ${b}`);
@@ -75,7 +81,10 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
     const priorZone = c.g.zones[0];
     cast(c, 6, borrowed);
     assert.equal(c.e.bossStage, 6);
-    assert.equal(c.g.notice, `九天执劫仙尊 · 万劫归一 · ${bossSkills(borrowed, false)[3]}`);
+    assert.equal(
+      c.g.notice,
+      `九天执劫仙尊 · 万劫归一 · ${bossSkills(borrowed, false)[borrowed >= 4 ? 4 : 3]}`,
+    );
     const shots = c.g.shots.slice(1),
       zones = c.g.zones.slice(1),
       children = c.g.enemies.slice(1);
@@ -83,7 +92,9 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
     assert.equal(priorZone.color, '#123456');
     assert.ok(shots.every((b) => b.color === SOVEREIGN_GOLD && b.bossStage === borrowed));
     assert.ok(zones.every((z) => z.color === SOVEREIGN_GOLD));
-    assert.ok(children.every((e) => e.bossSummon?.color === SOVEREIGN_GOLD));
+    assert.ok(
+      children.filter((e) => e.bossSummon).every((e) => e.bossSummon!.color === SOVEREIGN_GOLD),
+    );
     assert.deepEqual(
       [shots.length, zones.length, children.length],
       [
@@ -91,15 +102,17 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
         [7, 0, 0],
         [0, 0, 2],
         [0, 3, 0],
-        [5, 0, 0],
-        [5, 0, 0],
+        [0, 0, 3],
+        [0, 2, 0],
       ][borrowed],
     );
     if (borrowed === 0) assert.ok(zones.every((z) => z.damage === c.e.damage * 0.55));
-    if ([1, 4].includes(borrowed)) assert.ok(shots.every((b) => b.damage === c.e.damage * 0.6));
+    if (borrowed === 1) assert.ok(shots.every((b) => b.damage === c.e.damage * 0.6));
     if (borrowed === 2) assert.ok(children.every((e) => e.maxHp >= c.e.maxHp * 0.08));
     if (borrowed === 3) assert.ok(zones.every((z) => z.damage === c.e.damage && z.life === 12));
-    if (borrowed === 5) assert.ok(shots.every((b) => b.damage === c.e.damage * 0.85));
+    if (borrowed === 4) assert.ok(children.every((child) => child.illusionOf === c.e.id));
+    if (borrowed === 5)
+      assert.ok(zones.every((z) => z.kind === 'boss-sweep' && z.damage === c.e.damage));
     for (const shot of shots) assert.ok(Number.isFinite(bossShotPose(shot).x));
     assert.ok(Game.restore(c.g.save, c.g.snapshot()));
   });
@@ -110,6 +123,7 @@ for (let origin = 0; origin < 6; origin++)
     const sovereign = encounter();
     for (const c of [native, sovereign]) {
       c.e.damage = 100;
+      c.e.radius = native.e.radius;
       c.e.hp = c.e.maxHp = 300000;
       c.g.playerTrail = [
         { x: 40, y: 20 },
@@ -125,7 +139,7 @@ for (let origin = 0; origin < 6; origin++)
       })),
     });
     for (let castIndex = 0; castIndex < 4; castIndex++) {
-      cast(native, 3, origin);
+      cast(native, origin >= 4 ? 4 : 3, origin);
       cast(sovereign, 6, origin);
       assert.deepEqual(
         mechanics(sovereign),
@@ -144,7 +158,7 @@ for (let origin = 0; origin < 6; origin++)
     }
   });
 
-test('万劫归一异常路径仍恢复仙尊身份；回焰/魂影/星位及召物保留各自上限', () => {
+test('万劫归一异常路径仍恢复仙尊身份；回焰及召物保留各自上限，新借招不增限制', () => {
   const c = encounter();
   c.g.castBossMechanic = () => {
     throw new Error('injected failure');
@@ -155,12 +169,18 @@ test('万劫归一异常路径仍恢复仙尊身份；回焰/魂影/星位及召
     [0, 3],
     [1, 14],
     [2, 2],
-    [4, 10],
-    [5, 10],
   ]) {
     const h = encounter();
     for (let i = 0; i < 5; i++) cast(h, 6, borrowed);
     assert.equal([0, 2].includes(borrowed) ? h.g.enemies.length - 1 : h.g.shots.length, limit);
+  }
+  for (const borrowed of [4, 5]) {
+    const h = encounter();
+    for (let i = 0; i < 5; i++) cast(h, 6, borrowed);
+    assert.equal(
+      borrowed === 4 ? h.g.enemies.length - 1 : h.g.zones.length,
+      borrowed === 4 ? 15 : 10,
+    );
   }
 });
 
@@ -470,10 +490,18 @@ test('借用金色真实进入弹体、区域和召物笔画；劫印及引力�
   for (const borrowed of [0, 1, 2, 3, 4, 5]) {
     const c = encounter();
     cast(c, 6, borrowed);
+    if (borrowed === 4) c.g.updateEnemies(0.8);
     const canvas = paint();
-    for (const shot of c.g.shots) drawBossShot(canvas.c, shot);
-    for (const zone of c.g.zones) drawBossField(canvas.c, zone, c.g.time, false);
-    for (const child of c.g.enemies.slice(1)) drawBossSummon(canvas.c, child);
+    for (const shot of c.g.shots) {
+      if (shot.enemySkill === 'soul' && shot.bossStage === undefined)
+        drawSoulShot(canvas.c, shot.radius, shot.color);
+      else drawBossShot(canvas.c, shot);
+    }
+    for (const zone of c.g.zones)
+      if (!drawBossField(canvas.c, zone, c.g.time, false))
+        drawRegionalField(canvas.c, zone, c.g.time, false, true);
+    for (const child of c.g.enemies.slice(1).filter((e) => e.bossSummon))
+      drawBossSummon(canvas.c, child);
     assert.ok(canvas.colors.includes(SOVEREIGN_GOLD));
   }
   const c = encounter();
@@ -490,4 +518,82 @@ test('借用金色真实进入弹体、区域和召物笔画；劫印及引力�
   const canvas = paint();
   drawSovereignWarnings(canvas.c, c.g, false);
   assert.equal(canvas.arcs.length, 0);
+});
+
+test('仙尊幽影换形留下三影、横移150，0.8秒后各放八枚金色魂弹；原生保持紫色', () => {
+  for (const origin of [4, 6]) {
+    const c = encounter(origin);
+    const before = { x: c.e.x, y: c.e.y };
+    cast(c, origin === 6 ? 6 : 4, 4);
+    near(c.e.x, before.x);
+    near(c.e.y, before.y + 150);
+    const shadows = c.g.enemies.filter((e) => e.illusionOf === c.e.id);
+    assert.equal(shadows.length, 3);
+    assert.deepEqual(
+      shadows.map((e) => [e.x, e.y]),
+      [-150, 0, 300].map((side) => [before.x, before.y + side]),
+    );
+    assert.ok(
+      shadows.every(
+        (e) =>
+          e.radius === c.e.radius &&
+          e.hp === 1 &&
+          e.speed === 0 &&
+          e.damage === 0 &&
+          e.cooldown === 0.8,
+      ),
+    );
+    assert.ok(
+      shadows.every((e) => !('color' in e)),
+      '幻影没有颜色字段，不新增字段',
+    );
+    c.g.updateEnemies(0.799);
+    assert.equal(c.g.shots.length, 0);
+    c.g.updateEnemies(0.0011);
+    assert.equal(c.g.shots.length, 24);
+    for (const shadow of shadows)
+      assert.equal(
+        c.g.shots.filter((s) => s.origin.x === shadow.x && s.origin.y === shadow.y).length,
+        8,
+      );
+    assert.ok(
+      c.g.shots.every(
+        (s) =>
+          s.enemySkill === 'soul' &&
+          s.damage === c.e.damage * 0.35 &&
+          s.color === (origin === 6 ? SOVEREIGN_GOLD : '#baa2d0'),
+      ),
+    );
+    assert.ok(shadows.every((e) => e.dead));
+  }
+});
+
+test('幽影换形或周天星轨生成异常时仍恢复仙尊身份', () => {
+  for (const borrowed of [4, 5]) {
+    const c = encounter();
+    if (borrowed === 4)
+      c.g.spawnEnemy = () => {
+        throw Error('shadow failure');
+      };
+    else
+      c.g.zone = () => {
+        throw Error('sweep failure');
+      };
+    assert.throws(() => cast(c, 6, borrowed), /failure/);
+    assert.equal(c.e.bossStage, 6);
+  }
+});
+
+test('共用魂弹笔画仅仙尊金色覆盖，原生紫色的发光、填充与描边保持', () => {
+  for (const color of [undefined, '#baa2d0', SOVEREIGN_GOLD]) {
+    const canvas = paint();
+    drawSoulShot(canvas.c, 7, color);
+    if (color === SOVEREIGN_GOLD)
+      assert.ok(canvas.colors.filter((c) => c === SOVEREIGN_GOLD).length >= 2);
+    else {
+      assert.ok(canvas.colors.includes('#c9a9ed'));
+      assert.ok(canvas.colors.includes('#f0dcff'));
+      assert.ok(!canvas.colors.includes(SOVEREIGN_GOLD));
+    }
+  }
 });

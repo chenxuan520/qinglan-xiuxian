@@ -53,13 +53,14 @@ function soul(c: CanvasRenderingContext2D, size: number, bend: number) {
 }
 
 /** 与冥主魂弹共用幽魂笔画；弹心仍位于原碰撞中心，尾部仅提示飞行方向。 */
-export function drawSoulShot(c: CanvasRenderingContext2D, radius: number) {
+export function drawSoulShot(c: CanvasRenderingContext2D, radius: number, color?: string) {
+  const golden = color === SOVEREIGN_GOLD;
   c.save();
   c.rotate(Math.PI / 2);
-  c.shadowColor = '#b395dc';
+  c.shadowColor = golden ? SOVEREIGN_GOLD : '#b395dc';
   c.shadowBlur = 8;
-  c.fillStyle = '#c9a9ed';
-  c.strokeStyle = '#f0dcff';
+  c.fillStyle = golden ? SOVEREIGN_GOLD : '#c9a9ed';
+  c.strokeStyle = golden ? SOVEREIGN_GOLD : '#f0dcff';
   c.lineWidth = 1;
   soul(c, radius, radius * 0.3);
   c.restore();

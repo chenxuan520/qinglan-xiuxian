@@ -1268,7 +1268,7 @@ export class Game {
               owner.damage * 0.35,
             );
             shot.enemySkill = 'soul';
-            shot.color = '#baa2d0';
+            shot.color = owner.bossStage === FINAL_TRIAL_STAGE ? SOVEREIGN_GOLD : '#baa2d0';
           }
           e.dead = true;
         }
@@ -1775,7 +1775,9 @@ export class Game {
           enemies = this.enemies.length;
         try {
           e.bossStage = borrowed;
-          this.castBossMechanic(e, nx, ny);
+          if (borrowed === 4) this.#castShadowShift(e, nx, ny);
+          else if (borrowed === 5) this.#castCelestialSweep(e, p);
+          else this.castBossMechanic(e, nx, ny);
         } finally {
           e.bossStage = FINAL_TRIAL_STAGE;
         }
@@ -1783,7 +1785,9 @@ export class Game {
         for (const zone of this.zones.slice(zones)) zone.color = SOVEREIGN_GOLD;
         for (const child of this.enemies.slice(enemies))
           if (child.bossSummon) child.bossSummon.color = SOVEREIGN_GOLD;
-        this.announce(`${STAGES[stage].boss} · 万劫归一 · ${bossSkills(borrowed, false)[3]}`);
+        this.announce(
+          `${STAGES[stage].boss} · 万劫归一 · ${bossSkills(borrowed, false)[borrowed >= 4 ? 4 : 3]}`,
+        );
       } else if (phase === 7) {
         (e.judgements ??= []).push(this.time + 3);
         this.announce('九天执劫仙尊 · 天劫审判 · 三息之后雷落');
@@ -1801,30 +1805,7 @@ export class Game {
       return;
     }
     if (stage === 4 && phase === 4) {
-      for (const side of [-150, 0, 300]) {
-        if (this.enemies.length >= (this.isFinalTrial ? 210 : 240)) break;
-        const illusion = this.spawnEnemy(
-          58,
-          false,
-          false,
-          {
-            x: e.x - ny * side,
-            y: e.y + nx * side,
-          },
-          undefined,
-          false,
-        );
-        illusion.illusionOf = e.id;
-        illusion.radius = e.radius;
-        illusion.hp = illusion.maxHp = 1;
-        illusion.damage = illusion.speed = 0;
-        illusion.elite = false;
-        illusion.cooldown = illusion.windup = 0.8;
-        illusion.pendingSkill = 'soul';
-      }
-      this.#effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
-      e.x -= ny * 150;
-      e.y += nx * 150;
+      this.#castShadowShift(e, nx, ny);
       return;
     }
     if (this.isFinalTrial && ((stage === 3 && phase === 4) || (stage === 4 && phase === 5))) {
@@ -1832,24 +1813,7 @@ export class Game {
       return;
     }
     if (stage === 5 && phase === 4) {
-      const center = { x: e.x, y: e.y };
-      const start =
-        Math.atan2(p.y - e.y, p.x - e.x) + ((this.random() < 0.5 ? 1 : -1) * Math.PI) / 2;
-      const speed = ((this.random() < 0.5 ? 1 : -1) * Math.PI) / 3;
-      for (let i = 0; i < 2; i++) {
-        const angle = start + i * Math.PI;
-        this.zone(center.x, center.y, 16, 3, e.damage, STAGES[5].color, 'boss-sweep', 1, true);
-        Object.assign(this.zones.at(-1)!, {
-          spinCenter: { ...center },
-          spinAngle: angle,
-          spinStart: angle,
-          spinSpeed: speed,
-          spinInner: 40,
-          spinOuter: 900,
-        });
-        rotateZone(this.zones.at(-1)!);
-      }
-      this.announce('太虚劫灵 · 周天星轨 · 贴身或随轨而行');
+      this.#castCelestialSweep(e, p);
       return;
     }
     if (stage === 5 && phase === 5) {
@@ -1959,6 +1923,51 @@ export class Game {
         }
         break;
     }
+  }
+  #castShadowShift(e: Enemy, nx: number, ny: number) {
+    for (const side of [-150, 0, 300]) {
+      if (this.enemies.length >= (this.isFinalTrial ? 210 : 240)) break;
+      const illusion = this.spawnEnemy(
+        58,
+        false,
+        false,
+        {
+          x: e.x - ny * side,
+          y: e.y + nx * side,
+        },
+        undefined,
+        false,
+      );
+      illusion.illusionOf = e.id;
+      illusion.radius = e.radius;
+      illusion.hp = illusion.maxHp = 1;
+      illusion.damage = illusion.speed = 0;
+      illusion.elite = false;
+      illusion.cooldown = illusion.windup = 0.8;
+      illusion.pendingSkill = 'soul';
+    }
+    this.#effect(e.x, e.y, 0.8, 55, '#baa2d0', 'pulse');
+    e.x -= ny * 150;
+    e.y += nx * 150;
+  }
+  #castCelestialSweep(e: Enemy, p: Point) {
+    const center = { x: e.x, y: e.y };
+    const start = Math.atan2(p.y - e.y, p.x - e.x) + ((this.random() < 0.5 ? 1 : -1) * Math.PI) / 2;
+    const speed = ((this.random() < 0.5 ? 1 : -1) * Math.PI) / 3;
+    for (let i = 0; i < 2; i++) {
+      const angle = start + i * Math.PI;
+      this.zone(center.x, center.y, 16, 3, e.damage, STAGES[5].color, 'boss-sweep', 1, true);
+      Object.assign(this.zones.at(-1)!, {
+        spinCenter: { ...center },
+        spinAngle: angle,
+        spinStart: angle,
+        spinSpeed: speed,
+        spinInner: 75,
+        spinOuter: 900,
+      });
+      rotateZone(this.zones.at(-1)!);
+    }
+    this.announce('太虚劫灵 · 周天星轨 · 看箭头，随轨而行');
   }
   get gravityBoss() {
     return this.isFinalTrial && this.state !== 'won' && this.state !== 'lost'

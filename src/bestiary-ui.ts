@@ -43,7 +43,7 @@ const bossHints = [
   '单次蓄势扑击、快慢三层冰牙与八点冰牢，横移躲扑击，留意冰圈先后；两狼左右夹击，可反复扑击，至多存续六息；每只气血至少为施放妖王的8%，另有重新锁向的两段连扑。',
   miasmaHint(BOSS_MECHANICS.nativeMiasmaLife),
   '六名护卫召唤、更快的二十发摄魂环弹与六点鬼牢，留意中央落阵；魂弹命中封宝2秒；五道魂影沿你刚走过的路线逆行；还会瞬移留下三具幻影，幻影短暂蓄力后散出魂弹，可先击破，幻影不提供收获。',
-  '十字天雷分两拍落下、二十二发星环与五点陨雷，观察圆形预警后换位；星位轮转：五星依次离轨；周天星轨：两道星轨绕身旋转半周，贴身或顺轨而行可避；雷网横移：三道带缺口的雷线横扫，触之定身。',
+  '十字天雷分两拍落下、二十二发星环与五点陨雷，观察圆形预警后换位；星位轮转：五星依次离轨；周天星轨：两道星轨绕施法处扫过半周，预警箭头示向，随轨而行可避；雷网横移：三道带缺口的雷线横扫，触之定身。',
 ];
 const trialBossHints = bossHints
   .map(
@@ -51,7 +51,7 @@ const trialBossHints = bossHints
       hint + (id === 3 ? '还会放出一团向前漂移的追云。' : id === 4 ? '远处也可能瞬移追近。' : ''),
   )
   .concat(
-    '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。<span class="boss-skill-name">万劫归一：</span>借用前六位妖王之一的招牌，化为金色；<span class="boss-skill-name">天劫审判：</span>劫印三息后沿落脚点连劈三雷；<span class="boss-skill-name">归墟引力：</span>半血后将修士拉向自身，同时放出雷环。',
+    '环弹、雷阵、围阵、剑潮、召唤与冲刺，半血后部分弹幕更密。<span class="boss-skill-name">万劫归一：</span>随机借用苍木落种成林、狐王九尾回焰、狼王双狼合猎、毒君五毒游瘴、冥主幽影换形、劫灵周天星轨之一，化为金色；<span class="boss-skill-name">天劫审判：</span>劫印三息后沿落脚点连劈三雷；<span class="boss-skill-name">归墟引力：</span>半血后将修士拉向自身，同时放出雷环。',
   );
 export function bestiaryPanel(
   bestiaryStage: number,

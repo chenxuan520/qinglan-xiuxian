@@ -886,7 +886,7 @@ export class Renderer {
               c.arc(-10, 0, 20, -0.8, 0.8);
               c.stroke();
             } else if (shot.kind === 'hostile' && shot.enemySkill === 'soul') {
-              this.battleArt!.drawSoulShot(c, shot.radius);
+              this.battleArt!.drawSoulShot(c, shot.radius, shot.color);
             } else if (shot.enemySkill === 'frostbolt') {
               c.beginPath();
               c.moveTo(12, 0);
