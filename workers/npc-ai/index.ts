@@ -652,7 +652,7 @@ export default {
           messages.push({ role: 'assistant', content: draft || '{}' });
           messages.push({
             role: 'user',
-            content: journeyAppraisalRetryMessage(outputIssue, draft),
+            content: journeyAppraisalRetryMessage(outputIssue, draft, input),
           });
         }
         if (!appraisal) {

@@ -31,7 +31,7 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
   )
     return false;
   const asserted = text.replace(
-    /(?:尚未|还未|仍未|未曾|未能|未|不曾|没有|无缘|尚待|待)(?:叩入仙门|证得真仙|修成真仙|证得长生|飞升成仙|成仙|登仙)/g,
+    /(?:尚未|还未|仍未|未曾|未能|未|不曾|没有|无缘|尚待|待)(?:叩入仙门|证得真仙|修成真仙|证得长生|飞升成仙|成仙|登仙|踏破七境|尽破七境|通关七境|走遍七境)/g,
     '',
   );
   const has = (id: string) => facts.feats.includes(id);
@@ -45,7 +45,7 @@ function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
     return false;
   if (
     facts.stages.length !== STAGES.length &&
-    /七境(?:皆|尽|全|已)|(?:踏破|尽破|走遍|通关)七境/.test(text)
+    /七境(?:皆|尽|全|已)|(?:踏破|尽破|走遍|通关)七境/.test(asserted)
   )
     return false;
   if (
@@ -160,10 +160,17 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
       '此世选择一命问道的极限修行，已在险境中落幕；不编造具体死因，不是寿尽，也不能说仍可继续修行',
     immortal: '已证真仙并叩入仙门，此世圆满结束',
   }[facts.ending];
+  const ref = localJourneyAppraisal(facts);
+  const groundedReference = {
+    title: ref.title,
+    detail: ref.detail.replace(/，皆为此身亲证/g, ''),
+  };
+  const isAllStagesCleared = facts.stages.length === STAGES.length;
+  const isImmortalRealm = facts.realmIndex === 8;
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     {
       role: 'system' as const,
-      content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、有温度的中文古风白话回望角色走过的路，像一段完整的题跋，不写资料说明、评语生成过程、人格评分或数据清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，不能因一项成就忽略其他已知经历。人间选择有事实才写，并写出对应意味；道侣与家书同时存在时尽量兼顾。事实未提供就直接省略，不能把缺项写成人生：不得出现「尚无记载」「暂无记录」「缘簿留白」「这页空白也属于真实的此世」等表述，也不提存档、记录、数据、字段、摘要、档案、纪事、留白或空白。缺少牵挂事实不等于孤独、没有故事、没有旧缘或没有归处，不能如此推断；不编造遗憾、爱人、弟子或亲人死亡。\n只输出 JSON 对象，恰好四个字段：title（2至10个汉字的题名）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。输入的 ties 数组为空时，输出 ties 必须是空字符串，不补任何牵挂句；有牵挂事实时必须写对应句。ending 写结局与意味；cultivation 写具体成果，不重述同一句结局。outcome 仅供辨认状态，groundedReference 仅供事实校对，不照抄参考全文；将事实融成一段短评，避免连续重复相同信息，并保留无灵根或最险历练等具体修行经历。非空段落以中文句末标点结束，合起来自然、有相互呼应，总计30至78字，绝不能超过80字；无牵挂时用结局和修行成果写完整短评，不为了凑字数编造第三段。正文只用中文、数字和中文标点，不输出Markdown、解释、推理或标签。\n只能引用提供的事实。成就id是已达成经历，未列出的成就不能补写。灵根只是当前资质，不能说天生如此。已通关秘境是精确列表，全部七境都有才可说踏破七境。正在修行不能写成此生已落幕，真仙尚未叩门不能写仙门已开；寿尽、天劫殒命与劫杀身陨均为已经结束的人生；劫杀不能写成寿尽、天劫殒命或平安脱身，不能写成仍可继续修行，尚未证仙时不能写成已得长生。没有道侣事实不能写道侣；有相识未结缘只写相逢；旧信尚未读不能说读过。故乡家书展读不代表亲历归乡相见。结局、境界和成就以事实为准。`,
+      content: `你为修仙游戏《叩仙门：青岚纪》写给玩家一段个人留影评语。以克制、有温度的中文古风散文白话回望角色走过的路，像一段完整的题跋，严禁写成五言或七言短诗对联，不写资料说明、评语生成过程、人格评分或数据清单。结合此世结局、确实取得的修行成果和已知的人间牵挂，不能因一项成就忽略其他已知经历。人间选择有事实才写，并写出对应意味；道侣与家书同时存在时尽量兼顾。事实未提供就直接省略，不能把缺项写成人生：不得出现「尚无记载」「暂无记录」「缘簿留白」「这页空白也属于真实的此世」等表述，也不提存档、记录、数据、字段、摘要、档案、纪事、留白或空白。缺少牵挂事实不等于孤独、没有故事、没有旧缘或没有归处，不能如此推断；不编造遗憾、爱人、弟子或亲人死亡。\n只输出 JSON 对象，恰好四个字段：title（2至10个汉字的题名）、ending（结局句）、cultivation（修行成果句）、ties（人间牵挂句）。输入的 ties 数组为空时，输出 ties 必须是空字符串，不补任何牵挂句；有牵挂事实时必须写对应句。ending 写结局与意味；cultivation 写具体成果，不重述同一句结局。outcome 仅供辨认状态，groundedReference 仅供事实校对，不照抄参考全文；将事实融成一段短评，避免连续重复相同信息，并保留无灵根或最险历练等具体修行经历。只正面写确实取得的境界、法宝与已知经历，不写否定句或缺项说明（如不可写「未成真仙」「未破七境」「未有牵挂」等），未达成的直接省略不提。非空段落以中文句末标点结束，合起来自然、有相互呼应，总计30至78字，绝不能超过80字；无牵挂时用结局和修行成果写完整短评（每句约16至25个汉字，两句合计必须达到35至60字，绝不可少于30字），不为了凑字数编造第三段。正文只用中文、数字和中文标点，不输出Markdown、解释、推理或标签。\n只能引用提供的事实。成就id是已达成经历，未列出的成就不能补写。灵根只是当前资质，不能说天生如此。已通关秘境是精确列表，全部七境都有才可说踏破七境。正在修行不能写成此生已落幕，真仙尚未叩门不能写仙门已开；寿尽、天劫殒命与劫杀身陨均为已经结束的人生；劫杀不能写成寿尽、天劫殒命或平安脱身，不能写成仍可继续修行；尚未证得真仙时绝不能写成已得长生或成仙。没有道侣事实不能写道侣；有相识未结缘只写相逢；旧信尚未读不能说读过。故乡家书展读不代表亲历归乡相见。结局、境界和成就以事实为准。`,
     },
     {
       role: 'user' as const,
@@ -171,39 +178,135 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
         ...facts,
         outcome: ending,
         realm: facts.ascending ? '渡劫' : facts.mortal ? '凡人' : REALMS[facts.realmIndex],
+        realmStatus: isImmortalRealm ? '已证真仙' : '尚未成仙',
         currentRoot: spiritRootInfo(facts.root).name,
         pathName: pathInfo(facts.path).name,
         weaponName: treasure(facts.weapon).name,
         clearedStages: facts.stages.map((index) => STAGES[index].name),
-        groundedReference: localJourneyAppraisal(facts),
-        tieMeaning:
-          'home=故乡；letter-found/unread=尚未展读；letter-read=已读；met=仅相识；bond=道侣；friendship=知己；river=劝渔夫远行；harbor=陪他守渡；teach=劝游学少年授业；travel=赠言送行。',
+        stagesStatus: isAllStagesCleared
+          ? '已踏破七境'
+          : facts.stages.length
+            ? `已通关${facts.stages.length}境`
+            : '尚未通关秘境',
+        groundedReference,
+        ...(facts.ties.length > 0
+          ? {
+              tieMeaning:
+                'home=故乡；letter-found/unread=尚未展读；letter-read=已读；met=仅相识；bond=道侣；friendship=知己；river=劝渔夫远行；harbor=陪他守渡；teach=劝游学少年授业；travel=赠言送行。',
+            }
+          : {}),
       }),
     },
   ];
   return messages;
 }
 
-export function journeyAppraisalRetryMessage(reason: string, draft = '') {
+export function journeyAppraisalRetryMessage(
+  reason: string,
+  draft = '',
+  facts?: JourneyAppraisalFacts,
+) {
   let draftLength = 0;
+  let draftText = '';
   try {
     const parsed: unknown = JSON.parse(draft);
-    if (record(parsed))
+    if (record(parsed)) {
+      draftText = ['title', 'ending', 'cultivation', 'ties']
+        .map((key) => (typeof parsed[key] === 'string' ? parsed[key] : ''))
+        .join('');
       draftLength = ['ending', 'cultivation', 'ties']
         .map((key) => (typeof parsed[key] === 'string' ? parsed[key] : ''))
         .join('')
         .replace(/[^\p{Script=Han}]/gu, '').length;
+    }
   } catch {}
-  const hint =
-    reason === 'detail-format'
-      ? draftLength > 78
+  let hint = '';
+  if (reason === 'detail-format') {
+    hint =
+      draftLength > 78
         ? `上次正文 ${draftLength} 个汉字，超过上限，请压到 78 个汉字以内。`
-        : `上次正文只有 ${draftLength} 个汉字，至少需要 30 个，请把结局与修行成果各写完整一句。`
-      : reason === 'section-ties-unexpected'
-        ? 'ties 必须为空字符串 ""，不得编造任何牵挂句。'
-        : reason === 'title-format'
-          ? 'title 必须是单个 2 至 6 个纯汉字的字符串，不能是数组或备选列表。'
-          : '只能写这次事实中确实发生的结局，不得写别的结局意象；ties 为空时也不得写孤身、独行、孤影等孤独词。';
+        : `上次正文只有 ${draftLength} 个汉字，至少需要 30 个。严禁写五言或七言短诗对联，请扩充细节，ending 与 cultivation 各写 16 至 25 个汉字，两段合计必须达到 35 至 55 个汉字，不要只写简短半句。`;
+  } else if (reason === 'section-ties-unexpected') {
+    hint = 'ties 必须为空字符串 ""，不得编造任何牵挂句。';
+  } else if (reason === 'title-format') {
+    hint = 'title 必须是单个 2 至 6 个纯汉字的字符串，不能是数组或备选列表。';
+  } else if (reason === 'facts' && facts) {
+    const issues: string[] = [];
+    if (
+      facts.realmIndex < 8 &&
+      /(?:已成|终成|终于成|已证|证得|证就|修成)真仙|真仙(?:已成|已证|得证|之境已证)|(?:已证|证得|终得)长生|长生(?:已证|已经证得|已得|得证)|(?:已|终|终于|业已)成仙|凡骨登仙|飞升成仙/.test(
+        draftText,
+      )
+    ) {
+      issues.push('当前境界尚未成仙，绝不可写已证长生、成仙、登仙或真仙之境；');
+    }
+    if (
+      facts.stages.length !== STAGES.length &&
+      /七境(?:皆|尽|全|已)|(?:踏破|尽破|走遍|通关)七境/.test(draftText)
+    ) {
+      issues.push(
+        `本次尚未通关全部秘境（仅通关 ${facts.stages.length} 境），绝不可写踏破七境或七境皆破；`,
+      );
+    }
+    if (
+      facts.ending !== 'ambush' &&
+      /殒于劫修|劫杀身陨|身陨坊外|止于劫杀|坊外刀光|劫修/.test(draftText)
+    ) {
+      issues.push('本次并非遭劫修袭杀结局，不得出现坊外刀光或劫修身陨；');
+    } else if (facts.ending === 'ambush' && !/劫修|劫杀|坊外刀光/.test(draftText)) {
+      issues.push('本次为坊外遭劫修袭杀结局，ending 必须写出劫修袭杀或坊外刀光；');
+    }
+    if (
+      facts.ending !== 'tribulation' &&
+      /此身止于天劫|天劫殒命|殒于天劫|雷光(?:远去|收笔)/.test(draftText)
+    ) {
+      issues.push('本次并非天劫殒命结局，不得写天劫殒命或雷光收笔；');
+    }
+    if (
+      facts.ending !== 'lifespan' &&
+      /寿尽|寿终|寿元(?:已尽|行尽|耗尽)|止于岁月/.test(draftText)
+    ) {
+      issues.push('本次并非寿元耗尽结局，不得写寿尽、寿终或止于岁月；');
+    }
+    if (
+      facts.ending === 'ongoing' &&
+      /此世落幕|此生落幕|此世已终|此世终章已落|殒命|身陨/.test(draftText)
+    ) {
+      issues.push('此世仍在修行，绝不可写落幕、殒命或终章已落；');
+    }
+    if (
+      facts.ending !== 'immortal' &&
+      /(?:已|曾|终于|终得|终已)叩(?:入|开)?仙门|叩入仙门|仙门(?:已|终于|业已)(?:开|开启)|已入仙门/.test(
+        draftText,
+      )
+    ) {
+      issues.push('尚未叩入仙门，绝不可写叩入仙门或仙门已开；');
+    }
+    if (!facts.ties.includes('companion-bond') && /道侣|同心旧结|结为伴侣/.test(draftText)) {
+      issues.push('本次未结为道侣，不得写道侣或同心相守；');
+    }
+    if (
+      !facts.ties.includes('home-letter-read') &&
+      /(?:读过|曾展读|展读过|读罢|读懂|已读|读完).{0,4}家书|家书.{0,4}(?:已读|已展|已阅|读过|读罢|读完)|曾展读故乡家书/.test(
+        draftText,
+      )
+    ) {
+      issues.push('故乡家书尚未展读，不得写读过家书；');
+    }
+    if (
+      !facts.ties.length &&
+      /孑然|孤身|独自|独行|孤独|无人相伴|无人同行|未遇故人|人缘尚缺/.test(draftText)
+    ) {
+      issues.push('ties 为空时不得写孤身、独行、孤影、孤独等词；');
+    }
+    hint =
+      issues.length > 0
+        ? issues.join('')
+        : '只能写这次事实中确实发生的结局，不得写别的结局意象；ties 为空时也不得写孤身、独行、孤影等孤独词。';
+  } else {
+    hint =
+      '只能写这次事实中确实发生的结局，不得写别的结局意象；ties 为空时也不得写孤身、独行、孤影等孤独词。';
+  }
   return `${hint}请保持原意重新输出完整 JSON，字段仍为 title、ending、cultivation、ties。`;
 }
 

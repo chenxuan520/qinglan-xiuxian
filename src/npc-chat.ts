@@ -506,7 +506,8 @@ export function mountNpcChat(
     npcDefaultLine(npc.id);
   let conversation = conversations.get(npc.id);
   if (conversation?.identity !== identity) {
-    conversation = { identity, messages: memory ? [{ role: 'assistant', content: memory }] : [] };
+    const greeting: NpcMessage = { role: 'assistant', content: fallback };
+    conversation = { identity, messages: [greeting], greeting };
     conversations.set(npc.id, conversation);
   }
   if (market) {
@@ -517,6 +518,11 @@ export function mountNpcChat(
     );
     if (conversation.greeting && marketReplyRevealsRealm(request, conversation.greeting.content))
       delete conversation.greeting;
+    if (!conversation.messages.length) {
+      const greeting: NpcMessage = { role: 'assistant', content: fallback };
+      conversation.messages = [greeting];
+      conversation.greeting = greeting;
+    }
   }
   const messages = conversation.messages;
   const log = host.querySelector<HTMLElement>('.npc-chat-log')!;
@@ -544,10 +550,10 @@ export function mountNpcChat(
     log.hidden = !log.firstChild;
     log.scrollTop = log.scrollHeight;
   };
-  const send = async (message: string, greeting = false) => {
+  const send = async (message: string) => {
     if (button.disabled || !host.isConnected) return;
     const history = messages.slice(-NPC_AI_SETTINGS.maxHistoryMessages);
-    if (!greeting) messages.push({ role: 'user', content: message });
+    messages.push({ role: 'user', content: message });
     render();
     const controller = new AbortController();
     activeRequest = controller;
@@ -563,7 +569,6 @@ export function mountNpcChat(
       market && JSON.stringify(currentRequest) !== JSON.stringify(request) ? null : reply;
     const localReply = market ? marketDialogueLocalReply(currentRequest) : fallback;
     const answer: NpcMessage = { role: 'assistant', content: currentReply ?? localReply };
-    if (greeting) conversation.greeting = answer;
     messages.push(answer);
     messages.splice(0, Math.max(0, messages.length - NPC_AI_SETTINGS.maxHistoryMessages));
     render();
@@ -582,7 +587,7 @@ export function mountNpcChat(
         : reply
           ? '家中叙话 · 随口聊聊'
           : '家常依旧 · 随口聊聊';
-    if (!greeting) input.focus({ preventScroll: true });
+    input.focus({ preventScroll: true });
   };
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -592,11 +597,4 @@ export function mountNpcChat(
     void send(message);
   });
   render();
-  if (!messages.length)
-    void send(
-      townId
-        ? '有位修士来到你跟前，请以自己的身份打个招呼。'
-        : '你的孩子回到青岚故居，请以自己的身份和孩子打个招呼。',
-      true,
-    );
 }

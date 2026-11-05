@@ -178,13 +178,13 @@ test('推进铁匠故事不会清空父母闲谈或重复请求自动问候', as
   first.input.value = '家里可好？';
   first.form.submit({ preventDefault() {} });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests, 2);
+  assert.equal(requests, 1);
   assert.equal(first.log.children.length, 3);
   assert.equal(chooseSmithStory(save, 'bellows'), true);
   const reopened = host();
   mountNpcChat(reopened, save, person);
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(requests, 2);
+  assert.equal(requests, 1);
   assert.equal(reopened.log.children.length, 3);
 });
 
@@ -259,14 +259,14 @@ test('故居只隐藏正文同句初始问候，AI与失败兜底保留，后续
     assert.equal(first.log.children.length, 0);
     assert.equal(first.log.hidden, true);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(requests.length, count + 1);
-    assert.equal(first.log.children.length, initial && initial !== quote ? 1 : 0);
+    assert.equal(requests.length, count);
     first.input.value = '家里可好？';
     first.form.submit({ preventDefault() {} });
     await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(requests.length, count + 1);
     assert.equal(first.log.hidden, false);
     assert.equal(first.log.children.at(-1).children[1].textContent, quote);
-    assert.equal(requests.at(-1).history[0].content, initial ?? quote);
+    assert.equal(requests.at(-1).history[0].content, quote);
     const reopened = host(quote);
     const beforeReopen = requests.length;
     mountNpcChat(reopened, save, person);

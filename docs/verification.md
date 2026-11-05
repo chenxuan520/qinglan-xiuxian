@@ -2,6 +2,17 @@
 
 本文按日期记录当时的实现与验证结果，历史数值、结构版本和测试结论不代表当前规则。现行玩法见 [玩法详解](gameplay.md)，自动测试的最新源版本与结果见 [运行监控](https://xiuxian.011203.xyz/monitor/)。
 
+## 留影评语事实修正与 NPC 闲谈「动静分离」优化（2026-11-05）
+
+- 基线 `694c897`。按用户要求，完成留影评语 Worker AI 端点加固与城镇 NPC 闲谈「动静分离」优化：
+  1. **留影评语靶向诊断重试**：重构 `journeyAppraisalRetryMessage`，针对模型违规的具体维度（尚未成仙却写真仙之境、未满七境却称踏破七境、死因错配、牵挂凭空捏造、字数超限/不足）进行针对性纠偏提示，打破原先泛化重试导致模型输出相同草稿连错 3 次报 502 的死循环。
+  2. **否定词误判修复**：修复 `fitsFacts` 的正则逻辑，将「未踏破七境」「走遍七境」等否定前缀纳入 `asserted` 剥离范围，杜绝模型写出合规否定澄清时被误判虚报秘境。
+  3. **事实输入脱敏与防幻觉**：清理本地参考 `groundedReference` 里的「，皆为此身亲证」避免模型照抄违规；空牵挂时彻底隐藏 `tieMeaning` 字典；在事实 Payload 中显式提供 `realmStatus` 与 `stagesStatus` 并严禁写否定句与缺项说明。
+  4. **文体与字数规范**：加固系统提示词，严禁五言或七言短诗对联，明确复合句与每句 16～25 字（两句合计 35～60 字）的稳定区间，规避短句被 `detail-format` 拒绝。实测 6 种结局（`ongoing`, `lifespan`, `ambush`, `tribulation`, `extreme`, `immortal`）在真实 `GLM-4.7-flash` 下全部 Attempt 1 通过（耗时 1.4～1.8 秒，字数 33～66 汉字，0 幻觉）。
+  5. **NPC 闲谈「动静分离」**：废除过去只要点击/打开 NPC 界面即自动向 Worker 发起 `greeting` 请求的无谓开销。打开 NPC 界面（进场）直接展示本地现成的精品开场白（包含铁匠往事、坊市同道、父母家常等），0 延迟、0 Neurons 消耗；**仅当玩家在输入框主动打字并点击「交谈」时，才向 Worker 发起动态 AI 对话**，大幅降低无谓的 AI 额度损耗。
+  6. **单测适配**：同步更新 `tests/journey-appraisal-ai.test.ts`、`tests/npc-chat.test.ts`、`tests/npc-inspection-race.test.ts`、`tests/journey-consistency.test.ts` 与 `tests/binaries.test.ts`（以通用 `git rev-parse --abbrev-ref HEAD` 替代特定 git 版本的 `git branch --show-current`）。
+- 全量自动化测试 `npm test` **2332/2332** 全部通过；`npm run check:npc-ai` Worker 类型检查 0 错误；`npx tsc --noEmit` 0 错误；`npm run docs:check`（**38/38**）、`npm run assets:check` 全部通过；生产构建 `npm run build` 顺利通过（入口 JS 549.40 kB / gzip 200.08 kB，CSS 161.60 kB / gzip 34.40 kB，在预算门禁内）。
+
 ## 留影评语 AI 提示词文学意境优化（2026-11-04）
 
 - 基线 `6491c20`。按用户要求，优化留影卡片「此世评语」的 Cloudflare Workers AI（Qwen3-30B）System Prompt（`src/journey-appraisal-ai-protocol.ts`）：
@@ -4191,3 +4202,27 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 - 按用户要求不重跑全量门禁，沿用本轮不重跑CI的偏好以[skip ci]提交；不触发、重跑或取消Actions任务，也不影响正在执行的完整模拟。纯计算等价优化不改变界面、走位选择与玩家规则，无需更新游戏内说明或做浏览器回归。
 
 - 最终按需缓存版再次通过上述50项与全部精确差分。短基准直接计时完整autoplayInput，预热后交错新旧顺序各7轮：双轨每轮2000次中位232.503→176.010毫秒（-24.3%），六轨711.214→508.840毫秒（-28.5%）。普通雷路每轮20000次210.531→216.650毫秒（+2.9%）；无危险短样本有抖动，独立进程放大到每轮200000次后方向反转（310.957→284.625毫秒），不把此差异计为收益，也不据此声称其他场景更快。仅星轨存在时创建缓存；保留所有原始正负样本，证据/tmp/ai-sweep-benchmark.json、/tmp/ai-sweep-benchmark-none.json，Node版本及样本均在文件中。
+
+## 留影评语事实校验与重试机制修复及 NPC 闲谈「动静分离」（2026-11-05）
+
+- **问题根因**：线上 `POST /journey-appraisal` 偶发 502 的剩余根因有三：
+  1. `journeyAppraisalRetryMessage` 在事实校验失败时仅给出通用的“只能写这次事实中确实发生的结局”，未指出具体哪项事实冲突，导致模型原样重复草稿，耗尽 3 次重试失败；
+  2. `groundedReference` 原文包含「皆为此身亲证」等字句，把黑名单词汇主动输入上下文诱导模型抄袭；
+  3. 无牵挂时仅两句短文（ending + cultivation），模型倾向写十字符律诗对联，偶发不足 30 字被 `detail-format` 拦截；
+  4. 每次打开 NPC 界面时自动在后台触发 `greeting` AI 请求，无谓消耗额度。
+- **改动内容**：
+  1. `journeyAppraisalRetryMessage` 接入实际 `facts` 参数并在 `workers/npc-ai/index.ts` 传递，针对未成仙写长生/真仙、未通关写踏破七境、非对应死因出现对应词汇、未结道侣写道侣等违规，生成精准靶向的纠错提示；
+  2. 修复 `asserted` 正则与秘境通关判定，剥离否定词（如“未踏破七境”不误判为踏破七境）；
+  3. `groundedReference` 剔除「皆为此身亲证」后再送入上下文，无牵挂时彻底不发 `tieMeaning` 避免诱导编造；
+  4. 提示词严禁五言七言对联律诗，要求使用连贯散文句，每句 16–25 字，确保无牵挂时总字数自然落在 35–55 字之间；
+  5. 城镇 NPC 闲聊实行「动静分离」：进场直接展示本地精品开场白（包含铁匠往事、坊市同道、父母家常等），0 延迟、0 Neurons 算力消耗；仅在玩家主动输入并点击「交谈」时才向 Worker 发起动态 AI 对话，大幅节省算力开销；
+  6. 修复 `tests/binaries.test.ts` 中 `git branch --show-current` 在较旧 Git 2.20.1 下不支持的问题，使用通用的 `git rev-parse --abbrev-ref HEAD`。
+- **验证结果**：
+  - 直连真实 Cloudflare Workers AI（`@cf/zai-org/glm-4.7-flash`，关闭思考）针对 6 类结局（ongoing、lifespan、ambush、tribulation、extreme、immortal）全量实测，**全部 6 项样本均在 Attempt 1 一次性成功通过**，平均耗时 1.4 秒，正文字数全部符合 30–78 字区间且零事实幻觉。
+  - `tests/journey-appraisal-ai.test.ts` 21/21 全绿（新增靶向重试诊断单测）。
+  - 全量 `npm test` 2332/2332 全绿。
+  - `npm run check:npc-ai` 0 错误。
+  - `npx tsc --noEmit` 0 错误。
+  - `npm run docs:check` 38/38 全绿。
+  - `npm run assets:check` 通过。
+  - `npm run build` 通过（JS 549 kB / gzip 200 kB / CSS 161 kB）。

@@ -78,18 +78,15 @@ for (const status of [200, 503]) {
     });
     t.mock.method(globalThis, 'fetch', async (_url: any, options: any) => {
       calls++;
-      if (calls === 1) return Response.json({ reply: '道友，今日坊中来往的人不少。' });
       sent = JSON.parse(options.body);
       return pending;
     });
     const { save, npc } = fixture(status);
     mountNpcChat(host as any, save, { ...npc, generation: 0 });
-    for (let n = 0; n < 50 && button.disabled; n++)
-      await new Promise((resolve) => setImmediate(resolve));
     assert.equal(button.disabled, false);
     input.value = '这桩机缘是否可信，核验过了吗？';
     submit({ preventDefault() {} });
-    assert.equal(calls, 2);
+    assert.equal(calls, 1);
     const old = marketDialogueLocalReply(sent);
     assert.match(old, /尚未核验/);
     assert.ok(chooseMarketOpportunity(save, npc.id, save.mortal.sectMarket!.visit, 'inspect'));
@@ -113,6 +110,6 @@ for (const status of [200, 503]) {
       .join('');
     assert.ok(displayed.includes(expected), displayed);
     assert.ok(!displayed.includes('尚未核验'));
-    assert.equal(calls, 2, '丢弃迟到结论不额外发送新请求');
+    assert.equal(calls, 1, '丢弃迟到结论不额外发送新请求');
   });
 }

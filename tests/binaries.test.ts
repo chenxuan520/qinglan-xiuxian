@@ -176,7 +176,7 @@ test('既有素材中间被替换后恢复，仍报告违规提交', () => {
 test('旧基点侧支加入再删除二进制，合并后 push、PR 和未知基点仍拒绝', () => {
   const r = repository(true);
   try {
-    const main = r.git('branch', '--show-current');
+    const main = r.git('rev-parse', '--abbrev-ref', 'HEAD');
     r.git('checkout', '-b', 'old-base', r.legacy);
     r.write('temporary.bin', original);
     r.commit();
@@ -196,7 +196,7 @@ test('旧基点侧支加入再删除二进制，合并后 push、PR 和未知基
 test('旧基点纯文本侧支合并通过，不将未继承基线误报为删除', () => {
   const r = repository(true);
   try {
-    const main = r.git('branch', '--show-current');
+    const main = r.git('rev-parse', '--abbrev-ref', 'HEAD');
     r.git('checkout', '-b', 'old-base', r.legacy);
     r.write('note.md', '只添加文本。');
     r.commit();
@@ -213,7 +213,7 @@ test('旧基点纯文本侧支合并通过，不将未继承基线误报为删�
 test('旧基点侧支写入损坏基线后删除，合并也不能绕过', () => {
   const r = repository(true);
   try {
-    const main = r.git('branch', '--show-current');
+    const main = r.git('rev-parse', '--abbrev-ref', 'HEAD');
     r.git('checkout', '-b', 'old-base', r.legacy);
     mkdirSync(join(r.cwd, 'scripts'));
     r.write('scripts/approved-binaries.json', 'not-json');

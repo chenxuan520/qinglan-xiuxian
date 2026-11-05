@@ -365,12 +365,13 @@ test('实际导入较早低阶存档后只剔除越界的旧回复，合法聊�
     reopened = chatHost();
   mountNpcChat(reopened as any, high, npc);
   await new Promise(setImmediate);
-  assert.match(chatText(reopened), /炉火正旺/);
+  assert.match(chatText(reopened), /行脚丹修/);
   assert.doesNotMatch(chatText(reopened), /筑基|同一大境界/);
   reopened.input.value = '近况如何？';
   reopened.form.submit({ preventDefault() {} });
   await new Promise(setImmediate);
-  assert.ok(calls.at(-1).history.some((m: any) => m.content === '炉火正旺，道友慢行。'));
+  assert.match(chatText(reopened), /炉火正旺/);
+  assert.ok(calls.at(-1).history.some((m: any) => m.content.includes('行脚丹修')));
   assert.ok(calls.at(-1).history.every((m: any) => !m.content.includes('筑基')));
   assert.equal(JSON.stringify(high), after);
 });

@@ -646,6 +646,21 @@ test('长度纠正会带出上次实际字数与下限', () => {
   assert.match(journeyAppraisalRetryMessage('detail-format', longDraft), /超过上限/);
 });
 
+test('事实错误纠正带出具体事实违规项', () => {
+  const input = facts(93);
+  const draft = JSON.stringify({
+    title: '青岚证道',
+    ending: '此世仍在修行。坊外刀光一闪，替这一生落了笔。',
+    cultivation: '踏破七境，已证得长生，修成真仙。',
+    ties: '檐下同心相守，道侣之意长存。',
+  });
+  const message = journeyAppraisalRetryMessage('facts', draft, input);
+  assert.match(message, /当前境界尚未成仙，绝不可写已证长生/);
+  assert.match(message, /本次尚未通关全部秘境/);
+  assert.match(message, /本次并非遭劫修袭杀结局，不得出现坊外刀光/);
+  assert.match(message, /本次未结为道侣，不得写道侣/);
+});
+
 test('非寿终结局不得写寿尽，非死亡结局不得写殒命', () => {
   const input = facts(93);
   const base = {
