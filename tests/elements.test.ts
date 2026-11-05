@@ -168,7 +168,7 @@ test('无灵根从当前路线的五行入门法宝中随机本命', () => {
   const save = freshSave('none', [], 'dual', () => 0.2);
   assert.equal(save.starter, 'fan');
   assert.ok(save.artifacts.includes('fan'));
-  assert.ok(save.artifacts.includes('chain'));
+  assert.ok(save.artifacts.includes('nest'));
   save.path = 'demonic';
   assert.equal(
     attuneSpiritRoot(save, 'none', [], () => 0.99),

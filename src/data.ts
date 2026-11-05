@@ -169,7 +169,7 @@ export type WeaponKind =
   | 'sand';
 export const ROOT_STARTERS: Record<ElementId, [WeaponKind, WeaponKind]> = {
   metal: ['sword', 'nail'],
-  wood: ['fan', 'chain'],
+  wood: ['fan', 'nest'],
   water: ['pearl', 'brush'],
   fire: ['lightning', 'fire'],
   earth: ['pagoda', 'skull'],
