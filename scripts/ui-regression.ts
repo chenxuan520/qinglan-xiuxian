@@ -725,6 +725,22 @@ async function checkSettlementLinks(name: string, viewport: string) {
     '只能打开被点选的修士',
   );
   await check(`${name}-click-market-npc`);
+  assert.equal(await evaluate('()=>window.__uiNpcMock'), 0, '打开闲谈不自动请求AI');
+  await browser.call('fill', {
+    pageId,
+    uid: await elementId('.npc-chat-form input'),
+    value: '近来有什么见闻？',
+  });
+  await click('.npc-chat-form button[type=submit]');
+  await wait(
+    '()=>window.__uiNpcMock>=1&&document.querySelector(".npc-chat-log")?.getAttribute("aria-busy")==="false"',
+  );
+  assert.equal(
+    await evaluate('()=>document.querySelector(".npc-chat-form button").disabled'),
+    false,
+    '闲谈接口故障后仍可再次交谈',
+  );
+  await check(`${name}-chat-service-fallback`);
   await click('[data-action=close]');
   await walkScene('#sect-market-view', 1000, 750);
   await clickScene('[data-market-place=auction] .town-building-caption');
