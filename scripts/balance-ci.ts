@@ -246,7 +246,7 @@ export async function main(args: string[]) {
   if (args.length) throw new Error('balance:ci 不接受参数，固定运行840条前六关样本');
   const started = Date.now(),
     cases = ciCases(),
-    jobs = Math.min(4, availableParallelism());
+    jobs = availableParallelism();
   const output = join(repository, 'artifacts/balance-ci');
   mkdirSync(output, { recursive: true });
   for (const name of ['summary.md', 'battles.csv']) rmSync(join(output, name), { force: true });

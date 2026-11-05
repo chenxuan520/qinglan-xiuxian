@@ -4177,3 +4177,8 @@ bfbf591已推送，两站及三个关联Worker实际部署步骤成功；隔离M
 - 模型改为 `@cf/zai-org/glm-4.7-flash`，与本 Worker 的闲谈、指南同款；按 `NPC_AI_SETTINGS.enableThinking` 传 `chat_template_kwargs: { enable_thinking: false }` 关闭思考。该模型类型支持 `response_format` 而不支持 `guided_json`，评语分支改用 `response_format: { type: 'json_object' }`，对象响应的序列化校验保留。
 - 关闭思考前后的真实调用对比（同一旧提示词、同一账号，`max_tokens` 分别为 512 和 2048）：不关思考时 4 条样本里 2 条 `finish_reason=length`、`content` 为空，单次 29.7–46.5 秒、64–79 neurons；关闭思考后 4 条样本 3 条一次通过，单次 1.4–3.1 秒、6.2–7.7 neurons，未通过的一条是正文过短（`detail-format`）。结论：思考必须关闭，否则 token 全耗在 `reasoning` 上。
 - 定向 `tests/journey-appraisal-ai.test.ts` 20/20、TypeScript、`npm run check:npc-ai` 通过。真实调用只覆盖 4 条样本，尚未做全量与线上部署验证。
+
+## 2026-11-05：按用户要求移除平衡模拟并行数上限
+
+- scripts/balance-ci.ts与scripts/balance-gate.ts默认并行数改为availableParallelism()，移除最多4个worker的截断；完整模拟--jobs=N直接使用指定正整数，移除最多8个worker的截断。样本、种子、验收范围及游戏本体不变，开发文档同步。
+- 用户明确要求不重跑CI；本次不运行840或10080条矩阵、不触发或取消Actions任务，也不影响正在执行的完整重跑。本地配置探针执行源码实际parseArgs及快检main到模拟入口，模拟可用并行度1/4/16/32/64、显式--jobs=1/8/16/32/64均原样保留，非法或重复参数仍拒绝，固定840条六关计划不变；文件写入与模拟入口使用内存替身，未启动worker或执行真实模拟。2项现有CLI定向单测、Node语法、TypeScript、格式及素材检查通过；独立代码审查已通过，无未解决问题（证据/tmp/balance-workers-code-review/report.md）。按用户要求，本次提交使用[skip ci]，不重跑远端CI。

@@ -147,7 +147,7 @@ function parseArgs(args: string[]) {
     growth: false,
     acceptance: false,
     currentOnly: false,
-    jobs: Math.min(4, availableParallelism()),
+    jobs: availableParallelism(),
     report: join(repository, 'artifacts/balance-gate.json'),
   };
   const seen = new Set<string>();
@@ -161,7 +161,7 @@ function parseArgs(args: string[]) {
     else if (arg === '--acceptance') {
       options.acceptance = true;
       options.full = true;
-    } else if (/^--jobs=[1-9]\d*$/.test(arg)) options.jobs = Math.min(8, Number(arg.slice(7)));
+    } else if (/^--jobs=[1-9]\d*$/.test(arg)) options.jobs = Number(arg.slice(7));
     else if (arg.startsWith('--report=') && arg.slice(9)) options.report = resolve(arg.slice(9));
     else
       throw new Error(
