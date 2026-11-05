@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "balance",
+      "title": "完整平衡报告",
+      "kind": "balance",
+      "url": "https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnostics.json",
+      "maxAgeHours": 48
+    },
+    {
+      "id": "weapons",
+      "title": "每日法宝测评",
+      "kind": "weapons",
+      "url": "https://chenxuan520.github.io/qinglan-xiuxian/weapon-report/summary.json",
+      "maxAgeHours": 48
+    },
+    {
+      "id": "autoplay",
+      "title": "自动历练对照",
+      "kind": "autoplay",
+      "url": "https://chenxuan520.github.io/qinglan-xiuxian/autoplay-report/summary.json",
+      "maxAgeHours": 48
+    },
+    {
+      "id": "performance",
+      "title": "构建与性能报告",
+      "kind": "performance",
+      "url": "https://chenxuan520.github.io/qinglan-xiuxian/monitor/performance.json",
+      "maxAgeHours": 48
+    },
+    {
+      "id": "players",
+      "title": "玩家聚合统计",
+      "kind": "telemetry",
+      "url": "https://qinglan-npc-ai.011203.xyz/monitor/stats?days=1&site=all",
+      "maxAgeHours": 2,
+      "timeoutMs": 30000
+    },
+    {
+      "id": "balance-task",
+      "title": "完整平衡后台任务",
+      "kind": "github",
+      "maxAgeHours": 48,
+      "workflow": {
+        "repository": "chenxuan520/qinglan-xiuxian",
+        "path": ".github/workflows/balance.yml",
+        "branch": "master",
+        "job": "full",
+        "maxRunHours": 6
+      }
+    },
+    {
+      "id": "weapon-task",
+      "title": "法宝测评后台任务",
+      "kind": "github",
+      "maxAgeHours": 48,
+      "workflow": {
+        "repository": "chenxuan520/qinglan-xiuxian",
+        "path": ".github/workflows/weapon-benchmark.yml",
+        "branch": "master",
+        "maxRunHours": 6
+      }
+    },
+    {
+      "id": "autoplay-task",
+      "title": "自动历练对照后台任务",
+      "kind": "github",
+      "maxAgeHours": 48,
+      "workflow": {
+        "repository": "chenxuan520/qinglan-xiuxian",
+        "path": ".github/workflows/autoplay-balance.yml",
+        "branch": "master",
+        "maxRunHours": 1
+      }
+    }
+  ],
+  "policy": {
+    "confirmations": 2,
+    "historyLimit": 72,
+    "maxHistoryHours": 168,
+    "baselineSamples": 3,
+    "relativeChange": 0.3,
+    "absoluteChange": 0.1,
+    "minMetricSamples": 30
+  },
+  "analysis": {
+    "engine": "pi",
+    "model": "gpt-6-luna",
+    "baseUrl": "https://api.openai.com/v1",
+    "protocol": "decisions",
+    "apiKeyEnv": "OBSERVER_API_KEY",
+    "timeoutMs": 45000,
+    "maxInputChars": 48000,
+    "maxOutputTokens": 3000
+  }
+}

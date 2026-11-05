@@ -1,4 +1,4 @@
-import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, TREASURES } from './data.ts';
+import { FINAL_TRIAL_STAGE, MAX_FORGE_LEVEL, STAGES, TREASURES } from './data.ts';
 import { isCurio, curioName, grantCurio } from './curio-data.ts';
 import { medicineInfo } from './medicine-data.ts';
 import {
@@ -17,7 +17,13 @@ export type DebugResourceKind =
   | 'medicine'
   | 'curio'
   | 'cultivation'
-  | 'realm';
+  | 'realm'
+  | 'stage';
+export const DEBUG_STAGES = STAGES.map((stage, index) => ({
+  id: String(index + 1),
+  name: `第${index + 1}境 · ${stage.name}`,
+  stage: index,
+}));
 export const DEBUG_REALMS = Array.from({ length: 25 }, (_, step) => ({
   id: String(step),
   name: step === 24 ? '渡劫' : realmTitle(step),
@@ -56,7 +62,13 @@ export function debugGrant(save: SaveData, input: DebugGrant) {
     current >= 0 &&
     Number.isSafeInteger(current + input.quantity);
   let message: string;
-  if (input.kind === 'cultivation' || input.kind === 'realm') {
+  if (input.kind === 'stage') {
+    const target = DEBUG_STAGES.find((stage) => stage.id === input.id);
+    if (!target) return { error: '请选择第1至第7境中的有效关卡。' };
+    if (target.stage <= next.unlocked) return { error: '此关卡已解锁，不会降低已有进度。' };
+    next.unlocked = target.stage;
+    message = `已解锁至${target.name} · 未补修为或发放通关奖励`;
+  } else if (input.kind === 'cultivation' || input.kind === 'realm') {
     const remaining = debugCultivationRemaining(next);
     if (!remaining) return { error: '修为调试最高到渡劫，当前已达上限。' };
     const target = DEBUG_REALMS.find((r) => r.id === input.id);

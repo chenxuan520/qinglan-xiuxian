@@ -137,6 +137,8 @@ npm run deploy:npc-ai -- --var DEBUG_MODE_ENABLED:false
 
 修为调试只增加不倒退；点数必须为正整数且不能超过到渡劫的剩余额度，超额整笔拒绝。直达境界补足真实累计门槛，不改变年岁、本命或通关记录；不会直接成仙。到达渡劫后两种发放均禁用；已通终关的真仙不再发修为。突破年表与大乘天劫时钟随真实进度同步，旧存档无需增加字段。
 
+「关卡解锁」可选择解锁至第一至第七境，只提高当前关卡选择范围，不能倒退；不补修为、不发通关奖励，不改变战斗数值、年岁、收藏、资源或通关记录。目标已解锁或全部关卡已解锁时提交按钮禁用；保留当前目标名称，关闭与刷新后仍生效。沿用每次操作重新核验服务器开关、禁止未完历练及锁档、先保存后应用的事务规则，不新增存档字段，也不替玩家自动进入战斗。
+
 开关只需发布 Worker，无需重新编译游戏；部署时应核对 `GET /debug/access` 的真实返回。进入面板和每次发放都重新核验，已打开面板不能沿用旧许可；断网、五秒超时、非成功状态或错误响应格式都拒绝。关闭面板或离开「关于」后，迟到响应不得打开面板或发放物资。发放先构造副本，存档写入成功后才应用；不添加独立调试存档或保存结构版本。此开关控制正常客户端的调试入口，不提供账号鉴权，也不改变本地存档可自行编辑的性质。
 
 ## 存档结构与恢复
@@ -425,6 +427,23 @@ npm run stats -- --days=30
 - 性能公开接口：<https://chenxuan520.github.io/qinglan-xiuxian/monitor/performance.json>。`schemaVersion: 1`，`publishedAt` 和 `sources.render / simulation / size` 各带 `state`（ready / failed / unavailable）、源提交、Actions run ID、采样时间及精简指标。两站监控都从这个接口动态读取，不在 Cloudflare 页面冻结数值；GitHub Pages 允许跨域 GET，无需浏览器 GitHub 凭证。
 - `scripts/restore-monitor-performance.ts` 只读取本仓库 master 的可信 `balance.yml` artifact。Pages 发布从独立Balance工作流恢复最新已上传完成的可信模拟/体积artifact，不在部署job重跑性能门禁。若本次快检仍在运行，保留最近可用摘要并标明源提交和采样时间，不把旧数据标成本次结果；每日发布同样使用最新正式artifact。`perf-checks` 保存模拟 / 体积，`perf-render` 只保存渲染数值摘要，均保留 90 天。数值报告、JSON 只进入 Actions artifact 和 Pages 部署目录，**不提交 Git**。每次游戏发布和每日完整报告发布都恢复这些摘要；渲染失败也发布安全失败记录，页面不会显示绿色成功。
 - 每日北京时间 12:00 调度保持不变。需要只更新渲染时，可手动运行 Balance gate 并选择 `render_only=true`：不重跑 10,080 矩阵，保留最近成功部署的游戏和正式平衡日报，只更新渲染及监控摘要。无头 Chrome 的平均 / 5%低分位帧率、最差帧间隔和长任务只是 CI 环境观测，不代表手机真机表现。
+
+## 运行数据异常观察
+
+`Runtime observer` 每小时在第17分钟读取既有完整平衡诊断、法宝测评、自动历练对照、CI性能、玩家聚合统计及对应后台任务，也可手动触发。它不运行模拟、不修改游戏或门禁。正常只留一行状态；新确认异常使本次 Actions 失败，沿用仓库的 GitHub Actions 失败通知设置。相同事件不反复提醒，严重程度升级、恢复和再次发生分别记录。请在 GitHub 通知设置中启用 Actions 失败通知；目前不创建 Issue、不发送邮件或群聊消息。
+
+配置集中在 `scripts/observer.config.json`。来源可增减；`kind: json` 支持 JSON Pointer、样本数指针、变化方向与观察阈值，带认证的后台通过 `headersEnv` 引用环境变量，不能把真实密钥写入 URL 或配置。默认只读取公开聚合值，不上传存档、匿名编号或逐个玩家记录。小样本不做率值告警；混合版本的玩家分关统计不做胜率趋势推断。会话不是人数，结算与开局不能严格配对，CI性能也不代表真机帧率。模拟结果和玩家指标分开，趋势只比较同版本、同分组、足够样本及不同生成批次的数据。报告失败、来源不可用、陈旧和任务超时有各自证据，不把缺失值当零或正常。
+
+仓库 Secret 使用 `OBSERVER_API_KEY`，通过交互命令设置：
+
+```bash
+gh secret set OBSERVER_API_KEY --repo chenxuan520/qinglan-xiuxian
+gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master
+```
+
+默认 `engine: pi`、模型 `gpt-6-luna`、协议 `decisions`。Luna 是分类模型；通过 Pi 官方分类器对候选异常的证据充分性评分，中文说明来自实际聚合事实，不能凭评分删除既有失败或生成无依据的根因。Pi 1.5.0 在 Runner 临时目录隔离安装，不进入游戏依赖和构建，不加载仓库指令、扩展、会话或文件修改工具。支持 `engine: openai` 直接接入 OpenAI 格式的 `responses`、`chat-completions` 或 `decisions` 服务；`engine: none` 只做规则观察。模型、服务根地址、协议、引擎可通过仓库 Variables `OBSERVER_MODEL`、`OBSERVER_BASE_URL`、`OBSERVER_PROTOCOL`、`OBSERVER_ENGINE` 覆盖。地址填写 API 根路径（默认 `https://api.openai.com/v1`），不能夹带凭据。自建本机服务允许 loopback HTTP，其他地址须 HTTPS。不会静默切换模型。
+
+观察器单独使用 Node 24（含 Pi 子进程的代理支持），游戏原有 Node 版本要求不变。`npm run observe` 本地执行同一入口，结果写到忽略目录 `artifacts/observer/`。CLI 可依次传配置路径与输出目录。请求有超时、响应大小和模型输入/输出限制；原始认证错误不进入日志。只有新的确认异常才调用模型，AI超时或认证失败仍保留原始规则证据。`observer-state` artifact 保存有限历史、已通知身份与恢复状态；下一次只恢复本仓库 master 的该工作流产物，失败运行也保留状态。状态缺失或损坏会明确失败，不能静默清空去重历史；首次运行没有历史则建立基线。Artifact 默认保留30天、最多72批历史，长期停用后重建基线须先确认历史过期原因。
 
 ## GitHub Pages · 平台部署
 

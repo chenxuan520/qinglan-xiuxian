@@ -23,6 +23,7 @@
     "assets:check": "node --experimental-strip-types scripts/check-binaries.ts",
     "balance": "node --experimental-strip-types scripts/balance.ts",
     "stats": "node --experimental-strip-types scripts/telemetry-stats.ts",
+    "observe": "node --experimental-strip-types scripts/observer.ts",
     "balance:passives": "node --experimental-strip-types scripts/passive-balance.ts",
     "balance:weapons": "node --experimental-strip-types scripts/weapon-benchmark.ts",
     "balance:autoplay": "node --experimental-strip-types scripts/autoplay-balance.ts",
