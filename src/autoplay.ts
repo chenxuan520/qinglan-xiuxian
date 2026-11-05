@@ -4,6 +4,7 @@ import type { Choice, Game, Point } from './game.ts';
 import {
   hazardDistance,
   regionalExposure,
+  prepareRegionalExposure,
   regionalHazard,
   entanglingHazard,
 } from './regional-hazards.ts';
@@ -277,6 +278,9 @@ function autoplayDirection(g: Game) {
     return preferred;
   let best = preferred;
   let bestScore = Infinity;
+  const hazardExposure = zones.some((z) => z.kind === 'boss-sweep')
+    ? prepareRegionalExposure(p, speed)
+    : undefined;
   // 危险附近才比较方向；毒圈还比较原方向和等待，不能把所有有风险的方向一律拒绝。
   for (let i = 0; i < (zones.length ? 18 : 16); i++) {
     const x = i === 17 ? 0 : i === 16 ? preferred.x : Math.cos((i * Math.PI) / 8),
@@ -298,7 +302,8 @@ function autoplayDirection(g: Game) {
       for (const z of zones) {
         if (regionalHazard(z)) {
           risk +=
-            (regionalExposure(z, p, x, y, speed) / 0.5) *
+            ((hazardExposure ? hazardExposure(z, x, y) : regionalExposure(z, p, x, y, speed)) /
+              0.5) *
             ((z.damage / Math.max(1, p.hp)) * 4 +
               (z.kind.includes('thunder') || entanglingHazard(z) ? 0.12 : 0));
           continue;
