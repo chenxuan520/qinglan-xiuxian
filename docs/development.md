@@ -75,6 +75,19 @@ push / PR 只执行原840条快检、模拟性能及构建体积门禁，不按�
 
 完整报告的生成时间固定按Asia/Shanghai显示并标注「北京时间」，原始JSON与版本核对保留原时间戳。完整报告标题旁提供「刷新报告」按钮，重新加载最近已发布的报告；它不触发新的平衡测试。逐局明细以`cache: no-store`读取，避免新页面混入旧JSON。手机窄屏放不下时按钮自然移至标题下一行，状态短语和诊断链接按语义整块换行。
 
+本地跑完相同的完整命令后，也可用已登录的 GitHub CLI 导入，覆盖同一在线日报，无需再跑一遍矩阵：
+
+```bash
+npm run balance:gate:full
+npm run balance:upload -- artifacts/balance-gate.json --dry-run
+npm run balance:upload -- artifacts/balance-gate.json
+gh run list --workflow balance-import.yml --branch master
+```
+
+上传也接受 `.json.gz`；`--dry-run` 只用本地 master 引用校验，不上传或派发。正式上传会重查远端 master；源提交必须是本仓库 master 的祖先，Git 中全部 `src/` 原始字节及模拟脚本的相对依赖须与当前 master 一致，报告 `currentHash` 必须匹配源提交。报告须保留完整协议、10,080 个互不重复的计划身份（正常结果与明确的模拟异常合计）和全部 42 组重复首关记录。两端均校验，接收端重算门禁与统计，不信任上传文件的通过标记；不完整、版本不符或损坏的输入不覆盖现有报告。完整但未通过的报告仍发布为红色，导入 Actions 同样失败，不擅自调整游戏数值或容差。
+
+`balance:upload` 将 gzip（最多 64 MiB，解压最多 512 MiB）暂存在唯一 `balance-local-input-*` **草稿** Release 的单个 `balance-input.json.gz` 附件，并派发仅 master 可运行的 `balance-import.yml`。这是临时传输，不发布正式 Release 或 tag；输入 SHA-256、附件归属、上传者身份、源码及完整样本校验后才生成 `balance-daily-report` artifact（90 天）。原始 gzip 另存 `balance-local-input` artifact（90 天），两份产物均保存后工作流删除该临时草稿；上传或派发失败会尝试清理本次草稿，接收校验失败则保留输入供排查；派发请求超时等结果不确定时也保留草稿，避免删除已被接收的输入。删除失败或任务取消时可在 Releases 检查对应临时草稿，原始本地结果始终保留。需要 GitHub 登录拥有仓库内容写入和 Actions 派发权限，不额外配置长期密钥。页面、`results.json`、`diagnostics.json` 保留原始测试提交/时间/用时，并附本地来源、导入时间、输入摘要及导入 run ID。导入只发布报告，保留最近成功部署的游戏和其他日报；后续游戏发布也恢复这类正式手动导入产物。已有定时和手动全量任务不因此重跑或取消。
+
 诊断区位于统计筛选之前，明细默认折叠，点击展开；Error / Warning 数量与通过状态始终可见，刷新后恢复折叠。报告页 favicon 复用主界面的 `favicon.svg`，相对路径兼容 GitHub Pages 子目录。诊断覆盖整次测试：红色 **Error** 包括执行异常、覆盖校验及硬门槛失败；黄色 **Warning** 包括历史差异、妖王演出和路线/本命/场地差异，不单独导致门禁失败。已列入硬失败的历史差异仍保留 Error。筛选不会隐藏总体错误。 妖王存活 P90 只统计初入仙途、无辅助且已击杀的记录，至少需10次有效击杀；前六境上限为90秒，终关六位旧王为180秒、最后仙尊为360秒，严格超过才提示偏长。该阈值只影响诊断，不调整实际战斗。
 
 本地 AI 可直接请求静态 GET 接口 **<https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnostics.json>**，无需凭证；与每日页面同时更新。`schemaVersion: 1`，包含真实 `commit/currentHash/generatedAt`、`passed`、计划/返回样本数、`counts.error/warning` 和 `items`。每项提供 `severity`（`error` / `warning`）、`category`、`source`、原始 `message`、中文 `displayMessage` 和可确定的 `scope`（灵根/路线/本命/场地/投入/难度/种子，或关卡/妖王）。关卡与妖王编号从 0 开始；未知格式保留原文、范围为空，不猜测原因。`scope: whole-run` 表示整次测试；诊断为筛查线索，不是自动证明了根因。需要逐局佐证时读取同目录 `results.json`，核对提交和时间后关联样本。

@@ -1,0 +1,146 @@
+name: Import local balance report
+run-name: 本地平衡导入 · ${{ inputs.release_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Temporary draft release ID (created by balance:upload)
+        required: true
+        type: string
+      asset_id:
+        description: balance-input.json.gz asset ID
+        required: true
+        type: string
+      sha256:
+        description: Uploaded gzip SHA-256
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  import:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      report-id: ${{ steps.report.outputs.artifact-id }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      IMPORT_RELEASE_ID: ${{ inputs.release_id }}
+      IMPORT_ASSET_ID: ${{ inputs.asset_id }}
+      IMPORT_SHA256: ${{ inputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate local input and generate report
+        id: input
+        run: node --experimental-strip-types scripts/import-balance-report.ts
+      - name: Preserve original compressed input
+        id: original
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-local-input
+          path: artifacts/balance-local-input/balance-input.json.gz
+          if-no-files-found: error
+          retention-days: 90
+      - name: Preserve validated report
+        # 原始压缩输入先归档；校验失败不会执行任一上传步骤。
+        id: report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-daily-report
+          path: artifacts/balance-daily-report
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove temporary input after preserving report
+        if: steps.report.outputs.artifact-id != '' && steps.original.outputs.artifact-id != ''
+        run: node --experimental-strip-types scripts/import-balance-report.ts --cleanup
+      - name: Check imported diagnostic status
+        if: steps.report.outputs.artifact-id != ''
+        run: node --experimental-strip-types scripts/check-balance-report.ts
+
+  publish-report:
+    needs: import
+    if: >-
+      always() && !cancelled() && github.ref == 'refs/heads/master' &&
+      needs.import.outputs.report-id != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Select latest deployed game
+        id: game
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          game_sha=$(gh run list --repo "$REPOSITORY" --workflow pages.yml --branch master --status success --limit 1 --json headSha --jq '.[0].headSha')
+          test -n "$game_sha"
+          echo "sha=$game_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.game.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - name: Build deployed game
+        env:
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: npm run build -- --base "$BASE_PATH/"
+      - name: Check complete production build size
+        run: node --experimental-strip-types scripts/size-check.ts --dir dist
+      - name: Get current report tools
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: artifacts/report-tools
+      - name: Include imported report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_RUN: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh run download "$REPORT_RUN" --repo "$REPOSITORY" --name balance-daily-report --dir dist/balance-report
+      - name: Preserve latest performance summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-monitor-performance.ts
+      - name: Preserve latest weapon evaluation report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-weapon-report.ts
+      - name: Preserve latest autoplay comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-autoplay-report.ts
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

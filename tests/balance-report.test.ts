@@ -4,9 +4,47 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { renderReport, reportHtml } from '../scripts/balance-report.ts';
+import { renderReport, reportHtml, refreshReport } from '../scripts/balance-report.ts';
 import { balanceCases, caseKey } from '../scripts/balance-policy.ts';
 import type { CampaignSample } from '../scripts/balance-simulation.ts';
+test('本地来源与导入时间独立展示，刷新保留真实测试版本、时间及来源JSON', () => {
+  const root = mkdtempSync(join(tmpdir(), 'qinglan-report-local-origin-'));
+  const origin = {
+    kind: 'local-import' as const,
+    importedAt: '2026-11-05T16:00:00Z',
+    inputSha256: 'b'.repeat(64),
+    sourceVerified: true as const,
+    workflowRunId: '12345',
+  };
+  const report = {
+    commit: 'a'.repeat(40),
+    generatedAt: '2026-11-04T16:00:00Z',
+    elapsedSeconds: 3600,
+    current: [],
+    passed: false,
+    origin,
+  };
+  try {
+    const input = join(root, 'input.json');
+    writeFileSync(input, JSON.stringify(report));
+    renderReport(input, root);
+    refreshReport(root);
+    const html = readFileSync(join(root, 'index.html'), 'utf8');
+    assert.match(html, /数据来源：本地导入 · 源码已校验/);
+    assert.match(html, /生成时间（北京时间）：2026-11-05 00:00:00/);
+    assert.match(html, /导入时间（北京时间）：2026-11-06 00:00:00/);
+    const result = JSON.parse(readFileSync(join(root, 'results.json'), 'utf8'));
+    const diagnostics = JSON.parse(readFileSync(join(root, 'diagnostics.json'), 'utf8'));
+    assert.deepEqual(result.origin, origin);
+    assert.deepEqual(diagnostics.origin, origin);
+    assert.equal(result.commit, report.commit);
+    assert.equal(result.generatedAt, report.generatedAt);
+    assert.equal(result.elapsedSeconds, report.elapsedSeconds);
+    assert.doesNotMatch(reportHtml({ current: [] }), /数据来源：本地导入/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 test('报告生成时间固定北京时间，跨日与零点正确，原始时间戳保持不变', () => {
   for (const [generatedAt, expected] of [
     ['2026-11-02T22:36:46.031Z', '2026-11-03 06:36:46'],

@@ -91,7 +91,30 @@ test('后续游戏发布接受可信 master push 全量报告，失败结果不�
     assert.equal(eligibleBalanceReportRun({ ...run, ...patch }, repo), false);
 });
 
-test('正式恢复脚本选中新失败 push 日报，跳过外仓并保留失败展示', () => {
+test('仅接受本仓库master已完成且未取消的手动本地导入报告', () => {
+  const repo = 'chenxuan520/qinglan-xiuxian';
+  const run = {
+    path: '.github/workflows/balance-import.yml',
+    head_branch: 'master',
+    head_repository: { full_name: repo },
+    status: 'completed',
+    event: 'workflow_dispatch',
+    conclusion: 'failure',
+  };
+  assert.equal(eligibleBalanceReportRun(run, repo), true);
+  for (const patch of [
+    { event: 'push' },
+    { event: 'schedule' },
+    { event: 'pull_request' },
+    { head_branch: 'other' },
+    { status: 'in_progress' },
+    { conclusion: 'cancelled' },
+    { head_repository: { full_name: 'someone/other' } },
+  ])
+    assert.equal(eligibleBalanceReportRun({ ...run, ...patch }, repo), false);
+});
+
+test('正式恢复脚本选中新失败push或手动导入日报，保留来源并跳过外仓和取消', () => {
   const root = mkdtempSync(join(tmpdir(), 'qinglan-ci-restore-push-'));
   try {
     const executable = join(root, 'gh');
@@ -103,35 +126,50 @@ const repo=process.env.GITHUB_REPOSITORY;
 const artifacts=[{id:44,created_at:'2026-10-10T15:00:00Z'},{id:33,created_at:'2026-10-10T14:00:00Z'},{id:22,created_at:'2026-10-10T13:00:00Z'},{id:11,created_at:'2026-10-10T12:00:00Z'}].map(a=>({...a,expired:false,workflow_run:{id:a.id,head_branch:'master'}}));
 if(args[0]==='api'){
  if(args[1].includes('/actions/artifacts?'))process.stdout.write(JSON.stringify([{artifacts}]));
- else{const id=Number(args[1].split('/').pop());process.stdout.write(JSON.stringify({id,path:'.github/workflows/balance.yml',head_branch:'master',head_repository:{full_name:id===33?'fork/evil':repo},event:id===11?'schedule':'push',status:'completed',conclusion:id===44?'cancelled':id===22?'failure':'success',head_sha:String(id).slice(0,1).repeat(40)}));}
+ else{const id=Number(args[1].split('/').pop());process.stdout.write(JSON.stringify({id,path:process.env.IMPORT_REPORT==='true'&&id===22?'.github/workflows/balance-import.yml':'.github/workflows/balance.yml',head_branch:'master',head_repository:{full_name:id===33?'fork/evil':repo},event:process.env.IMPORT_REPORT==='true'&&id===22?'workflow_dispatch':id===11?'schedule':'push',status:'completed',conclusion:id===44?'cancelled':id===22?'failure':'success',head_sha:String(id).slice(0,1).repeat(40)}));}
 }else if(args[0]==='run'&&args[1]==='download'){
  fs.appendFileSync(path.join(__dirname,'downloads'),args[2]+'\\n');
  const out=args[args.indexOf('--dir')+1];fs.mkdirSync(out,{recursive:true});
- fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({commit:args[2].slice(0,1).repeat(40),passed:false,current:[],targetFailures:['前六关目标未通过']}));
+ fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({commit:args[2].slice(0,1).repeat(40),passed:false,current:[],targetFailures:['前六关目标未通过'],...(process.env.IMPORT_REPORT==='true'?{origin:{kind:'local-import',importedAt:'2026-11-05T13:30:00Z',inputSha256:'a'.repeat(64),sourceVerified:true,workflowRunId:'22'}}:{})}));
 }else process.exit(1);
 `,
     );
     chmodSync(executable, 0o755);
-    execFileSync(
-      process.execPath,
-      ['--experimental-strip-types', join(process.cwd(), 'scripts/restore-balance-report.ts')],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          PATH: `${root}:${process.env.PATH}`,
-          GITHUB_REPOSITORY: 'chenxuan520/qinglan-xiuxian',
+    for (const imported of [false, true]) {
+      execFileSync(
+        process.execPath,
+        ['--experimental-strip-types', join(process.cwd(), 'scripts/restore-balance-report.ts')],
+        {
+          cwd: root,
+          env: {
+            ...process.env,
+            PATH: `${root}:${process.env.PATH}`,
+            GITHUB_REPOSITORY: 'chenxuan520/qinglan-xiuxian',
+            IMPORT_REPORT: String(imported),
+          },
+          stdio: 'pipe',
         },
-        stdio: 'pipe',
-      },
-    );
-    assert.equal(readFileSync(join(root, 'downloads'), 'utf8'), '22\n');
-    const result = JSON.parse(readFileSync(join(root, 'dist/balance-report/results.json'), 'utf8'));
-    assert.equal(result.commit, '2'.repeat(40));
-    assert.equal(result.passed, false);
-    assert.ok(
-      readFileSync(join(root, 'dist/balance-report/index.html'), 'utf8').includes('未通过'),
-    );
+      );
+      assert.equal(readFileSync(join(root, 'downloads'), 'utf8'), imported ? '22\n22\n' : '22\n');
+      const result = JSON.parse(
+        readFileSync(join(root, 'dist/balance-report/results.json'), 'utf8'),
+      );
+      assert.equal(result.commit, '2'.repeat(40));
+      assert.equal(result.passed, false);
+      assert.equal(result.origin?.kind, imported ? 'local-import' : undefined);
+      const diagnostics = JSON.parse(
+        readFileSync(join(root, 'dist/balance-report/diagnostics.json'), 'utf8'),
+      );
+      assert.deepEqual(diagnostics.origin, result.origin ?? null);
+      if (imported)
+        assert.match(
+          readFileSync(join(root, 'dist/balance-report/index.html'), 'utf8'),
+          /数据来源：本地导入 · 源码已校验/,
+        );
+      assert.ok(
+        readFileSync(join(root, 'dist/balance-report/index.html'), 'utf8').includes('未通过'),
+      );
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

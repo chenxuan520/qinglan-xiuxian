@@ -156,6 +156,7 @@ export function reportDiagnostics(
     schemaVersion: 1,
     commit: report.commit ?? null,
     currentHash: report.currentHash ?? null,
+    origin: report.origin ?? null,
     generatedAt: report.generatedAt ?? null,
     elapsedSeconds: report.elapsedSeconds ?? null,
     passed,

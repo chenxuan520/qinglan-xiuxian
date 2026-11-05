@@ -36,6 +36,7 @@
     "format:check": "prettier --check .",
     "balance:ci": "node --experimental-strip-types scripts/balance-ci.ts",
     "balance:report": "node --experimental-strip-types scripts/balance-report.ts",
+    "balance:upload": "node --experimental-strip-types scripts/upload-balance-report.ts",
     "perf:sim": "node --experimental-strip-types scripts/perf-sim.ts",
     "perf:render": "node --experimental-strip-types scripts/perf-render.ts",
     "size:check": "node --experimental-strip-types scripts/size-check.ts"

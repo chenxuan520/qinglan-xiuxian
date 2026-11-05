@@ -20,11 +20,12 @@ export function eligibleBalanceReportRun(
   repository: string,
 ) {
   return (
-    run.path === '.github/workflows/balance.yml' &&
+    ((run.path === '.github/workflows/balance.yml' &&
+      ['schedule', 'workflow_dispatch', 'push'].includes(run.event)) ||
+      (run.path === '.github/workflows/balance-import.yml' && run.event === 'workflow_dispatch')) &&
     run.head_branch === 'master' &&
     run.head_repository?.full_name === repository &&
     run.status === 'completed' &&
-    run.conclusion !== 'cancelled' &&
-    ['schedule', 'workflow_dispatch', 'push'].includes(run.event)
+    run.conclusion !== 'cancelled'
   );
 }
