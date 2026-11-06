@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 import { createContext, Script } from 'node:vm';
-import { settlementModal } from '../src/lobby-ui.ts';
+import { settlementModal, updateSettlementNextButton } from '../src/lobby-ui.ts';
 import { STAGES } from '../src/data.ts';
 import { isExtremeLife } from '../src/life-mode.ts';
 import { freshSave } from '../src/progress.ts';
@@ -27,6 +27,7 @@ function flow(extreme: boolean) {
   let clock = 1000;
   let renders = 0;
   let starts = 0;
+  const armedCalls: boolean[] = [];
   const timers: { run: () => void; delay: number }[] = [];
   const state = save(extreme);
   const shell = {
@@ -40,6 +41,7 @@ function flow(extreme: boolean) {
     nextConfirmArmedAt: 0,
     tribulationDue: () => false,
     mobileDisplay: { enter: () => {} },
+    modal: {},
     renderResult: () => renders++,
     startRun: () => starts++,
     window: {
@@ -52,6 +54,7 @@ function flow(extreme: boolean) {
     STAGES,
     isExtremeLife,
     Math,
+    updateSettlementNextButton: (_modal: unknown, armed: boolean) => armedCalls.push(armed),
   });
   const body = match[0].slice(0, match[0].lastIndexOf("  if (action === 'return')"));
   new Script(`function onNext() {${body}\n}`).runInContext(context);
@@ -59,6 +62,7 @@ function flow(extreme: boolean) {
     shell,
     timers,
     renders: () => renders,
+    armed: () => armedCalls,
     starts: () => starts,
     click(at?: number) {
       if (at !== undefined) clock = at;
@@ -74,7 +78,8 @@ test('极限模式第一次 next 只进入确认态，按钮文案与类名同�
   const run = flow(true);
   run.click();
   assert.equal(run.starts(), 0);
-  assert.equal(run.renders(), 1);
+  assert.deepEqual(run.armed(), [true]);
+  assert.equal(run.renders(), 0, '确认态只改按钮，不重建结算页');
   assert.equal(run.shell.nextConfirmUntil, 4000);
   assert.equal(run.shell.nextConfirmArmedAt, 1000);
   assert.equal(run.timers.length, 1);
@@ -143,7 +148,8 @@ test('400 毫秒内第二次 next 被忽略，400 毫秒后进入下一秘境', 
   run.click();
   run.click(1399);
   assert.equal(run.starts(), 0);
-  assert.equal(run.renders(), 1);
+  assert.deepEqual(run.armed(), [true]);
+  assert.equal(run.renders(), 0);
   run.click(1400);
   assert.equal(run.starts(), 1);
   assert.equal(run.shell.nextConfirmUntil, 0);
@@ -156,10 +162,12 @@ test('确认态 3 秒无操作后恢复，再点仍需两步', () => {
   run.advance(3000);
   run.timers[0].run();
   assert.equal(run.shell.nextConfirmUntil, 0);
-  assert.equal(run.renders(), 2);
+  assert.deepEqual(run.armed(), [true, false]);
+  assert.equal(run.renders(), 0);
   run.click(4000);
   assert.equal(run.starts(), 0);
   assert.equal(run.shell.nextConfirmUntil, 7000);
+  assert.deepEqual(run.armed(), [true, false, true]);
 });
 
 test('普通模式一次 next 直接进入下一秘境', () => {
@@ -178,4 +186,21 @@ test('结算关闭、新局、读档与切换存档都会清除确认态', () =>
     /game = pendingRun = null;\n\s+nextConfirmUntil = 0;\n\s+nextConfirmArmedAt = 0;/g,
   );
   assert.equal(clears?.length, 2);
+});
+
+test('按钮局部刷新只改确认态文案与类名', () => {
+  const classes = new Set<string>();
+  const button = {
+    classList: {
+      toggle: (name: string, on: boolean) => (on ? classes.add(name) : classes.delete(name)),
+    },
+    innerHTML: '',
+  };
+  const modal = { querySelector: () => button };
+  updateSettlementNextButton(modal as unknown as ParentNode, true);
+  assert.equal(button.innerHTML, '确认出发 · 此战不可退离');
+  assert.ok(classes.has('confirm-armed'));
+  updateSettlementNextButton(modal as unknown as ParentNode, false);
+  assert.match(button.innerHTML, /^前往下一秘境 /);
+  assert.ok(!classes.has('confirm-armed'));
 });

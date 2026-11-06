@@ -42,6 +42,7 @@ import type {
   reincarnatePanel,
   tribulationWonPanel,
 } from './opening-ui.ts';
+import { updateSettlementNextButton } from './lobby-ui.ts';
 import type {
   damagePanel,
   guidePanel,
@@ -2087,12 +2088,12 @@ function handleRun(shell: ActionShell, action: string, id?: string) {
         const until = now + 3000;
         shell.nextConfirmArmedAt = now;
         shell.nextConfirmUntil = until;
-        shell.renderResult();
+        updateSettlementNextButton(shell.modal, true);
         shell.window.setTimeout(() => {
           if (shell.nextConfirmUntil !== until || shell.performance.now() < until) return;
           shell.nextConfirmUntil = 0;
           shell.nextConfirmArmedAt = 0;
-          shell.renderResult();
+          updateSettlementNextButton(shell.modal, false);
         }, 3000);
         return true;
       }

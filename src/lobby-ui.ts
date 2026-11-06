@@ -223,6 +223,13 @@ export function deathModal(game: Game): string {
   return `<div class="modal-backdrop"><section class="result-panel" role="dialog" aria-modal="true" aria-label="重燃道心"><div class="eyebrow">仙途未尽</div><h2>重燃道心</h2><p>气血已尽，本次修行暂停。</p><p class="panel-note">观看广告后原地满血复活，获得 3 秒护体。<br>每局最多复活 ${MAX_REVIVES} 次，法宝、等级和战绩全部保留。${game.tribulation ? '<br>放弃本次天劫后可先留存此世，再确认轮回。' : ''}</p><div class="result-actions death-actions"><button class="primary-button" data-action="watch-ad">看广告复活 · 剩余 ${MAX_REVIVES - game.revivesUsed} 次</button><button class="secondary-button" data-action="finish-run">${game.tribulation ? '放弃渡劫 · 此世落幕' : '直接结算'}</button></div></section></div>`;
 }
 
+// 极限确认态只改按钮本身，避免重建结算页、丢失滚动与焦点。
+export function updateSettlementNextButton(modal: ParentNode, armed: boolean) {
+  const button = modal.querySelector<HTMLButtonElement>('.result-actions [data-action="next"]');
+  if (!button) return;
+  button.classList.toggle('confirm-armed', armed);
+  button.innerHTML = armed ? '确认出发 · 此战不可退离' : `前往下一秘境 ${smallIcon('arrow')}`;
+}
 export function settlementModal(
   save: SaveData,
   game: Game,
