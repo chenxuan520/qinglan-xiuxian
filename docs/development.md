@@ -453,7 +453,7 @@ AI 诊断保存在 `result.json` 的 `analysis.diagnostics` 和 Actions 摘要�
 gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master -f reanalyze=true
 ```
 
-`reanalyze` 默认为 `false`，定时运行始终只分析新增通知；手动 `true` 通过 `OBSERVER_REANALYZE=true` 重分析当前候选，摘要明确标注。它不重置去重状态或重复通知；AI 返回 failed／unavailable 时，即使没有新增提醒也会保存状态并非零退出。无信号及 `engine: none` 仍正常跳过模型。结果与摘要只记录固定的凭据来源标签、两个是否配置的布尔值及五种格式错误枚举，不记录原值、长度或散列；本地同名环境变量可验证同一流程。
+`reanalyze` 默认为 `false`，定时运行始终只分析新增通知；手动 `true` 通过 `OBSERVER_REANALYZE=true` 重分析当前候选，摘要明确标注。手动复查时没有候选则使用一条固定合成证据校验 API 连通，结果标记 `verificationOnly`，不写入线上信号、历史或告警；正常定时无信号及 `engine: none` 仍跳过模型。它不重置去重状态或重复通知；AI 返回 failed／unavailable 时，即使没有新增提醒也会保存状态并非零退出。结果与摘要只记录固定的凭据来源标签、两个是否配置的布尔值及五种格式错误枚举，不记录原值、长度或散列；本地同名环境变量可验证同一流程。
 
 ## GitHub Pages · 平台部署
 

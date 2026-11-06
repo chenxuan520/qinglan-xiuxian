@@ -12,6 +12,7 @@ import {
 } from './observe-policy.ts';
 import type {
   AnalysisResult,
+  AnalysisInput,
   ObserverConfig,
   ObserverCredentialSource,
   ObserverState,
@@ -146,6 +147,8 @@ export function observerSummary(
       `手动重分析：当前 ${decision.signals.length} 个候选，AI 状态 ${analysis.status}；去重与新增提醒规则保持。`,
       '',
     );
+  if (analysis.verificationOnly)
+    lines.push(`手动 API 连通校验（合成证据）：${analysis.status}，不作为线上异常。`, '');
   if (pending) lines.push(`后台任务执行中 ${pending} 项；尚未生成的新结果不判失败或恢复。`, '');
   if (unresolved && !decision.signals.length)
     lines.push(`仍有 ${unresolved} 项已提醒事件待核实，当前没有足够证据确认恢复。`, '');
@@ -166,7 +169,7 @@ export function observerSummary(
     lines.push(`- 已恢复：${markdown(incident.signal.title)}。`);
   if (!decision.notifications.length && decision.signals.length)
     lines.push('已有异常保持记录；未重复提醒。');
-  if (analysis.reanalyzed)
+  if (analysis.reanalyzed && !analysis.verificationOnly)
     for (const finding of analysis.findings)
       if (
         !decision.notifications.some(
@@ -240,32 +243,55 @@ export async function runObserver(
   const snapshot: Snapshot = { schemaVersion: 1, at, observations };
   const decision = evaluateSnapshot(snapshot, previous, config.policy);
   const reanalyze = env.OBSERVER_REANALYZE === 'true';
-  const result = await (deps.analyze ?? analyzeEvidence)(
-    {
+  let input: AnalysisInput = {
+    at,
+    signals: (reanalyze ? decision.signals : decision.notifications).map((s) => ({
+      ...s,
+      id: `${s.sourceId}/${s.id}`,
+    })),
+    evidence: observations.map((o) => ({
+      id: o.id,
+      text: JSON.stringify({
+        title: o.title,
+        status: o.status,
+        version: o.version,
+        generatedAt: o.generatedAt,
+        metrics: o.metrics,
+        signals: o.signals,
+      }),
+    })),
+  };
+  const verificationOnly = reanalyze && !input.signals.length && config.analysis.engine !== 'none';
+  if (verificationOnly)
+    input = {
       at,
-      signals: (reanalyze ? decision.signals : decision.notifications).map((s) => ({
-        ...s,
-        id: `${s.sourceId}/${s.id}`,
-      })),
-      evidence: observations.map((o) => ({
-        id: o.id,
-        text: JSON.stringify({
-          title: o.title,
-          status: o.status,
-          version: o.version,
-          generatedAt: o.generatedAt,
-          metrics: o.metrics,
-          signals: o.signals,
-        }),
-      })),
-    },
-    config.analysis,
-    { env },
-  );
+      signals: [
+        {
+          id: 'observer-check/connectivity',
+          sourceId: 'observer-check',
+          severity: 'warning',
+          title: '手动 API 连通校验：2 大于 1',
+          detail: '仅验证模型调用链，不是线上异常，不产生告警。',
+          evidenceIds: ['observer-check'],
+        },
+      ],
+      evidence: [
+        { id: 'observer-check', text: '用于手动连通验证的固定合成证据：整数 2 大于整数 1。' },
+      ],
+    };
+  const result = await (deps.analyze ?? analyzeEvidence)(input, config.analysis, { env });
   const source = observerCredentialSource(env);
   const analysis: AnalysisResult = {
     ...result,
     ...(reanalyze ? { reanalyzed: true } : {}),
+    ...(verificationOnly
+      ? {
+          verificationOnly: true,
+          ...(result.status === 'complete'
+            ? { summary: '手动 API 连通校验完成（合成证据），没有新增线上告警。' }
+            : {}),
+        }
+      : {}),
     ...(source ? { credentialSource: source } : {}),
   };
   mkdirSync(output, { recursive: true });

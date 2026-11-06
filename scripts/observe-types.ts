@@ -138,5 +138,6 @@ export interface AnalysisResult {
   error?: string;
   diagnostics?: AnalysisDiagnostics;
   reanalyzed?: boolean;
+  verificationOnly?: boolean;
   credentialSource?: ObserverCredentialSource;
 }

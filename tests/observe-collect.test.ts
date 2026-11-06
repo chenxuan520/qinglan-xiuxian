@@ -656,6 +656,62 @@ test('健康无信号及none均正常skipped，不因凭据诊断增加提醒或
   }
 });
 
+for (const status of ['complete', 'failed'] as const) {
+  test(`没有异常时手动连通校验${status}不生成线上信号或修改历史`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'observer-connectivity-'));
+    try {
+      const c = config();
+      c.sources = [spec];
+      c.analysis.engine = 'openai';
+      const inputs: AnalysisInput[] = [];
+      const collect = async () => normalizeSource(spec, { ...report, value: 0 }, at);
+      const analyze = async (input: AnalysisInput): Promise<AnalysisResult> => {
+        inputs.push(structuredClone(input));
+        return input.signals.length
+          ? {
+              engine: 'openai',
+              model: c.analysis.model,
+              status,
+              summary: '合成探针结果',
+              findings: [],
+            }
+          : skipped;
+      };
+      const env = { OBSERVER_API_KEY: 'fake-only-connectivity-key' };
+      const normal = await runObserver(c, emptyObserverState(), join(directory, 'normal'), at, {
+        collect,
+        analyze,
+        env,
+      });
+      const manual = await runObserver(c, emptyObserverState(), join(directory, 'manual'), at, {
+        collect,
+        analyze,
+        env: { ...env, OBSERVER_REANALYZE: 'true' },
+      });
+      assert.equal(inputs[0].signals.length, 0);
+      assert.equal(inputs[1].signals.length, 1);
+      assert.equal(inputs[1].signals[0].id, 'observer-check/connectivity');
+      assert.equal(manual.analysis.verificationOnly, true);
+      assert.equal(manual.analysis.status, status);
+      assert.equal(manual.failed, status === 'failed');
+      assert.deepEqual(manual.decision, normal.decision);
+      assert.deepEqual(manual.decision.signals, []);
+      assert.deepEqual(manual.decision.notifications, []);
+      const saved = JSON.parse(readFileSync(join(directory, 'manual/result.json'), 'utf8'));
+      assert.deepEqual(saved.signals, []);
+      assert.ok(!JSON.stringify(saved.snapshot).includes('observer-check'));
+      assert.ok(
+        !readFileSync(join(directory, 'manual/state.json'), 'utf8').includes('observer-check'),
+      );
+      const summary = readFileSync(join(directory, 'manual/summary.md'), 'utf8');
+      assert.match(summary, /手动 API 连通校验（合成证据）/);
+      assert.match(summary, /不作为线上异常/);
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+}
+
 test('凭据来源只接受固定标签和严格布尔，不记录任意环境值或key细节', () => {
   for (const selectedSecret of ['OPENAI_API_KEY', 'OBSERVER_API_KEY', 'custom-secret'] as const) {
     const source = observerCredentialSource({
