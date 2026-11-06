@@ -38,7 +38,8 @@ function fixture() {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
   };
-  git('init', '-b', 'master');
+  git('init');
+  git('checkout', '-B', 'master');
   git('config', 'user.name', 'Upload Test');
   git('config', 'user.email', 'upload-test@example.invalid');
   git('remote', 'add', 'origin', 'git@github.com:owner/qinglan-xiuxian.git');
