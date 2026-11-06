@@ -850,6 +850,7 @@ export function renderResult(shell: ActionShell) {
     shell.game,
     shell.rewards,
     shell.oldRealm,
+    shell.nextConfirmUntil > shell.performance.now(),
   );
   shell.modal.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true });
 }

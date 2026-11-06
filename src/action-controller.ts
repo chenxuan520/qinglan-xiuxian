@@ -156,6 +156,8 @@ export interface ActionShell {
   readonly SPIRIT_ROOTS: readonly { id: string }[];
   readonly STAGES: typeof STAGES;
   abandonConfirm: boolean;
+  nextConfirmUntil: number;
+  nextConfirmArmedAt: number;
   readonly acceptHometownRoot: typeof acceptHometownRoot;
   readonly adCompleted: () => boolean;
   adElements: ElementId[];
@@ -2069,6 +2071,26 @@ function handleRun(shell: ActionShell, action: string, id?: string) {
     shell.startRun(true);
   }
   if (action === 'next' && shell.game) {
+    if (isExtremeLife(shell.save)) {
+      const now = shell.performance.now();
+      if (now > shell.nextConfirmUntil) {
+        const until = now + 3000;
+        shell.nextConfirmArmedAt = now;
+        shell.nextConfirmUntil = until;
+        shell.renderResult();
+        shell.window.setTimeout(() => {
+          if (shell.nextConfirmUntil !== until || shell.performance.now() < until) return;
+          shell.nextConfirmUntil = 0;
+          shell.nextConfirmArmedAt = 0;
+          shell.renderResult();
+        }, 3000);
+        return true;
+      }
+      // 吞掉快速连点的第二下，避免一次双击直接开战。
+      if (now - shell.nextConfirmArmedAt < 400) return true;
+      shell.nextConfirmUntil = 0;
+      shell.nextConfirmArmedAt = 0;
+    }
     shell.selectedStage = Math.min(shell.STAGES.length - 1, shell.game.stage + 1);
     if (
       shell.assetsReady &&

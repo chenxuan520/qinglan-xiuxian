@@ -116,7 +116,7 @@ test('新局或读档续局重置后可以再记一次 quit', () => {
 test('game 赋值入口重置 quit 状态', () => {
   assert.match(
     source,
-    /set game\(next\) \{\n\s+game = next;\n\s+quitTracked = false;\n\s+\},/,
+    /set game\(next\) \{\n\s+game = next;\n\s+quitTracked = false;\n/,
     'scene-flow 与读档续局都经此 setter，必须重置',
   );
 });

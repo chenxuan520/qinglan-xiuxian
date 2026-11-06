@@ -208,6 +208,7 @@ export function settlementModal(
     ascensionCultivation: number;
   },
   oldRealm: string,
+  nextConfirmArmed = false,
 ): string {
   const won = game.state === 'won',
     realm = currentRealm(save).name;
@@ -220,10 +221,12 @@ export function settlementModal(
         : firstReturn
           ? `此行 ${game.elapsedYears.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 年<br>离乡时十五，如今 ${save.age.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 岁。`
           : `此行 ${game.elapsedYears.toLocaleString('zh-CN', { maximumFractionDigits: 1, useGrouping: false })} 年`;
+  const nextArmed =
+    won && game.stage < STAGES.length - 1 && isExtremeLife(save) && nextConfirmArmed;
   const actions =
     won && game.isFinalTrial
       ? '<button class="secondary-button" data-action="return">返回首页</button>'
-      : `<button class="secondary-button" data-action="return">返回首页</button><button class="primary-button" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}</button>`;
+      : `<button class="secondary-button" data-action="return">返回首页</button><button class="primary-button${nextArmed ? ' confirm-armed' : ''}" data-action="${won && game.stage < STAGES.length - 1 ? 'next' : 'retry'}">${nextArmed ? '确认出发 · 此战不可退离' : `${won && game.stage < STAGES.length - 1 ? '前往下一秘境' : '再入仙途'} ${smallIcon('arrow')}`}</button>`;
   return `<div class="modal-backdrop"><section class="result-panel settlement-panel ${won && game.isFinalTrial ? 'result-complete' : ''}" role="dialog" aria-modal="true" aria-label="历练结算"><div class="settlement-content"><div class="result-seal">${won ? (game.isFinalTrial ? '圆满' : '破境') : '归来'}</div><div class="eyebrow">${game.encounterName} · ${pathInfo(game.path).name} · <span class="difficulty-name difficulty-${game.difficulty}">${DIFFICULTIES[game.difficulty].name}</span></div><h2>${won ? (game.isFinalTrial ? '仙途圆满，自在长生' : '一剑荡妖尘') : '仙途漫漫，再行一程'}</h2><p>${won ? (game.isFinalTrial ? '七劫尽破，已证真仙。周期天劫就此止息，既有修行与劫印长存。' : `妖王已斩，${STAGES[game.stage + 1].name}已解锁。`) : '胜败皆为修行。此行所得，尽归道心。'}</p><div class="result-stats"><div><strong>${formatTime(game.time)}</strong><span>历练时长</span></div><div><strong>${game.kills}</strong><span>斩妖数量</span></div><div><strong>${game.level}</strong><span>局内等级</span></div></div><div class="reward-row"><span>${smallIcon('gem')}<b>+${rewards.stones}</b> 灵石</span><span>◆ <b>+${rewards.iron}</b> 玄铁</span><span>✧ <b>+${rewards.cultivation}</b> 本局修为</span></div><p class="result-years">${journeyYears}</p>${runLootContent(game.loot, game)}${rewards.ascensionCultivation > 0 ? `<p class="boss-reward">成仙修为补足 +${rewards.ascensionCultivation}<small>已计入本局总修为，仅补足成仙所需</small></p>` : ''}<div class="result-realm">${realm !== oldRealm ? `境界突破 · ${oldRealm} → ${realm}` : `当前境界 · ${realm}`}</div>${game.bossCultivation > 0 ? `<p class="boss-reward">妖王突破修为 +${Math.floor(game.bossCultivation).toLocaleString('zh-CN', { useGrouping: false })}<small>已计入本局总修为</small></p>` : ''}${won ? '' : preparationAdviceContent(save, false, true, game.weapons)}${humanRecollection(save) ? `<p class="human-recollection">${humanRecollection(save)}</p>` : ''}<details class="disclosure settlement-details"><summary>伤害统计与收益明细</summary><p class="panel-note">修为实时入账 ${rewards.cultivation - rewards.cultivationRemaining} · 本次补发 ${rewards.cultivationRemaining}，合计已计入永久修为。</p>${damageReport(game)}</details></div><div class="result-actions">${actions}</div></section></div>`;
 }
 

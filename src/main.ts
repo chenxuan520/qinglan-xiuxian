@@ -423,7 +423,9 @@ let bestiaryStage = -1;
 let bestiaryDifficulty = 0;
 let rewards: ReturnType<typeof settleRun> | null = null,
   oldRealm = '',
-  abandonConfirm = false;
+  abandonConfirm = false,
+  nextConfirmUntil = 0,
+  nextConfirmArmedAt = 0;
 const keys = new Set<string>();
 let touchInput = { x: 0, y: 0 },
   pointer: number | null = null,
@@ -1638,6 +1640,8 @@ function resetLifetime(
   ambushScene?.destroy();
   ambushScene = null;
   game = pendingRun = null;
+  nextConfirmUntil = 0;
+  nextConfirmArmedAt = 0;
   rewards = null;
   gameAudio.sync();
   selectedStage = 0;
@@ -1727,6 +1731,8 @@ function beginJourneyFarewell(reason: NonNullable<SaveData['pendingReincarnation
   }
   Object.assign(save, ended);
   game = pendingRun = null;
+  nextConfirmUntil = 0;
+  nextConfirmArmedAt = 0;
   ambushScene?.destroy();
   ambushScene = null;
   leaveTown();
@@ -1766,6 +1772,10 @@ function shellBindings(): ActionShell {
     get STAGES() { return STAGES; },
     get abandonConfirm() { return abandonConfirm; },
     set abandonConfirm(next) { abandonConfirm = next; },
+    get nextConfirmUntil() { return nextConfirmUntil; },
+    set nextConfirmUntil(next) { nextConfirmUntil = next; },
+    get nextConfirmArmedAt() { return nextConfirmArmedAt; },
+    set nextConfirmArmedAt(next) { nextConfirmArmedAt = next; },
     get acceptHometownRoot() { return acceptHometownRoot; },
     get adCompleted() { return adCompleted; },
     get adElements() { return adElements; },
@@ -1835,6 +1845,8 @@ function shellBindings(): ActionShell {
     set game(next) {
       game = next;
       quitTracked = false;
+      nextConfirmUntil = 0;
+      nextConfirmArmedAt = 0;
     },
     get gameAudio() { return gameAudio; },
     get guideReturn() { return guideReturn; },
