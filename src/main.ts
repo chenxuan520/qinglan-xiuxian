@@ -4,6 +4,7 @@ import { TAMPERED_LEADERBOARD_MESSAGE, sealSaveSnapshot } from './leaderboard-in
 import { bindSettlementDirectory } from './settlement-directory-source.ts';
 import { retargetPendingFirstTour } from './first-run-tour-state.ts';
 import { STANDALONE } from './build-mode.ts';
+import { loadNewPlayerAssets, startsWithPrologue } from './new-player-load.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
@@ -161,6 +162,7 @@ import { GameAudio } from './game-audio.ts';
 import { SoundSettings } from './sound-settings.ts';
 import { commitSaveAction } from './save-action.ts';
 import type { TownScene } from './town-scene.ts';
+import { preloadTownImages } from './town-images.ts';
 import { TownSource } from './town-source.ts';
 import type { SectMarketScene } from './sect-market-scene.ts';
 import { MarketEventSource } from './market-event-source.ts';
@@ -2745,15 +2747,47 @@ else if (!save.mortal.marketSocial?.ambush && lifespanInfo(save).remaining === 0
 else if (!save.mortal.marketSocial?.ambush && tribulationDue(save)) renderTribulationPending();
 if (saveLock) renderSaveLock();
 persist();
-ensureScene(selectedStage, () => {
-  if (!game && !inMortalWorld) renderLobby();
-  if (saveLock) {
-    renderSaveLock();
-    return;
-  }
-  if (panel === 'tribulation-pending') renderTribulationPending();
-  renderPrologue();
-});
+if (startsWithPrologue(save, { saveLock, game, pendingRun, inMortalWorld, panel })) {
+  loadNewPlayerAssets(
+    assetUrl(PROLOGUE_IMAGE),
+    () => renderPrologue(),
+    () => preloadTownImages(save.path),
+    () =>
+      renderer.prepareScene(selectedStage, false, [], () => {}, [
+        window.matchMedia('(max-width: 640px)').matches
+          ? JOURNEY_MAP_MOBILE_IMAGE
+          : JOURNEY_MAP_IMAGE,
+        PROLOGUE_IMAGE,
+      ]),
+    () => {
+      assetsReady = true;
+      if (!panel && !game && !inMortalWorld && !sceneLoading) renderLobby();
+    },
+    () => {
+      if (saveLock) return;
+      if (!panel && !game && !inMortalWorld && !sceneLoading)
+        ensureScene(
+          selectedStage,
+          () => {
+            if (!game && !inMortalWorld) renderLobby();
+          },
+          null,
+          false,
+          false,
+        );
+    },
+  );
+} else {
+  ensureScene(selectedStage, () => {
+    if (!game && !inMortalWorld) renderLobby();
+    if (saveLock) {
+      renderSaveLock();
+      return;
+    }
+    if (panel === 'tribulation-pending') renderTribulationPending();
+    renderPrologue();
+  });
+}
 requestAnimationFrame(frame);
 preloadRewardAds();
 void import('./first-run-tour.ts')

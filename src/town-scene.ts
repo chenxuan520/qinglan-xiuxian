@@ -2,7 +2,8 @@ import { resourceFailureContent } from './resource-panel.ts';
 import { resourceFailed } from './update-check.ts';
 import { assetUrl } from './asset-url.ts';
 import type { CultivationPath } from './data.ts';
-import { PLAYER_IMAGES, playerSpriteBackground } from './player-appearance.ts';
+import { playerSpriteBackground } from './player-appearance.ts';
+import { TOWN_IMAGES } from './town-images.ts';
 import {
   TOWN_WIDTH,
   TOWN_HEIGHT,
@@ -28,14 +29,6 @@ import { mapClick, walkRoute } from './settlement-navigation.ts';
 import { SettlementPassage, SETTLEMENT_PATHS, settlementEntry } from './settlement-passage.ts';
 import { SettlementSprite, settlementSpriteVisible } from './settlement-sprite.ts';
 
-const TOWN_IMAGES = [
-  '/assets/town-ground.webp',
-  '/assets/town-buildings.webp',
-  '/assets/sect-market-buildings.webp',
-  '/assets/town-props.webp',
-  '/assets/town-npcs.webp',
-  ...Object.values(PLAYER_IMAGES),
-];
 const NIGHT_BOAT_APPROACH = { x: 3370, y: 1270 };
 type NightBoatScene = { visible(): boolean; interact(): void };
 

@@ -956,8 +956,11 @@ export function ensureScene(
 }
 
 export function startRun(shell: ActionShell, replacePending = false) {
+  if (!shell.assetsReady) {
+    shell.ensureScene(shell.selectedStage, () => shell.startRun(replacePending), null, false, true);
+    return;
+  }
   if (
-    !shell.assetsReady ||
     (shell.game && !shell.settled) ||
     shell.save.pendingReincarnation ||
     shell.selectedStage > shell.save.unlocked ||
