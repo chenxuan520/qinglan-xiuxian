@@ -4,7 +4,6 @@ import { TAMPERED_LEADERBOARD_MESSAGE, sealSaveSnapshot } from './leaderboard-in
 import { bindSettlementDirectory } from './settlement-directory-source.ts';
 import { retargetPendingFirstTour } from './first-run-tour-state.ts';
 import { STANDALONE } from './build-mode.ts';
-import { createRunQuitState, trackRunQuitOnLeave } from './run-quit.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
@@ -361,7 +360,7 @@ if (
 let selectedStage = save.unlocked,
   difficulty = minimumDifficulty(save),
   game: Game | null = null;
-const runQuit = createRunQuitState();
+let quitTracked = false;
 let panel = '',
   bookTab = 'treasures',
   selectedTreasure = save.starter,
@@ -1418,17 +1417,7 @@ function finishRun() {
   Object.assign(save, next);
   settled = true;
   rewards = result;
-  telemetry.track({
-    type: 'run-end',
-    ...lifeStats(),
-    stage: game.stage,
-    difficulty: game.difficulty,
-    result: game.state === 'won' ? 'won' : abandonConfirm ? 'abandon' : 'lost',
-    seconds: Math.round(game.time),
-    level: game.level,
-    kills: game.kills,
-  });
-  telemetry.flush();
+  trackRunEnd(game.state === 'won' ? 'won' : abandonConfirm ? 'abandon' : 'lost', game);
   if (game.state === 'won') {
     selectedStage = Math.min(STAGES.length - 1, game.stage + 1);
     // 结算时预载，返回首页已选中下一境；失败时由正式入场流程提供重试。
@@ -1562,6 +1551,20 @@ function renderRootReveal(previousLife = '前尘已散，新一世从十五岁�
   section.scrollTop = 0;
   section.tabIndex = -1;
   section.focus({ preventScroll: true });
+}
+function trackRunEnd(result: 'won' | 'lost' | 'abandon' | 'quit', game: Game) {
+  telemetry.track({
+    type: 'run-end',
+    ...lifeStats(),
+    stage: game.stage,
+    difficulty: game.difficulty,
+    ...(result === 'quit' && game.tribulation ? { tribulation: game.tribulation } : {}),
+    result,
+    seconds: Math.round(game.time),
+    level: game.level,
+    kills: game.kills,
+  });
+  telemetry.flush();
 }
 function lifeStats() {
   return {
@@ -1831,7 +1834,7 @@ function shellBindings(): ActionShell {
     get game() { return game; },
     set game(next) {
       game = next;
-      runQuit.tracked = false;
+      quitTracked = false;
     },
     get gameAudio() { return gameAudio; },
     get guideReturn() { return guideReturn; },
@@ -2484,14 +2487,10 @@ window.addEventListener('resize', () => {
   canvasDirty = true;
 });
 window.addEventListener('pagehide', () => {
-  trackRunQuitOnLeave(
-    runQuit,
-    game,
-    settled,
-    lifeStats,
-    (event) => telemetry.track(event),
-    () => telemetry.flush(),
-  );
+  if (game && !settled && !quitTracked && (game.state === 'playing' || game.state === 'paused')) {
+    quitTracked = true;
+    trackRunEnd('quit', game);
+  }
   if ((game && !settled) || inMortalWorld) persist();
 });
 window.addEventListener('storage', (event) => {

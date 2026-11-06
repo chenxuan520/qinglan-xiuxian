@@ -13,7 +13,7 @@ function harness() {
     game: null,
     save: { stones: 1 },
     panel: '',
-    runQuit: { tracked: false },
+    quitTracked: false,
   });
   new Script(`
     globalThis.structuredClone = function(value) {

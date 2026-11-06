@@ -64,6 +64,7 @@ test('结算保存失败保留原奖励，禁止won坏快照与旁路交互；�
       },
       telemetry: { track: () => {}, flush: () => {} },
       lifeStats: () => ({}),
+      trackRunEnd: () => {},
       abandonConfirm: false,
       selectedStage: 0,
       renderer: { prepareScene: () => Promise.resolve() },
