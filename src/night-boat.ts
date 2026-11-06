@@ -58,7 +58,7 @@ export function visitNightBoat(save: SaveData, lastVisitAge?: number, random = M
       : MEDICINES.filter((m) => m.tier === '珍品' && m.years > 0 === (kind === 'timed')).map(
           (m) => m.id,
         );
-  const ratio = kind === 'curio' ? 0.15 : kind === 'timed' ? 0.08 : 0.2;
+  const ratio = kind === 'curio' ? 0.35 : kind === 'timed' ? 0.2 : 0.4;
   save.mortal.nightBoat = {
     appearedAt: save.age,
     kind,

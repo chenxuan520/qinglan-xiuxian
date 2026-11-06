@@ -244,6 +244,13 @@ export function damageReport(game: Game | null) {
       color: passive('bone').color,
       damage: game.damageBySource.bone,
     });
+  if (game.damageBySource.altar)
+    rows.push({
+      id: 'altar',
+      name: '秘境祭坛',
+      color: STAGES[game.stage].color,
+      damage: game.damageBySource.altar,
+    });
   const other = Math.max(0, total - rows.reduce((sum, row) => sum + row.damage, 0));
   if (other > 0.01) rows.push({ id: '', name: '其他伤害', color: '#a7bbae', damage: other });
   rows.sort((a, b) => b.damage - a.damage);

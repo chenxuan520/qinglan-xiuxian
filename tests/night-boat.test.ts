@@ -8,7 +8,7 @@ import {
   validNightBoat,
   visitNightBoat,
 } from '../src/night-boat.ts';
-import { freshSave, lifespanInfo, realmCost, type SaveData } from '../src/progress.ts';
+import { freshSave, lifespanInfo, readSave, realmCost, type SaveData } from '../src/progress.ts';
 
 const cultivationAt = (realm: number) =>
   Array.from({ length: realm * 3 }, (_, step) => realmCost(step)).reduce(
@@ -75,14 +75,14 @@ test('出现概率30%边界，寿尽或其他终局不会再生成夜船', () =>
   assert.equal(save.mortal.nightBoat, null);
 });
 
-test('夜船40%奇物/40%限时珍品/20%本世珍品及15%/8%/20%折寿在出现时固定', () => {
+test('夜船40%奇物/40%限时珍品/20%本世珍品及35%/20%/40%折寿在出现时固定', () => {
   for (const [roll, kind, cost] of [
-    [0, 'curio', 750],
-    [0.399999999, 'curio', 750],
-    [0.4, 'timed', 400],
-    [0.799999999, 'timed', 400],
-    [0.8, 'permanent', 1000],
-    [0.999999999, 'permanent', 1000],
+    [0, 'curio', 1750],
+    [0.399999999, 'curio', 1750],
+    [0.4, 'timed', 1000],
+    [0.799999999, 'timed', 1000],
+    [0.8, 'permanent', 2000],
+    [0.999999999, 'permanent', 2000],
   ] as const) {
     const save = traveller();
     const before = structuredClone(save);
@@ -95,6 +95,24 @@ test('夜船40%奇物/40%限时珍品/20%本世珍品及15%/8%/20%折寿在出�
   }
 });
 
+test('已有存档的750年奇物夜船读档后保留原价并按原价换取', () => {
+  const save = traveller();
+  save.mortal.nightBoat = {
+    appearedAt: save.age,
+    kind: 'curio',
+    id: 'soul-wood',
+    cost: 750,
+    claimed: false,
+  };
+  const read = readSave(JSON.stringify(save));
+  assert.equal(read.status, 'ok');
+  assert.deepEqual(read.save.mortal.nightBoat, save.mortal.nightBoat);
+  assert.equal(read.save.mortal.nightBoat!.cost, 750);
+  assert.equal(claimNightBoat(read.save), true);
+  assert.equal(read.save.lifespanSpent, 750);
+  assert.equal(read.save.curios.bag['soul-wood'], 1);
+});
+
 test('八件奇物逐件排除已得或售出者，绝不出现掌天瓶，奇物池空时改成限时珍品', () => {
   for (const wanted of CURIO_IDS.slice(1)) {
     const save = traveller();
@@ -105,7 +123,7 @@ test('八件奇物逐件排除已得或售出者，绝不出现掌天瓶，奇�
     const boat = show(save, 0.1, 0.999999);
     assert.equal(boat.kind, 'curio');
     assert.equal(boat.id, wanted);
-    assert.equal(boat.cost, 750);
+    assert.equal(boat.cost, 1750);
   }
   const save = traveller();
   for (const id of CURIO_IDS.slice(1)) {
@@ -115,7 +133,7 @@ test('八件奇物逐件排除已得或售出者，绝不出现掌天瓶，奇�
   assert.equal(save.curios.acquired.includes('heaven-bottle'), false);
   const boat = show(save, 0.1, 0.999999);
   assert.equal(boat.kind, 'timed');
-  assert.equal(boat.cost, 400);
+  assert.equal(boat.cost, 1000);
   assert.equal(medicineInfo(boat.id)!.tier, '珍品');
   assert.ok(medicineInfo(boat.id)!.years > 0);
 });
@@ -194,13 +212,13 @@ test('换取三类物品只扣固定阳寿、不扣灵石或增加年岁，并�
 test('出现后突破仍按旧整数cost折寿，购买后至少保留当前基础寿元一成', () => {
   const save = traveller();
   const boat = show(save, 0.9);
-  assert.equal(boat.cost, 1000);
+  assert.equal(boat.cost, 2000);
   save.cultivation = cultivationAt(6);
   assert.equal(lifespanInfo(save).base, 10000);
-  assert.equal(boat.cost, 1000);
+  assert.equal(boat.cost, 2000);
   assert.equal(claimNightBoat(save), true);
-  assert.equal(save.lifespanSpent, 1000);
-  assert.equal(lifespanInfo(save).limit, 9000);
+  assert.equal(save.lifespanSpent, 2000);
+  assert.equal(lifespanInfo(save).limit, 8000);
   for (const offset of [-0.001, 0, 0.001]) {
     const boundary = traveller();
     const offer = show(boundary, 0.5);
@@ -242,15 +260,15 @@ test('夜船第三件奇物沿用奇珍有缘成就记录', () => {
 test('本世多次夜船折寿累计，按基础寿元而非延寿后的上限计价', () => {
   const save = traveller();
   save.lifespanBonus = 5000;
-  assert.equal(show(save, 0.5).cost, 400);
+  assert.equal(show(save, 0.5).cost, 1000);
   assert.equal(claimNightBoat(save), true);
   save.age += 2000;
   visitNightBoat(save, 2015, rolls(0, 0.5, 0));
-  assert.equal(save.mortal.nightBoat!.cost, 400);
+  assert.equal(save.mortal.nightBoat!.cost, 1000);
   assert.equal(claimNightBoat(save), true);
-  assert.equal(save.lifespanSpent, 800);
+  assert.equal(save.lifespanSpent, 2000);
   assert.equal(save.medicine.bag[save.mortal.nightBoat!.id], 2);
-  assert.equal(lifespanInfo(save).limit, 9200);
+  assert.equal(lifespanInfo(save).limit, 8000);
 });
 
 test('满药囊、非法库存、累计折寿溢出及非法字段全部原子拒绝', () => {
@@ -286,7 +304,7 @@ test('满药囊、非法库存、累计折寿溢出及非法字段全部原子�
     appearedAt: 2015,
     kind: 'timed',
     id: 'butian',
-    cost: 400,
+    cost: 1000,
     claimed: false,
   };
   const before = structuredClone(invalid);

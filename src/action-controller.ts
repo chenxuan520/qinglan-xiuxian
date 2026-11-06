@@ -450,6 +450,15 @@ export function dispatchAction(shell: ActionShell, action: string, id?: string) 
   }
   // 按原顺序逐组处理；分组返回 true 表示本次动作已处理完，不再交给后续分组。
   if (handleLockedState(shell, action)) return;
+  if (shell.game?.altar?.phase === 'prompt') {
+    if (shell.game.state !== 'paused' || shell.saveLock) return;
+    shell.clearInput();
+    if (action === 'leave-altar') shell.game.leaveAltar();
+    else if (action === 'accept-altar' && shell.game.canAcceptAltar) {
+      if (!shell.game.acceptAltar()) shell.renderPause();
+    } else shell.renderPause();
+    return;
+  }
   if (
     shell.panel === 'settlement-retry' &&
     !shell.settled &&

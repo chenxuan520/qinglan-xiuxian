@@ -52,7 +52,7 @@ import {
   victoryModal,
 } from './lobby-ui.ts';
 import { enterTownVisit, executeMortalAction, marketAmbushPanel } from './town-host.ts';
-import { computeManualInput, trapModalTab } from './input-controller.ts';
+import { altarPromptKey, computeManualInput, trapModalTab } from './input-controller.ts';
 import { destinationInput } from './walk-navigation.ts';
 import { dispatchAction, type ActionShell } from './action-controller.ts';
 import * as sceneFlow from './scene-flow.ts';
@@ -2366,6 +2366,14 @@ document.addEventListener('keydown', (event) => {
     return;
   if (trapModalTab(event, modal)) return;
   if (saveLock) return;
+  if (game?.altar?.phase === 'prompt') {
+    const action = altarPromptKey(game, event);
+    if (action) {
+      event.preventDefault();
+      handleAction(action);
+    }
+    return;
+  }
   const key = event.key.toLowerCase();
   if (key === 'escape' || key === 'p') {
     if (event.repeat) return;

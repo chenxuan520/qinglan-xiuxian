@@ -17,6 +17,7 @@ export interface Enemy extends Point {
   hp: number;
   maxHp: number;
   lastHurtAt?: number;
+  frozenUntil?: number;
   radius: number;
   speed: number;
   damage: number;

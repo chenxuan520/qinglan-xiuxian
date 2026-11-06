@@ -1,3 +1,4 @@
+import { validAltarState } from './altars.ts';
 import { BOSS_MECHANICS, SOVEREIGN_GOLD, validBossMotion } from './boss-mechanics.ts';
 import { bossSkills } from './boss-skills.ts';
 import { isCurio, acquiredCurio } from './curio-data.ts';
@@ -116,6 +117,17 @@ export function validateRunSnapshot(
       s.rerolls > 3
     )
       return null;
+    if (
+      s.altar != null &&
+      (s.tribulation ||
+        s.stage >= FINAL_TRIAL_STAGE ||
+        !validAltarState(s.altar, s.stage, STAGES[s.stage].minutes * 60, s.time))
+    )
+      return null;
+    if (s.altar?.phase === 'prompt' && s.state !== 'paused') return null;
+    if (s.altarHealthScale !== undefined && ![1, 0.8].includes(s.altarHealthScale)) return null;
+    if (s.altarHealthScale === 0.8 && (s.altar?.kind !== 'soul' || s.altar.phase !== 'accepted'))
+      return null;
     if (typeof s.trialBossBlocked !== 'boolean') return null;
     for (const key of ['sovereignRecoveryAnnounced', 'sovereignRecoveryPending'] as const)
       if (s[key] !== undefined && typeof s[key] !== 'boolean') return null;
@@ -137,6 +149,10 @@ export function validateRunSnapshot(
         ))
     )
       return null;
+    const altarCorrosion =
+      s.altar?.kind === 'poison' && s.altar.phase === 'accepted'
+        ? Math.max(0, s.altar.damageUntil - s.time)
+        : 0;
     for (const [duration, limit] of [
       ['immobilized', ENEMY_CONTROL.bind],
       ['sealed', ENEMY_CONTROL.seal],
@@ -145,7 +161,9 @@ export function validateRunSnapshot(
     ] as const)
       if (
         s[duration] !== undefined &&
-        (!Number.isFinite(s[duration]) || s[duration] < 0 || s[duration] > limit)
+        (!Number.isFinite(s[duration]) ||
+          s[duration] < 0 ||
+          s[duration] > (duration === 'corroded' ? Math.max(limit, altarCorrosion + 1e-8) : limit))
       )
         return null;
     for (const key of ['nextEnemyBindAt', 'nextEnemySealAt', 'nextEnemyEntangleAt'] as const)
@@ -261,6 +279,11 @@ export function validateRunSnapshot(
           ]) &&
           ENEMIES[e.type] &&
           (e.lastHurtAt === undefined || Number.isFinite(e.lastHurtAt)) &&
+          (e.frozenUntil === undefined ||
+            (!e.boss &&
+              Number.isFinite(e.frozenUntil) &&
+              e.frozenUntil >= 0 &&
+              e.frozenUntil <= s.time + 8 + 1e-8)) &&
           (e.bossSummon === undefined ||
             (!!e.bossSummon &&
               !e.boss &&

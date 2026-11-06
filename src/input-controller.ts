@@ -1,3 +1,12 @@
+import type { Game } from './game.ts';
+
+export function altarPromptKey(game: Game | null, event: KeyboardEvent) {
+  if (game?.state !== 'paused' || game.altar?.phase !== 'prompt' || event.repeat) return null;
+  if (event.key === '1') return 'accept-altar';
+  if (event.key === 'Escape') return 'leave-altar';
+  return null;
+}
+
 export function trapModalTab(event: KeyboardEvent, modal: HTMLElement): boolean {
   if (event.key !== 'Tab' || !modal.innerHTML) return false;
   const elements = [

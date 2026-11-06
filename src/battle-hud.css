@@ -1,5 +1,97 @@
 /* 战斗顶部信息与操作区。通用按钮、音量面板及全屏按钮仍由 style.css 管理。
  * 媒体规则保留原先的覆盖顺序；本文件在 style.css 之后、其他功能样式之前加载。 */
+
+.upgrade-panel.altar-panel {
+  width: min(380px, 100%);
+}
+.choice-card.altar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  padding: 24px;
+}
+.choice-card.altar-card:hover {
+  transform: none;
+  border-color: #b6c79767;
+  box-shadow: 0 15px 60px #061e2655;
+}
+.altar-card .choice-art {
+  position: static;
+  width: 100%;
+  height: 72px;
+  color: var(--item-color);
+  font-size: 44px;
+}
+.altar-card h3 {
+  padding: 0;
+  text-align: center;
+}
+.altar-card p {
+  margin: 0;
+  min-height: 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.altar-card .altar-cost {
+  color: #e3ca94;
+}
+.altar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.altar-actions button {
+  flex: 1 1 130px;
+  padding-inline: 14px;
+}
+.altar-actions button:disabled {
+  opacity: 1;
+  color: #d2dbd5;
+  background: #40564b;
+}
+.guide-altar-table th,
+.guide-altar-table td {
+  text-align: left;
+  vertical-align: top;
+}
+.guide-altar-table th:first-child {
+  width: 6em;
+  white-space: nowrap;
+}
+.altar-guide-label {
+  display: none;
+}
+@media (max-width: 600px) {
+  .guide-altar-table,
+  .guide-altar-table caption,
+  .guide-altar-table tbody,
+  .guide-altar-table tr,
+  .guide-altar-table th,
+  .guide-altar-table td {
+    display: block;
+  }
+  .guide-altar-table thead {
+    display: none;
+  }
+  .guide-altar-table tr {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .guide-altar-table th,
+  .guide-altar-table td {
+    padding: 4px 0;
+    border-bottom: 0;
+  }
+  .guide-altar-table th {
+    color: #dad9b5;
+    font-size: 14px;
+  }
+  .altar-guide-label {
+    display: inline;
+    color: #dad9b5;
+  }
+}
 .game-hud {
   position: absolute;
   top: 32px;

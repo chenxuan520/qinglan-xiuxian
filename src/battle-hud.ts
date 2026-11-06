@@ -21,6 +21,7 @@ import { icon } from './icons.ts';
 import type { MobileDisplay } from './mobile-display.ts';
 import { HudLayout } from './hud-layout.ts';
 import { comboTreasure, curioCombo } from './curio-combos.ts';
+import { altarHudStatus } from './altar-ui.ts';
 
 // 只承接仙尊首次回元：模拟步不能替代前台绘制确认，正常提示保持独立。
 export class SovereignRecoveryNotice {
@@ -185,7 +186,8 @@ export class BattleHud {
     if (cachePrompt) {
       const c = game.cacheChallenge;
       const shown = !!c && ['offered', 'active'].includes(c.phase) && game.state === 'playing';
-      cachePrompt.hidden = !shown;
+      const altarStatus = shown ? '' : altarHudStatus(game);
+      cachePrompt.hidden = !shown && !altarStatus;
       if (shown && c) {
         const dx = c.x - game.player.x,
           dy = c.y - game.player.y;
@@ -204,7 +206,7 @@ export class BattleHud {
                 : `正在开阵 · ${Math.round(game.cacheApproachProgress * 100)}%`
               : `守匣灵阵 ${direction} ${Math.round(Math.hypot(dx, dy))} 步 · 入阵停留自动挑战`,
         );
-      }
+      } else set('cache-status', altarStatus);
     }
     const medicines = activeMedicines(save.medicine, save.age).map(
       (m) =>

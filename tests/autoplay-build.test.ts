@@ -21,7 +21,7 @@ function game(mode: AutoplayBuildMode = 'default', path: 'orthodox' | 'demonic' 
     save.starter = 'orbit';
     save.artifacts.push('orbit');
   }
-  return new Game(save, 0, 0, seeded(82));
+  return new Game(save, 0, 0, seeded(82), path, seeded(913));
 }
 test('新设置默认沿用原策略，旧档升级保留进度，非法本地设置安全回退', () => {
   assert.deepEqual(freshSave().autoplayBuild, defaultAutoplayBuild());

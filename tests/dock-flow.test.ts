@@ -307,7 +307,7 @@ test('夜船与lifespanSpent在本机读档、导出导入和未完历练续局�
     assert.ok(file.run);
     for (const restored of [local.save, file.save]) {
       assert.equal(restored.schema, SAVE_SCHEMA);
-      assert.equal(restored.lifespanSpent, claimed ? 400 : 0);
+      assert.equal(restored.lifespanSpent, claimed ? 1000 : 0);
       assert.deepEqual(restored.mortal.nightBoat, save.mortal.nightBoat);
       assert.deepEqual(lifespanInfo(restored), lifespanInfo(save));
       assert.equal(restored.factsTampered, false);

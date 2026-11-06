@@ -6,7 +6,7 @@ import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
 import { hazardMargin } from './regional-hazards.ts';
 import { CACHE_CHALLENGE, ENEMIES, ENEMY_TACTICS, FINAL_TRIAL_STAGE, STAGES, TAU } from './data.ts';
 import type { CultivationPath, ElementId } from './data.ts';
-import type { Game, Point } from './game.ts';
+import type { Enemy, Game, Point } from './game.ts';
 import { spriteFrame } from './sprites.ts';
 import { assetUrl } from './asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
@@ -15,6 +15,7 @@ import { drawPlayerFormation } from './player-formation.ts';
 import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
 import { ModuleSource, retryModule } from './module-source.ts';
 import { BattleResolution } from './battle-resolution.ts';
+import { altarDefinition } from './altar-ui.ts';
 
 type BattleArt = typeof import('./battle-art.ts');
 interface SpriteTexture {
@@ -34,6 +35,7 @@ export class Renderer {
   private sprites = new Map<string, SpriteTexture>();
   private formations = new Map<string, HTMLCanvasElement>();
   private glowSprites = new Map<string, HTMLCanvasElement>();
+  private frozenHeart: HTMLCanvasElement | null = null;
   private shade: CanvasGradient | null = null;
   private dangerShade: CanvasGradient | null = null;
   private previewShade: CanvasGradient | null = null;
@@ -517,6 +519,39 @@ export class Renderer {
       }
       c.restore();
     }
+    const altar = game.altar;
+    const altarInfo = altarDefinition(game);
+    if (
+      altar &&
+      altarInfo &&
+      ['offered', 'prompt'].includes(altar.phase) &&
+      this.visible(altar, p, 70)
+    ) {
+      const color = STAGES[game.stage].color;
+      c.save();
+      this.formation(altar.x, altar.y, 45, time * 0.3, color, 0.65);
+      c.strokeStyle = color;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(
+        altar.x,
+        altar.y,
+        50,
+        -Math.PI / 2,
+        -Math.PI / 2 + TAU * Math.max(0, Math.min(1, (altar.expiresAt - time) / 30)),
+      );
+      c.stroke();
+      c.textAlign = 'center';
+      c.font = '16px serif';
+      c.lineWidth = 4;
+      c.strokeStyle = '#173b35';
+      c.fillStyle = color;
+      c.strokeText(altarInfo.name, altar.x, altar.y - 62);
+      c.fillText(altarInfo.name, altar.x, altar.y - 62);
+      c.font = 'bold 24px serif';
+      c.fillText(altarInfo.glyph, altar.x, altar.y + 8);
+      c.restore();
+    }
     const cache = game.cacheChallenge;
     if (
       cache &&
@@ -582,6 +617,7 @@ export class Renderer {
         flash: 0,
         charge: 0,
         cooldown: 0,
+        frozenUntil: 0,
         dx: 0,
         dy: 0,
         maxHp: p.maxHp,
@@ -604,14 +640,19 @@ export class Renderer {
         );
         c.globalAlpha = 1;
       } else {
+        const frozen = !e.boss && (e.frozenUntil ?? 0) > game.time;
         if ('bossSummon' in e && e.bossSummon) {
+          if (frozen && e.bossSummon.kind === 'heart') {
+            this.drawFrozenHeart(e);
+            continue;
+          }
           this.battleArt!.drawBossSummon(c, e);
           if (e.bossSummon.kind === 'heart') continue;
         }
         if (e.illusionOf !== undefined) {
           c.save();
           c.globalAlpha = 0.38;
-          this.sprite(STAGES[4].sprite, e.x, e.y, e.radius * 3.1, 1, false);
+          this.sprite(STAGES[4].sprite, e.x, e.y, e.radius * 3.1, 1, false, 'orthodox', frozen);
           c.globalAlpha = 0.85;
           c.fillStyle = '#d8c6ed';
           c.font = '14px serif';
@@ -704,6 +745,8 @@ export class Renderer {
           e.radius * 3.1,
           e.x < p.x ? 1 : -1,
           e.flash > 0,
+          'orthodox',
+          frozen,
         );
         if (e.hp < e.maxHp || e.elite) {
           c.fillStyle = '#142623bb';
@@ -1088,6 +1131,27 @@ export class Renderer {
       Math.abs(at.y - camera.y) < this.height / this.scale / 2 + margin
     );
   }
+  private drawFrozenHeart(enemy: Enemy) {
+    // 木心由Canvas绘成，复用一张临时纹理做同样的整体染色，保留原招式绘制。
+    if (!this.frozenHeart) {
+      this.frozenHeart = document.createElement('canvas');
+      this.frozenHeart.width = this.frozenHeart.height = 256;
+    }
+    const canvas = this.frozenHeart;
+    const context = canvas.getContext('2d')!;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.save();
+    context.scale(2, 2);
+    context.translate(64 - enemy.x, 64 - enemy.y);
+    this.battleArt!.drawBossSummon(context, enemy);
+    context.restore();
+    context.save();
+    context.globalCompositeOperation = 'source-atop';
+    context.fillStyle = 'rgba(179, 220, 240, 0.35)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.restore();
+    this.ctx.drawImage(canvas, enemy.x - 64, enemy.y - 64, 128, 128);
+  }
   private sprite(
     index: number,
     x: number,
@@ -1096,6 +1160,7 @@ export class Renderer {
     facing = 1,
     flash = false,
     path: CultivationPath = 'orthodox',
+    frozen = false,
   ) {
     const c = this.ctx;
     c.save();
@@ -1105,7 +1170,7 @@ export class Renderer {
     c.beginPath();
     c.ellipse(0, 11, size * 0.25, size * 0.09, 0, 0, TAU);
     c.fill();
-    const key = `${index}:${size}:${flash}:${index === 0 ? path : ''}`;
+    const key = `${index}:${size}:${flash}:${index === 0 ? path : ''}:${frozen}`;
     let sprite = this.sprites.get(key);
     if (!sprite) {
       const playerFrame = index === 0 ? playerSpriteFrame(path) : undefined;
@@ -1131,6 +1196,12 @@ export class Renderer {
           canvas.width,
           canvas.height,
         );
+        if (frozen) {
+          context.filter = 'none';
+          context.globalCompositeOperation = 'source-atop';
+          context.fillStyle = 'rgba(179, 220, 240, 0.35)';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+        }
         sprite = { canvas, width, height, artScale: playerFrame?.scale ?? 1 };
         // 静态裁切与展示尺寸一起复用；尺寸/闪光/路线仍各自独立，长局缓存有界。
         if (this.sprites.size >= 256) this.sprites.delete(this.sprites.keys().next().value!);

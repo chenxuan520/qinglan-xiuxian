@@ -151,7 +151,7 @@ test('事实版本升级严格先核原档，再迁移与重封；迁移前改�
 
 test('养魂木计分升级到v3/当前格式：真实v2本地与文件先验旧摘要，再迁移，改档仍标记', () => {
   assert.equal(FACTS_VERSION, 3);
-  assert.equal(SAVE_SCHEMA, 44);
+  assert.equal(SAVE_SCHEMA, 45);
   const base = freshSave('heaven', ['metal'], 'dual', () => 0.5);
   base.training = { vitality: 10, power: 10, speed: 10 };
   base.curios.bag['soul-wood'] = 1;

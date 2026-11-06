@@ -7,6 +7,7 @@ import {
   type TrailPoint,
 } from './boss-mechanics.ts';
 import { enemyCombatStats } from './enemy-stats.ts';
+import { ALTARS, createAltar, type AltarState } from './altars.ts';
 import { recordBestiarySeen } from './bestiary-seen.ts';
 import { ownsCurio, bossCurio, soulWoodMultiplier } from './curio-data.ts';
 import { curioCombo, treasureDisplayName, windThunderCombo } from './curio-combos.ts';
@@ -119,6 +120,7 @@ import {
   syncTribulationClock,
   tribulationDue,
   gainCultivation,
+  lifespanInfo,
 } from './progress.ts';
 import type { SaveData } from './progress.ts';
 import { BOSS_ENTRANCE_DURATION } from './boss-entrance.ts';
@@ -127,6 +129,8 @@ import { REALM_BREAKTHROUGH_COLORS, REALM_BREAKTHROUGH_DURATION } from './realm-
 const distanceSquared = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const SOVEREIGN_RECOVERY_NOTICE = '九天执劫仙尊 · 劫息回元';
+// 模拟器会临时替换 Math.random；祭坛默认源保留独立引用，不进入该随机序列。
+const defaultAltarRandom = Math.random;
 
 // 只计数，不分配临时筛选数组；每次仍按原顺序完整扫描当前集合。
 function countMatching<T>(items: T[], matches: (item: T) => boolean) {
@@ -185,6 +189,9 @@ export class Game {
   damageBySource: Record<string, number> = {};
   bossCultivation = 0;
   revivesUsed = 0;
+  altar: AltarState | null = null;
+  altarHealthScale: 1 | 0.8 = 1;
+  private altarRandom: () => number;
   cacheChallenge: CacheChallenge | null = null;
   private cacheApproachStartedAt: number | null = null;
   private nextEnemySlowAt = 0;
@@ -224,6 +231,7 @@ export class Game {
     difficulty: number,
     random: () => number = Math.random,
     path: CultivationPath = save.mortal.member ? passive(save.mortal.member.id).school : save.path,
+    altarRandom: () => number = defaultAltarRandom,
   ) {
     this.save = save;
     this.medicine = medicineEffects(save.medicine, save.age);
@@ -232,6 +240,8 @@ export class Game {
     this.nextElite = this.eliteInterval;
     this.difficulty = difficulty;
     this.random = random;
+    this.altarRandom = altarRandom;
+    this.altar = createAltar(stage, this.stageDuration, altarRandom);
     this.path = path;
     this.spiritRoot = save.spiritRoot;
     this.rootElements = [...save.rootElements];
@@ -265,7 +275,8 @@ export class Game {
         (1 + this.save.retreatBonus.vitality / 100) *
         realmHealthMultiplier(this.realm) *
         medicineHp *
-        (ownsCurio(this.save, 'sacred-fragment') ? 1.2 : 1),
+        (ownsCurio(this.save, 'sacred-fragment') ? 1.2 : 1) *
+        this.altarHealthScale,
     );
   }
   get boss() {
@@ -329,6 +340,7 @@ export class Game {
       source?.path ?? save.path,
     );
     g.tribulation = save.tribulations + 1;
+    g.altar = null;
     if (source) {
       g.spiritRoot = source.spiritRoot;
       g.rootElements = [...source.rootElements];
@@ -421,7 +433,8 @@ export class Game {
         (1 - (this.passives.bone || 0) * 0.01 * this.medicine.drawback) *
         (this.slowed > 0 ? 1 - 0.25 * this.medicine.drawback : 1) *
         this.medicine.speed *
-        (this.windThunderActive ? 1.2 : ownsCurio(this.save, 'wind-wings') ? 1.15 : 1),
+        (this.windThunderActive ? 1.2 : ownsCurio(this.save, 'wind-wings') ? 1.15 : 1) *
+        ((this.altar?.slowUntil ?? 0) > this.time ? 0.75 : 1),
       crit: Math.min(0.85, root.baseCrit + crit * 0.07 + curse * 0.08 + this.medicine.crit),
       criticalDamage: 1.8 + curse * 0.12,
       armor:
@@ -527,6 +540,8 @@ export class Game {
       startedImmortal: this.startedImmortal,
       version: 2,
       realmScaling: 3,
+      altar: this.altar ? { ...this.altar } : null,
+      altarHealthScale: this.altarHealthScale,
       cacheChallenge: this.cacheChallenge
         ? { ...this.cacheChallenge, guardians: [...this.cacheChallenge.guardians] }
         : null,
@@ -612,11 +627,19 @@ export class Game {
       medicineHpFactor: this.medicine.hp,
     };
   }
-  static restore(save: SaveData, raw: unknown): Game | null {
+  static restore(
+    save: SaveData,
+    raw: unknown,
+    altarRandom: () => number = defaultAltarRandom,
+  ): Game | null {
     try {
       const s = validateRunSnapshot(save, raw);
       if (!s) return null;
-      const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual');
+      // 恢复只读取已经抽定的祭坛，不重新抽取出现时刻。
+      const g = new Game(save, s.stage, s.difficulty, Math.random, s.path ?? 'dual', () => 0);
+      g.altarRandom = altarRandom;
+      g.altar = s.altar ? { ...s.altar } : null;
+      g.altarHealthScale = s.altarHealthScale ?? 1;
       g.trialBossBlocked = s.trialBossBlocked;
       g.cacheChallenge = s.cacheChallenge
         ? { ...s.cacheChallenge, guardians: [...s.cacheChallenge.guardians] }
@@ -772,7 +795,12 @@ export class Game {
         if (!s.damageBySource || typeof s.damageBySource !== 'object') return null;
         for (const [id, amount] of Object.entries(s.damageBySource)) {
           if (
-            !(TREASURES.some((t) => t.id === id) || id === 'bone' || id === 'other') ||
+            !(
+              TREASURES.some((t) => t.id === id) ||
+              id === 'bone' ||
+              id === 'other' ||
+              id === 'altar'
+            ) ||
             !Number.isFinite(amount) ||
             amount < 0
           )
@@ -838,7 +866,7 @@ export class Game {
     }
   }
   resume() {
-    if (this.state === 'paused') this.state = 'playing';
+    if (this.state === 'paused' && this.altar?.phase !== 'prompt') this.state = 'playing';
   }
   update(dt: number) {
     if (this.state !== 'playing' || dt <= 0) return;
@@ -891,17 +919,19 @@ export class Game {
     this.immobilized = Math.max(0, this.immobilized - dt);
     this.sealed = Math.max(0, this.sealed - dt);
     this.entangled = Math.max(0, this.entangled - dt);
-    this.corroded = Math.max(0, this.corroded - dt);
+    this.corroded = Math.max(0, this.corroded - dt, (this.altar?.damageUntil ?? 0) - this.time);
     const p = this.player,
       stats = this.stats;
     p.invincible = Math.max(0, p.invincible - dt);
     this.heal(stats.regen * dt);
+    this.#updateAltarEffects(dt);
     if (this.burning.life > 0) {
       const elapsed = Math.min(dt, this.burning.life);
       const damage = this.burning.damage * (elapsed / this.burning.life);
       this.burning.damage -= damage;
       this.burning.life = Math.max(0, this.burning.life - elapsed);
       if (!this.#blockComboDamage(damage)) p.hp = Math.max(0, p.hp - damage);
+      this.#preserveAltarLife();
       if (p.hp === 0) {
         this.state = 'lost';
         this.clearSovereignSkills();
@@ -980,6 +1010,7 @@ export class Game {
     this.updateZones(dt);
     this.updateCacheChallenge();
     this.updatePickups(dt);
+    this.#updateAltar(dt);
     for (const e of this.effects) {
       e.life -= dt;
       if (e.kind === 'text') e.y -= dt * 28;
@@ -1271,6 +1302,26 @@ export class Game {
     const progress = this.combatProgress;
     for (const e of this.enemies) {
       if (e.dead) continue;
+      if (!e.boss && (e.frozenUntil ?? 0) > this.time) {
+        e.flash = Math.max(0, e.flash - dt);
+        // 冻结暂停技能与扑击轮次，不延长召唤狼原有的六息寿命。
+        if (
+          e.bossSummon &&
+          !this.enemies.some((owner) => owner.id === e.summonedBy && !owner.dead)
+        ) {
+          e.dead = true;
+          continue;
+        }
+        if (e.bossSummon?.kind === 'wolf') {
+          e.bossSummon.age += dt;
+          if (
+            e.bossSummon.age > BOSS_MECHANICS.wolfLife ||
+            !this.enemies.some((owner) => owner.id === e.summonedBy && !owner.dead)
+          )
+            e.dead = true;
+        }
+        continue;
+      }
       if (
         this.isFinalTrial &&
         e.boss &&
@@ -2808,7 +2859,7 @@ export class Game {
           this.areaDamage(b, radius, b.damage * 0.65, 'fire', 'fire', b.bossAttack);
           this.#effect(b.x, b.y, 0.45, radius, b.color, 'impact');
         }
-        if (b.kind === 'dragon') {
+        if (b.kind === 'dragon' && (e.boss || (e.frozenUntil ?? 0) <= this.time)) {
           const d = distance(e, this.player) || 1;
           e.x += ((e.x - this.player.x) / d) * 25;
           e.y += ((e.y - this.player.y) / d) * 25;
@@ -2893,7 +2944,7 @@ export class Game {
         const pull = this.#activeCombo('vortex') ? 75 : 60;
         for (const e of this.enemies) {
           const d = distance(e, z);
-          if (d < z.radius && d > 10 && !e.boss) {
+          if (d < z.radius && d > 10 && !e.boss && (e.frozenUntil ?? 0) <= this.time) {
             e.x += ((z.x - e.x) / d) * pull * dt;
             e.y += ((z.y - e.y) / d) * pull * dt;
           }
@@ -2903,7 +2954,8 @@ export class Game {
         z.tick = 0.5;
         if (z.hostile) {
           if (
-            ((this.tribulation && z.kind === 'blast') || z.kind === 'boss-judgement') &&
+            (((this.tribulation || this.altar?.kind === 'thunder') && z.kind === 'blast') ||
+              z.kind === 'boss-judgement') &&
             z.life > 0
           )
             this.#effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
@@ -3064,7 +3116,7 @@ export class Game {
     this.#ailmentNotice('entangle', '藤缠 · 暂难拾取');
   }
   private enemyCorrode() {
-    this.corroded = this.#ctl('corrode');
+    this.corroded = Math.max(this.#ctl('corrode'), (this.altar?.damageUntil ?? 0) - this.time);
     this.#ailmentNotice('corrode', '蚀体 · 无法回复');
   }
   #ailmentNotice(kind: string, message: string) {
@@ -3145,6 +3197,162 @@ export class Game {
       this.enemyField(e, 0, 0, 50, 2.4, e.damage * 0.35, '#bdcc79', 'enemy-miasma');
     if (tactics.boundSummons)
       for (const child of this.enemies) if (child.summonedBy === e.id) child.dead = true;
+  }
+  get altarCostYears() {
+    const limit = lifespanInfo(this.save).limit;
+    return Number.isFinite(limit) ? Math.round(limit * 2) / 10 : 0;
+  }
+  get canAcceptAltar() {
+    return (
+      this.state === 'paused' &&
+      this.altar?.phase === 'prompt' &&
+      !this.save.autoplay &&
+      !this.tribulation &&
+      !this.bossSpawned &&
+      this.player.hp > 0 &&
+      !this.expired &&
+      (this.altar.kind !== 'wood' ||
+        this.save.age + this.altarCostYears < lifespanInfo(this.save).limit)
+    );
+  }
+  acceptAltar() {
+    const a = this.altar;
+    if (!a || !this.canAcceptAltar) return false;
+    a.phase = 'accepted';
+    const until = (seconds: number) => Math.min(this.stageDuration, this.time + seconds);
+    switch (a.kind) {
+      case 'wood':
+        this.save.age += this.altarCostYears;
+        if (this.elapsedYears !== undefined) this.elapsedYears += this.altarCostYears;
+        this.heal(this.player.maxHp);
+        a.regenUntil = until(20);
+        break;
+      case 'fire':
+        this.player.hp = Math.max(1, this.player.hp - Math.floor(this.player.hp * 0.3));
+        for (const e of [...this.enemies])
+          if (!e.dead && !e.boss)
+            this.hitEnemy(
+              e,
+              e.maxHp * (e.elite || e.bossSummon?.kind === 'heart' ? 0.15 : 0.5),
+              false,
+              'altar',
+            );
+        break;
+      case 'ice':
+        for (const e of this.enemies) if (!e.dead && !e.boss) e.frozenUntil = until(8);
+        a.slowUntil = until(20);
+        break;
+      case 'poison':
+        a.damageUntil = until(30);
+        this.corroded = Math.max(this.corroded, a.damageUntil - this.time);
+        break;
+      case 'soul':
+        a.deathUntil = until(30);
+        this.altarHealthScale = 0.8;
+        this.player.maxHp = Math.max(1, this.#maximumHealth());
+        this.player.hp = Math.min(this.player.hp, this.player.maxHp);
+        break;
+      case 'thunder':
+        a.thunderUntil = until(30);
+        a.nextThunderAt = this.time + 2;
+        a.nextBacklashAt = this.time + 6;
+        break;
+    }
+    this.announce(`${ALTARS[this.stage].name} · 已献祭`);
+    this.resume();
+    this.onEvent('altar');
+    return true;
+  }
+  leaveAltar() {
+    if (this.state !== 'paused' || this.altar?.phase !== 'prompt') return;
+    this.altar.phase = 'offered';
+    this.altar.left = false;
+    this.resume();
+    this.onEvent('altar');
+  }
+  #preserveAltarLife() {
+    if (this.player.hp <= 0 && (this.altar?.deathUntil ?? 0) > this.time && !this.expired)
+      this.player.hp = 1;
+  }
+  #updateAltarEffects(dt: number) {
+    const a = this.altar;
+    if (!a || a.phase !== 'accepted') return;
+    const healingTime = Math.min(dt, Math.max(0, a.regenUntil - (this.time - dt)));
+    if (healingTime > 0) this.heal(this.player.maxHp * 0.02 * healingTime);
+    if (a.kind !== 'thunder') return;
+    while (a.nextThunderAt <= Math.min(this.time, a.thunderUntil) + 1e-8) {
+      a.nextThunderAt += 2;
+      const targets = this.enemies.filter(
+        (e) => !e.dead && !e.boss && distance(e, this.player) <= 600,
+      );
+      const starter = this.weapons[0];
+      const damage = this.weaponHitDamage(starter) * 5;
+      for (let i = 0; i < 3 && targets.length; i++) {
+        const [e] = targets.splice(Math.floor(this.altarRandom() * targets.length), 1);
+        this.#effect(e.x, e.y, 0.35, 30, STAGES[5].color, 'lightning');
+        this.hitEnemy(e, damage, false, 'altar');
+      }
+    }
+    while (a.nextBacklashAt <= Math.min(this.time, a.thunderUntil) + 1e-8) {
+      a.nextBacklashAt += 6;
+      // 不让最后一道预警越过妖王登场；其余落雷的伤害/预警保持一致。
+      const life = Math.min(0.15, this.stageDuration - this.time - 1);
+      if (life > 0)
+        this.zone(
+          this.player.x,
+          this.player.y,
+          60,
+          life,
+          this.player.maxHp * 0.15,
+          STAGES[5].color,
+          'blast',
+          1,
+          true,
+        );
+    }
+  }
+  #updateAltar(dt: number) {
+    const a = this.altar;
+    if (
+      !a ||
+      this.tribulation ||
+      this.isFinalTrial ||
+      this.state !== 'playing' ||
+      this.player.hp <= 0
+    )
+      return;
+    const latest = this.stageDuration - 60;
+    if (a.phase === 'pending' && this.time >= a.spawnAt) {
+      if (this.bossSpawned || (this.time > latest + 1e-8 && this.time - dt > a.spawnAt + 1e-8))
+        a.phase = 'gone';
+      else if (!['offered', 'active'].includes(this.cacheChallenge?.phase ?? '')) {
+        const angle = this.altarRandom() * TAU;
+        const radius = 300 + this.altarRandom() * 150;
+        a.x = this.player.x + Math.cos(angle) * radius;
+        a.y = this.player.y + Math.sin(angle) * radius;
+        a.expiresAt = Math.min(this.time, latest) + 30;
+        a.phase = 'offered';
+        this.announce(`${STAGES[this.stage].name} · ${ALTARS[this.stage].name} 现世`);
+        this.onEvent('altar');
+      }
+    }
+    if (a.phase !== 'offered') return;
+    if (this.time >= a.expiresAt || this.bossSpawned) {
+      a.phase = 'gone';
+      this.announce(`${ALTARS[this.stage].name}隐去`);
+      this.onEvent('altar');
+      return;
+    }
+    const nearby = distance(a, this.player) <= 70;
+    if (!nearby) a.left = true;
+    else if (a.left) {
+      a.left = false;
+      if (!this.save.autoplay) {
+        a.phase = 'prompt';
+        this.pause();
+        this.onEvent('altar');
+      }
+    }
   }
   get cacheNearby() {
     const c = this.cacheChallenge;
@@ -3299,7 +3507,7 @@ export class Game {
       if (e.dead || distanceSquared(at, e) > (radius + e.radius) ** 2) continue;
       this.hitEnemy(e, damage, false, source, attack);
       if (['ice', 'banner', 'nest'].includes(kind)) e.slow = 2.5 * this.stats.duration;
-      if ((kind === 'pulse' || kind === 'axe') && !e.boss) {
+      if ((kind === 'pulse' || kind === 'axe') && !e.boss && (e.frozenUntil ?? 0) <= this.time) {
         const d = distance(e, at) || 1;
         e.x += ((e.x - at.x) / d) * 70;
         e.y += ((e.y - at.y) / d) * 70;
@@ -3337,7 +3545,7 @@ export class Game {
       );
       if (distance(e, { x: from.x + dx * t, y: from.y + dy * t }) > width + e.radius) continue;
       this.hitEnemy(e, damage, false, source, attack);
-      if (pull && !e.boss) {
+      if (pull && !e.boss && (e.frozenUntil ?? 0) <= this.time) {
         const d = distance(e, from) || 1;
         // 保留牵引，但在双方碰撞半径之外留出走位余地；近身怪不再向内拉。
         const pullDistance = Math.min(40, Math.max(0, d - e.radius - 13 - 40));
@@ -3348,8 +3556,12 @@ export class Game {
     }
   }
   hitEnemy(e: Enemy, damage: number, crit = false, source = 'other', attack?: BossAttack) {
-    if (e.dead) return;
-    damage *= this.#comboDamage(source);
+    if (e.dead || (source === 'altar' && e.boss)) return;
+    if (source !== 'altar') damage *= this.#comboDamage(source);
+    if (!e.boss) {
+      if ((this.altar?.damageUntil ?? 0) > this.time) damage *= 1.4;
+      if ((e.frozenUntil ?? 0) > this.time) damage *= 1.3;
+    }
     if (e.illusionOf !== undefined) {
       if (damage > 0) e.dead = true;
       return;
@@ -3366,7 +3578,7 @@ export class Game {
       // 同一火球的直击与爆炸共用系数，不改弹丸本身伤害，以免削弱周围小怪群伤。
       damage *= multiplier;
     }
-    if (e.elite || e.boss) damage *= this.eliteDamage;
+    if (source !== 'altar' && (e.elite || e.boss)) damage *= this.eliteDamage;
     if (this.tribulation) {
       if (!this.tribulationVulnerable) return;
       damage = Math.min(
@@ -3381,19 +3593,21 @@ export class Game {
       this.tribulationOpeningDamage += damage;
     }
     if (this.passives.abyss) e.slow = Math.max(e.slow, this.passivePower('abyss') * 0.15);
-    if (!e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5) damage *= 0.45;
+    if (source !== 'altar' && !e.boss && ENEMIES[e.type].behavior === 'shield' && e.cooldown > 1.5)
+      damage *= 0.45;
     const actual = Math.min(e.hp, damage);
     if (actual > 0) e.lastHurtAt = this.time;
     e.hp -= damage;
     e.flash = 0.12;
     this.damageDealt += actual;
     this.damageBySource[source] = (this.damageBySource[source] || 0) + actual;
-    if (this.effects.length < 100)
-      this.#float(
-        e,
-        `${formatNumber(Math.ceil(damage))}${crit ? '!' : ''}`,
-        crit ? '#f8db88' : '#e5edce',
-      );
+    if (this.effects.length < 100) {
+      const text = `${formatNumber(Math.ceil(damage))}${crit ? '!' : ''}`;
+      const color = crit ? '#f8db88' : '#e5edce';
+      // 祭坛漂字固定落点，既有攻击仍沿用原来的战斗随机偏移。
+      if (source === 'altar') this.#effect(e.x, e.y - 22, 0.65, 0, color, 'text', text);
+      else this.#float(e, text, color);
+    }
     if (e.hp <= 0) {
       e.dead = true;
       this.enemyDeath(e);
@@ -3561,6 +3775,7 @@ export class Game {
     const burning = burn && this.burning.life <= 0 ? total * 0.2 : 0;
     if (burning > 0) this.burning = { life: ENEMY_CONTROL.burn, damage: burning };
     this.player.hp -= total;
+    this.#preserveAltarLife();
     if (this.player.hp <= 0) this.clearSovereignSkills();
     this.player.invincible = 0.8;
     if (poison && total > 0) this.enemyCorrode();
@@ -3580,7 +3795,7 @@ export class Game {
     this.onEvent('hurt');
   }
   private heal(amount: number) {
-    if (this.player.hp > 0 && this.corroded <= 0)
+    if (this.player.hp > 0 && this.corroded <= 0 && (this.altar?.damageUntil ?? 0) <= this.time)
       this.player.hp = Math.min(this.player.maxHp, this.player.hp + amount);
   }
   #effect(

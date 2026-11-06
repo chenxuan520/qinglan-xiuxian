@@ -9,6 +9,7 @@ import type { TownResident } from './town-population.ts';
 import type { PanelLocation } from './panel-host.ts';
 import type { AdPlacement } from './ads.ts';
 import type { Game } from './game.ts';
+import { altarPromptModal } from './altar-ui.ts';
 export function renderEpilogue(shell: ActionShell) {
   shell.battleHud.reset();
   shell.leaveTown();
@@ -621,6 +622,12 @@ export function renderChoices(shell: ActionShell) {
 
 export function renderPause(shell: ActionShell) {
   if (!shell.game) return;
+  if (shell.game.altar?.phase === 'prompt') {
+    shell.panel = 'altar';
+    shell.modal.innerHTML = altarPromptModal(shell.game);
+    shell.modal.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus();
+    return;
+  }
 
   shell.panelFrame(
     ...shell.pausePanel(shell.game, shell.save, shell.frameRate.value, shell.abandonConfirm),
@@ -629,6 +636,20 @@ export function renderPause(shell: ActionShell) {
 
 export function gameEvent(shell: ActionShell, name: string) {
   shell.gameAudio.play(name);
+  if (name === 'altar' && shell.game) {
+    shell.previousState = shell.game.state;
+    if (shell.game.altar?.phase === 'prompt') {
+      shell.clearInput();
+      shell.renderPause();
+    } else if (shell.panel === 'altar') {
+      shell.clearInput();
+      shell.panel = '';
+      shell.modal.innerHTML = '';
+    }
+    shell.updateHud();
+    shell.persist();
+    return;
+  }
   if (['loot', 'cache'].includes(name)) shell.persist();
 }
 
