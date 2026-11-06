@@ -1980,9 +1980,7 @@ function handlePreparation(shell: ActionShell, action: string, id?: string): boo
   }
   if (action === 'school-filter') {
     shell.schoolFilter = id!;
-    shell.selectedTreasure = shell.catalogTreasures.find(
-      (t) => shell.schoolFilter === 'all' || t.school === shell.schoolFilter,
-    )!.id;
+    shell.selectedTreasure = shell.save.starter;
     shell.renderPanel();
     shell.modal.querySelector('.panel')?.scrollTo(0, 0);
   }

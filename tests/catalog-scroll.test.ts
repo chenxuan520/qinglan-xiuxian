@@ -1,11 +1,72 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TREASURES, PASSIVES } from '../src/data.ts';
-import { freshSave } from '../src/progress.ts';
+import { freshSave, lifespanInfo, tribulationDue } from '../src/progress.ts';
 import { catalogPanel } from '../src/catalog-ui.ts';
 import { leaderboardSettings } from '../src/leaderboard-preference.ts';
 import { showPanel } from '../src/scene-flow.ts';
-import type { ActionShell } from '../src/action-controller.ts';
+import { dispatchAction, type ActionShell } from '../src/action-controller.ts';
+
+test('切换流派始终认准已保存本命，筛掉本命时不误选首件，分类切换不改变选择', () => {
+  const save = freshSave('heaven', ['wood'], 'dual', () => 0.5);
+  save.prologueSeen = save.hometownSeen = true;
+  save.mortal.hometown.stage = 'departed';
+  save.artifacts = TREASURES.map((t) => t.id);
+  let body = '';
+  const shell = {
+    save,
+    panel: 'arsenal',
+    game: null,
+    pendingRun: null,
+    saveLock: null,
+    lifespanInfo,
+    tribulationDue,
+    selectedTreasure: TREASURES[0].id,
+    bookTab: 'treasures',
+    schoolFilter: 'all',
+    catalogTreasures: TREASURES,
+    modal: { querySelector: () => null },
+    medicinePanel: { handle: () => false },
+    renderPanel() {
+      body = catalogPanel(save, {
+        panel: 'arsenal',
+        catalogTreasures: this.catalogTreasures,
+        selectedTreasure: this.selectedTreasure,
+        bookTab: this.bookTab,
+        schoolFilter: this.schoolFilter,
+      }).body;
+    },
+  };
+  const act = (action: string, id: string) =>
+    dispatchAction(shell as unknown as ActionShell, action, id);
+  const selected = () =>
+    [
+      ...body.matchAll(
+        /class="collection-card selected[^\"]*" data-action="treasure" data-id="([^\"]+)"/g,
+      ),
+    ].map((match) => match[1]);
+  for (const starter of TREASURES) {
+    save.starter = starter.id;
+    const before = structuredClone(save);
+    shell.selectedTreasure = TREASURES.find((t) => t.id !== starter.id)!.id;
+    for (const filter of ['demonic', 'orthodox', 'all', 'demonic', 'all']) {
+      act('school-filter', filter);
+      assert.deepEqual(
+        selected(),
+        filter === 'all' || starter.school === filter ? [starter.id] : [],
+        `${starter.id} / ${filter}`,
+      );
+      act('book-tab', 'passives');
+      act('book-tab', 'curios');
+      act('book-tab', 'treasures');
+      assert.deepEqual(
+        selected(),
+        filter === 'all' || starter.school === filter ? [starter.id] : [],
+      );
+      assert.deepEqual(save, before);
+    }
+  }
+});
 
 test('重新打开藏器阁默认高亮当前本命，旧浏览和筛选不影响且收藏顺序不变', () => {
   const save = freshSave('heaven', ['water'], 'dual', () => 0.5);
