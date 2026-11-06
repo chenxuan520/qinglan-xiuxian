@@ -398,8 +398,8 @@ export const TREASURES: Treasure[] = [
     desc: '灵珠命中后跳向附近目标，连续打击妖物。',
     evolution: '四海潮生',
     passive: 'magnet',
-    damage: 25,
-    cooldown: 1.5,
+    damage: 20,
+    cooldown: 1.8,
   },
   {
     id: 'dragon',
