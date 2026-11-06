@@ -665,27 +665,21 @@
   }
   .battle-bottom.compact-loadout {
     pointer-events: auto;
-    touch-action: pan-x;
     left: max(10px, env(safe-area-inset-left));
     right: max(10px, env(safe-area-inset-right));
     bottom: calc(10px + env(safe-area-inset-bottom));
     display: flex;
     flex-wrap: nowrap;
-    align-items: center;
-    justify-content: safe center;
+    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
     gap: 0;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-  }
-  .compact-loadout:focus-visible {
-    outline: 1px solid #d5d8a6;
-    outline-offset: 2px;
   }
   .compact-loadout .equipped-slots {
     display: flex;
     flex: 0 1 auto;
     width: auto;
-    min-width: calc(var(--slot-count) * 34px + (var(--slot-count) - 1) * 4px);
+    min-width: 0;
     justify-content: flex-start;
     gap: 4px;
   }
@@ -693,9 +687,10 @@
     position: relative;
     flex: 0 1 40px;
     width: 40px;
-    min-width: 34px;
+    min-width: 0;
     height: auto;
     aspect-ratio: 1;
+    container-type: inline-size;
     padding: 3px;
     gap: 0;
   }
@@ -712,7 +707,7 @@
     display: flex;
     flex: 0 1 auto;
     flex-wrap: nowrap;
-    min-width: calc(var(--slot-count) * 28px + (var(--slot-count) - 1) * 4px + 17px);
+    min-width: 0;
     max-width: none;
     margin-left: 8px;
     padding-left: 8px;
@@ -726,9 +721,10 @@
     position: relative;
     flex: 0 1 32px;
     width: 32px;
-    min-width: 28px;
+    min-width: 0;
     height: auto;
     aspect-ratio: 1;
+    container-type: inline-size;
     padding: 2px;
     gap: 0;
   }
@@ -741,12 +737,13 @@
     position: absolute;
     right: 0;
     bottom: 0;
-    min-width: 12px;
+    min-width: 0;
     margin: 0;
     padding: 1px 2px;
     background: #0b2924ed;
     color: #e6dfb5;
-    font-size: 9px;
+    font-size: 8px;
+    font-size: clamp(8px, 30cqw, 11px);
     line-height: 1.1;
     text-align: center;
   }

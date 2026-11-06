@@ -10,7 +10,7 @@ import {
   type SaveData,
 } from '../src/progress.ts';
 import { Game } from '../src/game.ts';
-import { formatTime, STAGE_YEARS_PER_MINUTE, TRIAL_BOSS_TIMES } from '../src/data.ts';
+import { formatTime, STAGE_YEARS_PER_MINUTE, TRIAL_BOSS_TIMES, xpNeeded } from '../src/data.ts';
 import { TOUR_STEPS, tourStep } from '../src/interface-tour-model.ts';
 import { COMPACT_HUD_QUERY } from '../src/compact-hud.ts';
 import { CURIO_IDS, CURIO_NAMES } from '../src/curio-data.ts';
@@ -147,6 +147,29 @@ function fixture(late = false, upgrade = false) {
   return save;
 }
 
+function loadoutFixture(full: boolean) {
+  const save = fixture();
+  const game = new Game(save, 0, 0, () => 0.5);
+  const weapons = full ? ['fan', 'vortex', 'umbrella', 'talisman', 'pearl'] : ['fan', 'vortex'];
+  const passives = full ? ['power', 'haste', 'area', 'guard'] : ['power', 'area'];
+  for (const [type, ids] of [
+    ['weapon', weapons],
+    ['passive', passives],
+  ] as const)
+    for (const id of ids) {
+      game.xp = xpNeeded(game.level);
+      game.update(0.01);
+      assert.equal(game.state, 'upgrade');
+      game.choices = [{ type, id, level: 1 }];
+      assert.ok(game.choose(0));
+    }
+  game.pause();
+  save.activeRun = game.snapshot();
+  assert.ok(Game.restore(save, save.activeRun));
+  assert.equal(readSave(JSON.stringify(save)).status, 'ok');
+  return save;
+}
+
 async function open(viewport: string, save: SaveData, testInitScript = '') {
   const text = await browser.call('new_page', {
     url: 'about:blank',
@@ -192,11 +215,11 @@ async function check(name: string, hud = false) {
         healthText: healthText ? {text:healthText.textContent, current:Number(health?.getAttribute('aria-valuenow')), ...box(healthText)} : null,
         level: document.querySelector('#level')?.textContent,
         time: document.querySelector('#time')?.textContent,
-        bottom: bottom ? { ...box(bottom), pointer: getComputedStyle(bottom).pointerEvents, touch: getComputedStyle(bottom).touchAction } : null,
+        bottom: bottom ? { ...box(bottom), pointer: getComputedStyle(bottom).pointerEvents, scroll:bottom.scrollWidth, client:bottom.clientWidth, tabindex:bottom.getAttribute('tabindex'), role:bottom.getAttribute('role'), label:bottom.getAttribute('aria-label') } : null,
         empty: document.querySelectorAll('.equipped-slot.empty').length,
         weaponCount: bottom?.querySelectorAll('.equipped-slot').length,
         passiveCount: bottom?.querySelectorAll('.passive-slots > span').length,
-        slots: slots.map(node => ({...box(node), icon:!!node.querySelector('.icon'), rank:node.querySelector('.loadout-rank')?.textContent})),
+        slots: slots.map(node => ({...box(node), offsetTop:node.offsetTop, weapon:node.classList.contains('equipped-slot'), icon:!!node.querySelector('.icon'), rank:node.querySelector('.loadout-rank')?.textContent, badge:box(node.querySelector('.loadout-rank')), rankFont:parseFloat(getComputedStyle(node.querySelector('.loadout-rank')).fontSize)})),
         weaponLabels: bottom?.querySelectorAll('.equipped-slot strong, .equipped-slot > div').length,
       } : null,
     };
@@ -274,8 +297,11 @@ async function check(name: string, hud = false) {
           compact.passiveCount <= 4,
         `${name} 底部法宝与功法缺失或超限`,
       );
-      assert.equal(compact.bottom.pointer, 'auto', `${name} 底栏不可将滑动穿透到战场`);
-      assert.equal(compact.bottom.touch, 'pan-x', `${name} 底栏保留原生横向滑动`);
+      assert.equal(compact.bottom.pointer, 'auto', `${name} 底栏不可将点按穿透到战场`);
+      assert.ok(compact.bottom.scroll <= compact.bottom.client, `${name} 底栏不允许横向溢出`);
+      assert.equal(compact.bottom.tabindex, null, `${name} 底栏不再保留滚动焦点`);
+      assert.equal(compact.bottom.role, 'group');
+      assert.equal(compact.bottom.label, '本局法宝与功法');
       assert.equal(compact.empty, 0, `${name} 竖屏不显示法宝空槽`);
       assert.equal(compact.weaponLabels, 0, `${name} 底部法宝使用图标与重数`);
       assert.equal(
@@ -290,14 +316,29 @@ async function check(name: string, hud = false) {
       for (const [index, slot] of compact.slots.entries()) {
         assert.equal(slot.icon, true, `${name} 槽位缺少图标`);
         assert.match(slot.rank, /^[1-6觉]$/, `${name} 槽位缺少重数或觉醒标记`);
+        assert.ok(Math.abs(slot.top - compact.slots[0].top) < 1, `${name} 底部法宝与功法必须同排`);
+        assert.equal(slot.offsetTop, compact.slots[0].offsetTop, `${name} 图标顶边同排`);
+        assert.ok(slot.width >= 20, `${name} 图标不足20px`);
         assert.ok(
-          Math.abs(center(slot) - center(compact.slots[0])) < 1,
-          `${name} 底部法宝与功法必须同排`,
-        );
-        assert.ok(
-          slot.top >= compact.bottom.top - 1 && slot.bottom <= compact.bottom.bottom + 1,
+          slot.top >= compact.bottom.top - 1 &&
+            slot.bottom <= compact.bottom.bottom + 1 &&
+            slot.left >= compact.bottom.left - 1 &&
+            slot.right <= compact.bottom.right + 1,
           `${name} 槽位超出底栏`,
         );
+        assert.ok(
+          slot.badge.left >= slot.left - 1 &&
+            slot.badge.right <= slot.right + 1 &&
+            slot.badge.top >= slot.top - 1 &&
+            slot.badge.bottom <= slot.bottom + 1,
+          `${name} 重数角标溢出格子`,
+        );
+        assert.ok(slot.rankFont >= 8, `${name} 角标字号不足8px`);
+        if (layout.viewport[0] === 390 && compact.weaponCount === 3 && compact.passiveCount === 2)
+          assert.ok(
+            Math.abs(slot.width - (slot.weapon ? 40 : 32)) < 0.1,
+            `${name} 有空间时保留原图标大小`,
+          );
         for (const other of compact.slots.slice(index + 1))
           assert.ok(!intersect(slot, other), `${name} 底部法宝与功法重叠`);
       }
@@ -1427,6 +1468,18 @@ try {
       response.ok && /(?:javascript|ecmascript)/i.test(contentType),
       `页面脚本未正确提供：${url.pathname}（${response.status}，${contentType}），请核对构建与预览的 base 路径`,
     );
+  }
+  for (const [name, viewport, full] of [
+    ['loadout-320-full', '320x568x1,mobile,touch', true],
+    ['loadout-360-full', '360x740x1,mobile,touch', true],
+    ['loadout-390-full', '390x844x1,mobile,touch', true],
+    ['loadout-390-partial', '390x844x1,mobile,touch', false],
+  ] as const) {
+    await open(viewport, loadoutFixture(full));
+    await click('[data-action=restore]');
+    await click('[data-action=resume]');
+    await check(name, true);
+    await finishPage();
   }
   await checkJourneyModuleRecovery();
   for (const [name, viewport] of viewports) {

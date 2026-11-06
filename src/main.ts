@@ -2359,11 +2359,6 @@ document.addEventListener('change', async (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (
-    (event.target as HTMLElement).closest('.compact-loadout') &&
-    ['ArrowLeft', 'ArrowRight'].includes(event.key)
-  )
-    return;
-  if (
     (event.target as HTMLElement).matches('input[type="range"], input[type="number"]') &&
     !['Escape', 'Tab'].includes(event.key)
   )

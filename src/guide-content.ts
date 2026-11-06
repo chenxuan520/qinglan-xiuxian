@@ -47,7 +47,7 @@ const LIFE_MODE_NOTES: Record<string, string> = {
 export function guideContent(tab: string) {
   const note = LIFE_MODE_NOTES[tab] ? `<p class="panel-note">${LIFE_MODE_NOTES[tab]}</p>` : '';
   const display = ['basics', 'combat'].includes(tab)
-    ? '<p class="panel-note">设置与暂停页可开关「伤害数字」；关闭后仍保留血条与伤害统计。手机竖屏战斗中，右上「⚙」打开设置与暂停，可查看年岁、永久修为、丹药，操作音效、伤害统计、指南与全屏；其左侧循环图标开关自动历练，亮起表示开启。底栏仅显示已持法宝与功法，角标表示重数或觉醒。</p>'
+    ? '<p class="panel-note">设置与暂停页可开关「伤害数字」；关闭后仍保留血条与伤害统计。手机竖屏战斗中，右上「⚙」打开设置与暂停，可查看年岁、永久修为、丹药，操作音效、伤害统计、指南与全屏；其左侧循环图标开关自动历练，亮起表示开启。底栏仅显示已持法宝与功法，角标表示重数或觉醒；放不下时等比缩小，始终一行完整显示。</p>'
     : '';
   return tab === 'basics'
     ? guideDetail(tab) +
