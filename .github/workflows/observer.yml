@@ -2,7 +2,8 @@ name: Runtime observer
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    # 北京时间每天中午12:00。
+    - cron: '0 4 * * *'
   workflow_dispatch:
     inputs:
       reanalyze:
@@ -39,7 +40,10 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          OBSERVER_API_KEY: ${{ secrets.OBSERVER_API_KEY }}
+          OBSERVER_API_KEY: ${{ secrets[vars.OBSERVER_API_KEY_SECRET || (secrets.OPENAI_API_KEY != '' && 'OPENAI_API_KEY' || 'OBSERVER_API_KEY')] }}
+          OBSERVER_KEY_SOURCE: ${{ vars.OBSERVER_API_KEY_SECRET != '' && (vars.OBSERVER_API_KEY_SECRET == 'OPENAI_API_KEY' && 'OPENAI_API_KEY' || vars.OBSERVER_API_KEY_SECRET == 'OBSERVER_API_KEY' && 'OBSERVER_API_KEY' || 'custom-secret') || (secrets.OPENAI_API_KEY != '' && 'OPENAI_API_KEY' || 'OBSERVER_API_KEY') }}
+          OBSERVER_OPENAI_KEY_CONFIGURED: ${{ secrets.OPENAI_API_KEY != '' }}
+          OBSERVER_COMPAT_KEY_CONFIGURED: ${{ secrets.OBSERVER_API_KEY != '' }}
           OBSERVER_ENGINE: ${{ vars.OBSERVER_ENGINE }}
           OBSERVER_MODEL: ${{ vars.OBSERVER_MODEL }}
           OBSERVER_BASE_URL: ${{ vars.OBSERVER_BASE_URL }}

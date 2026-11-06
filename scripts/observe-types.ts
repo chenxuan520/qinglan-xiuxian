@@ -121,6 +121,12 @@ export interface AnalysisDiagnostics {
   httpStatus?: number;
   errorName?: string;
   causeCode?: string;
+  keyFormatReason?: 'empty' | 'unmatched-wrapper' | 'internal-whitespace' | 'non-ascii' | 'quote';
+}
+export interface ObserverCredentialSource {
+  selectedSecret: 'OPENAI_API_KEY' | 'OBSERVER_API_KEY' | 'custom-secret';
+  openaiConfigured: boolean;
+  observerConfigured: boolean;
 }
 export interface AnalysisResult {
   engine: AnalysisConfig['engine'];
@@ -132,4 +138,5 @@ export interface AnalysisResult {
   error?: string;
   diagnostics?: AnalysisDiagnostics;
   reanalyzed?: boolean;
+  credentialSource?: ObserverCredentialSource;
 }

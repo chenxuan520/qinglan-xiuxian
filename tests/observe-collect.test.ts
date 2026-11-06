@@ -9,6 +9,7 @@ import { collectSource, normalizeSource, pointer, safeText } from '../scripts/ob
 import { emptyObserverState, parseObserverConfig } from '../scripts/observe-policy.ts';
 import {
   observerSummary,
+  observerCredentialSource,
   readObserverState,
   restoreObserverState,
   runObserver,
@@ -438,7 +439,7 @@ test('end-to-end observer preserves state before failure and suppresses repeat n
 });
 
 for (const status of ['failed', 'complete'] as const) {
-  test(`手动重分析${status}只复查当前候选，与正常运行的去重、状态和退出完全一致`, async () => {
+  test(`手动重分析${status}不改变去重状态，AI失败独立报告且不重通知`, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'observer-reanalyze-'));
     try {
       const c = config();
@@ -462,6 +463,7 @@ for (const status of ['failed', 'complete'] as const) {
       });
       const analyze = async (input: AnalysisInput): Promise<AnalysisResult> => {
         inputs.push(structuredClone(input));
+        if (!input.signals.length) return skipped;
         return {
           engine: 'openai',
           model: c.analysis.model,
@@ -512,7 +514,8 @@ for (const status of ['failed', 'complete'] as const) {
         inputs[2].signals.map((signal) => signal.id),
         ['test/failure'],
       );
-      assert.equal(manual.failed, false);
+      assert.equal(manual.failed, status === 'failed');
+      assert.equal(normal.failed, false);
       assert.equal(manual.analysis.reanalyzed, true);
       assert.equal(normal.analysis.reanalyzed, undefined);
       assert.deepEqual(manual.decision, normal.decision);
@@ -522,7 +525,7 @@ for (const status of ['failed', 'complete'] as const) {
         readFileSync(join(directory, 'normal/state.json'), 'utf8'),
       );
       assert.deepEqual(JSON.parse(readFileSync(join(directory, 'manual/exit.json'), 'utf8')), {
-        failed: false,
+        failed: status === 'failed',
         newIncidents: 0,
       });
       const saved = JSON.parse(readFileSync(join(directory, 'manual/result.json'), 'utf8'));
@@ -551,6 +554,133 @@ for (const status of ['failed', 'complete'] as const) {
     }
   });
 }
+
+for (const status of ['failed', 'unavailable'] as const) {
+  test(`实际AI ${status}在保存证据后返回失败，已有告警不再通知`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'observer-ai-exit-'));
+    const fakeKey = 'only-fake-invalid-key\u200b';
+    try {
+      const c = config();
+      c.sources = [spec];
+      const collect = async (_source: SourceSpec, time: string) => ({
+        ...normalizeSource(spec, { ...report, generatedAt: time }, time),
+        status: 'failed' as const,
+        signals: [
+          {
+            id: 'existing',
+            sourceId: spec.id,
+            severity: 'critical' as const,
+            title: '既有失败',
+            detail: '仅测试',
+            evidenceIds: [spec.id],
+            immediate: true,
+          },
+        ],
+      });
+      const first = await runObserver(c, emptyObserverState(), join(directory, 'first'), at, {
+        collect,
+        analyze: async () => skipped,
+        env: { OBSERVER_API_KEY: 'fake-initial-key' },
+      });
+      const env = {
+        ...(status === 'failed' ? { OBSERVER_API_KEY: fakeKey } : {}),
+        OBSERVER_REANALYZE: 'true',
+        OBSERVER_KEY_SOURCE: 'OPENAI_API_KEY',
+        OBSERVER_OPENAI_KEY_CONFIGURED: status === 'failed' ? 'true' : 'false',
+        OBSERVER_COMPAT_KEY_CONFIGURED: 'false',
+      };
+      const result = await runObserver(
+        c,
+        first.decision.state,
+        join(directory, 'second'),
+        '2026-11-05T13:00:00Z',
+        { collect, env },
+      );
+      assert.equal(result.failed, true);
+      assert.equal(result.analysis.status, status);
+      assert.deepEqual(result.decision.notifications, []);
+      const saved = JSON.parse(readFileSync(join(directory, 'second/result.json'), 'utf8'));
+      assert.equal(saved.analysis.status, status);
+      assert.deepEqual(saved.notifications, []);
+      assert.equal(saved.analysis.credentialSource.selectedSecret, 'OPENAI_API_KEY');
+      assert.equal(saved.analysis.credentialSource.openaiConfigured, status === 'failed');
+      assert.deepEqual(
+        readObserverState(join(directory, 'second/state.json')),
+        result.decision.state,
+      );
+      assert.deepEqual(JSON.parse(readFileSync(join(directory, 'second/exit.json'), 'utf8')), {
+        failed: true,
+        newIncidents: 0,
+      });
+      const summary = readFileSync(join(directory, 'second/summary.md'), 'utf8');
+      assert.match(summary, /AI 分析不可用/);
+      assert.match(summary, /未重复提醒/);
+      assert.match(summary, /AI 凭据来源：OPENAI_API_KEY/);
+      if (status === 'failed') assert.match(summary, /keyFormatReason non-ascii/);
+      assert.ok(!JSON.stringify(saved).includes(fakeKey));
+      assert.ok(!summary.includes(fakeKey));
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+}
+
+test('健康无信号及none均正常skipped，不因凭据诊断增加提醒或失败', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'observer-healthy-skip-'));
+  try {
+    for (const engine of ['pi', 'none'] as const) {
+      const c = config();
+      c.sources = [spec];
+      c.analysis.engine = engine;
+      const output = join(directory, engine);
+      const result = await runObserver(c, emptyObserverState(), output, at, {
+        collect: async () => normalizeSource(spec, { ...report, value: 0 }, at),
+        env: {
+          OBSERVER_API_KEY: 'only-fake-unused-key',
+          OBSERVER_KEY_SOURCE: 'OBSERVER_API_KEY',
+          OBSERVER_OPENAI_KEY_CONFIGURED: 'false',
+          OBSERVER_COMPAT_KEY_CONFIGURED: 'true',
+        },
+      });
+      assert.equal(result.analysis.status, 'skipped');
+      assert.equal(result.failed, false);
+      assert.deepEqual(result.decision.notifications, []);
+      assert.deepEqual(JSON.parse(readFileSync(join(output, 'exit.json'), 'utf8')), {
+        failed: false,
+        newIncidents: 0,
+      });
+      assert.match(readFileSync(join(output, 'summary.md'), 'utf8'), /未发现异常/);
+    }
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test('凭据来源只接受固定标签和严格布尔，不记录任意环境值或key细节', () => {
+  for (const selectedSecret of ['OPENAI_API_KEY', 'OBSERVER_API_KEY', 'custom-secret'] as const) {
+    const source = observerCredentialSource({
+      OBSERVER_KEY_SOURCE: selectedSecret,
+      OBSERVER_OPENAI_KEY_CONFIGURED: 'true',
+      OBSERVER_COMPAT_KEY_CONFIGURED: 'false',
+      OBSERVER_API_KEY: 'fake-sensitive-value',
+      EXTRA_SECRET: 'fake-extra-secret',
+    });
+    assert.deepEqual(source, { selectedSecret, openaiConfigured: true, observerConfigured: false });
+    assert.doesNotMatch(JSON.stringify(source), /fake-sensitive|fake-extra|length|hash|message/);
+  }
+  assert.equal(
+    observerCredentialSource({ OBSERVER_KEY_SOURCE: 'fake-sensitive-value' }),
+    undefined,
+  );
+  assert.deepEqual(
+    observerCredentialSource({
+      OBSERVER_KEY_SOURCE: 'custom-secret',
+      OBSERVER_OPENAI_KEY_CONFIGURED: 'fake-sensitive-value',
+      OBSERVER_COMPAT_KEY_CONFIGURED: 'TRUE',
+    }),
+    { selectedSecret: 'custom-secret', openaiConfigured: false, observerConfigured: false },
+  );
+});
 
 test('healthy runs and confirmed recovery summaries are concise', () => {
   const text = observerSummary(
@@ -588,6 +718,21 @@ test('workflow keeps observer isolated from deployments and simulation jobs', ()
   assert.match(workflow, /contents: read/);
   assert.match(workflow, /actions: read/);
   assert.match(workflow, /secrets\.OBSERVER_API_KEY/);
+  assert.match(workflow, /secrets\.OPENAI_API_KEY/);
+  assert.match(
+    workflow,
+    /secrets\[vars\.OBSERVER_API_KEY_SECRET \|\| \(secrets\.OPENAI_API_KEY != '' && 'OPENAI_API_KEY' \|\| 'OBSERVER_API_KEY'\)\]/,
+  );
+  assert.match(
+    workflow,
+    /OBSERVER_OPENAI_KEY_CONFIGURED: \$\{\{ secrets\.OPENAI_API_KEY != '' \}\}/,
+  );
+  assert.match(
+    workflow,
+    /OBSERVER_COMPAT_KEY_CONFIGURED: \$\{\{ secrets\.OBSERVER_API_KEY != '' \}\}/,
+  );
+  assert.match(workflow, /cron: '0 4 \* \* \*'/);
+  assert.doesNotMatch(workflow, /17 \* \* \* \*/);
   assert.match(workflow, /reanalyze:[\s\S]*?type: boolean\s+default: false/);
   assert.match(
     workflow,

@@ -119,23 +119,23 @@ for (const [name, rawKey] of pastedKeys) {
   });
 }
 
-for (const [name, rawKey] of [
-  ['未匹配ASCII前引号', `"${pastedKey}`],
-  ['未匹配ASCII后引号', `${pastedKey}'`],
-  ['未匹配中文引号', `‘${pastedKey}”`],
-  ['反向中文引号', `”${pastedKey}“`],
-  ['嵌套包装不递归修复', `"‘${pastedKey}’"`],
-  ['内部Unicode', `“${pastedKey}中”`],
-  ['内部Latin1', `${pastedKey}é`],
-  ['内部零宽', `${pastedKey.slice(0, 6)}\u200b${pastedKey.slice(6)}`],
-  ['内部CRLF', `${pastedKey.slice(0, 6)}\r\n${pastedKey.slice(6)}`],
-  ['内部LF', `'${pastedKey}\nsecond'`],
-  ['内部tab', `${pastedKey}\tsecond`],
-  ['内部空格', `${pastedKey} second`],
-  ['内部引号', `${pastedKey.slice(0, 6)}"${pastedKey.slice(6)}`],
-  ['内部NUL', `${pastedKey}\0`],
-  ['仅匹配引号', '“ ”'],
-  ['仅空白', ' \t\r\n '],
+for (const [name, rawKey, reason] of [
+  ['未匹配ASCII前引号', `"${pastedKey}`, 'unmatched-wrapper'],
+  ['未匹配ASCII后引号', `${pastedKey}'`, 'unmatched-wrapper'],
+  ['未匹配中文引号', `‘${pastedKey}”`, 'unmatched-wrapper'],
+  ['反向中文引号', `”${pastedKey}“`, 'unmatched-wrapper'],
+  ['嵌套包装不递归修复', `"‘${pastedKey}’"`, 'quote'],
+  ['内部Unicode', `“${pastedKey}中”`, 'non-ascii'],
+  ['内部Latin1', `${pastedKey}é`, 'non-ascii'],
+  ['内部零宽', `${pastedKey.slice(0, 6)}\u200b${pastedKey.slice(6)}`, 'non-ascii'],
+  ['内部CRLF', `${pastedKey.slice(0, 6)}\r\n${pastedKey.slice(6)}`, 'internal-whitespace'],
+  ['内部LF', `'${pastedKey}\nsecond'`, 'internal-whitespace'],
+  ['内部tab', `${pastedKey}\tsecond`, 'internal-whitespace'],
+  ['内部空格', `${pastedKey} second`, 'internal-whitespace'],
+  ['内部引号', `${pastedKey.slice(0, 6)}"${pastedKey.slice(6)}`, 'quote'],
+  ['内部NUL', `${pastedKey}\0`, 'non-ascii'],
+  ['仅匹配引号', '“ ”', 'empty'],
+  ['仅空白', ' \t\r\n ', 'empty'],
 ] as const) {
   test(`非法凭据${name}明确配置错误且不发送/不启动Pi，不泄露任何凭据细节`, async () => {
     for (const engine of ['openai', 'pi'] as const) {
@@ -159,6 +159,7 @@ for (const [name, rawKey] of [
       assert.equal(output.status, 'failed');
       assert.equal(output.error, 'AI API key 配置格式无效，请重新配置');
       assert.equal(output.diagnostics?.stage, 'setup');
+      assert.equal(output.diagnostics?.keyFormatReason, reason);
       assert.equal(output.diagnostics?.httpStatus, undefined);
       const text = JSON.stringify(output);
       assert.ok(!text.includes(pastedKey));
@@ -736,6 +737,14 @@ test('Pi桥完整保留已校验的失败和成功诊断', async () => {
   );
   assert.equal(success.status, 'complete');
   assert.deepEqual(success.diagnostics, diagnostics);
+  const keyDiagnostic = { ...piDiagnostic, stage: 'setup', keyFormatReason: 'non-ascii' };
+  const invalidKey = await analyzeEvidence(
+    evidence(),
+    { ...config, engine: 'pi' },
+    piMock({ analysisError: 'key_format', diagnostics: keyDiagnostic }).options,
+  );
+  assert.equal(invalidKey.status, 'failed');
+  assert.deepEqual(invalidKey.diagnostics, keyDiagnostic);
 });
 
 for (const [name, diagnostics] of [
@@ -744,6 +753,7 @@ for (const [name, diagnostics] of [
   ['未知阶段', { ...piDiagnostic, stage: key }],
   ['未知name', { ...piDiagnostic, errorName: key }],
   ['未知code', { ...piDiagnostic, causeCode: key }],
+  ['任意凭据原因', { ...piDiagnostic, keyFormatReason: key }],
   ['负耗时', { ...piDiagnostic, elapsedMs: -1 }],
   ['字符串耗时', { ...piDiagnostic, elapsedMs: '23' }],
   ['非法HTTP', { ...piDiagnostic, httpStatus: 999 }],

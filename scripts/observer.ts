@@ -10,7 +10,30 @@ import {
   parseObserverConfig,
   validateObserverState,
 } from './observe-policy.ts';
-import type { AnalysisResult, ObserverConfig, ObserverState, Snapshot } from './observe-types.ts';
+import type {
+  AnalysisResult,
+  ObserverConfig,
+  ObserverCredentialSource,
+  ObserverState,
+  Snapshot,
+} from './observe-types.ts';
+
+export function observerCredentialSource(
+  env: Readonly<Record<string, string | undefined>>,
+): ObserverCredentialSource | undefined {
+  const selectedSecret = env.OBSERVER_KEY_SOURCE;
+  if (
+    selectedSecret !== 'OPENAI_API_KEY' &&
+    selectedSecret !== 'OBSERVER_API_KEY' &&
+    selectedSecret !== 'custom-secret'
+  )
+    return undefined;
+  return {
+    selectedSecret,
+    openaiConfigured: env.OBSERVER_OPENAI_KEY_CONFIGURED === 'true',
+    observerConfigured: env.OBSERVER_COMPAT_KEY_CONFIGURED === 'true',
+  };
+}
 
 const MAX_STATE_BYTES = 16 * 1024 * 1024;
 export function readObserverState(path: string): ObserverState {
@@ -97,20 +120,27 @@ export function observerSummary(
     (i) => !i.resolvedAt && i.notifiedAt,
   ).length;
   const pending = snapshot.observations.filter((o) => o.status === 'pending').length;
+  const aiFailed = analysis.status === 'failed' || analysis.status === 'unavailable';
+  const source = analysis.credentialSource;
+  const credentialLabel = source
+    ? `AI 凭据来源：${source.selectedSecret}；OPENAI_API_KEY 已配置 ${source.openaiConfigured}；OBSERVER_API_KEY 已配置 ${source.observerConfigured}。`
+    : '';
   if (
     !decision.signals.length &&
     !decision.recovered.length &&
     !unresolved &&
     !pending &&
-    !analysis.reanalyzed
+    !analysis.reanalyzed &&
+    !aiFailed
   )
-    return `观察完成（北京时间 ${at}）：未发现异常；${snapshot.observations.length} 个来源。\n`;
+    return `观察完成（北京时间 ${at}）：未发现异常；${snapshot.observations.length} 个来源。${credentialLabel}\n`;
   const lines = [
     `运行观察（北京时间 ${at}）`,
     '',
     `新提醒 ${decision.notifications.length}，当前候选 ${decision.signals.length}，恢复 ${decision.recovered.length}。`,
     '',
   ];
+  if (credentialLabel) lines.push(credentialLabel, '');
   if (analysis.reanalyzed)
     lines.push(
       `手动重分析：当前 ${decision.signals.length} 个候选，AI 状态 ${analysis.status}；去重与新增提醒规则保持。`,
@@ -162,6 +192,7 @@ export function observerSummary(
         (diagnostic.httpStatus === undefined ? '' : `；HTTP ${diagnostic.httpStatus}`) +
         (diagnostic.errorName ? `；error.name ${markdown(diagnostic.errorName)}` : '') +
         (diagnostic.causeCode ? `；cause.code ${markdown(diagnostic.causeCode)}` : '') +
+        (diagnostic.keyFormatReason ? `；keyFormatReason ${diagnostic.keyFormatReason}` : '') +
         '。',
     );
   }
@@ -179,11 +210,12 @@ export async function runObserver(
     env?: Record<string, string | undefined>;
   } = {},
 ) {
+  const env = deps.env ?? process.env;
   const observations = await Promise.all(
     config.sources.map((source) => (deps.collect ?? collectSource)(source, at)),
   );
   if (config.analysis.engine !== 'none') {
-    const missing = !(deps.env ?? process.env)[config.analysis.apiKeyEnv];
+    const missing = !env[config.analysis.apiKeyEnv];
     observations.push({
       id: 'observer-integration',
       title: '观察器 AI 配置',
@@ -198,7 +230,7 @@ export async function runObserver(
               sourceId: 'observer-integration',
               severity: 'warning',
               title: '观察器未配置 API 凭据',
-              detail: `请配置仓库 Secret ${config.analysis.apiKeyEnv}；聚合证据仍正常采集。`,
+              detail: '请配置观察器 API 凭据；聚合证据仍正常采集。',
               evidenceIds: ['observer-integration'],
             },
           ]
@@ -207,7 +239,7 @@ export async function runObserver(
   }
   const snapshot: Snapshot = { schemaVersion: 1, at, observations };
   const decision = evaluateSnapshot(snapshot, previous, config.policy);
-  const reanalyze = (deps.env ?? process.env).OBSERVER_REANALYZE === 'true';
+  const reanalyze = env.OBSERVER_REANALYZE === 'true';
   const result = await (deps.analyze ?? analyzeEvidence)(
     {
       at,
@@ -228,8 +260,14 @@ export async function runObserver(
       })),
     },
     config.analysis,
+    { env },
   );
-  const analysis: AnalysisResult = { ...result, ...(reanalyze ? { reanalyzed: true } : {}) };
+  const source = observerCredentialSource(env);
+  const analysis: AnalysisResult = {
+    ...result,
+    ...(reanalyze ? { reanalyzed: true } : {}),
+    ...(source ? { credentialSource: source } : {}),
+  };
   mkdirSync(output, { recursive: true });
   const write = (name: string, data: string) => {
     writeFileSync(join(output, `${name}.tmp`), data, { mode: 0o600 });
@@ -247,7 +285,10 @@ export async function runObserver(
     }),
   );
   write('summary.md', observerSummary(snapshot, decision, analysis));
-  const failed = decision.notifications.length > 0;
+  const failed =
+    decision.notifications.length > 0 ||
+    analysis.status === 'failed' ||
+    analysis.status === 'unavailable';
   write('exit.json', JSON.stringify({ failed, newIncidents: decision.notifications.length }));
   return { failed, decision, analysis };
 }
@@ -278,8 +319,16 @@ async function main() {
   const output = resolve(args[1] ?? 'artifacts/observer');
   const path = join(output, 'state.json');
   const previous = existsSync(path) ? readObserverState(path) : emptyObserverState();
-  const { failed } = await runObserver(checked, previous, output);
-  console.log(failed ? '发现新的已确认异常；证据与去重状态已保存。' : '观察完成；无新增提醒。');
+  const { failed, decision, analysis } = await runObserver(checked, previous, output);
+  if (analysis.credentialSource)
+    console.log(JSON.stringify({ observerCredentials: analysis.credentialSource }));
+  console.log(
+    decision.notifications.length
+      ? '发现新的已确认异常；证据与去重状态已保存。'
+      : failed
+        ? 'AI 分析未完成；证据与去重状态已保存。'
+        : '观察完成；无新增提醒。',
+  );
   if (failed) process.exitCode = 1;
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))

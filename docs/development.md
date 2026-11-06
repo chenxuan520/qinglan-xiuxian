@@ -430,14 +430,14 @@ npm run stats -- --days=30
 
 ## 运行数据异常观察
 
-`Runtime observer` 每小时在第17分钟读取既有完整平衡诊断、法宝测评、自动历练对照、CI性能、玩家聚合统计及对应后台任务，也可手动触发。它不运行模拟、不修改游戏或门禁。正常只留一行状态；新确认异常使本次 Actions 失败，沿用仓库的 GitHub Actions 失败通知设置。相同事件不反复提醒，严重程度升级、恢复和再次发生分别记录。请在 GitHub 通知设置中启用 Actions 失败通知；目前不创建 Issue、不发送邮件或群聊消息。
+`Runtime observer` 每天北京时间中午12:00（UTC `0 4 * * *`）读取既有完整平衡诊断、法宝测评、自动历练对照、CI性能、玩家聚合统计及对应后台任务，也可手动触发。它不运行模拟、不修改游戏或门禁。正常只留一行状态；新确认异常使本次 Actions 失败，沿用仓库的 GitHub Actions 失败通知设置。相同事件不反复提醒，严重程度升级、恢复和再次发生分别记录。请在 GitHub 通知设置中启用 Actions 失败通知；目前不创建 Issue、不发送邮件或群聊消息。
 
 配置集中在 `scripts/observer.config.json`。来源可增减；`kind: json` 支持 JSON Pointer、样本数指针、变化方向与观察阈值，带认证的后台通过 `headersEnv` 引用环境变量，不能把真实密钥写入 URL 或配置。默认只读取公开聚合值，不上传存档、匿名编号或逐个玩家记录。小样本不做率值告警；混合版本的玩家分关统计不做胜率趋势推断。会话不是人数，结算与开局不能严格配对，CI性能也不代表真机帧率。模拟结果和玩家指标分开，趋势只比较同版本、同分组、足够样本及不同生成批次的数据。报告失败、来源不可用、陈旧和任务超时有各自证据，不把缺失值当零或正常。
 
-仓库 Secret 使用 `OBSERVER_API_KEY`，通过交互命令设置：
+仓库 Secret 默认使用标准名称 `OPENAI_API_KEY`，缺少时兼容原来的 `OBSERVER_API_KEY`；运行脚本仍只收到唯一的 `OBSERVER_API_KEY` 环境变量。自定义服务可通过仓库 Variable `OBSERVER_API_KEY_SECRET` 明确指定专用 Secret 名，指定后缺失会明确失败，不改用其他凭据。通过交互命令设置：
 
 ```bash
-gh secret set OBSERVER_API_KEY --repo chenxuan520/qinglan-xiuxian
+gh secret set OPENAI_API_KEY --repo chenxuan520/qinglan-xiuxian
 gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master
 ```
 
@@ -445,7 +445,7 @@ gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master
 
 API key 只整理复制时的首尾空白和一对匹配的外层单双引号（含中文引号），不修补内部字符；非法格式在请求前明确失败。原值及整理后的值均从证据、诊断和结果中脱敏，只将整理并预检后的凭据通过环境变量交给 Pi 子进程，不写入文件或命令参数。
 
-观察器单独使用 Node 24（含 Pi 子进程的代理支持），游戏原有 Node 版本要求不变。`npm run observe` 本地执行同一入口，结果写到忽略目录 `artifacts/observer/`。CLI 可依次传配置路径与输出目录。请求有超时、响应大小和模型输入/输出限制；原始认证错误不进入日志。只有新的确认异常才调用模型，AI超时或认证失败仍保留原始规则证据。`observer-state` artifact 保存有限历史、已通知身份与恢复状态；下一次只恢复本仓库 master 的该工作流产物，失败运行也保留状态。状态缺失或损坏会明确失败，不能静默清空去重历史；首次运行没有历史则建立基线。Artifact 默认保留30天、最多72批历史，长期停用后重建基线须先确认历史过期原因。
+观察器单独使用 Node 24（含 Pi 子进程的代理支持），游戏原有 Node 版本要求不变。`npm run observe` 本地执行同一入口，结果写到忽略目录 `artifacts/observer/`。CLI 可依次传配置路径与输出目录。请求有超时、响应大小和模型输入/输出限制；原始认证错误不进入日志。只有新的确认异常才调用模型，AI超时、认证失败或不可用时仍保留原始规则证据，并在保存后使任务失败。`observer-state` artifact 保存有限历史、已通知身份与恢复状态；下一次只恢复本仓库 master 的该工作流产物，失败运行也保留状态。状态缺失或损坏会明确失败，不能静默清空去重历史；首次运行没有历史则建立基线。Artifact 默认保留30天、最多72批历史，长期停用后重建基线须先确认历史过期原因。
 
 AI 诊断保存在 `result.json` 的 `analysis.diagnostics` 和 Actions 摘要中：仅含阶段、耗时、脱敏后的 endpoint origin/path、HTTP 状态及白名单异常名称/原因代码，不记录原始错误 message、请求头、响应正文或凭据；重定向只报告、不跟随。排查首次连接失败时可手动重分析当前候选，无需删除历史：
 
@@ -453,7 +453,7 @@ AI 诊断保存在 `result.json` 的 `analysis.diagnostics` 和 Actions 摘要�
 gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master -f reanalyze=true
 ```
 
-`reanalyze` 默认为 `false`，定时运行始终只分析新增通知；手动 `true` 通过 `OBSERVER_REANALYZE=true` 重分析当前候选，摘要明确标注。它不改变去重状态、notifications 或退出规则，没有新增确认异常便不重复通知；本地同名环境变量可验证同一流程。
+`reanalyze` 默认为 `false`，定时运行始终只分析新增通知；手动 `true` 通过 `OBSERVER_REANALYZE=true` 重分析当前候选，摘要明确标注。它不重置去重状态或重复通知；AI 返回 failed／unavailable 时，即使没有新增提醒也会保存状态并非零退出。无信号及 `engine: none` 仍正常跳过模型。结果与摘要只记录固定的凭据来源标签、两个是否配置的布尔值及五种格式错误枚举，不记录原值、长度或散列；本地同名环境变量可验证同一流程。
 
 ## GitHub Pages · 平台部署
 

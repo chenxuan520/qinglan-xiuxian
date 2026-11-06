@@ -41,10 +41,16 @@ const errors: Record<string, string> = {
 export class AnalysisError extends Error {
   code: keyof typeof errors;
   diagnostics?: AnalysisDiagnostics;
-  constructor(code: keyof typeof errors, diagnostics?: AnalysisDiagnostics) {
+  keyFormatReason?: AnalysisDiagnostics['keyFormatReason'];
+  constructor(
+    code: keyof typeof errors,
+    diagnostics?: AnalysisDiagnostics,
+    keyFormatReason?: AnalysisDiagnostics['keyFormatReason'],
+  ) {
     super(errors[code]);
     this.code = code;
     this.diagnostics = diagnostics;
+    this.keyFormatReason = keyFormatReason;
   }
 }
 export function requireAnalysis(value: unknown, code: keyof typeof errors): asserts value {
@@ -85,20 +91,37 @@ export function redactAnalysisText(text: string, apiKey: RedactionKeys = '') {
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[已脱敏邮箱]');
 }
 
+const keyWrappers: Record<string, string> = { '"': '"', "'": "'", '‘': '’', '“': '”' };
+const keyFormatReasons = new Set([
+  'empty',
+  'unmatched-wrapper',
+  'internal-whitespace',
+  'non-ascii',
+  'quote',
+]);
 function cleanAnalysisKey(raw: string) {
   let key = raw.trim();
-  const pairs: Record<string, string> = { '"': '"', "'": "'", '‘': '’', '“': '”' };
-  if (key.length >= 2 && pairs[key[0]] === key.at(-1)) key = key.slice(1, -1).trim();
+  if (key.length >= 2 && keyWrappers[key[0]] === key.at(-1)) key = key.slice(1, -1).trim();
   return key;
 }
 
 // 只容忍粘贴时的外层包装；不修补凭据内部内容，也不把Headers的原始异常向外转发。
 export function analysisHeaders(key: string) {
-  requireAnalysis(key && /^[\x21-\x7e]+$/.test(key) && !/["']/.test(key), 'key_format');
+  let reason: AnalysisDiagnostics['keyFormatReason'];
+  if (!key) reason = 'empty';
+  else if (
+    (/["'‘’“”]/.test(key[0]) || /["'‘’“”]/.test(key.at(-1)!)) &&
+    (key.length < 2 || keyWrappers[key[0]] !== key.at(-1))
+  )
+    reason = 'unmatched-wrapper';
+  else if (/\s/.test(key)) reason = 'internal-whitespace';
+  else if (/["'‘’“”]/.test(key)) reason = 'quote';
+  else if (!/^[\x21-\x7e]+$/.test(key)) reason = 'non-ascii';
+  if (reason) throw new AnalysisError('key_format', undefined, reason);
   try {
     return new Headers({ authorization: `Bearer ${key}`, 'content-type': 'application/json' });
   } catch {
-    throw new AnalysisError('key_format');
+    throw new AnalysisError('key_format', undefined, 'non-ascii');
   }
 }
 
@@ -190,6 +213,12 @@ export function createAnalysisTrace(config: AnalysisConfig, key: RedactionKeys):
 export function finishAnalysisTrace(trace: AnalysisTrace, error?: unknown): AnalysisDiagnostics {
   const diagnostics = trace.diagnostics;
   diagnostics.elapsedMs = Math.max(0, Math.round(performance.now() - trace.startedAt));
+  if (
+    error instanceof AnalysisError &&
+    error.keyFormatReason &&
+    keyFormatReasons.has(error.keyFormatReason)
+  )
+    diagnostics.keyFormatReason = error.keyFormatReason;
   if (error && typeof error === 'object') {
     const failure = error as { name?: unknown; cause?: { code?: unknown }; code?: unknown };
     if (
@@ -215,7 +244,15 @@ export function validateAnalysisDiagnostics(
   const raw = value as Record<string, unknown>;
   requireAnalysis(
     Object.keys(raw).every((name) =>
-      ['stage', 'elapsedMs', 'endpoint', 'httpStatus', 'errorName', 'causeCode'].includes(name),
+      [
+        'stage',
+        'elapsedMs',
+        'endpoint',
+        'httpStatus',
+        'errorName',
+        'causeCode',
+        'keyFormatReason',
+      ].includes(name),
     ),
     'pi',
   );
@@ -250,6 +287,7 @@ export function validateAnalysisDiagnostics(
   for (const [name, whitelist] of [
     ['errorName', diagnosticNames],
     ['causeCode', diagnosticCodes],
+    ['keyFormatReason', keyFormatReasons],
   ] as const)
     if (raw[name] !== undefined)
       requireAnalysis(typeof raw[name] === 'string' && whitelist.has(raw[name] as string), 'pi');
@@ -260,6 +298,9 @@ export function validateAnalysisDiagnostics(
     ...(raw.httpStatus === undefined ? {} : { httpStatus: raw.httpStatus as number }),
     ...(raw.errorName === undefined ? {} : { errorName: raw.errorName as string }),
     ...(raw.causeCode === undefined ? {} : { causeCode: raw.causeCode as string }),
+    ...(raw.keyFormatReason === undefined
+      ? {}
+      : { keyFormatReason: raw.keyFormatReason as AnalysisDiagnostics['keyFormatReason'] }),
   };
 }
 
