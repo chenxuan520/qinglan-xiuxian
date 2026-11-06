@@ -35,6 +35,7 @@ export const MONITOR_COLUMNS = {
     'won',
     'lost',
     'abandoned',
+    'quits',
     'ends',
     'seconds',
     'levels',
@@ -110,13 +111,13 @@ export function monitorQueries(filter: MonitorFilter): Record<MonitorSection, st
     count('epilogue', 'epilogues'),
     count('error', 'errors'),
   ].join(', ');
-  const outcomes = `${count('run-start', 'starts')}, ${count('run-end', 'ends')}, ${['won', 'lost'].map((r) => `sumIf(${w}, ${type} = 'run-end' AND ${result} = '${r}') AS ${r}`).join(', ')}, sumIf(${w}, ${type} = 'run-end' AND ${result} = 'abandon') AS abandoned, sumIf(${w} * ${seconds}, ${type} = 'run-end') AS seconds`;
+  const outcomes = `${count('run-start', 'starts')}, sumIf(${w}, ${type} = 'run-end' AND ${result} != 'quit') AS ends, ${['won', 'lost'].map((r) => `sumIf(${w}, ${type} = 'run-end' AND ${result} = '${r}') AS ${r}`).join(', ')}, sumIf(${w}, ${type} = 'run-end' AND ${result} = 'abandon') AS abandoned, sumIf(${w}, ${type} = 'run-end' AND ${result} = 'quit') AS quits, sumIf(${w} * ${seconds}, ${type} = 'run-end' AND ${result} != 'quit') AS seconds`;
   const battles = `${recent} AND ${tribulation} = -1 AND (${type} = 'run-start' OR ${type} = 'run-end')`;
   return {
     overview: `SELECT SUM(${w}) AS events, count(DISTINCT index1) AS browsers, ${base}, ${count('run-end', 'ends')}, max(${w}) AS sampleMax FROM ${table} WHERE ${recent}`,
     sites: `SELECT ${site} AS site, count(DISTINCT index1) AS browsers, ${base} FROM ${table} WHERE ${recent} GROUP BY site ORDER BY sessions DESC`,
     days: `SELECT toDate(timestamp + INTERVAL '8' HOUR) AS day, ${count('session', 'sessions')}, ${count('run-start', 'starts')}, sumIf(${w}, ${type} = 'run-end' AND ${result} = 'won' AND ${tribulation} = -1) AS won, ${count('error', 'errors')} FROM ${table} WHERE ${recent} GROUP BY day ORDER BY day`,
-    stages: `SELECT ${stage} AS stage, ${difficulty} AS difficulty, ${outcomes}, sumIf(${w} * ${level}, ${type} = 'run-end' AND ${level} >= 0) AS levels, sumIf(${w}, ${type} = 'run-end' AND ${level} >= 0) AS levelCount, sumIf(${w} * ${kills}, ${type} = 'run-end' AND ${kills} >= 0) AS kills, sumIf(${w}, ${type} = 'run-end' AND ${kills} >= 0) AS killCount FROM ${table} WHERE ${battles} GROUP BY stage, difficulty ORDER BY stage, difficulty`,
+    stages: `SELECT ${stage} AS stage, ${difficulty} AS difficulty, ${outcomes}, sumIf(${w} * ${level}, ${type} = 'run-end' AND ${result} != 'quit' AND ${level} >= 0) AS levels, sumIf(${w}, ${type} = 'run-end' AND ${result} != 'quit' AND ${level} >= 0) AS levelCount, sumIf(${w} * ${kills}, ${type} = 'run-end' AND ${result} != 'quit' AND ${kills} >= 0) AS kills, sumIf(${w}, ${type} = 'run-end' AND ${result} != 'quit' AND ${kills} >= 0) AS killCount FROM ${table} WHERE ${battles} GROUP BY stage, difficulty ORDER BY stage, difficulty`,
     roots: `SELECT ${root} AS root, ${outcomes} FROM ${table} WHERE ${battles} GROUP BY root ORDER BY starts DESC`,
     paths: `SELECT ${path} AS path, ${outcomes} FROM ${table} WHERE ${battles} GROUP BY path ORDER BY starts DESC`,
     best: `SELECT best, count() AS browsers FROM (SELECT index1, max(${stage}) AS best FROM ${table} WHERE ${recent} AND ${type} = 'run-end' AND ${result} = 'won' AND ${tribulation} = -1 GROUP BY index1) GROUP BY best ORDER BY best`,

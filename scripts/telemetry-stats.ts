@@ -1,4 +1,5 @@
 import { TELEMETRY_BLOBS, TELEMETRY_DOUBLES } from '../src/telemetry.ts';
+import { firstRunTelemetrySql, stagesTelemetrySql } from './telemetry-queries.ts';
 
 // 查询 Analytics Engine 中的匿名游玩统计。令牌需要 Account Analytics Read 权限，只在本机环境变量中使用。
 const token = process.env.CLOUDFLARE_ANALYTICS_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
@@ -68,18 +69,7 @@ console.table(
   })),
 );
 
-const stages = await query(
-  `SELECT ${stage} AS stage,
-    sumIf(${weight}, ${type} = 'run-start') AS starts,
-    sumIf(${weight}, ${type} = 'run-end' AND ${result} = 'won') AS won,
-    sumIf(${weight}, ${type} = 'run-end' AND ${result} = 'lost') AS lost,
-    sumIf(${weight}, ${type} = 'run-end' AND ${result} = 'abandon') AS abandoned,
-    sumIf(${weight} * ${seconds}, ${type} = 'run-end') AS seconds,
-    sumIf(${weight}, ${type} = 'run-end') AS ended
-  FROM ${table}
-  WHERE ${recent} AND ${tribulation} = -1 AND (${type} = 'run-start' OR ${type} = 'run-end')
-  GROUP BY stage ORDER BY stage`,
-);
+const stages = await query(stagesTelemetrySql(column, recent));
 console.log('\n各境历练（不含天劫）');
 console.table(
   stages.map((row) => {
@@ -90,8 +80,26 @@ console.table(
       通关: num(row.won),
       落败: num(row.lost),
       主动结束: num(row.abandoned),
+      中途离开: num(row.quit),
       通关率: ended ? `${Math.round((num(row.won) / ended) * 100)}%` : '—',
       平均时长: ended ? `${Math.round(num(row.seconds) / ended)} 秒` : '—',
+    };
+  }),
+);
+
+const firstRuns = await query(firstRunTelemetrySql(column, recent));
+console.log('\n首局（新存档的第一局，不含天劫）');
+console.table(
+  firstRuns.map((row) => {
+    const quit = num(row.quit);
+    return {
+      秘境: `第 ${num(row.stage) + 1} 境`,
+      开局: num(row.starts),
+      通关: num(row.won),
+      落败: num(row.lost),
+      主动结束: num(row.abandoned),
+      中途离开: quit,
+      离开时平均时长: quit ? `${Math.round(num(row.quitSeconds) / quit)} 秒` : '—',
     };
   }),
 );

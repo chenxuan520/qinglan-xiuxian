@@ -130,6 +130,7 @@ function telemetry(versions = 1) {
       won: 1,
       lost: 9,
       abandoned: 0,
+      quits: 0,
       ends: 10,
       seconds: 500,
       levels: 1,

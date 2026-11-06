@@ -399,7 +399,7 @@ auctionReason/auctionDues 接受本次 years，论道与赴约按一年预检寿
 
 静态站不变：统计代码打包在游戏 JS 内，不引入第三方脚本，也不需要服务器或构建密钥。`src/telemetry.ts` 同时提供事件校验、Analytics Engine 列映射与前端上报器；`src/setting.ts` 的 `TELEMETRY_SETTINGS` 集中发送来源、接口路径、批次与请求上限。只有页面来源为 `https://xiuxian.011203.xyz` 或 `https://chenxuan520.github.io`（GitHub Pages 子路径不影响 Origin）时才发送；本机 5173、自建副本与离线页面既不发送，也不写匿名编号。
 
-- 事件：`session`（打开页面）、`run-start`（开局 / 天劫）、`run-end`（通关、落败、主动结束或天劫成功）、`town`（走进青岚镇）、`reincarnate`（寿尽、天劫、终章离界传承、主动四种原因；命盘重抽不计；协议中的 `result=epilogue` 保留）、`epilogue`（叩门）、`error`（页面运行错误）、`sharing`（留影操作与二维码来源，固定动作见下文）。前六种附当前关卡、境界阶、年岁、历练次数、灵根、路线等数值；`error` 只带 `detail` 错误摘要（种类、错误名、信息与文件名行号，前端清洗控制字符并截断到 160 字符）。不含存档、闲聊、账号或设备信息。
+- 事件：`session`（打开页面）、`run-start`（开局 / 天劫）、`run-end`（通关、落败、主动结束、天劫成功，或离开页面时该局仍在进行，后者结果为 `quit`）、`town`（走进青岚镇）、`reincarnate`（寿尽、天劫、终章离界传承、主动四种原因；命盘重抽不计；协议中的 `result=epilogue` 保留）、`epilogue`（叩门）、`error`（页面运行错误）、`sharing`（留影操作与二维码来源，固定动作见下文）。前六种附当前关卡、境界阶、年岁、历练次数、灵根、路线等数值；离开页面时复用同一事件并补充该局关卡、时长、等级与击杀，不新增身份或设备信息。`error` 只带 `detail` 错误摘要（种类、错误名、信息与文件名行号，前端清洗控制字符并截断到 160 字符）。不含存档、闲聊、账号或设备信息。
 - `src/error-report.ts` 在页面启动后监听全局 `error` 与 `unhandledrejection`：相同摘要每次加载只发一次，合计不超过 8 个不同错误，随报随 flush；同时展示独立于游戏界面的底部提示（进度已保存，可刷新重进或忽略）。提示与上报互不影响，任何一环失败都不阻断游戏。
 - 匿名编号为随机 UUID，单独存于 `qinglan-telemetry-id`，不进存档、不随导出导入迁移；「关于」开关写 `qinglan-telemetry-off`，关闭即清空待发队列。存储不可用时本页使用临时编号。
 - 事件先在内存排队，满 10 条、结算、轮回、叩门、留影操作、带来源进入或页面隐藏时以 `navigator.sendBeacon`（`text/plain`，无预检）一次发送，不支持时退回 `fetch keepalive`；失败静默丢弃，不重试、不阻塞游戏。
@@ -410,7 +410,7 @@ npm run stats            # 近 7 天
 npm run stats -- --days=30
 ```
 
-查询脚本使用本机环境变量 `CLOUDFLARE_ANALYTICS_TOKEN`（或 `CLOUDFLARE_API_TOKEN`，须有 Account Analytics Read 权限），可选 `CLOUDFLARE_ACCOUNT_ID`，未设置时读取令牌可访问的唯一账号。输出各站概览、各境开局与通关率、玩家最远通关、轮回原因、版本分布与运行错误，均按 `_sample_interval` 加权。上线验证写入的记录使用版本号 `verification`，查询时排除。修改事件字段需同步 Worker、查询脚本与本节；发布顺序为先 `npm run deploy:npc-ai`，再推送或部署静态站，Worker 未更新时前端上报会被拒收但不影响游戏。
+查询脚本使用本机环境变量 `CLOUDFLARE_ANALYTICS_TOKEN`（或 `CLOUDFLARE_API_TOKEN`，须有 Account Analytics Read 权限），可选 `CLOUDFLARE_ACCOUNT_ID`，未设置时读取令牌可访问的唯一账号。输出各站概览、各境开局与通关率、首局视图、玩家最远通关、轮回原因、版本分布与运行错误，均按 `_sample_interval` 加权。各境表的「中途离开」单列，不计入通关率与平均时长；首局视图只看新存档第一局（`run-start` 的 `runs=0`、结算的 `runs=1`、离开的 `runs=0` 且 `result=quit`）。上线验证写入的记录使用版本号 `verification`，查询时排除。修改事件字段需同步 Worker、查询脚本与本节；发布顺序为先 `npm run deploy:npc-ai`，再推送或部署静态站，Worker 未更新时前端上报会被拒收但不影响游戏。
 
 ## 统一公开监控
 

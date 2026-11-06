@@ -9,6 +9,7 @@ import {
   TELEMETRY_BLOBS,
   TELEMETRY_DOUBLES,
   TELEMETRY_DETAIL_MAX_LENGTH,
+  TELEMETRY_RESULTS,
   type TelemetryBatch,
   type TelemetryEvent,
 } from '../src/telemetry.ts';
@@ -117,6 +118,29 @@ test('统计协议只接受白名单事件与有限数值，拒收未知字段�
       events: [{ type: 'error', detail: 'error: TypeError: x @ main.js:9' }],
     }),
     true,
+  );
+});
+
+test('run-end 接受新增的 quit 结果', () => {
+  assert.equal(TELEMETRY_RESULTS.includes('quit'), true);
+  const quitEvent: TelemetryEvent = {
+    type: 'run-end',
+    stage: 2,
+    difficulty: 1,
+    result: 'quit',
+    seconds: 184,
+    level: 27,
+    kills: 512,
+    path: 'orthodox',
+  };
+  const quitBatch: TelemetryBatch = { ...batch, events: [quitEvent] };
+  assert.equal(validTelemetryBatch(quitBatch), true);
+  assert.equal(
+    validTelemetryBatch({
+      ...quitBatch,
+      events: [{ ...quitEvent, result: 'expired' } as TelemetryEvent],
+    }),
+    false,
   );
 });
 

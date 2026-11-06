@@ -469,3 +469,22 @@ test('Worker 正常 GET 使用原生 fetch 的全局接收对象而非依赖对�
     else Reflect.deleteProperty(globalThis, 'caches');
   }
 });
+
+test('监控关卡表把中途离开单列，结算与时长不含 quit', () => {
+  const sql = monitorQueries({ days: 7, site: 'all' }).stages;
+  assert.ok(MONITOR_COLUMNS.stages.includes('quits'));
+  assert.match(sql, /sumIf\(_sample_interval, blob1 = 'run-end' AND blob6 = 'quit'\) AS quits/);
+  assert.match(sql, /sumIf\(_sample_interval, blob1 = 'run-end' AND blob6 != 'quit'\) AS ends/);
+  assert.match(
+    sql,
+    /sumIf\(_sample_interval \* double5, blob1 = 'run-end' AND blob6 != 'quit'\) AS seconds/,
+  );
+  assert.match(
+    sql,
+    /sumIf\(_sample_interval \* double6, blob1 = 'run-end' AND blob6 != 'quit' AND double6 >= 0\) AS levels/,
+  );
+  assert.match(
+    sql,
+    /sumIf\(_sample_interval, blob1 = 'run-end' AND blob6 != 'quit' AND double7 >= 0\) AS killCount/,
+  );
+});

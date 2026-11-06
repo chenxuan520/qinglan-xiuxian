@@ -60,7 +60,7 @@ root.innerHTML = `<main>
   <section aria-labelledby="errors-title"><h2 id="errors-title">运行错误</h2><p class="note">按站点、版本、摘要合并，最近出现优先；前端会去重限频。这是浏览器上报记录，不代表所有运行故障。摘要可能含浏览器原始错误文本。</p><div id="errors"></div></section>
   <section><h2>留影分享与二维码</h2><p class="note">保存统计为发起下载，不能确认相册落盘；系统分享完成不代表对方已收到。长按保存无法观测。二维码进入指带留影来源的链接打开，不等同真实扫码人数，复制该链接打开也会计入；新存档不能代表新玩家。历史无来源二维码无法追溯。</p><div id="sharing"></div></section>
   <section><h2>访问与开局趋势</h2><div id="trend"></div></section>
-  <section><h2>关卡历练</h2><p class="note">不含天劫，按关卡及难度区分。均值仅使用结算记录；通关率包含主动结束。</p><div id="stages"></div></section>
+  <section><h2>关卡历练</h2><p class="note">不含天劫，按关卡及难度区分。均值仅使用结算记录，不含中途离开；通关率包含主动结束。中途离开指离开页面时该局仍在进行，之后续局打完仍会另记一条结算。</p><div id="stages"></div></section>
   <section><div class="two-column"><div><h2>灵根</h2><div id="roots"></div></div><div><h2>路线</h2><div id="paths"></div></div></div></section>
   <section><div class="two-column"><div><h2>最远通关记录</h2><div id="best"></div></div><div><h2>最高境界记录</h2><div id="realms"></div></div></div></section>
   <section><h2>天劫历练</h2><p class="note">现有打点记录迎劫与成功渡劫，没有完整的失败或弃劫结算；这里不计算天劫胜率。</p><div id="tribulations"></div></section>
@@ -238,6 +238,7 @@ function render(data: MonitorData) {
             '通关',
             '落败',
             '主动结束',
+            '中途离开',
             '结算通关率',
             '平均时长',
             '平均等级',
@@ -249,6 +250,7 @@ function render(data: MonitorData) {
             count(r.won),
             count(r.lost),
             count(r.abandoned),
+            count(r.quits),
             rate(r),
             average(r.seconds, r.ends, ' 秒'),
             average(r.levels, r.levelCount),

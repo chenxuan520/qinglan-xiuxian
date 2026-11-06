@@ -4,6 +4,7 @@ import { TAMPERED_LEADERBOARD_MESSAGE, sealSaveSnapshot } from './leaderboard-in
 import { bindSettlementDirectory } from './settlement-directory-source.ts';
 import { retargetPendingFirstTour } from './first-run-tour-state.ts';
 import { STANDALONE } from './build-mode.ts';
+import { createRunQuitState, trackRunQuitOnLeave } from './run-quit.ts';
 import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
@@ -360,6 +361,7 @@ if (
 let selectedStage = save.unlocked,
   difficulty = minimumDifficulty(save),
   game: Game | null = null;
+const runQuit = createRunQuitState();
 let panel = '',
   bookTab = 'treasures',
   selectedTreasure = save.starter,
@@ -1827,7 +1829,10 @@ function shellBindings(): ActionShell {
     get forgeTreasure() { return marketEventSource.current!.forgeTreasure; },
     get freshTownPopulation() { return freshTownPopulation; },
     get game() { return game; },
-    set game(next) { game = next; },
+    set game(next) {
+      game = next;
+      runQuit.tracked = false;
+    },
     get gameAudio() { return gameAudio; },
     get guideReturn() { return guideReturn; },
     set guideReturn(next) { guideReturn = next; },
@@ -2479,6 +2484,14 @@ window.addEventListener('resize', () => {
   canvasDirty = true;
 });
 window.addEventListener('pagehide', () => {
+  trackRunQuitOnLeave(
+    runQuit,
+    game,
+    settled,
+    lifeStats,
+    (event) => telemetry.track(event),
+    () => telemetry.flush(),
+  );
   if ((game && !settled) || inMortalWorld) persist();
 });
 window.addEventListener('storage', (event) => {

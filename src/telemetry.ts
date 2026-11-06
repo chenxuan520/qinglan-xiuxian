@@ -30,6 +30,7 @@ export const TELEMETRY_RESULTS = [
   'extreme',
   'epilogue',
   'manual',
+  'quit',
 ] as const;
 // 写入 Analytics Engine 的列顺序；查询脚本按同一顺序命名 blob1… 与 double1…。
 // 现有数据集已有 blob1…6 的行，detail 只能追加在末尾，旧行该列为空。

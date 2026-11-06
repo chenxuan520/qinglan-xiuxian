@@ -9,7 +9,12 @@ const source = main.match(/^function shellBindings\([^]*?^\}/m);
 assert.ok(source, '实际主入口必须提供状态绑定');
 
 function harness() {
-  const context = createContext({ game: null, save: { stones: 1 }, panel: '' });
+  const context = createContext({
+    game: null,
+    save: { stones: 1 },
+    panel: '',
+    runQuit: { tracked: false },
+  });
   new Script(`
     globalThis.structuredClone = function(value) {
       if (this !== globalThis) throw new TypeError('Illegal invocation');
