@@ -8,7 +8,6 @@ import {
   MAX_RUN_LEVEL,
   STAGES,
   STAGE_YEARS_PER_MINUTE,
-  enemyWave,
   formatTime,
   passive,
   pathInfo,
@@ -16,8 +15,9 @@ import {
 } from './data.ts';
 import { activeMedicines } from './medicine-data.ts';
 import { formatNumber } from './number-format.ts';
-import { controls } from './common-ui.ts';
-import { icon } from './icons.ts';
+import { controls, runExperience, runWave } from './common-ui.ts';
+import { icon, smallIcon } from './icons.ts';
+import { compactHud } from './compact-hud.ts';
 import type { MobileDisplay } from './mobile-display.ts';
 import { HudLayout } from './hud-layout.ts';
 import { comboTreasure, curioCombo } from './curio-combos.ts';
@@ -135,6 +135,7 @@ export class SovereignRecoveryNotice {
 
 export class BattleHud {
   private lastLoadout = '';
+  private compact = false;
   private readonly ui: HTMLDivElement;
   private readonly save: SaveData;
   private readonly mobileDisplay: MobileDisplay;
@@ -153,12 +154,20 @@ export class BattleHud {
   }
   render(game: Game, volumeOpen: boolean, touchHintDismissed: boolean) {
     const { ui, save, mobileDisplay } = this;
+    const compact = (this.compact = compactHud());
 
     document.body.classList.remove('immortal-home');
     this.layout.reset();
     this.lastLoadout = '';
     document.body.classList.add('in-game');
-    ui.innerHTML = `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span id="cultivation-caption">永久修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${game.tribulation && isExtremeLife(save) ? '极限修行' : `<span class="difficulty-name difficulty-${game.difficulty}">${DIFFICULTIES[game.difficulty].name}</span>`}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(game.stageDuration)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(save, volumeOpen, mobileDisplay, true)}</div></div><div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div id="cache-prompt" class="cache-prompt" hidden><small id="cache-status"></small></div><p class="touch-movement-hint"${touchHintDismissed || save.autoplay ? ' hidden' : ''}>按住空白处拖动 · 法宝自动攻击</p><div class="battle-bottom"><div class="battle-controls"><span>左键点击前往 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
+    const header = compact
+      ? `<div class="game-hud compact-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level">Lv${game.level}</b></div><div class="compact-health"><div class="health-bar" role="progressbar" aria-label="气血" aria-valuemin="0"><i id="health-fill"></i></div><span id="health-text"></span></div></div><div class="stage-timer"><strong id="time"></strong></div><div class="combat-actions compact-actions"><button class="round-button auto-button ${save.autoplay ? 'active' : ''}" data-action="autoplay" aria-pressed="${save.autoplay}" aria-label="自动历练 · ${save.autoplay ? '开' : '关'}" title="自动历练 · ${save.autoplay ? '开' : '关'}">${smallIcon('auto')}</button><button class="round-button" data-action="pause" aria-label="设置与暂停" title="设置与暂停">${smallIcon('gear')}</button></div></div>`
+      : `<div class="game-hud"><div class="player-panel"><div class="player-heading"><span id="realm-name">${realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).name}</span><b id="level" title="局内等级：收集灵气升级，选择法宝与功法">LV. 1</b></div><div class="health-label"><span>气血</span><span id="health-text">100 / 100</span></div><div class="health-bar"><i id="health-fill"></i></div><div class="cultivation-label"><span id="cultivation-text"></span><span id="cultivation-caption">永久修为</span></div><div id="lifespan-text" class="lifespan-hud"></div><small id="medicine-hud"></small></div><div class="stage-timer"><div>${game.encounterName} · ${pathInfo(game.path).name}<i>·</i>${game.tribulation && isExtremeLife(save) ? '极限修行' : `<span class="difficulty-name difficulty-${game.difficulty}">${DIFFICULTIES[game.difficulty].name}</span>`}</div><strong id="time">00:00</strong><span> / ${game.tribulation ? '渡劫中' : formatTime(game.stageDuration)}</span><small id="wave-label">初入秘境 · 稳固道心</small></div><div class="combat-actions"><span class="kill-counter">斩妖 <b id="kills">0</b></span>${controls(save, volumeOpen, mobileDisplay, true)}</div></div>`;
+    const overlays = `<div id="boss-bar" class="boss-bar" hidden><div><span>${STAGES[game.stage].boss}</span><small>妖王</small></div><div class="health-bar"><i></i></div></div><div id="notice" class="battle-notice"></div><div id="cache-prompt" class="cache-prompt" hidden><small id="cache-status"></small></div><p class="touch-movement-hint"${touchHintDismissed || save.autoplay ? ' hidden' : ''}>按住空白处拖动 · 法宝自动攻击</p>`;
+    const footer = compact
+      ? `<div class="battle-bottom compact-loadout" tabindex="0" role="region" aria-label="本局法宝与功法，可横向滚动"><div class="equipped-slots" id="equipped-slots"></div><div class="passive-slots" id="passive-slots"></div></div><div class="xp-track"><i id="xp-fill"></i></div>`
+      : `<div class="battle-bottom"><div class="battle-controls"><span>左键点击前往 · <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 方向键</span><small><kbd>E</kbd> 开启自动历练 · 触屏拖动 · 自动施法</small></div><div class="equipped-slots" id="equipped-slots"></div><div class="battle-objective"><span id="xp-text">灵气 0 / 20</span><small>${game.tribulation ? '避开劫雷 · 反击核心' : game.isFinalTrial ? '全员精英 · 决战仙尊' : '存活历练 · 斩灭妖王'}</small></div></div><div class="passive-slots" id="passive-slots"></div><div class="xp-track"><i id="xp-fill"></i></div>`;
+    ui.innerHTML = header + overlays + footer;
     this.update(game);
   }
   update(game: Game) {
@@ -181,7 +190,7 @@ export class BattleHud {
     );
     // 真仙不再积累突破进度，去掉「永久修为」标题，免得标题下没有对应数值。
     set('cultivation-caption', realm.max ? '' : '永久修为');
-    set('level', `LV. ${game.level}`);
+    set('level', this.compact ? `Lv${game.level}` : `LV. ${game.level}`);
     const cachePrompt = document.getElementById('cache-prompt');
     if (cachePrompt) {
       const c = game.cacheChallenge;
@@ -228,41 +237,30 @@ export class BattleHud {
       );
     set(
       'health-text',
-      `${formatNumber(Math.ceil(game.player.hp))} / ${formatNumber(game.player.maxHp)}`,
+      this.compact
+        ? formatNumber(Math.ceil(game.player.hp))
+        : `${formatNumber(Math.ceil(game.player.hp))} / ${formatNumber(game.player.maxHp)}`,
     );
     document.querySelector<HTMLElement>('#health-fill')!.style.width =
       `${Math.max(0, game.player.hp / game.player.maxHp) * 100}%`;
     document.querySelector('.player-panel')?.classList.toggle('low-health', game.lowHealth > 0);
     set('kills', `${game.kills}`);
-    set('time', formatTime(game.time));
-    const maxLevel = game.level >= MAX_RUN_LEVEL;
     set(
-      'xp-text',
-      game.tribulation
-        ? '走位渡劫 · 不掉落灵气'
-        : maxLevel
-          ? `已满级 · LV. ${MAX_RUN_LEVEL}`
-          : `灵气 ${Math.floor(game.xp)} / ${xpNeeded(game.level)}`,
+      'time',
+      this.compact
+        ? `${formatTime(game.time)}/${game.tribulation ? '渡劫中' : formatTime(game.stageDuration)}`
+        : formatTime(game.time),
     );
+    if (this.compact) {
+      const health = this.ui.querySelector('.compact-health .health-bar');
+      health?.setAttribute('aria-valuenow', String(Math.max(0, game.player.hp)));
+      health?.setAttribute('aria-valuemax', String(game.player.maxHp));
+    }
+    const maxLevel = game.level >= MAX_RUN_LEVEL;
+    set('xp-text', runExperience(game));
     document.querySelector<HTMLElement>('#xp-fill')!.style.width =
       `${maxLevel ? 100 : Math.min(100, (game.xp / xpNeeded(game.level)) * 100)}%`;
-    set(
-      'wave-label',
-      game.tribulation
-        ? game.tribulationVulnerable
-          ? '核心显露 · 集中输出'
-          : '劫雷蓄势 · 留意预警'
-        : game.isFinalTrial
-          ? `七劫试炼 · 已破 ${game.trialBossesDefeated} / 7 劫 · 妖潮 ${enemyWave(game.stage, game.time) + 1} / 4`
-          : game.bossSpawned
-            ? '妖王现身 · 决战之时'
-            : [
-                '初入秘境 · 稳固道心',
-                '第二批妖物 · 妖影突袭',
-                '第三批妖物 · 强敌压境',
-                '最后一批 · 妖潮汹涌',
-              ][enemyWave(game.stage, game.time)],
-    );
+    set('wave-label', runWave(game));
     const notice = document.getElementById('notice')!;
     if (!notice.firstElementChild) {
       const current = document.createElement('div');
@@ -292,24 +290,39 @@ export class BattleHud {
         `${(game.boss.hp / game.boss.maxHp) * 100}%`;
     }
     const loadout = JSON.stringify([
+      this.compact,
       game.weapons.map((w) => [w.id, w.level, w.evolved, !!curioCombo(save, w.id)]),
       game.passives,
     ]);
     if (loadout !== this.lastLoadout) {
       this.lastLoadout = loadout;
-      document.getElementById('equipped-slots')!.innerHTML = Array.from({ length: 6 }, (_, i) => {
-        const w = game!.weapons[i];
-        if (!w)
-          return '<div class="equipped-slot empty"><span>＋</span><small>待悟法宝</small></div>';
-        const t = comboTreasure(save, w.id, true, w.evolved);
-        return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}">${icon(t.id, t.color)}<div><strong>${w.evolved ? t.evolution : t.name}</strong><span>${w.evolved ? '仙器 · 觉醒' : `${['', '一', '二', '三', '四', '五', '六'][w.level]}重`}<i>${'·'.repeat(w.level)}</i></span></div></div>`;
-      }).join('');
+      document.getElementById('equipped-slots')!.innerHTML = Array.from(
+        { length: this.compact ? game.weapons.length : 6 },
+        (_, i) => {
+          const w = game!.weapons[i];
+          if (!w)
+            return '<div class="equipped-slot empty"><span>＋</span><small>待悟法宝</small></div>';
+          const t = comboTreasure(save, w.id, true, w.evolved);
+          if (this.compact)
+            return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}" aria-label="${w.evolved ? t.evolution : t.name} · ${w.evolved ? '觉醒' : `${w.level}重`}">${icon(t.id, t.color)}<b class="loadout-rank">${w.evolved ? '觉' : w.level}</b></div>`;
+          return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}">${icon(t.id, t.color)}<div><strong>${w.evolved ? t.evolution : t.name}</strong><span>${w.evolved ? '仙器 · 觉醒' : `${['', '一', '二', '三', '四', '五', '六'][w.level]}重`}<i>${'·'.repeat(w.level)}</i></span></div></div>`;
+        },
+      ).join('');
       document.getElementById('passive-slots')!.innerHTML = Object.entries(game.passives)
-        .map(
-          ([id, level]) =>
-            `<span title="${passive(id).desc}">${icon(id, passive(id).color)}${passive(id).name}<b>${level}</b></span>`,
+        .map(([id, level]) =>
+          this.compact
+            ? `<span title="${passive(id).desc}" aria-label="${passive(id).name} · ${level}重">${icon(id, passive(id).color)}<b class="loadout-rank">${level}</b></span>`
+            : `<span title="${passive(id).desc}">${icon(id, passive(id).color)}${passive(id).name}<b>${level}</b></span>`,
         )
         .join('');
+      if (this.compact) {
+        this.ui
+          .querySelector<HTMLElement>('#equipped-slots')
+          ?.style.setProperty('--slot-count', String(game.weapons.length));
+        const passives = this.ui.querySelector<HTMLElement>('#passive-slots');
+        passives?.style.setProperty('--slot-count', String(Object.keys(game.passives).length));
+        if (passives) passives.hidden = !Object.keys(game.passives).length;
+      }
     }
     this.layout.update();
   }

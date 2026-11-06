@@ -22,5 +22,9 @@ export const smallIcon = (id: string) => {
     book: '<path d="M3 4q5-1 9 3 4-4 9-3v15q-5-1-9 3-4-4-9-3ZM12 7v15"/>',
     refresh: '<path d="M20 7A9 9 0 1 0 21 15M20 2v6h-6"/>',
   };
+  if (id === 'auto')
+    return '<svg width="24" height="24" viewBox="0 0 24 24" class="small-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="auto-cycle-arc"><path d="M12 4a8 8 0 1 1-8 8"/><path d="m1.5 14.5 2.5-2.5 2.5 2.5"/></g><path d="m10 8.5 5.5 3.5-5.5 3.5Z" fill="currentColor" stroke="none"/></svg>';
+  if (id === 'gear')
+    return `<svg width="24" height="24" viewBox="0 0 24 24" class="small-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths.settings}</svg>`;
   return `<svg viewBox="0 0 24 24" class="small-icon" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[id] || paths.gem}</svg>`;
 };

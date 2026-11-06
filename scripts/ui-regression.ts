@@ -2,16 +2,24 @@
 import assert from 'node:assert/strict';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { freshSave, readSave, IMMORTAL_CULTIVATION, type SaveData } from '../src/progress.ts';
+import {
+  freshSave,
+  readSave,
+  lifespanInfo,
+  IMMORTAL_CULTIVATION,
+  type SaveData,
+} from '../src/progress.ts';
 import { Game } from '../src/game.ts';
-import { formatTime, TRIAL_BOSS_TIMES } from '../src/data.ts';
-import { TOUR_STEPS } from '../src/interface-tour-model.ts';
+import { formatTime, STAGE_YEARS_PER_MINUTE, TRIAL_BOSS_TIMES } from '../src/data.ts';
+import { TOUR_STEPS, tourStep } from '../src/interface-tour-model.ts';
+import { COMPACT_HUD_QUERY } from '../src/compact-hud.ts';
 import { CURIO_IDS, CURIO_NAMES } from '../src/curio-data.ts';
 import { MEDICINES } from '../src/medicine-data.ts';
 import { medicineCraftStones } from '../src/medicine.ts';
 import { joinSect } from '../src/mortal.ts';
 import { spiritPower } from '../src/spirit-power.ts';
 import { formatNumber } from '../src/number-format.ts';
+import { runExperience, runWave } from '../src/common-ui.ts';
 import { JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../src/setting.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 import { UI_AD_FIXTURE } from './ui-ad-fixture.ts';
@@ -165,12 +173,31 @@ async function check(name: string, hud = false) {
     };
     const visible = node => node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden';
     const buttons = [...document.querySelectorAll('.combat-actions button:not([data-action=mute])')].filter(visible);
+    const compact = matchMedia(${JSON.stringify(COMPACT_HUD_QUERY)}).matches;
+    const health = compact ? document.querySelector('.compact-health .health-bar') : null;
+    const healthText = compact ? document.querySelector('#health-text') : null;
+    const bottom = compact ? document.querySelector('.battle-bottom.compact-loadout') : null;
+    const slots = bottom ? [...bottom.querySelectorAll('.equipped-slot, .passive-slots > span')].filter(visible) : [];
     return {
       viewport: [innerWidth, innerHeight], pageWidth: document.documentElement.scrollWidth,
       panels: [...document.querySelectorAll('.panel,.upgrade-panel')].map(node => ({...box(node), scroll:node.scrollWidth, client:node.clientWidth})),
       buttons: buttons.map(node => ({action:node.dataset.action, ...box(node)})),
       player: document.querySelector('.player-panel') ? box(document.querySelector('.player-panel')) : null,
       timer: document.querySelector('.stage-timer') ? box(document.querySelector('.stage-timer')) : null,
+      compact,
+      compactLayout: compact && document.querySelector('.game-hud') ? {
+        header: box(document.querySelector('.game-hud')),
+        health: health ? box(health) : null,
+        healthText: healthText ? {text:healthText.textContent, current:Number(health?.getAttribute('aria-valuenow')), ...box(healthText)} : null,
+        level: document.querySelector('#level')?.textContent,
+        time: document.querySelector('#time')?.textContent,
+        bottom: bottom ? { ...box(bottom), pointer: getComputedStyle(bottom).pointerEvents, touch: getComputedStyle(bottom).touchAction } : null,
+        empty: document.querySelectorAll('.equipped-slot.empty').length,
+        weaponCount: bottom?.querySelectorAll('.equipped-slot').length,
+        passiveCount: bottom?.querySelectorAll('.passive-slots > span').length,
+        slots: slots.map(node => ({...box(node), icon:!!node.querySelector('.icon'), rank:node.querySelector('.loadout-rank')?.textContent})),
+        weaponLabels: bottom?.querySelectorAll('.equipped-slot strong, .equipped-slot > div').length,
+      } : null,
     };
   }`);
   assert.ok(layout.pageWidth <= layout.viewport[0] + 1, `${name} 页面横向溢出`);
@@ -179,17 +206,96 @@ async function check(name: string, hud = false) {
     assert.ok(panel.left >= -1 && panel.right <= layout.viewport[0] + 1, `${name} 面板越界`);
   }
   if (hud) {
-    assert.ok(layout.player && layout.timer && layout.buttons.length >= 5, `${name} HUD 缺失`);
+    if (layout.compact) {
+      assert.ok(layout.player && layout.timer && layout.compactLayout, `${name} 竖屏 HUD 缺失`);
+      assert.deepEqual(
+        layout.buttons.map((button: any) => button.action),
+        ['autoplay', 'pause'],
+        `${name} 竖屏顶栏只保留自动与设置两钮`,
+      );
+    } else
+      assert.ok(layout.player && layout.timer && layout.buttons.length >= 5, `${name} HUD 缺失`);
     const intersect = (a: any, b: any) =>
       Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 &&
       Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
     for (const [i, button] of layout.buttons.entries()) {
-      assert.ok(button.width >= 31 && button.height >= 27, `${name} ${button.action} 点击区过小`);
+      if (layout.compact)
+        assert.ok(
+          Math.abs(button.width - 28) < 0.5 && Math.abs(button.height - 28) < 0.5,
+          `${name} ${button.action} 竖屏点击区应为28px`,
+        );
+      else
+        assert.ok(button.width >= 31 && button.height >= 27, `${name} ${button.action} 点击区过小`);
       assert.ok(button.left >= -1 && button.right <= layout.viewport[0] + 1, `${name} 按钮越界`);
       assert.ok(!intersect(button, layout.player), `${name} ${button.action} 与状态栏重叠`);
       assert.ok(!intersect(button, layout.timer), `${name} ${button.action} 与计时重叠`);
       for (const other of layout.buttons.slice(i + 1))
         assert.ok(!intersect(button, other), `${name} ${button.action}/${other.action} 重叠`);
+    }
+    if (layout.compact) {
+      const compact = layout.compactLayout;
+      const center = (rect: any) => (rect.top + rect.bottom) / 2;
+      assert.ok(Math.abs(compact.header.height - 36) < 0.5, `${name} 竖屏顶栏只占36px一行`);
+      for (const item of [layout.player, layout.timer, ...layout.buttons]) {
+        assert.ok(
+          Math.abs(center(item) - center(compact.header)) < 1,
+          `${name} 状态、计时与按钮必须同排`,
+        );
+        assert.ok(
+          item.left >= compact.header.left && item.right <= compact.header.right,
+          `${name} 顶栏内容越界`,
+        );
+      }
+      assert.ok(!intersect(layout.player, layout.timer), `${name} 气血与计时重叠`);
+      assert.ok(compact.health && compact.healthText, `${name} 缺少气血条或当前气血`);
+      assert.ok(compact.health.width >= 18 && compact.health.height > 0, `${name} 气血条不可塌缩`);
+      assert.ok(!intersect(compact.health, compact.healthText), `${name} 气血条与数字重叠`);
+      assert.ok(!intersect(compact.healthText, layout.timer), `${name} 当前气血与计时重叠`);
+      assert.equal(
+        compact.healthText.text,
+        formatNumber(Math.ceil(compact.healthText.current)),
+        `${name} 气血只显示当前值`,
+      );
+      assert.match(compact.level, /^Lv\d+$/, `${name} 局内等级格式`);
+      assert.match(
+        compact.time,
+        /^\d+:\d{2}\/(?:\d+:\d{2}|渡劫中)$/,
+        `${name} 已过时间与历练时长同排`,
+      );
+      assert.ok(
+        compact.bottom &&
+          compact.weaponCount >= 1 &&
+          compact.weaponCount <= 6 &&
+          compact.passiveCount <= 4,
+        `${name} 底部法宝与功法缺失或超限`,
+      );
+      assert.equal(compact.bottom.pointer, 'auto', `${name} 底栏不可将滑动穿透到战场`);
+      assert.equal(compact.bottom.touch, 'pan-x', `${name} 底栏保留原生横向滑动`);
+      assert.equal(compact.empty, 0, `${name} 竖屏不显示法宝空槽`);
+      assert.equal(compact.weaponLabels, 0, `${name} 底部法宝使用图标与重数`);
+      assert.equal(
+        compact.slots.length,
+        compact.weaponCount + compact.passiveCount,
+        `${name} 已持法宝与功法均应显示`,
+      );
+      assert.ok(
+        compact.bottom.left >= 0 && compact.bottom.right <= layout.viewport[0] + 1,
+        `${name} 底栏越界`,
+      );
+      for (const [index, slot] of compact.slots.entries()) {
+        assert.equal(slot.icon, true, `${name} 槽位缺少图标`);
+        assert.match(slot.rank, /^[1-6觉]$/, `${name} 槽位缺少重数或觉醒标记`);
+        assert.ok(
+          Math.abs(center(slot) - center(compact.slots[0])) < 1,
+          `${name} 底部法宝与功法必须同排`,
+        );
+        assert.ok(
+          slot.top >= compact.bottom.top - 1 && slot.bottom <= compact.bottom.bottom + 1,
+          `${name} 槽位超出底栏`,
+        );
+        for (const other of compact.slots.slice(index + 1))
+          assert.ok(!intersect(slot, other), `${name} 底部法宝与功法重叠`);
+      }
     }
   }
   results.push({ name, layout });
@@ -1392,14 +1498,19 @@ try {
     await click('[data-action=start]');
     await wait('() => !!document.querySelector(".game-hud")');
     await check(`${name}-battle`, true);
+    const compact = await evaluate<boolean>(
+      `() => matchMedia(${JSON.stringify(COMPACT_HUD_QUERY)}).matches`,
+    );
+    const pauseActions = compact ? '.compact-pause-actions' : '.pause-actions';
     await click('[data-action=pause]');
-    await click('.pause-actions [data-action=autoplay]');
+    await click(`${pauseActions} [data-action=autoplay]`);
     assert.equal((await saved()).autoplay, true);
-    await click('.pause-actions [data-action=autoplay]');
-    await click('.pause-actions [data-action=damage]');
+    await click(`${pauseActions} [data-action=autoplay]`);
+    await click(`${pauseActions} [data-action=damage]`);
     await click('[data-action=close]');
     await click('[data-action=resume]');
-    await click('.combat-actions [data-action=guide]');
+    if (compact) await click('.combat-actions [data-action=pause]');
+    await click(`${compact ? pauseActions : '.combat-actions'} [data-action=guide]`);
     await wait('() => !!document.querySelector("[data-action=guide-tour]")');
     const beforeTour = await evaluate("() => localStorage.getItem('qinglan-immortal-v1')");
     await click('[data-action=guide-tour]');
@@ -1408,8 +1519,9 @@ try {
       checkpoint = `${name}-tour-${step}`;
       await wait(`() => document.querySelector('.interface-tour')?.dataset.step === '${step}'`);
       await evaluate('async () => { await new Promise(requestAnimationFrame); return true; }');
+      const expected = tourStep(step, compact);
       const layout = await evaluate(`() => {
-        const target = document.querySelector(${JSON.stringify(TOUR_STEPS[step].target)});
+        const target = document.querySelector(${JSON.stringify(expected.target)});
         const bounds = target.getBoundingClientRect();
         let clipped = bounds.left < 0 || bounds.top < 0 || bounds.right > innerWidth + 1 || bounds.bottom > innerHeight + 1;
         for (let parent = target.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
@@ -1423,6 +1535,8 @@ try {
         const navigation = document.querySelector('.tour-navigation').getBoundingClientRect();
         const next = document.querySelector('[data-tour="next"]').getBoundingClientRect();
         return {
+          title: document.querySelector('.tour-card h2').textContent,
+          copy: document.querySelector('.tour-copy').textContent,
           inside: card.left >= 0 && card.top >= 0 && card.right <= innerWidth + 1 && card.bottom <= innerHeight + 1,
           overlap: Math.max(0, Math.min(card.right, hole.right) - Math.max(card.left, hole.left)) *
             Math.max(0, Math.min(card.bottom, hole.bottom) - Math.max(card.top, hole.top)),
@@ -1432,6 +1546,8 @@ try {
           practice: !document.querySelector('.interface-tour[data-step="12"]') || (hole.height >= 80 && hole.top <= innerHeight / 2 - 60 && hole.bottom >= innerHeight / 2 + 50 && hole.left <= innerWidth / 2 - 40 && hole.right >= innerWidth / 2 + 40),
         };
       }`);
+      assert.equal(layout.title, expected.title, `${checkpoint}：导览标题对应当前步骤`);
+      assert.equal(layout.copy, expected.copy, `${checkpoint}：导览文案对应当前界面`);
       assert.equal(layout.inside, true, `${checkpoint}：说明卡必须完整可见`);
       assert.equal(layout.visible, true, `${checkpoint}：高亮目标必须可见`);
       assert.equal(layout.practice, true, `${checkpoint}：走位亮区不能塌缩`);
@@ -1516,18 +1632,45 @@ try {
     await click('[data-action=resume]');
     await wait('() => !document.querySelector(".panel") && !!document.querySelector(".game-hud")');
     await check(`${name}-late`, true);
-    assert.match(
-      await evaluate("() => document.querySelector('#cultivation-text').textContent"),
-      /通关第七境成仙/,
-    );
+    if (compact) {
+      await click('.combat-actions [data-action=pause]');
+      await wait('() => !!document.querySelector(".compact-pause-info")');
+      const lateSave = (await saved()) as SaveData & { activeRun: ReturnType<Game['snapshot']> };
+      assert.equal(lateSave.activeRun?.state, 'paused', '齿轮打开暂停后再核对永久进度');
+      const pausedGame = Game.restore(structuredClone(lateSave), lateSave.activeRun);
+      assert.ok(pausedGame, '暂停的真实存档必须可以恢复');
+      assert.deepEqual(
+        await evaluate(
+          "() => [...document.querySelectorAll('.compact-pause-battle > span')].map(n => n.textContent)",
+        ),
+        [runExperience(pausedGame), runWave(pausedGame)],
+        '原灵气数值与波次信息完整迁入暂停',
+      );
+      const life = lifespanInfo(lateSave);
+      const stage = lateSave.activeRun!.stage;
+      assert.equal(
+        await evaluate("() => document.querySelector('.compact-pause-progress').textContent"),
+        `年岁 ${life.age < 1000000 ? life.age.toFixed(1) : formatNumber(life.age)}/${Number.isFinite(life.limit) ? life.limit : '∞'}岁 · ${STAGE_YEARS_PER_MINUTE[stage]}年/分 · 永久修为 ${formatNumber(lateSave.cultivation)}`,
+        '竖屏暂停显示真实年岁、有效寿元、计龄速度和永久修为',
+      );
+      await check(`${name}-late-pause`, true);
+    } else {
+      assert.match(
+        await evaluate("() => document.querySelector('#cultivation-text').textContent"),
+        /通关第七境成仙/,
+      );
+    }
+    const medicineSelector = compact ? '.compact-pause-medicines' : '#medicine-hud';
     assert.ok(
-      (await evaluate("() => document.querySelector('#medicine-hud').textContent")).includes(
-        '明清灵水',
-      ),
+      (
+        await evaluate(
+          `() => document.querySelector(${JSON.stringify(medicineSelector)}).textContent`,
+        )
+      ).includes('明清灵水'),
     );
     // 剩余年数会随战斗推进；提示、药效文本和布局必须取自同一次同步快照。
     const compactHud = await evaluate(`() => {
-      const hud = document.querySelector('#medicine-hud'), panel = document.querySelector('.player-panel').getBoundingClientRect(), box = hud.getBoundingClientRect();
+      const hud = document.querySelector(${JSON.stringify(medicineSelector)}), panel = document.querySelector(${JSON.stringify(compact ? '.panel' : '.player-panel')}).getBoundingClientRect(), box = hud.getBoundingClientRect();
       const style = getComputedStyle(hud);
       const medicines = [...hud.children].map(item => {
         const range = document.createRange(); range.selectNodeContents(item);
@@ -1540,25 +1683,45 @@ try {
         height:box.height, lineHeight:parseFloat(style.lineHeight), overflow:style.overflowX, ellipsis:style.textOverflow, medicines};
     }`);
     assert.equal(compactHud.inside, true, '药效栏不能溢出状态栏');
-    if (compactHud.mobile) {
+    if (compactHud.mobile && !compact) {
       assert.ok(compactHud.height <= compactHud.lineHeight + 1, '手机所有药效只占一行');
       assert.equal(compactHud.overflow, 'hidden');
       assert.equal(compactHud.ellipsis, 'ellipsis', '超长药效显示省略号');
     }
     const medicines = compactHud.medicines;
     assert.equal(medicines.length, 3, '三种药效的完整信息均须保留');
+    if (compact) {
+      assert.deepEqual(
+        medicines.map((medicine: any) => medicine.text.split(' ')[0]).sort(),
+        ['明清灵水', '万年灵乳', '无常丹'].sort(),
+        '竖屏暂停保留全部三种原药效',
+      );
+      assert.equal(
+        compactHud.title,
+        medicines.map((medicine: any) => medicine.text).join(' · '),
+        '竖屏暂停保留完整药效title',
+      );
+    }
     for (const [index, medicine] of medicines.entries()) {
       assert.match(medicine.text, /^(明清灵水|万年灵乳|无常丹) \d+年$/);
       assert.equal(medicine.lines, 1, '同一种丹药的药名与剩余年数不能拆行');
       assert.ok(compactHud.title.includes(medicine.text), '省略显示仍保留完整药效说明');
-      if (!compactHud.mobile) assert.equal(medicine.inside, true, '桌面药效不能溢出状态栏');
+      if (compact) assert.equal(medicine.inside, true, '竖屏暂停中的每种药效必须完整可见');
+      else if (!compactHud.mobile) assert.equal(medicine.inside, true, '桌面药效不能溢出状态栏');
       if (index > 0) {
-        if (compactHud.mobile)
+        if (compactHud.mobile && !compact)
           assert.ok(Math.abs(medicine.top - medicines[0].top) < 1, '手机药效必须同一行');
-        else assert.ok(medicine.top >= medicines[index - 1].bottom - 1, '桌面每种药效独占一行');
+        else if (!compact)
+          assert.ok(medicine.top >= medicines[index - 1].bottom - 1, '桌面每种药效独占一行');
       }
     }
-    const ageItems = await evaluate(`() => {
+    if (compact) {
+      await click('[data-action=resume]');
+      await wait(
+        '() => !document.querySelector(".panel") && !!document.querySelector(".compact-hud")',
+      );
+    } else {
+      const ageItems = await evaluate(`() => {
       const panel = document.querySelector('.player-panel').getBoundingClientRect();
       return [...document.querySelectorAll('#lifespan-text > span')].map(item => {
         const range = document.createRange(); range.selectNodeContents(item);
@@ -1567,22 +1730,29 @@ try {
           inside:rect.left >= panel.left && rect.right <= panel.right};
       });
     }`);
-    assert.equal(ageItems.length, 2, '年岁与计龄速度分别成项');
-    for (const item of ageItems) {
-      assert.equal(item.lines, 1, '年岁或流速单位不能拆成孤字');
-      assert.equal(item.inside, true, '年岁与计龄速度不能溢出状态栏');
+      assert.equal(ageItems.length, 2, '年岁与计龄速度分别成项');
+      for (const item of ageItems) {
+        assert.equal(item.lines, 1, '年岁或流速单位不能拆成孤字');
+        assert.equal(item.inside, true, '年岁与计龄速度不能溢出状态栏');
+      }
+      assert.equal(
+        await evaluate(
+          `() => {const e=document.querySelector('#lifespan-text'),s=getComputedStyle(e);return e.clientHeight <= parseFloat(s.lineHeight)+1}`,
+        ),
+        true,
+        '年岁与计龄速度合计只占一行',
+      );
     }
-    assert.equal(
-      await evaluate(
-        `() => {const e=document.querySelector('#lifespan-text'),s=getComputedStyle(e);return e.clientHeight <= parseFloat(s.lineHeight)+1}`,
-      ),
-      true,
-      '年岁与计龄速度合计只占一行',
-    );
     if (name === 'phone') {
       await browser.call('emulate', { pageId, viewport: '844x390x1,mobile,touch,landscape' });
+      await wait(
+        `() => !matchMedia(${JSON.stringify(COMPACT_HUD_QUERY)}).matches && !!document.querySelector('.game-hud:not(.compact-hud)')`,
+      );
       await check('rotate-landscape', true);
       await browser.call('emulate', { pageId, viewport });
+      await wait(
+        `() => matchMedia(${JSON.stringify(COMPACT_HUD_QUERY)}).matches && !!document.querySelector('.compact-hud')`,
+      );
       await check('rotate-portrait', true);
     }
     await finishPage();

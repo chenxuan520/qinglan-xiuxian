@@ -20,6 +20,9 @@ import {
   EVOLVED_COOLDOWN,
   AWAKENING_BURST,
   MAX_WEAPON_LEVEL,
+  MAX_RUN_LEVEL,
+  enemyWave,
+  xpNeeded,
   type Treasure,
   type CultivationPath,
   type SpiritRootId,
@@ -33,6 +36,31 @@ import { masteryDescription } from './mortal-ui.ts';
 import { formatNumber } from './number-format.ts';
 import { choiceGuidance } from './choice-guidance.ts';
 import { comboTreasure, treasureDisplayName } from './curio-combos.ts';
+
+export function runExperience(game: Game) {
+  return game.tribulation
+    ? '走位渡劫 · 不掉落灵气'
+    : game.level >= MAX_RUN_LEVEL
+      ? `已满级 · LV. ${MAX_RUN_LEVEL}`
+      : `灵气 ${Math.floor(game.xp)} / ${xpNeeded(game.level)}`;
+}
+
+export function runWave(game: Game) {
+  return game.tribulation
+    ? game.tribulationVulnerable
+      ? '核心显露 · 集中输出'
+      : '劫雷蓄势 · 留意预警'
+    : game.isFinalTrial
+      ? `七劫试炼 · 已破 ${game.trialBossesDefeated} / 7 劫 · 妖潮 ${enemyWave(game.stage, game.time) + 1} / 4`
+      : game.bossSpawned
+        ? '妖王现身 · 决战之时'
+        : [
+            '初入秘境 · 稳固道心',
+            '第二批妖物 · 妖影突袭',
+            '第三批妖物 · 强敌压境',
+            '最后一批 · 妖潮汹涌',
+          ][enemyWave(game.stage, game.time)];
+}
 
 export function telemetryRow(enabled: boolean, active: boolean) {
   const status = !enabled ? '已关闭' : active ? '已开启' : '已开启 · 当前不可用';
@@ -62,13 +90,16 @@ export function fullscreenButton(available: boolean, active: boolean) {
     ? `<button class="round-button fullscreen-button" data-action="fullscreen" aria-label="${active ? '退出全屏' : '进入全屏'}" aria-pressed="${active}">${active ? '还原' : '全屏'}</button>`
     : '';
 }
+export function soundControl(save: SaveData, volumeOpen: boolean, compact = false) {
+  return `<span class="sound-control"><button class="${compact ? 'secondary-button' : 'round-button'}" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${compact ? `音效 · ${save.sound ? '开' : '关'}` : smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span>`;
+}
 export function controls(
   save: SaveData,
   volumeOpen: boolean,
   display: { available: boolean; active: boolean },
   inGame = false,
 ) {
-  return `${autoplayButton(save.autoplay, inGame)}<span class="sound-control"><button class="round-button" data-action="sound" aria-label="${save.sound ? '调节音量' : '开启音乐与音效'}" title="${save.sound ? '调节音乐与音效音量' : '开启音乐与音效'}">${smallIcon(save.sound ? 'sound' : 'mute')}</button>${save.sound && volumeOpen ? `<div class="volume-control"><label>音乐与音效 <output>${Math.round(save.volume * 100)}%</output><input type="range" min="0" max="100" value="${Math.round(save.volume * 100)}" data-volume aria-label="音乐与音效音量" /></label><button data-action="mute">静音</button></div>` : ''}</span>${inGame ? '' : `<button class="round-button settings-button" data-action="settings" aria-label="设置" aria-haspopup="dialog" title="设置 · 自动历练、声音与离线资源">${smallIcon('settings')}</button>`}<button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton(display.available, display.active)}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
+  return `${autoplayButton(save.autoplay, inGame)}${soundControl(save, volumeOpen)}${inGame ? '' : `<button class="round-button settings-button" data-action="settings" aria-label="设置" aria-haspopup="dialog" title="设置 · 自动历练、声音与离线资源">${smallIcon('settings')}</button>`}<button class="round-button help-button" data-action="guide" aria-label="修行指南" title="修行指南 · 玩法与道具">?</button>${inGame ? `<button class="round-button damage-button" data-action="damage" aria-label="伤害统计" title="查看本局法宝伤害占比">伤害</button>${fullscreenButton(display.available, display.active)}<button class="round-button" data-action="pause" aria-label="暂停游戏" title="暂停 · Esc">${smallIcon('pause')}</button>` : ''}`;
 }
 export function realmVerse(realm: ReturnType<typeof realmInfo>) {
   if (realm.name === '凡人') return '十五离乡问道，凡骨亦可登仙。';

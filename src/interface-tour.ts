@@ -11,7 +11,8 @@ import { cultivationPanel } from './cultivation-ui.ts';
 import { catalogPanel } from './catalog-ui.ts';
 import { medicineContent } from './medicine-ui.ts';
 import { TREASURES, xpNeeded } from './data.ts';
-import { TOUR_STEPS, tourPlacement } from './interface-tour-model.ts';
+import { TOUR_STEPS, tourStep, tourPlacement } from './interface-tour-model.ts';
+import { compactHud } from './compact-hud.ts';
 
 export let tourActive = false;
 export let stopInterfaceTour = () => {};
@@ -89,6 +90,7 @@ export function startInterfaceTour(
   });
   let last = performance.now();
   let scene = '';
+  let compact = compactHud();
   let preview = new Game(structuredClone(sample), 0, 0, random);
   let move = { x: 0, y: 0 };
   let drag: { x: number; y: number; id: number } | null = null;
@@ -131,6 +133,10 @@ export function startInterfaceTour(
   function panel(name: string, definition: PanelDefinition) {
     host.frame(name, definition.title, definition.subtitle, definition.body, definition.wide);
   }
+  function renderBattleHud() {
+    hud.render(preview, false, true);
+    ui.insertAdjacentHTML('beforeend', '<div class="tour-practice-area" aria-hidden="true"></div>');
+  }
   function renderScene(next: string) {
     if (scene === next) return;
     hud.reset();
@@ -172,11 +178,7 @@ export function startInterfaceTour(
       preview = new Game(structuredClone(sample), 0, 0, random);
       for (let i = 0; i < 180; i++) preview.update(1 / 30);
       hud = new BattleHud(ui, preview.save, display);
-      hud.render(preview, false, true);
-      ui.insertAdjacentHTML(
-        'beforeend',
-        '<div class="tour-practice-area" aria-hidden="true"></div>',
-      );
+      renderBattleHud();
       if (next === 'upgrade') {
         preview.xp = xpNeeded(preview.level);
         preview.update(1 / 30);
@@ -206,7 +208,7 @@ export function startInterfaceTour(
 
   function position(scroll = false) {
     if (closed) return;
-    const step = TOUR_STEPS[index];
+    const step = tourStep(index, compact);
     const target = document.querySelector<HTMLElement>(step.target);
     if (!target) {
       close();
@@ -254,7 +256,7 @@ export function startInterfaceTour(
   }
   function show(next: number) {
     index = Math.max(0, Math.min(TOUR_STEPS.length - 1, next));
-    const step = TOUR_STEPS[index];
+    const step = tourStep(index, compact);
     renderScene(step.scene);
     overlay.dataset.step = String(index);
     overlay.dataset.scene = step.scene;
@@ -389,6 +391,11 @@ export function startInterfaceTour(
     'resize',
     () => {
       renderer.resize();
+      if (compact !== compactHud()) {
+        compact = compactHud();
+        if (['battle', 'upgrade', 'result'].includes(scene)) renderBattleHud();
+        card.querySelector('.tour-copy')!.textContent = tourStep(index, compact).copy;
+      }
       position(true);
     },
     { signal: abort.signal },

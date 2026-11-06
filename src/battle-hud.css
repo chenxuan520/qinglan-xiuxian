@@ -228,59 +228,7 @@
     white-space: nowrap;
   }
 }
-@media (pointer: coarse) and (max-width: 650px) and (orientation: portrait) {
-  .game-hud {
-    flex-wrap: wrap;
-  }
-  .game-hud .stage-timer {
-    position: static;
-    transform: none;
-    order: 1;
-    width: 100%;
-  }
-  .game-hud .combat-actions {
-    display: grid;
-    grid-template-columns: repeat(4, 32px);
-    grid-template-rows: 32px 32px 28px;
-    gap: 7px 5px;
-    max-width: 143px;
-  }
-  .game-hud .kill-counter {
-    grid-column: 1 / 4;
-    grid-row: 1;
-    min-width: 0;
-    height: 32px;
-    justify-content: center;
-    overflow: hidden;
-    white-space: nowrap;
-    padding: 6px 8px;
-    gap: 5px;
-  }
-  .game-hud .sound-control {
-    grid-column: 4;
-    grid-row: 1;
-  }
-  .game-hud .help-button {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .game-hud .damage-button {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .game-hud .fullscreen-button {
-    grid-column: 3;
-    grid-row: 2;
-  }
-  .game-hud [data-action='pause'] {
-    grid-column: 4;
-    grid-row: 2;
-  }
-  .game-hud .auto-button {
-    grid-column: 1 / -1;
-    grid-row: 3;
-  }
-}
+
 .combat-actions .round-button.auto-button {
   width: auto;
 }
@@ -569,5 +517,299 @@
   }
   .kill-counter b {
     font-size: 17px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 650px) and (orientation: portrait) {
+  .game-hud.compact-hud {
+    top: env(safe-area-inset-top, 0px);
+    left: max(6px, env(safe-area-inset-left));
+    right: max(6px, env(safe-area-inset-right));
+    height: 36px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 0 6px;
+    border: 1px solid #bdcea225;
+    background: #0f342de8;
+  }
+  .compact-hud .player-panel {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .compact-hud .player-heading {
+    flex: 0 0 auto;
+    gap: 3px;
+  }
+  .compact-hud .player-heading > span,
+  .compact-hud .player-heading b {
+    font-size: 12px;
+    letter-spacing: 0;
+  }
+  .compact-health {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .compact-health .health-bar {
+    flex: 1;
+    min-width: 18px;
+    height: 8px;
+  }
+  .compact-health #health-text {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .compact-hud .stage-timer {
+    position: static;
+    flex: 0 0 auto;
+    transform: none;
+    padding: 0;
+    width: auto;
+  }
+  .compact-hud .stage-timer strong {
+    font-size: 12px;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .compact-hud .compact-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    gap: 4px;
+    max-width: none;
+    margin-left: 0;
+  }
+  .compact-hud .compact-actions .round-button {
+    order: 0;
+    width: 28px;
+    height: 28px;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    flex: 0 0 28px;
+    border-radius: 50%;
+  }
+  .compact-actions .small-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .compact-actions .auto-button.active {
+    color: #173b2e;
+    background: #d5d8a6;
+    box-shadow: 0 0 0 1px #e2dcad99;
+  }
+  .compact-actions .auto-button.active .auto-cycle-arc {
+    transform-origin: 12px 12px;
+    animation: compact-auto-cycle 2s linear infinite;
+  }
+  @keyframes compact-auto-cycle {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .compact-actions .auto-button.active .auto-cycle-arc {
+      animation: none;
+    }
+  }
+  .compact-hud ~ .boss-bar {
+    width: auto;
+    left: max(6px, env(safe-area-inset-left));
+    right: max(6px, env(safe-area-inset-right));
+    transform: none;
+    top: calc(var(--battle-timer-bottom, 36px) + 2px);
+    padding: 3px 6px;
+  }
+  .compact-hud ~ .boss-bar > div:first-child {
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+  }
+  .compact-hud ~ .boss-bar .health-bar {
+    height: 6px;
+  }
+  .compact-hud ~ .battle-notice {
+    top: calc(var(--battle-info-bottom, 36px) + 8px);
+  }
+  .compact-hud ~ .cache-prompt {
+    top: calc(var(--battle-info-bottom, 36px) + 8px + var(--battle-notice-space, 0px));
+    bottom: auto;
+  }
+  .compact-hud ~ .touch-movement-hint {
+    top: calc(
+      var(--battle-info-bottom, 36px) + 12px + var(--battle-notice-space, 0px) +
+        var(--battle-prompt-space, 0px)
+    );
+  }
+  .battle-bottom.compact-loadout {
+    pointer-events: auto;
+    touch-action: pan-x;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: safe center;
+    gap: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .compact-loadout:focus-visible {
+    outline: 1px solid #d5d8a6;
+    outline-offset: 2px;
+  }
+  .compact-loadout .equipped-slots {
+    display: flex;
+    flex: 0 1 auto;
+    width: auto;
+    min-width: calc(var(--slot-count) * 34px + (var(--slot-count) - 1) * 4px);
+    justify-content: flex-start;
+    gap: 4px;
+  }
+  .compact-loadout .equipped-slot {
+    position: relative;
+    flex: 0 1 40px;
+    width: 40px;
+    min-width: 34px;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 3px;
+    gap: 0;
+  }
+  .compact-loadout .equipped-slot .icon {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    margin: 0;
+  }
+  .compact-loadout .passive-slots {
+    position: static;
+    transform: none;
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    min-width: calc(var(--slot-count) * 28px + (var(--slot-count) - 1) * 4px + 17px);
+    max-width: none;
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid #b8c8a955;
+    gap: 4px;
+  }
+  .compact-loadout .passive-slots[hidden] {
+    display: none;
+  }
+  .compact-loadout .passive-slots > span {
+    position: relative;
+    flex: 0 1 32px;
+    width: 32px;
+    min-width: 28px;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 2px;
+    gap: 0;
+  }
+  .compact-loadout .passive-slots .icon {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .compact-loadout .loadout-rank {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    min-width: 12px;
+    margin: 0;
+    padding: 1px 2px;
+    background: #0b2924ed;
+    color: #e6dfb5;
+    font-size: 9px;
+    line-height: 1.1;
+    text-align: center;
+  }
+  .compact-hud ~ .xp-track {
+    height: 4px;
+    bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .compact-pause-info {
+    margin-bottom: 12px;
+    font-size: 11px;
+    line-height: 1.8;
+    color: #c5d0ba;
+  }
+  .compact-pause-summary,
+  .compact-pause-progress {
+    display: block;
+  }
+  .compact-pause-medicines {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    font-size: 11px;
+    line-height: 1.8;
+    letter-spacing: 0.25px;
+  }
+  .compact-pause-medicines > span {
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .compact-pause-battle {
+    margin: 0 0 16px;
+    font-size: 11px;
+    line-height: 1.8;
+    letter-spacing: 0.5px;
+    color: #c5d0ba;
+  }
+  .compact-pause-battle > span {
+    display: block;
+  }
+  .compact-pause-actions,
+  .compact-pause-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .compact-pause-actions button,
+  .compact-pause-footer button {
+    min-width: 0;
+    width: 100%;
+    min-height: 46px;
+    height: auto;
+    padding: 10px 8px;
+    border-radius: 0;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+  .compact-pause-actions .auto-button {
+    border: 1px solid #b6cda638;
+    background: #abc4a507;
+  }
+  .compact-pause-actions .sound-control {
+    position: relative;
+    min-width: 0;
+  }
+  .compact-pause-actions .volume-control {
+    top: calc(100% + 8px);
+    right: 0;
+  }
+  .compact-pause-actions .fullscreen-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 }

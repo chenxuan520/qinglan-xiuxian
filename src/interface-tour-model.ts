@@ -113,6 +113,28 @@ export const TOUR_STEPS = [
   },
 ] as const;
 
+export function tourStep(index: number, compact = false) {
+  const step = TOUR_STEPS[index];
+  if (!compact || step.scene !== 'battle') return step;
+  if (step.target === '.player-panel')
+    return {
+      ...step,
+      copy: '顶栏显示境界、局内等级与气血。永久修为和年岁收在右上 ⚙ 的暂停面板里；局内等级用来选择法宝和功法。',
+    };
+  if (step.target === '.stage-timer')
+    return {
+      ...step,
+      copy: '顶栏显示已过时间与历练时长，秘境、路线和难度可在右上 ⚙ 查看。普通秘境计时到点后妖王登场；击败它才算通关。',
+    };
+  if (step.target === '.combat-actions')
+    return {
+      ...step,
+      target: '[data-action="pause"]',
+      copy: '点右上 ⚙ 可暂停并查看伤害、指南、音效与全屏。左侧循环图标开关自动历练，亮起并转动表示已开启；手动走位会立即接管。',
+    };
+  return step;
+}
+
 type Size = { width: number; height: number };
 type Rect = Size & { left: number; top: number };
 export function tourPlacement(target: Rect, viewport: Size, card: Size) {

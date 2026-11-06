@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TOUR_STEPS, tourPlacement } from '../src/interface-tour-model.ts';
+import { TOUR_STEPS, tourStep, tourPlacement } from '../src/interface-tour-model.ts';
+
+test('竖屏导览指向可见的设置按钮，横屏与非战斗步骤保持原样', () => {
+  for (let index = 0; index < TOUR_STEPS.length; index++) {
+    const original = TOUR_STEPS[index];
+    assert.equal(tourStep(index), original);
+    if (original.scene !== 'battle') assert.equal(tourStep(index, true), original);
+  }
+  const index = TOUR_STEPS.findIndex((step) => step.target === '.combat-actions');
+  assert.equal(tourStep(index, true).target, '[data-action="pause"]');
+  assert.match(tourStep(index, true).copy, /点右上 ⚙ 可暂停并查看伤害、指南、音效与全屏/);
+});
 
 test('导览完整覆盖行前、战斗、升级和结算，不增加游戏动作', () => {
   assert.equal(TOUR_STEPS[0].scene, 'home');

@@ -474,7 +474,12 @@ test('主入口键盘1接受、Esc离开，长按及P/E/2/3不穿透到通用暂
     ['2', false],
     ['3', false],
   ]) {
-    context.event = { key, repeat, target: { matches: () => false }, preventDefault() {} };
+    context.event = {
+      key,
+      repeat,
+      target: { matches: () => false, closest: () => null },
+      preventDefault() {},
+    };
     runInContext('listener(event)', context);
   }
   assert.deepEqual(actions, ['accept-altar', 'leave-altar']);

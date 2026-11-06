@@ -24,8 +24,14 @@ function environment() {
   let next = 0;
   const frames = new Map<number, FrameRequestCallback>();
   const properties = new Map<string, string>();
-  const viewport = { innerWidth: 800, innerHeight: 600 };
-  const counts = { timer: 0, boss: 0, writes: 0 };
+  const viewport: {
+    innerWidth: number;
+    innerHeight: number;
+    matchMedia?: (query: string) => { matches: boolean };
+  } = { innerWidth: 800, innerHeight: 600 };
+  const media = { matches: false };
+  const counts = { timer: 0, boss: 0, hud: 0, notice: 0, prompt: 0, writes: 0, removes: 0 };
+  const geometry = { hudBottom: 125.2, noticeHeight: 36.2, promptHeight: 22.2 };
   let bottom = 100.2;
   const element = (boss = false) => ({
     isConnected: true,
@@ -37,21 +43,55 @@ function environment() {
       }
       counts.boss++;
       const timer = Number.parseFloat(properties.get('--battle-timer-bottom') || '0');
-      return { bottom: Math.max(137, timer + 10) + 42 };
+      return { bottom: (media.matches ? timer + 2 : Math.max(137, timer + 10)) + 42 };
     },
   });
   let timer = element();
   const boss = element(true);
-  const hud = {};
+  let hud = {
+    isConnected: true,
+    getBoundingClientRect() {
+      counts.hud++;
+      return { bottom: geometry.hudBottom };
+    },
+  };
+  const classes = new Set<string>();
+  const notice = {
+    hidden: false,
+    isConnected: true,
+    classList: { contains: (name: string) => classes.has(name) },
+    getBoundingClientRect() {
+      counts.notice++;
+      return { height: geometry.noticeHeight };
+    },
+  };
+  let prompt = {
+    hidden: true,
+    isConnected: true,
+    getBoundingClientRect() {
+      counts.prompt++;
+      return { height: geometry.promptHeight };
+    },
+  };
   const root = {
     querySelector: (selector: string) =>
-      selector === '.stage-timer' ? timer : selector === '#boss-bar' ? boss : hud,
-    contains: (node: unknown) => node === timer || node === boss,
+      ({
+        '.stage-timer': timer,
+        '#boss-bar': boss,
+        '.game-hud': hud,
+        '#notice': notice,
+        '#cache-prompt': prompt,
+      })[selector] ?? null,
+    contains: (node: unknown) => [timer, boss, hud, notice, prompt].includes(node as never),
     style: {
       getPropertyValue: (name: string) => properties.get(name) || '',
       setProperty(name: string, value: string) {
         counts.writes++;
         properties.set(name, value);
+      },
+      removeProperty(name: string) {
+        counts.removes++;
+        properties.delete(name);
       },
     },
   } as unknown as HTMLElement;
@@ -80,6 +120,18 @@ function environment() {
     counts,
     properties,
     boss,
+    get timer() {
+      return timer;
+    },
+    get hud() {
+      return hud;
+    },
+    notice,
+    get prompt() {
+      return prompt;
+    },
+    classes,
+    geometry,
     observers,
     Observer,
     request: (callback: FrameRequestCallback) => {
@@ -93,6 +145,10 @@ function environment() {
     setBottom(value: number) {
       bottom = value;
     },
+    setCompact(matches: boolean) {
+      media.matches = matches;
+      viewport.matchMedia ??= () => media;
+    },
     detach() {
       timer.isConnected = false;
       boss.isConnected = false;
@@ -100,6 +156,16 @@ function environment() {
     replace() {
       timer.isConnected = false;
       timer = element();
+    },
+    replaceHud() {
+      const previous = hud;
+      previous.isConnected = false;
+      hud = { ...previous, isConnected: true };
+    },
+    replacePrompt() {
+      const previous = prompt;
+      previous.isConnected = false;
+      prompt = { ...previous, isConnected: true };
     },
     flush() {
       let turns = 0;
@@ -121,6 +187,8 @@ test('普通HUD刷新不反复读布局；内容换行后重新定位', () =>
     assert.equal(f.properties.get('--battle-info-bottom'), '101px');
     assert.equal(f.counts.timer, 1);
     assert.equal(f.observers[0].observed.length, 3);
+    assert.deepEqual(f.observers[0].observed, [f.timer, f.boss, f.hud]);
+    assert.deepEqual([...f.properties.keys()], ['--battle-timer-bottom', '--battle-info-bottom']);
     for (let i = 0; i < 200; i++) layout.update();
     assert.equal(f.pending, 0);
     assert.equal(f.counts.timer, 1);
@@ -129,6 +197,7 @@ test('普通HUD刷新不反复读布局；内容换行后重新定位', () =>
     f.flush();
     assert.equal(f.properties.get('--battle-info-bottom'), '181px');
     assert.equal(f.counts.timer, 2);
+    assert.equal(f.counts.hud + f.counts.notice + f.counts.prompt + f.counts.removes, 0);
   }));
 
 test('计时栏移位后妖王栏与通知跟随实际新位置，定位收敛', () =>
@@ -193,4 +262,213 @@ test('缺少ResizeObserver时保留定位，并合并同帧多次刷新', () =>
     layout.update();
     f.flush();
     assert.equal(f.properties.get('--battle-info-bottom'), '222px');
+  }, false));
+
+test('竖屏以整条顶栏定位，保留原三项并额外观察通知和守匣提示', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    const layout = new HudLayout(f.root);
+    layout.update();
+    assert.equal(f.pending, 1);
+    assert.equal(f.counts.hud, 0, 'update 只调度，不同步读取布局');
+    f.flush();
+    assert.deepEqual(f.observers[0].observed, [f.timer, f.boss, f.hud, f.notice, f.prompt]);
+    assert.equal(f.properties.get('--battle-timer-bottom'), '126px');
+    assert.equal(f.properties.get('--battle-info-bottom'), '126px');
+    assert.equal(f.properties.get('--battle-notice-space'), '0px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '0px');
+    assert.equal(f.counts.timer, 0);
+    assert.equal(f.counts.hud, 1);
+    assert.equal(f.counts.notice + f.counts.prompt, 0, '隐藏提示不读尺寸');
+    const before = { ...f.counts };
+    for (let i = 0; i < 200; i++) layout.update();
+    f.flush();
+    assert.deepEqual(f.counts, before, '无变化的 HUD 刷新不逐帧测量或写样式');
+  }));
+
+test('竖屏顶栏变高后妖王栏紧随，通知基准在妖王底部且两帧内收敛', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    f.boss.hidden = false;
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-info-bottom'), '170px');
+    f.geometry.hudBottom = 200.2;
+    f.observers[0].fire();
+    f.flush();
+    assert.equal(f.properties.get('--battle-timer-bottom'), '201px');
+    assert.equal(f.properties.get('--battle-info-bottom'), '245px');
+    assert.equal(f.pending, 0);
+    const writes = f.counts.writes;
+    f.observers[0].fire();
+    f.flush();
+    assert.equal(f.counts.writes, writes, '收敛后不重复写定位变量');
+    const before = { ...f.counts };
+    for (let i = 0; i < 200; i++) layout.update();
+    f.flush();
+    assert.deepEqual(f.counts, before);
+    f.boss.hidden = true;
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-info-bottom'), '201px');
+  }));
+
+test('提示显隐无需等待尺寸回调，通知 visible 类及两处 hidden 均改变占位', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    f.classes.add('visible');
+    f.prompt.hidden = false;
+    const before = { ...f.counts };
+    layout.update();
+    layout.update();
+    assert.equal(f.pending, 1, '多个可见性变化合并同一帧');
+    assert.deepEqual(f.counts, before);
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '45px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '31px');
+    assert.equal(f.counts.notice, 1);
+    assert.equal(f.counts.prompt, 1);
+    const shown = { ...f.counts };
+    for (let i = 0; i < 200; i++) layout.update();
+    f.flush();
+    assert.deepEqual(f.counts, shown);
+    f.classes.delete('visible');
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '0px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '31px');
+    assert.equal(f.counts.notice, shown.notice, '不可见通知不读取仍存在的盒尺寸');
+    f.classes.add('visible');
+    f.notice.hidden = true;
+    f.prompt.hidden = true;
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '0px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '0px');
+    f.notice.hidden = false;
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '45px');
+  }));
+
+test('通知与守匣换行的尺寸回调合并更新高度加8，空盒及脱离页面不占位', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    f.classes.add('visible');
+    f.prompt.hidden = false;
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    f.geometry.noticeHeight = 76;
+    f.geometry.promptHeight = 48;
+    const before = { ...f.counts };
+    for (let i = 0; i < 100; i++) f.observers[0].fire();
+    assert.equal(f.pending, 1);
+    assert.deepEqual(f.counts, before);
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '84px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '56px');
+    assert.equal(f.counts.notice, before.notice + 1);
+    assert.equal(f.counts.prompt, before.prompt + 1);
+    assert.equal(f.counts.writes, before.writes + 2);
+    assert.equal(f.pending, 0);
+    const writes = f.counts.writes;
+    f.observers[0].fire();
+    f.flush();
+    assert.equal(f.counts.writes, writes);
+    f.geometry.noticeHeight = 0;
+    f.prompt.isConnected = false;
+    const promptReads = f.counts.prompt;
+    f.observers[0].fire();
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '0px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '0px');
+    assert.equal(f.counts.prompt, promptReads);
+  }));
+
+test('竖屏转横屏移除专用变量，恢复原三项观察与计时栏测量，转回重新绑定', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    f.classes.add('visible');
+    f.prompt.hidden = false;
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-notice-space'), '45px');
+    f.setCompact(false);
+    layout.update();
+    assert.ok(f.observers[0].disconnected);
+    assert.equal(f.properties.has('--battle-notice-space'), false);
+    assert.equal(f.properties.has('--battle-prompt-space'), false);
+    assert.deepEqual(f.observers[1].observed, [f.timer, f.boss, f.hud]);
+    f.flush();
+    assert.equal(f.properties.get('--battle-timer-bottom'), '101px');
+    assert.equal(f.properties.get('--battle-info-bottom'), '101px');
+    assert.deepEqual([...f.properties.keys()], ['--battle-timer-bottom', '--battle-info-bottom']);
+    const before = { ...f.counts };
+    for (let i = 0; i < 200; i++) layout.update();
+    f.flush();
+    assert.deepEqual(f.counts, before);
+    f.setCompact(true);
+    layout.update();
+    assert.ok(f.observers[1].disconnected);
+    assert.equal(f.observers[2].observed.length, 5);
+    f.flush();
+    assert.equal(f.properties.get('--battle-timer-bottom'), '126px');
+    assert.equal(f.properties.get('--battle-notice-space'), '45px');
+  }));
+
+test('竖屏重建顶栏或提示会换观察节点，reset取消测量、清变量且迟到回调无效', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    f.replaceHud();
+    layout.update();
+    assert.ok(f.observers[0].disconnected);
+    assert.ok(f.observers[1].observed.includes(f.hud));
+    f.replacePrompt();
+    layout.update();
+    assert.ok(f.observers[1].disconnected);
+    assert.ok(f.observers[2].observed.includes(f.prompt));
+    assert.equal(f.pending, 1);
+    layout.reset();
+    assert.ok(f.observers[2].disconnected);
+    assert.equal(f.pending, 0);
+    assert.equal(f.properties.has('--battle-notice-space'), false);
+    assert.equal(f.properties.has('--battle-prompt-space'), false);
+    const before = { ...f.counts };
+    for (const observer of f.observers) observer.fire();
+    f.flush();
+    assert.deepEqual(f.counts, before);
+  }));
+
+test('竖屏无 ResizeObserver 仍响应视口和显隐，不在每次HUD刷新时测量', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    const before = { ...f.counts };
+    for (let i = 0; i < 200; i++) layout.update();
+    f.flush();
+    assert.deepEqual(f.counts, before);
+    f.classes.add('visible');
+    f.prompt.hidden = false;
+    f.boss.hidden = false;
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-info-bottom'), '170px');
+    assert.equal(f.properties.get('--battle-notice-space'), '45px');
+    assert.equal(f.properties.get('--battle-prompt-space'), '31px');
+    f.viewport.innerHeight = 800;
+    f.geometry.hudBottom = 160;
+    layout.update();
+    f.flush();
+    assert.equal(f.properties.get('--battle-info-bottom'), '204px');
   }, false));

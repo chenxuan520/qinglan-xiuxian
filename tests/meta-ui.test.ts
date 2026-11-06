@@ -182,37 +182,21 @@ test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
   assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });
 
-test('手机竖屏战斗按钮使用固定网格，不随斩妖数字换行', () => {
+test('手机竖屏顶栏单行、按钮28像素，自动图标尊重减少动态设置', () => {
   const start = styles.indexOf(
     '@media (pointer: coarse) and (max-width: 650px) and (orientation: portrait)',
   );
-  const end = styles.indexOf('\n}\n.combat-actions .round-button.auto-button', start);
   assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-  const portraitHud = styles.slice(start, end);
+  const portraitHud = styles.slice(start);
+  assert.match(portraitHud, /\.game-hud\.compact-hud \{[^}]*height: 36px;[^}]*flex-wrap: nowrap;/s);
+  assert.match(portraitHud, /\.compact-hud \.compact-actions \{[^}]*flex-wrap: nowrap;/s);
   assert.match(
     portraitHud,
-    /\.game-hud \.combat-actions \{[^}]*display: grid;[^}]*grid-template-columns: repeat\(4, 32px\);/s,
+    /\.compact-hud \.compact-actions \.round-button \{[^}]*order: 0;[^}]*width: 28px;[^}]*height: 28px;/s,
   );
-  assert.match(
-    portraitHud,
-    /\.game-hud \.kill-counter \{[^}]*grid-column: 1 \/ 4;[^}]*grid-row: 1;/s,
-  );
-  assert.match(portraitHud, /\.game-hud \.sound-control \{[^}]*grid-column: 4;[^}]*grid-row: 1;/s);
-  assert.match(portraitHud, /\.game-hud \.help-button \{[^}]*grid-column: 1;[^}]*grid-row: 2;/s);
-  assert.match(portraitHud, /\.game-hud \.damage-button \{[^}]*grid-column: 2;[^}]*grid-row: 2;/s);
-  assert.match(
-    portraitHud,
-    /\.game-hud \.fullscreen-button \{[^}]*grid-column: 3;[^}]*grid-row: 2;/s,
-  );
-  assert.match(
-    portraitHud,
-    /\.game-hud \[data-action='pause'\] \{[^}]*grid-column: 4;[^}]*grid-row: 2;/s,
-  );
-  assert.match(
-    portraitHud,
-    /\.game-hud \.auto-button \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 3;/s,
-  );
+  assert.match(portraitHud, /animation: compact-auto-cycle 2s linear infinite;/);
+  assert.match(portraitHud, /@media \(prefers-reduced-motion: reduce\) \{[^}]*animation: none;/s);
+  assert.doesNotMatch(portraitHud, /grid-template-columns: repeat\(4, 32px\)/);
 });
 
 test('升级卡片写出伤害倍率，觉醒卡片说明觉醒一击', () => {

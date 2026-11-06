@@ -9,6 +9,7 @@ import { ironMarketContent } from './iron-market-ui.ts';
 import { MedicinePanel } from './medicine-panel.ts';
 import { cultivationPanel } from './cultivation-ui.ts';
 import { BattleHud } from './battle-hud.ts';
+import { COMPACT_HUD_QUERY, compactHud } from './compact-hud.ts';
 import { LetterReminder } from './letter-reminder.ts';
 import { leaderboardAvailable } from './leaderboard-availability.ts';
 import { LeaderboardPreference, leaderboardSettings } from './leaderboard-preference.ts';
@@ -1352,6 +1353,7 @@ function renderHud() {
 }
 
 function updateHud() {
+  refreshHudMode();
   return sceneFlow.updateHud(shellBindings());
 }
 
@@ -2050,7 +2052,7 @@ function shellBindings(): ActionShell {
     set oldRealm(next) { oldRealm = next; },
     get openOfflinePanel() { return openOfflinePanel; },
     get panelHost() { return panelHost; },
-    get pausePanel() { return (game: Game, save: SaveData, fps: number | undefined, abandon: boolean) => pausePanel(game, save, fps, abandon, damageNumbers.enabled); },
+    get pausePanel() { return (game: Game, save: SaveData, fps: number | undefined, abandon: boolean) => pausePanel(game, save, fps, abandon, damageNumbers.enabled, { display: mobileDisplay, volumeOpen }); },
     get prepareAuction() { return marketEventSource.current!.prepareAuction; },
     get releaseTownScene() { return releaseTownScene; },
     get rememberRewardReturn() { return rememberRewardReturn; },
@@ -2357,6 +2359,11 @@ document.addEventListener('change', async (event) => {
 });
 document.addEventListener('keydown', (event) => {
   if (
+    (event.target as HTMLElement).closest('.compact-loadout') &&
+    ['ArrowLeft', 'ArrowRight'].includes(event.key)
+  )
+    return;
+  if (
     (event.target as HTMLElement).matches('input[type="range"], input[type="number"]') &&
     !['Escape', 'Tab'].includes(event.key)
   )
@@ -2507,7 +2514,19 @@ window.addEventListener('resize', () => {
   clearInput();
   renderer.resize();
   canvasDirty = true;
+  refreshHudMode();
 });
+let compactHudMode = compactHud();
+function refreshHudMode() {
+  if (guideSource.current?.tourActive) return;
+  const next = compactHud();
+  if (next === compactHudMode) return;
+  compactHudMode = next;
+  if (!game || settled) return;
+  renderHud();
+  if (game.state === 'paused' && panel === '') renderPause();
+}
+window.matchMedia(COMPACT_HUD_QUERY).addEventListener('change', refreshHudMode);
 window.addEventListener('pagehide', () => {
   if (game && !settled && !quitTracked && (game.state === 'playing' || game.state === 'paused')) {
     quitTracked = true;

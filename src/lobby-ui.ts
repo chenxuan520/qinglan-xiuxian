@@ -22,7 +22,7 @@ import {
   type ElementId,
   type SpiritRootId,
 } from './data.ts';
-import { realmInfo, type SaveData } from './progress.ts';
+import { lifespanInfo, realmInfo, type SaveData } from './progress.ts';
 import type { Game } from './game.ts';
 import {
   autoplayButton,
@@ -31,7 +31,11 @@ import {
   controls,
   currency,
   damageReport,
+  fullscreenButton,
   realmVerse,
+  runExperience,
+  runWave,
+  soundControl,
   spiritRootSummary,
   weaponAffinity,
 } from './common-ui.ts';
@@ -47,6 +51,8 @@ import { icon, smallIcon } from './icons.ts';
 import { currentRealm } from './opening-ui.ts';
 import type { PanelParts } from './panel-host.ts';
 import { treasureDisplayName } from './curio-combos.ts';
+import { compactHud } from './compact-hud.ts';
+import { formatNumber } from './number-format.ts';
 
 export function saveLockPanel(
   saveLock: 'unreadable' | 'newer' | 'stale',
@@ -155,11 +161,31 @@ export function pausePanel(
   fps: number | undefined,
   abandonConfirm: boolean,
   showDamageNumbers = true,
+  context?: { display: { available: boolean; active: boolean }; volumeOpen: boolean },
 ): PanelParts {
+  const compact = compactHud();
+  const kills = `<span class="pause-kills">已斩 ${game.kills} 妖${fps === undefined ? '' : `<small class="pause-frame-rate" title="暂停前最近一秒的平均帧率">${fps} FPS</small>`}</span>`;
+  let description = `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · ${kills}</p>`;
+  if (compact) {
+    const life = lifespanInfo(save);
+    const medicines = activeMedicines(save.medicine, save.age).map(
+      (m) =>
+        `${m.name} ${formatNumber(Math.max(0, Math.round(save.medicine.active[m.id] - save.age)))}年`,
+    );
+    description = `<p class="pause-description compact-pause-info"><span class="compact-pause-summary">${game.encounterName} · ${pathInfo(game.path).name} · <span class="difficulty-name difficulty-${game.difficulty}">${game.tribulation && isExtremeLife(save) ? '极限修行' : DIFFICULTIES[game.difficulty].name}</span> · ${kills}</span><span class="compact-pause-progress">年岁 ${life.age < 1000000 ? life.age.toFixed(1) : formatNumber(life.age)}/${Number.isFinite(life.limit) ? life.limit : '∞'}岁 · ${game.tribulation ? '渡劫暂停计龄' : `${STAGE_YEARS_PER_MINUTE[game.stage]}年/分`} · 永久修为 ${formatNumber(save.cultivation)}</span>${medicines.length ? `<small class="compact-pause-medicines" title="${medicines.join(' · ')}">${medicines.map((text) => `<span>${text}</span>`).join(' ')}</small>` : ''}</p>`;
+  }
+  const footer = `<button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon" ${isExtremeLife(save) ? 'disabled title="极限历练不可主动结束"' : ''}>${game.tribulation ? '放弃渡劫' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button>`;
+  const damage = '<button class="secondary-button" data-action="damage">伤害统计</button>';
+  const battle = compact
+    ? `<p class="compact-pause-battle"><span>${runExperience(game)}</span><span>${runWave(game)}</span></p>`
+    : '';
+  const actions = compact
+    ? `<div class="compact-pause-actions">${autoplayButton(save.autoplay)}${soundControl(save, context?.volumeOpen ?? false, true)}${damage}<button class="secondary-button" data-action="guide">修行指南</button>${fullscreenButton(context?.display.available ?? false, context?.display.active ?? false)}</div><div class="compact-pause-footer">${footer}</div>`
+    : `<div class="pause-actions">${autoplayButton(save.autoplay)}${damage}${footer}</div>`;
   return [
     '静心片刻',
     '修行暂歇',
-    `<p class="pause-description">${game.encounterName} · ${pathInfo(game.path).name} · ${formatTime(game.time)} · <span class="pause-kills">已斩 ${game.kills} 妖${fps === undefined ? '' : `<small class="pause-frame-rate" title="暂停前最近一秒的平均帧率">${fps} FPS</small>`}</span></p><div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}<span class="pause-weapon-name">${treasureDisplayName(game.save, w.id, w.evolved)} · ${w.level}重</span>${weaponAffinity(treasure(w.id), game.spiritRoot, game.rootElements, true)}</span>`).join('')}</div><p class="panel-note">${isExtremeLife(save) ? '大道无情，生死有命。此战不可退离；未完战斗刷新或关闭页面会回到保存的战况并暂停。' : game.tribulation ? '放弃后此世落幕，可先留存此世，再确认轮回。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p>${damageNumbersControl(showDamageNumbers)}<div class="pause-actions">${autoplayButton(save.autoplay)}<button class="secondary-button" data-action="damage">伤害统计</button><button class="primary-button" data-action="resume">继续修行 ${smallIcon('play')}</button><button class="secondary-button" data-action="abandon" ${isExtremeLife(save) ? 'disabled title="极限历练不可主动结束"' : ''}>${game.tribulation ? '放弃渡劫' : abandonConfirm ? '确认结束并结算' : '结束本次历练'}</button></div>`,
+    `${description}<div class="pause-build">${game.weapons.map((w) => `<span>${icon(w.id, treasure(w.id).color)}<span class="pause-weapon-name">${treasureDisplayName(game.save, w.id, w.evolved)} · ${w.level}重</span>${weaponAffinity(treasure(w.id), game.spiritRoot, game.rootElements, true)}</span>`).join('')}</div>${battle}<p class="panel-note">${isExtremeLife(save) ? '大道无情，生死有命。此战不可退离；未完战斗刷新或关闭页面会回到保存的战况并暂停。' : game.tribulation ? '放弃后此世落幕，可先留存此世，再确认轮回。' : abandonConfirm ? '提前结束将按当前战绩结算收益，本次不会解锁下一秘境。' : '呼吸之间，万念归一。准备好后继续前行。'}</p>${damageNumbersControl(showDamageNumbers)}${actions}`,
   ];
 }
 

@@ -24,6 +24,7 @@ import type {
   treasure,
 } from './data.ts';
 import { changeAutoplayBuild } from './autoplay-build.ts';
+import { compactHud } from './compact-hud.ts';
 import { sectEntryMedicinePool } from './mortal.ts';
 import { SECTS } from './mortal-data.ts';
 import type { ironMarketContent } from './iron-market-ui.ts';
@@ -1727,8 +1728,10 @@ function handleToggles(shell: ActionShell, action: string): boolean {
   if (action === 'sound' || action === 'mute') {
     if (!shell.soundSettings.setEnabled(action === 'sound', true)) return true;
     shell.volumeOpen = action === 'sound' && !shell.volumeOpen;
-    if (shell.game) shell.renderHud();
-    else shell.renderLobby();
+    if (shell.game) {
+      shell.renderHud();
+      if (compactHud() && shell.game.state === 'paused' && shell.panel === '') shell.renderPause();
+    } else shell.renderLobby();
     return true;
   }
   return false;
