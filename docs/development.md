@@ -477,6 +477,8 @@ gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master -f 
 
 Quality gates的手机/电脑回归仍用Chrome DevTools MCP及独立浏览器工具，报告/失败截图保存为7天artifact，不提交仓库。两种构建的检查彼此独立，部署流水线不等待这些测试。
 
+手机竖屏顶栏另有并行的 `Mobile HUD safe areas` 检查：`npm run ui:hud-safe` 通过独立 Chrome 的原生安全区覆盖，验证390/320px、顶部0/24/44/59px、普通/妖王战斗及暂停返回，共16种组合。CDP仅配置安全区，页面操作、DOM断言与截图均经Chrome DevTools MCP；顶栏背景须贴顶，36px内容区在内部避让，妖王栏与提示随实际高度下移。实际安全区值不符或浏览器不支持覆盖时直接失败，不允许全部按0px误报通过；证据保存为7天artifact。本地运行前安装 `scripts/browser-tools` 依赖，并准备正常生产预览入口。
+
 构建会使用 Pages 提供的子目录路径，地图、人物、法宝图标和后台计时 Worker 均支持仓库地址下访问。本地 `npm run dev` 与默认构建继续使用根路径。
 
 GitHub Pages 和 localhost 是不同来源，浏览器存档各自独立，不会自动同步。

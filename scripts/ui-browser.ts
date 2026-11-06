@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 interface UiBrowserOptions {
   workspace?: string;
   timeoutMs?: number;
+  browserUrl?: string;
 }
 
 // MCP 的资源错误没有 URL：仅在全部错误是资源加载失败、失败请求全部属于可选字体源时放行。
@@ -35,7 +36,7 @@ export function optionalFontFailures(consoleText: string, networkText: string) {
   );
 }
 
-function chromePath(): string {
+export function chromePath(): string {
   const candidates = process.env.CHROME_PATH
     ? [process.env.CHROME_PATH]
     : [
@@ -86,11 +87,12 @@ export async function openUiBrowser(options: UiBrowserOptions = {}) {
   ]);
   const workspace = resolve(options.workspace ?? 'artifacts/ui-regression');
   mkdirSync(workspace, { recursive: true });
+  if (options.browserUrl) assertLocalPage(options.browserUrl);
   const args = [
     server,
-    '--headless',
-    '--isolated',
-    `--executablePath=${chromePath()}`,
+    ...(options.browserUrl
+      ? [`--browserUrl=${options.browserUrl}`]
+      : ['--headless', '--isolated', `--executablePath=${chromePath()}`]),
     '--no-usage-statistics',
     '--no-performance-crux',
     '--experimentalVision=true',

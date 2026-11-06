@@ -522,15 +522,15 @@
 
 @media (pointer: coarse) and (max-width: 650px) and (orientation: portrait) {
   .game-hud.compact-hud {
-    top: env(safe-area-inset-top, 0px);
+    top: 0;
     left: max(6px, env(safe-area-inset-left));
     right: max(6px, env(safe-area-inset-right));
-    height: 36px;
+    height: calc(36px + env(safe-area-inset-top, 0px));
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
-    padding: 0 6px;
+    padding: env(safe-area-inset-top, 0px) 6px 0;
     border: 1px solid #bdcea225;
     background: #0f342de8;
   }

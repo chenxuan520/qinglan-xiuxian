@@ -20,6 +20,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "docs:check": "node --experimental-strip-types --test tests/gameplay-docs.test.ts tests/guide-source.test.ts tests/bestiary.test.ts",
     "ui:check": "node --experimental-strip-types scripts/ui-regression.ts",
+    "ui:hud-safe": "node --experimental-strip-types scripts/ui-safe-area.ts",
     "assets:check": "node --experimental-strip-types scripts/check-binaries.ts",
     "balance": "node --experimental-strip-types scripts/balance.ts",
     "stats": "node --experimental-strip-types scripts/telemetry-stats.ts",

@@ -187,6 +187,7 @@ async function check(name: string, hud = false) {
       compact,
       compactLayout: compact && document.querySelector('.game-hud') ? {
         header: box(document.querySelector('.game-hud')),
+        safeTop: parseFloat(getComputedStyle(document.querySelector('.game-hud')).paddingTop),
         health: health ? box(health) : null,
         healthText: healthText ? {text:healthText.textContent, current:Number(health?.getAttribute('aria-valuenow')), ...box(healthText)} : null,
         level: document.querySelector('#level')?.textContent,
@@ -235,10 +236,14 @@ async function check(name: string, hud = false) {
     if (layout.compact) {
       const compact = layout.compactLayout;
       const center = (rect: any) => (rect.top + rect.bottom) / 2;
-      assert.ok(Math.abs(compact.header.height - 36) < 0.5, `${name} 竖屏顶栏只占36px一行`);
+      assert.ok(Math.abs(compact.header.top) < 0.5, `${name} 竖屏顶栏背景必须贴顶`);
+      assert.ok(
+        Math.abs(compact.header.height - compact.safeTop - 36) < 0.5,
+        `${name} 顶栏内容36px，安全区只占内部留白`,
+      );
       for (const item of [layout.player, layout.timer, ...layout.buttons]) {
         assert.ok(
-          Math.abs(center(item) - center(compact.header)) < 1,
+          Math.abs(center(item) - (compact.header.top + compact.safeTop + 18)) < 1,
           `${name} 状态、计时与按钮必须同排`,
         );
         assert.ok(

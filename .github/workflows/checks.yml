@@ -100,6 +100,41 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  hud-safe-area:
+    name: Mobile HUD safe areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE_PATH: /${{ github.event.repository.name }}
+      UI_BASE_URL: http://localhost:5173/${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix scripts/browser-tools
+      - run: npm run build -- --base "$BASE_PATH/"
+      - name: Check native safe areas through MCP
+        run: |
+          npm run preview -- --base "$BASE_PATH/" --port 5173 --strictPort > "$RUNNER_TEMP/hud-safe-preview.log" 2>&1 &
+          hud_safe_preview_pid=$!
+          trap 'kill "$hud_safe_preview_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent "$UI_BASE_URL" > /dev/null; then break; fi
+            sleep 1
+          done
+          npm run ui:hud-safe
+      - name: Preserve safe-area evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: hud-safe-area
+          path: artifacts/ui-regression/hud-safe-area/
+          if-no-files-found: warn
+          retention-days: 7
+
   standalone:
     name: Standalone build contract
     runs-on: ubuntu-latest
