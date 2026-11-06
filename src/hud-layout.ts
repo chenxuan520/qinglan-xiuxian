@@ -62,7 +62,7 @@ export class HudLayout {
         this.observer = new ResizeObserver(() => this.schedule());
         const elements = [timer, boss, hud ?? this.root.querySelector('.game-hud')];
         if (compact) elements.push(notice, prompt);
-        for (const el of elements) if (el) this.observer.observe(el);
+        for (const el of elements) if (el) this.observer.observe(el, { box: 'border-box' });
       }
       this.schedule();
     }

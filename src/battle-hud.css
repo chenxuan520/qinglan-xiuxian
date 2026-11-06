@@ -522,17 +522,26 @@
 
 @media (pointer: coarse) and (max-width: 650px) and (orientation: portrait) {
   .game-hud.compact-hud {
+    --compact-safe-top: 0px;
     top: 0;
     left: max(6px, env(safe-area-inset-left));
     right: max(6px, env(safe-area-inset-right));
-    height: calc(36px + env(safe-area-inset-top, 0px));
+    height: calc(36px + var(--compact-safe-top));
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
-    padding: env(safe-area-inset-top, 0px) 6px 0;
+    padding: var(--compact-safe-top) 6px 0;
     border: 1px solid #bdcea225;
     background: #0f342de8;
+  }
+  :root:is(:fullscreen, :-webkit-full-screen) .game-hud.compact-hud {
+    --compact-safe-top: env(safe-area-inset-top, 0px);
+  }
+  @media (display-mode: standalone), (display-mode: fullscreen) {
+    .game-hud.compact-hud {
+      --compact-safe-top: env(safe-area-inset-top, 0px);
+    }
   }
   .compact-hud .player-panel {
     flex: 1;

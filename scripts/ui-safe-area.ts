@@ -167,62 +167,77 @@ async function checkSafeAreas() {
   try {
     for (const width of [390, 320])
       for (const top of [0, 24, 44, 59])
-        for (const boss of [false, true]) {
-          const page = await browser.call('new_page', {
-            url: 'about:blank',
-            isolatedContext: `safe-${width}-${top}-${boss}`,
-          });
-          const previous = pageId;
-          pageId = Number(page.match(/(\d+):[^\n]*\[selected\]/)?.[1]);
-          assert.ok(pageId);
-          if (previous) await browser.call('close_page', { pageId: previous });
-          await browser.call('emulate', { pageId, viewport: `${width}x844x1,mobile,touch` });
-          const url = new URL(base);
-          url.searchParams.set('hud-safe', `${width}-${top}-${boss}`);
-          await browser.call('navigate_page', {
-            pageId,
-            url: url.href,
-            initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-leaderboard-v1','0');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(fixture(boss)))})`,
-          });
-          await wait('document.querySelector("[data-action=restore]")');
-          await browser.inset(url.href, top);
-          await click('[data-action=restore]');
-          await click('[data-action=resume]');
-          await evaluate(
-            'async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return true}',
-          );
-          const view = await evaluate(
-            `()=>{const h=document.querySelector('.compact-hud'),b=h.getBoundingClientRect(),bar=document.querySelector('#boss-bar'),r=bar.getBoundingClientRect();return{top:b.top,height:b.height,padding:parseFloat(getComputedStyle(h).paddingTop),buttons:[...h.querySelectorAll('button')].map(n=>n.getBoundingClientRect().toJSON()),bossHidden:bar.hidden,bossTop:r.top,bossBottom:r.bottom,noticeTop:document.querySelector('#notice').getBoundingClientRect().top}}`,
-          );
-          assert.equal(view.top, 0, '背景必须贴顶');
-          assert.equal(view.padding, top, '必须真正使用指定的原生安全区，禁止全部为0仍通过');
-          assert.equal(view.height, top + 36, '安全区仅是内部留白，内容区36px');
-          for (const button of view.buttons) {
-            assert.equal(button.width, 28);
-            assert.equal(button.height, 28);
-            assert.equal(button.y + 14, top + 18);
-          }
-          assert.equal(view.bossHidden, !boss);
-          if (boss) {
-            assert.ok(view.bossTop >= view.height);
-            assert.ok(view.noticeTop >= view.bossBottom);
-          }
-          await browser.call('take_screenshot', {
-            pageId,
-            filePath: join(output, `${width}-${top}-${boss ? 'boss' : 'normal'}.png`),
-          });
-          await click('[data-action=pause]');
-          await click('[data-action=resume]');
-          assert.equal(
+        for (const boss of [false, true])
+          for (const fullscreen of [false, true]) {
+            const page = await browser.call('new_page', {
+              url: 'about:blank',
+              isolatedContext: `safe-${width}-${top}-${boss}-${fullscreen}`,
+            });
+            const previous = pageId;
+            pageId = Number(page.match(/(\d+):[^\n]*\[selected\]/)?.[1]);
+            assert.ok(pageId);
+            if (previous) await browser.call('close_page', { pageId: previous });
+            await browser.call('emulate', { pageId, viewport: `${width}x844x1,mobile,touch` });
+            const url = new URL(base);
+            url.searchParams.set('hud-safe', `${width}-${top}-${boss}-${fullscreen}`);
+            await browser.call('navigate_page', {
+              pageId,
+              url: url.href,
+              initScript: `localStorage.setItem('qinglan-telemetry-off','1');localStorage.setItem('qinglan-leaderboard-v1','0');localStorage.setItem('qinglan-immortal-v1',${JSON.stringify(JSON.stringify(fixture(boss)))})`,
+            });
+            await wait('document.querySelector("[data-action=restore]")');
+            await browser.inset(url.href, top);
+            await click('[data-action=restore]');
+            const isFullscreen =
+              '!!(document.fullscreenElement || document.webkitFullscreenElement)';
+            if ((await evaluate(`()=>${isFullscreen}`)) !== fullscreen) {
+              await click('[data-action=fullscreen]');
+              await wait(`${isFullscreen} === ${fullscreen}`);
+            }
+            await click('[data-action=resume]');
             await evaluate(
-              '()=>document.querySelector(".compact-hud").getBoundingClientRect().top',
-            ),
-            0,
-            '暂停返回仍贴顶',
-          );
-          results.push({ width, requestedSafeTop: top, boss, view });
-          console.log(`通过：${width}px，原生安全区${top}px，${boss ? '妖王' : '普通'}战斗`);
-        }
+              'async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return true}',
+            );
+            const view = await evaluate(
+              `()=>{const probe=document.createElement('span');probe.style.cssText='position:fixed;visibility:hidden;padding-top:env(safe-area-inset-top,0px)';document.body.append(probe);const nativeTop=parseFloat(getComputedStyle(probe).paddingTop);probe.remove();const h=document.querySelector('.compact-hud'),b=h.getBoundingClientRect(),bar=document.querySelector('#boss-bar'),r=bar.getBoundingClientRect();return{nativeTop,fullscreen:${isFullscreen},top:b.top,height:b.height,padding:parseFloat(getComputedStyle(h).paddingTop),buttons:[...h.querySelectorAll('button')].map(n=>n.getBoundingClientRect().toJSON()),bossHidden:bar.hidden,bossTop:r.top,bossBottom:r.bottom,noticeTop:document.querySelector('#notice').getBoundingClientRect().top}}`,
+            );
+            const padding = fullscreen ? top : 0;
+            assert.equal(view.top, 0, '背景必须贴顶');
+            assert.equal(view.nativeTop, top, '必须真正配置指定的原生安全区，禁止全部为0仍通过');
+            assert.equal(view.fullscreen, fullscreen, '必须实际进入或退出全屏，不能只改样式');
+            assert.equal(view.padding, padding, '窗口不重复留白，全屏才避让硬件安全区');
+            assert.equal(view.height, padding + 36, '窗口内容一行36px，全屏再加安全区');
+            for (const button of view.buttons) {
+              assert.equal(button.width, 28);
+              assert.equal(button.height, 28);
+              assert.equal(button.y + 14, padding + 18);
+            }
+            assert.equal(view.bossHidden, !boss);
+            if (boss) {
+              assert.equal(view.bossTop, view.height + 2, '全屏切换后妖王栏必须紧贴当前顶栏');
+              assert.ok(view.noticeTop >= view.bossBottom);
+            }
+            await browser.call('take_screenshot', {
+              pageId,
+              filePath: join(
+                output,
+                `${width}-${top}-${boss ? 'boss' : 'normal'}-${fullscreen ? 'fullscreen' : 'window'}.png`,
+              ),
+            });
+            await click('[data-action=pause]');
+            await click('[data-action=resume]');
+            assert.equal(
+              await evaluate(
+                '()=>document.querySelector(".compact-hud").getBoundingClientRect().top',
+              ),
+              0,
+              '暂停返回仍贴顶',
+            );
+            results.push({ width, requestedSafeTop: top, boss, fullscreen, view });
+            console.log(
+              `通过：${width}px，原生安全区${top}px，${boss ? '妖王' : '普通'}战斗，${fullscreen ? '全屏' : '窗口'}`,
+            );
+          }
     await writeFile(
       join(output, 'report.json'),
       JSON.stringify({ passed: true, results }, null, 2),

@@ -100,18 +100,23 @@ function environment() {
     private notify: () => void;
     disconnected = false;
     observed: unknown[] = [];
+    boxes = new Map<unknown, string | undefined>();
     constructor(notify: () => void) {
       this.notify = notify;
       observers.push(this);
     }
-    observe(node: unknown) {
+    observe(node: unknown, options?: ResizeObserverOptions) {
       this.observed.push(node);
+      this.boxes.set(node, options?.box);
     }
     disconnect() {
       this.disconnected = true;
     }
     fire() {
       this.notify();
+    }
+    borderChanged(node: unknown) {
+      if (this.boxes.get(node) === 'border-box') this.notify();
     }
   }
   return {
@@ -312,6 +317,22 @@ test('竖屏顶栏变高后妖王栏紧随，通知基准在妖王底部且两�
     layout.update();
     f.flush();
     assert.equal(f.properties.get('--battle-info-bottom'), '201px');
+  }));
+
+test('全屏切换仅改变顶栏内边距与外框高度时，仍重新定位妖王栏且合并测量', () =>
+  fixture((f) => {
+    f.setCompact(true);
+    f.boss.hidden = false;
+    const layout = new HudLayout(f.root);
+    layout.update();
+    f.flush();
+    f.geometry.hudBottom = 36;
+    for (let i = 0; i < 20; i++) f.observers[0].borderChanged(f.hud);
+    assert.equal(f.pending, 1);
+    f.flush();
+    assert.equal(f.properties.get('--battle-timer-bottom'), '36px');
+    assert.equal(f.properties.get('--battle-info-bottom'), '80px');
+    assert.equal(f.pending, 0);
   }));
 
 test('提示显隐无需等待尺寸回调，通知 visible 类及两处 hidden 均改变占位', () =>

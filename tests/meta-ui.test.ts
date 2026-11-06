@@ -182,7 +182,7 @@ test('战斗中按 E 开启自动历练且移动键仍可接管', () => {
   assert.match(source, /if \(save\.autoplay\) handleAction\('autoplay'\);\s+keys\.add\(key\)/);
 });
 
-test('手机竖屏背景贴顶、内容内部避让安全区，按钮及减少动态设置保持', () => {
+test('手机竖屏窗口文字贴顶，只有全屏或独立窗口额外避让安全区', () => {
   const start = styles.indexOf(
     '@media (pointer: coarse) and (max-width: 650px) and (orientation: portrait)',
   );
@@ -190,8 +190,13 @@ test('手机竖屏背景贴顶、内容内部避让安全区，按钮及减少�
   const portraitHud = styles.slice(start);
   assert.match(
     portraitHud,
-    /\.game-hud\.compact-hud \{[^}]*top: 0;[^}]*height: calc\(36px \+ env\(safe-area-inset-top, 0px\)\);[^}]*flex-wrap: nowrap;[^}]*padding: env\(safe-area-inset-top, 0px\) 6px 0;/s,
+    /\.game-hud\.compact-hud \{[^}]*--compact-safe-top: 0px;[^}]*top: 0;[^}]*height: calc\(36px \+ var\(--compact-safe-top\)\);[^}]*flex-wrap: nowrap;[^}]*padding: var\(--compact-safe-top\) 6px 0;/s,
   );
+  assert.match(
+    portraitHud,
+    /:root:is\(:fullscreen, :-webkit-full-screen\) \.game-hud\.compact-hud \{[^}]*--compact-safe-top: env\(safe-area-inset-top, 0px\);/s,
+  );
+  assert.match(portraitHud, /@media \(display-mode: standalone\), \(display-mode: fullscreen\)/);
   assert.match(portraitHud, /\.compact-hud \.compact-actions \{[^}]*flex-wrap: nowrap;/s);
   assert.match(
     portraitHud,

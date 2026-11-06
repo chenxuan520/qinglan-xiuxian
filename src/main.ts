@@ -2759,14 +2759,30 @@ backgroundClock.onmessage = () => {
 };
 syncMortalSave(true);
 initOffline();
-renderLobby();
-if (save.pendingReincarnation) renderJourneyFarewell(save.pendingReincarnation);
-else if (!save.mortal.marketSocial?.ambush && lifespanInfo(save).remaining === 0)
-  renderLifespanEnd();
-else if (!save.mortal.marketSocial?.ambush && tribulationDue(save)) renderTribulationPending();
+const restoringExtremeRun =
+  isExtremeLife(save) &&
+  pendingRun !== null &&
+  !saveLock &&
+  !save.pendingReincarnation &&
+  !save.journeyEnded &&
+  !save.mortal.marketSocial?.ambush &&
+  lifespanInfo(save).remaining > 0;
+if (!restoringExtremeRun) {
+  renderLobby();
+  if (save.pendingReincarnation) renderJourneyFarewell(save.pendingReincarnation);
+  else if (!save.mortal.marketSocial?.ambush && lifespanInfo(save).remaining === 0)
+    renderLifespanEnd();
+  else if (!save.mortal.marketSocial?.ambush && tribulationDue(save)) renderTribulationPending();
+}
 if (saveLock) renderSaveLock();
 persist();
-if (startsWithPrologue(save, { saveLock, game, pendingRun, inMortalWorld, panel })) {
+if (restoringExtremeRun && pendingRun) {
+  const resume = () => {
+    assetsReady = true;
+    restoreRun();
+  };
+  if (ensureScene(pendingRun.stage, resume, pendingRun)) resume();
+} else if (startsWithPrologue(save, { saveLock, game, pendingRun, inMortalWorld, panel })) {
   loadNewPlayerAssets(
     assetUrl(PROLOGUE_IMAGE),
     () => renderPrologue(),
