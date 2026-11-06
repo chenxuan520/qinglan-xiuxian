@@ -4,6 +4,51 @@ import { TREASURES, PASSIVES } from '../src/data.ts';
 import { freshSave } from '../src/progress.ts';
 import { catalogPanel } from '../src/catalog-ui.ts';
 import { leaderboardSettings } from '../src/leaderboard-preference.ts';
+import { showPanel } from '../src/scene-flow.ts';
+import type { ActionShell } from '../src/action-controller.ts';
+
+test('重新打开藏器阁默认高亮当前本命，旧浏览和筛选不影响且收藏顺序不变', () => {
+  const save = freshSave('heaven', ['water'], 'dual', () => 0.5);
+  save.artifacts = TREASURES.map((t) => t.id);
+  let body = '';
+  const shell = {
+    save,
+    panel: '',
+    selectedTreasure: TREASURES[0].id,
+    bookTab: 'passives',
+    schoolFilter: 'demonic',
+    renderPanel() {
+      body = catalogPanel(save, {
+        panel: 'arsenal',
+        catalogTreasures: TREASURES,
+        selectedTreasure: this.selectedTreasure,
+        bookTab: this.bookTab,
+        schoolFilter: this.schoolFilter,
+      }).body;
+    },
+  };
+  for (const starter of ['pearl', 'nest', 'vortex']) {
+    save.starter = starter;
+    const before = structuredClone(save);
+    shell.selectedTreasure = TREASURES[0].id;
+    shell.bookTab = 'curios';
+    shell.schoolFilter = 'orthodox';
+    showPanel(shell as unknown as ActionShell, 'arsenal');
+    assert.deepEqual(
+      [
+        ...body.matchAll(
+          /class="collection-card selected[^\"]*" data-action="treasure" data-id="([^\"]+)"/g,
+        ),
+      ].map((m) => m[1]),
+      [starter],
+    );
+    assert.deepEqual(
+      [...body.matchAll(/data-action="treasure" data-id="([^\"]+)"/g)].map((m) => m[1]),
+      TREASURES.map((t) => t.id),
+    );
+    assert.deepEqual(save, before);
+  }
+});
 
 test('藏器阁各流派完整连续显示，无分页也不漏掉末件', () => {
   const save = freshSave();

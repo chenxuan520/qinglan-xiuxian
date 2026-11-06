@@ -104,6 +104,19 @@ for (const direction of [-1, 1])
       }
       const arrows = c.strokes.filter((s) => s.points.length === 9);
       assert.equal(arrows.length, 2);
+      const lines = c.strokes.filter((s) => s.dash.length);
+      assert.equal(lines.length, 2);
+      lines.forEach((stroke, ray) => {
+        const a = angle + ray * Math.PI;
+        assert.equal(stroke.color, STAGES[5].color);
+        assert.equal(stroke.width, 2);
+        assert.equal(stroke.alpha, 1);
+        assert.deepEqual(stroke.dash, [8, 5]);
+        [75, 900].forEach((radius, i) => {
+          near(stroke.points[i].x, 35 + Math.cos(a) * radius);
+          near(stroke.points[i].y, -20 + Math.sin(a) * radius);
+        });
+      });
       arrows.forEach((stroke, ray) => {
         const a = angle + ray * Math.PI;
         assert.equal(stroke.color, STAGES[5].color);
@@ -125,33 +138,27 @@ for (const direction of [-1, 1])
       drawRegionalField(base.ctx, field(angle, direction), 0, true);
       assert.equal(base.strokes.length, 0, '预警箭头仅在上层预警绘制一次');
     });
-    test(`星轨残影同心落后15度、透明度0.25并随轨转动，方向${direction}、角度${angle}`, () => {
-      const z = field(angle, direction);
-      z.delay = 0;
-      for (const dt of [0, 0.4])
-        for (const reduced of [false, true]) {
-          const copy = structuredClone(z);
-          rotateZone(copy, dt);
-          const c = recordingCanvas(),
-            initial = { ...c.state() };
-          drawRegionalField(c.ctx, copy, dt, reduced);
-          const ghosts = c.strokes.filter((s) => s.alpha === 0.25);
-          assert.equal(ghosts.length, 1);
-          const ghost = ghosts[0],
-            a = copy.spinAngle! - (direction * Math.PI) / 12;
-          assert.equal(ghost.width, 2);
-          assert.equal(ghost.color, STAGES[5].color);
-          assert.deepEqual(ghost.dash, []);
-          assert.equal(ghost.points.length, 2);
-          [75, 900].forEach((radius, i) => {
-            near(ghost.points[i].x, 35 + Math.cos(a) * radius);
-            near(ghost.points[i].y, -20 + Math.sin(a) * radius);
-          });
-          assert.deepEqual(c.state(), initial);
-          assert.equal(c.depth(), 0);
-          const warning = recordingCanvas();
-          drawRegionalField(warning.ctx, copy, dt, reduced, true);
-          assert.ok(!warning.strokes.some((s) => s.alpha === 0.25), '上层不重复叠加残影');
-        }
-    });
   }
+
+test('生效星轨在底层和上层均无alpha0.25残影，本体和边界仍绘制', () => {
+  for (const direction of [-1, 1])
+    for (const angle of [-1.2, 0, 0.7])
+      for (const dt of [0, 0.4])
+        for (const reduced of [false, true])
+          for (const warning of [false, true])
+            for (const color of [STAGES[5].color, '#e8d69c']) {
+              const z = field(angle, direction);
+              z.delay = 0;
+              z.color = color;
+              rotateZone(z, dt);
+              const before = structuredClone(z);
+              const c = recordingCanvas(),
+                initial = { ...c.state() };
+              assert.equal(drawRegionalField(c.ctx, z, dt, reduced, warning), true);
+              assert.ok(c.strokes.length > 0, '星轨本体或危险边界仍须绘制');
+              assert.ok(!c.strokes.some((s) => s.alpha === 0.25), '两层均不绘制淡残影');
+              assert.deepEqual(z, before);
+              assert.deepEqual(c.state(), initial);
+              assert.equal(c.depth(), 0);
+            }
+});

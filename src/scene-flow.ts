@@ -429,6 +429,11 @@ export function showAuction(shell: ActionShell) {
 }
 
 export function showPanel(shell: ActionShell, name: string) {
+  if (name === 'arsenal') {
+    shell.selectedTreasure = shell.save.starter;
+    shell.bookTab = 'treasures';
+    shell.schoolFilter = 'all';
+  }
   shell.panel = name;
   shell.renderPanel();
 }

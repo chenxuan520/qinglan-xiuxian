@@ -48,20 +48,6 @@ export function drawRegionalField(
     c.restore();
     return true;
   }
-  if (z.kind === 'boss-sweep' && !warning) {
-    c.save();
-    c.translate(-z.spinInner!, 0);
-    c.rotate((-Math.sign(z.spinSpeed!) * Math.PI) / 12);
-    c.globalAlpha = 0.25;
-    c.strokeStyle = z.color;
-    c.lineWidth = 2;
-    c.setLineDash([]);
-    c.beginPath();
-    c.moveTo(z.spinInner!, 0);
-    c.lineTo(z.spinOuter!, 0);
-    c.stroke();
-    c.restore();
-  }
   if (warning) {
     capsule(c, length, z.radius);
     c.strokeStyle = '#301c22b3';
