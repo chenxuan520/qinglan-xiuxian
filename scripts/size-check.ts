@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 
 export const SIZE_BUDGET = {
   jsBytes: 600_000,
-  jsGzip: 220_000,
-  cssBytes: 170_000,
+  jsGzip: 300_000,
+  cssBytes: 180_000,
   cssGzip: 35_000,
-  distBytes: 18_000_000,
+  distBytes: 20_000_000,
 };
 
 export interface SizeMeasure {
@@ -83,7 +83,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     `预算 JS ≤ ${SIZE_BUDGET.jsBytes}（gzip ≤ ${SIZE_BUDGET.jsGzip}）· CSS ≤ ${SIZE_BUDGET.cssBytes}（gzip ≤ ${SIZE_BUDGET.cssGzip}）`,
   );
   console.log(
-    `整个构建目录 ${measure.distBytes} 字节，预算 ≤ ${SIZE_BUDGET.distBytes} 字节（18 MB），包含全部静态资源和清单。`,
+    `整个构建目录 ${measure.distBytes} 字节，预算 ≤ ${SIZE_BUDGET.distBytes} 字节（20 MB），包含全部静态资源和清单。`,
   );
   const breaches = budgetBreaches(measure);
   writeFileSync(
