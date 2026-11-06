@@ -67,7 +67,7 @@ jobs:
       - name: Preserve latest balance report
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-balance-report.ts
+        run: node --experimental-strip-types scripts/restore-balance-report.ts
       - name: Preserve latest performance summaries
         env:
           GH_TOKEN: ${{ github.token }}

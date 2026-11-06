@@ -94,8 +94,10 @@ test('所有Pages日报发布保留公开巡检结果，sparse工具同时包含
   assert.match(source, /--workflow pages.yml --branch master --status success/);
   assert.match(source, /ref: \$\{\{ steps.game.outputs.sha \}\}/);
   assert.ok(source.indexOf('npm run build --') < source.indexOf('path: artifacts/report-tools'));
+  // 平衡报告刷新按模块所在仓库校验dist路径，须使用已部署游戏工作树中的工具。
+  assert.match(source, /run: node --experimental-strip-types scripts\/restore-balance-report\.ts/);
+  assert.doesNotMatch(source, /artifacts\/report-tools\/scripts\/restore-balance-report\.ts/);
   for (const script of [
-    'balance-report',
     'monitor-performance',
     'weapon-report',
     'autoplay-report',
