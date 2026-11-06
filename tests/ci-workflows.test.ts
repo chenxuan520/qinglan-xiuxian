@@ -46,7 +46,7 @@ test('单测只在独立门禁运行，保留PR和分支/版本标签触发及�
   assert.match(source, /if: always\(\)/);
 });
 
-test('Pages保留四类报告并从独立性能artifact恢复，二进制与平衡门禁未遗漏', () => {
+test('Pages保留五类报告并从独立性能artifact恢复，二进制与平衡门禁未遗漏', () => {
   const source = read('pages.yml');
   assert.doesNotMatch(source, /MONITOR_LOCAL_CHECKS/);
   for (const script of [
@@ -54,11 +54,55 @@ test('Pages保留四类报告并从独立性能artifact恢复，二进制与平�
     'restore-monitor-performance',
     'restore-weapon-report',
     'restore-autoplay-report',
+    'restore-observer-report',
   ])
     assert.ok(source.includes(`scripts/${script}.ts`), script);
   assert.match(read('binaries.yml'), /scripts\/check-binaries\.ts/);
   for (const command of ['balance:ci', 'perf:sim', 'size:check', 'balance:gate:full'])
     assert.ok(read('balance.yml').includes(`npm run ${command}`), command);
+});
+
+test('所有Pages日报发布保留公开巡检结果，sparse工具同时包含纯协议', () => {
+  for (const name of [
+    'pages',
+    'balance',
+    'weapon-benchmark',
+    'autoplay-balance',
+    'balance-import',
+  ]) {
+    const source = read(`${name}.yml`);
+    assert.match(source, /scripts\/restore-observer-report\.ts/);
+    assert.ok(
+      source.indexOf('scripts/restore-observer-report.ts') <
+        source.indexOf('actions/upload-pages-artifact@'),
+    );
+    if (source.includes('sparse-checkout:')) assert.match(source, /src\/observer-report\.ts/);
+  }
+  const source = read('observer-report.yml');
+  assert.match(
+    source,
+    /workflow_run:[\s\S]*workflows: \['Runtime observer'\][\s\S]*types: \[completed\]/,
+  );
+  assert.match(source, /head_repository.full_name == github.repository/);
+  assert.match(source, /repository.full_name == github.repository/);
+  assert.match(source, /conclusion != 'cancelled'/);
+  assert.doesNotMatch(
+    source,
+    /conclusion == 'success'|workflow_run.head_sha|secrets\.|continue-on-error/,
+  );
+  assert.match(source, /group: pages\s+cancel-in-progress: false/);
+  assert.match(source, /--workflow pages.yml --branch master --status success/);
+  assert.match(source, /ref: \$\{\{ steps.game.outputs.sha \}\}/);
+  assert.ok(source.indexOf('npm run build --') < source.indexOf('path: artifacts/report-tools'));
+  for (const script of [
+    'balance-report',
+    'monitor-performance',
+    'weapon-report',
+    'autoplay-report',
+    'observer-report',
+  ])
+    assert.ok(source.includes(`artifacts/report-tools/scripts/restore-${script}.ts`));
+  assert.doesNotMatch(source, testCommands);
 });
 
 test('tag只打单机包，官网仍正常联网构建，独立门禁检查单机产物', () => {

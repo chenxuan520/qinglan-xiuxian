@@ -243,6 +243,18 @@ footer {
   border-top: 1px solid #e4eae5;
   padding-top: 16px;
 }
+section[aria-labelledby='observer-title'] {
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.observer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.observer-links a {
+  display: inline-flex;
+}
 @media (max-width: 700px) {
   main {
     padding: 20px 12px 40px;

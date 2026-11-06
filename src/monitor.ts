@@ -32,6 +32,7 @@ import {
 import './monitor.css';
 import { mountAutoplayMonitor } from './monitor-autoplay.ts';
 import { mountWeaponMonitor } from './monitor-weapons.ts';
+import { mountObserverMonitor } from './monitor-observer.ts';
 import { monitorDeadline } from './monitor-request.ts';
 import { SHARING_ACTIONS, type SharingAction } from './sharing.ts';
 import {
@@ -72,6 +73,7 @@ root.innerHTML = `<main>
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 mountWeaponMonitor(root);
 mountAutoplayMonitor(root);
+mountObserverMonitor(root);
 const charts: Chart[] = [];
 let liveController: AbortController | undefined;
 let ciController: AbortController | undefined;
