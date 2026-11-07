@@ -3281,7 +3281,7 @@ export class Game {
     if (this.player.hp <= 0 && (this.altar?.deathUntil ?? 0) > this.time && !this.expired) {
       this.player.hp = 1;
       if (this.time - this.altarSavedAt >= 0.6)
-        this.#effect(this.player.x, this.player.y - 34, 0.9, 0, STAGES[4].color, 'text', '借命');
+        this.#effect(this.player.x, this.player.y - 58, 0.9, 0, STAGES[4].color, 'text', '借命');
       this.altarSavedAt = this.time;
     }
   }
