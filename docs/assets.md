@@ -41,7 +41,7 @@
 
 ## 仙途山河图 · 首页选关（2026-09-23）
 
-内置 imagegen 分别生成两幅无字青绿山水底图：桌面横卷 `public/assets/journey-map.webp`（1672 × 941），手机竖卷 `public/assets/journey-map-mobile.webp`（1024 × 1536）。九处地貌对应青岚镇、七境与仙门；文字、按钮和进度路线由前端叠加，不烘焙在图片中。提示词分别保留于 [横版提示词](journey-map-wide-prompt.txt) 与 [手机版提示词](journey-map-mobile-prompt.txt)。
+内置 imagegen 分别生成两幅无字青绿山水底图：桌面横卷 `public/assets/journey-map.webp`（1672 × 941），手机竖卷 `public/assets/journey-map-mobile.webp`（1024 × 1536）。九处地貌对应青岚镇、七境与仙门；文字、按钮和进度路线由前端叠加，不烘焙在图片中。提示词分别保留于 [横版提示词](prompts/journey-map-wide-prompt.txt) 与 [手机版提示词](prompts/journey-map-mobile-prompt.txt)。
 
 先运行现有压缩脚本，再以原始工具输出按 WebP quality=68、method=6 精压，均保持原尺寸。横版 PNG 3142365 字节压至 251582 字节（约 246 KiB），竖版 PNG 3532306 字节压至 280160 字节（约 274 KiB），合计减少约 92%。仓库仅保留 WebP，不携带 PNG。
 
@@ -53,7 +53,7 @@
 
 原图 1774 × 887 RGBA、1,935,095 字节；按网页图标用途缩至 1024 × 512，WebP quality=78、method=6、保留透明通道，204,474 字节，减少约 89.4%。每格 128 × 128，页面展示 72 × 72。图集加入初始资源预载，与法宝图集共用基础路径处理。
 
-完整最终生成提示词见 [丹药图集提示词](medicine-art-prompt.txt)。
+完整最终生成提示词见 [丹药图集提示词](prompts/medicine-art-prompt.txt)。
 
 ## 山河一梦 · 序章与 README 封面（2026-09-20）
 

@@ -43,7 +43,7 @@ export function parseNovel(markdown: string): Novel {
     .trimEnd()
     .split('\n');
   if (
-    /^\[创作说明与设定索引\]\([\w-]+\.md\) · \[世界观设定稿\]\(worldbuilding\.md\)$/.test(
+    /^\[创作说明与设定索引\]\([\w\/-]+\.md\) · \[世界观设定稿\]\(worldbuilding\.md\)$/.test(
       lines.at(-1)?.trim() ?? '',
     )
   ) {

@@ -5767,4 +5767,4 @@
 
 ---
 
-[创作说明与设定索引](novel-notes.md) · [世界观设定稿](worldbuilding.md)
+[创作说明与设定索引](notes/novel-notes.md) · [世界观设定稿](worldbuilding.md)
