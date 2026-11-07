@@ -190,6 +190,7 @@ export class Game {
   bossCultivation = 0;
   revivesUsed = 0;
   altar: AltarState | null = null;
+  altarSavedAt = -Infinity;
   altarHealthScale: 1 | 0.8 = 1;
   private altarRandom: () => number;
   cacheChallenge: CacheChallenge | null = null;
@@ -3220,6 +3221,9 @@ export class Game {
     if (!a || !this.canAcceptAltar) return false;
     a.phase = 'accepted';
     const until = (seconds: number) => Math.min(this.stageDuration, this.time + seconds);
+    const altarColor = STAGES[this.stage].color;
+    this.#effect(a.x, a.y, 0.4, 45, altarColor, 'altar-collapse');
+    this.#effect(this.player.x, this.player.y, 0.5, 220, altarColor, 'altar-pulse');
     switch (a.kind) {
       case 'wood':
         this.save.age += this.altarCostYears;
@@ -3229,14 +3233,17 @@ export class Game {
         break;
       case 'fire':
         this.player.hp = Math.max(1, this.player.hp - Math.floor(this.player.hp * 0.3));
+        this.#effect(this.player.x, this.player.y, 0.6, 700, '#f08a4b', 'altar-firewave');
         for (const e of [...this.enemies])
-          if (!e.dead && !e.boss)
+          if (!e.dead && !e.boss) {
+            if (this.effects.length < 200) this.#effect(e.x, e.y, 0.35, 22, '#f08a4b', 'impact');
             this.hitEnemy(
               e,
               e.maxHp * (e.elite || e.bossSummon?.kind === 'heart' ? 0.15 : 0.5),
               false,
               'altar',
             );
+          }
         break;
       case 'ice':
         for (const e of this.enemies) if (!e.dead && !e.boss) e.frozenUntil = until(8);
@@ -3271,8 +3278,12 @@ export class Game {
     this.onEvent('altar');
   }
   #preserveAltarLife() {
-    if (this.player.hp <= 0 && (this.altar?.deathUntil ?? 0) > this.time && !this.expired)
+    if (this.player.hp <= 0 && (this.altar?.deathUntil ?? 0) > this.time && !this.expired) {
       this.player.hp = 1;
+      if (this.time - this.altarSavedAt >= 0.6)
+        this.#effect(this.player.x, this.player.y - 34, 0.9, 0, STAGES[4].color, 'text', '借命');
+      this.altarSavedAt = this.time;
+    }
   }
   #updateAltarEffects(dt: number) {
     const a = this.altar;

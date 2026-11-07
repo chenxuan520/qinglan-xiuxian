@@ -5,7 +5,7 @@ import { freshSave, realmCost, lifespanInfo, type SaveData } from '../src/progre
 import { visitNightBoat, claimNightBoat } from '../src/night-boat.ts';
 import { ENEMIES, STAGE_ENEMIES, STAGES } from '../src/data.ts';
 import { useMedicine } from '../src/medicine.ts';
-import type { AltarState } from '../src/altars.ts';
+import { ALTARS, type AltarState } from '../src/altars.ts';
 
 const near = (actual: number, expected: number) =>
   assert.ok(
@@ -1020,4 +1020,74 @@ test('蚀体校验只对已接受毒祭坛扩展到实际剩余时长，越界�
   accept(wood);
   wood.pause();
   assert.equal(Game.restore(wood.save, { ...wood.snapshot(), corroded: 3.001 }), null);
+});
+
+test('接受祭坛时产生法阵收拢与自身灵光外扩，颜色为当前秘境色', () => {
+  for (let stage = 0; stage < ALTARS.length; stage++) {
+    const g = arena(stage);
+    const a = prompt(g);
+    g.effects.length = 0;
+    assert.equal(g.acceptAltar(), true);
+    const collapse = g.effects.find((e) => e.kind === 'altar-collapse')!;
+    const pulse = g.effects.find((e) => e.kind === 'altar-pulse')!;
+    assert.deepEqual([collapse.x, collapse.y], [a.x, a.y]);
+    assert.deepEqual([pulse.x, pulse.y], [g.player.x, g.player.y]);
+    assert.equal(collapse.color, STAGES[stage].color);
+    assert.equal(pulse.color, STAGES[stage].color);
+  }
+});
+
+test('焚天一炬先放火环，受伤妖物各出一次火光，特效过多时只留火环', () => {
+  const g = arena(1);
+  prompt(g);
+  const first = target(g, 120);
+  const second = target(g, 160);
+  g.effects.length = 0;
+  assert.equal(g.acceptAltar(), true);
+  assert.ok(g.effects.some((e) => e.kind === 'altar-firewave' && e.radius === 700));
+  const impacts = g.effects.filter((e) => e.kind === 'impact' && e.color === '#f08a4b');
+  assert.deepEqual(
+    impacts.map((e) => [e.x, e.y]).sort(),
+    [
+      [first.x, first.y],
+      [second.x, second.y],
+    ].sort(),
+  );
+
+  const crowded = arena(1);
+  prompt(crowded);
+  target(crowded, 120);
+  crowded.effects = Array.from({ length: 200 }, (_, i) => ({
+    x: 0,
+    y: 0,
+    life: 1,
+    maxLife: 1,
+    radius: 0,
+    color: '#000',
+    kind: 'dummy',
+    id: i,
+  })) as typeof crowded.effects;
+  assert.equal(crowded.acceptAltar(), true);
+  assert.ok(crowded.effects.some((e) => e.kind === 'altar-firewave'));
+  assert.equal(crowded.effects.filter((e) => e.kind === 'impact').length, 0);
+});
+
+test('冥府借命锁血时记下时间并飘出「借命」，0.6 秒内重复只刷新暗角时间', () => {
+  const g = arena(4);
+  accept(g);
+  g.effects.length = 0;
+  g.player.hp = 1;
+  g.player.invincible = 0;
+  g.hurtPlayer(g.player.maxHp * 10);
+  assert.equal(g.player.hp, 1);
+  assert.equal(g.altarSavedAt, g.time);
+  const saved = g.effects.filter((e) => e.kind === 'text' && e.text === '借命');
+  assert.equal(saved.length, 1);
+  g.time += 0.2;
+  g.player.invincible = 0;
+  g.player.hp = 1;
+  g.hurtPlayer(g.player.maxHp * 10);
+  assert.equal(g.effects.filter((e) => e.kind === 'text' && e.text === '借命').length, 1);
+  assert.equal(g.altarSavedAt, g.time);
+  assert.equal('altarSavedAt' in structuredClone(g.snapshot()), false);
 });

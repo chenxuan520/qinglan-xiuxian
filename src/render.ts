@@ -220,6 +220,24 @@ export class Renderer {
       c.fillRect(0, 0, w, h);
       c.restore();
     }
+    if (game && time - game.altarSavedAt < 0.3) {
+      const progress = Math.max(0, 1 - (time - game.altarSavedAt) / 0.3);
+      c.save();
+      const saved = c.createRadialGradient(
+        w / 2,
+        h / 2,
+        Math.min(w, h) * 0.25,
+        w / 2,
+        h / 2,
+        Math.hypot(w, h) * 0.55,
+      );
+      saved.addColorStop(0, `${STAGES[4].color}00`);
+      saved.addColorStop(1, STAGES[4].color);
+      c.globalAlpha = 0.45 * progress;
+      c.fillStyle = saved;
+      c.fillRect(0, 0, w, h);
+      c.restore();
+    }
     if (!game) {
       if (!this.previewShade) {
         this.previewShade = c.createLinearGradient(0, 0, w, 0);
@@ -625,6 +643,28 @@ export class Renderer {
     ].sort((a, b) => a.y - b.y);
     for (const e of entities) {
       if (e.type === -1) {
+        const altar = game.altar;
+        const auraColor =
+          (altar?.regenUntil ?? 0) > time
+            ? STAGES[0].color
+            : (altar?.damageUntil ?? 0) > time
+              ? STAGES[3].color
+              : (altar?.deathUntil ?? 0) > time
+                ? STAGES[4].color
+                : null;
+        if (auraColor) {
+          const pulse = this.reducedMotion.matches
+            ? 0.25
+            : 0.25 + Math.sin((time / 1.6) * TAU) * 0.07;
+          c.save();
+          c.strokeStyle = auraColor;
+          c.globalAlpha = pulse;
+          c.lineWidth = 2;
+          c.beginPath();
+          c.arc(p.x, p.y, 30, 0, TAU);
+          c.stroke();
+          c.restore();
+        }
         this.playerFormation(p.x, p.y + 9, game.realmIndex, time);
         if (game.buddhaShieldReady || game.windThunderActive)
           this.battleArt!.drawComboPlayer(c, game, time, this.reducedMotion.matches, compact);
@@ -1051,6 +1091,33 @@ export class Renderer {
             c.restore();
           }
         }
+      } else if (e.kind === 'altar-collapse') {
+        const progress = 1 - e.life / e.maxLife;
+        c.globalAlpha = 0.8 * (e.life / e.maxLife);
+        c.lineWidth = 2;
+        c.beginPath();
+        c.arc(e.x, e.y, e.radius * (1 - progress), 0, TAU);
+        c.stroke();
+      } else if (e.kind === 'altar-pulse') {
+        const progress = 1 - e.life / e.maxLife;
+        c.globalAlpha = 0.7 * (e.life / e.maxLife);
+        c.lineWidth = 3 - 2 * progress;
+        c.beginPath();
+        c.arc(e.x, e.y, e.radius * progress, 0, TAU);
+        c.stroke();
+      } else if (e.kind === 'altar-firewave') {
+        const progress = 1 - e.life / e.maxLife;
+        const radius = e.radius * progress;
+        c.globalAlpha = 0.35 * (e.life / e.maxLife);
+        c.lineWidth = 10;
+        c.beginPath();
+        c.arc(e.x, e.y, radius, 0, TAU);
+        c.stroke();
+        c.globalAlpha = 0.8 * (e.life / e.maxLife);
+        c.lineWidth = 3;
+        c.beginPath();
+        c.arc(e.x, e.y, radius, 0, TAU);
+        c.stroke();
       } else if (e.kind === 'text') {
         c.font = `600 ${e.text?.includes('!') ? 16 : 13}px Georgia, serif`;
         c.textAlign = 'center';

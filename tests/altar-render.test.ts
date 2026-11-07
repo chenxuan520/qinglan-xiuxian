@@ -58,6 +58,8 @@ function drawingFixture() {
     method: string;
     args: any[];
     color: unknown;
+    stroke: unknown;
+    lineWidth: unknown;
     composite: unknown;
     filter: unknown;
     texture: boolean;
@@ -84,6 +86,8 @@ function drawingFixture() {
                 method: name,
                 args,
                 color: target.fillStyle,
+                stroke: target.strokeStyle,
+                lineWidth: target.lineWidth,
                 composite: target.globalCompositeOperation,
                 filter: target.filter,
                 texture,
@@ -267,4 +271,67 @@ test('Canvas木心同样整体淡蓝覆盖，复用临时纹理且冻结结束�
       false,
     );
     assert.equal(JSON.stringify(heart), before);
+  }));
+
+test('祭坛收拢、外扩与火环按寿命变化半径线宽，火环为双层描边', () =>
+  fixture((r, drawing) => {
+    const game = encounter();
+    game.altar = null;
+    r.sprite = () => {};
+    game.effects = [
+      {
+        x: 100,
+        y: 100,
+        life: 0.2,
+        maxLife: 0.4,
+        radius: 45,
+        color: '#fff',
+        kind: 'altar-collapse',
+      },
+      { x: 100, y: 100, life: 0.25, maxLife: 0.5, radius: 220, color: '#fff', kind: 'altar-pulse' },
+      {
+        x: 100,
+        y: 100,
+        life: 0.3,
+        maxLife: 0.6,
+        radius: 700,
+        color: '#f08a4b',
+        kind: 'altar-firewave',
+      },
+    ] as any;
+    drawing.calls.length = 0;
+    r.drawGame(game, game.time);
+    const arcs = drawing.calls.filter((call) => call.method === 'arc' && call.args[0] === 100);
+    const collapse = arcs.find((call) => call.args[2] === 22.5)!;
+    assert.equal(collapse.lineWidth, 2);
+    const pulse = arcs.find((call) => call.args[2] === 110)!;
+    assert.equal(pulse.lineWidth, 2);
+    const wave = arcs.filter((call) => call.args[2] === 350);
+    assert.deepEqual(
+      wave.map((call) => call.lineWidth),
+      [10, 3],
+    );
+    assert.ok(wave.every((call) => call.stroke === '#f08a4b'));
+  }));
+
+test('持续祭坛效果只在玩家脚下画对应秘境色光环，过期不画', () =>
+  fixture((r, drawing) => {
+    const game = encounter();
+    game.altar = { ...game.altar, phase: 'accepted' };
+    r.sprite = () => {};
+    const aura = () => {
+      drawing.calls.length = 0;
+      r.drawGame(game, game.time);
+      return drawing.calls.find((call) => call.method === 'arc' && call.args[2] === 30);
+    };
+    game.altar.regenUntil = game.time + 5;
+    assert.equal(aura()?.stroke, STAGES[0].color);
+    game.altar.regenUntil = game.time - 1;
+    game.altar.damageUntil = game.time + 5;
+    assert.equal(aura()?.stroke, STAGES[3].color);
+    game.altar.damageUntil = game.time - 1;
+    game.altar.deathUntil = game.time + 5;
+    assert.equal(aura()?.stroke, STAGES[4].color);
+    game.altar.deathUntil = game.time - 1;
+    assert.equal(aura(), undefined);
   }));
