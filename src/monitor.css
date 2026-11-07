@@ -201,6 +201,16 @@ td {
 td:first-child {
   min-width: 110px;
 }
+.weapon-detail td:first-child,
+.weapon-detail th:first-child {
+  min-width: 48px;
+  width: 48px;
+}
+.weapon-detail td:nth-child(2),
+.weapon-detail td:nth-child(6) {
+  min-width: 110px;
+  white-space: nowrap;
+}
 .chart {
   height: 300px;
   margin-top: 20px;

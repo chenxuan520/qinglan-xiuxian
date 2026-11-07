@@ -5,7 +5,7 @@ import { TREASURES, treasure } from '../src/data.ts';
 import { seeded } from './balance-policy.ts';
 import { weaponCaseKey, WEAPON_BENCHMARK_PROTOCOL } from './weapon-benchmark-policy.ts';
 import type { WeaponCase, WeaponPlanOptions } from './weapon-benchmark-policy.ts';
-import { validWeaponReport } from '../src/weapon-report.ts';
+import { rankWeapons, validWeaponReport, weaponTotal } from '../src/weapon-report.ts';
 import type { WeaponBattleStats, WeaponPairStats, WeaponReport } from '../src/weapon-report.ts';
 
 export const mean = (xs: number[]) =>
@@ -326,12 +326,14 @@ export function weaponReportMarkdown(r: WeaponReport) {
     '',
     '## 完整单关',
     '',
-    '| 法宝 | 路线 | 第一关 | 第三关 | 第六关 | 本命伤害占比 | 觉醒 |',
-    '| --- | --- | --- | --- | --- | --- | --- |',
+    '按三关合计胜率从高到低排序；每格 40 场左右，相差几个百分点多为样本波动，宜按档位看。',
+    '',
+    '| 排名 | 法宝 | 路线 | 第一关 | 第三关 | 第六关 | 三关合计 | 本命伤害占比 | 觉醒 |',
+    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
   ];
-  for (const w of r.weapons)
+  for (const { rank, wins, n, weapon: w } of rankWeapons(r.weapons))
     lines.push(
-      `| ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${w.stages.map((g) => `${g.stats.wins}/${g.stats.n}`).join(' | ')} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
+      `| ${rank} | ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${w.stages.map((g) => `${g.stats.wins}/${g.stats.n}`).join(' | ')} | ${weaponTotal(wins, n)} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
     );
   lines.push(
     '',

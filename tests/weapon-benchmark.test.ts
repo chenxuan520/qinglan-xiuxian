@@ -37,6 +37,7 @@ import {
   weaponClusterInterval,
   verifyWeaponCoverage,
   buildWeaponReport,
+  weaponReportMarkdown,
   writeWeaponReport,
 } from '../scripts/weapon-benchmark-report.ts';
 import {
@@ -44,7 +45,7 @@ import {
   checkDailyWeaponReport,
   WEAPON_PUBLIC_FILES,
 } from '../scripts/restore-weapon-report.ts';
-import { validWeaponReport } from '../src/weapon-report.ts';
+import { rankWeapons, validWeaponReport, weaponTotal } from '../src/weapon-report.ts';
 import { weaponMonitorHTML } from '../src/monitor-weapons.ts';
 
 const options = parseWeaponOptions([]);
@@ -289,4 +290,111 @@ test('公开摘要拒绝漏样本、错误数值和损坏计数；失败与陈�
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+function rankedWeapon(id: string, wins: number[], n: number[] = [40, 40, 40]) {
+  return {
+    id,
+    name: id,
+    school: 'orthodox',
+    natural: { wins: wins[0] ?? 0, n: n[0] ?? 0, evolved: 0, ownShare: 50 },
+    stages: wins.map((value, index) => ({
+      stage: [0, 2, 5][index],
+      stats: { wins: value, n: n[index] ?? 0 },
+    })),
+    groups: [],
+    pairs: [],
+    pairGroups: [],
+    focused: null,
+    replicated: [],
+  } as unknown as WeaponReport['weapons'][number];
+}
+
+test('法宝明细按三关合计胜率排序，并以第六关与原始顺序破同率', () => {
+  const a = rankedWeapon('sword', [10, 10, 10]);
+  const b = rankedWeapon('pearl', [9, 9, 9]);
+  const c = rankedWeapon('fan', [8, 10, 12]);
+  const d = rankedWeapon('beads', [8, 10, 12]);
+  const empty = rankedWeapon('ice', [0, 0, 0], [0, 0, 0]);
+  const before = structuredClone([a, b, c, d, empty]);
+  const ranked = rankWeapons([a, b, c, d, empty]);
+  assert.deepEqual(
+    ranked.map((row) => row.weapon.id),
+    ['fan', 'beads', 'sword', 'pearl', 'ice'],
+  );
+  assert.deepEqual(
+    ranked.map((row) => row.rank),
+    [1, 2, 3, 4, 5],
+  );
+  assert.deepEqual(
+    ranked.map((row) => [row.wins, row.n, weaponTotal(row.wins, row.n)]),
+    [
+      [30, 120, '30/120（25%）'],
+      [30, 120, '30/120（25%）'],
+      [30, 120, '30/120（25%）'],
+      [27, 120, '27/120（23%）'],
+      [0, 0, '0/0（0%）'],
+    ],
+  );
+  assert.deepEqual([a, b, c, d, empty], before);
+});
+
+test('报告完整单关按排名输出，监控明细同样带排名与三关合计', () => {
+  const weapons = [rankedWeapon('pearl', [30, 35, 44]), rankedWeapon('sword', [40, 34, 35])];
+  const report = {
+    schemaVersion: 1,
+    protocolVersion: 1,
+    state: 'complete',
+    generatedAt: '2026-11-07T04:00:00.000Z',
+    commit: 'a'.repeat(40),
+    sourceHash: 'b'.repeat(64),
+    runId: 1,
+    elapsedSeconds: 60,
+    error: null,
+    planned: 240,
+    returned: 240,
+    counts: {
+      natural: 240,
+      pairs: 240,
+      actualSimulations: 480,
+      focused: 0,
+      replicated: 0,
+      campaigns: 0,
+    },
+    options: { seeds: 10, extended: false, weapons: ['pearl', 'sword'], seedOffset: 0, workers: 1 },
+    weapons,
+    campaigns: [],
+  } as unknown as WeaponReport;
+  const markdown = weaponReportMarkdown(report);
+  const rows = markdown.split('## 完整单关')[1].split('## 同投入配对')[0];
+  assert.match(rows, /按三关合计胜率从高到低排序/);
+  assert.match(
+    rows,
+    /\| 排名 \| 法宝 \| 路线 \| 第一关 \| 第三关 \| 第六关 \| 三关合计 \| 本命伤害占比 \| 觉醒 \|/,
+  );
+  assert.match(rows, /^\| 1 \| pearl \| 正道 \| 30\/40 \| 35\/40 \| 44\/40 \| 109\/120（91%）/m);
+  assert.match(rows, /^\| 2 \| sword /m);
+
+  const html = weaponMonitorHTML(report);
+  assert.match(html, /排名/);
+  assert.match(html, /三关合计/);
+  assert.match(html, /109\/120（91%）/);
+  assert.ok(html.indexOf('pearl') < html.indexOf('sword'));
+});
+
+test('同率再按 TREASURES 原始顺序，N=0 排在零胜样本之后', () => {
+  const beads = rankedWeapon('beads', [10, 10, 10]);
+  const fan = rankedWeapon('fan', [10, 10, 10]);
+  assert.deepEqual(
+    rankWeapons([beads, fan]).map((row) => row.weapon.id),
+    ['fan', 'beads'],
+    '输入顺序与 TREASURES 相反时，仍按 TREASURES 顺序',
+  );
+  const zeroWins = rankedWeapon('beads', [0, 0, 0]);
+  const empty = rankedWeapon('sword', [0, 0, 0], [0, 0, 0]);
+  assert.deepEqual(
+    rankWeapons([empty, zeroWins]).map((row) => row.weapon.id),
+    ['beads', 'sword'],
+    '有样本的 0% 也排在 N=0 之前，即使 N=0 法宝原始顺序更靠前',
+  );
 });

@@ -1,4 +1,4 @@
-import { ROOT_STARTERS } from './data.ts';
+import { ROOT_STARTERS, TREASURES } from './data.ts';
 // 每日法宝测评的公开摘要；不包含逐帧记录或本地文件路径。
 export const WEAPON_REPORT_URL = 'https://chenxuan520.github.io/qinglan-xiuxian/weapon-report/';
 export const WEAPON_REPORT_PROTOCOL = 1;
@@ -103,6 +103,40 @@ export interface WeaponReport {
     replicated: { evolved: boolean; stats: WeaponPairStats }[];
   }[];
   campaigns: { root: string; n: number; clearedSix: number }[];
+}
+export interface RankedWeapon {
+  weapon: WeaponReport['weapons'][number];
+  rank: number;
+  wins: number;
+  n: number;
+  rate: number;
+}
+// 完整单关展示顺序：三关合计胜率优先，再用第六关胜率与法宝原始顺序打破同率。
+export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
+  const order = new Map<string, number>(TREASURES.map((treasure, index) => [treasure.id, index]));
+  const sixthRate = (weapon: WeaponReport['weapons'][number]) => {
+    const stats = weapon.stages[2]?.stats;
+    return stats && stats.n ? stats.wins / stats.n : 0;
+  };
+  return weapons
+    .map((weapon) => {
+      const stages = weapon.stages.slice(0, 3).map((stage) => stage.stats);
+      const wins = stages.reduce((sum, stats) => sum + stats.wins, 0);
+      const n = stages.reduce((sum, stats) => sum + stats.n, 0);
+      return { weapon, rank: 0, wins, n, rate: n ? wins / n : 0 };
+    })
+    .sort(
+      (a, b) =>
+        (a.n === 0 ? 1 : 0) - (b.n === 0 ? 1 : 0) ||
+        b.rate - a.rate ||
+        sixthRate(b.weapon) - sixthRate(a.weapon) ||
+        (order.get(a.weapon.id) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(b.weapon.id) ?? Number.MAX_SAFE_INTEGER),
+    )
+    .map((item, index) => ({ ...item, rank: index + 1 }));
+}
+export function weaponTotal(wins: number, n: number) {
+  return `${wins}/${n}（${n ? Math.round((wins / n) * 100) : 0}%）`;
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);

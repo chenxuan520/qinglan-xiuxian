@@ -51,9 +51,10 @@ export const monitorReason = (value: unknown) =>
     epilogue: '离界传承',
     manual: '主动轮回',
   })[String(value)] ?? '未记录';
-export function monitorTable(headers: string[], rows: unknown[][]) {
+export function monitorTable(headers: string[], rows: unknown[][], className = '') {
   if (!rows.length) return '<p class="note">当前范围暂无记录。</p>';
-  return `<div class="table-wrap" tabindex="0" role="region" aria-label="${monitorEscape(headers[0])}统计表，可横向滚动"><table><thead><tr>${headers.map((c) => `<th scope="col">${monitorEscape(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${monitorEscape(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const tableClass = className ? ` class="${monitorEscape(className)}"` : '';
+  return `<div class="table-wrap" tabindex="0" role="region" aria-label="${monitorEscape(headers[0])}统计表，可横向滚动"><table${tableClass}><thead><tr>${headers.map((c) => `<th scope="col">${monitorEscape(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c) => `<td>${monitorEscape(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 export function monitorVersions(rows: MonitorRow[]) {
   const headers = ['版本', '打开', '开局', '错误'];

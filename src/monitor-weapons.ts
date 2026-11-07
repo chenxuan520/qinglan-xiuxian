@@ -1,4 +1,10 @@
-import { WEAPON_REPORT_URL, validWeaponReport, type WeaponReport } from './weapon-report.ts';
+import {
+  rankWeapons,
+  validWeaponReport,
+  weaponTotal,
+  WEAPON_REPORT_URL,
+  type WeaponReport,
+} from './weapon-report.ts';
 import { monitorDeadline } from './monitor-request.ts';
 import {
   monitorEscape as esc,
@@ -17,13 +23,16 @@ export function weaponMonitorHTML(data: WeaponReport, now = Date.now()) {
   return `<p><span class="badge ${complete ? 'good' : 'error'}">${complete ? '测评执行完整' : '测评执行失败'}</span>${run}</p><p>${esc(scope)} · 已返回 ${count(data.returned)} / ${count(data.planned)} 个计划样本 · 用时 ${count(data.elapsedSeconds / 60)} 分钟</p><p class="note">生成时间（北京）${esc(time(data.generatedAt))} · 源提交 ${esc(data.commit.slice(0, 12))}</p>${stale ? '<p class="status warning">结果已超过36小时，请查看Actions运行状态。</p>' : ''}${data.error ? `<p class="status error">${esc(data.error)}</p>` : ''}<p class="note">第一、三、六关为标准化单关，后段配对比较整套本命与功法的同投入收益。不是线上玩家或连续六关的胜率；执行完整也不等于所有法宝强度一致。</p>${
     complete
       ? `<details><summary>法宝明细（${data.weapons.length}件），点击展开</summary>${table(
-          ['法宝', '第一关', '第三关', '第六关', '正式AI觉醒', '定向培养通过'],
-          data.weapons.map((w) => [
+          ['排名', '法宝', '第一关', '第三关', '第六关', '三关合计', '正式AI觉醒', '定向培养通过'],
+          rankWeapons(data.weapons).map(({ rank, wins, n, weapon: w }) => [
+            String(rank),
             w.name,
             ...w.stages.map((g) => `${g.stats.wins}/${g.stats.n}`),
+            weaponTotal(wins, n),
             `${w.natural.evolved}/${w.natural.n}`,
             w.focused ? `${w.focused.wins}/${w.focused.n}` : '未运行',
           ]),
+          'weapon-detail',
         )}</details>`
       : ''
   }<p><a href="${WEAPON_REPORT_URL}" target="_blank" rel="noopener noreferrer">完整测评、配对区间与分组CSV ↗</a> · <a href="${WEAPON_REPORT_URL}summary.json" target="_blank" rel="noopener noreferrer">测评JSON接口 ↗</a></p>`;
