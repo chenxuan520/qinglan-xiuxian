@@ -7,6 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   AUTOPLAY_BUILDS,
+  AUTOPLAY_TARGET_SLOTS,
   type AutoplayBuild,
   type AutoplayBuildMode,
 } from '../src/autoplay-build.ts';
@@ -38,7 +39,11 @@ export function autoplayCases(): BalanceCase[] {
   }));
 }
 export function autoplayBuild(mode: AutoplayBuildMode): AutoplayBuild {
-  return { mode, targets: mode === 'custom' ? [...AUTOPLAY_CUSTOM_TARGETS] : ['', ''] };
+  const targets = mode === 'custom' ? [...AUTOPLAY_CUSTOM_TARGETS] : [];
+  return {
+    mode,
+    targets: [...targets, ...Array(AUTOPLAY_TARGET_SLOTS - targets.length).fill('')],
+  };
 }
 export interface AutoplayModeResult {
   mode: AutoplayBuildMode;

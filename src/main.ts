@@ -2274,7 +2274,7 @@ document.addEventListener('change', async (event) => {
     handleAction('autoplay-build', input.value);
     return;
   }
-  if (panel === 'settings' && /^autoplay-build-target-[01]$/.test(input.id)) {
+  if (panel === 'settings' && /^autoplay-build-target-[0-5]$/.test(input.id)) {
     handleAction('autoplay-target', `${input.id.at(-1)}:${input.value}`);
     return;
   }

@@ -70,7 +70,7 @@ test('独立模式测试固定40配对开局，不扩充现有840矩阵', () => 
     AUTOPLAY_REPORT_MODES,
     AUTOPLAY_BUILDS.map(({ id, name }) => ({ id, name })),
   );
-  assert.deepEqual(autoplayBuild('custom').targets, ['ice', 'skull']);
+  assert.deepEqual(autoplayBuild('custom').targets, ['ice', 'skull', '', '', '', '']);
   assert.equal(ciCases().length, 840);
 });
 // 统计器的胜利分支使用显式结构夹具，不要求某个真实开局在每次加难后仍必胜。

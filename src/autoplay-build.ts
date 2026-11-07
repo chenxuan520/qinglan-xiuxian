@@ -21,16 +21,18 @@ export const AUTOPLAY_BUILDS = [
     name: '极致进攻',
     description: '偏重升重、伤害、攻速与暴击。',
   },
-  { id: 'custom', name: '指定法宝', description: '培养指定法宝及觉醒功法。' },
+  { id: 'custom', name: '指定法宝', description: '按顺位培养最多六件指定法宝。' },
 ] as const;
+export const AUTOPLAY_TARGET_SLOTS = 6;
 export type AutoplayBuildMode = (typeof AUTOPLAY_BUILDS)[number]['id'];
 export interface AutoplayBuild {
   mode: AutoplayBuildMode;
-  targets: [string, string];
+  targets: string[];
 }
 export function defaultAutoplayBuild(): AutoplayBuild {
-  return { mode: 'default', targets: ['', ''] };
+  return { mode: 'default', targets: Array(AUTOPLAY_TARGET_SLOTS).fill('') };
 }
+const validTarget = (id: string) => id === '' || TREASURES.some((t) => t.id === id);
 export function validAutoplayBuild(value: unknown): value is AutoplayBuild {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const b = value as AutoplayBuild;
@@ -38,21 +40,32 @@ export function validAutoplayBuild(value: unknown): value is AutoplayBuild {
     Object.keys(b).every((key) => key === 'mode' || key === 'targets') &&
     AUTOPLAY_BUILDS.some((mode) => mode.id === b.mode) &&
     Array.isArray(b.targets) &&
-    b.targets.length === 2 &&
-    b.targets.every((id) => id === '' || TREASURES.some((t) => t.id === id)) &&
-    (!b.targets[0] || b.targets[0] !== b.targets[1])
+    b.targets.length === AUTOPLAY_TARGET_SLOTS &&
+    b.targets.every(validTarget) &&
+    new Set(b.targets.filter(Boolean)).size === b.targets.filter(Boolean).length
   );
+}
+// 旧存档的两件目标即第一、第二顺位，其余槽位补空后按新结构校验。
+export function migrateAutoplayBuild(value: unknown): AutoplayBuild | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const b = value as AutoplayBuild;
+  if (!Array.isArray(b.targets) || b.targets.length !== 2) return null;
+  const migrated = { ...b, targets: [...b.targets, ...Array(AUTOPLAY_TARGET_SLOTS - 2).fill('')] };
+  return validAutoplayBuild(migrated) ? migrated : null;
 }
 export function changeAutoplayBuild(current: AutoplayBuild, field: string, value: string) {
   const next: AutoplayBuild = { mode: current.mode, targets: [...current.targets] };
   if (field === 'mode') {
     if (!AUTOPLAY_BUILDS.some((b) => b.id === value)) return null;
     next.mode = value as AutoplayBuildMode;
-  } else if (field === '0' || field === '1') {
-    if (value !== '' && !TREASURES.some((t) => t.id === value)) return null;
+  } else if (/^[0-5]$/.test(field)) {
+    if (!validTarget(value)) return null;
     const slot = Number(field);
     next.targets[slot] = value;
-    if (value && next.targets[1 - slot] === value) next.targets[1 - slot] = '';
+    if (value)
+      next.targets = next.targets.map((id, index) =>
+        index === slot ? value : id === value ? '' : id,
+      );
   } else return null;
   return next;
 }
@@ -65,6 +78,7 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
     build.mode === 'native'
       ? [g.weapons[0]?.id].filter((id): id is NonNullable<typeof id> => !!id)
       : build.targets.filter((id) => id && allowsSchool(g.path, treasure(id).school));
+  const rank = (id: string) => targets.indexOf(id);
   if (build.mode !== 'survival' && build.mode !== 'offense' && !targets.length) return original;
   if (c.type === 'evolve') return original;
   const hp = g.player.hp / g.player.maxHp;
@@ -103,10 +117,13 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
     }
     return original;
   }
-  if (c.type === 'weapon' && targets.includes(c.id as (typeof targets)[number]))
-    return Math.max(76 + c.level, Math.min(85, original + 8));
+  if (c.type === 'weapon' && targets.includes(c.id as (typeof targets)[number])) {
+    const order = rank(c.id);
+    return Math.max(76 + c.level - order * 2, Math.min(85 - order * 2, original + 8));
+  }
   const recipes: string[] = [];
-  for (const id of targets) {
+  const planned = new Set(Object.keys(g.passives));
+  for (const [order, id] of targets.entries()) {
     const owned = g.weapons.find((w) => w.id === id);
     const required = g.evolutionRequirements(id);
     if (!owned || owned.evolved || required.some((p) => (g.passives[p] || 0) >= MAX_PASSIVE_LEVEL))
@@ -120,12 +137,15 @@ export function buildChoiceScore(c: Choice, g: Game, original: number) {
         g.choices.some((choice) => choice.type === 'passive' && choice.id === p),
       ) ??
       required[0];
-    if (recipe && !g.passives[recipe]) recipes.push(recipe);
-    if (c.type === 'passive' && c.id === recipe) return Math.max(original, 88 + c.level);
+    if (!recipe) continue;
+    if (!planned.has(recipe) && planned.size >= MAX_PASSIVES) break;
+    planned.add(recipe);
+    if (!g.passives[recipe]) recipes.push(recipe);
+    if (c.type === 'passive' && c.id === recipe) return Math.max(original, 88 + c.level - order);
   }
-  // 培养目标尚未成型时留出末格；后半程允许补入其他法宝，避免空等。
+  // 培养目标尚未成型时留出末格；只守前两个顺位，避免为靠后目标长期空等。
   if (c.type === 'weapon' && c.level === 1 && g.time < Math.min(120, g.stageDuration * 0.6)) {
-    const missing = targets.filter((id) => !g.weapons.some((w) => w.id === id)).length;
+    const missing = targets.slice(0, 2).filter((id) => !g.weapons.some((w) => w.id === id)).length;
     if (missing > 0 && MAX_WEAPONS - g.weapons.length <= missing)
       return original - (original >= 77 ? 100 : 20);
   }

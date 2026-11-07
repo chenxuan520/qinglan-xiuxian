@@ -22,7 +22,7 @@ import {
 } from './progress.ts';
 import { validMortal } from './mortal-data.ts';
 import { validChronicle } from './chronicle.ts';
-import { validAutoplayBuild } from './autoplay-build.ts';
+import { migrateAutoplayBuild, validAutoplayBuild } from './autoplay-build.ts';
 import { isExtremeLife } from './life-mode.ts';
 import { inspectSaveIntegrity, sealSaveSnapshot } from './leaderboard-integrity.ts';
 
@@ -181,7 +181,9 @@ export function importSave(text: string) {
     (data.suppliesReadyAt !== undefined && !validSuppliesReadyAt(data.suppliesReadyAt)) ||
     (data.artifacts !== undefined && !artifactIds(data.artifacts)) ||
     (data.artifactDrops !== undefined && !artifactIds(data.artifactDrops)) ||
-    (data.autoplayBuild !== undefined && !validAutoplayBuild(data.autoplayBuild)) ||
+    (data.autoplayBuild !== undefined &&
+      !validAutoplayBuild(data.autoplayBuild) &&
+      !migrateAutoplayBuild(data.autoplayBuild)) ||
     ['sound', 'autoplay', 'prologueSeen', 'hometownSeen', 'journeyEnded'].some(
       (key) => data[key] !== undefined && typeof data[key] !== 'boolean',
     ) ||

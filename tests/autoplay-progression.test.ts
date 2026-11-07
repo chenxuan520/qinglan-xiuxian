@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { autoplayChoice, autoplayInput } from '../src/autoplay.ts';
-import { AUTOPLAY_BUILDS } from '../src/autoplay-build.ts';
+import { AUTOPLAY_BUILDS, buildChoiceScore } from '../src/autoplay-build.ts';
 import { allowsSchool, MAX_PASSIVE_LEVEL, MAX_WEAPON_LEVEL, TREASURES } from '../src/data.ts';
 import type { CultivationPath, WeaponKind } from '../src/data.ts';
 import { Game } from '../src/game.ts';
@@ -342,4 +342,43 @@ test('未学配套不抢已学替代配方的槽位，已觉醒或已有满级�
     g.choices.push({ type: 'heal', id: 'heal', level: 1 });
     assert.equal(pick(g).type, 'heal', mode);
   }
+});
+
+test('六顺位按顺序培养，功法格满后不再追靠后目标的配方', () => {
+  const g = game();
+  own(g, ['orbit', 'fire'], 2);
+  g.passives = { haste: 1, guard: 1, magnet: 1 };
+  g.choices = [
+    { type: 'passive', id: 'power', level: 1 },
+    { type: 'passive', id: 'area', level: 1 },
+  ];
+  g.save.autoplayBuild = { mode: 'custom', targets: ['orbit', 'fire', '', '', '', ''] };
+  assert.equal(buildChoiceScore(g.choices[1], g, 50), 89, '第一顺位配方照常追求');
+  assert.equal(
+    buildChoiceScore(g.choices[0], g, 50),
+    30,
+    '功法格满后第二顺位不再得到配方加分，只余压末格惩罚',
+  );
+
+  own(g, ['orbit', 'fire'], 1);
+  g.passives = {};
+  g.choices = [
+    { type: 'weapon', id: 'fire', level: 1 },
+    { type: 'weapon', id: 'orbit', level: 1 },
+  ];
+  assert.ok(
+    buildChoiceScore(g.choices[1], g, 50) > buildChoiceScore(g.choices[0], g, 50),
+    '两件目标同时出现时第一顺位更高',
+  );
+  g.save.autoplayBuild = { mode: 'custom', targets: ['orbit', '', '', '', '', ''] };
+  assert.equal(buildChoiceScore(g.choices[1], g, 50), 77, '第一顺位评分与改前一致');
+});
+
+test('只有前两个顺位预留法宝格，第三顺位不压制新法宝', () => {
+  const g = game();
+  own(g, ['orbit', 'fire', 'pulse', 'ice', 'arrow'], 1);
+  g.passives = {};
+  g.save.autoplayBuild = { mode: 'custom', targets: ['orbit', 'fire', 'poison', '', '', ''] };
+  const choice = { type: 'weapon', id: 'meteor', level: 1 } as const;
+  assert.equal(buildChoiceScore(choice, g, 40), 40, '前两顺位已齐，第三顺位不再预留');
 });

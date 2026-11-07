@@ -312,7 +312,7 @@ test('审判/引力续局与导入保留剩余时刻且深克隆，第二环在�
       assert.equal(g.zones.length, 3);
     }
   }
-  assert.equal(SAVE_SCHEMA, 45);
+  assert.equal(SAVE_SCHEMA, 46);
   const old = freshSave();
   old.schema = SAVE_SCHEMA - 1;
   assert.equal(readSave(JSON.stringify(old)).status, 'ok');

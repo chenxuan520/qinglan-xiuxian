@@ -9,6 +9,12 @@ import { freshSave, SAVE_KEY, lifespanInfo, tribulationDue } from '../src/progre
 import { Game } from '../src/game.ts';
 import { dispatchAction } from '../src/action-controller.ts';
 import { settingsContent } from '../src/settings-ui.ts';
+import {
+  changeAutoplayBuild,
+  defaultAutoplayBuild,
+  migrateAutoplayBuild,
+  validAutoplayBuild,
+} from '../src/autoplay-build.ts';
 
 const main = readFileSync(new URL('../src/main.ts', import.meta.url), 'utf8');
 const flow = new Script(
@@ -91,7 +97,10 @@ test('设置真实路由先保存再应用，不开启自动、不修改属性�
     h.context.handleAction('autoplay-target', '0:orbit');
     h.context.handleAction('autoplay-target', '1:skull');
     const after = JSON.parse(h.stored);
-    assert.deepEqual(after.autoplayBuild, { mode: 'custom', targets: ['orbit', 'skull'] });
+    assert.deepEqual(after.autoplayBuild, {
+      mode: 'custom',
+      targets: ['orbit', 'skull', '', '', '', ''],
+    });
     assert.deepEqual(h.save.autoplayBuild, after.autoplayBuild);
     assert.equal(after.autoplay, false);
     assert.equal(after.cultivation, before.cultivation);
@@ -125,7 +134,7 @@ test('旧界面、战斗中与无效目标不能通过动作绕过设置入口',
   }
   const h = harness(),
     before = h.stored;
-  for (const id of ['2:sword', '0:unknown', '0:', '']) {
+  for (const id of ['6:sword', '0:unknown', '0:', '']) {
     h.context.handleAction('autoplay-target', id);
     if (id === '0:') continue;
     assert.equal(h.stored, before);
@@ -137,8 +146,45 @@ test('设置默认选中原路线，指定目标选项含正魔法宝，离线�
   assert.match(html, /<option value="default" selected>默认路线<\/option>/);
   assert.doesNotMatch(html, /id="autoplay-build-target-/);
   assert.match(html, /<details class="disclosure settings-section" data-disclosure="offline">/);
-  save.autoplayBuild = { mode: 'custom', targets: ['ice', 'skull'] };
+  save.autoplayBuild = { mode: 'custom', targets: ['ice', 'skull', '', '', '', ''] };
   html = settingsContent(save);
+  assert.match(html, /第一顺位/);
+  assert.equal((html.match(/id="autoplay-build-target-/g) ?? []).length, 6);
   assert.match(html, /<option value="ice" selected>玄冰镜<\/option>/);
   assert.match(html, /<option value="skull" selected>白骨髅<\/option>/);
+});
+
+test('六顺位存档结构、旧两件迁移与重复清槽', () => {
+  assert.deepEqual(defaultAutoplayBuild().targets, ['', '', '', '', '', '']);
+  assert.equal(
+    validAutoplayBuild({ mode: 'custom', targets: ['orbit', 'fire', '', '', '', ''] }),
+    true,
+  );
+  assert.equal(
+    validAutoplayBuild({ mode: 'custom', targets: ['orbit', 'orbit', '', '', '', ''] }),
+    false,
+  );
+  assert.equal(
+    validAutoplayBuild({ mode: 'custom', targets: ['orbit', 'unknown', '', '', '', ''] }),
+    false,
+  );
+  assert.equal(validAutoplayBuild({ mode: 'custom', targets: ['orbit', 'fire'] }), false);
+  assert.deepEqual(migrateAutoplayBuild({ mode: 'custom', targets: ['orbit', 'fire'] }), {
+    mode: 'custom',
+    targets: ['orbit', 'fire', '', '', '', ''],
+  });
+  const start = { mode: 'custom', targets: ['orbit', 'fire', 'ice', '', '', ''] } as const;
+  assert.deepEqual(changeAutoplayBuild({ ...start, targets: [...start.targets] }, '2', ''), {
+    mode: 'custom',
+    targets: ['orbit', 'fire', '', '', '', ''],
+  });
+  assert.deepEqual(changeAutoplayBuild({ ...start, targets: [...start.targets] }, '5', 'orbit'), {
+    mode: 'custom',
+    targets: ['', 'fire', 'ice', '', '', 'orbit'],
+  });
+  assert.equal(changeAutoplayBuild({ ...start, targets: [...start.targets] }, '6', 'arrow'), null);
+  assert.equal(
+    changeAutoplayBuild({ ...start, targets: [...start.targets] }, '0', 'unknown'),
+    null,
+  );
 });

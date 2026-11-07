@@ -646,3 +646,9 @@
   opacity: 0.45;
   cursor: default;
 }
+
+@media (max-width: 650px) {
+  .settings-build-targets {
+    grid-template-columns: 1fr;
+  }
+}

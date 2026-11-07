@@ -12,7 +12,7 @@ export function autoplayBuildContent(save: SaveData) {
       ? `<div class="settings-build-targets">${build.targets
           .map(
             (id, slot) =>
-              `<label class="settings-build-field">法宝${slot === 0 ? '一' : '二'}<select id="autoplay-build-target-${slot}" aria-label="优先培养的第${slot === 0 ? '一' : '二'}件法宝"><option value="">不指定</option>${(
+              `<label class="settings-build-field">第${['一', '二', '三', '四', '五', '六'][slot]}顺位<select id="autoplay-build-target-${slot}" aria-label="自动历练优先培养的第${['一', '二', '三', '四', '五', '六'][slot]}顺位法宝"><option value="">不指定</option>${(
                 ['orthodox', 'demonic'] as const
               )
                 .map(
@@ -30,7 +30,7 @@ export function autoplayBuildContent(save: SaveData) {
           )
           .join(
             '',
-          )}</div><p>${build.targets.some(Boolean) ? '目标须符合本局路线。' : '尚未指定法宝，暂按默认路线选择。'}</p>`
+          )}</div><p>${build.targets.some(Boolean) ? '按顺位优先拿取并培养；功法格有限，靠后的顺位可能来不及觉醒。须符合本局路线。' : '尚未指定法宝，暂按默认路线选择。'}</p>`
       : ''
   }<p class="panel-note">只影响自动选技。设置随存档与轮回保留。</p>`;
 }

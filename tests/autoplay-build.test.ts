@@ -50,13 +50,24 @@ test('新设置默认沿用原策略，旧档升级保留进度，非法本地�
   }
 });
 test('两件目标不可重复，切换倾向保留选择，修改不会影响原对象', () => {
-  const original = { mode: 'custom' as const, targets: ['sword', 'fire'] as [string, string] };
+  const original = {
+    mode: 'custom' as const,
+    targets: ['sword', 'fire', '', '', '', ''],
+  };
   const moved = changeAutoplayBuild(original, '1', 'sword')!;
-  assert.deepEqual(moved.targets, ['', 'sword']);
-  assert.deepEqual(original.targets, ['sword', 'fire']);
+  assert.deepEqual(moved.targets, ['', 'sword', '', '', '', '']);
+  assert.deepEqual(original.targets, ['sword', 'fire', '', '', '', '']);
   const next = changeAutoplayBuild(original, 'mode', 'native')!;
   assert.deepEqual(next.targets, original.targets);
-  assert.equal(changeAutoplayBuild(original, '2', 'fire'), null);
+  assert.deepEqual(changeAutoplayBuild(original, '2', 'fire')!.targets, [
+    'sword',
+    '',
+    'fire',
+    '',
+    '',
+    '',
+  ]);
+  assert.equal(changeAutoplayBuild(original, '6', 'fire'), null);
   assert.equal(changeAutoplayBuild(original, '0', 'not-a-weapon'), null);
   assert.equal(changeAutoplayBuild(original, 'mode', 'not-a-mode'), null);
 });
@@ -91,9 +102,9 @@ test('指定两件法宝均可优先获取，目标缺失或路线不符时与�
     assert.equal(autoplayChoice(g)!.index, 1);
   }
   for (const targets of [
-    ['', ''],
-    ['skull', ''],
-  ] as [string, string][]) {
+    ['', '', '', '', '', ''],
+    ['skull', '', '', '', '', ''],
+  ]) {
     g.save.autoplayBuild.targets = targets;
     g.player.hp = g.player.maxHp * 0.2;
     g.choices = [
@@ -197,7 +208,7 @@ test('设置仅影响排序，候选概率、随机数、战斗属性和走位�
   const snapshots: string[] = [];
   for (const { id: mode } of AUTOPLAY_BUILDS) {
     const g = game(mode);
-    g.save.autoplayBuild.targets = ['poison', 'ice'];
+    g.save.autoplayBuild.targets = ['poison', 'ice', '', '', '', ''];
     g.state = 'upgrade';
     g.choices = g.makeChoices();
     let randomCalls = 0;
@@ -241,7 +252,7 @@ test('各倾向的真实候选可连续执行，重悟有限，法宝与功法�
 test('各倾向和目标随存档完整往返，续局仍使用已保存的倾向', () => {
   for (const { id: mode } of AUTOPLAY_BUILDS) {
     const g = game(mode);
-    g.save.autoplayBuild.targets = ['poison', 'ice'];
+    g.save.autoplayBuild.targets = ['poison', 'ice', '', '', '', ''];
     g.state = 'upgrade';
     g.choices = g.makeChoices();
     const restored = importSave(exportSave(g.save, g));
@@ -249,4 +260,19 @@ test('各倾向和目标随存档完整往返，续局仍使用已保存的倾�
     assert.deepEqual(autoplayChoice(restored.run!), autoplayChoice(g));
     assert.notEqual(restored.save.autoplayBuild.targets, g.save.autoplayBuild.targets);
   }
+});
+
+test('旧两件目标读档与导入都补足六槽并保留前两位', () => {
+  const save = freshSave();
+  save.autoplayBuild = {
+    mode: 'custom',
+    targets: ['orbit', 'fire'],
+  } as unknown as typeof save.autoplayBuild;
+  const loaded = readSave(JSON.stringify(save));
+  assert.equal(loaded.status, 'ok');
+  assert.deepEqual(loaded.save.autoplayBuild.targets, ['orbit', 'fire', '', '', '', '']);
+  const file = JSON.parse(exportSave(save));
+  file.save.autoplayBuild = { mode: 'custom', targets: ['orbit', 'fire'] };
+  const imported = importSave(JSON.stringify(file));
+  assert.deepEqual(imported.save.autoplayBuild.targets, ['orbit', 'fire', '', '', '', '']);
 });
