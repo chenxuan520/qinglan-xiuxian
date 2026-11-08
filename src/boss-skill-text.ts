@@ -49,6 +49,6 @@ export const BOSS_SKILL_TEXT: Record<string, string> = {
   金阙天兵: '召唤天兵',
   踏云雷袭: '蓄力冲刺',
   万劫归一: '随机借用六王招牌招式之一，化为金色',
-  天劫审判: '劫印三息后沿落脚点连劈三雷',
+  天劫审判: '三息后沿修士走向连劈三雷',
   归墟引力: '半血后将修士拉向自身，同时放出<span class="boss-skill-term">雷环</span>',
 };

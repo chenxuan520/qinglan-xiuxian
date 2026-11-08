@@ -486,7 +486,7 @@ function paint() {
   ) as CanvasRenderingContext2D;
   return { c, colors, arcs };
 }
-test('借用金色真实进入弹体、区域和召物笔画；劫印及引力按快照状态绘制', () => {
+test('借用金色真实进入弹体、区域和召物笔画；引力按快照状态绘制', () => {
   for (const borrowed of [0, 1, 2, 3, 4, 5]) {
     const c = encounter();
     cast(c, 6, borrowed);
@@ -504,6 +504,11 @@ test('借用金色真实进入弹体、区域和召物笔画；劫印及引力�
       drawBossSummon(canvas.c, child);
     assert.ok(canvas.colors.includes(SOVEREIGN_GOLD));
   }
+  const judgement = encounter();
+  cast(judgement, 7);
+  const seal = paint();
+  drawSovereignWarnings(seal.c, judgement.g, false);
+  assert.equal(seal.arcs.length, 0);
   const c = encounter();
   c.e.hp *= 0.4;
   cast(c, 7);
@@ -511,8 +516,8 @@ test('借用金色真实进入弹体、区域和召物笔画；劫印及引力�
   for (const reduced of [false, true]) {
     const canvas = paint();
     drawSovereignWarnings(canvas.c, c.g, reduced);
-    assert.ok(canvas.colors.includes(SOVEREIGN_GOLD));
-    assert.equal(canvas.arcs.length, 5);
+    assert.ok(canvas.colors.some((color) => color.startsWith(SOVEREIGN_GOLD)));
+    assert.equal(canvas.arcs.length, 3);
   }
   c.g.hitEnemy(c.e, c.e.maxHp * 2);
   const canvas = paint();

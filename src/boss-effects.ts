@@ -294,37 +294,12 @@ export function drawBossShot(c: CanvasRenderingContext2D, shot: Shot) {
 // 同一火焰笔画供组合魂火复用，颜色、缩放与寿命由调用处限定。
 export { flame as drawFlame };
 
-// 直接绘制保存的劫印/引力状态，暂停与续局不依赖瞬时特效队列。
+// 直接绘制保存的引力状态，暂停与续局不依赖瞬时特效队列。
 export function drawSovereignWarnings(c: CanvasRenderingContext2D, game: Game, reduced: boolean) {
   if (!game.isFinalTrial || game.state === 'won' || game.state === 'lost') return;
   const p = game.player;
   for (const e of game.enemies) {
     if (e.dead || !e.boss || e.bossStage !== 6) continue;
-    if (e.judgements?.length) {
-      c.save();
-      c.translate(p.x, p.y);
-      c.strokeStyle = SOVEREIGN_GOLD;
-      c.lineWidth = 2;
-      c.beginPath();
-      c.arc(0, 0, 29, 0, TAU);
-      c.stroke();
-      c.beginPath();
-      c.arc(
-        0,
-        0,
-        34,
-        -Math.PI / 2,
-        -Math.PI / 2 + TAU * Math.max(0, 1 - (e.judgements[0] - game.time) / 3),
-      );
-      c.stroke();
-      c.beginPath();
-      c.moveTo(5, -16);
-      c.lineTo(-6, 1);
-      c.lineTo(4, -1);
-      c.lineTo(-5, 16);
-      c.stroke();
-      c.restore();
-    }
     if ((e.gravityUntil ?? 0) <= game.time) continue;
     c.save();
     c.strokeStyle = SOVEREIGN_GOLD + '99';
