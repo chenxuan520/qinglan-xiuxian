@@ -38,19 +38,22 @@ for (const [origin, arena] of [
     const stats = [wolf.maxHp, wolf.damage, wolf.speed];
     for (let round = 0; round < 2; round++) {
       advance(g, wolf, 1.21);
-      assert.ok(wolf.charge > 1.37 && wolf.charge <= 1.4);
+      const span = BOSS_MECHANICS.wolfWindup + BOSS_MECHANICS.wolfDash;
+      assert.ok(wolf.charge > span - 0.03 && wolf.charge <= span);
       const locked = { x: wolf.x, y: wolf.y, dx: wolf.dx, dy: wolf.dy };
-      advance(g, wolf, wolf.charge - 0.55);
-      assert.deepEqual({ x: wolf.x, y: wolf.y }, { x: locked.x, y: locked.y });
-      advance(g, wolf, 0.55);
+      advance(g, wolf, wolf.charge - BOSS_MECHANICS.wolfDash);
+      assert.ok(Math.abs(wolf.x - locked.x) < 1e-9);
+      assert.ok(Math.abs(wolf.y - locked.y) < 1e-9);
+      advance(g, wolf, BOSS_MECHANICS.wolfDash);
       assert.ok(Math.abs(Math.hypot(wolf.x - locked.x, wolf.y - locked.y) - 209) < 1e-6);
       assert.equal(wolf.dead, false);
       assert.equal(wolf.bossSummon!.side, side);
       assert.ok(wolf.bossSummon!.round! < 0.03);
       assert.deepEqual([wolf.maxHp, wolf.damage, wolf.speed], stats);
     }
-    assert.ok(Math.abs(wolf.bossSummon!.age - 5.2) < 1e-7);
-    advance(g, wolf, 0.79);
+    const roundAge = BOSS_MECHANICS.wolfFlank + BOSS_MECHANICS.wolfWindup + BOSS_MECHANICS.wolfDash;
+    assert.ok(Math.abs(wolf.bossSummon!.age - roundAge * 2) < 1e-7);
+    advance(g, wolf, 1.64);
     assert.equal(wolf.dead, false);
     advance(g, wolf, 0.02);
     assert.equal(wolf.dead, true);
@@ -97,6 +100,16 @@ test('双狼第二轮age与round续局保存，旧档无round可继续，非法�
   const legacy = structuredClone(raw);
   delete legacy.enemies.find((e) => e.id === wolves[0].id)!.bossSummon!.round;
   assert.ok(Game.restore(g.save, legacy));
+  for (const round of [2.3, 2.5, 2.6]) {
+    const legacy = structuredClone(raw);
+    legacy.enemies.find((e) => e.id === wolves[0].id)!.bossSummon!.round = round;
+    const migrated = Game.restore(g.save, legacy);
+    assert.ok(migrated);
+    assert.equal(
+      migrated.enemies.find((e) => e.id === wolves[0].id)!.bossSummon!.round,
+      BOSS_MECHANICS.wolfFlank,
+    );
+  }
   for (const [key, value] of [
     ['round', -0.01],
     ['round', 2.61],
@@ -110,4 +123,24 @@ test('双狼第二轮age与round续局保存，旧档无round可继续，非法�
     });
     assert.equal(Game.restore(g.save, bad), null);
   }
+});
+
+test('猎狼蓄力时每帧追瞄，扑击开始后方向锁定且总位移仍为209', () => {
+  const { g, wolves } = encounter(2, 2);
+  const wolf = wolves[0];
+  advance(g, wolf, 1.21);
+  g.player.x = 500;
+  g.player.y = 300;
+  advance(g, wolf, 0.01);
+  const dx = (500 - wolf.x) / (Math.hypot(500 - wolf.x, 300 - wolf.y) || 1);
+  const dy = (300 - wolf.y) / (Math.hypot(500 - wolf.x, 300 - wolf.y) || 1);
+  assert.ok(Math.abs(wolf.dx - dx) < 1e-9);
+  assert.ok(Math.abs(wolf.dy - dy) < 1e-9);
+  advance(g, wolf, wolf.charge - BOSS_MECHANICS.wolfDash);
+  const locked = { dx: wolf.dx, dy: wolf.dy, x: wolf.x, y: wolf.y };
+  g.player.x = -500;
+  g.player.y = -300;
+  advance(g, wolf, BOSS_MECHANICS.wolfDash);
+  assert.deepEqual({ dx: wolf.dx, dy: wolf.dy }, { dx: locked.dx, dy: locked.dy });
+  assert.ok(Math.abs(Math.hypot(wolf.x - locked.x, wolf.y - locked.y) - 209) < 1e-6);
 });

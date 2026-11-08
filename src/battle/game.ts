@@ -174,6 +174,7 @@ export class Game {
   shots: Shot[] = [];
   zones: Zone[] = [];
   effects: Effect[] = [];
+  awakenWaves: { weapon: string; start: number; damage: number; hit: number[] }[] = [];
   pickups: Pickup[] = [];
   choices: Choice[] = [];
   viewport = { width: 1440, height: 900 };
@@ -592,6 +593,7 @@ export class Game {
           ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
         })),
       bossVolleys: bossVolleys.map((v) => ({ weapon: v.weapon, hitBosses: [...v.hitBosses] })),
+      awakenWaves: this.awakenWaves.map((wave) => ({ ...wave, hit: [...wave.hit] })),
       shots: this.shots.map(({ bossAttack, ...s }) => ({
         ...s,
         hit: [...s.hit],
@@ -673,6 +675,7 @@ export class Game {
       g.baseHp = spiritRootInfo(g.spiritRoot).baseHp + realmBonuses(g.realm).hp;
       g.rootElements = rootElementsFor(g.spiritRoot, s.rootElements ?? save.rootElements, () => 0);
       g.time = s.time;
+      g.awakenWaves = (s.awakenWaves ?? []).map((wave) => ({ ...wave, hit: [...wave.hit] }));
       g.sovereignRecoveryAnnounced = s.sovereignRecoveryAnnounced ?? false;
       g.sovereignRecoveryPending = s.sovereignRecoveryPending ?? false;
       if (g.sovereignRecoveryPending) {
@@ -738,6 +741,15 @@ export class Game {
           ...(e.judgements ? { judgements: [...e.judgements] } : {}),
           ...(e.bossSummon ? { bossSummon: { ...e.bossSummon } } : {}),
         }));
+      for (const e of g.enemies) {
+        const round = e.bossSummon?.round;
+        if (
+          e.bossSummon?.kind === 'wolf' &&
+          round !== undefined &&
+          round > BOSS_MECHANICS.wolfFlank + BOSS_MECHANICS.wolfWindup + BOSS_MECHANICS.wolfDash
+        )
+          e.bossSummon.round = BOSS_MECHANICS.wolfFlank;
+      }
       for (const e of g.enemies)
         if (e.boss) {
           const count = bossSkills(e.bossStage ?? s.stage, g.isFinalTrial).length;
@@ -1016,6 +1028,7 @@ export class Game {
       }
     }
     if (!this.tribulation) this.updateEnemies(dt);
+    this.updateAwakenWaves();
     this.updateShots(dt);
     this.updateZones(dt);
     this.updateCacheChallenge();
@@ -2292,7 +2305,8 @@ export class Game {
   }
   private updateBossSummon(e: Enemy, dt: number) {
     const state = e.bossSummon!;
-    const before = state.round ?? state.age % (BOSS_MECHANICS.wolfFlank + 1.4);
+    const chargeSpan = BOSS_MECHANICS.wolfWindup + BOSS_MECHANICS.wolfDash;
+    const before = state.round ?? state.age % (BOSS_MECHANICS.wolfFlank + chargeSpan);
     state.age += dt;
     e.flash = Math.max(0, e.flash - dt);
     const owner = this.enemies.find((b) => b.id === e.summonedBy && !b.dead);
@@ -2314,18 +2328,23 @@ export class Game {
       e.x += ((tx - e.x) / d) * travel;
       e.y += ((ty - e.y) / d) * travel;
     } else {
-      if (before < BOSS_MECHANICS.wolfFlank) {
+      const previous = chargeSpan - Math.max(0, before - BOSS_MECHANICS.wolfFlank);
+      e.charge = Math.max(0, chargeSpan - (state.round - BOSS_MECHANICS.wolfFlank));
+      if (e.charge < 1e-9) e.charge = 0;
+      // 蓄力期间每帧追瞄；越过扑击起点后不再改变方向。
+      if (previous > BOSS_MECHANICS.wolfDash) {
         const d = distance(e, this.player) || 1;
         e.dx = (this.player.x - e.x) / d;
         e.dy = (this.player.y - e.y) / d;
       }
-      const previous = 1.4 - Math.max(0, before - BOSS_MECHANICS.wolfFlank);
-      e.charge = Math.max(0, 1.4 - (state.round - BOSS_MECHANICS.wolfFlank));
-      if (e.charge < 1e-9) e.charge = 0;
-      const travel = (Math.min(0.55, previous) - Math.min(0.55, e.charge)) * 380;
+      const travel =
+        (Math.min(BOSS_MECHANICS.wolfDash, previous) -
+          Math.min(BOSS_MECHANICS.wolfDash, e.charge)) *
+        380;
       e.x += e.dx * travel;
       e.y += e.dy * travel;
-      if (e.charge <= 0.55 && distance(e, this.player) < e.radius + 13) this.hurtPlayer(e.damage);
+      if (e.charge <= BOSS_MECHANICS.wolfDash && distance(e, this.player) < e.radius + 13)
+        this.hurtPlayer(e.damage);
       if (e.charge === 0) state.round = 0;
     }
   }
@@ -2399,13 +2418,32 @@ export class Game {
       element: t.element,
     });
     this.onEvent('evolve');
-    const damage = this.weaponHitDamage(w, false) * AWAKENING_BURST.hits;
-    for (const e of this.enemies) {
-      if (e.dead || distance(e, p) > AWAKENING_BURST.radius + e.radius) continue;
-      const bossCap =
-        (e.maxHp * AWAKENING_BURST.bossShare) / (this.eliteDamage * this.#comboDamage(w.id));
-      this.hitEnemy(e, e.boss ? Math.min(damage, bossCap) : damage, false, w.id);
+    // 觉醒一击随冲击环扩散结算，伤害按觉醒时的数值锁定。
+    this.awakenWaves.push({
+      weapon: w.id,
+      start: this.time,
+      damage: this.weaponHitDamage(w, false) * AWAKENING_BURST.hits,
+      hit: [],
+    });
+  }
+  private updateAwakenWaves() {
+    if (!this.awakenWaves.length) return;
+    for (const wave of this.awakenWaves) {
+      const t = this.time - wave.start;
+      const r = AWAKENING_BURST.radius * Math.min(1, t / AWAKENING_BURST.waveSeconds);
+      for (const e of this.enemies) {
+        if (e.dead || wave.hit.includes(e.id)) continue;
+        if (distance(e, this.player) > r + e.radius) continue;
+        wave.hit.push(e.id);
+        const bossCap =
+          (e.maxHp * AWAKENING_BURST.bossShare) /
+          (this.eliteDamage * this.#comboDamage(wave.weapon));
+        this.hitEnemy(e, e.boss ? Math.min(wave.damage, bossCap) : wave.damage, false, wave.weapon);
+      }
     }
+    this.awakenWaves = this.awakenWaves.filter(
+      (wave) => this.time - wave.start < AWAKENING_BURST.waveSeconds,
+    );
   }
   private cast(w: Weapon) {
     const t = treasure(w.id),
@@ -3937,7 +3975,7 @@ export class Game {
     }
     this.state = 'playing';
     this.choices = [];
-    // 觉醒一击可能击杀最后的妖王，必须在恢复战斗之后结算，才不会覆盖胜利状态。
+    // 觉醒冲击波在后续战斗帧结算，可能击杀最后的妖王，因此仍须先恢复战斗状态。
     if (awakened) this.awaken(awakened);
     else this.onEvent('select');
     return true;

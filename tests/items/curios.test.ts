@@ -58,7 +58,7 @@ import {
 } from '../../src/market/market-social.ts';
 import { powerBreakdown } from '../../src/core/power-breakdown.ts';
 import { inheritanceContent } from '../../src/core/inheritance-ui.ts';
-import { SPIRIT_ROOTS } from '../../src/core/data.ts';
+import { AWAKENING_BURST, SPIRIT_ROOTS } from '../../src/core/data.ts';
 
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 function ready() {
@@ -664,6 +664,8 @@ test('金雷竹与明清灵水不突破妖王觉醒一击5%上限', () => {
         { type: 'heal', id: 'heal', level: 1 },
       ];
       assert.ok(g.choose(0));
+      g.time += AWAKENING_BURST.waveSeconds;
+      g.update(0.01);
       near(boss.hp, 95);
     }
 });

@@ -125,6 +125,8 @@ test('组合觉醒伤害仍遵守妖王5%上限', () => {
     const e = target(g, false, true);
     e.hp = e.maxHp = 100;
     g.awaken(g.weapons[0]);
+    g.time += AWAKENING_BURST.waveSeconds;
+    g.update(0.01);
     near(e.maxHp - e.hp, e.maxHp * AWAKENING_BURST.bossShare);
   }
 });

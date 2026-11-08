@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../../src/battle/game.ts';
 import { autoplayChoice, autoplayInput } from '../../src/battle/autoplay.ts';
 import {
+  AWAKENING_BURST,
   TREASURES,
   PASSIVES,
   STAGES,
@@ -162,6 +163,11 @@ test('仙器觉醒释放觉醒一击：420 像素内按八倍单击伤害结算�
   g.onEvent = (name) => events.push(name);
   assert.equal(g.choose(0), true);
   assert.equal(g.state, 'playing');
+  // 冲击波尚在原点，所有妖物都要等环扩散到达后才结算。
+  assert.equal(near.hp, near.maxHp);
+  assert.equal(elite.hp, elite.maxHp);
+  assert.equal(boss.hp, boss.maxHp);
+  advance(g, 0.49);
   const close = (actual: number, expected: number) =>
     assert.ok(Math.abs(actual - expected) < 1e-6 * expected, `${actual} != ${expected}`);
   close(near.maxHp - near.hp, hit);
@@ -176,6 +182,9 @@ test('仙器觉醒释放觉醒一击：420 像素内按八倍单击伤害结算�
   assert.equal(awaken[0].radius, 420);
   assert.ok(events.includes('evolve'));
   assert.ok(!events.includes('select'));
+  advance(g, 0.6);
+  close(near.maxHp - near.hp, hit);
+  assert.equal(far.hp, far.maxHp);
 
   g.state = 'upgrade';
   g.choices = [{ type: 'heal', id: 'heal', level: 1 }];
@@ -191,6 +200,8 @@ test('觉醒一击击杀最后的妖王时进入胜利，不被恢复战斗覆�
   const events: string[] = [];
   g.onEvent = (name) => events.push(name);
   assert.equal(g.choose(0), true);
+  assert.equal(boss.dead, false);
+  advance(g, 0.49);
   assert.equal(boss.dead, true);
   assert.equal(g.state, 'won');
   assert.ok(events.includes('win'));
@@ -770,4 +781,110 @@ test('气血已耗尽时斩妖突破不会复活角色', () => {
   assert.equal(game.state, 'lost');
   assert.equal(game.player.hp, 0);
   assert.equal(save.cultivation, realmCost(0));
+});
+
+test('觉醒冲击波逐帧扩散结算、每只只受一次，暂停冻结且大跨度不漏', () => {
+  const { g, hit } = awakeningGame();
+  const close = g.spawnEnemy(0, false, false, { x: 50, y: 0 });
+  const far = g.spawnEnemy(0, false, false, { x: 400, y: 0 });
+  for (const e of [close, far]) {
+    Object.assign(e, { speed: 0, hp: 1e9, maxHp: 1e9 });
+  }
+  g.choose(0);
+  g.update(0.01);
+  assert.equal(close.hp, close.maxHp);
+  assert.equal(far.hp, far.maxHp);
+  for (let i = 0; i < 4; i++) g.update(0.01);
+  assert.ok(Math.abs(close.maxHp - close.hp - hit) < 1e-6 * hit);
+  assert.equal(far.hp, far.maxHp);
+  for (let i = 0; i < 40; i++) g.update(0.01);
+  assert.ok(Math.abs(far.maxHp - far.hp - hit) < 1e-6 * hit);
+  for (let i = 0; i < 4; i++) g.update(0.01);
+  assert.equal(g.awakenWaves.length, 0);
+  for (let i = 0; i < 50; i++) g.update(0.01);
+  assert.ok(Math.abs(close.maxHp - close.hp - hit) < 1e-6 * hit);
+  assert.ok(Math.abs(far.maxHp - far.hp - hit) < 1e-6 * hit);
+});
+
+test('觉醒冲击波暂停时冻结，续局只结算剩余妖物且不重复', () => {
+  const { g, hit } = awakeningGame();
+  const close = g.spawnEnemy(0, false, false, { x: 50, y: 0 });
+  const far = g.spawnEnemy(0, false, false, { x: 400, y: 0 });
+  for (const e of [close, far]) Object.assign(e, { speed: 0, hp: 1e9, maxHp: 1e9 });
+  g.choose(0);
+  for (let i = 0; i < 20; i++) g.update(0.01);
+  assert.ok(Math.abs(close.maxHp - close.hp - hit) < 1e-6 * hit);
+  assert.equal(far.hp, far.maxHp);
+  g.pause();
+  g.update(0.5);
+  assert.equal(far.hp, far.maxHp);
+  const restored = Game.restore(g.save, g.snapshot())!;
+  assert.ok(restored);
+  assert.equal(restored.awakenWaves.length, 1);
+  restored.resume();
+  for (let i = 0; i < 30; i++) restored.update(0.01);
+  const farAfter = restored.enemies.find((e) => e.id === far.id)!;
+  const closeAfter = restored.enemies.find((e) => e.id === close.id)!;
+  assert.ok(Math.abs(farAfter.maxHp - farAfter.hp - hit) < 1e-6 * hit);
+  assert.ok(Math.abs(closeAfter.maxHp - closeAfter.hp - hit) < 1e-6 * hit);
+  assert.equal(restored.awakenWaves.length, 0);
+  for (let i = 0; i < 30; i++) restored.update(0.01);
+  assert.ok(Math.abs(farAfter.maxHp - farAfter.hp - hit) < 1e-6 * hit);
+});
+
+test('觉醒冲击波跨大步长时按满半径一次结算并移除', () => {
+  const { g, hit } = awakeningGame();
+  const close = g.spawnEnemy(0, false, false, { x: 50, y: 0 });
+  const far = g.spawnEnemy(0, false, false, { x: 400, y: 0 });
+  for (const e of [close, far]) Object.assign(e, { speed: 0, hp: 1e9, maxHp: 1e9 });
+  g.choose(0);
+  g.time += 1;
+  g.update(0.01);
+  assert.ok(Math.abs(close.maxHp - close.hp - hit) < 1e-6 * hit);
+  assert.ok(Math.abs(far.maxHp - far.hp - hit) < 1e-6 * hit);
+  assert.equal(g.awakenWaves.length, 0);
+});
+
+test('觉醒冲击环仍在特效前 0.3 比例内扩满', () => {
+  const { g } = awakeningGame();
+  g.choose(0);
+  const effect = g.effects.find((e) => e.kind === 'awaken')!;
+  assert.equal(effect.maxLife, 1.6);
+  assert.equal(AWAKENING_BURST.waveSeconds / effect.maxLife, 0.3);
+});
+
+test('觉醒冲击波快照拒绝非法法宝、非有限数值与非法命中列表', () => {
+  const { g } = awakeningGame();
+  g.choose(0);
+  const raw = JSON.parse(JSON.stringify(g.snapshot()));
+  const reject = (patch: (wave: Record<string, unknown>) => void) => {
+    const copy = structuredClone(raw);
+    patch(copy.awakenWaves[0]);
+    assert.equal(Game.restore(g.save, copy), null);
+  };
+  reject((wave) => (wave.weapon = 'missing'));
+  reject((wave) => (wave.start = Number.POSITIVE_INFINITY));
+  reject((wave) => (wave.start = raw.time + 1));
+  reject((wave) => (wave.damage = -1));
+  reject((wave) => (wave.hit = [1.5]));
+  reject((wave) => (wave.hit = [2, 2]));
+  reject((wave) => (wave.hit = [-1]));
+  const copy = structuredClone(raw);
+  copy.awakenWaves[0].hit = [raw.enemies[0]?.id ?? 1];
+  const restored = Game.restore(g.save, copy);
+  assert.ok(restored);
+  assert.deepEqual(restored.awakenWaves[0].hit, copy.awakenWaves[0].hit);
+});
+
+test('觉醒冲击波圆心跟随玩家当前位置，身后妖物不会被扫到', () => {
+  const { g, hit } = awakeningGame();
+  const behind = g.spawnEnemy(0, false, false, { x: -400, y: 0 });
+  const ahead = g.spawnEnemy(0, false, false, { x: 400, y: 0 });
+  for (const e of [behind, ahead]) Object.assign(e, { speed: 0, hp: 1e9, maxHp: 1e9 });
+  g.choose(0);
+  g.input = { x: 1, y: 0 };
+  for (let i = 0; i < 50; i++) g.update(0.01);
+  assert.ok(g.player.x > 0);
+  assert.equal(behind.hp, behind.maxHp);
+  assert.ok(Math.abs(ahead.maxHp - ahead.hp - hit) < 1e-6 * hit);
 });

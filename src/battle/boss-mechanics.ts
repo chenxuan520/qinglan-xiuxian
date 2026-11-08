@@ -7,6 +7,8 @@ export const BOSS_MECHANICS = {
   heartLife: 8,
   heartLimit: 3,
   wolfFlank: 1.2,
+  wolfWindup: 0.425,
+  wolfDash: 0.55,
   wolfLife: 6,
   wolfLimit: 2,
   nativeMiasmaLife: 12,

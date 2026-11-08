@@ -297,6 +297,7 @@ export function validateRunSnapshot(
                 (e.bossSummon.kind === 'wolf' &&
                   Number.isFinite(e.bossSummon.round) &&
                   e.bossSummon.round >= 0 &&
+                  // 旧蓄势为 1.4 秒，schema 46 的合法 round 可达 2.6；恢复时归一到新蓄力起点。
                   e.bossSummon.round <= 2.6)) &&
               [-1, 1].includes(e.bossSummon.side) &&
               Number.isSafeInteger(e.summonedBy) &&
@@ -465,6 +466,27 @@ export function validateRunSnapshot(
             v.hitBosses.length <= 500 &&
             new Set(v.hitBosses).size === v.hitBosses.length &&
             v.hitBosses.every((id) => Number.isSafeInteger(id) && id > 0),
+        ))
+    )
+      return null;
+    if (
+      s.awakenWaves !== undefined &&
+      (!Array.isArray(s.awakenWaves) ||
+        s.awakenWaves.length > MAX_WEAPONS ||
+        !s.awakenWaves.every(
+          (wave) =>
+            wave &&
+            typeof wave === 'object' &&
+            !Array.isArray(wave) &&
+            TREASURES.some((t) => t.id === wave.weapon) &&
+            Number.isFinite(wave.start) &&
+            wave.start <= s.time &&
+            Number.isFinite(wave.damage) &&
+            wave.damage >= 0 &&
+            Array.isArray(wave.hit) &&
+            wave.hit.length <= 500 &&
+            new Set(wave.hit).size === wave.hit.length &&
+            wave.hit.every((id) => Number.isSafeInteger(id) && id > 0),
         ))
     )
       return null;

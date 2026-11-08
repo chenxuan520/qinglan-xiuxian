@@ -41,7 +41,7 @@ export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
     c.beginPath();
     c.arc(0, 5, e.radius + 5, 0, TAU);
     c.stroke();
-    if (e.charge > 0.55) {
+    if (e.charge > BOSS_MECHANICS.wolfDash) {
       c.save();
       c.rotate(Math.atan2(e.dy, e.dx));
       c.fillStyle = '#f5d18a';

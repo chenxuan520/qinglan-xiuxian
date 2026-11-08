@@ -176,17 +176,26 @@ test('两猎狼从相反侧翼绕行、完整蓄势锁向，扑后再包抄、�
   assert.equal(wolves.length, 2);
   assert.ok(wolves[0].y * wolves[1].y < 0);
   advance(g, 1.21);
-  assert.ok(wolves.every((e) => e.charge > 0.55));
-  const before = wolves.map((e) => ({ x: e.x, y: e.y, dx: e.dx, dy: e.dy }));
+  assert.ok(wolves.every((e) => e.charge > R.wolfDash));
+  const before = wolves.map((e) => ({ x: e.x, y: e.y }));
   Object.assign(g.player, { x: 900, y: 900 });
-  advance(g, 0.5);
+  advance(g, 0.2);
   for (let i = 0; i < 2; i++) {
-    assert.equal(wolves[i].x, before[i].x);
-    assert.equal(wolves[i].y, before[i].y);
-    assert.equal(wolves[i].dx, before[i].dx);
-    assert.equal(wolves[i].dy, before[i].dy);
+    assert.ok(Math.abs(wolves[i].x - before[i].x) < 1e-9);
+    assert.ok(Math.abs(wolves[i].y - before[i].y) < 1e-9);
+    const d = Math.hypot(900 - wolves[i].x, 900 - wolves[i].y);
+    assert.ok(Math.abs(wolves[i].dx - (900 - wolves[i].x) / d) < 1e-9);
+    assert.ok(Math.abs(wolves[i].dy - (900 - wolves[i].y) / d) < 1e-9);
   }
-  advance(g, 1.1);
+  advance(g, 0.3);
+  const locked = wolves.map((e) => ({ dx: e.dx, dy: e.dy }));
+  Object.assign(g.player, { x: -900, y: -900 });
+  advance(g, 0.2);
+  for (let i = 0; i < 2; i++) {
+    assert.equal(wolves[i].dx, locked[i].dx);
+    assert.equal(wolves[i].dy, locked[i].dy);
+  }
+  advance(g, 0.9);
   assert.equal(actors(g).length, 2);
   advance(g, 3.3);
   assert.equal(actors(g).length, 0);

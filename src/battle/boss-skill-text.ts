@@ -23,7 +23,7 @@ export const BOSS_SKILL_TEXT: Record<string, string> = {
   踏雪突袭: '单次蓄势扑击，横移可躲',
   霜牙连射: '快慢三层冰牙',
   玄冰牢狱: '八点冰牢，留意冰圈先后',
-  双狼合猎: `两狼左右夹击，可反复扑击，至多存续<span class="combat-unit">${BOSS_MECHANICS.wolfLife}秒</span>；每只气血至少为狼王的<span class="combat-unit">8%</span>`,
+  双狼合猎: `两狼左右夹击，蓄力时紧盯修士，可反复扑击，至多存续<span class="combat-unit">${BOSS_MECHANICS.wolfLife}秒</span>；每只气血至少为狼王的<span class="combat-unit">8%</span>`,
   踏雪连袭: '两段重新锁向的连扑',
   五毒瘴池: '五处固定瘴池',
   蚀骨毒矢: '五道毒矢，落空处化为毒瘴',

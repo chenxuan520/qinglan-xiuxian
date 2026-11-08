@@ -1570,7 +1570,7 @@ export function adSupplies(unlocked: number) {
 export const MAX_PASSIVE_LEVEL = 5;
 export const EVOLVED_DAMAGE = 1.8;
 export const EVOLVED_COOLDOWN = 0.7;
-export const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05 };
+export const AWAKENING_BURST = { radius: 420, hits: 8, bossShare: 0.05, waveSeconds: 0.48 };
 export const weaponLevelDamage = (level: number) => 1 + (level - 1) * 0.32;
 // 低重补强缓解成型空窗；升阶继续递增，高重与仙器沿用原曲线。
 export function weaponDamageMultiplier(id: string, level: number) {

@@ -5,6 +5,7 @@ import { drawEnemyWarnings } from './render-warnings.ts';
 import { drawRegionalField, drawPlayerAilments } from './regional-render.ts';
 import { hazardMargin } from './regional-hazards.ts';
 import {
+  AWAKENING_BURST,
   CACHE_CHALLENGE,
   ENEMIES,
   ENEMY_TACTICS,
@@ -1413,12 +1414,12 @@ export class Renderer {
     }
     this.formation(x, ground, seal * (0.25 + 0.75 * burst), progress * 2.4, gold, fade);
     this.formation(x, ground, seal * (0.16 + 0.46 * burst), -progress * 3.2, color, fade * 0.9);
-    // 伤害在觉醒瞬间结算，冲击环扩散到的范围就是实际命中范围。
+    // 伤害随冲击环扩散逐只结算，冲击环扫到的范围就是命中范围。
     c.globalAlpha = fade * (1 - Math.min(1, progress / 0.45));
     c.strokeStyle = color;
     c.lineWidth = 6;
     c.beginPath();
-    c.arc(x, ground, radius * Math.min(1, progress / 0.3), 0, TAU);
+    c.arc(x, ground, radius * Math.min(1, progress / (AWAKENING_BURST.waveSeconds / 1.6)), 0, TAU);
     c.stroke();
     c.globalAlpha = fade;
     if (element === 'metal') {

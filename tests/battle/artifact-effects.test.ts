@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, type Effect, type Zone } from '../../src/battle/game.ts';
 import { freshSave, parseSave, SAVE_SCHEMA } from '../../src/core/progress.ts';
-import { treasure, type WeaponKind } from '../../src/core/data.ts';
+import { AWAKENING_BURST, treasure, type WeaponKind } from '../../src/core/data.ts';
 import { joinSect } from '../../src/town/mortal.ts';
 import { autoplayChoice } from '../../src/battle/autoplay.ts';
 import { choiceCard } from '../../src/ui/common-ui.ts';
@@ -267,6 +267,8 @@ test('骨灵实际弹丸命中及觉醒一击使用白骨增益', () => {
   near(e.maxHp - e.hp, shot.damage);
   near(g.damageBySource.skull, shot.damage);
   g.awaken(w);
+  g.time += AWAKENING_BURST.waveSeconds;
+  g.update(0.01);
   near(e.maxHp - e.hp, shot.damage * 9);
 });
 

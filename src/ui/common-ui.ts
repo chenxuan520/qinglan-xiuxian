@@ -222,11 +222,11 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
   const multiplier = (level: number) => `×${weaponDamageMultiplier(c.id, level).toFixed(2)}`;
   const description =
     c.type === 'evolve'
-      ? `法术形态强化；觉醒瞬间释放「觉醒一击」，身边妖物受 ${AWAKENING_BURST.hits} 倍单次伤害，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
+      ? `法术形态强化；觉醒时释放「觉醒一击」，伤害随冲击环扩散，环扫过的妖物受 ${AWAKENING_BURST.hits} 倍单次伤害，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
       : item.desc;
   const compactDescription =
     c.type === 'evolve'
-      ? `形态强化；觉醒一击 ×${AWAKENING_BURST.hits}，妖王至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血。`
+      ? `形态强化；冲击环扫过时逐个受 ${AWAKENING_BURST.hits} 倍伤害，妖王<span class="combat-unit">至多损失 ${Math.round(AWAKENING_BURST.bossShare * 100)}% 气血</span>。`
       : description;
   const mastery = c.type === 'passive' ? masteryDescription(save, c.id) : '';
   const guidance = game ? choiceGuidance(game, c) : null;
