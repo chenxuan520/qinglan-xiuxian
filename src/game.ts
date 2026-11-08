@@ -2206,11 +2206,11 @@ export class Game {
       }
     } else if (stage === 1) {
       const count = Math.min(
-        7,
-        14 - countMatching(this.shots, (b) => b.bossMotion?.kind === 'return'),
+        9,
+        18 - countMatching(this.shots, (b) => b.bossMotion?.kind === 'return'),
       );
       for (let i = 0; i < count; i++) {
-        const a = Math.atan2(ny, nx) + (i / 6 - 0.5) * 1.2;
+        const a = Math.atan2(ny, nx) + (i / Math.max(1, count - 1) - 0.5) * 1.2;
         const speed = !this.tribulation ? rules.nativeReturnSpeed : rules.returnSpeed;
         const shot = this.hostileShot(e, Math.cos(a), Math.sin(a), speed, e.damage * 0.6);
         shot.bossMotion = { kind: 'return', velocity: { x: shot.vx, y: shot.vy } };

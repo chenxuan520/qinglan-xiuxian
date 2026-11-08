@@ -72,9 +72,9 @@ test('狐王原生与终关炎扇9+8发、轮舞20+20发，速度与半间隔交
   }
 });
 
-test('七道回焰和五道魂影伤害0.6倍，重复施法及部分命中后严格遵守14/10上限', () => {
+test('九道回焰和五道魂影伤害0.6倍，重复施法及部分命中后严格遵守18/10上限', () => {
   for (const [origin, batch, limit, kind] of [
-    [1, 7, 14, 'return'],
+    [1, 9, 18, 'return'],
     [4, 5, 10, 'memory'],
   ] as const) {
     for (const arena of [origin, 6]) {

@@ -97,16 +97,16 @@ test('普通精英仍掉宝匣，召唤双狼自然到期或随主人消散不�
   assert.ok(h.g.enemies.filter((e) => e.bossSummon?.kind === 'wolf').every((e) => e.dead));
 });
 
-test('古墟回焰单程534.75、往返232.5，预热/停驻不变；终关同值', () => {
+test('古墟回焰单程802.125、往返348.75，预热/停驻不变；终关同值', () => {
   for (const arena of [1, 6]) {
     const { g } = encounter(1, 3, arena);
-    const b = g.shots[3],
+    const b = g.shots[4],
       duration = 2.3,
-      speed = 232.5;
+      speed = 348.75;
     assert.equal(bossReturnOut(b), duration);
     assert.ok(validBossMotion(b.bossMotion!, 1));
     const edge = bossShotPose(b, R.returnWarmup + duration);
-    assert.ok(Math.abs(Math.hypot(edge.x - b.origin.x, edge.y - b.origin.y) - 534.75) < 1e-9);
+    assert.ok(Math.abs(Math.hypot(edge.x - b.origin.x, edge.y - b.origin.y) - 802.125) < 1e-9);
     for (const [age, direction] of [
       [R.returnWarmup + 0.5, 1],
       [R.returnWarmup + duration + R.returnRest + 0.5, -1],
@@ -119,25 +119,25 @@ test('古墟回焰单程534.75、往返232.5，预热/停驻不变；终关同�
   }
 });
 
-test('新版本可恢复155旧回焰并保持原去返轨迹，232.5新回焰在转向后续局不瞬移', () => {
-  for (const legacy of [false, true]) {
+test('新旧回焰速度都能恢复并保持各自去返轨迹', () => {
+  for (const speed of [155, 232.5, 348.75]) {
     const { g } = encounter(1, 3);
     const b = g.shots[3];
     g.shots = [b];
     Object.assign(g.player, { x: 2000, y: 2000 });
-    if (legacy) {
-      b.bossMotion = { kind: 'return', velocity: { x: 155, y: 0 } };
-      b.vx = 155;
-      b.vy = 0;
-      b.life = R.returnWarmup + 2 * R.returnOut + R.returnRest;
-    }
+    b.bossMotion = { kind: 'return', velocity: { x: speed, y: 0 } };
+    b.vx = speed;
+    b.vy = 0;
+    const out = speed === 155 ? R.returnOut : R.nativeReturnOut;
+    b.life = R.returnWarmup + 2 * out + R.returnRest;
+    assert.equal(bossReturnOut(b), out);
     g.updateShots(R.returnWarmup + bossReturnOut(b) + R.returnRest + 0.1);
     const h = Game.restore(g.save, g.snapshot());
     assert.ok(h);
     g.updateShots(0.2);
     h.updateShots(0.2);
     assert.deepEqual(h.shots, g.shots);
-    assert.equal(Math.abs(g.shots[0].vx), legacy ? 155 : 232.5);
+    assert.equal(Math.abs(g.shots[0].vx), speed);
   }
 });
 

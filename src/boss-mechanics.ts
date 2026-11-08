@@ -14,7 +14,8 @@ export const BOSS_MECHANICS = {
   nativePursuitMiasmaSpeed: 120,
   returnWarmup: 0.8,
   returnSpeed: 155,
-  nativeReturnSpeed: 232.5,
+  nativeReturnSpeed: 348.75,
+  nativeReturnSpeedLegacy: 232.5,
   returnOut: 1.15,
   nativeReturnOut: 2.3,
   returnRest: 0.4,
@@ -44,7 +45,9 @@ export interface TrailPoint extends Point {
 export function bossReturnOut(b: Shot) {
   const m = b.bossMotion;
   return m?.kind === 'return' &&
-    Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - BOSS_MECHANICS.nativeReturnSpeed) < 1e-6
+    [BOSS_MECHANICS.nativeReturnSpeed, BOSS_MECHANICS.nativeReturnSpeedLegacy].some(
+      (speed) => Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - speed) < 1e-6,
+    )
     ? BOSS_MECHANICS.nativeReturnOut
     : BOSS_MECHANICS.returnOut;
 }
@@ -110,9 +113,11 @@ export function validBossMotion(m: BossMotion, stage: number | undefined) {
     return (
       stage === 1 &&
       point(m.velocity) &&
-      [BOSS_MECHANICS.returnSpeed, BOSS_MECHANICS.nativeReturnSpeed].some(
-        (speed) => Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - speed) < 1e-6,
-      )
+      [
+        BOSS_MECHANICS.returnSpeed,
+        BOSS_MECHANICS.nativeReturnSpeed,
+        BOSS_MECHANICS.nativeReturnSpeedLegacy,
+      ].some((speed) => Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - speed) < 1e-6)
     );
   if (m.kind === 'star')
     return (

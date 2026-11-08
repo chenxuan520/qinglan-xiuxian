@@ -63,8 +63,18 @@ for (let origin = 0; origin < 6; origin++)
         assert.ok(g.zones.every((z) => z.delay === R.heartGrow));
       }
       if (origin === 1) {
-        assert.equal(g.shots.length, 7);
+        assert.equal(g.shots.length, 9);
         assert.ok(g.shots.every((b) => b.bossMotion?.kind === 'return'));
+        const aim = Math.atan2(g.player.y - e.y, g.player.x - e.x);
+        const relative = g.shots.map((b) => {
+          const delta = Math.atan2(b.vy, b.vx) - aim;
+          return Math.atan2(Math.sin(delta), Math.cos(delta));
+        });
+        for (let i = 0; i < relative.length; i++)
+          assert.ok(
+            Math.abs(relative[i] - (-0.6 + i * 0.15)) < 1e-9,
+            '九道回焰应居中对称并等距铺开',
+          );
       }
       if (origin === 2) {
         assert.equal(actors(g).length, 2);
@@ -182,7 +192,7 @@ test('两猎狼从相反侧翼绕行、完整蓄势锁向，扑后再包抄、�
 
 test('回焰预热无伤，去程与返程沿同一轨迹，转向短停，真实命中后只扣一次血', () => {
   const { g } = cast(1);
-  const b = g.shots[3];
+  const b = g.shots[4];
   g.shots = [b];
   Object.assign(g.player, { x: b.origin.x, y: b.origin.y });
   const hp = g.player.hp;
@@ -193,7 +203,7 @@ test('回焰预热无伤，去程与返程沿同一轨迹，转向短停，真�
   assert.equal(g.shots.length, 0);
   const { g: h } = cast(1);
   Object.assign(h.player, { x: 900, y: 900 });
-  const shot = h.shots[3];
+  const shot = h.shots[4];
   const out = bossShotPose(shot, R.returnWarmup + 0.5),
     back = bossShotPose(shot, R.returnWarmup + 2 * bossReturnOut(shot) + R.returnRest - 0.5);
   assert.ok(Math.abs(out.x - back.x) < 1e-9 && Math.abs(out.y - back.y) < 1e-9);

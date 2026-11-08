@@ -99,7 +99,7 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
       [shots.length, zones.length, children.length],
       [
         [0, 3, 3],
-        [7, 0, 0],
+        [9, 0, 0],
         [0, 0, 2],
         [0, 3, 0],
         [0, 0, 3],
@@ -167,7 +167,7 @@ test('万劫归一异常路径仍恢复仙尊身份；回焰及召物保留各�
   assert.equal(c.e.bossStage, 6);
   for (const [borrowed, limit] of [
     [0, 3],
-    [1, 14],
+    [1, 18],
     [2, 2],
   ]) {
     const h = encounter();
