@@ -333,7 +333,7 @@ test('毒矢字段跟随快照、暂停和导入往返，旧无标记弹仍可�
   assert.ok(Game.restore(c.g.save, legacy));
 });
 
-test('毒矢按发射origin满280化小瘴，基伤不随施放者移动、改伤或死亡改变', () => {
+test('毒矢按发射origin满500化毒瘴，基伤不随施放者移动、改伤或死亡改变', () => {
   for (const arena of [3, 6]) {
     const c = encounter(3, arena);
     cast(c, 1);
@@ -341,7 +341,7 @@ test('毒矢按发射origin满280化小瘴，基伤不随施放者移动、改�
     c.g.shots = [shot];
     const baseDamage = c.boss.damage;
     Object.assign(c.g.player, { x: 10000, y: 10000 });
-    Object.assign(shot, { x: shot.origin.x + 167.99, y: shot.origin.y + 224, vx: 0, vy: 0 });
+    Object.assign(shot, { x: shot.origin.x + 299.99, y: shot.origin.y + 400, vx: 0, vy: 0 });
     c.g.updateShots(0);
     assert.equal(c.g.shots.length, 1);
     assert.equal(c.g.zones.length, 0);
@@ -350,16 +350,16 @@ test('毒矢按发射origin满280化小瘴，基伤不随施放者移动、改�
     c.boss.damage *= 10;
     c.g.hitEnemy(c.boss, c.boss.hp * 100);
     assert.equal(c.boss.dead, true);
-    shot.x = shot.origin.x + 168;
+    shot.x = shot.origin.x + 300;
     c.g.updateShots(0);
     assert.equal(c.g.shots.length, 0);
     assert.equal(c.g.zones.length, 1);
     const zone = c.g.zones[0];
-    assert.deepEqual([zone.x, zone.y], [shot.origin.x + 168, shot.origin.y + 224]);
+    assert.deepEqual([zone.x, zone.y], [shot.origin.x + 300, shot.origin.y + 400]);
     assert.equal(zone.kind, 'boss-miasma');
-    assert.equal(zone.radius, 28);
-    assert.equal(zone.life, 2.5);
-    assert.equal(zone.maxLife, 2.5);
+    assert.equal(zone.radius, 56);
+    assert.equal(zone.life, 5);
+    assert.equal(zone.maxLife, 5);
     assert.equal(zone.delay, 0.3);
     assert.equal(zone.castDelay, 0.3);
     assert.equal(zone.damage, baseDamage);
@@ -380,7 +380,7 @@ test('毒矢距离边界先碰撞，命中或佛光消弹均不在脚下额外�
     cast(c, 1);
     const shot = c.g.shots[2];
     c.g.shots = [shot];
-    Object.assign(shot, { x: shot.origin.x + 280, vx: 0, vy: 0 });
+    Object.assign(shot, { x: shot.origin.x + 510, y: shot.origin.y, vx: 0, vy: 0 });
     Object.assign(c.g.player, { x: shot.x, y: shot.y });
     if (shield) {
       c.g.weapons = [{ id: 'beads', level: 1, evolved: false, timer: 99999 }];
@@ -395,13 +395,13 @@ test('毒矢距离边界先碰撞，命中或佛光消弹均不在脚下额外�
   }
 });
 
-test('化瘴预警期间无伤，生效后按原毒伤倍率蚀体；暂停和续局保留小瘴', () => {
+test('化瘴预警期间无伤，生效后按原毒伤倍率蚀体；暂停和续局保留毒瘴', () => {
   const c = encounter(3);
   cast(c, 1);
   const shot = c.g.shots[2];
   c.g.shots = [shot];
   Object.assign(c.g.player, { x: 10000, y: 10000 });
-  Object.assign(shot, { x: shot.origin.x + 280, vx: 0, vy: 0 });
+  Object.assign(shot, { x: shot.origin.x + 510, y: shot.origin.y, vx: 0, vy: 0 });
   c.g.updateShots(0);
   const zone = c.g.zones[0];
   c.g.pause();
@@ -416,7 +416,7 @@ test('化瘴预警期间无伤，生效后按原毒伤倍率蚀体；暂停和�
   const hp = restored.player.hp;
   restored.updateZones(0.29);
   assert.equal(restored.player.hp, hp);
-  assert.equal(restored.zones[0].life, 2.5);
+  assert.equal(restored.zones[0].life, 5);
   restored.updateZones(0.02);
   assert.equal(restored.player.hp, hp);
   restored.updateZones(0.01);
@@ -431,7 +431,7 @@ test('旧无标记毒弹与寿命结束毒矢不化瘴', () => {
     const shot = c.g.shots[2];
     c.g.shots = [shot];
     Object.assign(c.g.player, { x: 10000, y: 10000 });
-    Object.assign(shot, { x: shot.origin.x + 300, vx: 0, vy: 0 });
+    Object.assign(shot, { x: shot.origin.x + 300, y: shot.origin.y + 400, vx: 0, vy: 0 });
     if (expired) shot.life = 0;
     else {
       delete shot.miasmaArrow;

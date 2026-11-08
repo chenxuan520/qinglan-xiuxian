@@ -2811,8 +2811,8 @@ export class Game {
             b.bossStage === 3 || (b.bossStage === FINAL_TRIAL_STAGE && effect === 3),
           );
           b.life = 0;
-        } else if (b.miasmaArrow && !this.tribulation && distance(b, b.origin) >= 280) {
-          this.zone(b.x, b.y, 28, 2.5, b.miasmaDamage!, STAGES[3].color, 'boss-miasma', 0.3, true);
+        } else if (b.miasmaArrow && !this.tribulation && distance(b, b.origin) >= 500) {
+          this.zone(b.x, b.y, 56, 5, b.miasmaDamage!, STAGES[3].color, 'boss-miasma', 0.3, true);
           b.life = 0;
         }
         continue;
