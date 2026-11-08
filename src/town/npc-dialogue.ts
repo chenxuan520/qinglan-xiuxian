@@ -474,7 +474,7 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
     return `${address}，坊外少人照应，若翻了脸，可就是性命相搏。凭据、同行的人、回来的路，都先问清楚，莫为一件宝物轻易赴险。`;
   if (context?.risk && riskQuestion) {
     if (context.risk.inspection === 'no-flaw-found')
-      return `${address}，你已当面核验，眼下未见破绽。凭据仍须与实际交付对上，没查出问题也不是替往后的交易作保。`;
+      return `${address}，你已当面核验，眼下未见破绽。真到交货时，再对一遍便是。`;
     if (context.risk.kind === 'goods')
       return `${address}，封签叠着新旧两层纸，隔瓶难辨药香。尚未核验，不能断言真假；可先验丹、核对来路，也可直接作别。`;
     if (context.risk.kind === 'deposit')
@@ -508,14 +508,14 @@ export function marketDialogueLocalReply(input: NpcDialogueRequest) {
     context?.contact?.grudge &&
     /认得|记得|见过|近来|招呼|你我|上次|恩怨|敌意/.test(input.message)
   )
-    return `${address}，你我之间已有嫌隙，这话我记着。买卖还须看当面的凭据，闲聊既不算成交，也不能替谁抹去旧账。`;
+    return `${address}，你我之间已有嫌隙，这话我记着。要谈买卖，当面验货再说。`;
   if (
     context?.contact?.aidAt !== undefined &&
     /相助|帮忙|指点|讲法|人情|记得|你我|上次/.test(input.message)
   )
-    return `${address}，先前在坊中承过你的帮助，这份人情我记得。今日的事仍按眼前凭据说，不拿旧情替谁作保。`;
+    return `${address}，先前在坊中承过你的帮助，这份人情我记得。`;
   if (context?.contact?.tradeVisit && /认得|记得|见过|近来|招呼|你我|上次|交易/.test(input.message))
-    return `${address}，你我曾按当面报价做过交易，这段往来我记得。今日货色仍须验明，熟识也不是省去凭据的理由。`;
+    return `${address}，你我曾按当面报价做过交易，这段往来我记得。`;
   if (
     context?.contact &&
     context.contact.birthVisit < input.marketVisit!.visit &&

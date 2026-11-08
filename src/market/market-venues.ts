@@ -60,14 +60,14 @@ export function venueWork(save: SaveData) {
           years: 1,
           stones: 40,
           iron: 1,
-          text: '一场法器交割请你在场见证。先对数量与封签，再由双方按约交货；不替任何一方强买强卖。',
+          text: '一场法器交割请你在场见证。先对数量与封签，再由双方按约交货。',
         }
       : {
           title: '主持调停',
           years: 1,
           stones: 40,
           iron: 1,
-          text: '两家铺面愿到执事堂对单，请你主持当面调停。只按凭据结清争议，不替任何一方讨取额外财物。',
+          text: '两家铺面愿到执事堂对单，请你主持当面调停。',
         };
 }
 export function venueSeekOffers(save: SaveData) {
@@ -250,11 +250,11 @@ export function executeVenue(save: SaveData, choice: string, stamp: string, unfi
     advanceMortal(save, 30);
     if (id === 'pay') {
       save.stones -= favor.price;
-      text = `为旧识${favor.friend.name}垫付${favor.price}灵石，按明示估值当面取回${favor.medicine.name}交给他；丹药不进入你的丹囊，这笔资助不承诺返还。`;
+      text = `为旧识${favor.friend.name}垫付${favor.price}灵石，按明示估值当面取回${favor.medicine.name}交给他；丹药不进入你的丹囊，这笔灵石就当是帮他了。`;
     } else {
       text = favor.mistaken
-        ? `替${favor.friend.name}核对交割凭据，原来是他记错了付讫的批次。你请他向${favor.other.name}说明原委，旧识也不能只凭一面之词。`
-        : `${senior && id === 'mediate' ? '你请双方当面依单交割' : '你请当值见证调出封签与交货单'}，查明${favor.friend.name}确已付清，${favor.other.name}按约放行丹药；没有额外索财。`;
+        ? `替${favor.friend.name}核对交割凭据，原来是他记错了付讫的批次。你请他向${favor.other.name}说明原委。`
+        : `${senior && id === 'mediate' ? '你请双方当面依单交割' : '你请当值见证调出封签与交货单'}，查明${favor.friend.name}确已付清，${favor.other.name}按约放行丹药。`;
     }
     rememberMarketAid(save, favor.friend.id);
     state.favorAt = save.age;

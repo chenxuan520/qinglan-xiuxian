@@ -202,7 +202,7 @@ export function marketFellowView(save: SaveData): MarketFellowView | null {
     ...base,
     phase: base.complete ? '一炉有归' : alive ? '故人回音' : '旧信待展',
     text: result.text,
-    quote: '认识一个人，靠一程程来往；辨一桩交易，也须看当下的凭据。',
+    quote: '炉边一盏茶，换得半生见闻。',
     actions: base.complete
       ? []
       : [{ id: 'read', label: alive ? '听完这一程见闻' : '读过旧信与药册' }],

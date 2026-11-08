@@ -97,8 +97,8 @@ test('核验日志包含真货与骗局时都不把“已核验”误称为“�
       assert.ok(chooseMarketOpportunity(save, id, 1, 'inspect'));
       const echo = marketWorldEcho(save)!;
       assert.equal(echo.kind, 'exposed');
-      assert.match(echo.text, /亲手核过/);
-      assert.doesNotMatch(echo.text, /揭穿|骗局|假药|人人|街上都知道/);
+      assert.match(echo.text, /亲手核过的凭据/);
+      assert.doesNotMatch(echo.text, /揭穿|骗局|假药|假封签|人人|街上都知道/);
       checked = true;
     }
     assert.equal(checked, true);

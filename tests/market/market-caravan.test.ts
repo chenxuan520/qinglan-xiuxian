@@ -51,6 +51,7 @@ test('游商求购逐项对应本批在场当事人的实际条件、报酬，�
     const leads = venueRequests(s);
     assert.equal(leads.length, 1, '沿用原本每批一位求购者，不新增委托');
     const html = marketVenueContent(s, 'caravan');
+    assert.doesNotMatch(html, /同一条街/);
     const primary = requestsSection(html);
     for (const { npc, request, fulfilled } of leads) {
       assert.deepEqual(request, marketRequest(s, npc.id));

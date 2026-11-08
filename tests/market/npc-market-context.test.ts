@@ -191,7 +191,7 @@ test('只有真实执行核验后才给AI相应公开结论，未见破绽不写
     assert.equal(validDialogue(request), true);
     const local = marketDialogueLocalReply(request);
     if (expected === 'fraud-exposed') assert.match(local, /已当面查出/);
-    if (expected === 'no-flaw-found') assert.match(local, /眼下未见破绽.*不是.*作保/);
+    if (expected === 'no-flaw-found') assert.match(local, /眼下未见破绽.*再对一遍/);
     if (expected === 'overpriced') assert.match(local, /高于药铺/);
   }
 });

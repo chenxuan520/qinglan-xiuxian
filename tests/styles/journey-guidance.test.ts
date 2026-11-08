@@ -249,7 +249,8 @@ test('茶馆旧书为主动独立阅读入口，不改写玩家身份、不替�
   const tea = townResidents(s.mortal.population!, s.age).find((n) => n.id === 'tea')!;
   const html = townEventContent(s, tea);
   assert.match(html, /href="[^\"]*novel\/" target="_blank" rel="noopener"/);
-  assert.match(html, /陆迟的故事已成旧闻，你仍可走自己的路/);
+  assert.match(html, /案头旧书《不系舟》里，也有从青岚渡口出发的少年。/);
+  assert.doesNotMatch(html, /已成旧闻/);
   assert.match(html, /data-action="mortal-activity" data-id="tea"/);
   assert.match(html, /消耗 0.5 年/);
   assert.deepEqual(s, before);

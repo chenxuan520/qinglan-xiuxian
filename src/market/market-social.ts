@@ -190,7 +190,7 @@ export function debateMarket(
     rememberMarketContact(save, id)!.debateGiftAt = save.age;
   }
   save.mortal.marketSocial!.lastDebateAt = save.age;
-  const text = `与${n.name}论道一年，${opening}。${root.name} · ${pathInfo(save.path).name} · 本命${item.name}。${rootLine}${advice}${reward.kind === 'recipe' ? (reward.exchange ? `你向对方讲授《${medicineInfo(reward.exchange)!.name}》丹方，换得《${medicineInfo(reward.id)!.name}》丹方。` : `你支付${reward.price}灵石，抄录了《${medicineInfo(reward.id)!.name}》丹方。`) : reward.kind === 'medicine' ? `旧识以${medicineInfo(reward.id)!.name}一份答谢当年相助，已收入丹囊；本人本世不再重复赠送。` : '此番交流修行取舍，未获赠丹药或丹方，修为与属性不变。'}`;
+  const text = `与${n.name}论道一年，${opening}。${root.name} · ${pathInfo(save.path).name} · 本命${item.name}。${rootLine}${advice}${reward.kind === 'recipe' ? (reward.exchange ? `你向对方讲授《${medicineInfo(reward.exchange)!.name}》丹方，换得《${medicineInfo(reward.id)!.name}》丹方。` : `你支付${reward.price}灵石，抄录了《${medicineInfo(reward.id)!.name}》丹方。`) : reward.kind === 'medicine' ? `旧识以${medicineInfo(reward.id)!.name}一份答谢当年相助，已收入丹囊；这份谢礼他只送这一回。` : '此番交流修行取舍，未获赠丹药或丹方，修为与属性不变。'}`;
   return log(save, id, 'debate', text);
 }
 export function marketRequest(save: SaveData, id: MarketCultivatorId) {
@@ -255,14 +255,14 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
   const basePrice = Math.min(budget, Math.floor((auctionValue(item) * baseRatio) / 100));
   const price = Math.min(budget, Math.floor((auctionValue(item) * ratio) / 100));
   const priceText = coerced
-    ? '他仗着境界压低收货价，你可以拒绝，不必因威压交货。'
+    ? '他仗着境界，把收货价压得很低。'
     : price === budget
-      ? '他此行携带的灵石有限，以眼前明示的收货价为准；是否交货由你取舍。'
+      ? '他此行携带的灵石有限，以眼前明示的收货价为准。'
       : motive.friend && price > basePrice
         ? '故交愿为合用之物再添一点报酬；仍以眼前明示的收货价为准。'
         : price > basePrice
-          ? '此物正合他眼下所需，收货价比他通常的报价略高；是否交货由你取舍。'
-          : '此物正合他眼下所需，按眼前明示的收货价结算；是否交货由你取舍。';
+          ? '此物正合他眼下所需，收货价比他通常的报价略高。'
+          : '此物正合他眼下所需，按眼前明示的收货价结算。';
   return {
     ...item,
     kind: item.kind as 'medicine' | 'artifact',
@@ -284,24 +284,24 @@ export function marketWorldScene(save: SaveData, id: MarketCultivatorId) {
   const scenes =
     n.realmIndex > player
       ? [
-          '他的威压拂过衣袖，你下意识收紧行囊。对方随口说的价钱，低阶修士也未必敢争；先看明示报价，守住退路。',
-          '他谈起一名散修为取宝孤身赴约，最后连护身法器都没带回来。你望了眼自己的行囊，知道好听的话不等于可靠的凭据。',
-          '对方目光掠过你腰间法宝，却没有先说货在何处。境界悬殊时，独自赴约更须小心；可以核验，也可以婉拒。',
+          '他的威压拂过衣袖，你下意识收紧行囊。对方随口报了个价，语气不容商量。',
+          '他谈起一名散修为取宝孤身赴约，最后连护身法器都没带回来。',
+          '对方目光掠过你腰间法宝，却迟迟不提货在何处。',
         ]
       : n.realmIndex < player
         ? [
-            '见你靠近，他先把露在袖口的丹瓶藏好，才低声见礼。修士并非都敢把身家摆出来，低阶者尤其如此。',
-            '他原先话说得很满，察觉你的气息后便收敛了些。坊市中的客气，常常也要看彼此境界。',
-            '他提起有人仗着高阶强买强卖，自己只敢找熟人结伴交易。你更强，也不必因此轻信每一张笑脸。',
+            '见你靠近，他先把露在袖口的丹瓶藏好，才低声见礼。',
+            '他原先话说得很满，察觉你的气息后便收敛了些。',
+            '他说起有人仗着境界强压价钱，自己如今只敢找熟人结伴交易。',
           ]
         : [
-            '你们口称道友，手却都没离开护身法宝。一样的大境界，并不代表知道对方藏着多少手段。',
-            '他说上次有人把收货说成垫路费，灵石交出后，承诺便成了一句空话。你决定先看凭据，再谈信任。',
-            '他提醒你，露财易招觊觎，独行易受试探。交易时留在明处，疑点多时宁可作别。',
+            '你们口称道友，手却都没离开护身法宝。',
+            '他说上次有人要他先垫路费，灵石交出去，人就再没露面。',
+            '他压低声音说，近来坊外不太平，独自出坊的人少了。',
           ];
   const ending =
     mood === '强横' && n.realmIndex > player
-      ? '他的话中带着逼迫，报价也可能有意压低；你仍可拒绝。'
+      ? '他的话中带着逼迫，报价恐怕也有意压低。'
       : mood === '虚浮'
         ? '他说起货色时格外夸张，价钱和品级仍须自己核对。'
         : '';
@@ -610,12 +610,12 @@ function receiveMarketItem(save: SaveData, item: AuctionItem) {
 export const MARKET_RISK_CLUES = {
   'secluded-road': '约定处在坊外僻路，离开了坊市的公开照应。',
   bloodstain: '对方袖口有旧血迹，却不肯多谈来路。',
-  'claimed-sect': '他自称与附近宗门相熟，称坊外自有人照应；口头名号不是凭据，仍须核验。',
+  'claimed-sect': '他自称与附近宗门相熟，说坊外自有人照应。',
   'pressed-departure': '对方催你独行赴约，迟迟不说接应者是谁。',
   'higher-realm': '对方修为难测，若翻脸，正面应战凶险。',
   'sect-backing': '你佩着在籍宗门信物，对方有所顾忌；离坊后仍不能指望宗门立刻救援。',
   'old-grudge': '这正是曾伏击你的劫修，旧怨未消，私下邀约尤须提防。',
-  'known-trader': '你们曾公平交割，但一次好交易并不能替这次邀约作保。',
+  'known-trader': '你们曾公平交割过一回。',
 } as const;
 export type MarketRiskClue = keyof typeof MARKET_RISK_CLUES;
 export function marketOpportunityRisk(save: SaveData, id: MarketCultivatorId) {
