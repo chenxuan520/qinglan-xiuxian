@@ -609,7 +609,23 @@ test('现有调试表单列出七境，只显示关卡选择与不补修为说�
   const h = stagePanelHarness(t);
   await h.open();
   h.stage();
-  assert.match(h.html().shown, /<option value="stage">关卡解锁<\/option>/);
+  const categoryLabels = [
+    ...h
+      .html()
+      .shown.matchAll(
+        /<option value="(?:stones|iron|artifact|medicine|curio|cultivation|realm|stage)">([^<]+)<\/option>/g,
+      ),
+  ].map((match) => match[1]);
+  assert.deepEqual(categoryLabels, [
+    '灵石',
+    '玄铁',
+    '法宝',
+    '丹药',
+    '奇物',
+    '修为',
+    '境界',
+    '关卡',
+  ]);
   for (const target of DEBUG_STAGES)
     assert.ok(h.html().fields.includes(`<option value="${target.id}">${target.name}</option>`));
   assert.match(h.html().fields, /不补修为、不发通关奖励/);

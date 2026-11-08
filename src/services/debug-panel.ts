@@ -43,7 +43,7 @@ export async function openDebugPanel(host: DebugHost, current: () => boolean) {
       ['curio', '奇物'],
       ['cultivation', '修为'],
       ['realm', '境界'],
-      ['stage', '关卡解锁'],
+      ['stage', '关卡'],
     ]
       .map(([id, name]) => `<option value="${id}">${name}</option>`)
       .join(
