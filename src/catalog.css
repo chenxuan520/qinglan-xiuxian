@@ -521,6 +521,10 @@
 }
 .enemy-card .boss-skill-name {
   display: inline-block;
+  margin-right: 0.3em;
+}
+.enemy-card .boss-skill-term {
+  white-space: nowrap;
 }
 .combat-unit {
   white-space: nowrap;

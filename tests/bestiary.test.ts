@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bestiaryPanel } from '../src/bestiary-ui.ts';
+import { bossSkills } from '../src/boss-skills.ts';
+import { BOSS_SKILL_TEXT, BOSS_TRAITS } from '../src/boss-skill-text.ts';
+import { BOSS_MECHANICS } from '../src/boss-mechanics.ts';
 import { bestiaryEnemyStats } from '../src/bestiary-stats.ts';
 import { enemyCombatStats } from '../src/enemy-stats.ts';
 import { Game } from '../src/game.ts';
@@ -104,8 +107,43 @@ test('图鉴保留本地与终关原妖王招式，说明减速、同刻精英�
   const trial = bestiaryPanel(6).body;
   assert.match(trial, /0:45后追加蓄势冲刺/);
   assert.match(trial, /唤来两名护卫/);
-  assert.match(trial, /快慢两层炎扇（九发与八发）、五点火径与快慢两层轮舞（各二十发）/);
-  assert.match(trial, /单次蓄势扑击、快慢三层冰牙与八点冰牢/);
+  assert.match(trial, /九尾炎扇<\/span> 快慢两层炎扇，九发与八发/);
+  assert.match(trial, /踏雪突袭<\/span> 单次蓄势扑击，横移可躲/);
   for (const name of ['十字天雷', '五毒瘴池', '摄魂灵轮']) assert.ok(trial.includes(name));
   for (const name of ['三叠天雷']) assert.ok(!trial.includes(name));
+});
+
+test('妖物志妖王招式说明覆盖全部名称且卡片按特性与招式顺序输出', () => {
+  assert.equal(BOSS_TRAITS.length, 7);
+  const names = new Set<string>();
+  for (let stage = 0; stage < 7; stage++)
+    for (const trial of [false, true])
+      for (const name of bossSkills(stage, trial)) {
+        names.add(name);
+        assert.ok(BOSS_SKILL_TEXT[name], `${name} 缺少说明`);
+      }
+  assert.deepEqual(new Set(Object.keys(BOSS_SKILL_TEXT)), names);
+
+  const card = (stage: number, page = stage) => {
+    const html = bestiaryPanel(page).body;
+    const article = html.match(
+      new RegExp(`<article class="enemy-card" data-boss-stage="${stage}">[^]*?</article>`),
+    )![0];
+    return article;
+  };
+  const wood = card(0);
+  assert.match(wood, /<span class="boss-skill-name">特性<\/span>弹幕与藤圈附藤缠/);
+  assert.doesNotMatch(wood, /<\/span> · /);
+  const namesInCard = [...wood.matchAll(/<span class="boss-skill-name">([^<]+)<\/span>/g)].map(
+    (m) => m[1],
+  );
+  assert.deepEqual(namesInCard, ['特性', ...bossSkills(0, false)]);
+
+  const trialPoison = card(3, 6);
+  assert.match(trialPoison, /游瘴驱逐/);
+  assert.doesNotMatch(card(3), /游瘴驱逐/);
+  assert.match(
+    trialPoison,
+    new RegExp(`持续<span class="combat-unit">${BOSS_MECHANICS.nativeMiasmaLife}秒</span>`),
+  );
 });

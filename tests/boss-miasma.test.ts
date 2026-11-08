@@ -255,9 +255,10 @@ test('固定毒池保持，小怪瘴云提速150%，图鉴中第四境和终关�
   assert.equal(cloud.radius, 50);
   assert.equal(cloud.x, enemy.x + 75);
   assert.equal(cloud.y, enemy.y);
-  assert.match(bestiaryPanel(3).body, /三团持续12秒的漂移毒瘴/);
-  assert.match(bestiaryPanel(6).body, /三团持续12秒的漂移毒瘴/);
-  assert.doesNotMatch(bestiaryPanel(6).body, /三团(?:持续6秒的漂移毒瘴|漂移毒瘴持续6秒)/);
+  const poison = /五毒游瘴<\/span> 三团漂移毒瘴，持续<span class="combat-unit">12秒<\/span>/;
+  assert.match(bestiaryPanel(3).body, poison);
+  assert.match(bestiaryPanel(6).body, poison);
+  assert.doesNotMatch(bestiaryPanel(6).body, /持续<span class="combat-unit">6秒<\/span>/);
   const guide = guideContent('combat');
   const gameplay = readFileSync(new URL('../docs/gameplay.md', import.meta.url), 'utf8');
   assert.match(
