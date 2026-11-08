@@ -4,7 +4,6 @@ import { ELEMENTS, ROOT_STARTERS, treasure } from '../src/data.ts';
 import { freshSave } from '../src/progress.ts';
 import { rootRevealBody } from '../src/opening-ui.ts';
 
-// 双件结构是「名称在前、路线在后」；无灵根单件仍是「小标题在前、名称在后」，不会被这条匹配到。
 function pairedCards(html: string) {
   return [
     ...html.matchAll(
@@ -60,23 +59,32 @@ test('多灵根命盘按首位五行显示两件，而非按当前特殊本命�
   assert.deepEqual(save, before);
 });
 
-test('无灵根仍用原单件结构显示实际本命及其五行，不添加双件或路线标记', () => {
-  for (const ids of Object.values(ROOT_STARTERS)) {
-    for (const id of ids) {
-      const save = freshSave(
-        'none',
-        [],
-        treasure(id).school === 'demonic' ? 'demonic' : 'orthodox',
-      );
-      save.starter = id;
-      save.artifacts = [...ids];
+test('无灵根按随机本命所属五行展示实际赠送的正魔两件，三条路线均不改存档', () => {
+  for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+    const pairs = Object.values(ROOT_STARTERS);
+    const candidates =
+      path === 'dual' ? pairs.flat() : pairs.map((pair) => pair[path === 'demonic' ? 1 : 0]);
+    for (const [index, id] of candidates.entries()) {
+      const save = freshSave('none', [], path, () => (index + 0.25) / candidates.length);
+      assert.equal(save.starter, id);
+      const [orthodoxId, demonicId] = ROOT_STARTERS[treasure(id).element];
+      assert.deepEqual(save.artifacts, [orthodoxId, demonicId]);
       const before = structuredClone(save);
       const html = rootRevealBody(save);
-      assert.equal([...html.matchAll(/class="root-reveal-starter"/g)].length, 1);
-      assert.ok(html.includes(`<strong>${treasure(id).name}</strong>`));
+      assert.deepEqual(pairedCards(html), [
+        { name: treasure(orthodoxId).name, path: '正道' },
+        { name: treasure(demonicId).name, path: '魔道' },
+      ]);
+      assert.equal([...html.matchAll(/class="root-reveal-starter"/g)].length, 2);
       const element = ELEMENTS.find((e) => e.id === treasure(id).element)!;
-      assert.ok(html.includes(`<small>本命法宝 · ${element.name}系</small>`));
-      assert.doesNotMatch(html, /root-reveal-starters|is-current|正道|魔道|undefined/);
+      assert.ok(
+        html.includes(
+          `<small class="root-reveal-starters-title">本命法宝 · ${element.name}系</small>`,
+        ),
+      );
+      assert.ok(html.includes('<h3>无灵根</h3>'));
+      assert.doesNotMatch(html, /is-current|undefined/);
+      assert.deepEqual(save.rootElements, []);
       assert.deepEqual(save, before);
     }
   }
