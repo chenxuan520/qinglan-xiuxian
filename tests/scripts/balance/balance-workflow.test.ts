@@ -184,6 +184,12 @@ const workflow = readFileSync(
 );
 const fullJob = workflow.match(/^  full:\n([^]*?)(?=^  [a-z-]+:)/m)![0];
 const publishJob = workflow.match(/^  publish-report:\n([^]*)/m)![0];
+const fullWorkflow = readFileSync(
+  new URL('../../../.github/workflows/balance-full.yml', import.meta.url),
+  'utf8',
+);
+const shardJob = fullWorkflow.match(/^  shards:\n([^]*?)(?=^  [a-z-]+:)/m)![0];
+const aggregateJob = fullWorkflow.match(/^  aggregate:\n([^]*)/m)![0];
 
 function actionExpression(expression: string, context: Record<string, unknown>) {
   return runInNewContext(
@@ -272,6 +278,132 @@ test('同分支定时/手动全量共用取消组，其他分支及仓库隔离�
   assert.ok(!workflow.match(/^  quick:\n([^]*?)(?=^  [a-z-]+:)/m)![0].includes('concurrency:'));
 });
 
+test('本地可复用全量透传日报ID，调用作业只保留合法关键字且不重复并发组', () => {
+  assert.match(fullJob, /^    uses: \.\/\.github\/workflows\/balance-full\.yml$/m);
+  assert.doesNotMatch(fullJob, /^    (?:outputs|steps|runs-on|timeout-minutes):/m);
+  assert.match(
+    fullWorkflow,
+    /workflow_call:\n\s+outputs:\n\s+report-id:\n[^]*?value: \$\{\{ jobs\.aggregate\.outputs\.report-id \}\}/,
+  );
+  assert.match(aggregateJob, /report-id: \$\{\{ steps\.report\.outputs\.artifact-id \}\}/);
+  assert.match(aggregateJob, /name: Preserve daily web report\n[^]*?id: report\n/);
+  assert.doesNotMatch(fullWorkflow, /concurrency:|continue-on-error:/);
+  assert.doesNotMatch(
+    fullWorkflow.slice(0, fullWorkflow.indexOf('jobs:')),
+    /schedule:|push:|workflow_dispatch:/,
+  );
+});
+
+test('八分片互不取消且使用全部可用CPU，报告路径与唯一可重试artifact逐片对应', () => {
+  assert.match(shardJob, /fail-fast: false/);
+  assert.doesNotMatch(fullWorkflow, /max-parallel:|--jobs[=\s]/);
+  const indices = JSON.parse(shardJob.match(/^        shard: (.+)$/m)![1]) as number[];
+  assert.deepEqual(indices, [0, 1, 2, 3, 4, 5, 6, 7]);
+  const command = shardJob.match(/^        run: (npm run balance:gate:full .+)$/m)![1];
+  const artifact = shardJob.match(/^          name: (balance-shard-.+)$/m)![1];
+  const file = shardJob.match(/^          path: (.+)$/m)![1];
+  const names = new Set<string>();
+  for (const index of indices) {
+    const expand = (text: string) => text.replaceAll('${{ matrix.shard }}', String(index));
+    assert.equal(
+      expand(command),
+      `npm run balance:gate:full -- --shard=${index}/8 --report=${expand(file)}`,
+    );
+    assert.equal(expand(file), `artifacts/balance-shards/shard-${index}.json`);
+    names.add(expand(artifact));
+  }
+  assert.equal(names.size, 8);
+  assert.match(shardJob, /node-version: '22'/);
+  assert.match(shardJob, /- run: npm ci/);
+  assert.match(shardJob, /if-no-files-found: error\n\s+overwrite: true\n\s+retention-days: 14/);
+  const preserve = shardJob.match(/name: Preserve raw shard\n\s+if: (.+)/)![1];
+  for (const cancelled of [false, true])
+    assert.equal(
+      actionExpression(preserve, { always: () => true, cancelled: () => cancelled }),
+      !cancelled,
+    );
+  const diagnostics = shardJob.match(/- name: Preserve shard crash diagnostics\n([^]*)/)![0];
+  assert.match(diagnostics, /path: \/tmp\/qinglan-balance-failed-\*\/samples\.json/);
+  assert.match(diagnostics, /if-no-files-found: ignore\n\s+overwrite: true\n\s+retention-days: 14/);
+  const diagnosticArtifact = diagnostics.match(/^          name: (.+)$/m)![1];
+  for (const index of indices) {
+    const name = diagnosticArtifact.replaceAll('${{ matrix.shard }}', String(index));
+    assert.equal(name, `balance-diagnostics-${index}`);
+    assert.doesNotMatch(name, /^balance-shard-/);
+  }
+  const diagnosticGuard = diagnostics.match(/^        if: (.+)$/m)![1];
+  for (const failed of [false, true])
+    for (const cancelled of [false, true])
+      assert.equal(
+        actionExpression(diagnosticGuard, {
+          failure: () => failed,
+          cancelled: () => cancelled,
+        }),
+        failed && !cancelled,
+      );
+});
+
+test('合并等待全部分片，失败仍收尾，下载绑定本run且下载失败不能被吞掉', () => {
+  assert.match(aggregateJob, /^    needs: \[shards\]$/m);
+  assert.match(aggregateJob, /^    timeout-minutes: 360$/m);
+  const expression = aggregateJob.match(/^    if: (.+)$/m)![1];
+  for (const result of ['success', 'failure'])
+    for (const cancelled of [false, true])
+      assert.equal(
+        actionExpression(expression, {
+          always: () => true,
+          cancelled: () => cancelled,
+          needs: { shards: { result } },
+        }),
+        !cancelled,
+      );
+  assert.match(aggregateJob, /REPORT_RUN: \$\{\{ github\.run_id \}\}/);
+  assert.match(aggregateJob, /REPOSITORY: \$\{\{ github\.repository \}\}/);
+  assert.match(aggregateJob, /GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(aggregateJob, /node-version: '22'/);
+  assert.match(aggregateJob, /- run: npm ci/);
+  assert.match(
+    aggregateJob,
+    /run: npm run balance:gate:full -- --merge-shards=artifacts\/balance-shards --shard-count=8$/m,
+  );
+  const command = aggregateJob.match(/^        run: (gh run download .+)$/m)![1];
+  const root = mkdtempSync(join(tmpdir(), 'qinglan-shard-download-'));
+  try {
+    const gh = join(root, 'gh');
+    writeFileSync(
+      gh,
+      `#!${process.execPath}\nrequire('node:fs').writeFileSync('args.json', JSON.stringify(process.argv.slice(2)));process.exit(Number(process.env.DOWNLOAD_EXIT));\n`,
+    );
+    chmodSync(gh, 0o755);
+    for (const code of [0, 7]) {
+      const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', command], {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${root}:${process.env.PATH}`,
+          REPORT_RUN: '812',
+          REPOSITORY: 'chenxuan520/qinglan-xiuxian',
+          DOWNLOAD_EXIT: String(code),
+        },
+      });
+      assert.equal(result.status, code);
+      assert.deepEqual(JSON.parse(readFileSync(join(root, 'args.json'), 'utf8')), [
+        'run',
+        'download',
+        '812',
+        '--repo',
+        'chenxuan520/qinglan-xiuxian',
+        '--pattern',
+        'balance-shard-*',
+        '--dir',
+        'artifacts/balance-shards',
+      ]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('取消快检或渲染时跳过收尾，正常失败仍保留诊断产物', () => {
   for (const job of ['quick', 'perf-render']) {
     const source = workflow.match(new RegExp(`^  ${job}:\\n([^]*?)(?=^  [a-z-]+:)`, 'm'))![0];
@@ -294,7 +426,7 @@ test('取消矩阵跳过日报和诊断，真实失败仍生成上传并让CI失
     'Preserve complete report',
     'Fail CI on report Error after preserving artifacts',
   ]) {
-    const expression = fullJob.match(new RegExp(`name: ${name}\\n\\s+if: ([^\\n]+)`))![1];
+    const expression = aggregateJob.match(new RegExp(`name: ${name}\\n\\s+if: ([^\\n]+)`))![1];
     for (const cancelled of [false, true])
       assert.equal(
         actionExpression(expression, { always: () => true, cancelled: () => cancelled }),
@@ -302,6 +434,20 @@ test('取消矩阵跳过日报和诊断，真实失败仍生成上传并让CI失
         name,
       );
   }
+  const steps = [
+    'Merge and validate full matrix',
+    'Generate daily web report even on failure',
+    'Preserve daily web report',
+    'Preserve complete report',
+    'Fail CI on report Error after preserving artifacts',
+  ].map((name) => aggregateJob.indexOf(`name: ${name}`));
+  assert.ok(steps.every((index, i) => index >= 0 && (i === 0 || index > steps[i - 1])));
+  assert.match(aggregateJob, /name: balance-daily-report\n[^]*?retention-days: 90/);
+  assert.match(aggregateJob, /name: balance-full\n[^]*?artifacts\/balance-gate\.json/);
+  assert.match(
+    aggregateJob,
+    /run: node --experimental-strip-types scripts\/balance\/check-balance-report\.ts/,
+  );
 });
 
 test('已取消的全量/渲染不能发布，真实失败日报及render-only仍可发布', () => {

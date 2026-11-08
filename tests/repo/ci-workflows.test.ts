@@ -58,8 +58,11 @@ test('Pages保留五类报告并从独立性能artifact恢复，二进制与平�
   ])
     assert.ok(source.includes(`scripts/${script}.ts`), script);
   assert.match(read('binaries.yml'), /scripts\/assets\/check-binaries\.ts/);
-  for (const command of ['balance:ci', 'perf:sim', 'size:check', 'balance:gate:full'])
+  for (const command of ['balance:ci', 'perf:sim', 'size:check'])
     assert.ok(read('balance.yml').includes(`npm run ${command}`), command);
+  assert.match(read('balance.yml'), /uses: \.\/\.github\/workflows\/balance-full\.yml/);
+  assert.match(read('balance-full.yml'), /workflow_call:/);
+  assert.match(read('balance-full.yml'), /npm run balance:gate:full/);
 });
 
 test('所有Pages日报发布保留公开巡检结果，sparse工具同时包含纯协议', () => {

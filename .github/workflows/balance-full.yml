@@ -1,0 +1,104 @@
+name: Full balance matrix
+
+on:
+  workflow_call:
+    outputs:
+      report-id:
+        description: '完整矩阵日报 artifact ID，失败日报同样返回'
+        value: ${{ jobs.aggregate.outputs.report-id }}
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Run full matrix shard
+        run: npm run balance:gate:full -- --shard=${{ matrix.shard }}/8 --report=artifacts/balance-shards/shard-${{ matrix.shard }}.json
+      - name: Preserve raw shard
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-shard-${{ matrix.shard }}
+          path: artifacts/balance-shards/shard-${{ matrix.shard }}.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+      - name: Preserve shard crash diagnostics
+        if: failure() && !cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-diagnostics-${{ matrix.shard }}
+          path: /tmp/qinglan-balance-failed-*/samples.json
+          if-no-files-found: ignore
+          overwrite: true
+          retention-days: 14
+
+  aggregate:
+    needs: [shards]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    outputs:
+      report-id: ${{ steps.report.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Download raw shards from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_RUN: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh run download "$REPORT_RUN" --repo "$REPOSITORY" --pattern 'balance-shard-*' --dir artifacts/balance-shards
+      - name: Merge and validate full matrix
+        run: npm run balance:gate:full -- --merge-shards=artifacts/balance-shards --shard-count=8
+      - name: Generate daily web report even on failure
+        if: always() && !cancelled()
+        run: |
+          npm run balance:report
+          cat artifacts/balance-daily-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve daily web report
+        if: always() && !cancelled()
+        id: report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-daily-report
+          path: artifacts/balance-daily-report/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90
+      - name: Preserve complete report
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: balance-full
+          path: |
+            artifacts/balance-gate.json
+            /tmp/qinglan-balance-failed-*/samples.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+      - name: Fail CI on report Error after preserving artifacts
+        if: always() && !cancelled()
+        run: node --experimental-strip-types scripts/balance/check-balance-report.ts

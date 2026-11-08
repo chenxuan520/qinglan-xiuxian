@@ -9,7 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { availableParallelism, tmpdir } from 'node:os';
+import { availableParallelism, cpus, tmpdir } from 'node:os';
 import { basename, relative, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
@@ -32,12 +32,9 @@ import {
 } from './balance-metrics.ts';
 import { growthShape, simulateFarm } from './balance-simulation.ts';
 import type { CampaignSample } from './balance-simulation.ts';
+import { createBalanceShard, mergeBalanceShards, selectShardCases } from './balance-shards.ts';
+import type { RunnerCapacity, SimulationError } from './balance-shards.ts';
 import type { AutoplayBuild } from '../../src/battle/autoplay-build.ts';
-interface SimulationError {
-  case: BalanceCase;
-  key: string;
-  error: string;
-}
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 function sourceHash(root: string) {
@@ -56,6 +53,47 @@ function sourceHash(root: string) {
   }
   visit(join(root, 'src'), 'src');
   return hash.digest('hex');
+}
+function executionHash() {
+  const hash = createHash('sha256');
+  for (const name of [
+    'balance-gate.ts',
+    'balance-shards.ts',
+    'balance-policy.ts',
+    'balance-metrics.ts',
+    'balance-simulation.ts',
+  ]) {
+    hash.update(name);
+    hash.update(readFileSync(join(repository, 'scripts/balance', name)));
+  }
+  return hash.digest('hex');
+}
+
+function runnerCapacity(): RunnerCapacity {
+  const models = cpus();
+  let cpuQuota: string | null = null;
+  try {
+    cpuQuota = readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim();
+  } catch {
+    // 非 cgroup v2 或非 Linux 环境没有此观测值，不以主机逻辑核数冒充配额。
+  }
+  return {
+    node: process.version,
+    platform: process.platform,
+    architecture: process.arch,
+    cpuModel: models[0]?.model ?? 'unavailable',
+    logicalCpus: models.length,
+    availableCpus: availableParallelism(),
+    cpuQuota,
+  };
+}
+
+function readShardFiles(directory: string): unknown[] {
+  const files = readdirSync(directory, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+    .map((entry) => join(entry.parentPath, entry.name))
+    .sort();
+  return files.map((file) => JSON.parse(readFileSync(file, 'utf8')));
 }
 export async function runCases(
   cases: BalanceCase[],
@@ -148,6 +186,9 @@ function parseArgs(args: string[]) {
     currentOnly: false,
     jobs: availableParallelism(),
     report: join(repository, 'artifacts/balance-gate.json'),
+    shard: undefined as { index: number; count: number } | undefined,
+    mergeShards: undefined as string | undefined,
+    shardCount: 8,
   };
   const seen = new Set<string>();
   for (const arg of args) {
@@ -161,12 +202,28 @@ function parseArgs(args: string[]) {
       options.acceptance = true;
       options.full = true;
     } else if (/^--jobs=[1-9]\d*$/.test(arg)) options.jobs = Number(arg.slice(7));
+    else if (/^--shard=\d+\/[1-9]\d*$/.test(arg)) {
+      const [index, count] = arg.slice(8).split('/').map(Number);
+      options.shard = { index, count };
+    } else if (arg.startsWith('--merge-shards=') && arg.slice(15))
+      options.mergeShards = resolve(arg.slice(15));
+    else if (/^--shard-count=[1-9]\d*$/.test(arg)) options.shardCount = Number(arg.slice(14));
     else if (arg.startsWith('--report=') && arg.slice(9)) options.report = resolve(arg.slice(9));
     else
       throw new Error(
-        `未知参数：${arg}。仅支持 --full、--acceptance、--current-only、--growth-targets、--jobs=N、--report=路径`,
+        `未知参数：${arg}。仅支持 --full、--acceptance、--current-only、--growth-targets、--jobs=N、--report=路径、--shard=编号/总数、--merge-shards=目录、--shard-count=N`,
       );
   }
+  if (options.shard && options.mergeShards) throw new Error('分片运行与分片合并不能同时指定');
+  if (
+    (options.shard || options.mergeShards) &&
+    (!options.full || !options.acceptance || !options.currentOnly)
+  )
+    throw new Error('分片仅支持完整矩阵的当前独立验收：--full --acceptance --current-only');
+  if (seen.has('--shard-count') && !options.mergeShards)
+    throw new Error('--shard-count 仅用于合并分片');
+  if (!Number.isSafeInteger(options.jobs) || !Number.isSafeInteger(options.shardCount))
+    throw new Error('并发数与分片总数必须为有效整数');
   const artifactRoot = join(repository, 'artifacts');
   if (
     !options.report.startsWith(artifactRoot + '/') &&
@@ -259,7 +316,46 @@ export async function main(args: string[]) {
     console.log(
       `平衡门禁：${cases.length} 条路线，${options.full ? '20 样本/组、三个难度' : '全部本命快速覆盖、初入仙途'}；裸开荒一试即停，其余 5 次/关、${LIMITS.battleSeconds} 秒/局；${options.currentOnly ? '当前独立验收（不执行历史对照）' : `对照 ${BALANCE_REFERENCE.slice(0, 7)}`}`,
     );
-    const currentRun = await runCases(cases, repository, options.jobs, '当前');
+    const identity = { commit, currentHash, executionHash: executionHash() };
+    const capacity = runnerCapacity();
+    console.log(`模拟资源：${JSON.stringify({ ...capacity, requestedJobs: options.jobs })}`);
+    if (options.shard) {
+      const { index, count } = options.shard;
+      const selected = selectShardCases(cases, index, count);
+      const workerCount = Math.min(options.jobs, selected.length);
+      console.log(
+        `完整矩阵分片 ${index + 1}/${count}：${selected.length} 条，${workerCount} 个 worker`,
+      );
+      const run = await runCases(selected, repository, options.jobs, `分片 ${index + 1}/${count}`);
+      if (sourceHash(repository) !== currentHash || executionHash() !== identity.executionHash)
+        throw new Error('分片期间源码发生变化，不能合并为正式报告');
+      const shard = createBalanceShard(
+        cases,
+        index,
+        count,
+        identity,
+        run,
+        started,
+        Date.now(),
+        workerCount,
+        capacity,
+      );
+      mkdirSync(dirname(options.report), { recursive: true });
+      writeFileSync(options.report, JSON.stringify(shard), {
+        flag: options.report.startsWith(join(repository, 'artifacts') + '/') ? 'w' : 'wx',
+      });
+      console.log(`分片 ${index + 1}/${count} 已保存；完整验收将在全部分片合并后执行。`);
+      return;
+    }
+    const merged = options.mergeShards
+      ? mergeBalanceShards(readShardFiles(options.mergeShards), cases, options.shardCount, identity)
+      : undefined;
+    const currentRun = merged ?? (await runCases(cases, repository, options.jobs, '当前'));
+    const reportStarted = merged ? Math.min(started, merged.startedAt) : started;
+    if (merged)
+      console.log(
+        `已合并 ${options.shardCount}/${options.shardCount} 片，共 ${currentRun.results.length + currentRun.errors.length}/${cases.length} 条，继续原完整验收。`,
+      );
     // 产品源码逐字节相同才复用同一确定性实测，数值改变必须真的运行旧引擎对照。
     const reuse = currentHash === referenceHash;
     const referenceRun =
@@ -326,7 +422,10 @@ export async function main(args: string[]) {
     const report = {
       commit,
       generatedAt: new Date().toISOString(),
-      elapsedSeconds: (Date.now() - started) / 1000,
+      elapsedSeconds: (Date.now() - reportStarted) / 1000,
+      execution: merged
+        ? { kind: 'sharded', count: options.shardCount, shards: merged.shards }
+        : { kind: 'single-runner', jobs: Math.min(options.jobs, cases.length), runner: capacity },
       failures,
       bossFailures,
       groupFailures,
