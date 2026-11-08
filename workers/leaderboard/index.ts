@@ -3,14 +3,14 @@ import {
   FACTS_VERSION,
   validFactsSeal,
   verifyFactsSeal,
-} from '../../src/leaderboard-integrity.ts';
+} from '../../src/leaderboard/leaderboard-integrity.ts';
 import {
   LEADERBOARD_LIMIT,
   LEADERBOARD_MAX_BYTES,
   LEADERBOARD_VERSION,
   normalizeLeaderboardName,
   type LeaderboardEntry,
-} from '../../src/leaderboard-contract.ts';
+} from '../../src/leaderboard/leaderboard-contract.ts';
 import { parseLeaderboardFacts, scoreLeaderboardFacts } from './score.ts';
 import { leaderboardAdminApi } from './admin-api.ts';
 import { leaderboardPage } from './page.ts';

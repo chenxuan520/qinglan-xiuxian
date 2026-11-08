@@ -98,7 +98,7 @@ jobs:
       - name: Preserve latest balance report
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types scripts/restore-balance-report.ts
+        run: node --experimental-strip-types scripts/balance/restore-balance-report.ts
       - name: Include this weapon report
         env:
           GH_TOKEN: ${{ github.token }}
@@ -115,33 +115,33 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             package.json
-            scripts/restore-weapon-report.ts
-            scripts/restore-autoplay-report.ts
-            scripts/restore-observer-report.ts
-            src/observer-report.ts
-            src/autoplay-report.ts
-            scripts/restore-monitor-performance.ts
-            src/monitor-performance.ts
-            scripts/ci-artifacts.ts
-            src/weapon-report.ts
-            src/data.ts
+            scripts/weapon-benchmark/restore-weapon-report.ts
+            scripts/perf/restore-autoplay-report.ts
+            scripts/observer/restore-observer-report.ts
+            src/services/observer-report.ts
+            src/battle/autoplay-report.ts
+            scripts/perf/restore-monitor-performance.ts
+            src/services/monitor-performance.ts
+            scripts/build/ci-artifacts.ts
+            src/services/weapon-report.ts
+            src/core/data.ts
       - name: Preserve performance summaries
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-monitor-performance.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/perf/restore-monitor-performance.ts
       - name: Validate current report without changing the built game
         env:
           REPORT_RUN: ${{ github.run_id }}
           REPORT_COMMIT: ${{ github.sha }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-weapon-report.ts --check dist/weapon-report
+        run: node --experimental-strip-types artifacts/report-tools/scripts/weapon-benchmark/restore-weapon-report.ts --check dist/weapon-report
       - name: Preserve latest autoplay comparison
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-autoplay-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/perf/restore-autoplay-report.ts
       - name: Preserve latest observer report
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-observer-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/observer/restore-observer-report.ts
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist

@@ -22,7 +22,7 @@
 
 ## 素材与城镇扩建
 
-- 新图片生成后运行 `python3 scripts/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。
+- 新图片生成后运行 `python3 scripts/assets/compress-assets.py` 压成 WebP（需要 Pillow），保留尺寸及 alpha，项目不携带 PNG 原图。城镇扩建在 `town.ts` 追加道路、建筑与 NPC 坐标，并检查可达性；只有载入完毕、前台有焦点的城镇且无弹窗时推进人间时间。
 - 动态素材 URL 使用 `assetUrl()`，兼容 GitHub Pages 子路径。新增素材先生成并检查，再接入。法宝图标沿用统一图集，避免混用图片和 SVG。
 
 ## 声音

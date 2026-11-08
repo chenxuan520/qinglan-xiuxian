@@ -1,10 +1,10 @@
-import { marketReplyRevealsRealm, type NpcDialogueRequest } from '../../src/npc-dialogue.ts';
-import { REALMS } from '../../src/data.ts';
+import { marketReplyRevealsRealm, type NpcDialogueRequest } from '../../src/town/npc-dialogue.ts';
+import { REALMS } from '../../src/core/data.ts';
 import {
   isMarketCultivatorId,
   marketCharacters,
   marketLocalReply,
-} from '../../src/sect-market-data.ts';
+} from '../../src/sect/sect-market-data.ts';
 
 function reportedFacts(input: NpcDialogueRequest) {
   return [input.message, ...input.history.filter((m) => m.role === 'user').map((m) => m.content)]

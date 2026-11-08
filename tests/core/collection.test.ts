@@ -1,0 +1,354 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Game } from '../../src/battle/game.ts';
+import { ELEMENTS, ROOT_STARTERS, TREASURES, treasure } from '../../src/core/data.ts';
+import {
+  freshSave,
+  parseSave,
+  forge,
+  forgeCost,
+  train,
+  claimArtifacts,
+  settleRun,
+} from '../../src/core/progress.ts';
+
+test('三十六件已收藏法宝均能炼至十阶，每阶准确扣款且刷新保留，满阶不再扣款', () => {
+  for (const item of TREASURES) {
+    let save = freshSave();
+    save.artifacts = TREASURES.map((t) => t.id);
+    save.stones = save.iron = 1000000;
+    for (let level = 0; level < 10; level++) {
+      const cost = forgeCost(level);
+      const { stones, iron } = save;
+      assert.equal(forge(save, item.id), true, `${item.id} 升至 ${level + 1} 阶`);
+      assert.equal(save.stones, stones - cost.stones);
+      assert.equal(save.iron, iron - cost.iron);
+      save = parseSave(JSON.stringify(save));
+      assert.equal(save.forge[item.id], level + 1);
+    }
+    const before = JSON.stringify(save);
+    assert.equal(forge(save, item.id), false);
+    assert.equal(JSON.stringify(save), before);
+  }
+});
+
+test('炼器首阶保持可负担，玄铁与灵石逐阶递增，后五阶加速且缺料不扣款', () => {
+  assert.deepEqual(
+    Array.from({ length: 5 }, (_, level) => forgeCost(level)),
+    [
+      { iron: 3, stones: 35 },
+      { iron: 9, stones: 65 },
+      { iron: 15, stones: 95 },
+      { iron: 21, stones: 125 },
+      { iron: 27, stones: 155 },
+    ],
+  );
+  assert.deepEqual(forgeCost(9), { iron: 507, stones: 2555 });
+  for (let level = 5; level < 10; level++) {
+    const cost = forgeCost(level),
+      prior = forgeCost(level - 1),
+      beforePrior = forgeCost(level - 2);
+    for (const material of ['iron', 'stones'] as const) {
+      assert.ok(cost[material] - prior[material] > prior[material] - beforePrior[material]);
+      const save = freshSave();
+      save.forge.sword = level;
+      save.stones = cost.stones;
+      save.iron = cost.iron;
+      save[material]--;
+      const before = JSON.stringify(save);
+      assert.equal(forge(save, 'sword'), false);
+      assert.equal(JSON.stringify(save), before);
+    }
+  }
+});
+
+test('一份首关补给足够本命炼至三阶并修习两项根基，玄铁消耗有效而灵石不独占预算', () => {
+  const save = freshSave();
+  save.stones = 300;
+  save.iron = 30;
+  for (let i = 0; i < 3; i++) assert.equal(forge(save, save.starter), true);
+  assert.equal(save.forge[save.starter], 3);
+  assert.equal(save.iron, 3);
+  assert.equal(save.stones, 105);
+  assert.equal(train(save, 'vitality'), true);
+  assert.equal(train(save, 'power'), true);
+  assert.equal(save.stones, 15);
+  const before = JSON.stringify(save);
+  assert.equal(forge(save, save.starter), false);
+  assert.equal(JSON.stringify(save), before);
+});
+
+test('十阶炼器含圆满奖励，实际攻击伤害增加百分之二百，旧五阶保留原加成', () => {
+  const damage = (level: number) => {
+    const save = parseSave(JSON.stringify({ ...freshSave(), forge: { sword: level } }));
+    const game = new Game(save, 0, 0, () => 0.5);
+    game.spawnEnemy(0, false, false, { x: 200, y: 0 });
+    game.update(0.01);
+    return game.shots.find((shot) => shot.kind === 'sword')!.damage;
+  };
+  assert.ok(Math.abs(damage(5) / damage(0) - 1.4) < 1e-10);
+  assert.ok(Math.abs(damage(10) / damage(0) - 3) < 1e-10);
+});
+
+test('音量保存，零音量和最大音量均有效，越界值被限制', () => {
+  assert.equal(freshSave().volume, 0.6);
+  for (const volume of [0, 0.37, 1])
+    assert.equal(parseSave(JSON.stringify({ ...freshSave(), volume })).volume, volume);
+  const base = JSON.stringify(freshSave());
+  const patched = (volume: string) =>
+    JSON.stringify({ ...JSON.parse(base), volume: JSON.parse(volume) });
+  assert.equal(parseSave(patched('-1')).volume, 0);
+  assert.equal(parseSave(patched('8')).volume, 1);
+  assert.equal(parseSave(patched('"bad"')).volume, 0.6);
+});
+
+test('新角色默认静音，存档解析仍保留显式声音设置', () => {
+  assert.equal(freshSave().sound, false);
+  assert.equal(parseSave(null).sound, false);
+  assert.equal(parseSave('{"version":1,"schema":12}').sound, false);
+  for (const sound of [false, true])
+    assert.equal(parseSave(JSON.stringify({ ...freshSave(), sound })).sound, sound);
+});
+
+test('金系入门收藏青霄剑与追魂钉，未收藏法宝不能炼器但仍可局内领悟', () => {
+  const save = freshSave();
+  assert.deepEqual(save.artifacts, ['sword', 'nail']);
+  save.stones = save.iron = 9999;
+  assert.equal(forge(save, 'orbit'), false);
+  assert.equal(save.stones, 9999);
+  assert.equal(forge(save, 'sword'), true);
+  const g = new Game(save, 0, 0);
+  const offered = new Set<string>();
+  for (let i = 0; i < 500; i++)
+    for (const c of g.makeChoices()) if (c.type === 'weapon') offered.add(c.id);
+  assert.equal(offered.size, TREASURES.length);
+  save.starter = 'orbit';
+  assert.equal(new Game(save, 0, 0).weapons[0].id, 'sword');
+  save.path = 'demonic';
+  assert.equal(new Game(save, 0, 0).weapons[0].id, 'nail');
+});
+
+test('五行各路线仅赠对应两件入门法宝，刷新、导入与续局不额外赠送金系法宝', () => {
+  for (const element of ELEMENTS) {
+    for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+      const save = freshSave('heaven', [element.id], path, () => 0.5);
+      const expected = ROOT_STARTERS[element.id];
+      assert.deepEqual(save.artifacts, expected);
+      assert.equal(save.starter, expected[path === 'demonic' ? 1 : 0]);
+      const game = new Game(save, 0, 0, () => 0.5);
+      assert.deepEqual(
+        game.weapons.map((w) => w.id),
+        [save.starter],
+      );
+      const loaded = parseSave(JSON.stringify(save));
+      assert.deepEqual(loaded.artifacts, expected);
+      assert.equal(loaded.starter, save.starter);
+      const restored = Game.restore(loaded, JSON.parse(JSON.stringify(game.snapshot())))!;
+      assert.ok(restored);
+      assert.deepEqual(
+        restored.weapons.map((w) => w.id),
+        [save.starter],
+      );
+      if (element.id !== 'metal') {
+        loaded.stones = loaded.iron = 9999;
+        assert.equal(forge(loaded, 'sword'), false);
+        assert.equal(forge(loaded, 'nail'), false);
+        assert.equal(loaded.stones, 9999);
+        assert.equal(loaded.iron, 9999);
+      }
+    }
+  }
+});
+
+test('无灵根每种随机本命仅收藏对应五行两件，反复读档不补金系也不重抽本命', () => {
+  for (const path of ['orthodox', 'demonic', 'dual'] as const) {
+    const candidates =
+      path === 'dual'
+        ? Object.values(ROOT_STARTERS).flat()
+        : Object.values(ROOT_STARTERS).map((pair) => pair[path === 'demonic' ? 1 : 0]);
+    for (let i = 0; i < candidates.length; i++) {
+      let save = freshSave('none', [], path, () => (i + 0.1) / candidates.length);
+      const starter = candidates[i];
+      const expected = ROOT_STARTERS[treasure(starter).element];
+      assert.equal(save.starter, starter);
+      assert.deepEqual(save.artifacts, expected);
+      for (let reload = 0; reload < 3; reload++) {
+        save = parseSave(JSON.stringify(save), () => {
+          throw new Error('已有无灵根本命不得重抽');
+        });
+        assert.equal(save.starter, starter);
+        assert.deepEqual(save.rootElements, []);
+        assert.deepEqual(save.artifacts, expected);
+        assert.equal(new Game(save, 0, 0).weapons[0].id, starter);
+      }
+    }
+  }
+});
+
+test('非金系档已收藏的青霄剑、追魂钉和炼器保留', () => {
+  const save = freshSave('heaven', ['wood'], 'orthodox', () => 0.5);
+  save.artifacts.push('sword', 'nail', 'orbit');
+  save.forge.sword = 7;
+  save.forge.nail = 3;
+  save.stones = 1234;
+  const loaded = parseSave(JSON.stringify(save));
+  assert.deepEqual(new Set(loaded.artifacts), new Set(save.artifacts));
+  assert.equal(loaded.forge.sword, 7);
+  assert.equal(loaded.forge.nail, 3);
+  assert.equal(loaded.stones, 1234);
+  assert.equal(loaded.starter, 'fan');
+});
+
+test('无灵根领取遗宝再改选本命，刷新不按新本命五行额外赠宝', () => {
+  for (const [roll, id] of [
+    [0, 'orbit'],
+    [0.99, 'sword'],
+  ] as const) {
+    const save = freshSave('none', [], 'orthodox', () => roll);
+    save.artifactDrops.push(id);
+    assert.deepEqual(claimArtifacts(save), [id]);
+    save.starter = id;
+    const expected = [...save.artifacts];
+    for (let reload = 0; reload < 3; reload++) {
+      const loaded = parseSave(JSON.stringify(save));
+      assert.deepEqual(loaded.artifacts, expected);
+      assert.equal(loaded.starter, id);
+      assert.equal(new Game(loaded, 0, 0).weapons[0].id, id);
+      Object.assign(save, loaded);
+    }
+  }
+});
+
+test('只有击败妖王才掉三件未拥有法宝，收入藏器阁，收齐后不重复掉落', () => {
+  const save = freshSave();
+  const g = new Game(save, 6, 0, () => 0.5);
+  const small = g.spawnEnemy(0, true);
+  g.hitEnemy(small, 1e9);
+  assert.deepEqual(save.artifactDrops, []);
+  assert.equal(save.artifacts.length, 2);
+  for (let i = 0; i < 12; i++) {
+    g.hitEnemy(g.spawnEnemy(10, false, true, undefined, 0), 1e9);
+    assert.equal(new Set(save.artifacts).size, Math.min(36, 2 + (i + 1) * 3));
+    assert.deepEqual(save.artifactDrops, []);
+  }
+  const reloaded = parseSave(JSON.stringify(save));
+  assert.equal(reloaded.artifacts.length, 36);
+  assert.deepEqual(claimArtifacts(reloaded), []);
+  assert.deepEqual(reloaded.artifactDrops, []);
+  assert.equal(reloaded.chronicle.entries.filter((e) => e.title === '万宝归藏').length, 1);
+});
+
+test('手动与自动历练击败妖王后立即解锁炼器，重复击杀和续局不重复入库', () => {
+  for (const autoplay of [false, true]) {
+    const save = freshSave();
+    save.autoplay = autoplay;
+    save.unlocked = 6;
+    save.stones = save.iron = 1000;
+    const g = new Game(save, 6, 0, () => 0.5);
+    g.time = 90;
+    g.trialBossesSpawned = 1;
+    const boss = g.spawnEnemy(10, false, true, undefined, 0);
+    g.hitEnemy(boss, 1e9);
+    const id = save.artifacts.find((id) => !['sword', 'nail'].includes(id))!;
+    assert.ok(id);
+    assert.equal(forge(save, id), true);
+    g.hitEnemy(boss, 1e9);
+    assert.equal(save.artifacts.length, 5);
+    const restored = Game.restore(save, JSON.parse(JSON.stringify(g.snapshot())))!;
+    assert.ok(restored);
+    assert.equal(save.artifacts.length, 5);
+    assert.equal(save.chronicle.entries.filter((e) => e.title === '妖王遗宝').length, 1);
+  }
+});
+
+test('无效与重复收藏被过滤，炼器与收藏跨刷新保留', () => {
+  const save = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
+  save.artifacts.push('lightning');
+  save.forge.lightning = 3;
+  save.starter = 'lightning';
+  const parsed = parseSave(
+    JSON.stringify({
+      ...save,
+      artifacts: [...save.artifacts, 'nail', 'invalid', 'nail'],
+      artifactDrops: ['orbit', 'orbit', 'nail', 'bad'],
+    }),
+  );
+  assert.deepEqual(parsed.artifacts, ['sword', 'nail', 'lightning', 'orbit']);
+  assert.deepEqual(parsed.artifactDrops, []);
+  assert.equal(parsed.starter, 'lightning');
+  assert.equal(parsed.forge.lightning, 3);
+  assert.deepEqual(parseSave(JSON.stringify(parsed)), parsed);
+});
+
+test('后期强怪、精英和妖王给予递增灵气与修为，续局结算不重复入账', () => {
+  function kill(stage: number, elite = false, boss = false) {
+    const save = freshSave();
+    save.unlocked = 6;
+    const g = new Game(save, stage, 0, () => 0.5);
+    const e = g.spawnEnemy(stage === 0 ? 0 : 64, elite, boss);
+    g.hitEnemy(e, 1e9);
+    return g;
+  }
+  const low = kill(0),
+    high = kill(5),
+    elite = kill(5, true),
+    boss = kill(5, false, true);
+  assert.ok(high.combatCultivation + 0.7 > (low.combatCultivation + 0.7) * 5);
+  assert.ok(elite.save.cultivation > high.save.cultivation);
+  assert.ok(high.pickups.find((p) => p.kind === 'xp')!.value > low.pickups[0].value);
+  assert.ok(boss.save.cultivation >= 3000);
+  assert.ok(boss.level >= 10);
+  const restored = Game.restore(high.save, JSON.parse(JSON.stringify(high.snapshot())))!;
+  assert.ok(restored);
+  assert.equal(restored.combatCultivation, high.combatCultivation);
+  const credited = high.save.cultivation;
+  const rewards = settleRun(high.save, { ...restored.snapshot(), victory: false });
+  assert.equal(rewards.cultivationRemaining, 0);
+  assert.equal(high.save.cultivation, credited);
+});
+
+test('终关取消回血丹掉落，前六境仍可掉落；终关旧续局的丹药被移除', () => {
+  for (const stage of [0, 6]) {
+    const save = freshSave();
+    save.unlocked = 6;
+    const g = new Game(save, stage, 0, () => 0.5);
+    const e = g.spawnEnemy(0);
+    const rolls = stage === 6 ? [0.5, 0.001] : [0.001];
+    g.random = () => rolls.shift() ?? 0.001;
+    g.hitEnemy(e, 1e9);
+    assert.equal(
+      g.pickups.some((p) => p.kind === 'heal'),
+      stage !== 6,
+    );
+    g.pickups.push({ kind: 'heal', value: 1, x: 0, y: 0, pull: true });
+    const restored = Game.restore(save, JSON.parse(JSON.stringify(g.snapshot())))!;
+    assert.ok(restored);
+    assert.equal(
+      restored.pickups.some((p) => p.kind === 'heal'),
+      stage !== 6,
+    );
+  }
+});
+
+test('终关丹药与宝匣均不回血，前六境分别回30%与5%，宝匣仍升阶法宝给玄铁', () => {
+  for (const stage of [0, 1, 2, 3, 4, 5, 6]) {
+    for (const kind of ['heal', 'chest'] as const) {
+      const g = new Game(freshSave(), stage, 0, () => 0.5);
+      g.player.hp = 10;
+      g.weapons[0].timer = 999;
+      g.pickups = [{ kind, value: 1, x: 0, y: 0, pull: true }];
+      const regen = g.stats.regen * 0.01;
+      g.update(0.01);
+      if (stage === 6) assert.ok(Math.abs(g.player.hp - 10 - regen) < 1e-6);
+      else
+        assert.ok(
+          Math.abs(g.player.hp - 10 - regen - g.player.maxHp * (kind === 'heal' ? 0.3 : 0.05)) <
+            1e-6,
+        );
+      if (kind === 'chest') {
+        assert.equal(g.weapons[0].level, 2);
+        assert.equal(g.iron, 2);
+      }
+    }
+  }
+});

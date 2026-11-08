@@ -10,10 +10,10 @@ import {
   validHouseAdConfig,
   weightedHouseAd,
   type HouseAdConfig,
-} from '../../src/house-ad-contract.ts';
+} from '../../src/ads/house-ad-contract.ts';
 import { adAdminSession, adAuthAction } from './auth.ts';
 import { ADMIN_HTML, ADMIN_SCRIPT, ADMIN_CSS, LOGIN_HTML, LOGIN_SCRIPT } from './admin.ts';
-import { adSellerLine } from '../../src/ad-platform-contract.ts';
+import { adSellerLine } from '../../src/ads/ad-platform-contract.ts';
 import { adMetrics, issueAdReceipt, recordAdMetrics, validAdMetricEvent } from './metrics.ts';
 import { AD_API_GUIDE, houseAdsOpenApi } from './api.ts';
 import { validateCampaignImages } from './images.ts';

@@ -78,9 +78,9 @@ jobs:
       - name: Build production site for browser checks
         run: npm run build -- --base "$BASE_PATH/"
       - name: Check complete production build size
-        run: node --experimental-strip-types scripts/size-check.ts --dir dist
+        run: node --experimental-strip-types scripts/build/size-check.ts --dir dist
       - name: Install isolated browser regression tools
-        run: npm ci --prefix scripts/browser-tools
+        run: npm ci --prefix scripts/ui/browser-tools
       - name: Check desktop and mobile interfaces
         run: |
           npm run preview -- --base "$BASE_PATH/" --port 5173 --strictPort > "$RUNNER_TEMP/qinglan-ui-preview.log" 2>&1 &
@@ -114,7 +114,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm ci --prefix scripts/browser-tools
+      - run: npm ci --prefix scripts/ui/browser-tools
       - run: npm run build -- --base "$BASE_PATH/"
       - name: Check native safe areas through MCP
         run: |
@@ -149,5 +149,5 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:standalone -- --outDir artifacts/standalone --emptyOutDir
-      - run: node --experimental-strip-types scripts/size-check.ts --dir artifacts/standalone
-      - run: node --experimental-strip-types scripts/standalone-check.ts artifacts/standalone
+      - run: node --experimental-strip-types scripts/build/size-check.ts --dir artifacts/standalone
+      - run: node --experimental-strip-types scripts/build/standalone-check.ts artifacts/standalone

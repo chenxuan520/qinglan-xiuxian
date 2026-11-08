@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
-import { offlineBuild } from './scripts/offline-build.ts';
+import { offlineBuild } from './scripts/build/offline-build.ts';
 
 // 构建时注入 git describe 版本字符串（与 roadbook 的 update_version.sh 同口径），
 // 展示在关于面板；构建选项仍由命令行参数决定，本文件不覆盖。

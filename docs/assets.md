@@ -2,18 +2,18 @@
 
 ## 社交分享卡片封面（2026-10-10）
 
-`public/assets/og-cover.jpg` 由 `python3 scripts/generate-og-image.py` 生成（需要 Pillow）：取 `qinglan-prologue-dark.webp`（黄昏山门全景，与深色主视觉同系）按宽度等比缩放后垂直居中裁成标准的 1200 × 630，以质量 85 存成 JPEG 约 200 KiB。分享抓取器对 JPEG 支持最完备，不在此处压成 WebP。index.html 的 canonical、Open Graph 与 Twitter 卡片标签固定指向唯一官网 `https://xiuxian.011203.xyz/`（含图绝对地址与尺寸声明），`tests/social-meta.test.ts` 校验标签内容与封面文件一致性。更换主视觉时改脚本里的来源并重跑。
+`public/assets/og-cover.jpg` 由 `python3 scripts/assets/generate-og-image.py` 生成（需要 Pillow）：取 `qinglan-prologue-dark.webp`（黄昏山门全景，与深色主视觉同系）按宽度等比缩放后垂直居中裁成标准的 1200 × 630，以质量 85 存成 JPEG 约 200 KiB。分享抓取器对 JPEG 支持最完备，不在此处压成 WebP。index.html 的 canonical、Open Graph 与 Twitter 卡片标签固定指向唯一官网 `https://xiuxian.011203.xyz/`（含图绝对地址与尺寸声明），`tests/services/social-meta.test.ts` 校验标签内容与封面文件一致性。更换主视觉时改脚本里的来源并重跑。
 
 ## 正魔兼修人物立绘（2026-10-10）
 
-正道保留 `characters.webp` 第零格的青衣执剑少年；魔道为黑红衣袍、单手持万魂幡，兼修为黑白青玉衣袍、单手托阴阳盘，均保留原人物的脸、发髻与金冠。两张新图由内置 imagegen 参考原角色生成，使用 `python3 scripts/compress-assets.py` 压缩，保持 1086 × 1448 尺寸与逐像素相同的 alpha 通道。
+正道保留 `characters.webp` 第零格的青衣执剑少年；魔道为黑红衣袍、单手持万魂幡，兼修为黑白青玉衣袍、单手托阴阳盘，均保留原人物的脸、发髻与金冠。两张新图由内置 imagegen 参考原角色生成，使用 `python3 scripts/assets/compress-assets.py` 压缩，保持 1086 × 1448 尺寸与逐像素相同的 alpha 通道。
 
 | 素材                  |       PNG 原图 |    WebP 成品 |
 | --------------------- | -------------: | -----------: |
 | `player-demonic.webp` | 1,919,965 字节 | 320,706 字节 |
 | `player-dual.webp`    | 1,984,932 字节 | 262,040 字节 |
 
-合计减少 85.1%，项目只保存 WebP。`src/player-appearance.ts` 统一静态图片与取景，首页、元婴分身、战斗、小镇和此世留影共用，不再运行衣袍染色或生成 data URL。首次场景加载与城镇加载均预载三种形象；路线切换复用已加载图片，旧续局继续按本局路线显示。人物在 Canvas 中沿用缩放缓存，不在每帧重新处理像素。
+合计减少 85.1%，项目只保存 WebP。`src/battle/player-appearance.ts` 统一静态图片与取景，首页、元婴分身、战斗、小镇和此世留影共用，不再运行衣袍染色或生成 data URL。首次场景加载与城镇加载均预载三种形象；路线切换复用已加载图片，旧续局继续按本局路线显示。人物在 Canvas 中沿用缩放缓存，不在每帧重新处理像素。
 
 兼修原图中的人物占比更大，统一按 90% 居中显示；正道、魔道保持原尺寸。CSS 肖像、小镇与 Canvas 首页、战斗、分身及留影使用同一比例，图片尺寸和资源预载不变。
 
@@ -21,9 +21,9 @@
 
 ## PWA 与主屏幕图标（2026-10-10）
 
-`public/icons/` 的 PNG 由 `python3 scripts/generate-icons.py` 生成（需要 Pillow），图案与 `public/favicon.svg` 同源同配色：manifest 用图保留圆角与透明角；maskable 满幅铺底并把画作缩进 76% 安全区，供系统圆形裁切；apple-touch-icon（180×180）满幅铺底，画作缩至 90%，避免 iOS 把透明角填黑。PNG 是 Web App Manifest 与苹果主屏幕的硬性格式要求，不经 `compress-assets.py` 转 WebP。调整标志时同步更新 `favicon.svg` 与脚本中的几何常量，再重跑脚本；`tests/pwa.test.ts` 校验 manifest 声明与图标文件尺寸一致。
+`public/icons/` 的 PNG 由 `python3 scripts/assets/generate-icons.py` 生成（需要 Pillow），图案与 `public/favicon.svg` 同源同配色：manifest 用图保留圆角与透明角；maskable 满幅铺底并把画作缩进 76% 安全区，供系统圆形裁切；apple-touch-icon（180×180）满幅铺底，画作缩至 90%，避免 iOS 把透明角填黑。PNG 是 Web App Manifest 与苹果主屏幕的硬性格式要求，不经 `compress-assets.py` 转 WebP。调整标志时同步更新 `favicon.svg` 与脚本中的几何常量，再重跑脚本；`tests/services/pwa.test.ts` 校验 manifest 声明与图标文件尺寸一致。
 
-2026-10-27 起图案改为与 `favicon.svg` 同源的山门、玉月与远山；满幅版的门柱和远山延伸到画布底边，远山限制在门洞内。替换四张 PNG 经用户明确批准，新版散列登记在 `scripts/check-binaries.ts` 的 `EXPLICITLY_APPROVED_ART`，原基线 `approved-binaries.json` 未改动，旧版仍可通过以保证历史提交检查。
+2026-10-27 起图案改为与 `favicon.svg` 同源的山门、玉月与远山；满幅版的门柱和远山延伸到画布底边，远山限制在门洞内。替换四张 PNG 经用户明确批准，新版散列登记在 `scripts/assets/check-binaries.ts` 的 `EXPLICITLY_APPROVED_ART`，原基线 `approved-binaries.json` 未改动，旧版仍可通过以保证历史提交检查。
 
 ## 二进制资源与构建体积约束
 
@@ -33,11 +33,11 @@
 
 ## 周天星轨 · Canvas 绘制
 
-周天星轨由 `src/regional-render.ts` 使用 Canvas 几何绘制，无独立图片素材。预警期保留虚线与每道三个旋向箭头；生效期绘制星轨本体及危险边界，取消身后透明度0.25的淡色残影。原生劫灵、终关劫灵及仙尊借用周天星轨共用该绘制逻辑。
+周天星轨由 `src/battle/regional-render.ts` 使用 Canvas 几何绘制，无独立图片素材。预警期保留虚线与每道三个旋向箭头；生效期绘制星轨本体及危险边界，取消身后透明度0.25的淡色残影。原生劫灵、终关劫灵及仙尊借用周天星轨共用该绘制逻辑。
 
 ## 微信赞赏码 · 关于面板与轮回确认（2026-10-04）
 
-路径：`public/assets/support-wechat.webp`，由作者提供的微信赞赏码截图裁出码的部分，不含顶部窗口栏、引导语与底部横幅，四周留约 8% 白边。赞赏码是微信小程序码，不是标准二维码（`jsqr` 无法解码），也无法用 `uqr` 重新生成，只能使用原图；更换时直接替换该文件，路径常量为 `src/setting.ts` 的 `SUPPORT_CODE_IMAGE`。按作者要求改为深底白点的反色码：按亮度把白底转为透明、黑色码点转为柔白 `#f4f4ee` 并以透明度保留抗锯齿，两端截去 JPEG 噪点；中央头像与右下点赞角标按区域保护、保持原色不透明，头像圆角外与角标外圈的残留白色随底色一并透明。关于面板直接透出面板渐变背景；终章正文不显示赞赏码，通关后的「再问长生」轮回确认窗口使用深绿圆角底。462 × 462 RGBA，经现有压缩脚本 quality=82、透明通道无损转为 WebP，104,968 字节 PNG 压至 23,010 字节（减少 78.1%），不保留 PNG。作者已用手机微信实际扫描反色版确认可识别。码中央的头像为作者本人的微信头像。
+路径：`public/assets/support-wechat.webp`，由作者提供的微信赞赏码截图裁出码的部分，不含顶部窗口栏、引导语与底部横幅，四周留约 8% 白边。赞赏码是微信小程序码，不是标准二维码（`jsqr` 无法解码），也无法用 `uqr` 重新生成，只能使用原图；更换时直接替换该文件，路径常量为 `src/core/setting.ts` 的 `SUPPORT_CODE_IMAGE`。按作者要求改为深底白点的反色码：按亮度把白底转为透明、黑色码点转为柔白 `#f4f4ee` 并以透明度保留抗锯齿，两端截去 JPEG 噪点；中央头像与右下点赞角标按区域保护、保持原色不透明，头像圆角外与角标外圈的残留白色随底色一并透明。关于面板直接透出面板渐变背景；终章正文不显示赞赏码，通关后的「再问长生」轮回确认窗口使用深绿圆角底。462 × 462 RGBA，经现有压缩脚本 quality=82、透明通道无损转为 WebP，104,968 字节 PNG 压至 23,010 字节（减少 78.1%），不保留 PNG。作者已用手机微信实际扫描反色版确认可识别。码中央的头像为作者本人的微信头像。
 
 ## 仙途山河图 · 首页选关（2026-09-23）
 
@@ -49,7 +49,7 @@
 
 ## 二十八种丹药图集（2026-09-21）
 
-内置 imagegen 生成 `public/assets/medicines.webp`：八列四行，前三行各八种，第四行左侧四种本世珍品，其余四格留空，严格按 `src/medicine-data.ts` 顺序映射。统一手绘瓷瓶、玉盏、灵丹风格，全部为图片图标，不混用 SVG。项目只保留最终 WebP。
+内置 imagegen 生成 `public/assets/medicines.webp`：八列四行，前三行各八种，第四行左侧四种本世珍品，其余四格留空，严格按 `src/items/medicine-data.ts` 顺序映射。统一手绘瓷瓶、玉盏、灵丹风格，全部为图片图标，不混用 SVG。项目只保留最终 WebP。
 
 原图 1774 × 887 RGBA、1,935,095 字节；按网页图标用途缩至 1024 × 512，WebP quality=78、method=6、保留透明通道，204,474 字节，减少约 89.4%。每格 128 × 128，页面展示 72 × 72。图集加入初始资源预载，与法宝图集共用基础路径处理。
 
@@ -86,14 +86,14 @@ Use case: lighting-weather. Edit the provided panoramic Chinese xianxia painting
 运行资源统一为 WebP，`public/assets/` 不保留未压缩 PNG。原有 25 张图片从 68,873,273 字节压缩到 9,217,774 字节（减少 86.6%）；原尺寸不变，RGBA 素材逐像素校验 alpha 通道无损。纹理 quality=75，角色与图集 quality=82，method=6。需要 Pillow 的生成维护命令：
 
 ```bash
-python3 scripts/compress-assets.py
+python3 scripts/assets/compress-assets.py
 ```
 
 脚本先写临时文件，检查尺寸、透明通道和体积，通过后原子替换 WebP，再移除对应 PNG；不会让构建读到编码中的半成品。原始 imagegen 输出仍在工具生成目录，项目只携带压缩成品。首境预载 8 张图、约 2.51 MB；其他秘境只补齐对应地图和妖物，旧续局额外在场妖物也补载。城镇和宗门按需加载，音乐独立加载；新玩家会在序章期间按顺序预热离乡城镇图，进入小镇时命中缓存或继续显示现有加载层。老玩家及按需加载仍以场景进度条全部完成才允许开局或入城计龄，失败可重试；新玩家后台准备第一境场景素材失败时，回到首页或开战会改用现有加载层重试。
 
 ## 青岚镇模块化素材（2026-09-20）
 
-地图为 3600 × 2500 世界坐标，由 `src/town.ts` 摆放街道、28 栋建筑与港口杂物，镜头跟随玩家；扩展街区只需增加道路、建筑及事件坐标。没有使用一整张城镇背景放大。新图由内置 imagegen 生成，保留透明边缘、尺寸与格子顺序后压缩；九位具名镇民与街上行人共用同一图集，行人做小幅饱和度与明暗变化。
+地图为 3600 × 2500 世界坐标，由 `src/town/town.ts` 摆放街道、28 栋建筑与港口杂物，镜头跟随玩家；扩展街区只需增加道路、建筑及事件坐标。没有使用一整张城镇背景放大。新图由内置 imagegen 生成，保留透明边缘、尺寸与格子顺序后压缩；九位具名镇民与街上行人共用同一图集，行人做小幅饱和度与明暗变化。
 
 - `town-buildings.webp`：1254 × 1254 RGBA，3 × 3，472,856 字节。按行：药铺、茶馆、镖局；民居院落、铁匠铺、书铺；鱼市、粮蔬铺、裁缝铺。
 - `town-props.webp`：1536 × 1024 RGBA，3 × 2，313,364 字节。按行：树、菜摊、灯笼架；渔船、木栈桥、晾衣架。船只跨过规则格边，因此船与栈桥按实际边界分别取景，避免相邻碎片。
@@ -135,7 +135,7 @@ Use case: stylized-concept. Asset type: one production-ready transparent PNG arc
 可在安装了 Python 3、numpy 的 macOS 上使用系统 `afconvert` 重新生成：
 
 ```bash
-python3 scripts/generate-music.py
+python3 scripts/assets/generate-music.py
 ```
 
 生成使用固定随机种子，临时 WAV 自动清理。运行和部署直接使用已提交的 M4A 文件，不需要 Python 或音频编码器。每次进入页面先静音，序章右上角和主界面提供开启声音按钮；普通点击 / 按键不触发播放。音乐和战斗音效共用总音量与静音，保留音量，导入存档不自动打开声音。
@@ -158,7 +158,7 @@ Use case: stylized-concept. Asset type: seamless square ground texture for the F
 
 ## 各境专属妖物扩充（2026-09-19）
 
-本轮使用内置 imagegen 生成 44 个地域进阶种，五张图集均为 1536 × 1024 RGBA PNG，已检查实际透明通道。古墟为 6 列 × 2 行，其余为 4 列 × 2 行；顺序与 `src/data.ts` 中地域进阶种一致。先落盘验证，再接入加载清单。最终提示词如下。
+本轮使用内置 imagegen 生成 44 个地域进阶种，五张图集均为 1536 × 1024 RGBA PNG，已检查实际透明通道。古墟为 6 列 × 2 行，其余为 4 列 × 2 行；顺序与 `src/core/data.ts` 中地域进阶种一致。先落盘验证，再接入加载清单。最终提示词如下。
 
 ### enemies-ruins.webp
 
@@ -208,13 +208,13 @@ Use case: stylized-concept. Asset type: transparent PNG sprite atlas for a polis
 | `public/assets/characters.webp`       | 主角及基础妖物，4 列 × 2 行         | 1536 × 1024，透明 PNG |
 | `public/assets/enemies-distinct.webp` | 独立妖物变体与九幽冥主，3 列 × 2 行 | 1536 × 1024，透明 PNG |
 
-法宝与功法图标统一使用生成图集，法术特效使用 Canvas 绘制。妖物图集的裁切定义统一在 `src/sprites.ts`，图鉴与战斗共用，避免映射不一致。
+法宝与功法图标统一使用生成图集，法术特效使用 Canvas 绘制。妖物图集的裁切定义统一在 `src/battle/sprites.ts`，图鉴与战斗共用，避免映射不一致。
 
 ## 扩展图集：法宝、功法与高阶妖物
 
-均通过内置 `image_gen.imagegen` 生成。法宝图集 1–3 为 1448 × 1086、4 列 × 3 行；功法图集为 1254 × 1254、4 列 × 4 行。所有法宝和功法图标统一读取图片，不再使用 SVG 物品图标。物品按 `TREASURES` / `PASSIVES` 顺序映射，见 `src/item-art.ts`。
+均通过内置 `image_gen.imagegen` 生成。法宝图集 1–3 为 1448 × 1086、4 列 × 3 行；功法图集为 1254 × 1254、4 列 × 4 行。所有法宝和功法图标统一读取图片，不再使用 SVG 物品图标。物品按 `TREASURES` / `PASSIVES` 顺序映射，见 `src/items/item-art.ts`。
 
-高阶妖物图集 1–2 为 1536 × 1024、4 列 × 2 行；六境妖王为 1536 × 1024、3 列 × 2 行。三个角色图集保留真实 alpha 通道，使用 `src/sprites.ts` 的统一映射，战斗与妖物志共用。已有角色图集继续保留，保证旧存档和旧妖物可用。
+高阶妖物图集 1–2 为 1536 × 1024、4 列 × 2 行；六境妖王为 1536 × 1024、3 列 × 2 行。三个角色图集保留真实 alpha 通道，使用 `src/battle/sprites.ts` 的统一映射，战斗与妖物志共用。已有角色图集继续保留，保证旧存档和旧妖物可用。
 
 ### treasures-1.webp
 
@@ -302,7 +302,7 @@ Use case: background-extraction. EDIT THIS EXACT ATLAS. Keep all six character i
 
 ## 各秘境独立地面
 
-青岚竹海沿用 `terrain.webp`；其余五境由内置工具分别生成独立纹理，均为 1254 × 1254 PNG，保存于 `public/assets/`。关卡通过 `src/data.ts` 的 `terrain` 字段选择实际背景，战斗和选关预览共用。
+青岚竹海沿用 `terrain.webp`；其余五境由内置工具分别生成独立纹理，均为 1254 × 1254 PNG，保存于 `public/assets/`。关卡通过 `src/core/data.ts` 的 `terrain` 字段选择实际背景，战斗和选关预览共用。
 
 ### terrain-ruins.webp
 
@@ -342,7 +342,7 @@ Use case: stylized-concept. Asset type: one square seamless terrain texture for 
 
 `public/assets/sect-market-buildings.webp` 为独立九宫格建筑，采用青玉瓦、白石台基与青铜器具，区别于青岚镇民居。包括丹阁、拍卖楼、法器阁、符箓摊、小院、门楼、两类行馆与游商摊；现有功能入口仍由场内修士及拍卖行提供，装饰建筑不新增玩法。仅生成建筑，地板、树木、灯笼和三类修士继续复用已有素材。
 
-按用户要求缩至 768 × 768，再经 `scripts/compress-assets.py` 以 WebP quality=65、method=6 压缩，保留输入 alpha；整张 225512 字节，约 220.2 KiB，低于 250000 字节。`src/market-art.ts` 按完整屋檐取景，避免拍卖楼宽屋檐被等宽切片裁掉。原始 PNG 与验证截图仅保留在工作区临时目录，不提交 Git。
+按用户要求缩至 768 × 768，再经 `scripts/assets/compress-assets.py` 以 WebP quality=65、method=6 压缩，保留输入 alpha；整张 225512 字节，约 220.2 KiB，低于 250000 字节。`src/market/market-art.ts` 按完整屋檐取景，避免拍卖楼宽屋檐被等宽切片裁掉。原始 PNG 与验证截图仅保留在工作区临时目录，不提交 Git。
 
 ## 奇物九宫格
 

@@ -1,0 +1,128 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Game } from '../../src/battle/game.ts';
+import { freshSave } from '../../src/core/progress.ts';
+import { PASSIVES } from '../../src/core/data.ts';
+import { joinSect } from '../../src/town/mortal.ts';
+
+const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
+function learn(g: Game, id: string, level = 5) {
+  g.state = 'upgrade';
+  g.choices = [{ type: 'passive', id, level }];
+  assert.equal(g.choose(0), true);
+}
+
+test('八本魔功分别增强专长并承担代价，正道数值保留', () => {
+  const checks: Record<string, (g: Game) => void> = {
+    blood: (g) => {
+      near(g.stats.damage, 1.9);
+      near(g.stats.armor, 1.15);
+    },
+    frenzy: (g) => {
+      near(g.stats.cooldown, 0.6);
+      assert.equal(g.player.maxHp, 90);
+      g.player.hp = 40;
+      near(g.stats.cooldown, 0.5);
+      near(g.stats.speed, 210);
+    },
+    abyss: (g) => {
+      near(g.stats.area, 1.8);
+      near(g.stats.damage, 0.9);
+    },
+    bone: (g) => {
+      assert.equal(g.player.maxHp, 190);
+      near(g.stats.speed, 166.25);
+    },
+    devour: (g) => {
+      near(g.stats.duration, 2);
+      near(g.stats.killHeal, 0.25);
+      near(g.stats.regen, 0.144);
+    },
+    curse: (g) => {
+      near(g.stats.crit, 0.47);
+      near(g.stats.criticalDamage, 2.4);
+      near(g.stats.armor, 1.075);
+    },
+    soul: (g) => {
+      near(g.stats.xp, 1.5);
+      near(g.stats.cooldown, 1.05);
+    },
+    forbidden: (g) => {
+      near(g.stats.xp, 1.9);
+      near(g.stats.damage, 1.4);
+      near(g.stats.armor, 1.075);
+    },
+  };
+  for (const p of PASSIVES.filter((p) => p.school === 'demonic')) {
+    assert.doesNotMatch(p.desc, /代价[:：]/);
+    const g = new Game(freshSave(), 0, 0);
+    learn(g, p.id);
+    checks[p.id](g);
+  }
+  const g = new Game(freshSave(), 0, 0);
+  for (const id of ['power', 'haste', 'guard', 'duration']) learn(g, id);
+  near(g.stats.damage, 1.6);
+  near(g.stats.cooldown, 0.65);
+  near(g.stats.armor, 0.7);
+  near(g.stats.regen, 0.93);
+  assert.equal(g.player.maxHp, 150);
+});
+
+test('魔道精研只增强收益，不扩大气血、移速、承伤、恢复或施法代价', () => {
+  for (const p of PASSIVES.filter((p) => p.school === 'demonic')) {
+    const s = freshSave();
+    s.cultivation = 1e9;
+    s.completed = [6];
+    s.stones = 1000;
+    joinSect(s, p.id);
+    const g = new Game(s, 0, 0);
+    learn(g, p.id);
+    const before = g.stats,
+      hp = g.player.maxHp;
+    s.mortal.mastery[p.id] = 10;
+    const upgraded = Game.restore(s, g.snapshot())!;
+    near(upgraded.stats.armor, before.armor);
+    if (p.id === 'bone') {
+      assert.ok(upgraded.player.maxHp > hp);
+      near(upgraded.stats.speed, before.speed);
+    }
+    if (p.id === 'frenzy') {
+      assert.equal(upgraded.player.maxHp, hp);
+      assert.ok(upgraded.stats.cooldown < before.cooldown);
+    }
+    if (p.id === 'devour') {
+      near(upgraded.stats.regen, before.regen);
+      assert.ok(upgraded.stats.killHeal > before.killHeal);
+    }
+    if (p.id === 'abyss') {
+      near(upgraded.stats.damage, before.damage);
+      assert.ok(upgraded.stats.area > before.area);
+    }
+    if (p.id === 'soul') {
+      near(upgraded.stats.cooldown, before.cooldown);
+      assert.ok(upgraded.stats.xp > before.xp);
+    }
+  }
+});
+
+test('所有七十种四魔功满重组合保持可移动、可回血及承伤边界', () => {
+  const ids = PASSIVES.filter((p) => p.school === 'demonic').map((p) => p.id);
+  let cases = 0;
+  for (let a = 0; a < 5; a++)
+    for (let b = a + 1; b < 6; b++)
+      for (let c = b + 1; c < 7; c++)
+        for (let d = c + 1; d < 8; d++) {
+          const s = freshSave('none');
+          s.path = 'demonic';
+          const g = new Game(s, 0, 0);
+          const regen = g.stats.regen;
+          for (const i of [a, b, c, d]) learn(g, ids[i]);
+          assert.ok(g.player.maxHp >= 72 && g.player.hp > 0 && g.player.hp <= g.player.maxHp);
+          assert.ok(g.stats.speed >= 133);
+          assert.ok(g.stats.regen >= regen * 0.8);
+          assert.ok(g.stats.armor <= 1.3 + 1e-8);
+          assert.ok(g.stats.cooldown >= 0.3 && g.stats.cooldown <= 1.05);
+          cases++;
+        }
+  assert.equal(cases, 70);
+});

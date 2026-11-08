@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { factsSealInput, FACTS_VERSION } from '../../src/leaderboard-integrity.ts';
+import { factsSealInput, FACTS_VERSION } from '../../src/leaderboard/leaderboard-integrity.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import worker, { type LeaderboardWorkerEnv } from '../../workers/leaderboard/index.ts';

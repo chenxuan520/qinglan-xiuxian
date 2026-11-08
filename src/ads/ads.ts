@@ -1,0 +1,142 @@
+import { STANDALONE } from '../core/build-mode.ts';
+// 激励广告供给层：复活、自选灵根、物资补给、借寿四个广告位共用一套 provider 接口。
+// main.ts 只管界面（占位倒计时与领取按钮），provider 决定「什么时刻算看完」：
+// 占位 provider 走 5 秒倒计时（无 SDK 的默认行为），真实 SDK provider 以看完回调解锁。
+// 供给由广告平台按需选择；新增适配器同步平台协议和后台配置，任何 provider 不可用都回退占位。
+import { platformAdProvider } from './ads-platform-source.ts';
+export { preloadRewardAds } from './ads-platform-source.ts';
+import { AdLoadTrace } from './ad-load-diagnostics.ts';
+
+export { AD_DURATION_MS, AD_SECONDS } from './ad-rules.ts';
+// 接入次数限制时，按广告位区分单元与额度。
+export type AdPlacement = 'revive' | 'reward-root' | 'reward-supplies' | 'lifespan';
+export const AD_PLACEHOLDER_HTML = '<div class="revive-ad">广告位招租</div>';
+
+export interface RewardAdCallbacks {
+  // 自营成功显示或 Google 开始播放后接管观看时钟。
+  onStarted?(): void;
+  // 广告完整看完，解锁奖励；恰好回调一次。
+  onWatched(onClaim?: () => void): void;
+  // SDK 不可用、加载失败、无库存或被跳过——恰好回调一次，调用方回退占位倒计时。
+  onFailed(reason: string): void;
+}
+
+export interface RewardAdContext {
+  host: HTMLElement;
+  signal: AbortSignal;
+  onProgress(seconds: number): void;
+  trace?: AdLoadTrace;
+}
+
+export interface RewardAdProvider {
+  name: string;
+  loadTimeoutMs?: number;
+  ownsPlaybackClock?: boolean;
+  placementName(placement: AdPlacement): string;
+  // 检测 SDK 可用性（未配置或加载失败返回 false）；false 时调用方走占位，不会调 play。
+  prepare(context?: {
+    placement: AdPlacement;
+    signal: AbortSignal;
+    alive?: () => boolean;
+    trace?: AdLoadTrace;
+  }): Promise<boolean>;
+  play(placement: AdPlacement, callbacks: RewardAdCallbacks, context?: RewardAdContext): void;
+}
+
+// 游戏当前声音状态：main.ts 在初始化与开关声音时同步给广告层，供 SDK 的 sound 参数跟随静音。
+let adSoundOn = false;
+export function setAdSoundEnabled(on: boolean) {
+  adSoundOn = on;
+}
+export function adSoundEnabled() {
+  return adSoundOn;
+}
+
+const placeholderProvider: RewardAdProvider = {
+  name: 'placeholder',
+  placementName: (placement) => placement,
+  prepare: async () => false, // 占位模式没有真实广告可准备，play 不会被调用。
+  play: (_placement, callbacks) => callbacks.onFailed('占位模式，无真实广告'),
+};
+
+export function getAdProvider(): RewardAdProvider {
+  if (STANDALONE) return placeholderProvider;
+  return platformAdProvider();
+}
+
+// 广告播放质量上的超时：无回调等待阈值。任何外部广告库（尤其未过审的 AdSense）都可能完全静默、
+// 不给任何回调信号（吸附/未加载/拒载/未过审全堵不成信号），超时必回退占位倒计时，不把玩家卡死。
+export const AD_WATCH_TIMEOUT_MS = 3000;
+
+export interface WatchPlacementOptions {
+  provider: RewardAdProvider;
+  placement: AdPlacement;
+  // 面板仍存活检查（玩家可能中途关闭/切换面板）；不满足时本次播放结果完全作废。
+  alive(): boolean;
+  onWatched(onClaim?: () => void): void;
+  onFallback(reason: string, noInventory: boolean): void;
+  timeoutMs?: number;
+  host?: HTMLElement;
+  onProgress?(seconds: number): void;
+}
+
+// 触发 provider.prepare → play 的完整一轮，SDK 任何装死/出错都能在 timeoutMs 内落回占位。
+export function watchAdPlacement(options: WatchPlacementOptions): void {
+  const { provider, placement, alive, onWatched, onFallback } = options;
+  const timeoutMs = options.timeoutMs ?? provider.loadTimeoutMs ?? AD_WATCH_TIMEOUT_MS;
+  let finished = false;
+  const controller = new AbortController();
+  const trace = new AdLoadTrace();
+  const aliveTimer = setInterval(() => {
+    if (!alive()) done();
+  }, 200);
+  const timer = setTimeout(() => {
+    trace.code = 'timeout';
+    finishFallback('广告无响应，回退占位');
+  }, timeoutMs);
+  const done = () => {
+    finished = true;
+    clearTimeout(timer);
+    clearInterval(aliveTimer);
+    controller.abort();
+  };
+  const finishWatched = (onClaim?: () => void) => {
+    if (finished || !alive()) return;
+    done();
+    onWatched(onClaim);
+  };
+  const finishFallback = (reason: string) => {
+    if (finished || !alive()) return;
+    trace.report(placement);
+    done();
+    onFallback(reason, trace.empty);
+  };
+  provider
+    .prepare({ placement, signal: controller.signal, alive, trace })
+    .then((ready) => {
+      if (finished) return;
+      if (!alive()) return done();
+      if (!ready) return finishFallback('广告 SDK 不可用');
+      provider.play(
+        placement,
+        {
+          onStarted: () => {
+            if (!finished && alive() && provider.ownsPlaybackClock) clearTimeout(timer);
+          },
+          onWatched: finishWatched,
+          onFailed: finishFallback,
+        },
+        options.host
+          ? {
+              host: options.host,
+              signal: controller.signal,
+              trace,
+              onProgress: (seconds) => {
+                if (!finished && alive()) options.onProgress?.(seconds);
+              },
+            }
+          : undefined,
+      );
+    })
+    .catch(() => finishFallback('广告 SDK 准备失败'));
+}

@@ -32,7 +32,7 @@ jobs:
       - name: Restore deduplication and compatible history
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/observer.ts --restore artifacts/observer
+        run: node scripts/observer/observer.ts --restore artifacts/observer
       - name: Install isolated Pi classifier runtime
         run: npm install --prefix "$RUNNER_TEMP/observer-pi" --registry=https://registry.npmjs.org --no-audit --no-fund --ignore-scripts @earendil-works/pi-coding-agent@1.5.0
       - name: Observe existing reports and aggregate telemetry
@@ -50,7 +50,7 @@ jobs:
           OBSERVER_PROTOCOL: ${{ vars.OBSERVER_PROTOCOL }}
           OBSERVER_REANALYZE: ${{ github.event_name == 'workflow_dispatch' && inputs.reanalyze == true }}
           OBSERVER_PI_PACKAGE_ROOT: ${{ runner.temp }}/observer-pi/node_modules/@earendil-works/pi-ai
-        run: node scripts/observer.ts
+        run: node scripts/observer/observer.ts
       - name: Preserve evidence and state before notification
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

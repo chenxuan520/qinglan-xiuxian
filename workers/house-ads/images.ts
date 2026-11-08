@@ -1,4 +1,4 @@
-import { houseAdUrl, type HouseAdCampaign } from '../../src/house-ad-contract.ts';
+import { houseAdUrl, type HouseAdCampaign } from '../../src/ads/house-ad-contract.ts';
 
 const publicImageUrl = (value: string) => {
   if (!houseAdUrl(value)) return false;

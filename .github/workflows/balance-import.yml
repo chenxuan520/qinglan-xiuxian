@@ -45,7 +45,7 @@ jobs:
       - run: npm ci
       - name: Validate local input and generate report
         id: input
-        run: node --experimental-strip-types scripts/import-balance-report.ts
+        run: node --experimental-strip-types scripts/balance/import-balance-report.ts
       - name: Preserve original compressed input
         id: original
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -65,10 +65,10 @@ jobs:
           retention-days: 90
       - name: Remove temporary input after preserving report
         if: steps.report.outputs.artifact-id != '' && steps.original.outputs.artifact-id != ''
-        run: node --experimental-strip-types scripts/import-balance-report.ts --cleanup
+        run: node --experimental-strip-types scripts/balance/import-balance-report.ts --cleanup
       - name: Check imported diagnostic status
         if: steps.report.outputs.artifact-id != ''
-        run: node --experimental-strip-types scripts/check-balance-report.ts
+        run: node --experimental-strip-types scripts/balance/check-balance-report.ts
 
   publish-report:
     needs: import
@@ -114,7 +114,7 @@ jobs:
           BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: npm run build -- --base "$BASE_PATH/"
       - name: Check complete production build size
-        run: node --experimental-strip-types scripts/size-check.ts --dir dist
+        run: node --experimental-strip-types scripts/build/size-check.ts --dir dist
       - name: Get current report tools
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -129,19 +129,19 @@ jobs:
       - name: Preserve latest performance summaries
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-monitor-performance.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/perf/restore-monitor-performance.ts
       - name: Preserve latest weapon evaluation report
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-weapon-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/weapon-benchmark/restore-weapon-report.ts
       - name: Preserve latest autoplay comparison
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-autoplay-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/perf/restore-autoplay-report.ts
       - name: Preserve latest observer report
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-observer-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/observer/restore-observer-report.ts
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist

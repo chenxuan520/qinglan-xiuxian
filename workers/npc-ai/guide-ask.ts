@@ -1,11 +1,11 @@
-import { guideCorpus } from '../../src/guide-corpus.ts';
-import { searchGuide } from '../../src/guide-search.ts';
+import { guideCorpus } from '../../src/guide/guide-corpus.ts';
+import { searchGuide } from '../../src/guide/guide-search.ts';
 import {
   GUIDE_ASK_BUSY,
   GUIDE_ASK_FAILURE,
   type GuideAskMessage,
-} from '../../src/guide-ask-contract.ts';
-import { NPC_AI_SETTINGS } from '../../src/setting.ts';
+} from '../../src/guide/guide-ask-contract.ts';
+import { NPC_AI_SETTINGS } from '../../src/core/setting.ts';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);

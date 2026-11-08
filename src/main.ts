@@ -1,24 +1,30 @@
-import { debugAccess } from './debug-access.ts';
-import { leaderboardUnavailableContent } from './leaderboard-notice.ts';
-import { TAMPERED_LEADERBOARD_MESSAGE, sealSaveSnapshot } from './leaderboard-integrity.ts';
-import { bindSettlementDirectory } from './settlement-directory-source.ts';
-import { retargetPendingFirstTour } from './first-run-tour-state.ts';
-import { STANDALONE } from './build-mode.ts';
-import { loadNewPlayerAssets, startsWithPrologue } from './new-player-load.ts';
-import { ironMarketContent } from './iron-market-ui.ts';
-import { MedicinePanel } from './medicine-panel.ts';
-import { cultivationPanel } from './cultivation-ui.ts';
-import { BattleHud } from './battle-hud.ts';
-import { COMPACT_HUD_QUERY, compactHud } from './compact-hud.ts';
-import { LetterReminder } from './letter-reminder.ts';
-import { leaderboardAvailable } from './leaderboard-availability.ts';
-import { LeaderboardPreference, leaderboardSettings } from './leaderboard-preference.ts';
-import { DamageNumbersPreference } from './damage-numbers.ts';
-import { JourneyCardPanel } from './journey-card-panel.ts';
-import { PanelHost, type PanelLocation } from './panel-host.ts';
-import { lifeModeChoice } from './life-mode-ui.ts';
-import { isExtremeLife, minimumDifficulty } from './life-mode.ts';
-import './medicine.css';
+import { debugAccess } from './services/debug-access.ts';
+import { leaderboardUnavailableContent } from './leaderboard/leaderboard-notice.ts';
+import {
+  TAMPERED_LEADERBOARD_MESSAGE,
+  sealSaveSnapshot,
+} from './leaderboard/leaderboard-integrity.ts';
+import { bindSettlementDirectory } from './town/settlement-directory-source.ts';
+import { retargetPendingFirstTour } from './ui/first-run-tour-state.ts';
+import { STANDALONE } from './core/build-mode.ts';
+import { loadNewPlayerAssets, startsWithPrologue } from './battle/new-player-load.ts';
+import { ironMarketContent } from './market/iron-market-ui.ts';
+import { MedicinePanel } from './items/medicine-panel.ts';
+import { cultivationPanel } from './content/cultivation-ui.ts';
+import { BattleHud } from './battle/battle-hud.ts';
+import { COMPACT_HUD_QUERY, compactHud } from './battle/compact-hud.ts';
+import { LetterReminder } from './town/letter-reminder.ts';
+import { leaderboardAvailable } from './leaderboard/leaderboard-availability.ts';
+import {
+  LeaderboardPreference,
+  leaderboardSettings,
+} from './leaderboard/leaderboard-preference.ts';
+import { DamageNumbersPreference } from './battle/damage-numbers.ts';
+import { JourneyCardPanel } from './content/journey-card-panel.ts';
+import { PanelHost, type PanelLocation } from './ui/panel-host.ts';
+import { lifeModeChoice } from './core/life-mode-ui.ts';
+import { isExtremeLife, minimumDifficulty } from './core/life-mode.ts';
+import './items/medicine.css';
 import {
   PROLOGUE_IMAGE,
   currentRealm,
@@ -36,7 +42,7 @@ import {
   tribulationForfeitPanel,
   tribulationPendingPanel,
   tribulationWonPanel,
-} from './opening-ui.ts';
+} from './town/opening-ui.ts';
 import {
   damagePanel,
   deathModal,
@@ -52,29 +58,29 @@ import {
   settlementModal,
   upgradeChoicesModal,
   victoryModal,
-} from './lobby-ui.ts';
-import { enterTownVisit, executeMortalAction, marketAmbushPanel } from './town-host.ts';
-import { altarPromptKey, computeManualInput, trapModalTab } from './input-controller.ts';
-import { destinationInput } from './walk-navigation.ts';
-import { dispatchAction, type ActionShell } from './action-controller.ts';
-import * as sceneFlow from './scene-flow.ts';
-import { DebugEntry } from './debug-entry.ts';
-import { createUpdateCheck, resourceFailed } from './update-check.ts';
-import { ModuleSource, retryModule } from './module-source.ts';
+} from './ui/lobby-ui.ts';
+import { enterTownVisit, executeMortalAction, marketAmbushPanel } from './town/town-host.ts';
+import { altarPromptKey, computeManualInput, trapModalTab } from './battle/input-controller.ts';
+import { destinationInput } from './town/walk-navigation.ts';
+import { dispatchAction, type ActionShell } from './ui/action-controller.ts';
+import * as sceneFlow from './battle/scene-flow.ts';
+import { DebugEntry } from './services/debug-entry.ts';
+import { createUpdateCheck, resourceFailed } from './services/update-check.ts';
+import { ModuleSource, retryModule } from './core/module-source.ts';
 import {
   resourceFailureContent,
   resourcesUpdated,
   panelUpdateNotice,
   setResourceRefreshWarning,
-} from './resource-panel.ts';
+} from './items/resource-panel.ts';
 
-import './styles.ts';
-import './battle-hud.css';
-import { inheritancePreview, isImmortalSuccessor } from './inheritance-ui.ts';
-import { recordChronicle } from './chronicle.ts';
-import './mortal.css';
-import './home-town.css';
-import './journey-map.css';
+import './styles/styles.ts';
+import './battle/battle-hud.css';
+import { inheritancePreview, isImmortalSuccessor } from './core/inheritance-ui.ts';
+import { recordChronicle } from './content/chronicle.ts';
+import './town/mortal.css';
+import './town/home-town.css';
+import './content/journey-map.css';
 import {
   AD_DURATION_MS,
   AD_SECONDS,
@@ -83,8 +89,8 @@ import {
   getAdProvider,
   watchAdPlacement,
   type AdPlacement,
-} from './ads.ts';
-import { GAME_VERSION } from './version.ts';
+} from './ads/ads.ts';
+import { GAME_VERSION } from './core/version.ts';
 import {
   fullscreenButton,
   retreatEstimate,
@@ -94,9 +100,9 @@ import {
   ERROR_NOTICE_ACTIONS,
   ERROR_NOTICE_TEXT,
   ERROR_NOTICE_TITLE,
-} from './common-ui.ts';
-import { JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './journey-map.ts';
-import { ChronicleSource } from './chronicle-source.ts';
+} from './ui/common-ui.ts';
+import { JOURNEY_MAP_IMAGE, JOURNEY_MAP_MOBILE_IMAGE } from './content/journey-map.ts';
+import { ChronicleSource } from './content/chronicle-source.ts';
 import {
   TREASURES,
   isCultivationPath,
@@ -114,7 +120,7 @@ import {
   type SpiritRootId,
   type ElementId,
   adSupplies,
-} from './data.ts';
+} from './core/data.ts';
 import {
   parseSave,
   endExtremeLife,
@@ -137,8 +143,8 @@ import {
   retreat,
   type SaveData,
   type BirthInheritance,
-} from './progress.ts';
-import { Game } from './game.ts';
+} from './core/progress.ts';
+import { Game } from './battle/game.ts';
 import {
   exportSave,
   importSave,
@@ -146,42 +152,46 @@ import {
   restoreSavedRun,
   backupUnreadableSave,
   MAX_SAVE_FILE_BYTES,
-} from './save-transfer.ts';
-import { autoplayChoice, autoplayInput } from './autoplay.ts';
-import { Renderer } from './render.ts';
-import { GuideSource } from './guide-source.ts';
-import { GAME_SITE_URL, SUPPORT_CODE_IMAGE, TELEMETRY_SETTINGS } from './setting.ts';
-import { createTelemetry, type TelemetryEvent } from './telemetry.ts';
-import { recordSharingArrival } from './sharing.ts';
-import { createErrorWatch } from './error-report.ts';
-import { assetUrl } from './asset-url.ts';
-import { MobileDisplay } from './mobile-display.ts';
+} from './core/save-transfer.ts';
+import { autoplayChoice, autoplayInput } from './battle/autoplay.ts';
+import { Renderer } from './battle/render.ts';
+import { GuideSource } from './guide/guide-source.ts';
+import { GAME_SITE_URL, SUPPORT_CODE_IMAGE, TELEMETRY_SETTINGS } from './core/setting.ts';
+import { createTelemetry, type TelemetryEvent } from './services/telemetry.ts';
+import { recordSharingArrival } from './services/sharing.ts';
+import { createErrorWatch } from './services/error-report.ts';
+import { assetUrl } from './core/asset-url.ts';
+import { MobileDisplay } from './battle/mobile-display.ts';
 
-import { ScreenAwake, autoplayScreenAwake } from './screen-awake.ts';
-import { FrameRate } from './frame-rate.ts';
-import { GameAudio } from './game-audio.ts';
-import { SoundSettings } from './sound-settings.ts';
-import { commitSaveAction } from './save-action.ts';
-import type { TownScene } from './town-scene.ts';
-import { preloadTownImages } from './town-images.ts';
-import { TownSource } from './town-source.ts';
-import type { SectMarketScene } from './sect-market-scene.ts';
-import { MarketEventSource } from './market-event-source.ts';
-import type { MarketAmbushScene } from './market-ambush-scene.ts';
-import type { AmbushOutcome } from './market-ambush.ts';
-import { marketCultivators } from './sect-market-data.ts';
-import type { AuctionView } from './auction-ui.ts';
-import type { AuctionKind } from './auction-data.ts';
-import { MARKET_START, isMarketCultivatorId, type MarketCultivator } from './sect-market-data.ts';
+import { ScreenAwake, autoplayScreenAwake } from './battle/screen-awake.ts';
+import { FrameRate } from './battle/frame-rate.ts';
+import { GameAudio } from './battle/game-audio.ts';
+import { SoundSettings } from './services/sound-settings.ts';
+import { commitSaveAction } from './core/save-action.ts';
+import type { TownScene } from './town/town-scene.ts';
+import { preloadTownImages } from './town/town-images.ts';
+import { TownSource } from './town/town-source.ts';
+import type { SectMarketScene } from './sect/sect-market-scene.ts';
+import { MarketEventSource } from './market/market-event-source.ts';
+import type { MarketAmbushScene } from './market/market-ambush-scene.ts';
+import type { AmbushOutcome } from './market/market-ambush.ts';
+import { marketCultivators } from './sect/sect-market-data.ts';
+import type { AuctionView } from './market/auction-ui.ts';
+import type { AuctionKind } from './market/auction-data.ts';
+import {
+  MARKET_START,
+  isMarketCultivatorId,
+  type MarketCultivator,
+} from './sect/sect-market-data.ts';
 import {
   sectMarketOpen,
   beginSectMarketVisit,
   exchangeSectMedicine,
   sectMarketExchangeReason,
   sectMarketOffer,
-} from './sect-market.ts';
-import { sectMarketPage } from './sect-market-page.ts';
-import { TOWN_START, HOMETOWN_START, townClockRunning } from './town.ts';
+} from './sect/sect-market.ts';
+import { sectMarketPage } from './sect/sect-market-page.ts';
+import { TOWN_START, HOMETOWN_START, townClockRunning } from './town/town.ts';
 import {
   departHometown,
   acceptHometownRoot,
@@ -189,22 +199,22 @@ import {
   visitHometown,
   readHometownLetter,
   type ParentId,
-} from './hometown.ts';
-import { freshTownPopulation, type TownResident } from './town-population.ts';
-import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './npc-chat-source.ts';
-import { openOfflinePanel, offlineAction, initOffline } from './offline.ts';
-import { settingsContent, settingsSoundNote, autoplayBuildContent } from './settings-ui.ts';
-import { townVisit } from './town-history.ts';
-import { chooseSmithStory } from './town-story.ts';
+} from './town/hometown.ts';
+import { freshTownPopulation, type TownResident } from './town/town-population.ts';
+import { closeNpcChat, mountNpcChat, mountTeaStory, NPC_AI_BASE } from './town/npc-chat-source.ts';
+import { openOfflinePanel, offlineAction, initOffline } from './services/offline.ts';
+import { settingsContent, settingsSoundNote, autoplayBuildContent } from './ui/settings-ui.ts';
+import { townVisit } from './town/town-history.ts';
+import { chooseSmithStory } from './town/town-story.ts';
 import {
   HUMAN_STORIES,
   chooseHumanStory,
   syncHumanStories,
   isHumanStoryId,
   unreadHumanLetterKeys,
-} from './human-stories.ts';
+} from './town/human-stories.ts';
 
-import { advanceMortal, resolveActivity, sectDuesPending, settleSectDues } from './mortal.ts';
+import { advanceMortal, resolveActivity, sectDuesPending, settleSectDues } from './town/mortal.ts';
 import {
   mortalPage,
   mortalStatus,
@@ -216,7 +226,7 @@ import {
   hometownContent,
   hometownLetterContent,
   townStatus,
-} from './mortal-ui.ts';
+} from './town/mortal-ui.ts';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `<canvas id="world" aria-label="修仙战斗场景"></canvas><div class="screen-grain"></div><div id="ui"></div><div id="modal-root"></div><div id="joystick"><span></span></div><div id="toast" role="status"></div>`;
@@ -394,11 +404,11 @@ let auctionKind: AuctionKind = 'medicine';
 const shownHumanLetters = new Set<string>();
 const letterReminder = new LetterReminder();
 const rankingPreference = new LeaderboardPreference();
-type RankingModule = typeof import('./leaderboard-feature.ts');
+type RankingModule = typeof import('./leaderboard/leaderboard-feature.ts');
 const rankingSource = new ModuleSource<RankingModule>((attempt) =>
   attempt
     ? retryModule<RankingModule>('leaderboard-feature', 'leaderboard', attempt)
-    : import('./leaderboard-feature.ts'),
+    : import('./leaderboard/leaderboard-feature.ts'),
 );
 let rankingOffer: InstanceType<RankingModule['LeaderboardOffer']> | null = null;
 let rankingPanel: InstanceType<RankingModule['LeaderboardPanel']> | null = null;
@@ -891,10 +901,10 @@ function refreshMarketActivities() {
   }
   if (section) section.scrollTop = scroll;
 }
-const ambushFlow = new ModuleSource<typeof import('./market-ambush-flow.ts')>((attempt) =>
+const ambushFlow = new ModuleSource<typeof import('./market/market-ambush-flow.ts')>((attempt) =>
   attempt
     ? retryModule('market-ambush-flow', 'ambush', attempt)
-    : import('./market-ambush-flow.ts'),
+    : import('./market/market-ambush-flow.ts'),
 );
 function loadAmbushFlow() {
   return ambushFlow.load();
@@ -2739,7 +2749,7 @@ function frame(now: number) {
   tickMortal(now);
   tick(now, true);
 }
-const backgroundClock = new Worker(new URL('./background-clock.ts', import.meta.url), {
+const backgroundClock = new Worker(new URL('./core/background-clock.ts', import.meta.url), {
   type: 'module',
 });
 backgroundClock.onmessage = () => {
@@ -2820,7 +2830,7 @@ if (restoringExtremeRun && pendingRun) {
 }
 requestAnimationFrame(frame);
 preloadRewardAds();
-void import('./first-run-tour.ts')
+void import('./ui/first-run-tour.ts')
   .then(({ queueFirstRunTour }) => queueFirstRunTour(shellBindings(), saveRead.status === 'empty'))
   .catch(() => resourceFailed(true));
 

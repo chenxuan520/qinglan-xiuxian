@@ -1,5 +1,5 @@
-import type { HouseAdPlacement } from '../../src/house-ad-contract.ts';
-import { adReceiptId, validAdMetricFlags } from '../../src/ad-metrics-contract.ts';
+import type { HouseAdPlacement } from '../../src/ads/house-ad-contract.ts';
+import { adReceiptId, validAdMetricFlags } from '../../src/ads/ad-metrics-contract.ts';
 
 type DB = HouseAdsEnv['DB'];
 export const adDay = (now = Date.now()) => new Date(now + 8 * 3600000).toISOString().slice(0, 10);

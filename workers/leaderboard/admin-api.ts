@@ -1,4 +1,4 @@
-import { normalizeLeaderboardName } from '../../src/leaderboard-contract.ts';
+import { normalizeLeaderboardName } from '../../src/leaderboard/leaderboard-contract.ts';
 
 type AdminEnv = Pick<LeaderboardEnv, 'DB'> & Partial<Pick<LeaderboardEnv, 'ADMIN_AUTH'>>;
 const ORIGIN = 'https://xiuxian.011203.xyz';

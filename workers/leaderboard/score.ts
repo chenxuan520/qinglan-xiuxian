@@ -9,12 +9,15 @@ import {
   TRIAL_BOSS_TIMES,
   TREASURES,
   allowsSchool,
-} from '../../src/data.ts';
-import { CURIO_IDS } from '../../src/curio-data.ts';
-import { MAX_MASTERY, SECTS } from '../../src/mortal-data.ts';
-import { freshSave, IMMORTAL_CULTIVATION, type SaveData } from '../../src/progress.ts';
-import { journeyScore, validAdUsage } from '../../src/journey-score.ts';
-import { LEADERBOARD_ACHIEVEMENTS, type LeaderboardFacts } from '../../src/leaderboard-contract.ts';
+} from '../../src/core/data.ts';
+import { CURIO_IDS } from '../../src/items/curio-data.ts';
+import { MAX_MASTERY, SECTS } from '../../src/town/mortal-data.ts';
+import { freshSave, IMMORTAL_CULTIVATION, type SaveData } from '../../src/core/progress.ts';
+import { journeyScore, validAdUsage } from '../../src/content/journey-score.ts';
+import {
+  LEADERBOARD_ACHIEVEMENTS,
+  type LeaderboardFacts,
+} from '../../src/leaderboard/leaderboard-contract.ts';
 
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);

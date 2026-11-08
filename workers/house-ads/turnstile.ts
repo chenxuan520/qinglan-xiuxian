@@ -1,4 +1,4 @@
-import { boundedAdJson } from '../../src/house-ad-contract.ts';
+import { boundedAdJson } from '../../src/ads/house-ad-contract.ts';
 
 export const AD_LOGIN_ACTION = 'ad_admin_login';
 export type TurnstileEnv = Pick<

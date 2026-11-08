@@ -1,8 +1,8 @@
 import { guideAskResponse } from './guide-ask.ts';
-import { GUIDE_ASK_PATH, GUIDE_ASK_TIMEOUT } from '../../src/guide-ask-contract.ts';
-import { marketDisposition } from '../../src/market-social-data.ts';
-import { TOWN_NPCS } from '../../src/town.ts';
-import { townResidents, validTownPopulation } from '../../src/town-population.ts';
+import { GUIDE_ASK_PATH, GUIDE_ASK_TIMEOUT } from '../../src/guide/guide-ask-contract.ts';
+import { marketDisposition } from '../../src/market/market-social-data.ts';
+import { TOWN_NPCS } from '../../src/town/town.ts';
+import { townResidents, validTownPopulation } from '../../src/town/town-population.ts';
 import {
   npcDefaultLine,
   validMarketDialogueVisit,
@@ -12,15 +12,15 @@ import {
   marketReplyRevealsRealm,
   marketAsksForLead,
   type NpcDialogueRequest,
-} from '../../src/npc-dialogue.ts';
+} from '../../src/town/npc-dialogue.ts';
 import {
   isMarketCultivatorId,
   marketCharacters,
   marketRelation,
   marketIdentity,
   isMarketTraderId,
-} from '../../src/sect-market-data.ts';
-import { MAX_REVIVES, REALMS } from '../../src/data.ts';
+} from '../../src/sect/sect-market-data.ts';
+import { MAX_REVIVES, REALMS } from '../../src/core/data.ts';
 import { guardDialogueReply as guardPerceptionReply } from './perception.ts';
 import {
   NPC_AI_SETTINGS,
@@ -29,18 +29,18 @@ import {
   TEA_STORY_SETTINGS,
   GAME_SITE_URL,
   JOURNEY_APPRAISAL_SETTINGS,
-} from '../../src/setting.ts';
-import { validJourneyAppraisalFacts } from '../../src/journey-appraisal.ts';
+} from '../../src/core/setting.ts';
+import { validJourneyAppraisalFacts } from '../../src/content/journey-appraisal.ts';
 import {
   extractJourneyAppraisal,
   journeyAppraisalDraft,
   journeyAppraisalMessages,
   journeyAppraisalRetryMessage,
-} from '../../src/journey-appraisal-ai-protocol.ts';
-import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town-story.ts';
-import { hometownParents, validHometown } from '../../src/hometown.ts';
-import { telemetryPoint, validTelemetryBatch } from '../../src/telemetry.ts';
-import { TELEMETRY_SETTINGS } from '../../src/setting.ts';
+} from '../../src/content/journey-appraisal-ai-protocol.ts';
+import { validSmithStory, smithStoryFits, smithStoryMemory } from '../../src/town/town-story.ts';
+import { hometownParents, validHometown } from '../../src/town/hometown.ts';
+import { telemetryPoint, validTelemetryBatch } from '../../src/services/telemetry.ts';
+import { TELEMETRY_SETTINGS } from '../../src/core/setting.ts';
 import { monitorResponse, type MonitorEnv } from './monitor.ts';
 
 export const NPC_MODEL = NPC_AI_SETTINGS.model;

@@ -1,9 +1,13 @@
-import { BALANCE_PROTOCOL, balanceCases, FULL_SEEDS } from '../../scripts/balance-policy.ts';
-import { caseKey } from '../../scripts/balance-policy.ts';
-import type { BalanceCase } from '../../scripts/balance-policy.ts';
-import type { BattleSample, CampaignSample } from '../../scripts/balance-simulation.ts';
-import { TRIAL_BOSS_TIMES } from '../../src/data.ts';
-import { realmInfo } from '../../src/progress.ts';
+import {
+  BALANCE_PROTOCOL,
+  balanceCases,
+  FULL_SEEDS,
+} from '../../scripts/balance/balance-policy.ts';
+import { caseKey } from '../../scripts/balance/balance-policy.ts';
+import type { BalanceCase } from '../../scripts/balance/balance-policy.ts';
+import type { BattleSample, CampaignSample } from '../../scripts/balance/balance-simulation.ts';
+import { TRIAL_BOSS_TIMES } from '../../src/core/data.ts';
+import { realmInfo } from '../../src/core/progress.ts';
 
 const plan = balanceCases(true);
 

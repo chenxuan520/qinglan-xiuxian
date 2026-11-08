@@ -1,0 +1,408 @@
+import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
+import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL, TAU } from '../core/data.ts';
+import type { Choice, Game, Point } from './game.ts';
+import {
+  hazardDistance,
+  regionalExposure,
+  prepareRegionalExposure,
+  regionalHazard,
+  entanglingHazard,
+} from './regional-hazards.ts';
+import { buildChoiceScore } from './autoplay-build.ts';
+
+const favored = [
+  'sword',
+  'lightning',
+  'dragon',
+  'fire',
+  'skull',
+  'pagoda',
+  'cauldron',
+  'umbrella',
+  'scythe',
+  'compass',
+  'nail',
+];
+function choiceScore(c: Choice, g: Game) {
+  if (c.type === 'evolve') return 100;
+  if (c.type === 'heal') {
+    const hp = g.player.hp / g.player.maxHp;
+    return hp < 0.3 ? 120 : hp < 0.5 ? 30 : -10;
+  }
+  if (
+    c.type === 'passive' &&
+    g.player.hp < g.player.maxHp * 0.3 &&
+    ['guard', 'bone', 'duration', 'devour'].includes(c.id)
+  )
+    return 95;
+  if (c.type === 'weapon')
+    return (
+      (favored.includes(c.id) ? 15 : 10) +
+      (c.level > 1 ? 8 : 2) +
+      c.level +
+      (c.level === 1 &&
+      g.weapons.length < MAX_WEAPONS &&
+      g.weapons.every((w) => w.level === MAX_WEAPON_LEVEL)
+        ? 64
+        : 0) +
+      (c.level === 1 && g.evolutionRequirements(c.id).some((id) => g.passives[id]) ? 2 : 0)
+    );
+  // 已持法宝优先从领悟起补满一套配方，不等待法宝六重。
+  if (
+    c.level >= 1 &&
+    c.level <= MAX_PASSIVE_LEVEL &&
+    (g.passives[c.id] || 0) === c.level - 1 &&
+    g.weapons.some((w) => {
+      const required = g.evolutionRequirements(w.id);
+      return (
+        !w.evolved &&
+        required.includes(c.id) &&
+        !required.some((id) => (g.passives[id] || 0) >= MAX_PASSIVE_LEVEL) &&
+        !required.some(
+          (id) => id !== c.id && (g.passives[id] || 0) >= Math.max(1, g.passives[c.id] || 0),
+        )
+      );
+    })
+  )
+    return 50 + c.level * 5;
+  const needed = g.weapons.some((w) => g.evolutionRequirements(w.id).includes(c.id) && !w.evolved);
+  const score =
+    (needed ? 16 : 0) +
+    (g.player.hp < g.player.maxHp * 0.5 && ['guard', 'bone', 'duration', 'devour'].includes(c.id)
+      ? 10
+      : 0) +
+    (['power', 'haste', 'guard', 'area', 'blood', 'devour', 'bone', 'abyss'].includes(c.id)
+      ? 4
+      : 0) +
+    (c.level <= 3 ? 5 : 0);
+  // 功法只能靠升级修习；已学功法优先升重，法宝仍可由宝匣提升。
+  return g.passives[c.id] ? Math.max(32, score + 12) : score;
+}
+function steer(direction: Point, follow: Point, weight = 1) {
+  const x = direction.x + follow.x * weight,
+    y = direction.y + follow.y * weight,
+    length = Math.hypot(x, y);
+  return length > 1e-8 ? { x: x / length, y: y / length } : follow;
+}
+const sweepFollowing = new WeakSet<Game['zones'][number]>();
+function sweepTarget(g: Game) {
+  const first = g.zones.find((z) => z.kind === 'boss-sweep' && z.life > 0 && z.spinCenter);
+  const second =
+    first &&
+    g.zones.find(
+      (z) =>
+        z !== first &&
+        z.kind === 'boss-sweep' &&
+        z.spinCenter?.x === first.spinCenter!.x &&
+        z.spinCenter?.y === first.spinCenter!.y &&
+        z.delay === first.delay &&
+        z.life === first.life,
+    );
+  if (!first || !second) return;
+  const center = first.spinCenter!,
+    dir = Math.sign(first.spinSpeed!);
+  const sx = g.player.x - center.x,
+    sy = g.player.y - center.y;
+  const distance = Math.hypot(sx, sy) || 1;
+  const outer = first.spinOuter! + first.radius + 8;
+  if (outer - distance < distance - first.spinInner!) {
+    const radius = outer + g.stats.speed * 0.24;
+    return { x: center.x + (sx / distance) * radius, y: center.y + (sy / distance) * radius };
+  }
+  if (distance < 120) {
+    const inward = Math.max(0, (distance - 80) / 80);
+    const tangent = first.delay > 0 ? 0 : dir;
+    return {
+      x: g.player.x - (sx * inward + sy * tangent) / distance,
+      y: g.player.y + (sx * tangent - sy * inward) / distance,
+    };
+  }
+  const theta = Math.atan2(g.player.y - center.y, g.player.x - center.x);
+  const ahead = (angle: number) => ((((theta - angle) * dir) % TAU) + TAU) % TAU;
+  const back = ahead(first.spinAngle!) < ahead(second.spinAngle!) ? second : first;
+  const start = back.spinStart ?? back.spinAngle!,
+    offset = Math.PI / 12;
+  const point = (angle: number) => ({
+    x: center.x + Math.cos(angle) * 160,
+    y: center.y + Math.sin(angle) * 160,
+  });
+  const angle =
+    (back.spinAngle! - start) * dir > offset
+      ? back.spinAngle! - dir * offset
+      : start + dir * offset;
+  let target = point(angle);
+  if (Math.hypot(target.x - g.player.x, target.y - g.player.y) <= 30) sweepFollowing.add(first);
+  if (sweepFollowing.has(first)) target = point(back.spinAngle! - dir * offset);
+  return target;
+}
+export function autoplayInput(g: Game) {
+  const direction = autoplayDirection(g);
+  if (g.immobilized > 0) return direction;
+  const boss = g.gravityBoss;
+  if (!boss) return direction;
+  const distance = Math.hypot(g.player.x - boss.x, g.player.y - boss.y);
+  const away = distance
+    ? { x: (g.player.x - boss.x) / distance, y: (g.player.y - boss.y) / distance }
+    : { x: 1, y: 0 };
+  return steer(direction, away);
+}
+function autoplayDirection(g: Game) {
+  if (g.immobilized > 0) return { x: 0, y: 0 };
+  const p = g.player;
+  let dx = 0,
+    dy = 0;
+  let nearest: Game['pickups'][number] | undefined;
+  let nearestDistance = Infinity;
+  for (const item of g.pickups) {
+    if (item.pull || g.entangled > 0 || (g.corroded > 0 && item.kind === 'heal')) continue;
+    const d = (item.x - p.x) ** 2 + (item.y - p.y) ** 2;
+    if (d < nearestDistance) {
+      nearest = item;
+      nearestDistance = d;
+    }
+  }
+  // 可见魂线指出控魂者；经验近在身边时先拾取，不为追主魂穿越整幅地图。
+  const owner =
+    g.stage === 4 && nearestDistance > 120 ** 2
+      ? g.enemies.find(
+          (e) =>
+            !e.dead &&
+            e.illusionOf === undefined &&
+            Math.hypot(e.x - p.x, e.y - p.y) < 300 &&
+            g.enemies.some((child) => !child.dead && child.summonedBy === e.id),
+        )
+      : undefined;
+  const heart = g.enemies.find(
+    (e) =>
+      !e.dead &&
+      e.bossSummon?.kind === 'heart' &&
+      e.bossSummon.age < BOSS_MECHANICS.heartGrow - 0.4 &&
+      Math.hypot(e.x - p.x, e.y - p.y) < 210,
+  );
+  const target =
+    heart ??
+    owner ??
+    nearest ??
+    (g.stage === 6 ? g.enemies[0] : g.enemies.find((e) => !e.dead && e.illusionOf === undefined));
+  if (target) {
+    const d = Math.hypot(target.x - p.x, target.y - p.y) || 1;
+    dx += ((target.x - p.x) / d) * (nearest ? 1 : 0.7);
+    dy += ((target.y - p.y) / d) * (nearest ? 1 : 0.7);
+  } else {
+    dx = Math.cos(g.time * 0.3);
+    dy = Math.sin(g.time * 0.3);
+  }
+  for (const e of g.enemies) {
+    if (e.bossSummon?.kind === 'heart' || e.illusionOf !== undefined || (g.stage < 6 && e.dead))
+      continue;
+    const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
+    const radius = e.radius + (e.boss ? 135 : 100);
+    if (d < radius) {
+      const f = ((radius - d) / radius) * 2.4;
+      dx -= ((e.x - p.x) / d) * f;
+      dy -= ((e.y - p.y) / d) * f;
+    }
+  }
+  for (const b of g.shots) {
+    if (b.kind !== 'hostile') continue;
+    const d = Math.hypot(b.x - p.x, b.y - p.y) || 1;
+    if (d < 80) {
+      dx -= ((b.x - p.x) / d) * 2;
+      dy -= ((b.y - p.y) / d) * 2;
+    }
+  }
+  // 天劫核心不可追贴：在收束雷环内侧持续绕行，给落雷与迎面雷弹留反应距离。
+  const core = g.tribulation ? g.boss : undefined;
+  // 核心显露且仍来得及撤离时给短程法宝反击距离，窗口结束前先退回。
+  const coreDistance =
+    core && g.tribulationVulnerable && g.tribulationNextAt - g.time > 50 / g.stats.speed + 0.12
+      ? 170
+      : 220;
+  if (core) {
+    const distance = Math.hypot(p.x - core.x, p.y - core.y);
+    const nx = distance ? (p.x - core.x) / distance : 1;
+    const ny = distance ? (p.y - core.y) / distance : 0;
+    const radial = Math.max(-1, Math.min(1, (coreDistance - distance) / 50));
+    dx = nx * radial - ny * 0.7;
+    dy = ny * radial + nx * 0.7;
+  }
+  const norm = Math.hypot(dx, dy) || 1;
+  let preferred = { x: dx / norm, y: dy / norm };
+  const sweep = sweepTarget(g);
+  if (sweep) {
+    const sx = sweep.x - p.x,
+      sy = sweep.y - p.y;
+    const length = Math.hypot(sx, sy) || 1;
+    preferred = { x: sx / length, y: sy / length };
+  }
+  const movingShots = g.shots.filter(
+    (b) =>
+      b.kind === 'hostile' &&
+      (b.bossMotion || g.tribulation) &&
+      Math.hypot(b.x - p.x, b.y - p.y) < 420,
+  );
+  const charges = g.enemies.filter(
+    (e) =>
+      (e.boss || e.bossSummon?.kind === 'wolf' || g.usesRegionalSkill(e)) &&
+      !e.dead &&
+      e.charge > 0,
+  );
+  const speed = g.stats.speed;
+  const zones = g.zones.filter(
+    (z) =>
+      z.hostile &&
+      z.life > 0 &&
+      (z.kind === 'boss-sweep'
+        ? Math.hypot(p.x - z.spinCenter!.x, p.y - z.spinCenter!.y) < z.spinOuter! + speed * 1.6
+        : hazardDistance(z, p) <
+          z.radius + 8 + speed * 1.6 + Math.hypot(z.vx || 0, z.vy || 0) * 1.6),
+  );
+  if (!charges.length && !zones.length && !movingShots.length) return preferred;
+  // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
+  const clearance = (e: (typeof charges)[number]) => e.radius + 13 + speed * 0.24;
+  const distanceToPath = (x: number, y: number, e: (typeof charges)[number]) => {
+    const along = Math.max(
+      0,
+      Math.min(
+        Math.min(e.boss ? 0.7 : 0.55, e.charge) * (e.boss ? 820 : 380),
+        (x - e.x) * e.dx + (y - e.y) * e.dy,
+      ),
+    );
+    return Math.hypot(x - e.x - e.dx * along, y - e.y - e.dy * along);
+  };
+  if (
+    !movingShots.length &&
+    !zones.length &&
+    !charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e))
+  )
+    return preferred;
+  let best = preferred;
+  let bestScore = Infinity;
+  const hazardExposure = zones.some((z) => z.kind === 'boss-sweep')
+    ? prepareRegionalExposure(p, speed)
+    : undefined;
+  // 危险附近才比较方向；毒圈还比较原方向和等待，不能把所有有风险的方向一律拒绝。
+  for (let i = 0; i < (zones.length ? 18 : 16); i++) {
+    const x = i === 17 ? 0 : i === 16 ? preferred.x : Math.cos((i * Math.PI) / 8),
+      y = i === 17 ? 0 : i === 16 ? preferred.y : Math.sin((i * Math.PI) / 8);
+    // 天劫弹幕持续推进，不能把等待当作躲过最后一招的方案。
+    if (core && i === 17) continue;
+    let score = -(x * preferred.x + y * preferred.y) * 0.08;
+    if (core) {
+      const separation = Math.hypot(
+        p.x + x * speed * 0.36 - core.x,
+        p.y + y * speed * 0.36 - core.y,
+      );
+      score += Math.max(0, (coreDistance - 30 - separation) / 60) * 3;
+      score += Math.max(0, (separation - 270) / 60) * 2;
+    }
+    if (zones.length) {
+      score -= (x * g.input.x + y * g.input.y) * 0.02;
+      let risk = 0;
+      for (const z of zones) {
+        if (regionalHazard(z)) {
+          risk +=
+            ((hazardExposure ? hazardExposure(z, x, y) : regionalExposure(z, p, x, y, speed)) /
+              0.5) *
+            ((z.damage / Math.max(1, p.hp)) * 4 +
+              (z.kind.includes('thunder') || entanglingHazard(z) ? 0.12 : 0));
+          continue;
+        }
+        const zx = p.x - z.x,
+          zy = p.y - z.y,
+          radius = z.radius + 8;
+        let enter = 0,
+          exit = Infinity;
+        if (x || y) {
+          const along = zx * x + zy * y;
+          const crossing = radius * radius - zx * zx - zy * zy + along * along;
+          if (crossing <= 0) continue;
+          const half = Math.sqrt(crossing);
+          enter = Math.max(0, (-along - half) / speed);
+          exit = (-along + half) / speed;
+        } else if (zx * zx + zy * zy >= radius * radius) continue;
+        // 先确认穿圈区间内有未消散的伤害tick；保留一轮决策余量。
+        const delay = Math.max(0, z.delay);
+        const tick = Math.max(0, z.tick);
+        const nextTick = tick + Math.max(0, Math.ceil((enter - 0.12 - delay - tick) / 0.5)) * 0.5;
+        // 藤缠与寒霜在伤害间隔中仍有控制，不能当作无害残影。
+        if (
+          !['enemy-roots', 'enemy-frost', 'boss-roots', 'boss-frost'].includes(z.kind) &&
+          (nextTick > z.life || delay + nextTick > exit + 0.12)
+        )
+          continue;
+        const exposure = Math.max(
+          0,
+          Math.min(exit, delay + z.life) - Math.max(enter, Math.max(0, delay - 0.12)),
+        );
+        risk +=
+          (exposure / 0.5) *
+          ((z.damage / Math.max(1, p.hp)) * 4 + (entanglingHazard(z) ? 0.12 : 0));
+      }
+      for (const e of g.enemies) {
+        if (e.dead || e.illusionOf !== undefined) continue;
+        const distance = Math.hypot(e.x - p.x, e.y - p.y) || 1;
+        if (distance > e.radius + 13 + (speed + e.speed) * 0.36) continue;
+        for (const seconds of [0.12, 0.24, 0.36]) {
+          const approach = Math.min(distance, e.speed * seconds) / distance;
+          const separation = Math.hypot(
+            p.x + x * speed * seconds - e.x - (p.x - e.x) * approach,
+            p.y + y * speed * seconds - e.y - (p.y - e.y) * approach,
+          );
+          risk +=
+            Math.max(0, 1 - separation / (e.radius + 13 + speed * 0.12)) *
+            (e.damage / Math.max(1, p.hp)) *
+            4;
+        }
+      }
+      // 无伤路线优先于拾取；所有方向都有风险时仍按累计损失选，而非停住。
+      score += risk > 0 ? 1 + risk : 0;
+    }
+    for (const b of movingShots) {
+      if (!b.bossMotion) {
+        const rx = b.x - p.x,
+          ry = b.y - p.y,
+          vx = b.vx - x * speed,
+          vy = b.vy - y * speed;
+        const closest = Math.max(
+          0,
+          Math.min(0.6, b.life, -(rx * vx + ry * vy) / (vx * vx + vy * vy || 1)),
+        );
+        const separation = Math.hypot(rx + vx * closest, ry + vy * closest);
+        score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 4;
+        continue;
+      }
+      for (const seconds of [0.12, 0.24, 0.36, 0.6]) {
+        if (b.life <= seconds) continue;
+        const point = bossShotPose(b, b.age + seconds);
+        if (!point.active) continue;
+        const separation = Math.hypot(
+          p.x + x * speed * seconds - point.x,
+          p.y + y * speed * seconds - point.y,
+        );
+        score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 2;
+      }
+    }
+    for (const e of charges) {
+      for (const seconds of [0.12, 0.24, 0.36]) {
+        const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);
+        score += Math.max(0, 1 - distance / clearance(e));
+      }
+    }
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x, y };
+    }
+  }
+  return best;
+}
+export function autoplayChoice(game: Game) {
+  const ranked = game.choices
+    .map((choice, index) => ({
+      index,
+      score: buildChoiceScore(choice, game, choiceScore(choice, game)),
+    }))
+    .sort((a, b) => b.score - a.score);
+  if (!ranked.length) return null;
+  return { index: ranked[0].index, reroll: ranked[0].score < 15 && game.rerolls > 0 };
+}

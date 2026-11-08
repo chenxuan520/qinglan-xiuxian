@@ -30,7 +30,7 @@ jobs:
       - name: Build standalone package
         run: npm run build:standalone -- --outDir artifacts/release/qinglan-xiuxian --emptyOutDir
       - name: Check complete offline build size
-        run: node --experimental-strip-types scripts/size-check.ts --dir artifacts/release/qinglan-xiuxian
+        run: node --experimental-strip-types scripts/build/size-check.ts --dir artifacts/release/qinglan-xiuxian
       - name: Package release
         working-directory: artifacts/release
         run: zip -q -r "../qinglan-xiuxian-${{ github.ref_name }}-offline.zip" qinglan-xiuxian

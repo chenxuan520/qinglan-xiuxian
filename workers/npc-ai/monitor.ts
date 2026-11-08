@@ -5,7 +5,7 @@ import {
   validMonitorData,
   type MonitorData,
   type MonitorSection,
-} from '../../src/monitor-protocol.ts';
+} from '../../src/services/monitor-protocol.ts';
 
 export type MonitorEnv = {
   MONITOR_PUBLIC?: string;

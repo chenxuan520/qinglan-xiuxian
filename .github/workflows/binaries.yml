@@ -22,4 +22,4 @@ jobs:
         with:
           node-version: '22'
       - name: Reject new binary files and extra fonts
-        run: node --experimental-strip-types scripts/check-binaries.ts
+        run: node --experimental-strip-types scripts/assets/check-binaries.ts

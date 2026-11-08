@@ -1,4 +1,4 @@
-import { HOUSE_AD_PLACEMENTS, HOUSE_AD_MAX_BYTES } from '../../src/house-ad-contract.ts';
+import { HOUSE_AD_PLACEMENTS, HOUSE_AD_MAX_BYTES } from '../../src/ads/house-ad-contract.ts';
 
 // 只描述接口契约，不读取投放、账号、会话或统计数据。
 export function houseAdsOpenApi(origin: string) {

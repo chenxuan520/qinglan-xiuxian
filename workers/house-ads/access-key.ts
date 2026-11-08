@@ -1,4 +1,4 @@
-import { boundedAdJson } from '../../src/house-ad-contract.ts';
+import { boundedAdJson } from '../../src/ads/house-ad-contract.ts';
 import { adRandomToken, digest } from './auth.ts';
 
 type Env = Pick<HouseAdsEnv, 'DB' | 'ADMIN_ORIGIN'>;

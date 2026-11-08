@@ -1,0 +1,195 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Game } from '../../src/battle/game.ts';
+import {
+  DIFFICULTIES,
+  BOSS_COMBAT,
+  ENEMIES,
+  FINAL_TRIAL_STAGE,
+  STAGE_COMBAT_SCALING,
+  STAGE_REALM_STEPS,
+  STAGES,
+  TRIAL_BOSS_STAGES,
+  TRIAL_PRESSURE_SECONDS,
+  tribulationRules,
+} from '../../src/core/data.ts';
+import {
+  freshSave,
+  realmDamageMultiplier,
+  realmHealthMultiplier,
+} from '../../src/core/progress.ts';
+
+test('三难度七境妖王使用固定强化倍率，移动速度提高30%，判定半径保留', () => {
+  for (const [difficulty, rules] of DIFFICULTIES.entries()) {
+    for (let stage = 0; stage < STAGES.length; stage++) {
+      const g = new Game(freshSave(), stage, difficulty, () => 0.5);
+      const scaling = STAGE_COMBAT_SCALING[stage];
+      for (const bossStage of stage === FINAL_TRIAL_STAGE ? TRIAL_BOSS_STAGES : [stage]) {
+        const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, bossStage);
+        const baseHp =
+          stage === FINAL_TRIAL_STAGE
+            ? bossStage === FINAL_TRIAL_STAGE
+              ? 560000
+              : 120000 + bossStage * 35000
+            : [16000, 27000, 38000, 49000, 78000, 106500][stage];
+        assert.equal(
+          boss.hp,
+          baseHp *
+            rules.hp *
+            (stage === FINAL_TRIAL_STAGE
+              ? BOSS_COMBAT.trialHp * BOSS_COMBAT.trialKingHp[bossStage]
+              : BOSS_COMBAT.hp[stage] * rules.bossHp[stage]) *
+            scaling.hp *
+            realmDamageMultiplier(STAGE_REALM_STEPS[stage]),
+        );
+        assert.equal(boss.maxHp, boss.hp);
+        assert.ok(Math.abs(boss.speed - [70, 74, 78, 82, 98.9, 108, 94][stage] * 1.3) < 1e-10);
+        assert.equal(g.spawnEnemy(10, true, true, { x: 100, y: 0 }, bossStage).speed, boss.speed);
+        const damage =
+          stage === FINAL_TRIAL_STAGE
+            ? bossStage === FINAL_TRIAL_STAGE
+              ? 220
+              : 85 + bossStage * 10
+            : 52 + stage * 16;
+        assert.equal(
+          boss.damage,
+          damage *
+            rules.damage *
+            scaling.damage *
+            realmHealthMultiplier(STAGE_REALM_STEPS[stage]) *
+            (stage === FINAL_TRIAL_STAGE ? BOSS_COMBAT.trialDamage : BOSS_COMBAT.damage[stage]) *
+            (stage > 0 && stage < FINAL_TRIAL_STAGE ? 1.1 : 1),
+        );
+        assert.equal(boss.bossStage, bossStage);
+        assert.equal(boss.radius, bossStage === FINAL_TRIAL_STAGE ? 62 : 48);
+      }
+    }
+  }
+});
+
+test('第二境妖王在既有增幅上再加20%气血，固定强度不随玩家资质或境界变化', () => {
+  for (const [difficulty, rules] of DIFFICULTIES.entries()) {
+    const beforeHp =
+      27000 *
+      rules.hp *
+      1.65 *
+      1.3 *
+      1.2 *
+      1.2 *
+      rules.bossHp[1] *
+      STAGE_COMBAT_SCALING[1].hp *
+      realmDamageMultiplier(6);
+    for (const root of ['heaven', 'none'] as const) {
+      for (const cultivation of [0, 1e9]) {
+        const save = freshSave(root);
+        save.cultivation = cultivation;
+        const g = new Game(save, 1, difficulty, () => 0.5);
+        const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 }, 1);
+        assert.ok(Math.abs(boss.maxHp / beforeHp - 1.2) < 1e-12);
+        assert.equal(boss.hp, boss.maxHp);
+        assert.equal(
+          boss.damage,
+          68 *
+            rules.damage *
+            STAGE_COMBAT_SCALING[1].damage *
+            realmHealthMultiplier(6) *
+            1.15 *
+            1.1,
+        );
+      }
+    }
+  }
+});
+test('各关三难度新旧精英连续恢复不重算场内速度，也不叠加10%倍率', () => {
+  for (let difficulty = 0; difficulty < DIFFICULTIES.length; difficulty++) {
+    for (let stage = 0; stage < STAGES.length; stage++) {
+      for (const legacy of [false, true]) {
+        const save = freshSave();
+        save.unlocked = stage;
+        const g = new Game(save, stage, difficulty, () => 0.5);
+        g.time = STAGES[stage].minutes * 30;
+        const enemy = g.spawnEnemy(0, true, false, { x: 100, y: 0 });
+        if (legacy)
+          enemy.speed =
+            (stage === FINAL_TRIAL_STAGE
+              ? Math.max(112.5, ENEMIES[0].speed * 1.2)
+              : ENEMIES[0].speed) *
+            1.15 *
+            1.1 *
+            (STAGE_COMBAT_SCALING[stage].elite?.speed ?? 1);
+        let raw = JSON.parse(JSON.stringify(g.snapshot()));
+        const expected = raw.enemies;
+        for (let round = 0; round < 3; round++) {
+          const restored = Game.restore(save, raw);
+          assert.ok(restored);
+          assert.deepEqual(restored.enemies, expected);
+          raw = JSON.parse(JSON.stringify(restored.snapshot()));
+        }
+      }
+    }
+  }
+});
+
+test('第五、第六关编号的独立天劫不使用普通妖王强化', () => {
+  for (const stage of [4, 5]) {
+    for (const round of [1, 5, 6]) {
+      const save = freshSave();
+      save.unlocked = stage;
+      save.cultivation = 1e9;
+      save.tribulations = round - 1;
+      const source = new Game(save, stage, 0, () => 0.5);
+      for (const origin of [null, source]) {
+        const g = Game.createTribulation(save, origin);
+        const rules = tribulationRules(round);
+        assert.deepEqual(
+          [g.boss!.hp, g.boss!.maxHp, g.boss!.speed, g.boss!.damage],
+          [
+            rules.hp * realmDamageMultiplier(23),
+            rules.hp * realmDamageMultiplier(23),
+            0,
+            g.player.maxHp * rules.damage,
+          ],
+        );
+        const spawned = g.spawnEnemy(10, false, true, { x: 0, y: 0 }, FINAL_TRIAL_STAGE);
+        const hp =
+          (16000 + stage * 11000) *
+          DIFFICULTIES[0].hp *
+          STAGE_COMBAT_SCALING[stage].hp *
+          realmDamageMultiplier(STAGE_REALM_STEPS[stage]);
+        assert.deepEqual([spawned.hp, spawned.maxHp, spawned.speed], [hp, hp, 70 + stage * 4]);
+      }
+    }
+  }
+});
+
+test('三难度新旧场内妖王反复恢复保留原气血、缺血与移速，不叠加强化倍率', () => {
+  for (const [difficulty, rules] of DIFFICULTIES.entries()) {
+    for (const stage of [1, 4, 5]) {
+      for (const legacy of [false, true]) {
+        const save = freshSave();
+        save.unlocked = stage;
+        const g = new Game(save, stage, difficulty, () => 0.5);
+        g.bossSpawned = true;
+        const boss = g.spawnEnemy(10, false, true, { x: 100, y: 0 });
+        if (legacy) {
+          boss.maxHp =
+            (16000 + stage * 11000) *
+            rules.hp *
+            STAGE_COMBAT_SCALING[stage].hp *
+            (stage === 1 ? 1.65 * realmDamageMultiplier(6) : 1);
+          boss.speed = 70 + stage * 4;
+        }
+        boss.hp = boss.maxHp * 0.63;
+        let raw = JSON.parse(JSON.stringify(g.snapshot()));
+        if (legacy) delete raw.stageDuration;
+        const expected = { ...boss };
+        for (let round = 0; round < 3; round++) {
+          const restored = Game.restore(save, raw);
+          assert.ok(restored);
+          assert.deepEqual(restored.boss, expected);
+          raw = JSON.parse(JSON.stringify(restored.snapshot()));
+        }
+      }
+    }
+  }
+});

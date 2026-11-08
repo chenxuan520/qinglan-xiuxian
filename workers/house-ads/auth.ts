@@ -1,4 +1,4 @@
-import { boundedAdJson } from '../../src/house-ad-contract.ts';
+import { boundedAdJson } from '../../src/ads/house-ad-contract.ts';
 import { verifyAdLogin, type TurnstileEnv } from './turnstile.ts';
 
 type AuthEnv = Pick<HouseAdsEnv, 'DB' | 'ADMIN_ORIGIN'> & TurnstileEnv;

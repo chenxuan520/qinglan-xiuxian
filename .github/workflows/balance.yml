@@ -118,7 +118,7 @@ jobs:
           retention-days: 14
       - name: Fail CI on report Error after preserving artifacts
         if: always() && !cancelled()
-        run: node --experimental-strip-types scripts/check-balance-report.ts
+        run: node --experimental-strip-types scripts/balance/check-balance-report.ts
 
   # 每日渲染实测：无头 Chrome 恢复第六境后期高压对局采样 60 秒帧率与长任务，只报告不设门槛。
   perf-render:
@@ -205,7 +205,7 @@ jobs:
         if: inputs.render_only == true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types scripts/restore-balance-report.ts
+        run: node --experimental-strip-types scripts/balance/restore-balance-report.ts
       - name: Preserve latest weapon evaluation report
         # 最后已部署游戏可能还没有新日报工具；只在构建完后取当前任务的控制脚本。
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -215,32 +215,32 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             package.json
-            scripts/restore-weapon-report.ts
-            scripts/restore-autoplay-report.ts
-            scripts/restore-observer-report.ts
-            src/observer-report.ts
-            src/autoplay-report.ts
-            scripts/restore-monitor-performance.ts
-            src/monitor-performance.ts
-            scripts/ci-artifacts.ts
-            src/weapon-report.ts
-            src/data.ts
+            scripts/weapon-benchmark/restore-weapon-report.ts
+            scripts/perf/restore-autoplay-report.ts
+            scripts/observer/restore-observer-report.ts
+            src/services/observer-report.ts
+            src/battle/autoplay-report.ts
+            scripts/perf/restore-monitor-performance.ts
+            src/services/monitor-performance.ts
+            scripts/build/ci-artifacts.ts
+            src/services/weapon-report.ts
+            src/core/data.ts
       - name: Publish latest performance summaries
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-monitor-performance.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/perf/restore-monitor-performance.ts
       - name: Restore weapon report with current validation tools
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-weapon-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/weapon-benchmark/restore-weapon-report.ts
       - name: Preserve latest autoplay comparison
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-autoplay-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/perf/restore-autoplay-report.ts
       - name: Preserve latest observer report
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node --experimental-strip-types artifacts/report-tools/scripts/restore-observer-report.ts
+        run: node --experimental-strip-types artifacts/report-tools/scripts/observer/restore-observer-report.ts
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist

@@ -1,0 +1,73 @@
+import { TRIAL_BOSS_STAGES } from '../../src/core/data.ts';
+import { Game } from '../../src/battle/game.ts';
+import { freshSave, realmCost, realmInfo } from '../../src/core/progress.ts';
+import { autoplayChoice, autoplayInput } from '../../src/battle/autoplay.ts';
+
+function seeded(seed: number) {
+  return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+}
+const results = [];
+const forgeLevel = process.argv.includes('--max-forge') ? 10 : 5;
+for (const step of [15, 18, 21, 23]) {
+  for (const seed of [41, 82, 123]) {
+    const save = freshSave();
+    save.unlocked = 6;
+    save.completed = [0, 1, 2, 3, 4, 5];
+    save.cultivation = Array.from({ length: step }, (_, i) => realmCost(i)).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    save.training = { vitality: 10, power: 10, speed: 8 };
+    save.forge = Object.fromEntries(
+      ['sword', 'orbit', 'lightning', 'pulse', 'fire', 'chain'].map((id) => [id, forgeLevel]),
+    );
+    save.artifacts = [...new Set([...save.artifacts, ...Object.keys(save.forge)])];
+    const g = new Game(save, 6, 0, seeded(seed));
+    const startingRealm = realmInfo(save.cultivation).name;
+    let minHp = g.player.hp;
+    let level5m: number | null = null;
+    let levelAtFinalBoss: number | null = null;
+    let finalBossAt: number | null = null;
+    let maxAliveBosses = 0;
+    for (let frame = 0; frame < 1140 * 30 && !['won', 'lost'].includes(g.state); frame++) {
+      if (g.state === 'upgrade') {
+        const c = autoplayChoice(g)!;
+        if (c.reroll) {
+          g.reroll();
+          continue;
+        }
+        g.choose(c.index);
+      }
+      if (frame % 4 === 0) g.input = autoplayInput(g);
+      g.update(1 / 30);
+      if (g.time >= 300) level5m ??= g.level;
+      if (g.trialBossesSpawned === TRIAL_BOSS_STAGES.length) {
+        levelAtFinalBoss ??= g.level;
+        finalBossAt ??= g.time;
+      }
+      maxAliveBosses = Math.max(maxAliveBosses, g.enemies.filter((e) => e.boss && !e.dead).length);
+      minHp = Math.min(minHp, g.player.hp);
+    }
+    results.push({
+      realm: startingRealm,
+      endRealm: realmInfo(save.cultivation).name,
+      seed,
+      forgeLevel,
+      state: g.state,
+      seconds: Math.round(g.time),
+      kings: g.trialBossesDefeated,
+      level: g.level,
+      level5m,
+      levelAtFinalBoss,
+      finalBossAt: finalBossAt === null ? null : Math.round(finalBossAt),
+      maxAliveBosses,
+      kills: g.kills,
+      minHp: Math.round(minHp),
+      hp: Math.round(g.player.hp),
+    });
+  }
+}
+console.table(results);
+console.log(
+  `相同根基（10/10/8）、六件常用法宝 ${forgeLevel} 阶、兼修新局，固定种子 AI。仅比较成长收益，不代表真人胜率。`,
+);

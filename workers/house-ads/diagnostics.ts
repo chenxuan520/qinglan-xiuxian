@@ -1,5 +1,5 @@
-import { validAdLoadDiagnostic } from '../../src/ad-load-contract.ts';
-import { boundedAdJson } from '../../src/house-ad-contract.ts';
+import { validAdLoadDiagnostic } from '../../src/ads/ad-load-contract.ts';
+import { boundedAdJson } from '../../src/ads/house-ad-contract.ts';
 
 export const AD_DIAGNOSTIC_MAX_VERSIONS = 16;
 export const AD_DIAGNOSTIC_MAX_ROWS = 1000;

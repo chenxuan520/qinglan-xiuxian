@@ -1,4 +1,4 @@
-import { adSellerLine, validAdPlatformSettings } from '../../src/ad-platform-contract.ts';
+import { adSellerLine, validAdPlatformSettings } from '../../src/ads/ad-platform-contract.ts';
 
 export default {
   async fetch(_request: Request, env: Pick<HouseAdsEnv, 'DB'>): Promise<Response> {

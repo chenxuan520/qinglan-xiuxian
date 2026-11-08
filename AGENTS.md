@@ -16,13 +16,13 @@
 - 仙途成就按实际达成难度由易到难排列，新增成就必须设置难度排序值并插入合适位置，不得默认追加到末尾；履历、留影与评语共用的成就标识及展示须同步核对。十五项中的「万古独尊」仅在本世未受任何传承遗物且其余十四项全部达成后获得，必须排在最后，自身不得参与条件，已撤成就不计入。
 - 游戏帮助所有分类不得出现广告字样，相关条件仅在实际操作界面说明。帮助只说明当前玩法、操作与奖励，不写更新日志、旧版本对照或存档迁移说明；技术兼容信息留在开发文档与验证记录。
 - 帮助「山河旧闻」由 `guide-lore.ts` 收录玩家可读的世界背景，沿用帮助的标题、段落与折叠样式；只主动阅读，不自动弹出或绑定奖励。后期剧情独立折叠且标题不泄底。设定依据保留在 `docs/worldbuilding.md`，源码与作者说明不渲染进游戏，小说仅通过独立阅读页入口承接；更新背景须核对现有机制和序终章，不把推测写成已经发生的玩家经历。
-- 小说《青岚纪·不系舟》正文以 `docs/novel.md`、《青岚纪·寸阴炉》正文以 `docs/novel-2.md` 为唯一来源，由独立 `novel/index.html` / `src/novel.ts` 双书架阅读器承接，`novel/?book=cunyin` 深链第二部；帮助只放新标签页入口，不自动打开或接入AI知识。章节按原文顺序解析并以纯文本呈现，文稿未经要求不改写；正文、HTML均计入离线构建指纹。两书阅读位置分开保存，字号与明暗偏好共用，只写独立 `qinglan-novel-reader-v1`，不读写游戏存档。桌面左目录右正文，手机目录用可关闭对话框；小说样式独立加载，不并入游戏CSS，不引入本地字体、依赖或二进制。
+- 小说《青岚纪·不系舟》正文以 `docs/novel.md`、《青岚纪·寸阴炉》正文以 `docs/novel-2.md` 为唯一来源，由独立 `novel/index.html` / `src/content/novel.ts` 双书架阅读器承接，`novel/?book=cunyin` 深链第二部；帮助只放新标签页入口，不自动打开或接入AI知识。章节按原文顺序解析并以纯文本呈现，文稿未经要求不改写；正文、HTML均计入离线构建指纹。两书阅读位置分开保存，字号与明暗偏好共用，只写独立 `qinglan-novel-reader-v1`，不读写游戏存档。桌面左目录右正文，手机目录用可关闭对话框；小说样式独立加载，不并入游戏CSS，不引入本地字体、依赖或二进制。
 - 帮助「山河旧闻」的短片使用官网 `/media/qinglan-promo-30s.mp4` 内嵌播放器（`guide-film.ts`），点击展开后才设置视频src；展开前不得请求、预取或播放视频，允许原生控件全屏。收起、关闭帮助、切换分类或面板重绘时暂停并释放视频；单机版不显示此联网入口。视频在发布时单独恢复，不进入Git、游戏构建预算或离线清单，不能放入 `public` 或 `src`。
 - 当前在 `master` 迭代。只有用户明确授权当前任务时才 commit / push；提交前先读 `git log --oneline -n 10`，沿用仓库英文 `Add ...` 风格，以实际历史为准。
 - **提交信息绝对禁止添加任何 AI 作者或协作署名**：包括 `Co-Authored-By: Codex <noreply@openai.com>`、其他 AI 的 `Co-Authored-By`、`Generated-by` 及同类署名。不得以历史提交、交接模板或仓库惯例为由添加；提交前必须检查完整提交信息，确认没有此类署名。
 - 开始多步骤任务时说明假设、简短计划及验证目标。完成前执行检查，报告实际结果及未验证部分。
 - **所有代码审查统一遵守根目录 [REVIEW.md](REVIEW.md)，同时审查游戏内帮助及相关文档的完整性。主 agent 与每一个独立审查子 agent 开审前必须先全文通读该文件，再通读本次所审完整代码及相关调用链；每个独立审查者必须亲自在浏览器完成其所审功能改动后的完整操作与细节验证，才能给出通过结论，不强制要求改动前证据。未完成阅读、实际验证或复审时，默认不得提交、推送或部署；用户明确强制要求立即发布时，按 REVIEW.md 的用户强制发布例外执行，并如实保留未验证项。** 独立审查、验证范围、画面与数值核对、复审和交付证据均以该文件为统一规则，不在本文件另列平行审查标准；地图与布局的实际操作、尺寸覆盖和截图检查同样按该文件执行。实施者与独立审查者各自完成验证，覆盖全部受影响入口与同类行为，不能互相替代。
-- 二进制资源红线：未经用户明确授权，禁止把任何新增二进制文件提交到 Git，包括图片、字体、音频、视频、压缩包及生成产物，也不得擅自替换已批准的二进制素材。仓库不允许任何字体文件、字库分包或完整字库。界面与 Canvas 可使用已批准的公共字体源 `fonts.loli.net`（样式）/ `gstatic.loli.net`（字形），必须保留系统字体回退；外部请求不能阻塞游戏、留影或离线游玩，不将远程字体复制、打包或纳入本地离线清单。提交前运行 `npm run assets:check`；CI 会按已批准素材基线检查路径、长度和 SHA-256，并逐提交检查新增二进制文件。禁止自行更新 `scripts/approved-binaries.json`、修改检查器或关闭 CI 来放行素材；用户明确要求新增素材时，先说明文件大小与用途，再按实际授权范围处理。所有截图、原图与临时生成结果只放 `/tmp` 或忽略的 `artifacts/`。
+- 二进制资源红线：未经用户明确授权，禁止把任何新增二进制文件提交到 Git，包括图片、字体、音频、视频、压缩包及生成产物，也不得擅自替换已批准的二进制素材。仓库不允许任何字体文件、字库分包或完整字库。界面与 Canvas 可使用已批准的公共字体源 `fonts.loli.net`（样式）/ `gstatic.loli.net`（字形），必须保留系统字体回退；外部请求不能阻塞游戏、留影或离线游玩，不将远程字体复制、打包或纳入本地离线清单。提交前运行 `npm run assets:check`；CI 会按已批准素材基线检查路径、长度和 SHA-256，并逐提交检查新增二进制文件。禁止自行更新 `scripts/assets/approved-binaries.json`、修改检查器或关闭 CI 来放行素材；用户明确要求新增素材时，先说明文件大小与用途，再按实际授权范围处理。所有截图、原图与临时生成结果只放 `/tmp` 或忽略的 `artifacts/`。
 - 体积门禁可放宽：入口 JS/CSS 的原始与 gzip 字节上限、整包上限在新增功能或可读性需要时可以经用户同意调整（如 2026-11-04 将 CSS 上限调到 170,000），不得为了凑预算牺牲代码结构、可读性或排版，例如合并语义不同的间距、压缩文案或写选择器特技。**代码优雅与可读性是第一优先级**，体积其次；素材批准基线与测试样本、验收区间仍按各自规则，不能借预算放宽绕过。
 - 2026-11-05 用户再次明确可在合理情况下放宽体积门禁、优先代码优雅与可读性；周天星轨接入时，入口 JS 原始字节预算由575,000调整为600,000，gzip、CSS与18MB整包预算保持。
 - 同日沿用上述授权，为星轨行动策略与双狼循环保留清晰结构，入口 JS gzip 预算由212,000小幅调整为213,000字节；原始600,000、CSS与18MB整包预算不变，玩法平衡样本及验收区间不变。
@@ -30,7 +30,7 @@
 - 2026-11-06 按用户明确要求将入口 JS gzip 预算由 214,000 调整为 220,000，用于容纳匿名统计的中途离开事件、首局视图与监控口径；原始 600,000、CSS 与 18MB 整包预算及全部平衡样本、验收区间不变。
 - 2026-11-06 按用户明确要求将入口 JS gzip 上限由 220,000 调整为 300,000、入口 CSS 原始字节由 170,000 调整为 180,000、完整构建目录由 18MB 调整为 20MB；CSS gzip 35,000、入口 JS 原始 600,000、全部平衡样本及验收区间不变。
 - 2026-11-06 沿用用户允许合理放宽体积门禁、保留清晰实现的授权，手机竖屏 HUD 接入实测入口 JS 602,327、CSS gzip 35,327 字节，将两项预算由 600,000 / 35,000 小幅调整为 610,000 / 36,000；其余预算、素材及平衡门禁保持。
-- 依赖与锁文件红线：`package-lock.json` 的 `resolved` 只能指向公网官方源 `registry.npmjs.org`，不得残留本机 npm 配置的内网镜像（2026-10 曾因此让 GitHub Actions 的 `npm ci` 崩溃，排查见 [验证记录](docs/verification.md)），由 `tests/repo-guardrails.test.ts` 检查；发现内网域名须在推送前改回官方源并重装验证。本机 `npm install` 或 `npm prune` 会顺手改动锁文件的 libc 等字段格式，提交锁文件时以最小 diff 为准，无关的格式变化要还原。
+- 依赖与锁文件红线：`package-lock.json` 的 `resolved` 只能指向公网官方源 `registry.npmjs.org`，不得残留本机 npm 配置的内网镜像（2026-10 曾因此让 GitHub Actions 的 `npm ci` 崩溃，排查见 [验证记录](docs/verification.md)），由 `tests/repo/repo-guardrails.test.ts` 检查；发现内网域名须在推送前改回官方源并重装验证。本机 `npm install` 或 `npm prune` 会顺手改动锁文件的 libc 等字段格式，提交锁文件时以最小 diff 为准，无关的格式变化要还原。
 - 渲染实测（`perf:render`）只用 Node 22 内置 WebSocket 与 fetch 直连 Chrome DevTools Protocol，不引入 puppeteer 等浏览器驱动依赖，避免把额外依赖子树带进每次 push 的 `npm ci`。
 - 浏览器预览、交互、DOM、网络、截图验证只使用 **Chrome DevTools MCP**。使用隔离浏览器上下文与测试存档，不操作用户正在玩的页面。不要改用 Playwright、Puppeteer、Selenium 或命令行浏览器；MCP profile 被占用时优先使用隔离上下文，不直接杀进程。
 - 直接修改现有页面并更新正常入口，禁止为预览、验证另建临时 HTML（包括 `__verify-*.html`、测试页和入口副本）。页面验证直接访问正常的 5173 首页，仍使用隔离上下文与测试存档。
@@ -71,48 +71,50 @@
 
 以下约定已由测试强制，`npm test` 失败即违规；不得以修改断言、放宽正则或删除测试来放行。
 
-- 锁文件只引用 `registry.npmjs.org`；游戏与 `scripts/browser-tools` 依赖中不出现 Puppeteer、Playwright、Selenium 等浏览器驱动 —— `tests/repo-guardrails.test.ts`
-- 仓库只保留 `index.html`、`novel/index.html`、`monitor/index.html` 三个 HTML 入口，不提交验证页或入口副本 —— `tests/repo-guardrails.test.ts`
-- `styles.ts` 按固定顺序加载十二份样式，`battle-hud.css` 在其后；游戏样式不使用吸顶，标签、分类、筛选与分页栏不固定定位 —— `tests/repo-guardrails.test.ts`
-- README 指向唯一官网，README 与网页摘要不以固定数量宣传法宝、功法、秘境或丹药 —— `tests/repo-guardrails.test.ts`
-- 坊间互动、炉边故人与拍卖准备只随坊市按需模块（`market-event-ui.ts`）加载，不得被静态导入拉回首屏入口 —— `tests/entry-boundaries.test.ts`
-- 新增二进制须在已批准基线内、仓库无字体文件 —— `npm run assets:check` 与 `tests/binaries.test.ts`
-- 全部帮助分类不出现广告字样 —— `tests/guide-source.test.ts`
+- 锁文件只引用 `registry.npmjs.org`；游戏与 `scripts/ui/browser-tools` 依赖中不出现 Puppeteer、Playwright、Selenium 等浏览器驱动 —— `tests/repo/repo-guardrails.test.ts`
+- 仓库只保留 `index.html`、`novel/index.html`、`monitor/index.html` 三个 HTML 入口，不提交验证页或入口副本 —— `tests/repo/repo-guardrails.test.ts`
+- `styles.ts` 按固定顺序加载十二份样式，`battle-hud.css` 在其后；游戏样式不使用吸顶，标签、分类、筛选与分页栏不固定定位 —— `tests/repo/repo-guardrails.test.ts`
+- README 指向唯一官网，README 与网页摘要不以固定数量宣传法宝、功法、秘境或丹药 —— `tests/repo/repo-guardrails.test.ts`
+- 坊间互动、炉边故人与拍卖准备只随坊市按需模块（`market-event-ui.ts`）加载，不得被静态导入拉回首屏入口 —— `tests/core/entry-boundaries.test.ts`
+- 新增二进制须在已批准基线内、仓库无字体文件 —— `npm run assets:check` 与 `tests/scripts/assets/binaries.test.ts`
+- 全部帮助分类不出现广告字样 —— `tests/guide/guide-source.test.ts`
 - 帮助与文档中的规则表格对照真实规则函数 —— `npm run docs:check`
 
 ## 技术与目录
+
+`src/`、`tests/`、`scripts/` 按领域分文件夹（见本次目录结构）；新文件必须放入对应文件夹，不得放在根层；测试放在与被测模块同名的 `tests/` 子目录。
 
 单机构建使用 `npm run build:standalone`（编译期 `--mode standalone`），tag Release 默认走此命令；普通 `build` 和两站部署保持联网版。单机包不得请求游戏后端、遥测、调试/白名单或外部字体/SDK，NPC、茶馆、留影沿用本地内容，页面标注「单机版」；自动历练不受影响。改动相关请求链路时同时验证两种构建、根/子路径与可选离线缓存，不能仅靠来源白名单阻止请求。详见 [开发与部署](docs/development.md)。
 
 前端使用 Vite + TypeScript + Canvas 2D，无运行时游戏框架。战斗与存档本地运行，NPC 闲谈使用独立 Cloudflare Workers AI，失败回退本地对白。需要 Node.js **22.18+**。
 
-| 路径                                                                | 职责                                      |
-| ------------------------------------------------------------------- | ----------------------------------------- |
-| `src/data.ts`                                                       | 法宝、功法、灵根、境界、关卡与难度数据    |
-| `src/game.ts`                                                       | 无 DOM 战斗模拟、升级、伤害统计、对局快照 |
-| `src/enemy-stats.ts`、`src/bestiary-stats.ts`                       | 实战出生数值、妖物志解锁时段与同刻对照    |
-| `src/autoplay.ts`                                                   | AI 走位及选技，实战与平衡模拟共用         |
-| `src/progress.ts`                                                   | 永久存档、成长、寿元、闭关、天劫与结算    |
-| `src/mortal-data.ts`、`src/mortal.ts`                               | 人间时间、十六宗门、供奉与精研规则        |
-| `src/mortal-ui.ts`、`src/mortal.css`                                | 人间界面、宗门图集和响应式布局            |
-| `src/save-transfer.ts`                                              | 存档导入导出及校验                        |
-| `src/main.ts`                                                       | 界面、输入、音频、存档写入与状态衔接      |
-| `src/game-audio.ts`、`src/sound-settings.ts`                        | 单实例音频输出、声音偏好操作与保存衔接    |
-| `src/battle-hud.css`                                                | 战斗顶部状态、按钮与横竖屏布局            |
-| `src/render.ts`、`src/style.css`                                    | Canvas 绘制、桌面和移动布局               |
-| `src/item-art.ts`、`src/sprites.ts`                                 | 统一图集映射，列表和战场共用              |
-| `src/town.ts`、`src/town-scene.ts`                                  | 城镇坐标、行走与交互、模块地图及镜头      |
-| `src/sect-market*.ts`、`src/market-roaming.ts`、`src/market-art.ts` | 坊市场景、镜头覆盖、散步修士及建筑取景    |
-| `src/market-social*.ts`、`src/market-ambush*.ts`                    | 论道、求购、私下机缘与独立劫修遭遇        |
-| `src/market-fellow*.ts`                                             | 同道重逢、寿数与后人、交易见闻线索        |
-| `src/market-exchange.ts`                                            | 组合换物报价、库存与统一估值约束          |
-| `src/iron-market*.ts`                                               | 玄铁十年行情、购买额度与批量交易          |
-| `src/auction*.ts`                                                   | 坊市拍卖、物品估值、结拍记录与状态校验    |
-| `src/scene-assets.ts`                                               | 按关卡生成预载素材清单                    |
-| `src/asset-url.ts`                                                  | 静态素材的部署基础路径处理                |
-| `src/guide.ts`                                                      | 游戏内说明，玩法变化时同步维护            |
-| `public/assets/`                                                    | 已生成的图片及背景音乐                    |
-| `tests/`、`scripts/`                                                | 逻辑测试、固定种子平衡模拟、素材生成脚本  |
+| 路径                                                                                   | 职责                                      |
+| -------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `src/core/data.ts`                                                                     | 法宝、功法、灵根、境界、关卡与难度数据    |
+| `src/battle/game.ts`                                                                   | 无 DOM 战斗模拟、升级、伤害统计、对局快照 |
+| `src/battle/enemy-stats.ts`、`src/content/bestiary-stats.ts`                           | 实战出生数值、妖物志解锁时段与同刻对照    |
+| `src/battle/autoplay.ts`                                                               | AI 走位及选技，实战与平衡模拟共用         |
+| `src/core/progress.ts`                                                                 | 永久存档、成长、寿元、闭关、天劫与结算    |
+| `src/town/mortal-data.ts`、`src/town/mortal.ts`                                        | 人间时间、十六宗门、供奉与精研规则        |
+| `src/town/mortal-ui.ts`、`src/town/mortal.css`                                         | 人间界面、宗门图集和响应式布局            |
+| `src/core/save-transfer.ts`                                                            | 存档导入导出及校验                        |
+| `src/main.ts`                                                                          | 界面、输入、音频、存档写入与状态衔接      |
+| `src/battle/game-audio.ts`、`src/services/sound-settings.ts`                           | 单实例音频输出、声音偏好操作与保存衔接    |
+| `src/battle/battle-hud.css`                                                            | 战斗顶部状态、按钮与横竖屏布局            |
+| `src/battle/render.ts`、`src/styles/style.css`                                         | Canvas 绘制、桌面和移动布局               |
+| `src/items/item-art.ts`、`src/battle/sprites.ts`                                       | 统一图集映射，列表和战场共用              |
+| `src/town/town.ts`、`src/town/town-scene.ts`                                           | 城镇坐标、行走与交互、模块地图及镜头      |
+| `src/sect/sect-market*.ts`、`src/market/market-roaming.ts`、`src/market/market-art.ts` | 坊市场景、镜头覆盖、散步修士及建筑取景    |
+| `src/market/market-social*.ts`、`src/market/market-ambush*.ts`                         | 论道、求购、私下机缘与独立劫修遭遇        |
+| `src/market/market-fellow*.ts`                                                         | 同道重逢、寿数与后人、交易见闻线索        |
+| `src/market/market-exchange.ts`                                                        | 组合换物报价、库存与统一估值约束          |
+| `src/market/iron-market*.ts`                                                           | 玄铁十年行情、购买额度与批量交易          |
+| `src/market/auction*.ts`                                                               | 坊市拍卖、物品估值、结拍记录与状态校验    |
+| `src/battle/scene-assets.ts`                                                           | 按关卡生成预载素材清单                    |
+| `src/core/asset-url.ts`                                                                | 静态素材的部署基础路径处理                |
+| `src/guide/guide.ts`                                                                   | 游戏内说明，玩法变化时同步维护            |
+| `public/assets/`                                                                       | 已生成的图片及背景音乐                    |
+| `tests/`、`scripts/`                                                                   | 逻辑测试、固定种子平衡模拟、素材生成脚本  |
 
 续局结构校验与战斗公共类型在 `game-validation.ts` / `game-types.ts`，连击系数在 `boss-followup.ts`；续局校验与连击系数文件的变更同样触发完整平衡测试。战斗 HUD 在 `battle-hud.ts`，面板框架、返回焦点与滚动在 `panel-host.ts`。序章、轮回与终章模板在 `opening-ui.ts`，首页与战斗结果模板在 `lobby-ui.ts`，入镇与人间活动在 `town-host.ts`，坊间互动执行在随坊市按需加载的 `market-social-actions.ts`，拍卖界面执行在 `auction-ui.ts`、交易结算在 `auction-trade.ts`，弹窗焦点与手动走位在 `input-controller.ts`，点击与按键动作分发在 `action-controller.ts`，城镇挂载、入场与广告面板在 `scene-flow.ts`。异步留影和丹囊交互分别在 `journey-card-panel.ts` / `medicine-panel.ts`；藏器阁界面与炼器保存事务在 `catalog-ui.ts`，洞府和妖物志模板在各自的 `*-ui.ts`。出场、突破与预警绘制在 `render-overlays.ts` / `render-warnings.ts`。`styles.ts` 按原顺序加载十二份连续样式，禁止为了归类移动媒体覆盖顺序；`battle-hud.css` 仍在其后加载。
 
@@ -127,6 +129,6 @@ npm run format:check
 npm run docs:check
 ```
 
-声音与战斗界面重构后运行 `npm ci --prefix scripts/browser-tools`、`npm run ui:check`（需要正常 5173 首页已启动）。回归只经 Chrome DevTools MCP 操作独立浏览器上下文，覆盖电脑、手机窄屏、竖屏及横屏的设置、声音、自动历练、暂停/帮助/伤害返回、刷新续局、升级选择与后期长数字/药效；`UI_BASE_URL` 可指定本机子路径，`CHROME_PATH` 可指定 Chrome。GitHub 的 `checks.yml` 独立运行同一浏览器回归门禁；单元测试、格式/Worker类型、界面回归分成独立job，失败让相应门禁标红，不放回Pages部署流程，也不以needs或轮询变相等待。提交前按 [REVIEW.md](REVIEW.md) 完成本地验证与审查。工具依赖单独锁定在 `scripts/browser-tools`，不进入游戏依赖或平衡作业。报告与失败截图只写 `artifacts/ui-regression/`；本机需逐张视检时使用 `UI_SCREENSHOTS=1 npm run ui:check`，截图不提交 Git。
+声音与战斗界面重构后运行 `npm ci --prefix scripts/ui/browser-tools`、`npm run ui:check`（需要正常 5173 首页已启动）。回归只经 Chrome DevTools MCP 操作独立浏览器上下文，覆盖电脑、手机窄屏、竖屏及横屏的设置、声音、自动历练、暂停/帮助/伤害返回、刷新续局、升级选择与后期长数字/药效；`UI_BASE_URL` 可指定本机子路径，`CHROME_PATH` 可指定 Chrome。GitHub 的 `checks.yml` 独立运行同一浏览器回归门禁；单元测试、格式/Worker类型、界面回归分成独立job，失败让相应门禁标红，不放回Pages部署流程，也不以needs或轮询变相等待。提交前按 [REVIEW.md](REVIEW.md) 完成本地验证与审查。工具依赖单独锁定在 `scripts/ui/browser-tools`，不进入游戏依赖或平衡作业。报告与失败截图只写 `artifacts/ui-regression/`；本机需逐张视检时使用 `UI_SCREENSHOTS=1 npm run ui:check`，截图不提交 Git。
 
 有人正在使用 5173 时，不启动第二个服务，不自动换成 5174。先检查现有进程，并按下一节更新生产预览。`npm run preview -- --port 5173 --strictPort` 用于尚无服务时预览 `dist`。
