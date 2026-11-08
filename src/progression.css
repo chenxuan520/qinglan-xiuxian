@@ -639,6 +639,9 @@ qinglan-guide-ask .guide-ask-toggle {
   line-height: 1.7;
   color: #adc0aa;
 }
+.curio-card.is-unowned {
+  filter: grayscale(1);
+}
 .curio-card.is-unowned .curio-art {
   opacity: 0.5;
 }
