@@ -52,10 +52,7 @@ for (let origin = 0; origin < 6; origin++)
       assert.deepEqual(bossSkills(origin, arena === 6).slice(0, 3), STAGES[origin].skills);
       assert.equal(
         bossSkills(origin, arena === 6).length,
-        4 +
-          Number([2, 4].includes(origin)) +
-          (origin === 5 ? 2 : 0) +
-          Number(arena === 6 && [3, 4].includes(origin)),
+        4 + Number([2, 4].includes(origin)) + (origin === 5 ? 2 : 0),
       );
       assert.deepEqual(bossSkills(6, true).slice(0, 6), STAGES[6].skills);
       assert.equal(bossSkills(6, true).length, 9);
@@ -247,36 +244,31 @@ test('回焰与星珠跨转折点按同一轨迹推进，长短帧和读档不�
   }
 });
 
-test('逆行魂影只走施法前记录的路线，拐弯和停驻都不读取玩家未来位置', () => {
+test('逆行魂影从足迹浮现，蓄力后锁定扑出时玩家位置并不再追踪', () => {
   const { g, e } = encounter(4);
-  g.input = { x: 1, y: 0 };
-  advance(g, 1.8);
-  g.input = { x: 0, y: 1 };
-  advance(g, 1.8);
-  const trace = structuredClone(g.playerTrail);
-  assert.equal(trace.length, R.trailLimit);
-  e.skillStep = 3;
+  g.time = 10;
+  g.playerTrail = Array.from({ length: 21 }, (_, i) => ({ x: i * 10, y: 0, time: i * 0.15 }));
+  Object.assign(g.player, { x: 300, y: 0 });
   g.castBossSkill(e, 1, 0);
   const b = g.shots[0];
-  assert.equal(b.bossMotion?.kind, 'memory');
   if (b.bossMotion?.kind !== 'memory') throw Error('missing memory');
-  assert.deepEqual(
-    b.bossMotion.path.slice(2),
-    trace
-      .slice()
-      .reverse()
-      .map(({ x, y }) => ({ x, y })),
-  );
-  const path = structuredClone(b.bossMotion.path);
-  Object.assign(g.player, { x: 10000, y: -10000 });
+  assert.deepEqual(b.bossMotion.path, [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ]);
+  assert.ok(Math.abs(b.bossMotion.warmup - 0.8) < 1e-9);
   g.updateShots(0.5);
-  assert.deepEqual(b.bossMotion.path, path);
-  assert.equal(b.x, e.x);
-  assert.equal(b.y, e.y);
-  const p1 = path[1],
-    d = Math.hypot(p1.x - path[0].x, p1.y - path[0].y);
-  const pose = bossShotPose(b, b.bossMotion.warmup + d / R.memorySpeed);
-  assert.ok(Math.hypot(pose.x - p1.x, pose.y - p1.y) < 1e-7);
+  assert.deepEqual({ x: b.x, y: b.y }, { x: 0, y: 0 });
+  Object.assign(g.player, { x: 300, y: 0 });
+  g.updateShots(0.31);
+  assert.equal(b.bossMotion.locked, true);
+  assert.deepEqual(b.bossMotion.path[1], { x: 300, y: 0 });
+  const locked = structuredClone(b.bossMotion.path);
+  Object.assign(g.player, { x: 900, y: 900 });
+  g.updateShots(0.2);
+  assert.deepEqual(b.bossMotion.path, locked);
+  const pose = bossShotPose(b, b.age);
+  assert.ok(Math.abs(Math.hypot(pose.vx, pose.vy) - R.memorySpeed) < 1e-6);
 });
 
 test('星珠绕固定星位旋转，五颗按1.3/1.65/2/2.35/2.7秒错拍释放，蓄势时不造成碰撞伤害', () => {
@@ -380,6 +372,16 @@ test('自动走位遇上折返、逆行和错拍的实际碰撞路线会放弃�
     g.pickups = [{ x: 200, y: 0, kind: 'xp', value: 1, pull: false }];
     const shot = g.shots[origin === 1 ? 2 : 0];
     g.shots = [shot];
+    if (shot.bossMotion?.kind === 'memory') {
+      // 新魂影在扑出瞬间才锁定路径；这里手工给出已锁定的真实路线。
+      shot.bossMotion.path = [
+        { x: shot.x, y: shot.y },
+        { x: 200, y: 0 },
+        { x: 200, y: -160 },
+      ];
+      shot.bossMotion.locked = true;
+      shot.bossMotion.warmup = R.memoryWarmup;
+    }
     shot.age =
       origin === 1
         ? R.returnWarmup + bossReturnOut(shot) + R.returnRest + 0.1

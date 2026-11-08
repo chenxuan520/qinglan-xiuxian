@@ -92,11 +92,19 @@ export function drawBossMotionCue(c: CanvasRenderingContext2D, b: Shot) {
     c.arc(0, 0, b.radius + 9, -Math.PI / 2, -Math.PI / 2 + progress * TAU);
     c.stroke();
   } else if (m.kind === 'memory') {
-    c.fillStyle = b.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : '#e5c8f5';
-    for (let i = 1; i <= 3; i++) {
+    if (!pose.active) {
+      const progress = Math.min(1, b.age / m.warmup);
+      c.strokeStyle = b.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : '#e5c8f5';
       c.beginPath();
-      c.arc(-i * 9, 0, 3 - i * 0.5, 0, TAU);
-      c.fill();
+      c.arc(0, 0, b.radius + 9, -Math.PI / 2, -Math.PI / 2 + progress * TAU);
+      c.stroke();
+    } else {
+      c.fillStyle = b.color === SOVEREIGN_GOLD ? SOVEREIGN_GOLD : '#e5c8f5';
+      for (let i = 1; i <= 3; i++) {
+        c.beginPath();
+        c.arc(-i * 9, 0, 3 - i * 0.5, 0, TAU);
+        c.fill();
+      }
     }
   }
   c.restore();

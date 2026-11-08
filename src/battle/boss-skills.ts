@@ -14,12 +14,17 @@ const native = STAGES.map((stage, id) =>
     ? [...stage.skills, ...additions[id]]
     : [...stage.skills, '万劫归一', '天劫审判', '归墟引力'],
 );
-const trial = native.map((skills, id) => [
-  ...skills,
-  ...(id === 3 ? ['游瘴驱逐'] : id === 4 ? ['幽影追踪'] : []),
-]);
-export function bossSkills(stage: number, finalTrial: boolean) {
-  return (finalTrial ? trial : native)[stage];
+export function bossSkills(stage: number, _finalTrial: boolean) {
+  return native[stage];
+}
+/** 远离触发的追击招式（原生与终关一致），不在技能轮转中。 */
+export function bossPursuitSkill(stage: number): string | null {
+  return stage === 3 ? '游瘴驱逐' : stage === 4 ? '幽影追踪' : null;
+}
+/** 妖物志展示用：轮转招式 + 追击招式。 */
+export function bestiaryBossSkills(stage: number, finalTrial: boolean) {
+  const pursuit = bossPursuitSkill(stage);
+  return pursuit ? [...bossSkills(stage, finalTrial), pursuit] : bossSkills(stage, finalTrial);
 }
 
 export function bossSkillCooldown(stage: number, finalTrial: boolean, enraged: boolean) {

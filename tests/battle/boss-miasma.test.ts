@@ -82,13 +82,13 @@ test('第四境真实远距追袭生成十二秒、速度120、半径70的追云
     assert.equal(z.damage, boss.damage * 0.8);
     assert.equal(z.radius, 70);
     const trial = encounter(6, difficulty);
-    trial.boss.skillStep = 4;
-    trial.g.castBossSkill(trial.boss, 0.6, 0.8);
+    trial.boss.pursuitCooldown = 0;
+    trial.g.update(0.01);
     const old = trial.g.zones[0];
     assert.equal(old.life, 12);
     assert.ok(Math.abs(Math.hypot(old.vx!, old.vy!) - 120) < 1e-8);
-    assert.equal(old.vx, 0.6 * 120);
-    assert.equal(old.vy, 0.8 * 120);
+    assert.equal(old.vx, 120);
+    assert.equal(old.vy, 0);
     assert.equal(old.radius, 70);
     assert.equal(old.castDelay, 1.2);
     assert.equal(old.damage, trial.boss.damage * 0.8);

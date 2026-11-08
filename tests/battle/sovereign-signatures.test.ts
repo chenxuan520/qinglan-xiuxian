@@ -542,7 +542,7 @@ test('仙尊幽影换形留下三影、横移150，0.8秒后各放八枚金色�
       shadows.every(
         (e) =>
           e.radius === c.e.radius &&
-          e.hp === 1 &&
+          e.hp === Math.max(1, Math.round(c.e.maxHp * 0.03)) &&
           e.speed === 0 &&
           e.damage === 0 &&
           e.cooldown === 0.8,

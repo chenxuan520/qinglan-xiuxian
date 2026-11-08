@@ -700,12 +700,32 @@ export class Renderer {
         if (e.illusionOf !== undefined) {
           c.save();
           c.globalAlpha = 0.38;
-          this.sprite(STAGES[4].sprite, e.x, e.y, e.radius * 3.1, 1, false, 'orthodox', frozen);
+          this.sprite(
+            STAGES[4].sprite,
+            e.x,
+            e.y,
+            e.radius * 3.1,
+            1,
+            e.flash > 0,
+            'orthodox',
+            frozen,
+          );
           c.globalAlpha = 0.85;
           c.fillStyle = '#d8c6ed';
           c.font = '14px serif';
           c.textAlign = 'center';
           c.fillText('影', e.x, e.y - e.radius * 1.7);
+          if (e.hp < e.maxHp) {
+            c.fillStyle = '#142623bb';
+            c.fillRect(e.x - e.radius, e.y - e.radius * 2.5, e.radius * 2, 3);
+            c.fillStyle = '#b8c68b';
+            c.fillRect(
+              e.x - e.radius,
+              e.y - e.radius * 2.5,
+              e.radius * 2 * Math.max(0, e.hp / e.maxHp),
+              3,
+            );
+          }
           c.restore();
           continue;
         }

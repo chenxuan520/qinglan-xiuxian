@@ -158,7 +158,7 @@ test('原生毒君与冥主保留特色追袭，其余远距蓄势冲锋，没�
       e.x = -500;
       e.pursuitCooldown = 0;
       g.update(0.01);
-      if (arena !== 6 && origin === 3) {
+      if (origin === 3) {
         assert.equal(e.charge, 0);
         assert.equal(g.zones.length, 1);
         assert.equal(g.zones[0].life, 12);
@@ -166,7 +166,7 @@ test('原生毒君与冥主保留特色追袭，其余远距蓄势冲锋，没�
         assert.equal(g.zones[0].endX, undefined);
         continue;
       }
-      if (arena !== 6 && origin === 4) {
+      if (origin === 4) {
         assert.equal(e.charge, 0);
         assert.equal(e.x, -260);
         assert.equal(g.zones.length, 0);
@@ -217,7 +217,12 @@ test('当前招式队列保存完整，已撤妖王条带清除且小怪区域�
     assert.deepEqual(Game.restore(native.g.save, mixed)!.zones, [
       { ...field, kind: 'enemy-firepath' },
     ]);
-    for (const invalid of [bossSkills(origin, true).length, -1, 0.5]) {
+    const invalidSteps = [
+      ...(origin === 3 || origin === 4 ? [] : [bossSkills(origin, true).length]),
+      -1,
+      0.5,
+    ];
+    for (const invalid of invalidSteps) {
       const broken = structuredClone(raw);
       broken.enemies[0].skillStep = invalid;
       assert.equal(Game.restore(g.save, broken), null);

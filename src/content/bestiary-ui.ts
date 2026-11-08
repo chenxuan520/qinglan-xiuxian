@@ -1,4 +1,4 @@
-import { bossSkills, bossSkillCooldown } from '../battle/boss-skills.ts';
+import { bestiaryBossSkills, bossSkillCooldown } from '../battle/boss-skills.ts';
 import { BOSS_SKILL_TEXT, BOSS_TRAITS } from '../battle/boss-skill-text.ts';
 import { ENEMY_SKILLS, regionalSkillDetails } from '../battle/regional-skill-info.ts';
 import { regionalEnemyTactics } from '../battle/regional-combat.ts';
@@ -125,7 +125,7 @@ export function bestiaryPanel(
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}><span class="boss-skill-name">特性</span>${BOSS_TRAITS[bossStage]}。${bossSkills(
+        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}><span class="boss-skill-name">特性</span>${BOSS_TRAITS[bossStage]}。${bestiaryBossSkills(
           bossStage,
           trial,
         )

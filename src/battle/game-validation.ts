@@ -51,6 +51,22 @@ export function validateRunSnapshot(
     )
       return null;
     if (s.path !== undefined && !isCultivationPath(s.path)) return null;
+    // 终关毒君/冥主的追击招式已移出技能轮转，旧快照里越界的索引就地迁移。
+    if (Array.isArray(s.enemies))
+      for (const e of s.enemies) {
+        if (!e || typeof e !== 'object' || !e.boss) continue;
+        if (e.bossStage !== 3 && e.bossStage !== 4) continue;
+        const count = savedBossSkillCount(e.bossStage, true);
+        if (e.skillStep !== undefined && Number.isInteger(e.skillStep) && e.skillStep >= count) {
+          e.skillStep = 0;
+          if (Array.isArray(e.bossSkillQueue))
+            e.bossSkillQueue = e.bossSkillQueue.filter((skill) => skill !== 0);
+        }
+        if (Array.isArray(e.bossSkillQueue))
+          e.bossSkillQueue = e.bossSkillQueue.filter(
+            (skill) => !Number.isInteger(skill) || skill < count,
+          );
+      }
     if (s.tribulation !== undefined && (!Number.isSafeInteger(s.tribulation) || s.tribulation < 0))
       return null;
     if (

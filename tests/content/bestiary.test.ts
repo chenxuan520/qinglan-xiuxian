@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bestiaryPanel } from '../../src/content/bestiary-ui.ts';
-import { bossSkills } from '../../src/battle/boss-skills.ts';
+import { bestiaryBossSkills } from '../../src/battle/boss-skills.ts';
 import { BOSS_SKILL_TEXT, BOSS_TRAITS } from '../../src/battle/boss-skill-text.ts';
 import { BOSS_MECHANICS } from '../../src/battle/boss-mechanics.ts';
 import { bestiaryEnemyStats } from '../../src/content/bestiary-stats.ts';
@@ -118,7 +118,7 @@ test('妖物志妖王招式说明覆盖全部名称且卡片按特性与招式�
   const names = new Set<string>();
   for (let stage = 0; stage < 7; stage++)
     for (const trial of [false, true])
-      for (const name of bossSkills(stage, trial)) {
+      for (const name of bestiaryBossSkills(stage, trial)) {
         names.add(name);
         assert.ok(BOSS_SKILL_TEXT[name], `${name} 缺少说明`);
       }
@@ -137,11 +137,13 @@ test('妖物志妖王招式说明覆盖全部名称且卡片按特性与招式�
   const namesInCard = [...wood.matchAll(/<span class="boss-skill-name">([^<]+)<\/span>/g)].map(
     (m) => m[1],
   );
-  assert.deepEqual(namesInCard, ['特性', ...bossSkills(0, false)]);
+  assert.deepEqual(namesInCard, ['特性', ...bestiaryBossSkills(0, false)]);
 
   const trialPoison = card(3, 6);
   assert.match(trialPoison, /游瘴驱逐/);
-  assert.doesNotMatch(card(3), /游瘴驱逐/);
+  assert.match(card(3), /游瘴驱逐/);
+  assert.match(card(4, 6), /幽影追踪/);
+  assert.match(card(4), /幽影追踪/);
   assert.match(
     trialPoison,
     new RegExp(`持续<span class="combat-unit">${BOSS_MECHANICS.nativeMiasmaLife}秒</span>`),

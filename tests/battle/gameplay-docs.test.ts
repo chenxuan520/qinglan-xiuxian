@@ -433,7 +433,7 @@ test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际�
   const text = compact(gameplay);
   const book = bestiaryPanel(6).body;
   const counts = Array.from({ length: 6 }, (_, origin) => bossSkills(origin, true).length);
-  assert.deepEqual(counts, [4, 4, 5, 5, 6, 6]);
+  assert.deepEqual(counts, [4, 4, 5, 4, 5, 6]);
   assert.ok(combat.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(book.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(text.includes('保留原本三招与非条带特色招式'));
@@ -455,8 +455,8 @@ test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际�
   assert.ok(text.includes(`气血分别再乘${hp}`));
   for (const enraged of [false, true])
     assert.ok(text.includes(`${bossPursuitCooldown(enraged)}秒`));
-  assert.ok(text.includes('原生毒君使用十二秒漂移追云、冥主瞬移追近'));
-  assert.ok(text.includes('终关毒君与冥主另将追云、瞬移列入常规轮换'));
+  assert.ok(text.includes('原生与终关的毒君使用十二秒漂移追云、冥主瞬移追近'));
+  assert.ok(text.includes('追云与瞬移追近同样不占技能轮转'));
   for (const source of [combat, book]) assert.ok(source.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(text.includes('非条带特色招式'));
   const old = [bossSkillCooldown(0, true, false), bossSkillCooldown(0, true, true)];

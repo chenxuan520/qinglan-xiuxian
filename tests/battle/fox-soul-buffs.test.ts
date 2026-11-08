@@ -83,7 +83,8 @@ test('九道回焰和五道魂影伤害0.6倍，重复施法及部分命中后�
       g.shots.forEach((shot, i) => {
         assert.equal(shot.damage, boss.damage * 0.6);
         assert.equal(shot.bossMotion!.kind, kind);
-        if (shot.bossMotion!.kind === 'memory') assert.equal(shot.bossMotion!.warmup, 1 + i * 0.35);
+        if (shot.bossMotion!.kind === 'memory')
+          assert.ok(Math.abs(shot.bossMotion!.warmup - (0.8 + i * 0.2)) < 1e-9);
       });
       for (let i = 0; i < 3; i++) g.castBossMechanic(boss, 1, 0);
       assert.equal(g.shots.length, limit);
@@ -156,7 +157,7 @@ test('提前击破的幻影不射击且没有收获，本体倒下取消剩余�
     const { g, boss } = cast(4, arena, 4);
     const shadow = g.enemies.find((e) => e.illusionOf === boss.id)!;
     const totals = [g.kills, g.xp, g.combatCultivation, g.iron, g.pickups.length];
-    g.hitEnemy(shadow, 1);
+    g.hitEnemy(shadow, shadow.hp);
     assert.deepEqual([g.kills, g.xp, g.combatCultivation, g.iron, g.pickups.length], totals);
     g.updateEnemies(0.81);
     assert.equal(g.shots.length, 16);

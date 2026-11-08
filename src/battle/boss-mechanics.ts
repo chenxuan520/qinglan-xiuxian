@@ -23,14 +23,17 @@ export const BOSS_MECHANICS = {
   returnRest: 0.4,
   orbitRadius: 135,
   orbitSpeed: 1.1,
-  memorySpeed: 170,
+  memorySpeed: 320,
+  memoryWarmup: 0.8,
+  memoryStagger: 0.2,
+  memoryOvershoot: 160,
   trailStep: 0.15,
   trailLimit: 24,
 } as const;
 
 export type BossMotion =
   | { kind: 'return'; velocity: Point }
-  | { kind: 'memory'; path: Point[]; warmup: number }
+  | { kind: 'memory'; path: Point[]; warmup: number; locked?: boolean }
   | { kind: 'star'; center: Point; angle: number; launchAt: number };
 export interface BossSummon {
   kind: 'heart' | 'wolf';
@@ -108,6 +111,19 @@ export function cloneBossMotion(m: BossMotion): BossMotion {
   return { ...m, center: { ...m.center } };
 }
 
+const LEGACY_MEMORY_WARMUPS = [1, 1.35, 1.7, 2.05, 2.4];
+export function validMemoryWarmup(warmup: number) {
+  return (
+    Number.isFinite(warmup) &&
+    [0, 1, 2, 3, 4].some(
+      (i) =>
+        Math.abs(warmup - (BOSS_MECHANICS.memoryWarmup + i * BOSS_MECHANICS.memoryStagger)) < 1e-8,
+    )
+  );
+}
+export function validMemoryShape(path: Point[], locked: boolean | undefined) {
+  return locked === true ? path.length === 3 : path.length === 2;
+}
 export function validBossMotion(m: BossMotion, stage: number | undefined) {
   const point = (p: Point) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
   if (!m || typeof m !== 'object') return false;
@@ -131,15 +147,20 @@ export function validBossMotion(m: BossMotion, stage: number | undefined) {
         (launchAt) => Math.abs(launchAt - m.launchAt) < 1e-8,
       )
     );
-  return (
-    m.kind === 'memory' &&
-    stage === 4 &&
-    Array.isArray(m.path) &&
-    m.path.length >= 2 &&
-    m.path.length <= BOSS_MECHANICS.trailLimit + 2 &&
-    m.path.every(point) &&
-    Number.isFinite(m.warmup) &&
-    m.warmup >= 1 &&
-    m.warmup <= 2.4
-  );
+  if (
+    m.kind !== 'memory' ||
+    stage !== 4 ||
+    !Array.isArray(m.path) ||
+    m.path.length < 2 ||
+    m.path.length > BOSS_MECHANICS.trailLimit + 2 ||
+    !m.path.every(point) ||
+    !Number.isFinite(m.warmup) ||
+    (m.locked !== undefined && typeof m.locked !== 'boolean')
+  )
+    return false;
+  if (m.locked === true) return validMemoryWarmup(m.warmup) && m.path.length === 3;
+  if (m.locked === false) return validMemoryWarmup(m.warmup) && m.path.length === 2;
+  // 未锁定：2 点短路径是新格式；长路径为旧规则魂影，续局时由 restore 丢弃。
+  if (m.path.length === 2) return validMemoryWarmup(m.warmup);
+  return LEGACY_MEMORY_WARMUPS.some((warmup) => Math.abs(m.warmup - warmup) < 1e-8);
 }

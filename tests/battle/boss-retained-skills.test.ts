@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../../src/battle/game.ts';
 import { freshSave } from '../../src/core/progress.ts';
 import {
+  bestiaryBossSkills,
   bossSkills,
   bossSkillCooldown,
   bossPursuitCooldown,
@@ -90,12 +91,13 @@ for (const arena of [4, 6])
     const shadows = g.enemies.filter((c) => c.illusionOf === e.id);
     assert.equal(shadows.length, 3);
     assert.ok(shadows.every((c) => c.radius === e.radius));
+    const illusionHp = Math.max(1, Math.round(e.maxHp * 0.03));
     assert.deepEqual(
       shadows.map((c) => [c.hp, c.damage, c.speed, c.cooldown]),
-      Array(3).fill([1, 0, 0, 0.8]),
+      Array(3).fill([illusionHp, 0, 0, 0.8]),
     );
     const totals = [g.kills, g.xp, g.combatCultivation, g.iron, g.pickups.length];
-    g.hitEnemy(shadows[0], 1, false, 'sword');
+    g.hitEnemy(shadows[0], shadows[0].hp, false, 'sword');
     assert.equal(shadows[0].dead, true);
     assert.deepEqual([g.kills, g.xp, g.combatCultivation, g.iron, g.pickups.length], totals);
     g.pause();
@@ -111,13 +113,10 @@ for (const arena of [4, 6])
 test('原生与终关远距十二秒追云使用相同参数，冥主瞬移不变，均无条带', () => {
   for (const origin of [3, 4])
     for (const arena of [origin, 6]) {
-      const { g, e } = encounter(origin, arena === 6 ? (origin === 3 ? 4 : 5) : 0, arena);
-      if (arena === 6) g.castBossSkill(e, 1, 0);
-      else {
-        e.x = -500;
-        e.pursuitCooldown = 0;
-        g.update(0.01);
-      }
+      const { g, e } = encounter(origin, 0, arena);
+      e.x = -500;
+      e.pursuitCooldown = 0;
+      g.update(0.01);
       assert.equal(e.charge, 0);
       if (origin === 3) {
         const z = g.zones[0];
@@ -156,8 +155,8 @@ test('七王旧圆阵与保留技能均进入实际轮换，仅劫灵新增两�
     }
   assert.ok(bossSkills(2, true).includes('踏雪连袭'));
   assert.ok(bossSkills(4, true).includes('幽影换形'));
-  assert.ok(bossSkills(3, true).includes('游瘴驱逐'));
-  assert.ok(bossSkills(4, true).includes('幽影追踪'));
+  assert.ok(bestiaryBossSkills(3, true).includes('游瘴驱逐'));
+  assert.ok(bestiaryBossSkills(4, true).includes('幽影追踪'));
 });
 
 test('所有妖王现有冷却再缩短30%，保留半血加速与完整蓄势', () => {

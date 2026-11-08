@@ -16,8 +16,8 @@ function encounter(stage = 0, x = -500, arena = stage) {
   return { g, boss };
 }
 
-test('终关七位妖王追袭蓄力减半，锁定方向且保留冲刺速度与距离', () => {
-  for (let stage = 0; stage < 7; stage++) {
+test('终关除毒君、冥主外的追袭蓄力减半，锁定方向且保留冲刺速度与距离', () => {
+  for (const stage of [0, 1, 2, 5, 6]) {
     const { g, boss } = encounter(stage, -500, 6);
     g.update(0.01);
     assert.ok(Math.abs(boss.charge - (0.425 + 0.7 - 0.01)) < 1e-8);

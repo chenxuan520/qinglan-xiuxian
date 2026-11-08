@@ -4,6 +4,8 @@ import {
   bossReturnOut,
   bossShotPose,
   cloneBossMotion,
+  validMemoryShape,
+  validMemoryWarmup,
   type TrailPoint,
 } from './boss-mechanics.ts';
 import { enemyCombatStats } from './enemy-stats.ts';
@@ -39,7 +41,12 @@ export type {
 } from './game-types.ts';
 import { validateRunSnapshot } from './game-validation.ts';
 import { BOSS_FOLLOWUP } from './boss-followup.ts';
-import { bossSkills, bossSkillCooldown, bossPursuitCooldown } from './boss-skills.ts';
+import {
+  bossPursuitCooldown,
+  bossPursuitSkill,
+  bossSkillCooldown,
+  bossSkills,
+} from './boss-skills.ts';
 import {
   regionalEnemyFields,
   regionalEnemyTactics,
@@ -764,19 +771,27 @@ export class Game {
         weapon: v.weapon,
         hitBosses: [...v.hitBosses],
       }));
-      g.shots = s.shots.map(({ bossAttack, ...b }) => ({
-        ...b,
-        hit: new Set(b.hit),
-        ...(b.bossMotion ? { bossMotion: cloneBossMotion(b.bossMotion) } : {}),
-        ...(bossAttack
-          ? {
-              bossAttack: {
-                volley: bossVolleys[bossAttack.volley],
-                multipliers: { ...bossAttack.multipliers },
-              },
-            }
-          : {}),
-      }));
+      g.shots = s.shots
+        .filter((b) => {
+          const m = b.bossMotion;
+          return (
+            m?.kind !== 'memory' ||
+            (validMemoryWarmup(m.warmup) && validMemoryShape(m.path, m.locked))
+          );
+        })
+        .map(({ bossAttack, ...b }) => ({
+          ...b,
+          hit: new Set(b.hit),
+          ...(b.bossMotion ? { bossMotion: cloneBossMotion(b.bossMotion) } : {}),
+          ...(bossAttack
+            ? {
+                bossAttack: {
+                  volley: bossVolleys[bossAttack.volley],
+                  multipliers: { ...bossAttack.multipliers },
+                },
+              }
+            : {}),
+        }));
       g.zones = s.zones
         .filter((z) => !(z.hostile && z.kind.startsWith('boss-') && z.endX !== undefined))
         .map((z) => ({ ...z }));
@@ -1365,6 +1380,7 @@ export class Game {
         continue;
       }
       if (e.illusionOf !== undefined) {
+        e.flash = Math.max(0, e.flash - dt);
         e.cooldown -= dt;
         e.windup = Math.max(0, e.cooldown);
         const owner = this.enemies.find((owner) => owner.id === e.illusionOf && !owner.dead);
@@ -1401,11 +1417,11 @@ export class Game {
         e.pursuitCooldown = (e.pursuitCooldown ?? 2.5) - dt;
         if (d > 330 && e.charge <= 0 && e.pursuitCooldown <= 0) {
           const stage = e.bossStage ?? this.stage;
-          if (!this.isFinalTrial && (stage === 3 || stage === 4)) {
+          if (stage === 3 || stage === 4) {
             e.pursuitCooldown = bossPursuitCooldown(e.hp < e.maxHp / 2);
             e.cooldown = Math.max(e.cooldown, 1.8 * 0.85 * (e.hp < e.maxHp / 2 ? 0.85 : 1));
             this.castBossPursuit(e, nx, ny);
-            this.announce(`${STAGES[stage].boss} · ${stage === 3 ? '游瘴驱逐' : '幽影追踪'}`);
+            this.announce(`${STAGES[stage].boss} · ${bossPursuitSkill(stage)}`);
             d = distance(e, p);
             nx = (p.x - e.x) / (d || 1);
             ny = (p.y - e.y) / (d || 1);
@@ -1924,10 +1940,6 @@ export class Game {
       this.#castShadowShift(e, nx, ny);
       return;
     }
-    if (this.isFinalTrial && ((stage === 3 && phase === 4) || (stage === 4 && phase === 5))) {
-      this.castBossPursuit(e, nx, ny);
-      return;
-    }
     if (stage === 5 && phase === 4) {
       this.#castCelestialSweep(e, p);
       return;
@@ -2062,7 +2074,7 @@ export class Game {
       );
       illusion.illusionOf = e.id;
       illusion.radius = e.radius;
-      illusion.hp = illusion.maxHp = 1;
+      illusion.hp = illusion.maxHp = Math.max(1, Math.round(e.maxHp * 0.03));
       illusion.damage = illusion.speed = 0;
       illusion.elite = false;
       illusion.cooldown = illusion.windup = 0.8;
@@ -2265,24 +2277,32 @@ export class Game {
         10 - countMatching(this.shots, (b) => b.bossMotion?.kind === 'memory'),
       );
       if (count <= 0) return;
-      const path = [
-        { x: e.x, y: e.y },
-        { x: this.player.x, y: this.player.y },
-        ...this.playerTrail
-          .slice()
-          .reverse()
-          .map((p) => ({ x: p.x, y: p.y })),
-      ];
-      let length = 0;
-      for (let i = 1; i < path.length; i++) length += distance(path[i - 1], path[i]);
+      const trail = this.playerTrail.map((p) => ({ x: p.x, y: p.y }));
+      // 足迹不足 2 点时，以冥主到修士连线上的点代替。
+      const source =
+        trail.length >= 2
+          ? trail
+          : [
+              { x: e.x, y: e.y },
+              { x: this.player.x, y: this.player.y },
+            ];
       for (let i = 0; i < count; i++) {
+        // 从最旧足迹起，均匀取 5 个点（不含最新一点）。
+        const t = (i / 5) * (source.length - 1);
+        const a = source[Math.floor(t)],
+          z = source[Math.min(source.length - 1, Math.floor(t) + 1)];
+        const f = t - Math.floor(t);
+        const spawn = { x: a.x + (z.x - a.x) * f, y: a.y + (z.y - a.y) * f };
         const shot = this.hostileShot(e, nx, ny, rules.memorySpeed, e.damage * 0.6);
+        shot.x = spawn.x;
+        shot.y = spawn.y;
+        shot.origin = { ...spawn };
         shot.bossMotion = {
           kind: 'memory',
-          path: path.map((p) => ({ ...p })),
-          warmup: 1 + i * 0.35,
+          path: [{ ...spawn }, { ...spawn }],
+          warmup: rules.memoryWarmup + i * rules.memoryStagger,
         };
-        shot.life = shot.bossMotion.warmup + length / rules.memorySpeed;
+        shot.life = shot.bossMotion.warmup + 10;
         shot.radius = 10;
       }
     } else if (stage === 5) {
@@ -2833,6 +2853,23 @@ export class Game {
         const vx = b.vx;
         b.vx = vx * Math.cos(turn) - b.vy * Math.sin(turn);
         b.vy = vx * Math.sin(turn) + b.vy * Math.cos(turn);
+      }
+      const memory = b.bossMotion;
+      if (memory?.kind === 'memory' && !memory.locked && b.age >= memory.warmup) {
+        const from = memory.path[0];
+        const d = distance(from, this.player) || 1;
+        const ux = (this.player.x - from.x) / d,
+          uy = (this.player.y - from.y) / d;
+        memory.path = [
+          from,
+          { x: this.player.x, y: this.player.y },
+          {
+            x: this.player.x + ux * BOSS_MECHANICS.memoryOvershoot,
+            y: this.player.y + uy * BOSS_MECHANICS.memoryOvershoot,
+          },
+        ];
+        memory.locked = true;
+        b.life = b.age + (d + BOSS_MECHANICS.memoryOvershoot) / BOSS_MECHANICS.memorySpeed;
       }
       if (b.bossMotion) {
         const { x, y, vx, vy } = bossShotPose(b);
@@ -3622,7 +3659,15 @@ export class Game {
       if ((e.frozenUntil ?? 0) > this.time) damage *= 1.3;
     }
     if (e.illusionOf !== undefined) {
-      if (damage > 0) e.dead = true;
+      if (damage > 0) {
+        e.hp = Math.max(0, e.hp - damage);
+        e.flash = 0.12;
+        if (this.effects.length < 100) {
+          const text = `${formatNumber(Math.ceil(damage))}${crit ? '!' : ''}`;
+          this.#float(e, text, crit ? '#f8db88' : '#e5edce');
+        }
+        if (e.hp <= 0) e.dead = true;
+      }
       return;
     }
     if (e.boss && !this.tribulation && attack) {
