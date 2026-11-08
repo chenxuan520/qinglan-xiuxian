@@ -2485,7 +2485,8 @@ export class Game {
     if (w.id === 'umbrella') {
       let blocked = 0;
       for (const b of this.shots) {
-        if (b.kind === 'hostile' && b.life > 0 && distance(b, p) < radius * 1.6) {
+        // 弹幕可消解；带 bossMotion 的妖王特殊轨迹招式（回焰、魂影、星位）不可消解。
+        if (b.kind === 'hostile' && !b.bossMotion && b.life > 0 && distance(b, p) < radius * 1.6) {
           b.life = 0;
           blocked++;
         }

@@ -535,7 +535,7 @@ export const TREASURES: Treasure[] = [
     mark: '伞',
     color: '#b9dceb',
     tag: '护体 · 拦截',
-    desc: '震退近敌并消解身边的敌方灵弹，消解后放出反击光束。',
+    desc: '震退近敌并消解身边的敌方弹幕（妖王回焰、魂\u2060影、星位除\u2060外），消解后放出反击光束。',
     evolution: '乾坤万法伞',
     passive: 'guard',
     damage: 27,
