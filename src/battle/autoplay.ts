@@ -1,5 +1,11 @@
 import { BOSS_MECHANICS, bossShotPose } from './boss-mechanics.ts';
-import { MAX_WEAPONS, MAX_WEAPON_LEVEL, MAX_PASSIVE_LEVEL, TAU } from '../core/data.ts';
+import {
+  MAX_PASSIVES,
+  MAX_WEAPONS,
+  MAX_WEAPON_LEVEL,
+  MAX_PASSIVE_LEVEL,
+  TAU,
+} from '../core/data.ts';
 import type { Choice, Game, Point } from './game.ts';
 import {
   hazardDistance,
@@ -23,7 +29,51 @@ const favored = [
   'compass',
   'nail',
 ];
-function choiceScore(c: Choice, g: Game) {
+/** 尚未觉醒、且配套功法一个都没学的已持法宝 */
+function uncoveredWeapons(g: Game) {
+  return g.weapons.filter(
+    (w) => !w.evolved && !g.evolutionRequirements(w.id).some((p) => g.passives[p]),
+  );
+}
+/** 剩余功法格 */
+export function freePassiveSlots(g: Game) {
+  return MAX_PASSIVES - Object.keys(g.passives).length;
+}
+/** 覆盖数：学这个功法能让几件「未覆盖」的已持法宝具备觉醒条件 */
+export function passiveCoverage(g: Game, passiveId: string) {
+  return uncoveredWeapons(g).filter((w) => g.evolutionRequirements(w.id).includes(passiveId))
+    .length;
+}
+/** 只剩最后 1 格时预定的功法：覆盖数最高者；同分取靠前法宝的配套，无则 null */
+export function reservedPassive(g: Game): string | null {
+  if (freePassiveSlots(g) !== 1) return null;
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const w of uncoveredWeapons(g))
+    for (const p of g.evolutionRequirements(w.id)) {
+      const count = passiveCoverage(g, p);
+      if (count > bestCount) {
+        best = p;
+        bestCount = count;
+      }
+    }
+  return best;
+}
+/** 某件法宝本局的觉醒前景 */
+export function awakenOutlook(g: Game, weaponId: string): 'sure' | 'open' | 'dead' {
+  const required = g.evolutionRequirements(weaponId);
+  if (required.some((p) => g.passives[p])) return 'sure';
+  if (!required.length) return 'dead';
+  const free = freePassiveSlots(g);
+  if (free >= 2) return 'open';
+  if (free === 1) {
+    const reserved = reservedPassive(g);
+    if (reserved === null) return 'open';
+    return required.includes(reserved) ? 'sure' : 'dead';
+  }
+  return 'dead';
+}
+export function choiceScore(c: Choice, g: Game) {
   if (c.type === 'evolve') return 100;
   if (c.type === 'heal') {
     const hp = g.player.hp / g.player.maxHp;
@@ -35,7 +85,20 @@ function choiceScore(c: Choice, g: Game) {
     ['guard', 'bone', 'duration', 'devour'].includes(c.id)
   )
     return 95;
-  if (c.type === 'weapon')
+  if (c.type === 'weapon') {
+    const outlook = awakenOutlook(g, c.id);
+    const awakenBonus =
+      c.level === 1
+        ? outlook === 'sure'
+          ? 6
+          : outlook === 'dead'
+            ? -8
+            : 0
+        : outlook === 'sure'
+          ? 4
+          : outlook === 'dead'
+            ? -6
+            : 0;
     return (
       (favored.includes(c.id) ? 15 : 10) +
       (c.level > 1 ? 8 : 2) +
@@ -45,8 +108,9 @@ function choiceScore(c: Choice, g: Game) {
       g.weapons.every((w) => w.level === MAX_WEAPON_LEVEL)
         ? 64
         : 0) +
-      (c.level === 1 && g.evolutionRequirements(c.id).some((id) => g.passives[id]) ? 2 : 0)
+      awakenBonus
     );
+  }
   // 已持法宝优先从领悟起补满一套配方，不等待法宝六重。
   if (
     c.level >= 1 &&
@@ -63,8 +127,14 @@ function choiceScore(c: Choice, g: Game) {
         )
       );
     })
-  )
-    return 50 + c.level * 5;
+  ) {
+    let s = 50 + c.level * 5;
+    if (c.level === 1) {
+      const k = passiveCoverage(g, c.id);
+      s += (freePassiveSlots(g) === 1 ? 10 : 3) * Math.max(0, k - 1);
+    }
+    return s;
+  }
   const needed = g.weapons.some((w) => g.evolutionRequirements(w.id).includes(c.id) && !w.evolved);
   const score =
     (needed ? 16 : 0) +
@@ -76,7 +146,10 @@ function choiceScore(c: Choice, g: Game) {
       : 0) +
     (c.level <= 3 ? 5 : 0);
   // 功法只能靠升级修习；已学功法优先升重，法宝仍可由宝匣提升。
-  return g.passives[c.id] ? Math.max(32, score + 12) : score;
+  if (g.passives[c.id]) return Math.max(32, score + 12);
+  if (freePassiveSlots(g) === 1 && uncoveredWeapons(g).length && passiveCoverage(g, c.id) === 0)
+    return score - 20;
+  return score;
 }
 function steer(direction: Point, follow: Point, weight = 1) {
   const x = direction.x + follow.x * weight,

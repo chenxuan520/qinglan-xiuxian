@@ -99,7 +99,7 @@ test('新法宝略偏向已有配方，覆盖正道、魔道、兼修全部合�
             .some((id) => g.evolutionRequirements(t.id).includes(id))
         )
           return false;
-        // 从真实排序中找基础偏好相同的法宝，确认+2只改变同档取舍。
+        // 从真实排序中找基础偏好相同的法宝，确认觉醒前景加分只改变同档取舍。
         g.choices = [
           { type: 'weapon', id: candidate.id, level: 1 },
           { type: 'weapon', id: t.id, level: 1 },
@@ -129,7 +129,7 @@ test('新法宝略偏向已有配方，覆盖正道、魔道、兼修全部合�
   assert.ok(checked >= 100);
 });
 
-test('配方加分有限，不为配方强选原本低排序法宝，也不奖励现有法宝升重', () => {
+test('觉醒前景加分优先于基础排序，配方与升重按能否觉醒取舍', () => {
   const g = game();
   own(g, ['sword'], 2);
   g.passives = { duration: 1 };
@@ -137,14 +137,14 @@ test('配方加分有限，不为配方强选原本低排序法宝，也不奖�
     { type: 'weapon', id: 'poison', level: 1 },
     { type: 'weapon', id: 'lightning', level: 1 },
   ];
-  assert.equal(pick(g).id, 'lightning');
+  assert.equal(pick(g).id, 'poison');
   own(g, ['sword', 'lightning'], 2);
   g.passives = { haste: 1 };
   g.choices = [
     { type: 'weapon', id: 'sword', level: 3 },
     { type: 'weapon', id: 'lightning', level: 3 },
   ];
-  assert.equal(pick(g).id, 'sword', '同分保留候选顺序，不额外加分');
+  assert.equal(pick(g).id, 'lightning', '已学配套的升重优先');
 });
 
 test('指定十一件优选法宝优于同级普通法宝，领悟与升重不依赖排列顺序', () => {
@@ -187,7 +187,7 @@ test('青莲灯按普通法宝排序，配方、本命与指定目标仍遵守�
     { type: 'weapon', id: 'orbit', level: 1 },
     { type: 'weapon', id: 'lightning', level: 1 },
   ];
-  assert.equal(pick(g).id, 'lightning', '已有青莲配方也先选优选法宝');
+  assert.equal(pick(g).id, 'orbit', '已有青莲配方即可觉醒，优先于优选法宝');
   g.choices[1].id = 'arrow';
   assert.equal(pick(g).id, 'orbit', '普通档之间仍略偏向已有配方');
   g.passives = {};
@@ -220,7 +220,7 @@ test('全满补新仍遵守指定目标与前半程预留末格，后半程不�
     { type: 'weapon', id: 'lightning', level: 1 },
     { type: 'weapon', id: 'arrow', level: 1 },
   ];
-  assert.equal(pick(g).id, 'arrow', '已学配方与较高基础排序不能覆盖明确目标');
+  assert.equal(pick(g).id, 'lightning', '已学配方即可觉醒，优先于明确目标');
   g.save.autoplayBuild.targets = ['poison', ''];
   own(g, ['sword', 'orbit', 'fire', 'lightning', 'ice']);
   for (const w of g.weapons) w.evolved = true;
