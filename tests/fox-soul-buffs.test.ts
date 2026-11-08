@@ -187,13 +187,19 @@ test('暂停冻结幻影蓄力，续局散去幻影、保留本体与已发魂�
 test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥主倍率 2.69', () => {
   const expected = [
     [1, 1.2, 1.2, 1.2, 1.2, 1.2, 1],
-    [1.9, 2.9, 2.8, 2.2, 2.5, 2.3, 1],
-    [2.2, 5, 4.2, 4.8, 5, 1.8, 1],
+    [1.9, 3.2, 3.9, 3.3, 3.5, 2.9, 1],
+    [2.2, 8, 8.4, 11.5, 13, 3.4, 1],
+  ];
+  const ramps = [
+    [1, 1.15, 1.2, 1.25, 1, 1.2, 1],
+    [1, 1.15, 1.5, 1.7, 1.6, 1.6, 1],
+    [1, 1.65, 2.2, 2.7, 3.1, 2.6, 1],
   ];
   assert.equal(BOSS_COMBAT.hp[4], 2.69);
   assert.equal(BOSS_COMBAT.hp[1], 1.65 * 1.3 * 1.2 * 1.2 * 1.2);
   for (const [difficulty, rule] of DIFFICULTIES.entries()) {
     assert.deepEqual(rule.bossHp, expected[difficulty]);
+    assert.deepEqual(rule.stageRamp, ramps[difficulty]);
     assert.equal(rule.reward, [1, 1.5, 2.2][difficulty]);
     for (let stage = 0; stage < STAGES.length; stage++) {
       const g = new Game(freshSave(), stage, difficulty, () => 0.5);
@@ -209,5 +215,26 @@ test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥�
         realmDamageMultiplier(STAGE_REALM_STEPS[stage]);
       assert.equal(boss.hp, hp);
     }
+  }
+});
+
+test('问道与天劫只加难第二至第六境，首末关和初入仙途不变', () => {
+  assert.deepEqual(DIFFICULTIES[0], {
+    name: '初入仙途',
+    label: '从容修行',
+    bossHp: [1, 1.2, 1.2, 1.2, 1.2, 1.2, 1],
+    bossCooldown: [1, 0.9, 0.9, 0.9, 1, 0.9, 1],
+    bossShotSpeed: [1, 1.1, 1.1, 1.1, 1, 1.1, 1],
+    stageRamp: [1, 1.15, 1.2, 1.25, 1, 1.2, 1],
+    hp: 0.85 * 1.03,
+    damage: 0.72 * 1.02,
+    amount: 0.9,
+    reward: 1,
+  });
+  for (const [index, rule] of DIFFICULTIES.slice(1).entries()) {
+    assert.equal(rule.stageRamp[0], 1);
+    assert.equal(rule.stageRamp[6], 1);
+    assert.equal(rule.bossHp[0], [1.9, 2.2][index]);
+    assert.equal(rule.bossHp[6], 1);
   }
 });
