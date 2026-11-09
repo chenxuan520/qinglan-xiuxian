@@ -461,6 +461,7 @@ test('报告与监控按档位分组，不再显示排名数字列', () => {
   assert.match(html, /终关/);
   assert.ok(!html.includes('三关合计'));
   assert.match(html, /旧版报告|法宝明细/);
+  assert.match(html, /90\/100<br><small>20秒<\/small>/);
 });
 
 test('旧版三关两灵根报告可渲染并标注旧版报告', () => {

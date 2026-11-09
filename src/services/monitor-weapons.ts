@@ -17,7 +17,7 @@ import {
 const weaponCell = (stats: WeaponBattleStats | undefined) => {
   if (!stats || !stats.n) return '—';
   const time = stats.bossSeconds === null ? '—' : `${Math.round(stats.bossSeconds)}秒`;
-  return `${stats.wins}/${stats.n}<small>${time}</small>`;
+  return `${stats.wins}/${stats.n}<br><small>${time}</small>`;
 };
 const tierNames = ['一档', '二档', '三档', '四档'] as const;
 const stageLabels = ['第一关', '第二关', '第三关', '第四关', '第五关', '第六关', '终关'];
@@ -33,7 +33,9 @@ function weaponTable(rows: string[][]) {
     '觉醒',
   ];
   const cell = (value: string) =>
-    esc(value).replace(/&lt;small&gt;(.*?)&lt;\/small&gt;/g, '<small>$1</small>');
+    esc(value)
+      .replace(/&lt;br&gt;/g, '<br>')
+      .replace(/&lt;small&gt;(.*?)&lt;\/small&gt;/g, '<small>$1</small>');
   return `<div class="table-wrap" tabindex="0" role="region" aria-label="法宝档位统计表，可横向滚动"><table class="weapon-detail"><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((value) => `<td>${cell(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 export function weaponMonitorHTML(data: WeaponReport, now = Date.now()) {
