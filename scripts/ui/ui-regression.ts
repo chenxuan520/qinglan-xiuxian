@@ -28,17 +28,14 @@ import { runExperience, runWave } from '../../src/ui/common-ui.ts';
 import { JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../../src/core/setting.ts';
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 import { UI_AD_FIXTURE } from './ui-ad-fixture.ts';
+import { uiRegressionPlan } from './ui-regression-plan.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
 assertLocalPage(baseUrl);
 const output = resolve('artifacts/ui-regression');
 const screenshots = process.env.UI_SCREENSHOTS === '1';
-const viewports = [
-  ['desktop', '1440x1000x1'],
-  ['phone', '390x844x1,mobile,touch'],
-  ['narrow', '320x640x1,mobile,touch'],
-  ['landscape', '844x390x1,mobile,touch,landscape'],
-] as const;
+const suite = process.env.UI_SUITE;
+const { shared, viewports } = uiRegressionPlan(suite);
 await mkdir(output, { recursive: true });
 await Promise.all(
   ['failure.png', 'failure.txt', 'report.json', 'console-errors.txt', 'network-requests.txt'].map(
@@ -1474,19 +1471,21 @@ try {
       `页面脚本未正确提供：${url.pathname}（${response.status}，${contentType}），请核对构建与预览的 base 路径`,
     );
   }
-  for (const [name, viewport, full] of [
-    ['loadout-320-full', '320x568x1,mobile,touch', true],
-    ['loadout-360-full', '360x740x1,mobile,touch', true],
-    ['loadout-390-full', '390x844x1,mobile,touch', true],
-    ['loadout-390-partial', '390x844x1,mobile,touch', false],
-  ] as const) {
-    await open(viewport, loadoutFixture(full));
-    await click('[data-action=restore]');
-    await click('[data-action=resume]');
-    await check(name, true);
-    await finishPage();
+  if (shared) {
+    for (const [name, viewport, full] of [
+      ['loadout-320-full', '320x568x1,mobile,touch', true],
+      ['loadout-360-full', '360x740x1,mobile,touch', true],
+      ['loadout-390-full', '390x844x1,mobile,touch', true],
+      ['loadout-390-partial', '390x844x1,mobile,touch', false],
+    ] as const) {
+      await open(viewport, loadoutFixture(full));
+      await click('[data-action=restore]');
+      await click('[data-action=resume]');
+      await check(name, true);
+      await finishPage();
+    }
+    await checkJourneyModuleRecovery();
   }
-  await checkJourneyModuleRecovery();
   for (const [name, viewport] of viewports) {
     await checkDisplayAndShortcuts(name, viewport);
     await checkRecipeBuying(name, viewport);
@@ -1826,13 +1825,19 @@ try {
   }
   await writeFile(
     resolve(output, 'report.json'),
-    JSON.stringify({ passed: true, results }, null, 2),
+    JSON.stringify({ passed: true, ...(suite ? { suite } : {}), results }, null, 2),
   );
-  console.log(`界面回归通过：${results.length} 个检查点，四种视口。`);
+  console.log(
+    `界面回归通过：${results.length} 个检查点，${suite ? `分组 ${suite}` : '四种视口'}。`,
+  );
 } catch (error) {
   await writeFile(
     resolve(output, 'report.json'),
-    JSON.stringify({ passed: false, checkpoint, error: String(error), results }, null, 2),
+    JSON.stringify(
+      { passed: false, ...(suite ? { suite } : {}), checkpoint, error: String(error), results },
+      null,
+      2,
+    ),
   );
   if (pageId) {
     await browser

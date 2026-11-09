@@ -34,9 +34,11 @@ const toolFiles = [
   'scripts/weapon-benchmark/weapon-benchmark-policy.ts',
   'scripts/weapon-benchmark/weapon-benchmark-simulation.ts',
   'scripts/weapon-benchmark/weapon-benchmark-report.ts',
+  'scripts/weapon-benchmark/weapon-benchmark-shards.ts',
   'src/services/weapon-report.ts',
   'scripts/balance/balance-simulation.ts',
   'scripts/balance/balance-policy.ts',
+  'scripts/balance/balance-metrics.ts',
 ];
 export interface WeaponOptions extends WeaponPlanOptions {
   workers: number;
@@ -50,7 +52,7 @@ export function parseWeaponOptions(args: string[]): WeaponOptions {
     seeds: 10,
     extended: false,
     seedOffset: 0,
-    workers: Math.max(1, Math.min(3, availableParallelism() - 1)),
+    workers: availableParallelism(),
     planOnly: false,
     reportOnly: false,
   };
@@ -76,10 +78,7 @@ export function parseWeaponOptions(args: string[]): WeaponOptions {
       }
     } else throw new Error(`未知参数：${key}`);
   }
-  assert.ok(
-    Number.isSafeInteger(options.workers) && options.workers >= 1 && options.workers <= 64,
-    'worker数须为1～64',
-  );
+  assert.ok(Number.isSafeInteger(options.workers) && options.workers >= 1, 'worker数须为正整数');
   assert.ok(!(options.planOnly && options.reportOnly), '计划预览与重新汇总不能同时启用');
   if (options.reportOnly) assert.ok(options.out, '重新汇总必须指定--out');
   weaponBenchmarkPlan(options);
@@ -134,6 +133,7 @@ export function weaponSourceHash() {
     .filter(Boolean);
   return hashFiles([...new Set(files)]);
 }
+export const weaponToolHash = () => hashFiles(toolFiles);
 const readLines = (path: string) =>
   readFileSync(path, 'utf8')
     .split('\n')

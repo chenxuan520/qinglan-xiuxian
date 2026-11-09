@@ -60,12 +60,17 @@ jobs:
       - run: npm run check:leaderboard
 
   interface:
-    name: Desktop and mobile interfaces
+    name: Interfaces (${{ matrix.suite }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [shared, desktop, phone, narrow, landscape]
     env:
       BASE_PATH: /${{ github.event.repository.name }}
       UI_BASE_URL: http://localhost:5173/${{ github.event.repository.name }}/
+      UI_SUITE: ${{ matrix.suite }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -95,7 +100,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ui-regression
+          name: ui-regression-${{ matrix.suite }}
           path: artifacts/ui-regression/
           if-no-files-found: ignore
           retention-days: 7

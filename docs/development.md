@@ -100,6 +100,10 @@ gh run list --workflow balance-import.yml --branch master
 curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnostics.json
 ```
 
+法宝日测 `weapon-benchmark.yml` 使用 8 个独立 runner，每片通过 `weapon-benchmark-shards.ts --shard INDEX/8 --out DIR` 执行原测评工具；同件法宝的自然流程、双侧配对、定向培养、新种子复验及连续六关流程都归到同片，按原计划实际记录数均衡分配，避免附加复验集中拖长尾部。每片默认使用 `availableParallelism()`，不再固定3个worker或另设64个worker上限。原10,320条实战/配对与80条连续流程仍共10,400条；分组只改变执行位置，不改法宝、AI、种子或模拟频率。实际CPU、worker与时间写入独立执行记录。
+
+法宝原始分片（`weapon-raw-INDEX`，含失败时已落盘的部分记录）保留14天；合并只读取本run产物，核对提交、源码/工具摘要、run编号、完整计划、八片身份及全部原始样本，缺片、重复、混源与未完成片均失败。全部校验后按原单机文件分组与连续流程次序统一计算原统计，不平均各片摘要。完整或失败的五份公开报告仍上传原`weapon-daily-report`并沿原路径发布，90天保留期、每日北京时间12:00与手动入口、取消不发布及新任务取消旧任务的规则不变；普通推送不启动法宝日测。
+
 ## 性能门禁与渲染实测
 
 性能回归防护分两层，源码在 `scripts/perf/perf-sim.ts`、`scripts/build/size-check.ts` 与 `scripts/perf/perf-render.ts`，产物均写入已忽略的 `artifacts/` 不提交仓库。
@@ -481,7 +485,7 @@ gh workflow run observer.yml --repo chenxuan520/qinglan-xiuxian --ref master -f 
 | `balance.yml`  | 推送/PR跑840快检及模拟/体积；全量与渲染仅定时或手动           | 推送/PR快检、每日12:00、手动    |
 | `release.yml`  | 编译、产物上限、离线包与校验和、Release                       | v\*标签                         |
 
-Quality gates的手机/电脑回归仍用Chrome DevTools MCP及独立浏览器工具，报告/失败截图保存为7天artifact，不提交仓库。两种构建的检查彼此独立，部署流水线不等待这些测试。
+Quality gates的手机/电脑回归仍用Chrome DevTools MCP及独立浏览器工具，将共享检查与desktop/phone/narrow/landscape四视口分为五个独立runner并行执行，失败不取消其他组；每组保留原断言与隔离存档。`UI_SUITE`只接受这五个名字，未知值直接失败；不设置时`npm run ui:check`仍串行执行原全部检查。报告/失败截图分别保存为`ui-regression-分组名`的7天artifact，不提交仓库。两种构建的检查彼此独立，部署流水线不等待这些测试。
 
 手机竖屏顶栏另有并行的 `Mobile HUD safe areas` 检查：`npm run ui:hud-safe` 通过独立 Chrome 的原生安全区覆盖，验证390/320px、顶部0/24/44/59px、普通/妖王战斗、窗口/全屏及暂停返回，共32种组合。CDP仅配置安全区，页面操作、DOM断言、真实全屏切换与截图均经Chrome DevTools MCP；窗口顶栏固定36px，文字、血条和按钮直接贴页面顶部，不重复计入已由浏览器避让的系统栏；仅全屏或独立窗口内部避让硬件安全区，妖王栏与提示随实际高度下移。尺寸观察统一使用border-box，与实际屏幕外框一致，内边距变化但内容高度不变时也会重新定位。独立探针读取的原生安全区值不符或浏览器不支持覆盖时直接失败，不允许全部按0px误报通过；证据保存为7天artifact。本地运行前安装 `scripts/ui/browser-tools` 依赖，并准备正常生产预览入口。
 

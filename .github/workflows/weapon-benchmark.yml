@@ -15,7 +15,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  shards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Run weapon evaluation shard
+        run: node --experimental-strip-types scripts/weapon-benchmark/weapon-benchmark-shards.ts --shard ${{ matrix.shard }}/8 --out artifacts/weapon-shard-${{ matrix.shard }}
+      - name: Preserve raw shard including partial failure evidence
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: weapon-raw-${{ matrix.shard }}
+          path: |
+            artifacts/weapon-shard-${{ matrix.shard }}/manifest.json
+            artifacts/weapon-shard-${{ matrix.shard }}/samples-*.jsonl
+            artifacts/weapon-shard-${{ matrix.shard }}/campaigns.jsonl
+            artifacts/weapon-shard-${{ matrix.shard }}/complete.json
+            artifacts/weapon-shard-${{ matrix.shard }}/shard.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
   benchmark:
+    needs: shards
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     timeout-minutes: 120
     outputs:
@@ -29,8 +64,24 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Run complete weapon experience evaluation
-        run: npm run balance:weapons -- --extended --workers 3 --out artifacts/weapon-benchmark
+      - name: Download raw shards from this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT_RUN: ${{ github.run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh run download "$REPORT_RUN" --repo "$REPOSITORY" --pattern 'weapon-raw-*' --dir artifacts/weapon-shards
+      - name: Merge complete weapon experience evaluation
+        if: always() && !cancelled()
+        run: node --experimental-strip-types scripts/weapon-benchmark/weapon-benchmark-shards.ts --merge artifacts/weapon-shards --out artifacts/weapon-benchmark
+      - name: Preserve execution resources
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: weapon-execution
+          path: artifacts/weapon-benchmark/execution.json
+          if-no-files-found: ignore
+          overwrite: true
+          retention-days: 14
       - name: Publish readable summary
         if: always() && !cancelled()
         run: |
@@ -50,6 +101,7 @@ jobs:
             artifacts/weapon-benchmark/battles.csv
             artifacts/weapon-benchmark/pairs.csv
           if-no-files-found: error
+          overwrite: true
           retention-days: 90
 
   publish-report:
