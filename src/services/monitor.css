@@ -207,7 +207,8 @@ td:first-child {
   width: 48px;
 }
 .weapon-detail td:nth-child(2),
-.weapon-detail td:nth-child(6) {
+.weapon-detail td:nth-child(7),
+.weapon-detail td:nth-child(11) {
   min-width: 110px;
   white-space: nowrap;
 }

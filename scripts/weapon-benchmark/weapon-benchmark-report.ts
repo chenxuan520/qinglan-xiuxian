@@ -353,7 +353,7 @@ export function weaponReportMarkdown(r: WeaponReport) {
     '',
     '## 完整单关',
     '',
-    '按前六关胜率分档（一档 ≥75%、二档 65–75%、三档 55–65%、四档 <55%）；档内按胜率，再按相对用时（各关击杀用时除以全体法宝该关中位数后取平均，越小越快）。终关为统一境界零资源入场，几乎无法通关，仅列出供参考，不计入分档。每格约 120 场，相差 5 个百分点以内多为样本波动；配对净差受 105 秒窗口影响，部分为 0，仅供参考。',
+    '按前六关胜率排序，同胜率再按相对用时（各关击杀用时除以全体法宝该关中位数后取平均，越小越快）。胜率后的 ±值为 95% 误差范围，两件法宝的胜率区间重叠时，强弱差异不可靠。终关为统一境界零资源入场，仅列出供参考，不计入排序。',
   ];
   const stageLabels = ['第一关', '第二关', '第三关', '第四关', '第五关', '第六关', '终关'];
   const stageCell = (stats: WeaponBattleStats | undefined) => {
@@ -361,23 +361,17 @@ export function weaponReportMarkdown(r: WeaponReport) {
     const time = stats.bossSeconds === null ? '—' : `${Math.round(stats.bossSeconds)}秒`;
     return `${stats.wins}/${stats.n}<small>${time}</small>`;
   };
-  const tierNames = ['一档', '二档', '三档', '四档'] as const;
-  const ranked = rankWeapons(r.weapons);
-  for (const tier of [1, 2, 3, 4] as const) {
-    const group = ranked.filter((row) => row.tier === tier);
-    if (!group.length) continue;
-    lines.push(
-      '',
-      `### ${tierNames[tier - 1]}`,
-      '',
-      `| 法宝 | 路线 | ${stageLabels.join(' | ')} | 前六关胜率 | 配对净差 | 相对用时 | 本命伤害占比 | 觉醒 |`,
-      `| --- | --- | ${stageLabels.map(() => '---').join(' | ')} | --- | --- | --- | --- | --- |`,
-    );
-    for (const { wins, n, weapon: w, pairNet, relativeKillTime } of group)
+  lines.push(
+    '',
+    `| 名次 | 法宝 | 路线 | ${stageLabels.join(' | ')} | 前六关胜率 | 配对净差 | 相对用时 | 本命伤害占比 | 觉醒 |`,
+    `| --- | --- | --- | ${stageLabels.map(() => '---').join(' | ')} | --- | --- | --- | --- | --- |`,
+  );
+  rankWeapons(r.weapons).forEach(
+    ({ wins, n, margin, weapon: w, pairNet, relativeKillTime }, index) =>
       lines.push(
-        `| ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${WEAPON_BENCHMARK_STAGES.map((stage) => stageCell(w.stages.find((g) => g.stage === stage)?.stats)).join(' | ')} | ${weaponTotal(wins, n)} | ${pairNet === null ? '—' : fmt(pairNet)} | ${relativeKillTime === null ? '—' : `${relativeKillTime.toFixed(2)}×`} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
-      );
-  }
+        `| ${index + 1} | ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${WEAPON_BENCHMARK_STAGES.map((stage) => stageCell(w.stages.find((g) => g.stage === stage)?.stats)).join(' | ')} | ${weaponTotal(wins, n, margin)} | ${pairNet === null ? '—' : fmt(pairNet)} | ${relativeKillTime === null ? '—' : `${relativeKillTime.toFixed(2)}×`} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
+      ),
+  );
   lines.push(
     '',
     '## 同投入配对',
@@ -556,6 +550,6 @@ export function writeWeaponReport(directory: string, r: WeaponReport) {
   const body = parts.join('\n');
   writeFileSync(
     join(directory, 'index.html'),
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="../favicon.svg" type="image/svg+xml"><title>每日法宝实战测评</title><style>body{font:16px/1.8 system-ui,sans-serif;color:#22352f;background:#f7f8f3;margin:0}main{max-width:1200px;margin:auto;padding:24px;overflow-wrap:anywhere}h1{font-size:28px}a{color:#21664f}nav{display:flex;gap:18px;flex-wrap:wrap}details{margin:20px 0;background:#edf1e8;padding:14px}summary{cursor:pointer;font-weight:600}.table-wrap{overflow-x:auto;max-width:100%;background:white}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:9px 12px;border-bottom:1px solid #dce3d8;white-space:nowrap;text-align:right}td small{display:block;font-size:11px;color:#5a6b60;font-weight:400}td:first-child,th:first-child{text-align:left}th{background:#e5ecdf}tr:nth-child(even){background:#f6f8f3}@media(max-width:600px){main{padding:16px}h1{font-size:24px}nav{gap:10px}td,th{padding:8px}}</style><main><nav><a href="../monitor/">返回监控</a><a href="summary.json">结构化JSON</a><a href="summary.md">完整Markdown</a><a href="battles.csv">关卡/灵根/场地CSV</a><a href="pairs.csv">配对分组CSV</a></nav>${body}</main></html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="../favicon.svg" type="image/svg+xml"><title>每日法宝实战测评</title><style>body{font:16px/1.8 system-ui,sans-serif;color:#22352f;background:#f7f8f3;margin:0}main{max-width:1200px;margin:auto;padding:24px;overflow-wrap:anywhere}h1{font-size:28px}a{color:#21664f}nav{display:flex;gap:18px;flex-wrap:wrap}details{margin:20px 0;background:#edf1e8;padding:14px}summary{cursor:pointer;font-weight:600}.table-wrap{overflow-x:auto;max-width:100%;background:white}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:9px 12px;border-bottom:1px solid #dce3d8;white-space:nowrap;text-align:right}td small{display:block;font-size:11px;color:#5a6b60;font-weight:400}td:first-child,th:first-child{text-align:left}td:nth-child(2),th:nth-child(2){text-align:left}th{background:#e5ecdf}tr:nth-child(even){background:#f6f8f3}@media(max-width:600px){main{padding:16px}h1{font-size:24px}nav{gap:10px}td,th{padding:8px}}</style><main><nav><a href="../monitor/">返回监控</a><a href="summary.json">结构化JSON</a><a href="summary.md">完整Markdown</a><a href="battles.csv">关卡/灵根/场地CSV</a><a href="pairs.csv">配对分组CSV</a></nav>${body}</main></html>`,
   );
 }

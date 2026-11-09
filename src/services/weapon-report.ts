@@ -113,12 +113,9 @@ export interface RankedWeapon {
   wins: number;
   n: number;
   rate: number;
-  tier: 1 | 2 | 3 | 4;
+  margin: number;
   pairNet: number | null;
   relativeKillTime: number | null;
-}
-export function weaponTier(rate: number): 1 | 2 | 3 | 4 {
-  return rate >= 0.75 ? 1 : rate >= 0.65 ? 2 : rate >= 0.55 ? 3 : 4;
 }
 const median = (values: number[]) => {
   if (!values.length) return null;
@@ -126,7 +123,17 @@ const median = (values: number[]) => {
     n = sorted.length;
   return n % 2 ? sorted[Math.floor(n / 2)] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
 };
-// 分档只看前六关；终关统一境界零资源入场，几乎无法通关，仅列出参考。
+// 与 autoplayInterval 同为 Wilson 95% 区间，但这里只要半宽（百分点）且 n=0 返回 0；
+// 返回值语义与那边的 [0,1] 夹取不同，故不复用。
+const wilsonMargin = (wins: number, n: number) => {
+  if (!n) return 0;
+  const p = wins / n,
+    z = 1.96,
+    z2 = z * z,
+    denominator = 1 + z2 / n;
+  return Math.round(((z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / denominator) * 100);
+};
+// 排序只看前六关；终关统一境界零资源入场，几乎无法通关，仅列出参考。
 export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
   const order = new Map<string, number>(TREASURES.map((treasure, index) => [treasure.id, index]));
   const scoredStages = WEAPON_BENCHMARK_STAGES.filter((stage) => stage < FINAL_TRIAL_STAGE);
@@ -162,7 +169,7 @@ export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
         wins,
         n,
         rate,
-        tier: weaponTier(rate),
+        margin: wilsonMargin(wins, n),
         pairNet: pairNets.length ? pairNets.reduce((a, b) => a + b, 0) / pairNets.length : null,
         relativeKillTime: relative.length
           ? relative.reduce((a, b) => a + b, 0) / relative.length
@@ -172,7 +179,6 @@ export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
     .sort(
       (a, b) =>
         (a.n === 0 ? 1 : 0) - (b.n === 0 ? 1 : 0) ||
-        a.tier - b.tier ||
         b.rate - a.rate ||
         (a.relativeKillTime === null ? 1 : 0) - (b.relativeKillTime === null ? 1 : 0) ||
         (a.relativeKillTime ?? 0) - (b.relativeKillTime ?? 0) ||
@@ -180,8 +186,9 @@ export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
           (order.get(b.weapon.id) ?? Number.MAX_SAFE_INTEGER),
     );
 }
-export function weaponTotal(wins: number, n: number) {
-  return `${wins}/${n}（${n ? Math.round((wins / n) * 100) : 0}%）`;
+export function weaponTotal(wins: number, n: number, margin?: number) {
+  const value = `${wins}/${n}（${n ? Math.round((wins / n) * 100) : 0}%${margin === undefined ? '' : ` ±${margin}`}）`;
+  return value;
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);

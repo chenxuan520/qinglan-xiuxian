@@ -45,12 +45,7 @@ import {
   checkDailyWeaponReport,
   WEAPON_PUBLIC_FILES,
 } from '../../../scripts/weapon-benchmark/restore-weapon-report.ts';
-import {
-  rankWeapons,
-  validWeaponReport,
-  weaponTier,
-  weaponTotal,
-} from '../../../src/services/weapon-report.ts';
+import { rankWeapons, validWeaponReport } from '../../../src/services/weapon-report.ts';
 import { weaponMonitorHTML } from '../../../src/services/monitor-weapons.ts';
 
 const options = parseWeaponOptions([]);
@@ -361,19 +356,16 @@ function rankedWeapon(
   } as unknown as WeaponReport['weapons'][number];
 }
 
-test('按前六关胜率分档，终关不影响分档与排序', () => {
-  for (const [wins, tier] of [
-    [7499, 2],
-    [7500, 1],
-    [6500, 2],
-    [6499, 3],
-    [5500, 3],
-    [5499, 4],
-  ] as const) {
-    const weapon = rankedWeapon('sword', Array(7).fill(wins), Array(7).fill(10000));
-    assert.equal(weaponTier(wins / 10000), tier);
-    assert.equal(rankWeapons([weapon])[0].tier, tier);
-  }
+test('按前六关胜率排序，结果不再分档，终关不影响排序', () => {
+  const marginOf = (wins: number[], n: number[]) =>
+    rankWeapons([rankedWeapon('sword', [...wins, 0], [...n, 0])])[0].margin;
+  assert.equal(marginOf([96, 96, 97, 97, 96, 97], Array(6).fill(120)), 3);
+  assert.equal(marginOf([60, 60, 60, 60, 60, 60], Array(6).fill(120)), 4);
+  assert.equal(
+    rankWeapons([rankedWeapon('sword', Array(7).fill(0), Array(7).fill(0))])[0].margin,
+    0,
+  );
+  assert.ok(!('tier' in rankWeapons([rankedWeapon('sword', [1, 0, 0, 0, 0, 0, 0])])[0]));
   const base = [5000, 5000, 5000, 5000, 5000, 5000];
   const wonFinal = rankedWeapon(
     'sword',
@@ -400,8 +392,6 @@ test('按前六关胜率分档，终关不影响分档与排序', () => {
   );
   assert.equal(rankWeapons([wonFinal])[0].rate, 0.5);
   assert.equal(rankWeapons([lostFinal])[0].rate, 0.5);
-  assert.equal(rankWeapons([wonFinal])[0].tier, 4);
-  assert.equal(rankWeapons([lostFinal])[0].tier, 4);
   const terminal = rankWeapons([wonFinal, lostFinal, finalDecoy]);
   assert.equal(terminal.find((row) => row.weapon.id === 'sword')!.relativeKillTime, 1);
   assert.equal(terminal.find((row) => row.weapon.id === 'pearl')!.relativeKillTime, 1);
@@ -502,7 +492,7 @@ function sampleReport(weapons: WeaponReport['weapons']): WeaponReport {
   } as unknown as WeaponReport;
 }
 
-test('报告与监控按档位分组，不再显示排名数字列', () => {
+test('报告与监控改单表按名次排序，胜率标注误差', () => {
   const weapons = [
     rankedWeapon('pearl', Array(7).fill(70), Array(7).fill(100), 3, Array(7).fill(15)),
     rankedWeapon('sword', Array(7).fill(90), Array(7).fill(100), 1, Array(7).fill(20)),
@@ -511,20 +501,21 @@ test('报告与监控按档位分组，不再显示排名数字列', () => {
   const markdown = weaponReportMarkdown(report);
   const rows = markdown.split('## 完整单关')[1].split('## 同投入配对')[0];
   assert.ok(!rows.includes('| 排名 |'));
-  assert.match(rows, /### 一档/);
-  assert.match(rows, /### 二档/);
+  assert.ok(!rows.includes('### 一档'));
+  assert.match(rows, /\| 名次 \| 法宝 \| 路线 \|/);
   assert.match(rows, /第一关.*第二关.*终关.*前六关胜率.*配对净差.*相对用时/);
   assert.match(rows, /90\/100<small>20秒<\/small>/);
-  assert.match(rows, /70\/100<small>15秒<\/small>/);
-  assert.ok(rows.indexOf('sword') < rows.indexOf('pearl'));
+  assert.match(rows, /^\| 1 \| sword .*540\/600（90% ±2）/m);
+  assert.match(rows, /^\| 2 \| pearl /m);
 
   const html = weaponMonitorHTML(report);
   assert.ok(!html.includes('排名'));
-  assert.match(html, /一档/);
-  assert.match(html, /二档/);
+  assert.ok(!html.includes('一档'));
+  assert.match(html, /名次/);
   assert.match(html, /终关/);
   assert.match(html, /前六关胜率/);
   assert.match(html, /相对用时/);
+  assert.match(html, /±\d+/);
   assert.ok(!html.includes('三关合计'));
   assert.match(html, /旧版报告|法宝明细/);
   assert.match(html, /90\/100<br><small>20秒<\/small>/);
@@ -539,6 +530,7 @@ test('旧版三关两灵根报告可渲染并标注旧版报告', () => {
   const html = weaponMonitorHTML(legacy);
   assert.match(html, /旧版报告/);
   assert.ok(html.includes('sword'));
+  assert.match(html, /109\/3000（4% ±1）/);
 });
 
 test('无胜局不输出击杀用时；旧版非extended报告也能通过兼容校验', () => {
