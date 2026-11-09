@@ -26,9 +26,9 @@ function weaponTable(rows: string[][]) {
     '法宝',
     '路线',
     ...stageLabels,
-    '总胜率',
+    '前六关胜率',
     '配对净差',
-    '击杀用时',
+    '相对用时',
     '本命伤害占比',
     '觉醒',
   ];
@@ -51,7 +51,7 @@ export function weaponMonitorHTML(data: WeaponReport, now = Date.now()) {
     .map((tier) => {
       const group = ranked.filter((row) => row.tier === tier);
       if (!group.length) return '';
-      const rows = group.map(({ wins, n, weapon: w, pairNet, killSeconds }) => [
+      const rows = group.map(({ wins, n, weapon: w, pairNet, relativeKillTime }) => [
         w.name,
         w.school === 'orthodox' ? '正道' : '魔道',
         ...WEAPON_BENCHMARK_STAGES.map((stage) =>
@@ -59,14 +59,14 @@ export function weaponMonitorHTML(data: WeaponReport, now = Date.now()) {
         ),
         weaponTotal(wins, n),
         pairNet === null ? '—' : pairNet.toFixed(1),
-        killSeconds === null ? '—' : `${Math.round(killSeconds)}秒`,
+        relativeKillTime === null ? '—' : `${relativeKillTime.toFixed(2)}×`,
         `${(w.natural.ownShare ?? 0).toFixed(1)}%`,
         `${w.natural.evolved}/${w.natural.n}`,
       ]);
       return `<h4>${tierNames[tier - 1]}</h4>${weaponTable(rows)}`;
     })
     .join('');
-  return `<p><span class="badge ${complete ? 'good' : 'error'}">${complete ? '测评执行完整' : '测评执行失败'}</span>${run}</p><p>${esc(scope)} · 已返回 ${count(data.returned)} / ${count(data.planned)} 个计划样本 · 用时 ${count(data.elapsedSeconds / 60)} 分钟</p><p class="note">生成时间（北京）${esc(time(data.generatedAt))} · 源提交 ${esc(data.commit.slice(0, 12))}</p>${stale ? '<p class="status warning">结果已超过36小时，请查看Actions运行状态。</p>' : ''}${data.error ? `<p class="status error">${esc(data.error)}</p>` : ''}<p class="note">第一至第六关与终关为标准化单关，后段配对比较整套本命与功法的同投入收益。不是线上玩家或连续七关的胜率；执行完整也不等于所有法宝强度一致。</p>${
+  return `<p><span class="badge ${complete ? 'good' : 'error'}">${complete ? '测评执行完整' : '测评执行失败'}</span>${run}</p><p>${esc(scope)} · 已返回 ${count(data.returned)} / ${count(data.planned)} 个计划样本 · 用时 ${count(data.elapsedSeconds / 60)} 分钟</p><p class="note">生成时间（北京）${esc(time(data.generatedAt))} · 源提交 ${esc(data.commit.slice(0, 12))}</p>${stale ? '<p class="status warning">结果已超过36小时，请查看Actions运行状态。</p>' : ''}${data.error ? `<p class="status error">${esc(data.error)}</p>` : ''}<p class="note">按前六关胜率分档（一档 ≥75%、二档 65–75%、三档 55–65%、四档 &lt;55%）；档内按胜率，再按相对用时（各关击杀用时除以全体法宝该关中位数后取平均，越小越快）。终关为统一境界零资源入场，几乎无法通关，仅列出供参考，不计入分档。每格约 120 场，相差 5 个百分点以内多为样本波动；配对净差受 105 秒窗口影响，部分为 0，仅供参考。不是线上玩家或连续七关的胜率；执行完整也不等于所有法宝强度一致。</p>${
     legacy
       ? '<p class="status warning">旧版报告：仅含第一、三、六关与两种灵根，档位按已有关卡计算。</p>'
       : ''

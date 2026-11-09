@@ -48,6 +48,7 @@ import {
 import {
   rankWeapons,
   validWeaponReport,
+  weaponTier,
   weaponTotal,
 } from '../../../src/services/weapon-report.ts';
 import { weaponMonitorHTML } from '../../../src/services/monitor-weapons.ts';
@@ -360,54 +361,117 @@ function rankedWeapon(
   } as unknown as WeaponReport['weapons'][number];
 }
 
-test('法宝按总胜率分档，档内先看配对净差再看击杀用时', () => {
-  const t1 = rankedWeapon('sword', Array(7).fill(850), Array(7).fill(1000));
-  const t2a = rankedWeapon('pearl', Array(7).fill(849), Array(7).fill(1000));
-  const t2b = rankedWeapon('fan', Array(7).fill(700), Array(7).fill(1000));
-  const t3 = rankedWeapon('beads', Array(7).fill(550), Array(7).fill(1000));
-  const t4 = rankedWeapon('ice', Array(7).fill(549), Array(7).fill(1000));
-  const ranked = rankWeapons([t4, t3, t2b, t2a, t1]);
-  assert.deepEqual(
-    ranked.map((row) => [row.weapon.id, row.tier]),
-    [
-      ['sword', 1],
-      ['fan', 2],
-      ['pearl', 2],
-      ['beads', 3],
-      ['ice', 4],
-    ],
+test('按前六关胜率分档，终关不影响分档与排序', () => {
+  for (const [wins, tier] of [
+    [7499, 2],
+    [7500, 1],
+    [6500, 2],
+    [6499, 3],
+    [5500, 3],
+    [5499, 4],
+  ] as const) {
+    const weapon = rankedWeapon('sword', Array(7).fill(wins), Array(7).fill(10000));
+    assert.equal(weaponTier(wins / 10000), tier);
+    assert.equal(rankWeapons([weapon])[0].tier, tier);
+  }
+  const base = [5000, 5000, 5000, 5000, 5000, 5000];
+  const wonFinal = rankedWeapon(
+    'sword',
+    [...base, 120],
+    Array(7).fill(10000),
+    0,
+    [10, 10, 10, 10, 10, 10, 999],
   );
+  const lostFinal = rankedWeapon('pearl', [...base, 0], Array(7).fill(10000), 0, [
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    null,
+  ]);
+  const finalDecoy = rankedWeapon(
+    'fan',
+    [...base, 0],
+    Array(7).fill(10000),
+    0,
+    [10, 10, 10, 10, 10, 10, 1],
+  );
+  assert.equal(rankWeapons([wonFinal])[0].rate, 0.5);
+  assert.equal(rankWeapons([lostFinal])[0].rate, 0.5);
+  assert.equal(rankWeapons([wonFinal])[0].tier, 4);
+  assert.equal(rankWeapons([lostFinal])[0].tier, 4);
+  const terminal = rankWeapons([wonFinal, lostFinal, finalDecoy]);
+  assert.equal(terminal.find((row) => row.weapon.id === 'sword')!.relativeKillTime, 1);
+  assert.equal(terminal.find((row) => row.weapon.id === 'pearl')!.relativeKillTime, 1);
+});
+
+test('相对用时按各关全体中位数归一，档内按胜率再按相对用时', () => {
+  const n = Array(6).fill(100);
+  const rate = Array(6).fill(50);
+  const fast = rankedWeapon('sword', [...rate, 0], [...n, 0], 0, [10, 10, null, null, null, null]);
+  const slow = rankedWeapon('pearl', [...rate, 0], [...n, 0], 0, [20, 20, null, null, null, null]);
+  const ranked = rankWeapons([slow, fast]);
+  assert.equal(ranked[0].relativeKillTime, 10 / 15);
+  assert.equal(ranked[1].relativeKillTime, 20 / 15);
   assert.deepEqual(
-    ranked.map((row) => row.rate),
-    [0.85, 0.7, 0.849, 0.55, 0.549],
+    ranked.map((row) => row.weapon.id),
+    ['sword', 'pearl'],
   );
 
-  const sameTier = [
-    rankedWeapon('ice', Array(7).fill(800), Array(7).fill(1000), 2, Array(7).fill(20)),
-    rankedWeapon('sword', Array(7).fill(800), Array(7).fill(1000), 5, Array(7).fill(30)),
-    rankedWeapon('pearl', Array(7).fill(800), Array(7).fill(1000), null, Array(7).fill(1)),
-    rankedWeapon('fan', Array(7).fill(800), Array(7).fill(1000), 2, Array(7).fill(10)),
-  ];
+  const noTime = rankedWeapon('ice', [...rate, 0], [...n, 0], 0, [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+  ]);
+  assert.equal(rankWeapons([noTime])[0].relativeKillTime, null);
   assert.deepEqual(
-    rankWeapons(sameTier).map((row) => row.weapon.id),
-    ['sword', 'fan', 'ice', 'pearl'],
-    '配对净差降序；同净差按击杀用时升序；无配对数据排档末',
+    rankWeapons([noTime, slow]).map((row) => row.weapon.id),
+    ['pearl', 'ice'],
+    '有相对用时的排在 null 之前',
+  );
+
+  const sword = rankedWeapon('sword', [...rate, 0], [...n, 0], 0, [10, 10, 10, 10, 10, 10]);
+  const pearl = rankedWeapon('pearl', [...rate, 0], [...n, 0], 10, [10, 10, 10, 10, 10, 10]);
+  assert.deepEqual(
+    rankWeapons([pearl, sword]).map((row) => row.weapon.id),
+    ['sword', 'pearl'],
+    '同胜率同用时按 TREASURES 顺序；配对净差不参与排序',
+  );
+
+  const zeroMedian = rankedWeapon('fan', [...rate, 0], [...n, 0], 0, [
+    0,
+    null,
+    null,
+    null,
+    null,
+    null,
+  ]);
+  const tenSeconds = rankedWeapon('beads', [...rate, 0], [...n, 0], 0, [
+    10,
+    null,
+    null,
+    null,
+    null,
+    null,
+  ]);
+  assert.equal(rankWeapons([zeroMedian, tenSeconds])[0].relativeKillTime, 0);
+  assert.equal(rankWeapons([zeroMedian, tenSeconds])[1].relativeKillTime, 1);
+  assert.deepEqual(
+    rankWeapons([zeroMedian, tenSeconds]).map((row) => row.weapon.id),
+    ['fan', 'beads'],
   );
 
   const empty = rankedWeapon('beads', Array(7).fill(0), Array(7).fill(0));
-  const zero = rankedWeapon('sword', Array(7).fill(0));
+  const zeroWin = rankedWeapon('sword', Array(7).fill(0));
   assert.deepEqual(
-    rankWeapons([empty, zero]).map((row) => row.weapon.id),
+    rankWeapons([empty, zeroWin]).map((row) => row.weapon.id),
     ['sword', 'beads'],
     '有样本的 0% 排在 N=0 之前',
-  );
-  assert.deepEqual(
-    rankWeapons([
-      rankedWeapon('beads', Array(7).fill(850), Array(7).fill(1000)),
-      rankedWeapon('fan', Array(7).fill(850), Array(7).fill(1000)),
-    ]).map((row) => row.weapon.id),
-    ['fan', 'beads'],
-    '完全同分时按 TREASURES 原始顺序',
   );
 });
 
@@ -449,7 +513,7 @@ test('报告与监控按档位分组，不再显示排名数字列', () => {
   assert.ok(!rows.includes('| 排名 |'));
   assert.match(rows, /### 一档/);
   assert.match(rows, /### 二档/);
-  assert.match(rows, /第一关.*第二关.*终关.*总胜率.*配对净差.*击杀用时/);
+  assert.match(rows, /第一关.*第二关.*终关.*前六关胜率.*配对净差.*相对用时/);
   assert.match(rows, /90\/100<small>20秒<\/small>/);
   assert.match(rows, /70\/100<small>15秒<\/small>/);
   assert.ok(rows.indexOf('sword') < rows.indexOf('pearl'));
@@ -459,6 +523,8 @@ test('报告与监控按档位分组，不再显示排名数字列', () => {
   assert.match(html, /一档/);
   assert.match(html, /二档/);
   assert.match(html, /终关/);
+  assert.match(html, /前六关胜率/);
+  assert.match(html, /相对用时/);
   assert.ok(!html.includes('三关合计'));
   assert.match(html, /旧版报告|法宝明细/);
   assert.match(html, /90\/100<br><small>20秒<\/small>/);

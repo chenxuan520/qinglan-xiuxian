@@ -353,7 +353,7 @@ export function weaponReportMarkdown(r: WeaponReport) {
     '',
     '## 完整单关',
     '',
-    '按总胜率分档；档内先看同投入配对净差，再看击杀用时。每格约 120 场，相差 5 个百分点以内多为样本波动。',
+    '按前六关胜率分档（一档 ≥75%、二档 65–75%、三档 55–65%、四档 <55%）；档内按胜率，再按相对用时（各关击杀用时除以全体法宝该关中位数后取平均，越小越快）。终关为统一境界零资源入场，几乎无法通关，仅列出供参考，不计入分档。每格约 120 场，相差 5 个百分点以内多为样本波动；配对净差受 105 秒窗口影响，部分为 0，仅供参考。',
   ];
   const stageLabels = ['第一关', '第二关', '第三关', '第四关', '第五关', '第六关', '终关'];
   const stageCell = (stats: WeaponBattleStats | undefined) => {
@@ -370,12 +370,12 @@ export function weaponReportMarkdown(r: WeaponReport) {
       '',
       `### ${tierNames[tier - 1]}`,
       '',
-      `| 法宝 | 路线 | ${stageLabels.join(' | ')} | 总胜率 | 配对净差 | 击杀用时 | 本命伤害占比 | 觉醒 |`,
+      `| 法宝 | 路线 | ${stageLabels.join(' | ')} | 前六关胜率 | 配对净差 | 相对用时 | 本命伤害占比 | 觉醒 |`,
       `| --- | --- | ${stageLabels.map(() => '---').join(' | ')} | --- | --- | --- | --- | --- |`,
     );
-    for (const { wins, n, weapon: w, pairNet, killSeconds } of group)
+    for (const { wins, n, weapon: w, pairNet, relativeKillTime } of group)
       lines.push(
-        `| ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${WEAPON_BENCHMARK_STAGES.map((stage) => stageCell(w.stages.find((g) => g.stage === stage)?.stats)).join(' | ')} | ${weaponTotal(wins, n)} | ${pairNet === null ? '—' : fmt(pairNet)} | ${killSeconds === null ? '—' : `${Math.round(killSeconds)}秒`} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
+        `| ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${WEAPON_BENCHMARK_STAGES.map((stage) => stageCell(w.stages.find((g) => g.stage === stage)?.stats)).join(' | ')} | ${weaponTotal(wins, n)} | ${pairNet === null ? '—' : fmt(pairNet)} | ${relativeKillTime === null ? '—' : `${relativeKillTime.toFixed(2)}×`} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
       );
   }
   lines.push(

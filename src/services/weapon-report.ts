@@ -1,4 +1,4 @@
-import { ROOT_STARTERS, TREASURES } from '../core/data.ts';
+import { FINAL_TRIAL_STAGE, ROOT_STARTERS, TREASURES } from '../core/data.ts';
 // 每日法宝测评的公开摘要；不包含逐帧记录或本地文件路径。
 export const WEAPON_REPORT_URL = 'https://chenxuan520.github.io/qinglan-xiuxian/weapon-report/';
 export const WEAPON_REPORT_PROTOCOL = 1;
@@ -115,27 +115,47 @@ export interface RankedWeapon {
   rate: number;
   tier: 1 | 2 | 3 | 4;
   pairNet: number | null;
-  killSeconds: number | null;
+  relativeKillTime: number | null;
 }
 export function weaponTier(rate: number): 1 | 2 | 3 | 4 {
-  return rate >= 0.85 ? 1 : rate >= 0.7 ? 2 : rate >= 0.55 ? 3 : 4;
+  return rate >= 0.75 ? 1 : rate >= 0.65 ? 2 : rate >= 0.55 ? 3 : 4;
 }
-// 先按总胜率分档；档内先看同投入配对净差，再看各关击杀中位用时之和。
+const median = (values: number[]) => {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b),
+    n = sorted.length;
+  return n % 2 ? sorted[Math.floor(n / 2)] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+};
+// 分档只看前六关；终关统一境界零资源入场，几乎无法通关，仅列出参考。
 export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
   const order = new Map<string, number>(TREASURES.map((treasure, index) => [treasure.id, index]));
+  const scoredStages = WEAPON_BENCHMARK_STAGES.filter((stage) => stage < FINAL_TRIAL_STAGE);
+  const stageMedians = new Map<number, number>();
+  for (const stage of scoredStages) {
+    const value = median(
+      weapons
+        .map((weapon) => weapon.stages.find((entry) => entry.stage === stage)?.stats.bossSeconds)
+        .filter((seconds): seconds is number => seconds != null && seconds > 0),
+    );
+    if (value !== null) stageMedians.set(stage, value);
+  }
   return weapons
     .map((weapon) => {
-      const stages = weapon.stages.map((stage) => stage.stats);
-      const wins = stages.reduce((sum, stats) => sum + stats.wins, 0);
-      const n = stages.reduce((sum, stats) => sum + stats.n, 0);
+      const stages = scoredStages.map((stage) =>
+        weapon.stages.find((entry) => entry.stage === stage),
+      );
+      const wins = stages.reduce((sum, entry) => sum + (entry?.stats.wins ?? 0), 0);
+      const n = stages.reduce((sum, entry) => sum + (entry?.stats.n ?? 0), 0);
       const rate = n ? wins / n : 0;
       const pairNets = weapon.pairs
         .map((pair) => pair.stats.winDifference)
-
         .filter((value): value is number => value != null);
-      const killSeconds = stages
-        .map((stats) => stats.bossSeconds)
-
+      const relative = stages
+        .map((entry) => {
+          const seconds = entry?.stats.bossSeconds,
+            base = entry ? stageMedians.get(entry.stage) : undefined;
+          return seconds != null && base ? seconds / base : null;
+        })
         .filter((value): value is number => value != null);
       return {
         weapon,
@@ -144,17 +164,18 @@ export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
         rate,
         tier: weaponTier(rate),
         pairNet: pairNets.length ? pairNets.reduce((a, b) => a + b, 0) / pairNets.length : null,
-        killSeconds: killSeconds.length ? killSeconds.reduce((a, b) => a + b, 0) : null,
+        relativeKillTime: relative.length
+          ? relative.reduce((a, b) => a + b, 0) / relative.length
+          : null,
       };
     })
     .sort(
       (a, b) =>
         (a.n === 0 ? 1 : 0) - (b.n === 0 ? 1 : 0) ||
         a.tier - b.tier ||
-        (a.pairNet === null ? 1 : 0) - (b.pairNet === null ? 1 : 0) ||
-        (b.pairNet ?? 0) - (a.pairNet ?? 0) ||
-        (a.killSeconds === null ? 1 : 0) - (b.killSeconds === null ? 1 : 0) ||
-        (a.killSeconds ?? 0) - (b.killSeconds ?? 0) ||
+        b.rate - a.rate ||
+        (a.relativeKillTime === null ? 1 : 0) - (b.relativeKillTime === null ? 1 : 0) ||
+        (a.relativeKillTime ?? 0) - (b.relativeKillTime ?? 0) ||
         (order.get(a.weapon.id) ?? Number.MAX_SAFE_INTEGER) -
           (order.get(b.weapon.id) ?? Number.MAX_SAFE_INTEGER),
     );
