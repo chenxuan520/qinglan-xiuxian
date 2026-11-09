@@ -145,20 +145,27 @@ test('成就栏只保留非必经目标，并补录可由旧档确认的成就',
       'story',
       'three-paths',
       'permanent-medicine',
-      'mastery',
       'collection',
+      'mastery',
       'level-100',
       'six-immortals',
       'curio-three',
       'forge',
       'training-master',
       'five-tribulations',
-      'hard-immortal',
       'one-life-clear',
+      'hard-immortal',
       'rootless-immortal',
       'peerless',
     ],
   );
+  const order = chronicleAchievements(s).map((achievement) => achievement.id);
+  const position = (id: string) => order.indexOf(id);
+  assert.ok(position('one-life-clear') < position('hard-immortal'));
+  assert.ok(position('hard-immortal') < position('rootless-immortal'));
+  assert.ok(position('rootless-immortal') < position('peerless'));
+  assert.ok(position('permanent-medicine') < position('collection'));
+  assert.ok(position('collection') < position('mastery'));
   s.mortal.mastery.power = 10;
   s.tribulations = 5;
   s.training = { vitality: 20, power: 20, speed: 20 };

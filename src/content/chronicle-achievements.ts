@@ -56,7 +56,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'collection',
-      difficulty: 95,
+      difficulty: 50,
       title: '万宝归藏',
       detail: '收齐三十六件法宝',
       verse: '天下奇兵，尽入袖中。',
@@ -98,7 +98,7 @@ export function chronicleAchievements(save: SaveData) {
     },
     {
       id: 'hard-immortal',
-      difficulty: 120,
+      difficulty: 130,
       title: '逆天改命',
       detail: '以天劫降临难度成就真仙',
       verse: '天威如狱，孤舟亦破万重浪。',
@@ -129,7 +129,7 @@ export function chronicleAchievements(save: SaveData) {
       title: '生死证道',
       detail: '以极限模式一命踏破七境，成就真仙',
       verse: '孤锋一命，斩尽七境不回头。',
-      difficulty: 130,
+      difficulty: 120,
     },
   ];
   return definitions
