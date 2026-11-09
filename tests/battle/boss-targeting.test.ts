@@ -51,7 +51,7 @@ test('终关七位妖王保留原地面目标，远距离也能锁定主角，�
             assert.ok(Math.abs(mean - center[axis]) < 1e-8, `${range}/${stage}/${phase}/${axis}`);
           }
           for (const zone of g.zones) {
-            assert.ok(zone.delay >= 1.2 && zone.delay <= 2);
+            assert.ok(zone.delay >= 1.0 && zone.delay <= 1.8);
             assert.equal(zone.castDelay, zone.delay);
             assert.ok(zone.kind.startsWith('boss-'));
             assert.equal(zone.damage, e.damage);
@@ -80,7 +80,7 @@ test('妖王脚下落阵先预警再伤害，暂停与续局不改落点，移�
     restored.resume();
     if (move) Object.assign(restored.player, { x: 900, y: 900 });
     const hp = restored.player.hp;
-    for (let i = 0; i < 120; i++) restored.updateZones(0.01);
+    for (let i = 0; i < 100; i++) restored.updateZones(0.01);
     assert.equal(restored.player.hp, hp);
     restored.updateZones(0.01);
     assert.equal(restored.player.hp < hp, !move);

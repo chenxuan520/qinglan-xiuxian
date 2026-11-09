@@ -273,7 +273,7 @@ test('最终仙尊拥有独立立绘、更强属性与二阶段弹幕，落雷�
   immortal.cooldown = 0;
   g.update(0.01);
   assert.equal(g.zones.filter((z) => z.hostile).length, 5);
-  assert.ok(g.zones.every((z) => z.delay > 1));
+  assert.ok(g.zones.every((z) => z.delay >= 0.9));
 });
 
 test('终关所有刷怪及召唤物都是精英，常规六境保持原有等级', () => {

@@ -6,6 +6,7 @@ import { freshSave, SAVE_SCHEMA } from '../../src/core/progress.ts';
 import { useMedicine } from '../../src/items/medicine.ts';
 import { autoplayInput } from '../../src/battle/autoplay.ts';
 import { BOSS_FIELDS, drawBossField, drawBossShot } from '../../src/battle/boss-effects.ts';
+import { BOSS_MECHANICS } from '../../src/battle/boss-mechanics.ts';
 
 function encounter(stage: number, arena = stage, medicine = false) {
   const save = freshSave('heaven');
@@ -35,7 +36,7 @@ test('七王所有招式在本关和终关保留自身主题，半血加快施�
         const first = e.cooldown;
         for (const z of g.zones) {
           assert.equal(z.kind, `boss-${BOSS_FIELDS[stage]}`);
-          assert.ok(z.delay >= 1.2);
+          assert.ok(z.delay >= 1.0);
         }
         for (const s of g.shots) assert.equal(s.bossStage, stage);
         e.skillStep = phase;
@@ -45,7 +46,7 @@ test('七王所有招式在本关和终关保留自身主题，半血加快施�
         // 冲刺保持完整预警与运动时长，不能被半血加速截短。
         if (!((stage === 2 && phase === 0) || (stage === 6 && phase === 5)))
           assert.ok(e.cooldown < first);
-        for (const z of g.zones) assert.ok(z.delay >= 1.2);
+        for (const z of g.zones) assert.ok(z.delay >= 1.0);
       }
 });
 
@@ -54,7 +55,10 @@ test('狐火垂直封路、冰牙分层推进、毒池留出逃生方向、交�
   fire.e.skillStep = 1;
   fire.g.castBossSkill(fire.e, 0.6, 0.8);
   for (const z of fire.g.zones) assert.ok(Math.abs(z.x * 0.6 + z.y * 0.8) < 1e-8);
-  assert.deepEqual([...new Set(fire.g.zones.map((z) => z.delay))].sort(), [1.2, 1.38, 1.56]);
+  assert.deepEqual(
+    [...new Set(fire.g.zones.map((z) => Math.round(z.delay * 100) / 100))].sort((a, b) => a - b),
+    [1.0, 1.18, 1.36],
+  );
   const ice = encounter(2, 6);
   ice.e.skillStep = 1;
   ice.g.castBossSkill(ice.e, 1, 0);
@@ -70,8 +74,8 @@ test('狐火垂直封路、冰牙分层推进、毒池留出逃生方向、交�
   assert.ok(poison.g.zones.every((z) => Math.hypot(z.x, z.y - 150) > z.radius + 12));
   const rift = encounter(5, 6);
   rift.g.castBossSkill(rift.e, 1, 0);
-  assert.ok(rift.g.zones.filter((z) => z.y === 0).every((z) => z.delay === 1.2));
-  assert.ok(rift.g.zones.filter((z) => z.y !== 0).every((z) => z.delay === 1.65));
+  assert.ok(rift.g.zones.filter((z) => z.y === 0).every((z) => z.delay === 1.0));
+  assert.ok(rift.g.zones.filter((z) => z.y !== 0).every((z) => z.delay === 1.45));
 });
 
 test('幽魂先转弯再直飞，暂停与续局保留弹幕轨迹；旧弹不追加主题', () => {
@@ -220,3 +224,20 @@ test('七种妖王特效在预警、激活、减少动态和读档数据下均�
     assert.equal(saves, 0);
   }
 });
+
+test('castBossSkill 产生的妖王地面阵最早预警为 1.0 秒；木心在 1.2 秒成阵', () => {
+  assert.equal(BOSS_MECHANICS.heartGrow, 1.2);
+  let minGroundDelay = Infinity;
+  for (let stage = 0; stage < STAGES.length; stage++) {
+    for (let phase = 0; phase < STAGES[stage].skills.length; phase++) {
+      const { g, e } = encounter(stage, 6);
+      e.skillStep = phase;
+      g.castBossSkill(e, 1, 0);
+      for (const z of g.zones) {
+        if (z.kind.startsWith('boss-')) minGroundDelay = Math.min(minGroundDelay, z.delay);
+      }
+    }
+  }
+  assert.equal(minGroundDelay, 1.0);
+});
+

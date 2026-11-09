@@ -235,7 +235,7 @@ test('第六王无后续伤害的五圈残影不阻挡低血量玩家避开致�
     boss.skillStep = 2;
     boss.cooldown = 0;
     boss.pursuitCooldown = 999;
-    for (let frame = 0; frame < 82; frame++) {
+    for (let frame = 0; frame < 72; frame++) {
       g.update(0.02);
       // 仅观察这次陨雷的残影，不混入随机轮换的下一招。
       boss.cooldown = 999;

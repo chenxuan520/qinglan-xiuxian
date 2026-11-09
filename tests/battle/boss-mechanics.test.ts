@@ -111,7 +111,7 @@ test('木心全程可打碎，扎根前不伤人，击碎即散阵，无击杀/�
   const zone = g.zones.find((z) => z.sourceId === heart.id)!;
   Object.assign(g.player, { x: heart.x, y: heart.y });
   const hp = g.player.hp;
-  g.updateZones(2);
+  g.updateZones(1.0);
   assert.equal(g.player.hp, hp);
   const before = [g.kills, g.xp, g.iron, g.combatCultivation, g.pickups.length];
   g.hitEnemy(heart, heart.hp, false, 'sword');

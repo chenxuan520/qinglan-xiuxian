@@ -1866,7 +1866,7 @@ export class Game {
     const ring = (count: number, speed: number) =>
       fan(count, (TAU * (count - 1)) / count, speed, this.time * 0.25);
     const kinds = ['roots', 'flame', 'frost', 'miasma', 'soul', 'rift', 'thunder'];
-    const blast = (x: number, y: number, radius: number, life = 0.5, delay = 1.2) =>
+    const blast = (x: number, y: number, radius: number, life = 0.5, delay = 1.0) =>
       this.zone(
         x,
         y,
@@ -1886,7 +1886,7 @@ export class Game {
           p.y + Math.sin(a) * radius,
           size,
           life,
-          1.2 + (i % 2) * stagger,
+          1.0 + (i % 2) * stagger,
         );
       }
     };
@@ -1991,7 +1991,7 @@ export class Game {
           fan(8, 1.5 * (7 / 8), 145);
         } else if (phase === 1)
           for (let i = -2; i <= 2; i++)
-            blast(p.x - ny * i * 85, p.y + nx * i * 85, 50, 3, 1.2 + Math.abs(i) * 0.18);
+            blast(p.x - ny * i * 85, p.y + nx * i * 85, 50, 3, 1.0 + Math.abs(i) * 0.18);
         else {
           ring(20, 180);
           // 慢环错开半个弹距，落在快环两发之间，避免同轨重叠。
@@ -2012,7 +2012,7 @@ export class Game {
         if (phase === 0) {
           blast(p.x, p.y, 62, 5);
           for (const x of [-100, 100])
-            for (const y of [-75, 75]) blast(p.x + x, p.y + y, 62, 5, 1.45);
+            for (const y of [-75, 75]) blast(p.x + x, p.y + y, 62, 5, 1.25);
         } else if (phase === 1) {
           const shots = fan(5, 0.75, this.tribulation ? 160 : 190);
           if (!this.tribulation)
@@ -2027,14 +2027,14 @@ export class Game {
         else if (phase === 1) ring(20, 200);
         else {
           ringZones(6, 165, 52, 2);
-          blast(p.x, p.y, 60, 0.5, 1.8);
+          blast(p.x, p.y, 60, 0.5, 1.6);
         }
         break;
       case 5:
         if (phase === 0) {
           for (let i = -2; i <= 2; i++) {
             blast(p.x + i * 105, p.y, 48);
-            if (i !== 0) blast(p.x, p.y + i * 105, 48, 0.5, 1.65);
+            if (i !== 0) blast(p.x, p.y + i * 105, 48, 0.5, 1.45);
           }
         } else if (phase === 1) ring(22, 175);
         else ringZones(5, 95, 70, 0.5, 0.4);
@@ -2043,10 +2043,10 @@ export class Game {
         if (phase === 0) ring(enraged ? 32 : 24, 185);
         else if (phase === 1)
           for (let i = -2; i <= 2; i++)
-            blast(p.x + i * 105, p.y + (i % 2) * 65, 88, 0.5, 1.2 + Math.abs(i) * 0.22);
+            blast(p.x + i * 105, p.y + (i % 2) * 65, 88, 0.5, 1.0 + Math.abs(i) * 0.22);
         else if (phase === 2) {
           ringZones(8, 180, 60, 0.5, 0.45);
-          blast(p.x, p.y, 80, 0.5, 2);
+          blast(p.x, p.y, 80, 0.5, 1.8);
         } else if (phase === 3) {
           fan(enraged ? 15 : 11, Math.PI * 1.2, 230);
         } else if (phase === 4) {
@@ -2897,7 +2897,7 @@ export class Game {
           );
           b.life = 0;
         } else if (b.miasmaArrow && !this.tribulation && distance(b, b.origin) >= 500) {
-          this.zone(b.x, b.y, 56, 5, b.miasmaDamage!, STAGES[3].color, 'boss-miasma', 0.3, true);
+          this.zone(b.x, b.y, 47, 5, b.miasmaDamage!, STAGES[3].color, 'boss-miasma', 0.3, true);
           b.life = 0;
         }
         continue;

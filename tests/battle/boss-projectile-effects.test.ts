@@ -357,7 +357,7 @@ test('毒矢按发射origin满500化毒瘴，基伤不随施放者移动、改�
     const zone = c.g.zones[0];
     assert.deepEqual([zone.x, zone.y], [shot.origin.x + 300, shot.origin.y + 400]);
     assert.equal(zone.kind, 'boss-miasma');
-    assert.equal(zone.radius, 56);
+    assert.equal(zone.radius, 47);
     assert.equal(zone.life, 5);
     assert.equal(zone.maxLife, 5);
     assert.equal(zone.delay, 0.3);
@@ -468,3 +468,29 @@ test('毒矢续局拒绝不合法标记、缺失或负/非有限基伤、错误�
     assert.equal(Game.restore(c.g.save, raw), null, String(Object.keys(change)));
   }
 });
+
+test('5支毒矢同时在500像素处化瘴，相邻毒池圆心距离与两池半径之和相差不超过1像素（贴边、不明显重叠）', () => {
+  const c = encounter(3);
+  cast(c, 1);
+  assert.equal(c.g.shots.length, 5);
+  for (const s of c.g.shots) {
+    const angle = Math.atan2(s.vy, s.vx);
+    s.x = s.origin.x + Math.cos(angle) * 500;
+    s.y = s.origin.y + Math.sin(angle) * 500;
+  }
+  c.g.updateShots(0);
+  assert.equal(c.g.zones.length, 5);
+  for (const z of c.g.zones) {
+    assert.equal(z.kind, 'boss-miasma');
+    assert.equal(z.radius, 47);
+  }
+  const angles = c.g.zones.map((z) => Math.atan2(z.y - c.boss.y, z.x - c.boss.x)).sort((a, b) => a - b);
+  for (let i = 0; i < angles.length - 1; i++) {
+    const z1 = c.g.zones.find((z) => Math.abs(Math.atan2(z.y - c.boss.y, z.x - c.boss.x) - angles[i]) < 1e-6)!;
+    const z2 = c.g.zones.find((z) => Math.abs(Math.atan2(z.y - c.boss.y, z.x - c.boss.x) - angles[i + 1]) < 1e-6)!;
+    const dist = Math.hypot(z1.x - z2.x, z1.y - z2.y);
+    const sumRadius = z1.radius + z2.radius;
+    assert.ok(Math.abs(dist - sumRadius) <= 1, `相邻圆心距离 ${dist} 与半径和 ${sumRadius} 相差不超过1像素`);
+  }
+});
+

@@ -3,7 +3,7 @@ import type { Point, Shot } from './game-types.ts';
 export const SOVEREIGN_GOLD = '#e8d69c';
 
 export const BOSS_MECHANICS = {
-  heartGrow: 2.4,
+  heartGrow: 1.2,
   heartLife: 8,
   heartLimit: 3,
   wolfFlank: 1.2,
