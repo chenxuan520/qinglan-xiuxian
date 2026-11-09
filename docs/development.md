@@ -224,7 +224,7 @@ npx wrangler d1 migrations apply qinglan-leaderboard --remote --config workers/l
 npx wrangler deploy --config workers/leaderboard/wrangler.jsonc --keep-vars
 ```
 
-**自动部署**：推送 `master` 且排行榜代码、`workers/house-ads/admin.ts`（榜单管理登录页共用脚本）、`src/`、根依赖文件或根 TypeScript 配置变化时，`.github/workflows/leaderboard.yml` 执行 `npm run deploy:leaderboard`；修改该工作流本身也会触发，并保留手动运行入口。复用仓库 Secret `CLOUDFLARE_API_TOKEN`，缺少凭据或部署失败会让任务明确失败，不将跳过当作已发布。三个 Worker 均采用整个 `src/` 的保守范围，避免新增共享依赖漏部署，因此其中的界面代码改动也可能触发；仅 `docs/`、仓库根 `README.md`、公共素材或根域验证 Worker 改动不触发。D1 迁移仍按原有命令单独执行，自动流程不包含数据库操作。
+**自动部署**：推送 `master` 且排行榜代码、`workers/house-ads/admin.ts`（榜单管理登录页共用脚本）、`src/`、根依赖文件或根 TypeScript 配置变化时，`.github/workflows/leaderboard.yml` 执行 `npm run deploy:leaderboard`；修改该工作流本身也会触发，并保留手动运行入口。复用仓库 Secret `CLOUDFLARE_API_TOKEN`，缺少凭据或部署失败会让任务明确失败，不将跳过当作已发布。三个 Worker 均采用整个 `src/` 的保守范围，避免新增共享依赖漏部署，因此其中的界面代码改动也可能触发；仅 `docs/`、仓库根 `README.md` 或公共素材改动不触发。D1 迁移仍按原有命令单独执行，自动流程不包含数据库操作。
 
 ## 妖物志遭遇与未知形影
 
@@ -293,9 +293,9 @@ npm run deploy:cloudflare
 
 不同网址的浏览器存档独立。迁移时先在原网址的设置中导出存档，再到新网址的设置中导入。
 
-### 根域 ads.txt 验证代理（qinglan-ads-verify）
+### 广告授权文件（已停用）
 
-AdSense 站点注册认注册根域 `011203.xyz`，而根域默认重定向到个人主页（`www.chenxuanweb.top`）；Cloudflare 的 Redirect Rule 位于 Worker 之前执行，单靠 Worker 路由抢不出 `/ads.txt`，需要在重定向规则的表达式里排除 `/ads.txt`（在控制台手动改，不在本仓库脚本里）。Worker `qinglan-ads-verify`（`workers/ads-verify/`）经路由 `011203.xyz/ads.txt` 读取广告平台同一个 D1 配置生成授权行；官网 `xiuxian.011203.xyz/ads.txt` 则由广告 Worker 提供。发布商 ID 在广告管理后台统一修改，两处均即时读取、不缓存，不再编辑静态 `public/ads.txt` 或网页 meta。清空 ID 后返回空授权文件；数据库异常返回 503，不返回过期授权。GitHub Pages 仅作游戏备份站，不承载根域验证。部署：`npx wrangler deploy --config workers/ads-verify/wrangler.jsonc`，保留同一 D1 绑定。Google 站点所有权、审核及广告资格仍由站长在官方控制台确认，后台保存不代表通过审核。
+Google AdSense 已停用，仓库不再提供 `ads.txt`：根域验证 Worker `qinglan-ads-verify`（`workers/ads-verify/`）与官网 `/ads.txt` 路由均已从仓库删除，house-ads 重新部署后官网与旧广告域名停止返回该文件。若 Cloudflare 控制台仍保留该 Worker 或旧路由，请手动删除；根域重定向规则里的 `/ads.txt` 排除项也可一并移除。发布商 ID 与广告位仍在广告管理后台配置。
 
 ## 自营图片广告 · 独立投放服务
 
@@ -322,9 +322,9 @@ npx wrangler d1 migrations apply qinglan-house-ads --remote --config workers/hou
 npm run deploy:house-ads
 ```
 
-**自动部署**：`.github/workflows/house-ads.yml` 在推送 `master` 且广告 Worker 代码、`src/`、根依赖或 TypeScript 配置及该工作流变化时，执行 `npm run deploy:house-ads`，也可手动运行。沿用已有 `CLOUDFLARE_API_TOKEN` 与 `--keep-vars`，不重置账号、会话、投放数据或密钥；缺少凭据及发布失败明确标红。NPC、广告与排行榜各有独立并发组，不取消进行中的部署。根域 `qinglan-ads-verify` 不接自动部署，现有发布方式不变。
+**自动部署**：`.github/workflows/house-ads.yml` 在推送 `master` 且广告 Worker 代码、`src/`、根依赖或 TypeScript 配置及该工作流变化时，执行 `npm run deploy:house-ads`，也可手动运行。沿用已有 `CLOUDFLARE_API_TOKEN` 与 `--keep-vars`，不重置账号、会话、投放数据或密钥；缺少凭据及发布失败明确标红。NPC、广告与排行榜各有独立并发组，不取消进行中的部署。
 
-首次部署先创建同名D1数据库，写入ID并应用迁移。已有平台部署前应用 `0003_ad_platform.sql`，增加集中设置、凭条和日汇总；不改既有账号、会话、广告和 revision。根域验证 Worker 也须绑定同一 D1 并单独发布。`0002_admin_login.sql`只创建登录所需表，不写入公开默认账号或密码；管理账号和随机初始密码由部署工具在本地安全生成并单独交付，只将盐和校验值写入D1，不能提交Git或公开展示。密码可在后台修改，遗忘时由维护者更新D1校验值并撤销旧会话。官网将`/ads/*`、`/ads.txt`及匿名故障入口`/api/client-status`路由至广告Worker，不影响游戏页面、小说或其他后端；旧广告域名只保留已有客户端的公开接口和管理入口跳转。移除本广告原有Access应用，不修改其他Access应用、组织或环境授权。仓库配置仅声明管理来源及官网/Pages CORS；部署用`--keep-vars`，无管理身份或密码进入前端。先验证Worker真实密码登录，再发布游戏两站；隔离测试身份不用于线上登录。
+首次部署先创建同名D1数据库，写入ID并应用迁移。已有平台部署前应用 `0003_ad_platform.sql`，增加集中设置、凭条和日汇总；不改既有账号、会话、广告和 revision。`0002_admin_login.sql`只创建登录所需表，不写入公开默认账号或密码；管理账号和随机初始密码由部署工具在本地安全生成并单独交付，只将盐和校验值写入D1，不能提交Git或公开展示。密码可在后台修改，遗忘时由维护者更新D1校验值并撤销旧会话。官网将`/ads/*`及匿名故障入口`/api/client-status`路由至广告Worker，不影响游戏页面、小说或其他后端；旧广告域名只保留已有客户端的公开接口和管理入口跳转。移除本广告原有Access应用，不修改其他Access应用、组织或环境授权。仓库配置仅声明管理来源及官网/Pages CORS；部署用`--keep-vars`，无管理身份或密码进入前端。先验证Worker真实密码登录，再发布游戏两站；隔离测试身份不用于线上登录。
 
 ## NPC 对话 · Cloudflare Workers AI
 

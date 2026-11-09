@@ -13,7 +13,6 @@ import {
 } from '../../src/ads/house-ad-contract.ts';
 import { adAdminSession, adAuthAction } from './auth.ts';
 import { ADMIN_HTML, ADMIN_SCRIPT, ADMIN_CSS, LOGIN_HTML, LOGIN_SCRIPT } from './admin.ts';
-import { adSellerLine } from '../../src/ads/ad-platform-contract.ts';
 import { adMetrics, issueAdReceipt, recordAdMetrics, validAdMetricEvent } from './metrics.ts';
 import { AD_API_GUIDE, houseAdsOpenApi } from './api.ts';
 import { validateCampaignImages } from './images.ts';
@@ -189,19 +188,6 @@ export const createHouseAdsWorker = (
         return path === '/openapi.json'
           ? json(houseAdsOpenApi(env.ADMIN_ORIGIN))
           : page(AD_API_GUIDE, 'text/markdown; charset=utf-8');
-      }
-      if (path === '/ads.txt') {
-        try {
-          const current = await config(env);
-          return new Response(adSellerLine(current.settings!), {
-            headers: {
-              ...Object.fromEntries(headers()),
-              'Content-Type': 'text/plain; charset=utf-8',
-            },
-          });
-        } catch {
-          return new Response('temporarily unavailable', { status: 503, headers: headers() });
-        }
       }
       if (path === '/api/reward-content/event') {
         const extra = publicHeaders(request, env.ALLOWED_ORIGINS, 'POST');

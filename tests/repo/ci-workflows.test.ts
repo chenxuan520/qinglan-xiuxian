@@ -155,23 +155,17 @@ test('三个Worker响应自己的代码、共享src与发布依赖，保留手�
   }
 });
 
-test('广告登录页更新也部署引用它的排行榜，不因文档、素材或ads.txt验证代码发布Worker', () => {
+test('广告登录页更新也部署引用它的排行榜，不因文档或素材发布Worker', () => {
   assert.ok(workerTriggered('house-ads', 'workers/house-ads/admin.ts'));
   assert.ok(workerTriggered('leaderboard', 'workers/house-ads/admin.ts'));
   assert.equal(workerTriggered('npc-ai', 'workers/house-ads/admin.ts'), false);
   assert.equal(workerTriggered('leaderboard', 'workers/house-ads/index.ts'), false);
   for (const worker of workerWorkflows)
-    for (const path of [
-      'docs/development.md',
-      'README.md',
-      'public/assets/terrain.webp',
-      'workers/ads-verify/index.ts',
-      'workers/ads-verify/wrangler.jsonc',
-    ])
+    for (const path of ['docs/development.md', 'README.md', 'public/assets/terrain.webp'])
       assert.equal(workerTriggered(worker, path), false, `${worker} 不应因 ${path} 发布`);
 });
 
-test('Worker部署沿用既有凭据与keep-vars，缺配置明确失败，不自动改库或部署验证Worker', () => {
+test('Worker部署沿用既有凭据与keep-vars，缺配置明确失败，不自动改库', () => {
   const scripts = JSON.parse(
     readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
   ).scripts;
@@ -184,11 +178,18 @@ test('Worker部署沿用既有凭据与keep-vars，缺配置明确失败，不�
     assert.match(source, /contents: read/);
     assert.doesNotMatch(
       source,
-      /(?:contents|actions|pages|id-token): write|continue-on-error|wrangler login|secret (?:put|bulk)|migrations apply|deploy:ads-verify/,
+      /(?:contents|actions|pages|id-token): write|continue-on-error|wrangler login|secret (?:put|bulk)|migrations apply/,
     );
     assert.ok(
       scripts[`deploy:${worker}`].includes(`--config workers/${worker}/wrangler.jsonc --keep-vars`),
     );
   }
-  assert.ok(!readdirSync(workflows).includes('ads-verify.yml'));
+});
+
+test('广告 Worker 不再绑定 ads.txt 路由', () => {
+  const source = readFileSync(
+    new URL('../../workers/house-ads/wrangler.jsonc', import.meta.url),
+    'utf8',
+  );
+  assert.ok(!source.includes('ads.txt'));
 });

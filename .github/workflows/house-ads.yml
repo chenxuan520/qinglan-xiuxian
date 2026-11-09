@@ -1,6 +1,6 @@
 name: Deploy house ads Worker
 
-# 仅部署广告平台；根域 ads.txt 验证 Worker 保持原来的独立发布方式。
+# 仅部署广告平台。
 on:
   push:
     branches: [master]

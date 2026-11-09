@@ -16,7 +16,6 @@ import {
 } from '../../workers/house-ads/metrics.ts';
 import { configuredAdProvider } from '../../src/ads/ads-platform.ts';
 import { adWorker as worker } from '../helpers/house-ads.ts';
-import seller from '../../workers/ads-verify/index.ts';
 import { ADMIN_HTML, LOGIN_HTML, ADMIN_SCRIPT } from '../../workers/house-ads/admin.ts';
 import { adStore, adEnv, adSessionFixture, exampleAd } from '../helpers/house-ads.ts';
 
@@ -114,7 +113,7 @@ test('平台配置仅接受真实Google字段与四个广告位，空client不�
   new Script(ADMIN_SCRIPT);
 });
 
-test('同一配置源驱动管理端、Google选择和两份ads.txt，旧格式保存不清空Google配置', async (t) => {
+test('同一配置源驱动管理端与Google选择，旧格式保存不清空Google配置', async (t) => {
   const store = adStore(),
     env = adEnv(store),
     fixture = await adSessionFixture(store),
@@ -138,12 +137,7 @@ test('同一配置源驱动管理端、Google选择和两份ads.txt，旧格式�
   assert.deepEqual(await (await api(env, '/api/reward-content/creative?placement=revive')).json(), {
     ad: null,
   });
-  const line = 'google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n';
-  assert.equal(await (await api(env, '/ads.txt')).text(), line);
-  assert.equal(
-    await (await seller.fetch(new Request('https://011203.xyz/ads.txt'), env)).text(),
-    line,
-  );
+  assert.equal((await api(env, '/ads.txt')).status, 404);
   assert.equal(
     (await api(env, '/ads/admin/config', cookie, 'PUT', { revision: 1, campaigns: [] })).status,
     200,

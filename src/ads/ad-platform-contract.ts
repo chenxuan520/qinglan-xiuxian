@@ -45,8 +45,3 @@ export function validAdPlatformSettings(v: unknown): v is AdPlatformSettings {
     )
   );
 }
-export function adSellerLine(settings: AdPlatformSettings) {
-  return settings.adsense.client
-    ? `google.com, ${settings.adsense.client.slice(3)}, DIRECT, f08c47fec0942fa0\n`
-    : '';
-}
