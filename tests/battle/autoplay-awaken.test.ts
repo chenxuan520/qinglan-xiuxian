@@ -92,7 +92,7 @@ test('最后一个功法格按覆盖数预留，功法分随覆盖数提高', ()
   assert.equal(choiceScore(passive('haste'), g), 55);
 });
 
-test('最后一格预定后，配套相符的新法宝加分、配套不符的减分', () => {
+test('最后一格预定后，配套相符的新法宝不扣分、配套不符的减分', () => {
   const g = stub(
     [
       { id: 'first', level: 5 },
@@ -102,7 +102,7 @@ test('最后一格预定后，配套相符的新法宝加分、配套不符的�
     threeLearned,
     { ...requirements, sword: ['area'], umbrella: ['haste'] },
   );
-  assert.equal(choiceScore(weapon('sword'), g), 24);
+  assert.equal(choiceScore(weapon('sword'), g), 18);
   assert.equal(choiceScore(weapon('umbrella'), g), 10);
 });
 

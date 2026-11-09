@@ -84,7 +84,7 @@ test('觉醒与危急恢复不会被补新法宝挤掉，各倾向遵守自救�
   }
 });
 
-test('新法宝略偏向已有配方，覆盖正道、魔道、兼修全部合法法宝', () => {
+test('已学配方不再给新法宝加分，同档仍保留候选原顺序，覆盖正道、魔道、兼修全部合法法宝', () => {
   let checked = 0;
   for (const path of ['orthodox', 'demonic', 'dual'] as const)
     for (const t of TREASURES.filter((t) => allowsSchool(path, t.school))) {
@@ -99,7 +99,7 @@ test('新法宝略偏向已有配方，覆盖正道、魔道、兼修全部合�
             .some((id) => g.evolutionRequirements(t.id).includes(id))
         )
           return false;
-        // 从真实排序中找基础偏好相同的法宝，确认觉醒前景加分只改变同档取舍。
+        // 从真实排序中找基础偏好相同的法宝，确认已学配方不改变同档取舍。
         g.choices = [
           { type: 'weapon', id: candidate.id, level: 1 },
           { type: 'weapon', id: t.id, level: 1 },
@@ -122,14 +122,14 @@ test('新法宝略偏向已有配方，覆盖正道、魔道、兼修全部合�
           { type: 'weapon', id: other.id, level: 1 },
           { type: 'weapon', id: t.id, level: 1 },
         ];
-        assert.equal(pick(g).id, t.id, `${path}/${t.id}/${recipe}`);
+        assert.equal(pick(g).id, other.id, `${path}/${t.id}/${recipe}`);
         checked++;
       }
     }
   assert.ok(checked >= 100);
 });
 
-test('觉醒前景加分优先于基础排序，配方与升重按能否觉醒取舍', () => {
+test('能觉醒的法宝不额外加分，基础排序与升重顺序不变', () => {
   const g = game();
   own(g, ['sword'], 2);
   g.passives = { duration: 1 };
@@ -137,14 +137,14 @@ test('觉醒前景加分优先于基础排序，配方与升重按能否觉醒�
     { type: 'weapon', id: 'poison', level: 1 },
     { type: 'weapon', id: 'lightning', level: 1 },
   ];
-  assert.equal(pick(g).id, 'poison');
+  assert.equal(pick(g).id, 'lightning');
   own(g, ['sword', 'lightning'], 2);
   g.passives = { haste: 1 };
   g.choices = [
     { type: 'weapon', id: 'sword', level: 3 },
     { type: 'weapon', id: 'lightning', level: 3 },
   ];
-  assert.equal(pick(g).id, 'lightning', '已学配套的升重优先');
+  assert.equal(pick(g).id, 'sword', '已学配套不改变同档升重顺序');
 });
 
 test('指定十一件优选法宝优于同级普通法宝，领悟与升重不依赖排列顺序', () => {
@@ -187,9 +187,9 @@ test('青莲灯按普通法宝排序，配方、本命与指定目标仍遵守�
     { type: 'weapon', id: 'orbit', level: 1 },
     { type: 'weapon', id: 'lightning', level: 1 },
   ];
-  assert.equal(pick(g).id, 'orbit', '已有青莲配方即可觉醒，优先于优选法宝');
+  assert.equal(pick(g).id, 'lightning', '已有青莲配方不加分，优选法宝仍在前');
   g.choices[1].id = 'arrow';
-  assert.equal(pick(g).id, 'orbit', '普通档之间仍略偏向已有配方');
+  assert.equal(pick(g).id, 'orbit', '普通档同分保留候选原顺序');
   g.passives = {};
   g.choices.reverse();
   assert.equal(pick(g).id, 'arrow', '没有配方时同分保留候选原顺序');
@@ -220,7 +220,7 @@ test('全满补新仍遵守指定目标与前半程预留末格，后半程不�
     { type: 'weapon', id: 'lightning', level: 1 },
     { type: 'weapon', id: 'arrow', level: 1 },
   ];
-  assert.equal(pick(g).id, 'lightning', '已学配方即可觉醒，优先于明确目标');
+  assert.equal(pick(g).id, 'arrow', '已学配方不加分，明确目标优先');
   g.save.autoplayBuild.targets = ['poison', ''];
   own(g, ['sword', 'orbit', 'fire', 'lightning', 'ice']);
   for (const w of g.weapons) w.evolved = true;

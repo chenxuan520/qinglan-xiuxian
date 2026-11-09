@@ -87,18 +87,9 @@ export function choiceScore(c: Choice, g: Game) {
     return 95;
   if (c.type === 'weapon') {
     const outlook = awakenOutlook(g, c.id);
-    const awakenBonus =
-      c.level === 1
-        ? outlook === 'sure'
-          ? 6
-          : outlook === 'dead'
-            ? -8
-            : 0
-        : outlook === 'sure'
-          ? 4
-          : outlook === 'dead'
-            ? -6
-            : 0;
+    // 只扣「本局觉醒不了」的法宝；给「已能觉醒」加分会让 AI 过早铺开新法宝、
+    // 拖慢主力升重，840 条门禁双灵根实测由 39.2% 降到 29.2%，故不加分。
+    const awakenBonus = outlook === 'dead' ? (c.level === 1 ? -8 : -6) : 0;
     return (
       (favored.includes(c.id) ? 15 : 10) +
       (c.level > 1 ? 8 : 2) +
