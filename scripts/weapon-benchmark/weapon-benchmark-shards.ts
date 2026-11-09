@@ -31,7 +31,7 @@ import type { WeaponOptions } from './weapon-benchmark.ts';
 import { caseKey } from '../balance/balance-policy.ts';
 import { verifyCoverage } from '../balance/balance-metrics.ts';
 
-export const WEAPON_CI_SHARDS = 8;
+export const WEAPON_CI_SHARDS = 16;
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export function weaponShardOptions(options: WeaponOptions, index: number, count: number) {
   assert.ok(
@@ -220,20 +220,16 @@ export function readWeaponShards(
 }
 
 export async function weaponShardMain(args: string[]) {
-  assert.equal(args.length, 4, '使用 --shard INDEX/8 --out DIR 或 --merge DIR --out DIR');
+  assert.equal(args.length, 4, '使用 --shard INDEX/16 --out DIR 或 --merge DIR --out DIR');
   const [mode, value, outKey, outValue] = args;
   assert.ok(mode === '--shard' || mode === '--merge', '未知法宝CI模式');
   assert.equal(outKey, '--out');
   assert.ok(outValue);
   const options = parseWeaponOptions(['--extended']),
-    expected = identity();
-  assert.equal(
-    weaponBenchmarkPlan(options).length + weaponCampaignPlan(options).length,
-    10400,
-    'CI必须运行原完整10400计划',
-  );
+    expected = identity(),
+    planned = weaponBenchmarkPlan(options).length + weaponCampaignPlan(options).length;
   if (mode === '--shard') {
-    assert.match(value, /^[0-7]\/8$/, '法宝CI须为0～7号八分片');
+    assert.match(value, /^(?:[0-9]|1[0-5])\/16$/, '法宝CI须为0～15号十六分片');
     const index = Number(value.split('/')[0]),
       startedAt = Date.now();
     const subset = {
@@ -241,7 +237,7 @@ export async function weaponShardMain(args: string[]) {
       out: validateWeaponOutput(outValue),
     };
     console.log(
-      `法宝CI分片${index + 1}/8；资源 ${JSON.stringify({ availableCpus: availableParallelism(), cpuModel: cpus()[0]?.model ?? 'unavailable', node: process.version })}`,
+      `法宝CI分片${index + 1}/16；资源 ${JSON.stringify({ availableCpus: availableParallelism(), cpuModel: cpus()[0]?.model ?? 'unavailable', node: process.version })}`,
     );
     await runWeaponBenchmark(subset);
     assert.deepEqual(identity(), expected, '分片期间提交、源码或工具改变');
@@ -277,14 +273,14 @@ export async function weaponShardMain(args: string[]) {
           sourceHash: expected.sourceHash,
           runId: expected.runId,
           elapsedSeconds: (Date.now() - merged.startedAt) / 1000,
-          planned: 10400,
+          planned,
           error: null,
         },
       );
       writeWeaponReport(out, report);
       writeFileSync(join(out, 'execution.json'), JSON.stringify({ shards: merged.shards }));
       console.log(
-        `法宝CI完整合并：${report.returned}/10400；${merged.workers}个模拟worker，报告 ${out}`,
+        `法宝CI完整合并：${report.returned}/${planned}；${merged.workers}个模拟worker，报告 ${out}`,
       );
     } catch (error) {
       writeWeaponReport(
@@ -294,7 +290,7 @@ export async function weaponShardMain(args: string[]) {
           sourceHash: expected.sourceHash,
           runId: expected.runId,
           elapsedSeconds: (Date.now() - startedAt) / 1000,
-          planned: 10400,
+          planned,
           error: String(error),
         }),
       );

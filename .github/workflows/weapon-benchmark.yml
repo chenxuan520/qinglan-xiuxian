@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -32,7 +32,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run weapon evaluation shard
-        run: node --experimental-strip-types scripts/weapon-benchmark/weapon-benchmark-shards.ts --shard ${{ matrix.shard }}/8 --out artifacts/weapon-shard-${{ matrix.shard }}
+        run: node --experimental-strip-types scripts/weapon-benchmark/weapon-benchmark-shards.ts --shard ${{ matrix.shard }}/16 --out artifacts/weapon-shard-${{ matrix.shard }}
       - name: Preserve raw shard including partial failure evidence
         if: always() && !cancelled()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

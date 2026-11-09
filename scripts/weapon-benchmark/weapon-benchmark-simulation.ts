@@ -10,6 +10,7 @@ import {
   STAGE_YEARS_PER_MINUTE,
   TREASURES,
   evolutionPassives,
+  rootElementsFor,
   treasure,
 } from '../../src/core/data.ts';
 import { freshSave, realmCost, realmInfo, tribulationDue } from '../../src/core/progress.ts';
@@ -35,7 +36,13 @@ function view(g: Game, device: string) {
 }
 function entrySave(id: string, stage: number, root: string, index: number) {
   const t = treasure(id);
-  const rootElements = root === 'heaven' ? [elements[index % 5]] : triples[index % 10];
+  const element = elements[index % 5];
+  const rootElements =
+    root === 'heaven'
+      ? [element]
+      : root === 'dual'
+        ? rootElementsFor('dual', [element], seeded(913 * (index + 1)))
+        : triples[index % 10];
   const save = withRandom(seeded(8128 + index), () =>
     freshSave(root, rootElements, t.school, seeded(444 + index)),
   );
@@ -345,11 +352,26 @@ export function battle(g: Game, job: any, limit: number) {
     stop =
       g.state === 'won' ? 'won' : g.state === 'lost' ? (g.expired ? 'expired' : 'lost') : 'timeout';
   const seconds = g.time - start;
+  const firstBoss = meter.bosses.find((b) => !b.enemy.summonedBy);
+  const bossAt = firstBoss ? firstBoss.at - start : null;
+  const liveBosses = g.enemies.filter((e) => e.boss && !e.summonedBy && !e.dead);
+  const liveMax = liveBosses.reduce((sum, e) => sum + e.maxHp, 0);
+  const bossHpLeft =
+    stop === 'won'
+      ? 0
+      : bossAt === null
+        ? null
+        : liveMax > 0
+          ? liveBosses.reduce((sum, e) => sum + Math.max(0, e.hp), 0) / liveMax
+          : 0;
   const result = {
     ...job,
     entry,
     state: stop,
     seconds,
+    bossAt,
+    bossSeconds: stop === 'won' && bossAt !== null ? seconds - bossAt : null,
+    bossHpLeft,
     frames,
     level: g.level,
     kills: g.kills,

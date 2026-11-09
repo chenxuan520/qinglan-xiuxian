@@ -49,7 +49,7 @@ export interface WeaponOptions extends WeaponPlanOptions {
 export function parseWeaponOptions(args: string[]): WeaponOptions {
   const options: WeaponOptions = {
     weapons: selectBenchmarkWeapons(),
-    seeds: 10,
+    seeds: 20,
     extended: false,
     seedOffset: 0,
     workers: availableParallelism(),

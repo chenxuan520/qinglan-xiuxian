@@ -2,7 +2,9 @@ import {
   rankWeapons,
   validWeaponReport,
   weaponTotal,
+  WEAPON_BENCHMARK_STAGES,
   WEAPON_REPORT_URL,
+  type WeaponBattleStats,
   type WeaponReport,
 } from './weapon-report.ts';
 import { monitorDeadline } from './monitor-request.ts';
@@ -10,9 +12,30 @@ import {
   monitorEscape as esc,
   monitorCount as count,
   monitorTime as time,
-  monitorTable as table,
 } from './monitor-view.ts';
 
+const weaponCell = (stats: WeaponBattleStats | undefined) => {
+  if (!stats || !stats.n) return '—';
+  const time = stats.bossSeconds === null ? '—' : `${Math.round(stats.bossSeconds)}秒`;
+  return `${stats.wins}/${stats.n}<small>${time}</small>`;
+};
+const tierNames = ['一档', '二档', '三档', '四档'] as const;
+const stageLabels = ['第一关', '第二关', '第三关', '第四关', '第五关', '第六关', '终关'];
+function weaponTable(rows: string[][]) {
+  const headers = [
+    '法宝',
+    '路线',
+    ...stageLabels,
+    '总胜率',
+    '配对净差',
+    '击杀用时',
+    '本命伤害占比',
+    '觉醒',
+  ];
+  const cell = (value: string) =>
+    esc(value).replace(/&lt;small&gt;(.*?)&lt;\/small&gt;/g, '<small>$1</small>');
+  return `<div class="table-wrap" tabindex="0" role="region" aria-label="法宝档位统计表，可横向滚动"><table class="weapon-detail"><thead><tr>${headers.map((h) => `<th scope="col">${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((value) => `<td>${cell(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
 export function weaponMonitorHTML(data: WeaponReport, now = Date.now()) {
   const stale = now - Date.parse(data.generatedAt) > 36 * 3600_000;
   const complete = data.state === 'complete';
@@ -20,20 +43,34 @@ export function weaponMonitorHTML(data: WeaponReport, now = Date.now()) {
     ? ` <a href="https://github.com/chenxuan520/qinglan-xiuxian/actions/runs/${data.runId}" target="_blank" rel="noopener noreferrer">查看Actions ↗</a>`
     : '';
   const scope = `${data.options.weapons.length}件法宝 · 每条件${data.options.seeds}个种子 · ${data.options.extended ? '包含培养/新种子/连续流程' : '主矩阵'}`;
-  return `<p><span class="badge ${complete ? 'good' : 'error'}">${complete ? '测评执行完整' : '测评执行失败'}</span>${run}</p><p>${esc(scope)} · 已返回 ${count(data.returned)} / ${count(data.planned)} 个计划样本 · 用时 ${count(data.elapsedSeconds / 60)} 分钟</p><p class="note">生成时间（北京）${esc(time(data.generatedAt))} · 源提交 ${esc(data.commit.slice(0, 12))}</p>${stale ? '<p class="status warning">结果已超过36小时，请查看Actions运行状态。</p>' : ''}${data.error ? `<p class="status error">${esc(data.error)}</p>` : ''}<p class="note">第一、三、六关为标准化单关，后段配对比较整套本命与功法的同投入收益。不是线上玩家或连续六关的胜率；执行完整也不等于所有法宝强度一致。</p>${
+  const legacy = data.weapons.some((w) => w.stages.length < WEAPON_BENCHMARK_STAGES.length);
+  const ranked = rankWeapons(data.weapons);
+  const tiers = ([1, 2, 3, 4] as const)
+    .map((tier) => {
+      const group = ranked.filter((row) => row.tier === tier);
+      if (!group.length) return '';
+      const rows = group.map(({ wins, n, weapon: w, pairNet, killSeconds }) => [
+        w.name,
+        w.school === 'orthodox' ? '正道' : '魔道',
+        ...WEAPON_BENCHMARK_STAGES.map((stage) =>
+          weaponCell(w.stages.find((g) => g.stage === stage)?.stats),
+        ),
+        weaponTotal(wins, n),
+        pairNet === null ? '—' : pairNet.toFixed(1),
+        killSeconds === null ? '—' : `${Math.round(killSeconds)}秒`,
+        `${(w.natural.ownShare ?? 0).toFixed(1)}%`,
+        `${w.natural.evolved}/${w.natural.n}`,
+      ]);
+      return `<h4>${tierNames[tier - 1]}</h4>${weaponTable(rows)}`;
+    })
+    .join('');
+  return `<p><span class="badge ${complete ? 'good' : 'error'}">${complete ? '测评执行完整' : '测评执行失败'}</span>${run}</p><p>${esc(scope)} · 已返回 ${count(data.returned)} / ${count(data.planned)} 个计划样本 · 用时 ${count(data.elapsedSeconds / 60)} 分钟</p><p class="note">生成时间（北京）${esc(time(data.generatedAt))} · 源提交 ${esc(data.commit.slice(0, 12))}</p>${stale ? '<p class="status warning">结果已超过36小时，请查看Actions运行状态。</p>' : ''}${data.error ? `<p class="status error">${esc(data.error)}</p>` : ''}<p class="note">第一至第六关与终关为标准化单关，后段配对比较整套本命与功法的同投入收益。不是线上玩家或连续七关的胜率；执行完整也不等于所有法宝强度一致。</p>${
+    legacy
+      ? '<p class="status warning">旧版报告：仅含第一、三、六关与两种灵根，档位按已有关卡计算。</p>'
+      : ''
+  }${
     complete
-      ? `<details><summary>法宝明细（${data.weapons.length}件），点击展开</summary>${table(
-          ['排名', '法宝', '第一关', '第三关', '第六关', '三关合计', '正式AI觉醒', '定向培养通过'],
-          rankWeapons(data.weapons).map(({ rank, wins, n, weapon: w }) => [
-            String(rank),
-            w.name,
-            ...w.stages.map((g) => `${g.stats.wins}/${g.stats.n}`),
-            weaponTotal(wins, n),
-            `${w.natural.evolved}/${w.natural.n}`,
-            w.focused ? `${w.focused.wins}/${w.focused.n}` : '未运行',
-          ]),
-          'weapon-detail',
-        )}</details>`
+      ? `<details><summary>法宝明细（${data.weapons.length}件），按档位分组，点击展开</summary>${tiers}</details>`
       : ''
   }<p><a href="${WEAPON_REPORT_URL}" target="_blank" rel="noopener noreferrer">完整测评、配对区间与分组CSV ↗</a> · <a href="${WEAPON_REPORT_URL}summary.json" target="_blank" rel="noopener noreferrer">测评JSON接口 ↗</a></p>`;
 }

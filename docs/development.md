@@ -100,9 +100,9 @@ gh run list --workflow balance-import.yml --branch master
 curl --fail https://chenxuan520.github.io/qinglan-xiuxian/balance-report/diagnostics.json
 ```
 
-法宝日测 `weapon-benchmark.yml` 使用 8 个独立 runner，每片通过 `weapon-benchmark-shards.ts --shard INDEX/8 --out DIR` 执行原测评工具；同件法宝的自然流程、双侧配对、定向培养、新种子复验及连续六关流程都归到同片，按原计划实际记录数均衡分配，避免附加复验集中拖长尾部。每片默认使用 `availableParallelism()`，不再固定3个worker或另设64个worker上限。原10,320条实战/配对与80条连续流程仍共10,400条；分组只改变执行位置，不改法宝、AI、种子或模拟频率。实际CPU、worker与时间写入独立执行记录。
+法宝日测 `weapon-benchmark.yml` 使用 16 个独立 runner，每片通过 `weapon-benchmark-shards.ts --shard INDEX/16 --out DIR` 执行原测评工具；同件法宝的自然流程、双侧配对、定向培养、新种子复验及连续六关流程都归到同片，按原计划实际记录数均衡分配，避免附加复验集中拖长尾部。每片默认使用 `availableParallelism()`，不再固定3个worker或另设64个worker上限。原47,040条实战/配对与80条连续流程共47,120条；分组只改变执行位置，不改法宝、AI、种子或模拟频率。实际CPU、worker与时间写入独立执行记录。
 
-法宝原始分片（`weapon-raw-INDEX`，含失败时已落盘的部分记录）保留14天；合并只读取本run产物，核对提交、源码/工具摘要、run编号、完整计划、八片身份及全部原始样本，缺片、重复、混源与未完成片均失败。全部校验后按原单机文件分组与连续流程次序统一计算原统计，不平均各片摘要。完整或失败的五份公开报告仍上传原`weapon-daily-report`并沿原路径发布，90天保留期、每日北京时间12:00与手动入口、取消不发布及新任务取消旧任务的规则不变；普通推送不启动法宝日测。
+法宝原始分片（`weapon-raw-INDEX`，含失败时已落盘的部分记录）保留14天；合并只读取本run产物，核对提交、源码/工具摘要、run编号、完整计划、十六片身份及全部原始样本，缺片、重复、混源与未完成片均失败。全部校验后按原单机文件分组与连续流程次序统一计算原统计，不平均各片摘要。完整或失败的五份公开报告仍上传原`weapon-daily-report`并沿原路径发布，90天保留期、每日北京时间12:00与手动入口、取消不发布及新任务取消旧任务的规则不变；普通推送不启动法宝日测。
 
 ## 性能门禁与渲染实测
 

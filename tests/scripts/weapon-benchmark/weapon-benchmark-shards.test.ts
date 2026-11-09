@@ -132,10 +132,10 @@ function fixture(root: string) {
   }
 }
 
-test('完整10400计划在八片中恰好覆盖，所有可用CPU均可使用，不保留3/64限制', () => {
+test('完整47120计划在十六片中恰好覆盖，所有可用CPU均可使用，不保留3/64限制', () => {
   const full = parseWeaponOptions(['--extended']),
     before = structuredClone(full);
-  const parts = Array.from({ length: 8 }, (_v, index) => weaponShardOptions(full, index, 8));
+  const parts = Array.from({ length: 16 }, (_v, index) => weaponShardOptions(full, index, 16));
   assert.deepEqual(parts.flatMap((p) => p.weapons).sort(), [...full.weapons].sort());
   assert.deepEqual(
     parts.flatMap((p) => weaponBenchmarkPlan(p).map(weaponCaseKey)).sort(),
@@ -149,7 +149,7 @@ test('完整10400计划在八片中恰好覆盖，所有可用CPU均可使用，
   );
   assert.equal(
     parts.reduce((n, p) => n + weaponBenchmarkPlan(p).length + weaponCampaignPlan(p).length, 0),
-    10400,
+    47120,
   );
   const weight = (o: typeof full) => weaponBenchmarkPlan(o).length + weaponCampaignPlan(o).length;
   const loads = parts.map(weight);
@@ -162,11 +162,11 @@ test('完整10400计划在八片中恰好覆盖，所有可用CPU均可使用，
   assert.equal(full.workers, availableParallelism());
   assert.equal(parseWeaponOptions(['--workers', '65']).workers, 65);
   for (const [index, count] of [
-    [-1, 8],
-    [8, 8],
+    [-1, 16],
+    [16, 16],
     [0, 0],
     [0, 37],
-    [0.5, 8],
+    [0.5, 16],
   ])
     assert.throws(() => weaponShardOptions(full, index, count));
 });
@@ -345,7 +345,7 @@ test('真实自然与双侧配对样本跨worker分配后每个原始数值不�
       .sort((a, b) => weaponCaseKey(a.job ?? a).localeCompare(weaponCaseKey(b.job ?? b)));
   };
   try {
-    assert.equal(jobs.length, 5);
+    assert.equal(jobs.length, 9);
     assert.deepEqual(
       await run([jobs], 'one'),
       await run([jobs.filter((_v, i) => i % 2 === 0), jobs.filter((_v, i) => i % 2 === 1)], 'two'),
@@ -355,14 +355,14 @@ test('真实自然与双侧配对样本跨worker分配后每个原始数值不�
   }
 });
 
-test('合并缺损时仍写失败公开报告并拒绝伪造完整10400结果', async () => {
+test('合并缺损时仍写失败公开报告并拒绝伪造完整47120结果', async () => {
   const root = mkdtempSync(join(tmpdir(), 'qinglan-weapon-failed-'));
   try {
     const out = join(root, 'report');
     await assert.rejects(weaponShardMain(['--merge', join(root, 'missing'), '--out', out]));
     const r = JSON.parse(readFileSync(join(out, 'summary.json'), 'utf8'));
     assert.equal(r.state, 'failed');
-    assert.equal(r.planned, 10400);
+    assert.equal(r.planned, 47120);
     assert.equal(r.returned, 0);
     assert.ok(r.error);
   } finally {
@@ -370,17 +370,17 @@ test('合并缺损时仍写失败公开报告并拒绝伪造完整10400结果', 
   }
 });
 
-test('法宝CI八片并行保留原始失败证据，合并失败仍上传公开报告且取消不发布', () => {
+test('法宝CI十六片并行保留原始失败证据，合并失败仍上传公开报告且取消不发布', () => {
   const source = readFileSync(
     new URL('../../../.github/workflows/weapon-benchmark.yml', import.meta.url),
     'utf8',
   );
   const shards = source.split('\n  shards:')[1].split('\n  benchmark:')[0],
     merge = source.split('\n  benchmark:')[1].split('\n  publish-report:')[0];
-  assert.match(shards, /shard: \[0, 1, 2, 3, 4, 5, 6, 7\]/);
+  assert.match(shards, /shard: \[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15\]/);
   assert.match(shards, /fail-fast: false/);
   assert.doesNotMatch(shards, /max-parallel|--workers/);
-  assert.match(shards, /--shard \$\{\{ matrix.shard \}\}\/8/);
+  assert.match(shards, /--shard \$\{\{ matrix.shard \}\}\/16/);
   for (const file of [
     'manifest.json',
     'samples-*.jsonl',

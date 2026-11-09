@@ -6,6 +6,8 @@ import {
   WEAPON_REPORT_PROTOCOL,
   FOCUSED_WEAPONS,
   REPLICATED_WEAPONS,
+  WEAPON_BENCHMARK_STAGES,
+  WEAPON_BENCHMARK_ROOTS,
 } from '../../src/services/weapon-report.ts';
 export { FOCUSED_WEAPONS, REPLICATED_WEAPONS } from '../../src/services/weapon-report.ts';
 export const WEAPON_BENCHMARK_PROTOCOL = WEAPON_REPORT_PROTOCOL;
@@ -36,7 +38,7 @@ export const BENCHMARK_TEAMS = {
 interface BaseCase {
   weapon: WeaponKind;
   stage: number;
-  root: 'heaven' | 'triple';
+  root: (typeof WEAPON_BENCHMARK_ROOTS)[number];
   device: 'phone' | 'desktop';
   index: number;
   seed: number;
@@ -103,10 +105,11 @@ export function weaponBenchmarkPlan(options: WeaponPlanOptions) {
   );
   const result: WeaponCase[] = [];
   const natural = (weapon: WeaponKind, policy: BaseCase['policy']) => {
-    for (const stage of [0, 2, 5])
-      for (const root of ['heaven', 'triple'] as const)
+    for (const stage of WEAPON_BENCHMARK_STAGES)
+      for (const root of WEAPON_BENCHMARK_ROOTS)
         for (const device of ['phone', 'desktop'] as const)
-          for (let index = 0; index < options.seeds; index++)
+          for (let index = 0; index < options.seeds; index++) {
+            const rootOffset = root === 'heaven' ? 0 : root === 'dual' ? 487 : 953;
             result.push({
               kind: 'natural',
               weapon,
@@ -114,14 +117,10 @@ export function weaponBenchmarkPlan(options: WeaponPlanOptions) {
               root,
               device,
               index,
-              seed:
-                62801 +
-                index * 104729 +
-                (root === 'heaven' ? 0 : 953) +
-                stage * 15485863 +
-                options.seedOffset,
+              seed: 62801 + index * 104729 + rootOffset + stage * 15485863 + options.seedOffset,
               policy,
             });
+          }
   };
   const pair = (weapon: WeaponKind, replicate: boolean) => {
     const school = treasure(weapon).school;

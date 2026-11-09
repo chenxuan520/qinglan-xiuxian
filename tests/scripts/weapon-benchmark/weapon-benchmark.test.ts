@@ -58,7 +58,7 @@ const meta = {
   sourceHash: 'b'.repeat(64),
   runId: 123,
   elapsedSeconds: 100,
-  planned: 10400,
+  planned: 47120,
   error: 'worker失败',
 };
 const failure = () => buildWeaponReport([], [], { ...options, extended: true }, meta);
@@ -72,12 +72,28 @@ const observation = (state = 'won', seconds = 5, bosses: any[] = []) => ({
   ownDamage: 40,
 });
 
+test('每件法宝完整单关840场，七关三灵根双设备二十种子且种子不重复', () => {
+  const plan = weaponBenchmarkPlan({ ...options, weapons: ['sword'] });
+  const natural = plan.filter((c) => c.kind === 'natural');
+  assert.equal(natural.length, 840);
+  assert.deepEqual(
+    [...new Set(natural.map((c) => c.stage))].sort((a, b) => a - b),
+    [0, 1, 2, 3, 4, 5, 6],
+  );
+  assert.deepEqual([...new Set(natural.map((c) => c.root))].sort(), ['dual', 'heaven', 'triple']);
+  assert.equal(new Set(natural.map(weaponCaseKey)).size, natural.length);
+  const triple = natural.find((c) => c.root === 'triple' && c.stage === 2 && c.index === 0)!;
+  assert.equal(triple.seed, 62801 + 953 + 2 * 15485863);
+  const dual = natural.find((c) => c.root === 'dual' && c.stage === 0 && c.index === 0)!;
+  assert.equal(dual.seed, 62801 + 487);
+});
+
 test('36法宝标准与完整计划保持覆盖；筛选、扩样和种子复验不重复', () => {
   const plan = weaponBenchmarkPlan(options);
-  assert.equal(plan.length, 8640);
-  assert.equal(plan.filter((c) => c.kind === 'natural').length, 4320);
+  assert.equal(plan.length, 38880);
+  assert.equal(plan.filter((c) => c.kind === 'natural').length, 30240);
   const extended = { ...options, extended: true };
-  assert.equal(weaponBenchmarkPlan(extended).length, 10320);
+  assert.equal(weaponBenchmarkPlan(extended).length, 47040);
   assert.equal(weaponCampaignPlan(extended).length, 80);
   assert.deepEqual(selectBenchmarkWeapons('青莲灯,pagoda,青莲灯'), ['orbit', 'pagoda']);
   for (const seeds of [1, 11, 100]) {
@@ -105,7 +121,7 @@ test('36法宝标准与完整计划保持覆盖；筛选、扩样和种子复验
 });
 
 test('自然流程采用实际关卡境界；配对同时保留相同底盘、槽位和总投入', () => {
-  for (const stage of [0, 2, 5]) {
+  for (const stage of [0, 1, 2, 3, 4, 5, 6]) {
     const g = setupNatural({
       weapon: 'orbit',
       root: 'triple',
@@ -169,6 +185,12 @@ test('配对保留未解决妖王和自检样本，胜利按窗口成功计，�
   assert.equal(stats.bossUnresolved, 1);
   assert.equal(stats.remainingHp, 60);
   assert.equal(stats.observedSeconds, 30);
+  const timed = weaponBattleStats([
+    { ...observation('won', 10, [dead]), bossAt: 2, bossSeconds: 4, bossHpLeft: 0 },
+    { ...observation('lost', 30, [alive]), bossAt: 3, bossSeconds: null, bossHpLeft: 0.4 },
+  ]);
+  assert.equal(timed.bossSeconds, 4);
+  assert.equal(timed.remainingHp, 40);
   assert.equal(median([]), null);
   const rows = [0, 1, 2].flatMap((index) =>
     [0, 1].map((device) => ({
@@ -296,56 +318,101 @@ test('公开摘要拒绝漏样本、错误数值和损坏计数；失败与陈�
   }
 });
 
-function rankedWeapon(id: string, wins: number[], n: number[] = [40, 40, 40]) {
+function rankedWeapon(
+  id: string,
+  wins: number[],
+  n: number[] = wins.map(() => 1000),
+  pairNet: number | null = null,
+  kills: (number | null)[] = [],
+) {
   return {
     id,
     name: id,
     school: 'orthodox',
     natural: { wins: wins[0] ?? 0, n: n[0] ?? 0, evolved: 0, ownShare: 50 },
     stages: wins.map((value, index) => ({
-      stage: [0, 2, 5][index],
-      stats: { wins: value, n: n[index] ?? 0 },
+      stage: index,
+      stats: {
+        wins: value,
+        n: n[index] ?? 0,
+        bossSeconds: kills[index] ?? null,
+      },
     })),
     groups: [],
-    pairs: [],
+    pairs:
+      pairNet === null
+        ? []
+        : [
+            {
+              evolved: false,
+              stats: {
+                winDifference: pairNet,
+                candidate: { wins: 0, n: 0 },
+                reference: { wins: 0, n: 0 },
+                winCI: null,
+                survivalDifference: null,
+              },
+            },
+          ],
     pairGroups: [],
     focused: null,
     replicated: [],
   } as unknown as WeaponReport['weapons'][number];
 }
 
-test('法宝明细按三关合计胜率排序，并以第六关与原始顺序破同率', () => {
-  const a = rankedWeapon('sword', [10, 10, 10]);
-  const b = rankedWeapon('pearl', [9, 9, 9]);
-  const c = rankedWeapon('fan', [8, 10, 12]);
-  const d = rankedWeapon('beads', [8, 10, 12]);
-  const empty = rankedWeapon('ice', [0, 0, 0], [0, 0, 0]);
-  const before = structuredClone([a, b, c, d, empty]);
-  const ranked = rankWeapons([a, b, c, d, empty]);
+test('法宝按总胜率分档，档内先看配对净差再看击杀用时', () => {
+  const t1 = rankedWeapon('sword', Array(7).fill(850), Array(7).fill(1000));
+  const t2a = rankedWeapon('pearl', Array(7).fill(849), Array(7).fill(1000));
+  const t2b = rankedWeapon('fan', Array(7).fill(700), Array(7).fill(1000));
+  const t3 = rankedWeapon('beads', Array(7).fill(550), Array(7).fill(1000));
+  const t4 = rankedWeapon('ice', Array(7).fill(549), Array(7).fill(1000));
+  const ranked = rankWeapons([t4, t3, t2b, t2a, t1]);
   assert.deepEqual(
-    ranked.map((row) => row.weapon.id),
-    ['fan', 'beads', 'sword', 'pearl', 'ice'],
-  );
-  assert.deepEqual(
-    ranked.map((row) => row.rank),
-    [1, 2, 3, 4, 5],
-  );
-  assert.deepEqual(
-    ranked.map((row) => [row.wins, row.n, weaponTotal(row.wins, row.n)]),
+    ranked.map((row) => [row.weapon.id, row.tier]),
     [
-      [30, 120, '30/120（25%）'],
-      [30, 120, '30/120（25%）'],
-      [30, 120, '30/120（25%）'],
-      [27, 120, '27/120（23%）'],
-      [0, 0, '0/0（0%）'],
+      ['sword', 1],
+      ['fan', 2],
+      ['pearl', 2],
+      ['beads', 3],
+      ['ice', 4],
     ],
   );
-  assert.deepEqual([a, b, c, d, empty], before);
+  assert.deepEqual(
+    ranked.map((row) => row.rate),
+    [0.85, 0.7, 0.849, 0.55, 0.549],
+  );
+
+  const sameTier = [
+    rankedWeapon('ice', Array(7).fill(800), Array(7).fill(1000), 2, Array(7).fill(20)),
+    rankedWeapon('sword', Array(7).fill(800), Array(7).fill(1000), 5, Array(7).fill(30)),
+    rankedWeapon('pearl', Array(7).fill(800), Array(7).fill(1000), null, Array(7).fill(1)),
+    rankedWeapon('fan', Array(7).fill(800), Array(7).fill(1000), 2, Array(7).fill(10)),
+  ];
+  assert.deepEqual(
+    rankWeapons(sameTier).map((row) => row.weapon.id),
+    ['sword', 'fan', 'ice', 'pearl'],
+    '配对净差降序；同净差按击杀用时升序；无配对数据排档末',
+  );
+
+  const empty = rankedWeapon('beads', Array(7).fill(0), Array(7).fill(0));
+  const zero = rankedWeapon('sword', Array(7).fill(0));
+  assert.deepEqual(
+    rankWeapons([empty, zero]).map((row) => row.weapon.id),
+    ['sword', 'beads'],
+    '有样本的 0% 排在 N=0 之前',
+  );
+  assert.deepEqual(
+    rankWeapons([
+      rankedWeapon('beads', Array(7).fill(850), Array(7).fill(1000)),
+      rankedWeapon('fan', Array(7).fill(850), Array(7).fill(1000)),
+    ]).map((row) => row.weapon.id),
+    ['fan', 'beads'],
+    '完全同分时按 TREASURES 原始顺序',
+  );
 });
 
-test('报告完整单关按排名输出，监控明细同样带排名与三关合计', () => {
-  const weapons = [rankedWeapon('pearl', [30, 35, 44]), rankedWeapon('sword', [40, 34, 35])];
-  const report = {
+function sampleReport(weapons: WeaponReport['weapons']): WeaponReport {
+  return {
     schemaVersion: 1,
     protocolVersion: 1,
     state: 'complete',
@@ -365,40 +432,112 @@ test('报告完整单关按排名输出，监控明细同样带排名与三关�
       replicated: 0,
       campaigns: 0,
     },
-    options: { seeds: 10, extended: false, weapons: ['pearl', 'sword'], seedOffset: 0, workers: 1 },
+    options: { seeds: 20, extended: false, weapons: ['pearl', 'sword'], seedOffset: 0, workers: 1 },
     weapons,
     campaigns: [],
   } as unknown as WeaponReport;
+}
+
+test('报告与监控按档位分组，不再显示排名数字列', () => {
+  const weapons = [
+    rankedWeapon('pearl', Array(7).fill(70), Array(7).fill(100), 3, Array(7).fill(15)),
+    rankedWeapon('sword', Array(7).fill(90), Array(7).fill(100), 1, Array(7).fill(20)),
+  ];
+  const report = sampleReport(weapons);
   const markdown = weaponReportMarkdown(report);
   const rows = markdown.split('## 完整单关')[1].split('## 同投入配对')[0];
-  assert.match(rows, /按三关合计胜率从高到低排序/);
-  assert.match(
-    rows,
-    /\| 排名 \| 法宝 \| 路线 \| 第一关 \| 第三关 \| 第六关 \| 三关合计 \| 本命伤害占比 \| 觉醒 \|/,
-  );
-  assert.match(rows, /^\| 1 \| pearl \| 正道 \| 30\/40 \| 35\/40 \| 44\/40 \| 109\/120（91%）/m);
-  assert.match(rows, /^\| 2 \| sword /m);
+  assert.ok(!rows.includes('| 排名 |'));
+  assert.match(rows, /### 一档/);
+  assert.match(rows, /### 二档/);
+  assert.match(rows, /第一关.*第二关.*终关.*总胜率.*配对净差.*击杀用时/);
+  assert.match(rows, /90\/100<small>20秒<\/small>/);
+  assert.match(rows, /70\/100<small>15秒<\/small>/);
+  assert.ok(rows.indexOf('sword') < rows.indexOf('pearl'));
 
   const html = weaponMonitorHTML(report);
-  assert.match(html, /排名/);
-  assert.match(html, /三关合计/);
-  assert.match(html, /109\/120（91%）/);
-  assert.ok(html.indexOf('pearl') < html.indexOf('sword'));
+  assert.ok(!html.includes('排名'));
+  assert.match(html, /一档/);
+  assert.match(html, /二档/);
+  assert.match(html, /终关/);
+  assert.ok(!html.includes('三关合计'));
+  assert.match(html, /旧版报告|法宝明细/);
 });
 
-test('同率再按 TREASURES 原始顺序，N=0 排在零胜样本之后', () => {
-  const beads = rankedWeapon('beads', [10, 10, 10]);
-  const fan = rankedWeapon('fan', [10, 10, 10]);
-  assert.deepEqual(
-    rankWeapons([beads, fan]).map((row) => row.weapon.id),
-    ['fan', 'beads'],
-    '输入顺序与 TREASURES 相反时，仍按 TREASURES 顺序',
-  );
-  const zeroWins = rankedWeapon('beads', [0, 0, 0]);
-  const empty = rankedWeapon('sword', [0, 0, 0], [0, 0, 0]);
-  assert.deepEqual(
-    rankWeapons([empty, zeroWins]).map((row) => row.weapon.id),
-    ['beads', 'sword'],
-    '有样本的 0% 也排在 N=0 之前，即使 N=0 法宝原始顺序更靠前',
-  );
+test('旧版三关两灵根报告可渲染并标注旧版报告', () => {
+  const legacy = sampleReport([rankedWeapon('sword', [30, 35, 44])]);
+  legacy.weapons[0].stages = legacy.weapons[0].stages.slice(0, 3).map((stage, index) => ({
+    ...stage,
+    stage: [0, 2, 5][index],
+  }));
+  const html = weaponMonitorHTML(legacy);
+  assert.match(html, /旧版报告/);
+  assert.ok(html.includes('sword'));
+});
+
+test('无胜局不输出击杀用时；旧版非extended报告也能通过兼容校验', () => {
+  const dead = { at: 10, deadAt: 25, observed: 15, hp: 0 };
+  const alive = { at: 10, deadAt: null, observed: 20, hp: 0.5 };
+  const stats = weaponBattleStats([
+    { ...observation('lost', 30, [dead, alive]), bossSeconds: null, bossHpLeft: 0.5 },
+  ]);
+  assert.equal(stats.bossSeconds, null);
+  assert.equal(stats.remainingHp, 50);
+
+  const battleStats = (n: number, wins: number) => ({
+    n,
+    wins,
+    lost: n - wins,
+    timeout: 0,
+    censored: 0,
+    arrived: 0,
+    evolved: 0,
+    at6Seconds: null,
+    evolveSeconds: null,
+    ownShare: 0,
+    bossKilled: 0,
+    bossUnresolved: 0,
+    bossSeconds: null,
+    observedSeconds: null,
+    remainingHp: null,
+  });
+  const pairStats = {
+    n: 120,
+    selfChecks: 0,
+    clusters: 1,
+    candidate: battleStats(120, 60),
+    reference: battleStats(120, 50),
+    winDifference: 10,
+    winCI: null,
+    survivalDifference: 0,
+    survivalCI: null,
+  };
+  const legacy = {
+    ...sampleReport([]),
+    planned: 240,
+    returned: 240,
+    counts: {
+      natural: 120,
+      pairs: 120,
+      actualSimulations: 240,
+      focused: 0,
+      replicated: 0,
+      campaigns: 0,
+    },
+    options: { seeds: 10, extended: false, weapons: ['orbit'], seedOffset: 0, workers: 1 },
+    weapons: [
+      {
+        id: 'orbit',
+        name: '青莲灯',
+        school: 'orthodox',
+        natural: battleStats(120, 60),
+        stages: [0, 2, 5].map((stage) => ({ stage, stats: battleStats(40, 20) })),
+        groups: [],
+        pairs: [{ evolved: false, stats: pairStats }],
+        pairGroups: [],
+        focused: null,
+        replicated: [],
+      },
+    ],
+  } as unknown as WeaponReport;
+  assert.equal(validWeaponReport(legacy), true);
 });

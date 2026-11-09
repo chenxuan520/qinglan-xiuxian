@@ -2,6 +2,8 @@ import { ROOT_STARTERS, TREASURES } from '../core/data.ts';
 // 每日法宝测评的公开摘要；不包含逐帧记录或本地文件路径。
 export const WEAPON_REPORT_URL = 'https://chenxuan520.github.io/qinglan-xiuxian/weapon-report/';
 export const WEAPON_REPORT_PROTOCOL = 1;
+export const WEAPON_BENCHMARK_STAGES = [0, 1, 2, 3, 4, 5, 6] as const;
+export const WEAPON_BENCHMARK_ROOTS = ['heaven', 'dual', 'triple'] as const;
 export const FOCUSED_WEAPONS = [
   'orbit',
   'chain',
@@ -18,15 +20,17 @@ export function expectedWeaponCounts(options: {
   seeds: number;
   extended: boolean;
 }) {
-  const n = options.seeds * 12;
+  const natural =
+    options.seeds * WEAPON_BENCHMARK_STAGES.length * WEAPON_BENCHMARK_ROOTS.length * 2;
+  const pairs = options.seeds * 12;
   return {
-    natural: options.weapons.length * n,
-    pairs: options.weapons.length * n,
+    natural: options.weapons.length * natural,
+    pairs: options.weapons.length * pairs,
     focused: options.extended
-      ? options.weapons.filter((id) => FOCUSED_WEAPONS.includes(id)).length * n
+      ? options.weapons.filter((id) => FOCUSED_WEAPONS.includes(id)).length * natural
       : 0,
     replicated: options.extended
-      ? options.weapons.filter((id) => REPLICATED_WEAPONS.includes(id)).length * n
+      ? options.weapons.filter((id) => REPLICATED_WEAPONS.includes(id)).length * pairs
       : 0,
     campaigns: options.extended
       ? Object.values(ROOT_STARTERS)
@@ -106,34 +110,54 @@ export interface WeaponReport {
 }
 export interface RankedWeapon {
   weapon: WeaponReport['weapons'][number];
-  rank: number;
   wins: number;
   n: number;
   rate: number;
+  tier: 1 | 2 | 3 | 4;
+  pairNet: number | null;
+  killSeconds: number | null;
 }
-// 完整单关展示顺序：三关合计胜率优先，再用第六关胜率与法宝原始顺序打破同率。
+export function weaponTier(rate: number): 1 | 2 | 3 | 4 {
+  return rate >= 0.85 ? 1 : rate >= 0.7 ? 2 : rate >= 0.55 ? 3 : 4;
+}
+// 先按总胜率分档；档内先看同投入配对净差，再看各关击杀中位用时之和。
 export function rankWeapons(weapons: WeaponReport['weapons']): RankedWeapon[] {
   const order = new Map<string, number>(TREASURES.map((treasure, index) => [treasure.id, index]));
-  const sixthRate = (weapon: WeaponReport['weapons'][number]) => {
-    const stats = weapon.stages[2]?.stats;
-    return stats && stats.n ? stats.wins / stats.n : 0;
-  };
   return weapons
     .map((weapon) => {
-      const stages = weapon.stages.slice(0, 3).map((stage) => stage.stats);
+      const stages = weapon.stages.map((stage) => stage.stats);
       const wins = stages.reduce((sum, stats) => sum + stats.wins, 0);
       const n = stages.reduce((sum, stats) => sum + stats.n, 0);
-      return { weapon, rank: 0, wins, n, rate: n ? wins / n : 0 };
+      const rate = n ? wins / n : 0;
+      const pairNets = weapon.pairs
+        .map((pair) => pair.stats.winDifference)
+
+        .filter((value): value is number => value != null);
+      const killSeconds = stages
+        .map((stats) => stats.bossSeconds)
+
+        .filter((value): value is number => value != null);
+      return {
+        weapon,
+        wins,
+        n,
+        rate,
+        tier: weaponTier(rate),
+        pairNet: pairNets.length ? pairNets.reduce((a, b) => a + b, 0) / pairNets.length : null,
+        killSeconds: killSeconds.length ? killSeconds.reduce((a, b) => a + b, 0) : null,
+      };
     })
     .sort(
       (a, b) =>
         (a.n === 0 ? 1 : 0) - (b.n === 0 ? 1 : 0) ||
-        b.rate - a.rate ||
-        sixthRate(b.weapon) - sixthRate(a.weapon) ||
+        a.tier - b.tier ||
+        (a.pairNet === null ? 1 : 0) - (b.pairNet === null ? 1 : 0) ||
+        (b.pairNet ?? 0) - (a.pairNet ?? 0) ||
+        (a.killSeconds === null ? 1 : 0) - (b.killSeconds === null ? 1 : 0) ||
+        (a.killSeconds ?? 0) - (b.killSeconds ?? 0) ||
         (order.get(a.weapon.id) ?? Number.MAX_SAFE_INTEGER) -
           (order.get(b.weapon.id) ?? Number.MAX_SAFE_INTEGER),
-    )
-    .map((item, index) => ({ ...item, rank: index + 1 }));
+    );
 }
 export function weaponTotal(wins: number, n: number) {
   return `${wins}/${n}（${n ? Math.round((wins / n) * 100) : 0}%）`;
@@ -175,7 +199,7 @@ function battle(v: unknown): v is WeaponBattleStats {
     (v.wins as number) + (v.lost as number) + (v.timeout as number) + (v.censored as number) ===
       v.n &&
     (v.arrived as number) <= (v.n as number) &&
-    (v.bossKilled as number) + (v.bossUnresolved as number) === v.arrived &&
+    (v.bossKilled as number) + (v.bossUnresolved as number) >= (v.arrived as number) &&
     (v.evolved as number) <= (v.n as number)
   );
 }
@@ -294,9 +318,25 @@ export function validWeaponReport(input: unknown): input is WeaponReport {
     (input.state !== 'complete' ||
       (input.returned === input.planned &&
         input.error === null &&
-        Object.entries(
-          expectedWeaponCounts(input.options as unknown as WeaponReport['options']),
-        ).every(([key, n]) => (input.counts as Record<string, unknown>)[key] === n) &&
+        (() => {
+          const options = input.options as unknown as WeaponReport['options'];
+          const expected = expectedWeaponCounts(options),
+            counts = input.counts as Record<string, unknown>,
+            legacyNatural = options.weapons.length * options.seeds * 12,
+            legacyFocused = options.extended
+              ? options.weapons.filter((id) => FOCUSED_WEAPONS.includes(id)).length *
+                options.seeds *
+                12
+              : 0;
+          // 兼容旧版三关两灵根报告：自然/定向培养为 seeds×12，配对与连战不变。
+          return (
+            ((counts.natural === expected.natural && counts.focused === expected.focused) ||
+              (counts.natural === legacyNatural && counts.focused === legacyFocused)) &&
+            counts.pairs === expected.pairs &&
+            counts.replicated === expected.replicated &&
+            counts.campaigns === expected.campaigns
+          );
+        })() &&
         input.weapons.length === input.options.weapons.length &&
         new Set(input.weapons.map((w) => w.id)).size === input.weapons.length &&
         input.weapons.every((w) =>

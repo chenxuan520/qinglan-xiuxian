@@ -5,7 +5,13 @@ import { TREASURES, treasure } from '../../src/core/data.ts';
 import { seeded } from '../balance/balance-policy.ts';
 import { weaponCaseKey, WEAPON_BENCHMARK_PROTOCOL } from './weapon-benchmark-policy.ts';
 import type { WeaponCase, WeaponPlanOptions } from './weapon-benchmark-policy.ts';
-import { rankWeapons, validWeaponReport, weaponTotal } from '../../src/services/weapon-report.ts';
+import {
+  rankWeapons,
+  validWeaponReport,
+  weaponTotal,
+  WEAPON_BENCHMARK_ROOTS,
+  WEAPON_BENCHMARK_STAGES,
+} from '../../src/services/weapon-report.ts';
 import type {
   WeaponBattleStats,
   WeaponPairStats,
@@ -47,6 +53,16 @@ export function verifyWeaponBattle(r: any) {
   assert.ok(Math.abs(total - r.damage) < Math.max(1e-5, r.damage * 1e-8), '伤害来源与总量不符');
   assert.ok(Math.abs((r.damageBySource[r.weapon] ?? 0) - r.ownDamage) < 1e-7, '本命伤害来源不符');
   assert.ok(r.endWeapons.length <= 6 && Object.keys(r.endPassives).length <= 4, '构筑超过槽位限制');
+  assert.ok(
+    (r.bossAt === undefined || r.bossAt === null || (number(r.bossAt) && r.bossAt >= 0)) &&
+      (r.bossSeconds === undefined ||
+        r.bossSeconds === null ||
+        (number(r.bossSeconds) && r.bossSeconds >= 0)) &&
+      (r.bossHpLeft === undefined ||
+        r.bossHpLeft === null ||
+        (number(r.bossHpLeft) && r.bossHpLeft >= 0 && r.bossHpLeft <= 1)),
+    '非法妖王计时',
+  );
   for (const boss of r.bosses)
     assert.ok(
       number(boss.at) &&
@@ -113,9 +129,16 @@ export function weaponBattleStats(rows: any[]): WeaponBattleStats {
     ownShare: mean(rows.map((r) => (r.damage ? (100 * r.ownDamage) / r.damage : 0))),
     bossKilled: dead.length,
     bossUnresolved: alive.length,
-    bossSeconds: median(dead.map((b) => b.deadAt - b.at)),
+    bossSeconds: median(
+      rows.filter((r) => r.state === 'won' && r.bossSeconds != null).map((r) => r.bossSeconds),
+    ),
     observedSeconds: median(alive.map((b) => b.observed)),
-    remainingHp: median(alive.map((b) => 100 * b.hp)),
+    remainingHp:
+      median(
+        rows
+          .filter((r) => r.state !== 'won' && r.bossHpLeft != null)
+          .map((r) => 100 * r.bossHpLeft),
+      ) ?? median(alive.map((b) => 100 * b.hp)),
   };
 }
 export function weaponClusterInterval(
@@ -219,8 +242,8 @@ export function buildWeaponReport(
         p = pairs.filter((r) => r.job.weapon === id),
         f = focused.filter((r) => r.weapon === id);
       const groups = [];
-      for (const stage of [0, 2, 5])
-        for (const root of ['heaven', 'triple'])
+      for (const stage of WEAPON_BENCHMARK_STAGES)
+        for (const root of WEAPON_BENCHMARK_ROOTS)
           for (const device of ['phone', 'desktop'])
             groups.push({
               stage,
@@ -256,7 +279,7 @@ export function buildWeaponReport(
         name: t.name,
         school: t.school,
         natural: weaponBattleStats(n),
-        stages: [0, 2, 5].map((stage) => ({
+        stages: WEAPON_BENCHMARK_STAGES.map((stage) => ({
           stage,
           stats: weaponBattleStats(n.filter((r) => r.stage === stage)),
         })),
@@ -315,13 +338,13 @@ export function weaponReportMarkdown(r: WeaponReport) {
     '',
     '## 方法与限制',
     '',
-    '完整战斗覆盖第一、三、六关，从0秒开始，按正式怪物基准境界统一入场；天灵根/三灵根、手机/电脑交叉，保留正式Game与AI、拾取、成长和选技，固定30Hz。零炼器、训练、广告和丹药。后关是标准化条件，不是连续六关新玩家胜率。',
+    '完整战斗覆盖第一至第六关与终关，从0秒开始，按正式怪物基准境界统一入场；天灵根/双灵根/三灵根、手机/电脑交叉，保留正式Game与AI、拾取、成长和选技，固定30Hz。零炼器、训练、广告和丹药。后关是标准化条件，不是连续七关新玩家胜率。',
     '第五关后段105秒：相同五件三重队伍，候选/参考为六重或仙器，各带本门五重配方和相同三种三重功法，总投入十四重功法。六重可在后续正常选技中觉醒；仙器起始不含觉醒瞬间爆发。三参考在三底盘间轮换。不同候选底盘可能不同，只比较同一对内差异。',
     '排除自身参考；未到王、到王未击杀和已击杀分开，未击杀同时保留剩余血量与观测下界。生存指标限105秒，通关吸收为成功状态至截止。承伤剔除致命溢出、回血记实际值、成长加血单列；支援净收益属于整套构筑，不能全归给本命。',
-    '95%探索区间按元素/种子index整簇做4000次重抽，含该簇两种设备和各底盘；簇较少，不是总体真人胜率或多重校正后的改数值门槛。相同种子可复现，但后续暴击、波次和成长会随武器自然分化。没有真人问卷、真机手感或帧率测试。',
+    '95%探索区间按元素/种子index整簇做4000次重抽，含该簇两种设备和各底盘；簇较少，不是总体真人胜率或多重校正后的改数值门槛。相同种子可复现，但后续暴击、波次和成长会随武器自然分化。没有真人问卷、真机手感或帧率测试。自动历练对地面落阵近乎完美闪避、不主动配合法宝走位，护体类与依赖走位的法宝强度可能与真人体感不同；测评条件为零炼器、零训练、零丹药。',
     r.options.seeds % 10 !== 0
       ? '自定义子样本：种子数不是10的倍数，五行与参考轮换不完全平衡；不能与标准整矩阵直接横比。'
-      : '每灵根十种子为一轮平衡组合；表格均用本次实际分母。',
+      : `每灵根${r.options.seeds}个种子为${r.options.seeds / 10}轮平衡组合；表格均用本次实际分母。`,
     r.options.seeds < 2
       ? '只有一个种子簇，不提供95%区间。'
       : '种子簇按固定顺序重抽，改变worker数量不会改变统计结果。',
@@ -330,15 +353,31 @@ export function weaponReportMarkdown(r: WeaponReport) {
     '',
     '## 完整单关',
     '',
-    '按三关合计胜率从高到低排序；每格 40 场左右，相差几个百分点多为样本波动，宜按档位看。',
-    '',
-    '| 排名 | 法宝 | 路线 | 第一关 | 第三关 | 第六关 | 三关合计 | 本命伤害占比 | 觉醒 |',
-    '| --- | --- | --- | --- | --- | --- | --- | --- | --- |',
+    '按总胜率分档；档内先看同投入配对净差，再看击杀用时。每格约 120 场，相差 5 个百分点以内多为样本波动。',
   ];
-  for (const { rank, wins, n, weapon: w } of rankWeapons(r.weapons))
+  const stageLabels = ['第一关', '第二关', '第三关', '第四关', '第五关', '第六关', '终关'];
+  const stageCell = (stats: WeaponBattleStats | undefined) => {
+    if (!stats || !stats.n) return '—';
+    const time = stats.bossSeconds === null ? '—' : `${Math.round(stats.bossSeconds)}秒`;
+    return `${stats.wins}/${stats.n}<small>${time}</small>`;
+  };
+  const tierNames = ['一档', '二档', '三档', '四档'] as const;
+  const ranked = rankWeapons(r.weapons);
+  for (const tier of [1, 2, 3, 4] as const) {
+    const group = ranked.filter((row) => row.tier === tier);
+    if (!group.length) continue;
     lines.push(
-      `| ${rank} | ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${w.stages.map((g) => `${g.stats.wins}/${g.stats.n}`).join(' | ')} | ${weaponTotal(wins, n)} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
+      '',
+      `### ${tierNames[tier - 1]}`,
+      '',
+      `| 法宝 | 路线 | ${stageLabels.join(' | ')} | 总胜率 | 配对净差 | 击杀用时 | 本命伤害占比 | 觉醒 |`,
+      `| --- | --- | ${stageLabels.map(() => '---').join(' | ')} | --- | --- | --- | --- | --- |`,
     );
+    for (const { wins, n, weapon: w, pairNet, killSeconds } of group)
+      lines.push(
+        `| ${w.name} | ${w.school === 'orthodox' ? '正道' : '魔道'} | ${WEAPON_BENCHMARK_STAGES.map((stage) => stageCell(w.stages.find((g) => g.stage === stage)?.stats)).join(' | ')} | ${weaponTotal(wins, n)} | ${pairNet === null ? '—' : fmt(pairNet)} | ${killSeconds === null ? '—' : `${Math.round(killSeconds)}秒`} | ${fmt(w.natural.ownShare)}% | ${w.natural.evolved}/${w.natural.n} |`,
+      );
+  }
   lines.push(
     '',
     '## 同投入配对',
@@ -402,13 +441,14 @@ export function writeWeaponReport(directory: string, r: WeaponReport) {
         '边界暂停',
         '妖王已击杀',
         '妖王未解决',
+        '击杀中位用时秒',
         '未解决观测秒中位',
         '未解决剩余血量%中位',
       ],
       r.weapons.flatMap((w) =>
         w.groups.map((g) => [
           w.name,
-          g.root === 'heaven' ? '天灵根' : '三灵根',
+          g.root === 'heaven' ? '天灵根' : g.root === 'dual' ? '双灵根' : '三灵根',
           g.device === 'phone' ? '手机' : '电脑',
           g.stage + 1,
           g.stats.n,
@@ -418,6 +458,7 @@ export function writeWeaponReport(directory: string, r: WeaponReport) {
           g.stats.censored,
           g.stats.bossKilled,
           g.stats.bossUnresolved,
+          fmt(g.stats.bossSeconds),
           fmt(g.stats.observedSeconds),
           fmt(g.stats.remainingHp),
         ]),
@@ -472,6 +513,10 @@ export function writeWeaponReport(directory: string, r: WeaponReport) {
       parts.push(`<h1>${esc(line.slice(2))}</h1>`);
       continue;
     }
+    if (line.startsWith('### ')) {
+      parts.push(`<h3>${esc(line.slice(4))}</h3>`);
+      continue;
+    }
     if (line.startsWith('## ')) {
       if (disclosure) {
         parts.push('</details>');
@@ -498,7 +543,7 @@ export function writeWeaponReport(directory: string, r: WeaponReport) {
       }
       i--;
       parts.push(
-        `<div class="table-wrap" tabindex="0" role="region" aria-label="测评明细，可横向滚动"><table>${rows.map((cells, k) => `<${k ? 'tbody' : 'thead'}><tr>${cells.map((c) => `<${k ? 'td' : 'th'}>${esc(c)}</${k ? 'td' : 'th'}>`).join('')}</tr></${k ? 'tbody' : 'thead'}>`).join('')}</table></div>`,
+        `<div class="table-wrap" tabindex="0" role="region" aria-label="测评明细，可横向滚动"><table>${rows.map((cells, k) => `<${k ? 'tbody' : 'thead'}><tr>${cells.map((c) => `<${k ? 'td' : 'th'}>${esc(c).replace(/&lt;small&gt;(.*?)&lt;\/small&gt;/g, '<small>$1</small>')}</${k ? 'td' : 'th'}>`).join('')}</tr></${k ? 'tbody' : 'thead'}>`).join('')}</table></div>`,
       );
       continue;
     }
@@ -511,6 +556,6 @@ export function writeWeaponReport(directory: string, r: WeaponReport) {
   const body = parts.join('\n');
   writeFileSync(
     join(directory, 'index.html'),
-    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="../favicon.svg" type="image/svg+xml"><title>每日法宝实战测评</title><style>body{font:16px/1.8 system-ui,sans-serif;color:#22352f;background:#f7f8f3;margin:0}main{max-width:1200px;margin:auto;padding:24px;overflow-wrap:anywhere}h1{font-size:28px}a{color:#21664f}nav{display:flex;gap:18px;flex-wrap:wrap}details{margin:20px 0;background:#edf1e8;padding:14px}summary{cursor:pointer;font-weight:600}.table-wrap{overflow-x:auto;max-width:100%;background:white}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:9px 12px;border-bottom:1px solid #dce3d8;white-space:nowrap;text-align:right}td:first-child,th:first-child{text-align:left}th{background:#e5ecdf}tr:nth-child(even){background:#f6f8f3}@media(max-width:600px){main{padding:16px}h1{font-size:24px}nav{gap:10px}td,th{padding:8px}}</style><main><nav><a href="../monitor/">返回监控</a><a href="summary.json">结构化JSON</a><a href="summary.md">完整Markdown</a><a href="battles.csv">关卡/灵根/场地CSV</a><a href="pairs.csv">配对分组CSV</a></nav>${body}</main></html>`,
+    `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="../favicon.svg" type="image/svg+xml"><title>每日法宝实战测评</title><style>body{font:16px/1.8 system-ui,sans-serif;color:#22352f;background:#f7f8f3;margin:0}main{max-width:1200px;margin:auto;padding:24px;overflow-wrap:anywhere}h1{font-size:28px}a{color:#21664f}nav{display:flex;gap:18px;flex-wrap:wrap}details{margin:20px 0;background:#edf1e8;padding:14px}summary{cursor:pointer;font-weight:600}.table-wrap{overflow-x:auto;max-width:100%;background:white}table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:9px 12px;border-bottom:1px solid #dce3d8;white-space:nowrap;text-align:right}td small{display:block;font-size:11px;color:#5a6b60;font-weight:400}td:first-child,th:first-child{text-align:left}th{background:#e5ecdf}tr:nth-child(even){background:#f6f8f3}@media(max-width:600px){main{padding:16px}h1{font-size:24px}nav{gap:10px}td,th{padding:8px}}</style><main><nav><a href="../monitor/">返回监控</a><a href="summary.json">结构化JSON</a><a href="summary.md">完整Markdown</a><a href="battles.csv">关卡/灵根/场地CSV</a><a href="pairs.csv">配对分组CSV</a></nav>${body}</main></html>`,
   );
 }
