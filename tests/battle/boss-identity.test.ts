@@ -240,4 +240,3 @@ test('castBossSkill 产生的妖王地面阵最早预警为 1.0 秒；木心在 
   }
   assert.equal(minGroundDelay, 1.0);
 });
-

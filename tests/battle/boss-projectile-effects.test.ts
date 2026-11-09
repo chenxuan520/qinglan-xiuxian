@@ -484,13 +484,21 @@ test('5支毒矢同时在500像素处化瘴，相邻毒池圆心距离与两池�
     assert.equal(z.kind, 'boss-miasma');
     assert.equal(z.radius, 47);
   }
-  const angles = c.g.zones.map((z) => Math.atan2(z.y - c.boss.y, z.x - c.boss.x)).sort((a, b) => a - b);
+  const angles = c.g.zones
+    .map((z) => Math.atan2(z.y - c.boss.y, z.x - c.boss.x))
+    .sort((a, b) => a - b);
   for (let i = 0; i < angles.length - 1; i++) {
-    const z1 = c.g.zones.find((z) => Math.abs(Math.atan2(z.y - c.boss.y, z.x - c.boss.x) - angles[i]) < 1e-6)!;
-    const z2 = c.g.zones.find((z) => Math.abs(Math.atan2(z.y - c.boss.y, z.x - c.boss.x) - angles[i + 1]) < 1e-6)!;
+    const z1 = c.g.zones.find(
+      (z) => Math.abs(Math.atan2(z.y - c.boss.y, z.x - c.boss.x) - angles[i]) < 1e-6,
+    )!;
+    const z2 = c.g.zones.find(
+      (z) => Math.abs(Math.atan2(z.y - c.boss.y, z.x - c.boss.x) - angles[i + 1]) < 1e-6,
+    )!;
     const dist = Math.hypot(z1.x - z2.x, z1.y - z2.y);
     const sumRadius = z1.radius + z2.radius;
-    assert.ok(Math.abs(dist - sumRadius) <= 1, `相邻圆心距离 ${dist} 与半径和 ${sumRadius} 相差不超过1像素`);
+    assert.ok(
+      Math.abs(dist - sumRadius) <= 1,
+      `相邻圆心距离 ${dist} 与半径和 ${sumRadius} 相差不超过1像素`,
+    );
   }
 });
-
