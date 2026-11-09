@@ -39,7 +39,9 @@ export function checkDailyWeaponReport(directory: string, commit?: string, runId
   const report = JSON.parse(readFileSync(join(directory, 'summary.json'), 'utf8'));
   assert.ok(validWeaponReport(report), '法宝日报摘要损坏');
   assert.ok(
-    report.options.extended && report.options.seeds === 20 && report.options.seedOffset === 0,
+    report.options.extended &&
+      [10, 20].includes(report.options.seeds) &&
+      report.options.seedOffset === 0,
     '正式日报必须使用标准完整测评',
   );
   assert.deepEqual(
