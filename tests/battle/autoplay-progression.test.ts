@@ -147,7 +147,7 @@ test('能觉醒的法宝不额外加分，基础排序与升重顺序不变', ()
   assert.equal(pick(g).id, 'sword', '已学配套不改变同档升重顺序');
 });
 
-test('指定十一件优选法宝优于同级普通法宝，领悟与升重不依赖排列顺序', () => {
+test('指定十二件优选法宝优于同级普通法宝，领悟与升重不依赖排列顺序', () => {
   const favored: WeaponKind[] = [
     'sword',
     'lightning',
@@ -160,6 +160,7 @@ test('指定十一件优选法宝优于同级普通法宝，领悟与升重不�
     'scythe',
     'shard',
     'nail',
+    'bloodpool',
   ];
   const g = game();
   g.rerolls = 0;
