@@ -132,12 +132,23 @@ test('妖物志妖王招式说明覆盖全部名称且卡片按特性与招式�
     return article;
   };
   const wood = card(0);
-  assert.match(wood, /<span class="boss-skill-name">特性<\/span>弹幕与藤圈附藤缠/);
-  assert.doesNotMatch(wood, /<\/span> · /);
+  assert.match(wood, /<span class="boss-skill-label">特性<\/span>弹幕与藤圈附藤缠/);
+  const woodSkills = bestiaryBossSkills(0, false);
+  assert.ok(
+    wood.includes(
+      `<small>${woodSkills
+        .map((name) => `<span class="boss-skill-name">${name}</span>`)
+        .join(' · ')}<br>`,
+    ),
+  );
   const namesInCard = [...wood.matchAll(/<span class="boss-skill-name">([^<]+)<\/span>/g)].map(
     (m) => m[1],
   );
-  assert.deepEqual(namesInCard, ['特性', ...bestiaryBossSkills(0, false)]);
+  assert.deepEqual(namesInCard, woodSkills);
+  const labelsInCard = [...wood.matchAll(/<span class="boss-skill-label">([^<]+)<\/span>/g)].map(
+    (m) => m[1],
+  );
+  assert.deepEqual(labelsInCard, ['特性', ...woodSkills]);
 
   const trialPoison = card(3, 6);
   assert.match(trialPoison, /游瘴驱逐/);

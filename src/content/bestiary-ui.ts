@@ -125,11 +125,13 @@ export function bestiaryPanel(
           ? TRIAL_BOSS_TIMES[TRIAL_BOSS_STAGES.indexOf(bossStage)]
           : stage.minutes * 60;
         const stats = enemyCombatStats(arena, difficulty, time, 10, false, true, bossStage);
-        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}><span class="boss-skill-name">特性</span>${BOSS_TRAITS[bossStage]}。${bestiaryBossSkills(
-          bossStage,
-          trial,
-        )
-          .map((name) => `<span class="boss-skill-name">${name}</span> ${BOSS_SKILL_TEXT[name]}`)
+        const skills = bestiaryBossSkills(bossStage, trial);
+        return `<article class="enemy-card" data-boss-stage="${bossStage}"><span aria-hidden="true" class="sprite-thumb${known ? '' : ' is-unseen'}" style="${spriteStyle(stage.sprite)}"></span><div><h3>${known ? stage.boss : '???'}</h3><p>${trial ? `第 ${TRIAL_BOSS_STAGES.indexOf(bossStage) + 1} 劫 · 最早 ${known ? formatTime(time) : '???'} 后现身` : `${stage.name} · ${known ? formatTime(time) : '???'} 后现身`}</p><small${bossStage === FINAL_TRIAL_STAGE ? ' class="sovereign-skills"' : ''}>${skills
+          .map((name) => `<span class="boss-skill-name">${name}</span>`)
+          .join(
+            ' · ',
+          )}<br><span class="boss-skill-label">特性</span>${BOSS_TRAITS[bossStage]}。${skills
+          .map((name) => `<span class="boss-skill-label">${name}</span> ${BOSS_SKILL_TEXT[name]}`)
           .join(
             '；',
           )}。</small>${statLine('妖王', { hp: [stats.hp], damage: [stats.damage] }, known)}<p class="boss-lore" aria-label="妖王来历">${completed.includes(bossStage) ? BOSS_LORE[bossStage] : '击败后可见来历'}</p></div></article>`;

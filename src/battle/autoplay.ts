@@ -26,7 +26,7 @@ const favored = [
   'cauldron',
   'umbrella',
   'scythe',
-  'compass',
+  'shard',
   'nail',
 ];
 /** 尚未觉醒、且配套功法一个都没学的已持法宝 */

@@ -158,7 +158,7 @@ test('指定十一件优选法宝优于同级普通法宝，领悟与升重不�
     'cauldron',
     'umbrella',
     'scythe',
-    'compass',
+    'shard',
     'nail',
   ];
   const g = game();
