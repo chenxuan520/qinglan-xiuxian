@@ -364,7 +364,13 @@ export async function collectSource(
         if (w.job) {
           const jobs = await api(`repos/${w.repository}/actions/runs/${run.id}/jobs?per_page=100`);
           if (!object(jobs) || !Array.isArray(jobs.jobs)) throw new Error('jobs');
-          const job = jobs.jobs.find((j: any) => j.name === w.job && j.conclusion !== 'skipped');
+          // 可复用工作流只返回“父任务 / 子任务”，运行中的分片也须识别为原任务。
+          const job = jobs.jobs.find(
+            (j: any) =>
+              j.conclusion !== 'skipped' &&
+              (j.name === w.job ||
+                (typeof j.name === 'string' && j.name.startsWith(`${w.job} / `))),
+          );
           if (!job) continue;
           // 报告发布也可能失败；整个任务结论仍需一并查看。
         }

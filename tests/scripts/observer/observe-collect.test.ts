@@ -231,6 +231,43 @@ test('full task source skips forks, push and render-only runs; pending execution
   assert.deepEqual(result.signals, []);
 });
 
+test('reusable full workflow descendants are recognized before aggregation and after completion', async () => {
+  for (const [status, conclusion, jobs, expected] of [
+    ['in_progress', null, [{ name: 'full / shards (0)', conclusion: null }], 'pending'],
+    ['completed', 'success', [{ name: 'full / aggregate', conclusion: 'success' }], 'ready'],
+    ['completed', 'failure', [{ name: 'full / shards (2)', conclusion: 'failure' }], 'failed'],
+  ] as const) {
+    const result = await collectSource(githubSpec, at, {
+      github: async (path) =>
+        path.includes('/jobs') ? { jobs } : { workflow_runs: [run(1, { status, conclusion })] },
+    });
+    assert.equal(result.status, expected);
+    assert.equal(result.url, 'https://github.com/owner/repo/actions/runs/1');
+    if (expected === 'failed') assert.equal(result.signals[0].id, 'run-failed');
+    else assert.deepEqual(result.signals, []);
+  }
+});
+
+test('skipped reusable descendants and similar names cannot turn render-only into a full run', async () => {
+  const result = await collectSource(githubSpec, at, {
+    github: async (path) =>
+      path.includes('/jobs')
+        ? {
+            jobs: path.includes('/2/')
+              ? [
+                  { name: 'full / shards (0)', conclusion: 'skipped' },
+                  { name: 'fuller / aggregate', conclusion: 'success' },
+                  { name: 'full-extra / aggregate', conclusion: 'success' },
+                  { name: 'perf-render', conclusion: 'success' },
+                ]
+              : [{ name: 'full', conclusion: 'success' }],
+          }
+        : { workflow_runs: [run(2), run(1)] },
+  });
+  assert.equal(result.status, 'ready');
+  assert.equal(result.url, 'https://github.com/owner/repo/actions/runs/1');
+});
+
 test('completed background failure is immediate; timeout is separate and confirmed', async () => {
   const api = (r: unknown) => async (path: string) =>
     path.includes('/jobs')
