@@ -25,18 +25,18 @@ function fixture() {
 }
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 
-test('番天印按四秒基础间隔施放，伤害、落点半径与落印延迟保留', () => {
+test('番天印按三点五秒基础间隔施放，伤害、落点半径与落印延迟保留', () => {
   for (const evolved of [false, true]) {
     const g = fixture();
     g.weapons = [{ id: 'meteor', level: 6, evolved, timer: 0 }];
     g.spawnEnemy(0, false, false, { x: 140, y: 0 });
     g.update(0.01);
-    near(g.weapons[0].timer, 4 * g.stats.cooldown * (evolved ? 0.7 : 1));
+    near(g.weapons[0].timer, 3.5 * g.stats.cooldown * (evolved ? 0.7 : 1));
     const z = g.zones.find((z) => z.kind === 'meteor')!;
     near(z.radius, 75 * g.stats.area * (evolved ? 1.45 : 1));
     near(z.damage, g.weaponHitDamage(g.weapons[0]));
     near(z.castDelay!, 0.55);
-    near(treasure('meteor').damage, 65);
+    near(treasure('meteor').damage, 80);
   }
 });
 

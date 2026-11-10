@@ -342,8 +342,8 @@ export const TREASURES: Treasure[] = [
     desc: '灵印自高空落下，对妖群造成高额范围伤害。',
     evolution: '山河社稷',
     passive: 'area',
-    damage: 65,
-    cooldown: 4,
+    damage: 80,
+    cooldown: 3.5,
   },
   {
     id: 'chain',
