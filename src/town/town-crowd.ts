@@ -49,7 +49,9 @@ export function townCrowd(seed: number, buildings: readonly (TownPoint & { art: 
 export function townCrowdPosition(npc: TownPasserby, seconds: number) {
   const dx = npc.destination.x - npc.x;
   const dy = npc.destination.y - npc.y;
-  const duration = Math.hypot(dx, dy) / npc.speed;
+  // 现有街巷路线均沿单轴往返；斜线仍保留通用距离计算。
+  const distance = dx === 0 ? Math.abs(dy) : dy === 0 ? Math.abs(dx) : Math.hypot(dx, dy);
+  const duration = distance / npc.speed;
   if (!duration) return { x: npc.x, y: npc.y, facing: 1 };
   // 在路段两端各驻足一秒，再折返；不同步速与起点避免整齐列队。
   const half = duration + 1;

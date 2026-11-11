@@ -107,6 +107,15 @@ test('既有 smallIcon 输出与基线逐字一致', () => {
 });
 
 test('auto 图标仅圆弧箭头分组可旋转，gear 复用六齿路径且新图标为 24px / 线宽 2', () => {
+  // f236853 的实际输出，保护共用 SVG 模板后连属性顺序也保持一致。
+  assert.equal(
+    hash(smallIcon('auto')),
+    '80e007c88e63c61f3bd3a59c9068e0269006678627676b24bcbefb6677b8cfe2',
+  );
+  assert.equal(
+    hash(smallIcon('gear')),
+    '2ecdcf942c128e04ebf617636362b1493ba5fb0ae28e2cb33c48b0a4244cec85',
+  );
   for (const id of ['auto', 'gear']) {
     assert.match(smallIcon(id), /width="24" height="24" viewBox="0 0 24 24"/);
     assert.match(smallIcon(id), /stroke-width="2"/);
