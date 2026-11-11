@@ -24,6 +24,7 @@ import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
 import { ModuleSource, retryModule } from '../core/module-source.ts';
 import { BattleResolution } from './battle-resolution.ts';
 import { altarDefinition } from './altar-ui.ts';
+import { bossGuardedByHearts, heartGuardReady } from './boss-mechanics.ts';
 
 type BattleArt = typeof import('./battle-art.ts');
 interface SpriteTexture {
@@ -628,6 +629,11 @@ export class Renderer {
       }
       c.restore();
     }
+    for (const e of game.enemies) {
+      if (e.dead || !heartGuardReady(e) || !this.visible(e, p)) continue;
+      const owner = game.enemies.find((v) => v.id === e.summonedBy && !v.dead);
+      if (owner) this.battleArt!.drawHeartLink(c, e, owner);
+    }
     const entities = [
       ...game.enemies.filter((e) => !e.dead && this.visible(e, p)),
       {
@@ -743,7 +749,8 @@ export class Renderer {
             c.restore();
           }
         }
-        if (e.elite || e.boss)
+        const guarded = e.boss && 'id' in e && bossGuardedByHearts(game.enemies, e.id);
+        if ((e.elite || e.boss) && !guarded)
           this.cachedFormation(
             e.x,
             e.y + 6,
@@ -774,6 +781,7 @@ export class Renderer {
             game.tribulationVulnerable ? '#ffdc83' : '#bb93ee',
             0.8,
           );
+        if (guarded) this.battleArt!.drawBossGuard(c, e);
         const sprite =
           game.tribulation && e.boss
             ? 81

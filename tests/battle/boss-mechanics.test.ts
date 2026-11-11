@@ -3,13 +3,21 @@ import assert from 'node:assert/strict';
 import { Game } from '../../src/battle/game.ts';
 import { freshSave, readSave, SAVE_SCHEMA } from '../../src/core/progress.ts';
 import { bossSkills } from '../../src/battle/boss-skills.ts';
-import { STAGES } from '../../src/core/data.ts';
+import { FINAL_TRIAL_STAGE, STAGES } from '../../src/core/data.ts';
 import {
   BOSS_MECHANICS as R,
+  SOVEREIGN_GOLD,
+  bossGuardedByHearts,
   bossReturnOut,
   bossShotPose,
+  heartGuardReady,
 } from '../../src/battle/boss-mechanics.ts';
-import { drawBossSummon, drawBossMotionCue } from '../../src/battle/boss-mechanics-render.ts';
+import {
+  drawBossSummon,
+  drawBossMotionCue,
+  drawHeartLink,
+  drawBossGuard,
+} from '../../src/battle/boss-mechanics-render.ts';
 import { autoplayInput } from '../../src/battle/autoplay.ts';
 import { exportSave, importSave } from '../../src/core/save-transfer.ts';
 
@@ -165,6 +173,151 @@ test('木心每王最多三枚，不叠加刷屏，主人倒下或八秒到期�
   g.castBossSkill(e, 1, 0);
   g.hitEnemy(e, e.hp);
   assert.ok(g.enemies.filter((c) => c.bossSummon).every((c) => c.dead));
+});
+
+function strike(g: Game, target: any, amount = 100) {
+  target.hp = target.maxHp;
+  g.update(0.001);
+  const before = target.hp;
+  g.hitEnemy(target, amount, false, 'sword');
+  return before - target.hp;
+}
+
+test('木心长成后为施法者减伤三成，全碎或到时后恢复', () => {
+  const { g, e } = cast(0);
+  const hearts = actors(g);
+  const open = strike(g, e);
+  for (const heart of hearts) heart.bossSummon!.age = R.heartGrow;
+  const guarded = strike(g, e);
+  assert.ok(Math.abs(guarded - open * (1 - R.heartGuard)) < 1e-9);
+  hearts[1].dead = hearts[2].dead = true;
+  assert.ok(Math.abs(strike(g, e) - guarded) < 1e-9, '三颗与一颗长成木心减伤相同');
+  g.hitEnemy(hearts[0], hearts[0].hp, false, 'sword');
+  assert.ok(Math.abs(strike(g, e) - open) < 1e-9, '击碎全部木心后恢复');
+  assert.ok(g.effects.some((v) => v.kind === 'text' && v.text === '木心碎'));
+
+  const expired = cast(0);
+  const expiring = actors(expired.g);
+  for (const heart of expiring) heart.bossSummon!.age = R.heartLife + 1;
+  expired.g.update(0.001);
+  assert.ok(!expired.g.effects.some((v) => v.kind === 'text' && v.text === '木心碎'));
+  assert.ok(Math.abs(strike(expired.g, expired.e) - open) < 1e-9, '到时消失后恢复');
+});
+
+test('木心减伤只作用于施法者本体，小怪、木心与其他妖王不受影响', () => {
+  const guarded = cast(0),
+    hearts = actors(guarded.g);
+  for (const heart of hearts) heart.bossSummon!.age = R.heartGrow;
+  const other = guarded.g.spawnEnemy(10, false, true, { x: 200, y: 0 });
+  Object.assign(other, { speed: 0, cooldown: 99999 });
+  const guardedBoss = strike(guarded.g, guarded.e);
+  const guardedOther = strike(guarded.g, other);
+  const guardedHeart = strike(guarded.g, hearts[0], 10);
+
+  const control = cast(0);
+  const controlOther = control.g.spawnEnemy(10, false, true, { x: 200, y: 0 });
+  Object.assign(controlOther, { speed: 0, cooldown: 99999 });
+  const controlBoss = strike(control.g, control.e);
+  const controlOtherDamage = strike(control.g, controlOther);
+  const controlHeart = strike(control.g, actors(control.g)[0], 10);
+  assert.ok(Math.abs(guardedBoss - controlBoss * 0.7) < 1e-9);
+  assert.equal(guardedOther, controlOtherDamage);
+  assert.equal(guardedHeart, controlHeart);
+});
+
+test('仙尊万劫归一借落种成林时同样获得木心减伤', () => {
+  const { g, e } = encounter(6, FINAL_TRIAL_STAGE);
+  g.random = () => 0;
+  e.skillStep = 8;
+  e.hp = e.maxHp;
+  g.castBossSkill(e, 1, 0);
+  assert.equal(e.bossStage, FINAL_TRIAL_STAGE);
+  const hearts = actors(g);
+  assert.equal(hearts.length, 3);
+  assert.ok(hearts.every((heart) => heart.bossSummon!.color === SOVEREIGN_GOLD));
+  const open = strike(g, e);
+  for (const heart of hearts) heart.bossSummon!.age = R.heartGrow;
+  const guarded = strike(g, e);
+  assert.ok(Math.abs(guarded - open * (1 - R.heartGuard)) < 1e-9);
+});
+
+test('木心护王状态不入快照，读档首帧按长成木心重算', () => {
+  const { g, e } = cast(0);
+  for (const heart of actors(g)) heart.bossSummon!.age = R.heartGrow;
+  const raw = g.snapshot();
+  assert.ok(!JSON.stringify(raw).includes('guardedBosses'));
+  const guarded = strike(g, e);
+  const restored = Game.restore(g.save, raw)!;
+  restored.weapons[0].timer = 99999;
+  restored.resume();
+  const boss = restored.enemies.find((v) => v.boss)!;
+  assert.equal(strike(restored, boss), guarded);
+});
+
+test('长成木心画实线藤脉，受护妖王有护体光且不留画布状态', () => {
+  const calls: any[] = [],
+    state: Record<string, unknown> = {};
+  let depth = 0,
+    dashes = 0;
+  const c = new Proxy({} as CanvasRenderingContext2D, {
+    get:
+      (_: unknown, method: string) =>
+      (...args: unknown[]) => {
+        if (method === 'save') depth++;
+        if (method === 'restore') depth--;
+        if (method === 'setLineDash') dashes++;
+        calls.push({ method, args, ...state });
+      },
+    set: (_, key: string, value) => {
+      state[key] = value;
+      return true;
+    },
+  });
+  const { g, e } = cast(0);
+  const heart = actors(g)[0];
+  heart.bossSummon!.age = R.heartGrow;
+  drawHeartLink(c, heart, e);
+  drawBossGuard(c, e);
+  assert.equal(dashes, 0);
+  assert.equal(depth, 0);
+  assert.ok(calls.some((v) => v.method === 'moveTo' && v.args[0] === heart.x));
+  assert.ok(calls.some((v) => v.method === 'lineTo' && v.args[0] === e.x));
+  assert.ok(
+    calls.some(
+      (v) =>
+        v.method === 'stroke' &&
+        v.lineWidth === 3 &&
+        v.globalAlpha === 0.55 &&
+        v.strokeStyle === STAGES[0].color,
+    ),
+  );
+  const underlay = calls.findIndex(
+    (v) => v.method === 'stroke' && v.lineWidth === 5 && v.strokeStyle === '#173e2c',
+  );
+  const vine = calls.findIndex(
+    (v) => v.method === 'stroke' && v.lineWidth === 3 && v.strokeStyle === STAGES[0].color,
+  );
+  assert.ok(underlay >= 0 && vine > underlay, '先画深色底衬再画主藤线');
+  assert.ok(
+    calls.some(
+      (v) => v.method === 'fill' && v.globalAlpha === 0.18 && v.fillStyle === STAGES[0].color,
+    ),
+  );
+  assert.ok(calls.some((v) => v.method === 'arc' && v.args[2] === e.radius + 10));
+  assert.ok(calls.some((v) => v.method === 'stroke' && v.globalAlpha === 0.5 && v.lineWidth === 2));
+
+  heart.bossSummon!.age = R.heartGrow - 0.001;
+  assert.equal(heartGuardReady(heart), false);
+  heart.bossSummon!.age = R.heartGrow;
+  assert.equal(heartGuardReady(heart), true);
+  assert.equal(bossGuardedByHearts(g.enemies, e.id), true);
+  heart.bossSummon!.color = SOVEREIGN_GOLD;
+  e.bossStage = FINAL_TRIAL_STAGE;
+  calls.length = 0;
+  drawHeartLink(c, heart, e);
+  drawBossGuard(c, e);
+  assert.ok(calls.some((v) => v.method === 'stroke' && v.strokeStyle === SOVEREIGN_GOLD));
+  assert.ok(calls.some((v) => v.method === 'fill' && v.fillStyle === SOVEREIGN_GOLD));
 });
 
 test('两猎狼从相反侧翼绕行、完整蓄势锁向，扑后再包抄、六秒消散不结算', () => {

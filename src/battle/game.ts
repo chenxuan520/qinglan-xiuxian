@@ -1,6 +1,7 @@
 import {
   BOSS_MECHANICS,
   SOVEREIGN_GOLD,
+  bossGuardedByHearts,
   bossReturnOut,
   bossShotPose,
   cloneBossMotion,
@@ -219,6 +220,7 @@ export class Game {
   #shownAilments = new Set<string>();
   #pendingAilmentNotices: string[] = [];
   #shownCombos = new Set<string>();
+  #guardedBosses = new Set<number>();
   #buddhaCooldown = 0;
   #pendingComboNotices: string[] = [];
   tribulation = 0;
@@ -908,6 +910,9 @@ export class Game {
   update(dt: number) {
     if (this.state !== 'playing' || dt <= 0) return;
     dt = Math.min(dt, 0.05);
+    this.#guardedBosses = new Set(
+      this.enemies.filter((e) => e.boss && this.#rootGuarded(e)).map((e) => e.id),
+    );
     const ageBefore = this.save.age;
     this.time += dt;
     if (!this.tribulation) {
@@ -3651,9 +3656,13 @@ export class Game {
       }
     }
   }
+  #rootGuarded(e: Enemy) {
+    return bossGuardedByHearts(this.enemies, e.id);
+  }
   hitEnemy(e: Enemy, damage: number, crit = false, source = 'other', attack?: BossAttack) {
     if (e.dead || (source === 'altar' && e.boss)) return;
     if (source !== 'altar') damage *= this.#comboDamage(source);
+    if (e.boss && this.#guardedBosses.has(e.id)) damage *= 1 - BOSS_MECHANICS.heartGuard;
     if (!e.boss) {
       if ((this.altar?.damageUntil ?? 0) > this.time) damage *= 1.4;
       if ((e.frozenUntil ?? 0) > this.time) damage *= 1.3;
@@ -3715,7 +3724,11 @@ export class Game {
     if (e.hp <= 0) {
       e.dead = true;
       this.enemyDeath(e);
-      if (e.cacheGuardian || e.bossSummon?.kind === 'heart') return;
+      if (e.cacheGuardian || e.bossSummon?.kind === 'heart') {
+        if (e.bossSummon?.kind === 'heart')
+          this.#float({ x: e.x, y: e.y - 24 }, '木心碎', '#d1e7a5');
+        return;
+      }
       this.kills++;
       if (this.tribulation) {
         this.state = this.player.hp > 0 ? 'won' : 'lost';

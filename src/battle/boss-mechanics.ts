@@ -1,9 +1,10 @@
-import type { Point, Shot } from './game-types.ts';
+import type { Enemy, Point, Shot } from './game-types.ts';
 
 export const SOVEREIGN_GOLD = '#e8d69c';
 
 export const BOSS_MECHANICS = {
   heartGrow: 1.2,
+  heartGuard: 0.3,
   heartLife: 8,
   heartLimit: 3,
   wolfFlank: 1.2,
@@ -30,6 +31,13 @@ export const BOSS_MECHANICS = {
   trailStep: 0.15,
   trailLimit: 24,
 } as const;
+
+export function heartGuardReady(e: Enemy) {
+  return e.bossSummon?.kind === 'heart' && e.bossSummon.age >= BOSS_MECHANICS.heartGrow;
+}
+export function bossGuardedByHearts(enemies: Enemy[], bossId: number) {
+  return enemies.some((c) => !c.dead && c.summonedBy === bossId && heartGuardReady(c));
+}
 
 export type BossMotion =
   | { kind: 'return'; velocity: Point }

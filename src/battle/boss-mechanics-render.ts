@@ -1,6 +1,6 @@
 import type { Enemy, Shot } from './game-types.ts';
 import { BOSS_MECHANICS, SOVEREIGN_GOLD, bossReturnOut, bossShotPose } from './boss-mechanics.ts';
-import { TAU } from '../core/data.ts';
+import { FINAL_TRIAL_STAGE, STAGES, TAU } from '../core/data.ts';
 
 export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
   const state = e.bossSummon!;
@@ -58,6 +58,37 @@ export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
   c.textAlign = 'center';
   c.fillStyle = state.kind === 'heart' ? '#d1e7a5' : '#b9ebff';
   c.fillText(state.kind === 'heart' ? '木心' : '猎', 0, state.kind === 'heart' ? 43 : -42);
+  c.restore();
+}
+
+export function drawHeartLink(c: CanvasRenderingContext2D, heart: Enemy, owner: Enemy) {
+  c.save();
+  c.beginPath();
+  c.moveTo(heart.x, heart.y);
+  c.lineTo(owner.x, owner.y);
+  c.strokeStyle = '#173e2c';
+  c.globalAlpha = 0.25;
+  c.lineWidth = 5;
+  c.stroke();
+  c.strokeStyle = heart.bossSummon?.color ?? STAGES[0].color;
+  c.globalAlpha = 0.55;
+  c.lineWidth = 3;
+  c.stroke();
+  c.restore();
+}
+
+export function drawBossGuard(c: CanvasRenderingContext2D, boss: Enemy) {
+  const color = boss.bossStage === FINAL_TRIAL_STAGE ? SOVEREIGN_GOLD : STAGES[0].color;
+  c.save();
+  c.beginPath();
+  c.arc(boss.x, boss.y, boss.radius + 10, 0, TAU);
+  c.fillStyle = color;
+  c.globalAlpha = 0.18;
+  c.fill();
+  c.globalAlpha = 0.5;
+  c.strokeStyle = color;
+  c.lineWidth = 2;
+  c.stroke();
   c.restore();
 }
 

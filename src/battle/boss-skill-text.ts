@@ -15,7 +15,7 @@ export const BOSS_SKILL_TEXT: Record<string, string> = {
   万木囚笼: '六处环形藤阵围向修士',
   荆棘散射: '七发荆棘扇射',
   唤醒山灵: '召唤三名山灵',
-  落种成林: `种下木心，<span class="combat-unit">${BOSS_MECHANICS.heartGrow}秒</span>后成阵；木心坚韧如精英，可提前击碎`,
+  落种成林: `种下木心，<span class="combat-unit">${BOSS_MECHANICS.heartGrow}秒</span>后成阵，并以藤脉护住妖王，减伤三成；击碎木心可断其护`,
   九尾炎扇: '快慢两层炎扇，九发与八发',
   焚天火径: '五点火径，及时离开火圈',
   赤焰轮舞: '快慢两层轮舞各二十发，穿过弹幕间隙',
