@@ -241,7 +241,8 @@ export function marketRequest(save: SaveData, id: MarketCultivatorId) {
     identity.slot,
   );
   const playerRealm = realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).index;
-  const coerced = disposition === '强横' && n.realmIndex > playerRealm;
+  const coerced =
+    disposition === '强横' && n.realmIndex > playerRealm && !ownsCurio(save, 'sacred-fragment');
   const baseRatio = coerced
     ? 70
     : disposition === '精明'
@@ -375,6 +376,10 @@ export function marketOpportunity(save: SaveData, id: MarketCultivatorId) {
   const risk = marketOpportunityRisk(save, id);
   const honest =
     save.mortal.sectMarket.opportunityHonest ?? roll(save, `opportunity-truth:${id}`) % 100 >= 40;
+  if (kind === 'invitation' && !honest && ownsCurio(save, 'heaven-house')) {
+    risk.clueCodes.push('heaven-omen');
+    risk.clues.push(MARKET_RISK_CLUES['heaven-omen']);
+  }
   const pool = marketMedicinePool(save.mortal.population!, save.mortal.sectMarket!, id).filter(
     (m) => m.years > 0,
   );
@@ -431,14 +436,20 @@ export function opportunityReason(
   if (!['inspect', 'accept', 'decline'].includes(action)) return '不支持的机缘操作';
   const o = marketOpportunity(save, id);
   if (!o) return '此处暂无坊间机缘';
+  const expose = o.kind === 'goods' && !o.honest && ownsCurio(save, 'heaven-bottle');
+  const inspectFree = o.item.kind === 'artifact' && ownsCurio(save, 'jade-book');
   const years =
     action === 'decline'
       ? 0
       : action === 'inspect'
-        ? MARKET_SOCIAL_SETTINGS.inspectYears
-        : o.kind === 'invitation'
-          ? MARKET_SOCIAL_SETTINGS.invitationYears
-          : MARKET_SOCIAL_SETTINGS.opportunityYears;
+        ? inspectFree
+          ? 0
+          : MARKET_SOCIAL_SETTINGS.inspectYears
+        : expose
+          ? 0
+          : o.kind === 'invitation'
+            ? MARKET_SOCIAL_SETTINGS.invitationYears
+            : MARKET_SOCIAL_SETTINGS.opportunityYears;
   const r = marketSocialReason(
     save,
     id,
@@ -459,7 +470,8 @@ export function opportunityReason(
       save.age < s.lastOpportunityAt + MARKET_SOCIAL_SETTINGS.opportunityInterval - 1e-9
     )
       return `坊间机缘收获相隔十年，尚需 ${Math.ceil((s.lastOpportunityAt + MARKET_SOCIAL_SETTINGS.opportunityInterval - save.age - 1e-9) * 10) / 10} 年`;
-    if (save.stones < o.cost + auctionDues(save, years)) return '请备足明示费用及期间供奉';
+    if (save.stones < (expose ? 0 : o.cost + auctionDues(save, years)))
+      return '请备足明示费用及期间供奉';
     if (o.kind === 'deposit' && o.honest && (save.medicine.bag[o.item.id] || 0) < 1)
       return '对方求购的丹药库存不足';
     if (
@@ -493,8 +505,18 @@ export function chooseMarketOpportunity(
     s.used.push(id);
     return log(save, id, 'declined', `你婉拒了${o.n.name}的私下邀约，仍留在坊市。`);
   }
+  if (action === 'accept' && o.kind === 'goods' && !o.honest && ownsCurio(save, 'heaven-bottle')) {
+    s.used.push(id);
+    return log(
+      save,
+      id,
+      'exposed',
+      '掌天瓶中的绿液微微一漾，你一嗅便知瓶里是掺灰泥丸，当场退回，未付一文。',
+    );
+  }
   if (action === 'inspect') {
-    advanceMortal(save, MARKET_SOCIAL_SETTINGS.inspectYears * 60);
+    const inspectFree = o.item.kind === 'artifact' && ownsCurio(save, 'jade-book');
+    if (!inspectFree) advanceMortal(save, MARKET_SOCIAL_SETTINGS.inspectYears * 60);
     s.inspected.push(id);
     return log(
       save,
@@ -503,7 +525,9 @@ export function chooseMarketOpportunity(
       o.kind === 'haggle'
         ? `你查了价，${medicineInfo(o.item.id)!.name}只是凡品，药铺参考价${medicineInfo(o.item.id)!.price}灵石；对方却开价${o.cost}。`
         : o.honest
-          ? `你花半年${o.item.kind === 'artifact' ? '核对器纹与寄存凭据' : '验看封签、当面核实凭据'}，这桩${o.kind === 'invitation' ? '坊外邀约' : '交易'}未见破绽。`
+          ? inspectFree
+            ? `你翻开金阙玉书对照器纹，片刻便核清寄存凭据，这桩${o.kind === 'invitation' ? '坊外邀约' : '交易'}未见破绽。`
+            : `你花半年${o.item.kind === 'artifact' ? '核对器纹与寄存凭据' : '验看封签、当面核实凭据'}，这桩${o.kind === 'invitation' ? '坊外邀约' : '交易'}未见破绽。`
           : o.kind === 'goods'
             ? '封签重贴，瓶中无药香，丹丸一捻便散。所谓好丹，不过掺灰泥丸。'
             : o.kind === 'deposit'
@@ -537,6 +561,8 @@ export function chooseMarketOpportunity(
       enemyDamage: 16 * ratio * (ownsCurio(save, 'jade-ruyi') ? 0.9 : 1),
       speed: root.baseSpeed,
     };
+    const snapshot = initialAmbushSnapshot(stats);
+    const bamboo = ownsCurio(save, 'thunder-bamboo');
     s.ambush = {
       visit,
       npcId: id,
@@ -549,9 +575,19 @@ export function chooseMarketOpportunity(
       npc: { ...o.n },
       stats,
       loot: marketAmbushLoot(save, id),
-      snapshot: initialAmbushSnapshot(stats),
+      snapshot: bamboo
+        ? { ...snapshot, enemy: { ...snapshot.enemy, hp: 0 }, outcome: 'victory' }
+        : snapshot,
       revivesUsed: 0,
+      ...(bamboo ? { fled: true as const } : {}),
     };
+    if (bamboo)
+      return log(
+        save,
+        id,
+        'ambush',
+        `${o.n.name}将你引到僻处，忽然拔刃相向。你袖中的金雷竹细叶一震，一道金雷劈落身前，对方大骇，弃下随身之物遁走。`,
+      );
     return log(
       save,
       id,
@@ -616,6 +652,7 @@ export const MARKET_RISK_CLUES = {
   'sect-backing': '你佩着在籍宗门信物，对方有所顾忌；离坊后仍不能指望宗门立刻救援。',
   'old-grudge': '这正是曾伏击你的劫修，旧怨未消，私下邀约尤须提防。',
   'known-trader': '你们曾公平交割过一回。',
+  'heaven-omen': '天机屋中卦象示凶：此行必见刀兵。',
 } as const;
 export type MarketRiskClue = keyof typeof MARKET_RISK_CLUES;
 export function marketOpportunityRisk(save: SaveData, id: MarketCultivatorId) {
@@ -695,7 +732,7 @@ export function settleMarketAmbush(save: SaveData, outcome: 'victory' | 'escaped
     for (const item of received) if (item.quantity > 0) receiveMarketItem(save, item);
     recordCollectionAchievement(save);
   }
-  rememberMarketAmbush(save, a.npcId, outcome);
+  rememberMarketAmbush(save, a.npcId, outcome, outcome !== 'victory' || !a.fled);
   save.mortal.marketSocial!.ambush = null;
   const lootText = received
     .filter((item) => item.quantity > 0)
@@ -715,7 +752,9 @@ export function settleMarketAmbush(save: SaveData, outcome: 'victory' | 'escaped
     a.npcId,
     outcome,
     outcome === 'victory'
-      ? `你击杀劫修${a.npc.name}，取回暂扣的${a.held}灵石${lootText ? `，并从其随身行囊取得${lootText}，已收入收藏与丹囊。` : '。'}${overflowText}此人不会再出现在坊市。`
+      ? a.fled
+        ? `你震退劫修${a.npc.name}，取回暂扣的${a.held}灵石${lootText ? `，并从其弃下的行囊取得${lootText}，已收入收藏与丹囊。` : '。'}${overflowText}此人已遁走，不会再出现在坊市。`
+        : `你击杀劫修${a.npc.name}，取回暂扣的${a.held}灵石${lootText ? `，并从其随身行囊取得${lootText}，已收入收藏与丹囊。` : '。'}${overflowText}此人不会再出现在坊市。`
       : `你甩开${a.npc.name}的追击，从退路回到坊市。损失暂扣的${a.held}灵石，法宝与丹药仍在行囊；对方记下这段旧怨。`,
   );
   if (outcome === 'victory')

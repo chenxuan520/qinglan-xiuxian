@@ -28,7 +28,7 @@ import {
 import { marketBuildingArt } from '../market/market-art.ts';
 import { marketFellowCharacter } from '../market/market-fellow.ts';
 import { mapClick, walkRoute } from '../town/settlement-navigation.ts';
-import { townWalkable, TOWN_WALK_SPEED } from '../town/town.ts';
+import { townWalkable, TOWN_WALK_SPEED, windWingsWalk } from '../town/town.ts';
 import {
   SettlementPassage,
   SETTLEMENT_PATHS,
@@ -422,7 +422,8 @@ export class SectMarketScene {
       ? Math.hypot(target.x - this.position.x, target.y - this.position.y)
       : 0;
     if (!this.enabled) this.clearInput();
-    else
+    else {
+      const walk = windWingsWalk(this.save);
       this.position = moveInSectMarket(
         this.position,
         target
@@ -440,8 +441,10 @@ export class SectMarketScene {
                 Number(this.keys.has('w') || this.keys.has('arrowup')) +
                 this.touch.y,
             },
-        target ? Math.min(dt, remaining / TOWN_WALK_SPEED) : dt,
+        target ? Math.min(dt, remaining / (TOWN_WALK_SPEED * walk)) : dt,
+        TOWN_WALK_SPEED * walk,
       );
+    }
     if (target && Math.hypot(target.x - this.position.x, target.y - this.position.y) < 0.01)
       this.clickRoute.shift();
     if (this.enabled) {

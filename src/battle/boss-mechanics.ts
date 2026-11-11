@@ -5,7 +5,7 @@ export const SOVEREIGN_GOLD = '#e8d69c';
 export const BOSS_MECHANICS = {
   heartGrow: 1.2,
   heartGuard: 0.3,
-  heartLife: 8,
+  heartLife: 10,
   heartLimit: 3,
   wolfFlank: 1.2,
   wolfWindup: 0.425,
@@ -39,6 +39,10 @@ export function heartGuardReady(e: Enemy) {
 }
 export function bossGuardedByHearts(enemies: Enemy[], bossId: number) {
   return enemies.some((c) => !c.dead && c.summonedBy === bossId && heartGuardReady(c));
+}
+export function summonLinkAlpha(a: Point, b: Point) {
+  const distance = Math.hypot(a.x - b.x, a.y - b.y);
+  return distance >= 300 ? 0 : distance <= 200 ? 1 : (300 - distance) / 100;
 }
 
 export type BossMotion =

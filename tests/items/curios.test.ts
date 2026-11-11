@@ -2,6 +2,7 @@ import { enterNextMarketBatch } from '../helpers/market-fixture.ts';
 import { AUCTION_CURIO_LOT } from '../../src/market/auction-data.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   CURIO_IDS,
   ownsCurio,
@@ -13,6 +14,8 @@ import {
   curioRoll,
   acquiredCurio,
 } from '../../src/items/curio-data.ts';
+import { CURIOS } from '../../src/items/curio-info.ts';
+import { guideContent } from '../../src/guide/guide.ts';
 import { Game } from '../../src/battle/game.ts';
 import {
   freshSave,
@@ -693,4 +696,26 @@ test('同归于尽无首通额外奇缘，但各关基础机缘不变', () => {
     assert.equal(bossCurio(s, stage, stage === 6 ? 6 : 0, true, false), null);
     assert.ok(bossCurio(s, stage, stage === 6 ? 6 : 0, true, true));
   }
+});
+
+test('九件奇物的隐藏彩蛋不写入奇物说明、指南或妖物志', () => {
+  const descriptions = CURIOS.map((curio) =>
+    [curio.name, curio.effect, curio.story].join(' '),
+  ).join('\n');
+  const guide = guideContent('combat') + guideContent('cultivation');
+  const bestiary = readFileSync(
+    new URL('../../src/content/bestiary-ui.ts', import.meta.url),
+    'utf8',
+  );
+  for (const secret of [
+    '故园残魂',
+    '金雷竹细叶一震',
+    '掌天瓶中的绿液微微一漾',
+    '你翻开金阙玉书对照器纹',
+    '天机屋中卦象示凶',
+    '灵眼之泉给在世父母延寿',
+    '风雷翅使镇上',
+  ])
+    for (const source of [descriptions, guide, bestiary])
+      assert.ok(!source.includes(secret), secret);
 });

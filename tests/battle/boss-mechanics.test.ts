@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../../src/battle/game.ts';
 import { freshSave, readSave, SAVE_SCHEMA } from '../../src/core/progress.ts';
 import { bossSkills } from '../../src/battle/boss-skills.ts';
-import { FINAL_TRIAL_STAGE, STAGES } from '../../src/core/data.ts';
+import { FINAL_TRIAL_STAGE, STAGES, TAU } from '../../src/core/data.ts';
 import {
   BOSS_MECHANICS as R,
   SOVEREIGN_GOLD,
@@ -11,6 +11,7 @@ import {
   bossReturnOut,
   bossShotPose,
   heartGuardReady,
+  summonLinkAlpha,
 } from '../../src/battle/boss-mechanics.ts';
 import {
   drawBossSummon,
@@ -161,7 +162,7 @@ test('木心全程可打碎，扎根前不伤人，击碎即散阵，无击杀/�
   }
 });
 
-test('木心每王最多三枚，不叠加刷屏，主人倒下或八秒到期后消散', () => {
+test('木心每王最多三枚，不叠加刷屏，主人倒下或十秒到期后消散', () => {
   const { g, e } = cast(0, 6);
   for (let i = 0; i < 4; i++) {
     e.skillStep = 3;
@@ -169,7 +170,7 @@ test('木心每王最多三枚，不叠加刷屏，主人倒下或八秒到期�
   }
   assert.equal(actors(g).length, 3);
   assert.equal(g.zones.length, 3);
-  for (const heart of actors(g)) g.updateBossSummon(heart, 8.01);
+  for (const heart of actors(g)) g.updateBossSummon(heart, R.heartLife + 0.01);
   g.updateZones(0.01);
   assert.equal(actors(g).length, 0);
   assert.equal(g.zones.length, 0);
@@ -177,6 +178,26 @@ test('木心每王最多三枚，不叠加刷屏，主人倒下或八秒到期�
   g.castBossSkill(e, 1, 0);
   g.hitEnemy(e, e.hp);
   assert.ok(g.enemies.filter((c) => c.bossSummon).every((c) => c.dead));
+});
+
+test('木心九点九秒仍护王，十秒后消散且藤圈存续八点八秒', () => {
+  const { g, e } = cast(0);
+  const hearts = actors(g);
+  assert.equal(R.heartLife, 10);
+  assert.ok(
+    g.zones
+      .filter((z) => z.kind === 'boss-roots')
+      .every((z) => z.life === R.heartLife - R.heartGrow),
+  );
+  for (const heart of hearts) heart.bossSummon!.age = 9.9;
+  const guarded = strike(g, e);
+  assert.ok(Game.restore(g.save, g.snapshot()), '九点九秒木心快照可恢复');
+  for (const heart of hearts) heart.bossSummon!.age = 10.01;
+  g.update(0.001);
+  const open = strike(g, e);
+  assert.ok(Math.abs(guarded - open * (1 - R.heartGuard)) < 1e-9);
+  g.update(0.001);
+  assert.equal(actors(g).length, 0);
 });
 
 function strike(g: Game, target: any, amount = 100) {
@@ -322,6 +343,57 @@ test('长成木心画实线藤脉，受护妖王有护体光且不留画布状�
   drawBossGuard(c, e);
   assert.ok(calls.some((v) => v.method === 'stroke' && v.strokeStyle === SOVEREIGN_GOLD));
   assert.ok(calls.some((v) => v.method === 'fill' && v.fillStyle === SOVEREIGN_GOLD));
+});
+
+test('冥主幽影追踪带普通鬼卒瞬移，幻影与其他妖物不动', () => {
+  for (const arena of [4, 6]) {
+    const { g, e } = encounter(4, arena);
+    e.skillStep = 0;
+    g.castBossSkill(e, 1, 0);
+    const guards = g.enemies.filter(
+      (c) => !c.dead && c.summonedBy === e.id && !c.bossSummon && c.illusionOf === undefined,
+    );
+    assert.ok(guards.length > 0);
+    const illusion = g.spawnEnemy(50, false, false, { x: 40, y: 40 });
+    illusion.illusionOf = e.id;
+    const other = g.spawnEnemy(50, false, false, { x: -40, y: 40 });
+    const beforeIllusion = { x: illusion.x, y: illusion.y };
+    const beforeOther = { x: other.x, y: other.y };
+    g.castBossPursuit(e, 1, 0);
+    assert.equal(e.x, g.player.x - 260);
+    assert.equal(e.y, g.player.y);
+    guards.forEach((guard, i) => {
+      const a = (i / guards.length) * TAU;
+      assert.ok(Math.abs(guard.x - (e.x + Math.cos(a) * 90)) < 1);
+      assert.ok(Math.abs(guard.y - (e.y + Math.sin(a) * 90)) < 1);
+    });
+    assert.deepEqual({ x: illusion.x, y: illusion.y }, beforeIllusion);
+    assert.deepEqual({ x: other.x, y: other.y }, beforeOther);
+  }
+});
+
+test('幽影换形侧移不带鬼卒，鬼卒位置保持', () => {
+  const { g, e } = encounter(4);
+  e.skillStep = 0;
+  g.castBossSkill(e, 1, 0);
+  const guards = g.enemies.filter(
+    (c) => !c.dead && c.summonedBy === e.id && !c.bossSummon && c.illusionOf === undefined,
+  );
+  const before = guards.map((guard) => ({ x: guard.x, y: guard.y }));
+  e.skillStep = 4;
+  g.castBossSkill(e, 1, 0);
+  assert.deepEqual(
+    guards.map((guard) => ({ x: guard.x, y: guard.y })),
+    before,
+  );
+});
+
+test('召唤连线按距离淡出：150像素全亮、250像素半透明、300像素不画', () => {
+  assert.equal(summonLinkAlpha({ x: 0, y: 0 }, { x: 150, y: 0 }), 1);
+  assert.equal(summonLinkAlpha({ x: 0, y: 0 }, { x: 200, y: 0 }), 1);
+  assert.equal(summonLinkAlpha({ x: 0, y: 0 }, { x: 250, y: 0 }), 0.5);
+  assert.equal(summonLinkAlpha({ x: 0, y: 0 }, { x: 300, y: 0 }), 0);
+  assert.equal(summonLinkAlpha({ x: 0, y: 0 }, { x: 400, y: 0 }), 0);
 });
 
 test('两猎狼从相反侧翼绕行、完整蓄势锁向，扑后再包抄、六秒消散不结算', () => {

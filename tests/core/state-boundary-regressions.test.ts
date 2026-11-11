@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { freshSave, realmCost, readSave } from '../../src/core/progress.ts';
+import { BOSS_MECHANICS } from '../../src/battle/boss-mechanics.ts';
 import { MEDICINES, validMedicine } from '../../src/items/medicine-data.ts';
 import {
   joinSect,
@@ -147,7 +148,8 @@ test('真实帧内木心寿尽后cache事件存档可自读，活体超龄仍拒
   const boss = game.spawnEnemy(10, false, true, { x: -180, y: 0 }, 0);
   Object.assign(boss, { speed: 0, cooldown: 99999, pursuitCooldown: 99999, skillStep: 3 });
   game.castBossSkill(boss, 1, 0);
-  game.enemies.find((e) => e.bossSummon?.kind === 'heart')!.bossSummon!.age = 8;
+  game.enemies.find((e) => e.bossSummon?.kind === 'heart')!.bossSummon!.age =
+    BOSS_MECHANICS.heartLife;
   game.cacheChallenge = { x: 0, y: 0, phase: 'offered', deadline: 100.005, guardians: [] };
   let saved = 0;
   game.onEvent = (name) =>
@@ -171,7 +173,7 @@ test('真实帧内木心寿尽后cache事件存档可自读，活体超龄仍拒
   game.update(0.01);
   assert.equal(saved, 1, '必须经过真实帧内cache事件，而非仅帧尾取快照');
   const invalid = game.snapshot();
-  invalid.enemies.find((e) => e.bossSummon)!.bossSummon!.age = 8.01;
+  invalid.enemies.find((e) => e.bossSummon)!.bossSummon!.age = BOSS_MECHANICS.heartLife + 0.01;
   assert.equal(Game.restore(structuredClone(save), invalid), null);
 });
 

@@ -299,7 +299,10 @@ test('五类发放只返回副本，可按原存档格式保存读回；本命�
   assert.equal(s.path, original.path);
   assert.equal(s.age, original.age);
   assert.equal(s.cultivation, 123);
-  assert.deepEqual(s.mortal, original.mortal);
+  assert.deepEqual(s.mortal, {
+    ...original.mortal,
+    hometown: { ...original.mortal.hometown!, spring: { father: true, mother: true } },
+  });
   assert.deepEqual(s.medicine.recipes, original.medicine.recipes);
   assert.equal(s.medicine.recipeSeed, original.medicine.recipeSeed);
 });

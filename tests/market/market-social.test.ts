@@ -19,10 +19,11 @@ import { marketCultivators, MARKET_CULTIVATORS } from '../../src/sect/sect-marke
 import { MEDICINES, medicineInfo } from '../../src/items/medicine-data.ts';
 import { TREASURES } from '../../src/core/data.ts';
 import { auctionValue } from '../../src/market/auction.ts';
-import { validMarketSocial } from '../../src/market/market-social-data.ts';
+import { validMarketSocial, validMarketAmbush } from '../../src/market/market-social-data.ts';
 import { marketSocialContent } from '../../src/market/market-social-ui.ts';
 import { marketTradeMotive } from '../../src/market/market-trade-motives.ts';
-import { rememberMarketContact } from '../../src/market/market-relations.ts';
+import { rememberMarketContact, marketContact } from '../../src/market/market-relations.ts';
+import { grantCurio } from '../../src/items/curio-data.ts';
 const ids = MARKET_CULTIVATORS.map((n) => n.id);
 function fixture(seed = 12345) {
   const s = freshSave('heaven', ['metal'], 'orthodox', () => 0.5);
@@ -313,6 +314,120 @@ test('弱肉强食见闻不额外计龄，高于玩家的强横求购按70%明�
     }
   }
   assert.ok(found);
+});
+
+test('梵圣真片使强横高境界求购不再按七成压价，未持有时仍压价', () => {
+  let found = false;
+  for (let seed = 1; seed < 500; seed++) {
+    const s = fixture(seed);
+    const id = ids.find((id) => marketRequest(s, id));
+    if (!id) continue;
+    const n = marketCultivators(s.mortal.population!, s.mortal.sectMarket!).find(
+      (n) => n.id === id,
+    )!;
+    const o = marketRequest(s, id)!;
+    if (n.realmIndex > 0 && o.price === Math.floor(auctionValue(o) * 0.7)) {
+      found = true;
+      grantCurio(s, 'sacred-fragment');
+      const next = marketRequest(s, id)!;
+      assert.ok(next.price >= Math.floor(auctionValue(next) * 0.85));
+      assert.doesNotMatch(next.priceText, /仗着境界/);
+      break;
+    }
+  }
+  assert.ok(found);
+});
+
+test('金雷竹令不诚实邀约开场即溃逃，暂扣灵石与战利品照常返还', () => {
+  const { s, id, o } = chance('invitation', false);
+  const before = s.stones;
+  grantCurio(s, 'thunder-bamboo');
+  const r = chooseMarketOpportunity(s, id, 1, 'accept')!;
+  assert.equal(s.mortal.marketSocial!.ambush!.snapshot.outcome, 'victory');
+  assert.equal(s.mortal.marketSocial!.ambush!.snapshot.enemy.hp, 0);
+  assert.equal(s.mortal.marketSocial!.ambush!.fled, true);
+  assert.equal(
+    r.text,
+    `${o.n.name}将你引到僻处，忽然拔刃相向。你袖中的金雷竹细叶一震，一道金雷劈落身前，对方大骇，弃下随身之物遁走。`,
+  );
+  assert.ok(
+    validMarketAmbush(
+      s.mortal.marketSocial!.ambush!,
+      s.age,
+      s.mortal.sectMarket!,
+      s.mortal.marketSocial!,
+    ),
+  );
+  const settled = settleMarketAmbush(s, 'victory')!;
+  assert.ok(settled);
+  assert.match(settled.text, /震退劫修/);
+  assert.match(settled.text, /遁走/);
+  assert.doesNotMatch(settled.text, /击杀/);
+  const contact = marketContact(s, id)!;
+  assert.equal(contact.dead, false);
+  assert.equal(contact.goodwill, 0);
+  assert.equal(s.stones, before);
+  assert.equal(s.mortal.marketSocial!.ambush, null);
+});
+
+test('天机屋为不诚实邀约追加天机示警，诚实邀约不追加', () => {
+  const bad = chance('invitation', false);
+  grantCurio(bad.s, 'heaven-house');
+  const badOffer = marketOpportunity(bad.s, bad.id)!;
+  assert.equal(badOffer.risk.clueCodes.at(-1), 'heaven-omen');
+  assert.equal(badOffer.risk.clues.at(-1), '天机屋中卦象示凶：此行必见刀兵。');
+  const good = chance('invitation', true);
+  grantCurio(good.s, 'heaven-house');
+  const goodOffer = marketOpportunity(good.s, good.id)!;
+  assert.ok(!goodOffer.risk.clueCodes.includes('heaven-omen'));
+  assert.ok(!goodOffer.risk.clues.includes('天机屋中卦象示凶：此行必见刀兵。'));
+});
+
+test('掌天瓶识破不诚实丹药交易，不付灵石不耗年岁；诚实交易照常扣费', () => {
+  const fake = chance('goods', false);
+  const stones = fake.s.stones;
+  const age = fake.s.age;
+  grantCurio(fake.s, 'heaven-bottle');
+  const r = chooseMarketOpportunity(fake.s, fake.id, 1, 'accept')!;
+  assert.equal(r.text, '掌天瓶中的绿液微微一漾，你一嗅便知瓶里是掺灰泥丸，当场退回，未付一文。');
+  assert.equal(fake.s.stones, stones);
+  assert.equal(fake.s.age, age);
+  assert.ok(fake.s.mortal.marketSocial!.used.includes(fake.id));
+
+  const honest = chance('goods', true);
+  const honestStones = honest.s.stones;
+  const honestAge = honest.s.age;
+  grantCurio(honest.s, 'heaven-bottle');
+  chooseMarketOpportunity(honest.s, honest.id, 1, 'accept');
+  assert.equal(honest.s.stones, honestStones - honest.o.cost);
+  assert.equal(honest.s.age, honestAge + 0.5);
+});
+
+test('金阙玉书核验法宝不耗年岁并改写文案，丹药核验仍耗半年', () => {
+  const find = (artifact: boolean) => {
+    for (let seed = 1; seed < 5000; seed++) {
+      const s = fixture(seed);
+      for (const id of ids) {
+        const o = marketOpportunity(s, id);
+        if (o && o.honest && o.kind !== 'haggle' && (o.item.kind === 'artifact') === artifact)
+          return { s, id };
+      }
+    }
+    throw Error('missing inspect fixture');
+  };
+  for (const artifact of [true, false]) {
+    const { s, id } = find(artifact);
+    const age = s.age;
+    grantCurio(s, 'jade-book');
+    const r = chooseMarketOpportunity(s, id, 1, 'inspect')!;
+    if (artifact) {
+      assert.equal(s.age, age);
+      assert.match(r.text, /你翻开金阙玉书对照器纹，片刻便核清寄存凭据/);
+    } else {
+      assert.equal(s.age, age + 0.5);
+      assert.match(r.text, /你花半年/);
+    }
+  }
 });
 
 test('非整数年岁刚获收获时显示十年冷却，不因浮点误差额外显示0.1年', () => {

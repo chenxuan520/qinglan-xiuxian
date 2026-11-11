@@ -54,6 +54,7 @@ export interface MarketAmbush {
   loot: AuctionItem[];
   snapshot: AmbushSnapshot;
   revivesUsed: number;
+  fled?: true;
 }
 export interface MarketSocialState {
   visit: number;
@@ -169,6 +170,7 @@ export function validMarketAmbush(
     Number.isSafeInteger(a.revivesUsed) &&
     a.revivesUsed >= 0 &&
     a.revivesUsed <= MAX_REVIVES &&
+    (a.fled === undefined || a.fled === true) &&
     validAmbushStats(a.stats) &&
     validAmbushSnapshot(a.snapshot, a.stats) &&
     Array.isArray(a.loot) &&

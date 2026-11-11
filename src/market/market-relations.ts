@@ -79,11 +79,17 @@ export function rememberMarketAmbush(
   save: SaveData,
   id: MarketCultivatorId,
   outcome: 'victory' | 'escaped' | 'defeat',
+  dead = true,
 ) {
   const contact = rememberMarketContact(save, id);
   if (!contact) return;
-  if (outcome === 'victory') contact.dead = true;
-  else contact.grudge = Math.min(3, contact.grudge + 1);
+  if (outcome === 'victory') {
+    if (dead) contact.dead = true;
+    else {
+      contact.goodwill = 0;
+      contact.grudge = 0;
+    }
+  } else contact.grudge = Math.min(3, contact.grudge + 1);
 }
 export function returningMarketContact(
   save: SaveData,

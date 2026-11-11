@@ -1,4 +1,5 @@
 import { recordChronicle } from '../content/chronicle.ts';
+import { ownsCurio } from '../items/curio-data.ts';
 import type { SaveData } from '../core/progress.ts';
 
 export type ParentId = 'father' | 'mother';
@@ -8,6 +9,11 @@ export interface HometownState {
   lastVisitAge: number | null;
   letterFoundAt: number | null;
   letterRead: boolean;
+  spring?: Partial<Record<ParentId, true>>;
+  soulMet?: true;
+}
+export function parentDiesAt(home: HometownState, id: ParentId) {
+  return home.parents[id].diesAt + (home.spring?.[id] ? 10 : 0);
 }
 
 export function freshHometown(random = Math.random): HometownState {
@@ -52,11 +58,21 @@ export function validHometown(value: unknown, age: number): value is HometownSta
     }) ||
     !validAge(home.lastVisitAge) ||
     !validAge(home.letterFoundAt) ||
-    typeof home.letterRead !== 'boolean'
+    typeof home.letterRead !== 'boolean' ||
+    (home.soulMet !== undefined && home.soulMet !== true) ||
+    (home.spring !== undefined &&
+      (!home.spring ||
+        typeof home.spring !== 'object' ||
+        Array.isArray(home.spring) ||
+        !Object.entries(home.spring).every(
+          ([id, value]) => (id === 'father' || id === 'mother') && value === true,
+        )))
   )
     return false;
   const lastDeath = Math.max(
-    ...Object.values(home.parents).map((p) => 15 + p.diesAt - p.ageAtStart),
+    ...(['father', 'mother'] as const).map(
+      (id) => 15 + parentDiesAt(home, id) - home.parents[id].ageAtStart,
+    ),
   );
   return (
     (home.stage === 'departed' ||
@@ -73,13 +89,14 @@ export function hometownParents(home: HometownState, age: number) {
   return (['father', 'mother'] as const).map((id) => {
     const parent = home.parents[id];
     const currentAge = parent.ageAtStart + age - 15;
+    const diesAt = parentDiesAt(home, id);
     const old = currentAge >= 60;
     return {
       id,
       name: `${old ? '年迈的' : ''}${id === 'father' ? '父亲' : '母亲'}`,
-      alive: currentAge < parent.diesAt,
+      alive: currentAge < diesAt,
       old,
-      age: Math.min(currentAge, parent.diesAt),
+      age: Math.min(currentAge, diesAt),
     };
   });
 }
@@ -118,11 +135,11 @@ export function visitHometown(save: SaveData, parent?: ParentId): boolean {
   for (const person of parents) {
     const milestone = `home-${person.id}`;
     if (!person.alive && !Object.hasOwn(save.chronicle.milestones, milestone)) {
-      const p = home.parents[person.id];
+      const diesAt = parentDiesAt(home, person.id);
       recordChronicle(
         save,
         '归乡闻讯',
-        `你${save.age.toFixed(1)}岁归乡，才知道${person.id === 'father' ? '父亲' : '母亲'}早在你${15 + p.diesAt - p.ageAtStart}岁那年离世，享年${p.diesAt}岁。`,
+        `你${save.age.toFixed(1)}岁归乡，才知道${person.id === 'father' ? '父亲' : '母亲'}早在你${15 + diesAt - home.parents[person.id].ageAtStart}岁那年离世，享年${diesAt}岁。`,
         milestone,
       );
       changed = true;
@@ -145,6 +162,22 @@ export function visitHometown(save: SaveData, parent?: ParentId): boolean {
       '故居家书',
       `故居里已不见父母。你找到一封${hometownLetter(home).name}留下的家书，尚未拆开。`,
       'home-letter-found',
+    );
+    changed = true;
+  }
+  if (
+    !parent &&
+    home.letterRead &&
+    !home.soulMet &&
+    parents.every((p) => !p.alive) &&
+    ownsCurio(save, 'soul-wood')
+  ) {
+    home.soulMet = true;
+    recordChronicle(
+      save,
+      '故园残魂',
+      '院中老槐下，怀里的养魂木忽然温热起来。恍惚间，灶前坐着两个熟悉的影子，像从前一样问你吃过饭没有。你应了一声，影子便淡了，只余一缕炊烟似的微光，绕着木心转了一圈，散去了。',
+      'home-soul-wood',
     );
     changed = true;
   }
@@ -174,7 +207,8 @@ export function readHometownLetter(save: SaveData): boolean {
 
 export function hometownLetter(home: HometownState): { name: string; lines: string[] } {
   const { mother, father } = home.parents;
-  return mother.diesAt - mother.ageAtStart >= father.diesAt - father.ageAtStart
+  return parentDiesAt(home, 'mother') - mother.ageAtStart >=
+    parentDiesAt(home, 'father') - father.ageAtStart
     ? { name: '母亲', lines: ['山里若冷，记得添衣。', '家中无事，莫要挂念。'] }
     : { name: '父亲', lines: ['出门在外，记得好好吃饭。', '家里的门还在，想回便回。'] };
 }

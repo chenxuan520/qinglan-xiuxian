@@ -155,8 +155,13 @@ export function exchangeSectMedicine(
   recordChronicle(save, '同道互通', text);
   return true;
 }
-export function moveInSectMarket(position: TownPoint, input: TownPoint, seconds: number) {
-  const next = moveInTown(position, input, seconds, MARKET_BUILDINGS, 260);
+export function moveInSectMarket(
+  position: TownPoint,
+  input: TownPoint,
+  seconds: number,
+  speed?: number,
+) {
+  const next = moveInTown(position, input, seconds, MARKET_BUILDINGS, 260, speed);
   return {
     x: Math.max(24, Math.min(MARKET_WIDTH - 24, next.x)),
     y: Math.max(24, Math.min(MARKET_HEIGHT - 24, next.y)),

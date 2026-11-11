@@ -9,11 +9,13 @@ import {
   visitHometown,
   readHometownLetter,
   hometownLetter,
+  parentDiesAt,
 } from '../../src/town/hometown.ts';
 import { SPIRIT_ROOTS, rootElementsFor } from '../../src/core/data.ts';
 import { freshMortal, validMortal, SECTS } from '../../src/town/mortal-data.ts';
-import { freshSave, parseSave } from '../../src/core/progress.ts';
+import { freshSave, parseSave, applyBirthInheritance } from '../../src/core/progress.ts';
 import { exportSave, importSave } from '../../src/core/save-transfer.ts';
+import { grantCurio } from '../../src/items/curio-data.ts';
 
 const traveller = () => {
   const save = freshSave('heaven', ['fire'], 'orthodox', () => 0);
@@ -264,6 +266,81 @@ test('读信必须已离乡、发现且双亲俱逝', () => {
     assert.equal(readHometownLetter(save), false);
     assert.equal(save.mortal.hometown!.letterRead, false);
   }
+});
+
+test('灵眼之泉给在世父母延寿十年，已故者不复生，新一世继承同样生效', () => {
+  const save = traveller();
+  const home = save.mortal.hometown!;
+  save.age = 52;
+  grantCurio(save, 'spirit-spring');
+  assert.equal(home.spring?.father, true);
+  assert.equal(home.spring?.mother, true);
+  assert.equal(parentDiesAt(home, 'father'), home.parents.father.diesAt + 10);
+  assert.ok(hometownParents(home, 57).every((parent) => parent.alive));
+  save.age = 66;
+  visitHometown(save);
+  assert.equal(home.letterFoundAt, 66);
+  assert.ok(validHometown(home, 66));
+
+  const dead = traveller();
+  dead.age = 80;
+  grantCurio(dead, 'spirit-spring');
+  assert.equal(dead.mortal.hometown!.spring, undefined);
+
+  const next = freshSave('heaven', ['fire'], 'orthodox', () => 0);
+  assert.equal(applyBirthInheritance(next, { kind: 'curio', id: 'spirit-spring' }), true);
+  assert.deepEqual(next.mortal.hometown!.spring, { father: true, mother: true });
+});
+
+test('养魂木只在父母俱逝、家书已读且未触发时归乡显现一次', () => {
+  const save = traveller();
+  const home = save.mortal.hometown!;
+  save.age = 100;
+  home.letterFoundAt = 56;
+  home.letterRead = true;
+  grantCurio(save, 'soul-wood');
+  assert.equal(visitHometown(save), true);
+  assert.equal(home.soulMet, true);
+  const entries = () => save.chronicle.entries.filter((entry) => entry.title === '故园残魂');
+  assert.equal(entries().length, 1);
+  assert.match(entries()[0].detail, /养魂木忽然温热起来/);
+  visitHometown(save);
+  assert.equal(entries().length, 1);
+
+  const unread = traveller();
+  unread.age = 100;
+  unread.mortal.hometown!.letterFoundAt = 56;
+  grantCurio(unread, 'soul-wood');
+  visitHometown(unread);
+  assert.ok(!unread.chronicle.entries.some((entry) => entry.title === '故园残魂'));
+
+  const noCurio = traveller();
+  noCurio.age = 100;
+  noCurio.mortal.hometown!.letterFoundAt = 56;
+  noCurio.mortal.hometown!.letterRead = true;
+  visitHometown(noCurio);
+  assert.ok(!noCurio.chronicle.entries.some((entry) => entry.title === '故园残魂'));
+});
+
+test('灵眼之泉与养魂木字段随存取往返，非法值拒绝', () => {
+  const save = traveller();
+  save.age = 100;
+  save.mortal.hometown!.spring = { father: true, mother: true };
+  save.mortal.hometown!.soulMet = true;
+  assert.ok(validHometown(save.mortal.hometown, save.age));
+  const loaded = importSave(exportSave(save, null)).save;
+  assert.deepEqual(loaded.mortal.hometown!.spring, { father: true, mother: true });
+  assert.equal(loaded.mortal.hometown!.soulMet, true);
+  for (const spring of [{ father: false }, { other: true }, [], 'father'])
+    assert.equal(
+      validHometown({ ...save.mortal.hometown, spring } as never, save.age),
+      false,
+      JSON.stringify(spring),
+    );
+  assert.equal(
+    validHometown({ ...save.mortal.hometown, soulMet: false } as never, save.age),
+    false,
+  );
 });
 
 test('故乡所有动作不改变年岁、经济、宗门、物品及奖励字段', () => {

@@ -1,4 +1,4 @@
-import { acquiredCurio, CURIO_IDS, isCurio } from '../items/curio-data.ts';
+import { acquiredCurio, CURIO_IDS, isCurio, ownsCurio } from '../items/curio-data.ts';
 import { MEDICINES, medicineInfo } from '../items/medicine-data.ts';
 import { lifespanInfo, type SaveData } from '../core/progress.ts';
 
@@ -58,7 +58,9 @@ export function visitNightBoat(save: SaveData, lastVisitAge?: number, random = M
       : MEDICINES.filter((m) => m.tier === '珍品' && m.years > 0 === (kind === 'timed')).map(
           (m) => m.id,
         );
-  const ratio = kind === 'curio' ? 0.35 : kind === 'timed' ? 0.2 : 0.4;
+  const ratio =
+    (kind === 'curio' ? 0.35 : kind === 'timed' ? 0.2 : 0.4) *
+    (ownsCurio(save, 'jade-ruyi') ? 0.8 : 1);
   save.mortal.nightBoat = {
     appearedAt: save.age,
     kind,

@@ -91,6 +91,7 @@ export const MARKET_DIALOGUE_CLUES = [
   'bloodstain',
   'pressed-departure',
   'claimed-sect',
+  'heaven-omen',
 ] as const;
 export interface MarketDialogueContact {
   birthVisit: number;
@@ -420,6 +421,7 @@ const CLUE_MEMORY: Record<(typeof MARKET_DIALOGUE_CLUES)[number], string> = {
   'pressed-departure': '邀约修士当面催促尽快动身',
   'claimed-sect':
     '邀约修士自称与宗门相熟、坊外有人照应；只是当面说法，尚未核实，不能当作真实身份或安全保证',
+  'heaven-omen': '天机屋的卦象显示此行必见刀兵，属于玩家持有的奇物示警',
 };
 export function marketDialogueMemory(input: NpcDialogueRequest) {
   const context = input.marketContext;

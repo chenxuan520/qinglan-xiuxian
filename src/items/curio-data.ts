@@ -1,4 +1,6 @@
 // 顺序与已批准的透明九宫格一致。每件奇物本世仅可获得一次。
+import type { HometownState } from '../town/hometown.ts';
+
 export const CURIO_IDS = [
   'heaven-bottle',
   'soul-wood',
@@ -87,7 +89,10 @@ export const soulWoodMultiplier = (save: { curios: CurioState }) =>
   ownsCurio(save, 'soul-wood') ? 1.5 : 1;
 export const acquiredCurio = (save: { curios: CurioState }, id: CurioId) =>
   save.curios.acquired.includes(id) || Object.hasOwn(save.curios.bag, id);
-export function grantCurio(save: { curios: CurioState }, id: string) {
+export function grantCurio(
+  save: { curios: CurioState; age?: number; mortal?: { hometown?: HometownState | null } },
+  id: string,
+) {
   if (!isCurio(id) || acquiredCurio(save, id)) return false;
   save.curios.bag[id] = 1;
   save.curios.acquired.push(id);
@@ -95,6 +100,15 @@ export function grantCurio(save: { curios: CurioState }, id: string) {
     save.curios.consignment.id = null;
     save.curios.consignment.closed = true;
   }
+  const home = save.mortal?.hometown;
+  const age = save.age;
+  if (id === 'spirit-spring' && home && age !== undefined)
+    for (const parentId of ['father', 'mother'] as const) {
+      const parent = home.parents[parentId];
+      const currentAge = parent.ageAtStart + age - 15;
+      const diesAt = parent.diesAt + (home.spring?.[parentId] ? 10 : 0);
+      if (currentAge < diesAt) (home.spring ??= {})[parentId] = true;
+    }
   return true;
 }
 export function curioRoll(seed: number, key: string) {

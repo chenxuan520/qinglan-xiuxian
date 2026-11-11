@@ -1,3 +1,5 @@
+import { ownsCurio, type CurioState } from '../items/curio-data.ts';
+
 export type TownPoint = { x: number; y: number };
 export const TOWN_WIDTH = 3600;
 export const TOWN_HEIGHT = 2500;
@@ -7,6 +9,8 @@ export const HOMETOWN_START = { x: 600, y: 600 };
 export const HOMETOWN_DOCK = { x: 3360, y: 1250 };
 export const TOWN_WALK_SPEED = 234;
 export const HOMETOWN_NAV_SPEED = 330;
+export const windWingsWalk = (save: { curios: CurioState }) =>
+  ownsCurio(save, 'wind-wings') ? 1.2 : 1;
 const STREET_ENDS = [870, 1740, 2580, 3150];
 const STREET_ROWS = [
   [560, 750, 590, 680],

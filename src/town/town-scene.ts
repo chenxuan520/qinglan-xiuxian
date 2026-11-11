@@ -89,6 +89,7 @@ export class TownScene {
   private hometown?: HometownScene;
   private passage?: SettlementPassage;
   private nightBoat?: NightBoatScene;
+  private windWings: () => number;
   private boatCanvas?: HTMLCanvasElement;
   private nearBoat = false;
 
@@ -103,6 +104,7 @@ export class TownScene {
     hometown?: HometownScene,
     connection?: { open: () => boolean; enter: (entry?: 'button') => void },
     nightBoat?: NightBoatScene,
+    windWings = () => 1,
   ) {
     this.host = host;
     host.style.contain = 'layout paint style';
@@ -112,6 +114,7 @@ export class TownScene {
     this.playerPath = playerPath;
     this.hometown = hometown;
     this.nightBoat = nightBoat;
+    this.windWings = windWings;
     this.layout = townSceneryLayout(population.seed, scenery, !!hometown);
     this.buildingSize = scenery?.revision ? 270 : 305;
     if (!townWalkable(this.position, this.layout.buildings, this.buildingSize))
@@ -523,7 +526,7 @@ export class TownScene {
     const remaining = target
       ? Math.hypot(target.x - this.position.x, target.y - this.position.y)
       : 0;
-    const speed = this.route.length ? HOMETOWN_NAV_SPEED : TOWN_WALK_SPEED;
+    const speed = (this.route.length ? HOMETOWN_NAV_SPEED : TOWN_WALK_SPEED) * this.windWings();
     if (!this.enabled) this.clearInput();
     else
       this.position = moveInTown(

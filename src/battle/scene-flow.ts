@@ -10,6 +10,7 @@ import { commitSaveAction } from '../core/save-action.ts';
 import type { ActionShell } from '../ui/action-controller.ts';
 import type { ParentId } from '../town/hometown.ts';
 import type { TownResident } from '../town/town-population.ts';
+import { windWingsWalk } from '../town/town.ts';
 import type { PanelLocation } from '../ui/panel-host.ts';
 import type { AdPlacement } from '../ads/ads.ts';
 import type { Game } from './game.ts';
@@ -163,6 +164,7 @@ export function mountTownScene(shell: ActionShell) {
             shell.panelFrame(...module.nightBoatPanel(shell.save, shell.pendingRun?.loot.curios));
           },
         },
+        () => windWingsWalk(shell.save),
       );
       if (host.dataset.arrival) {
         shell.townScene.showArrival(host.dataset.arrival);

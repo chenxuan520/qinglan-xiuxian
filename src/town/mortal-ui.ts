@@ -15,7 +15,7 @@ import {
   type CultivationPath,
 } from '../core/data.ts';
 import { lifespanInfo, realmInfo, type SaveData } from '../core/progress.ts';
-import { hometownParents, hometownLetter, type ParentId } from './hometown.ts';
+import { hometownParents, hometownLetter, parentDiesAt, type ParentId } from './hometown.ts';
 import {
   SECTS,
   SECT_DUES,
@@ -236,7 +236,12 @@ export function hometownContent(save: SaveData, parent?: ParentId) {
   }
   const longGone =
     save.age >=
-    Math.max(...Object.values(home.parents).map((p) => 15 + p.diesAt - p.ageAtStart)) + 200;
+    Math.max(
+      ...(['father', 'mother'] as const).map(
+        (id) => 15 + parentDiesAt(home, id) - home.parents[id].ageAtStart,
+      ),
+    ) +
+      200;
   const text = alive.length
     ? '门前灯火如旧。你可以停下来，说几句家常。'
     : realmInfo(save.cultivation, save.completed.includes(FINAL_TRIAL_STAGE)).max

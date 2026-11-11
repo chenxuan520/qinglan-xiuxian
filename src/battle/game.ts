@@ -2201,6 +2201,16 @@ export class Game {
       this.#effect(e.x, e.y, 0.7, e.radius, STAGES[4].color, 'pulse');
       e.x = this.player.x - nx * 260;
       e.y = this.player.y - ny * 260;
+      const guards = this.enemies.filter(
+        (c) => !c.dead && c.summonedBy === e.id && !c.bossSummon && c.illusionOf === undefined,
+      );
+      guards.forEach((guard, i) => {
+        this.#effect(guard.x, guard.y, 0.5, guard.radius, STAGES[4].color, 'pulse');
+        const a = (i / guards.length) * TAU;
+        guard.x = e.x + Math.cos(a) * 90;
+        guard.y = e.y + Math.sin(a) * 90;
+        this.#effect(guard.x, guard.y, 0.5, guard.radius, STAGES[4].color, 'pulse');
+      });
     }
   }
   private castBossMechanic(e: Enemy, nx: number, ny: number) {

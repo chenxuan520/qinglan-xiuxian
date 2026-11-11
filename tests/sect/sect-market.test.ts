@@ -490,6 +490,8 @@ test('场地可达三位修士、保持距离才可交谈；边界与两处建�
   const straight = moveInSectMarket(MARKET_START, { x: 1, y: 0 }, 0.05);
   assert.ok(Math.abs(straight.x - MARKET_START.x - 11.7) < 1e-9);
   assert.equal(straight.y, MARKET_START.y);
+  const fast = moveInSectMarket(MARKET_START, { x: 1, y: 0 }, 0.05, TOWN_WALK_SPEED * 1.2);
+  assert.ok(Math.abs(fast.x - MARKET_START.x - (straight.x - MARKET_START.x) * 1.2) < 1e-9);
   assert.equal(TOWN_WALK_SPEED, 234);
   const edge = moveInSectMarket(
     { x: MARKET_WIDTH - 24, y: MARKET_HEIGHT - 24 },

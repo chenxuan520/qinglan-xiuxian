@@ -81,6 +81,22 @@ test('出现概率30%边界，寿尽或其他终局不会再生成夜船', () =>
   assert.equal(save.mortal.nightBoat, null);
 });
 
+test('玉如意使新生成夜船报价降低两成，已生成报价不重算', () => {
+  for (const [roll, base] of [
+    [0, 1750],
+    [0.4, 1000],
+    [0.8, 2000],
+  ] as const) {
+    const save = traveller();
+    grantCurio(save, 'jade-ruyi');
+    const boat = show(save, roll);
+    assert.equal(boat.cost, Math.round(base * 0.8));
+    const fixed = boat.cost;
+    save.curios.bag['jade-ruyi'] = 0;
+    assert.equal(save.mortal.nightBoat!.cost, fixed);
+  }
+});
+
 test('夜船40%奇物/40%限时珍品/20%本世珍品及35%/20%/40%折寿在出现时固定', () => {
   for (const [roll, kind, cost] of [
     [0, 'curio', 1750],

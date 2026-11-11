@@ -18,7 +18,10 @@ import {
   HOMETOWN_DOCK,
   HOMETOWN_NAV_SPEED,
   TOWN_WALK_SPEED,
+  windWingsWalk,
 } from '../../src/town/town.ts';
+import { grantCurio } from '../../src/items/curio-data.ts';
+import { freshSave } from '../../src/core/progress.ts';
 
 test('房前屋后与两侧空地可走，不再把整块宅地当作空气墙', () => {
   for (const p of [
@@ -151,6 +154,25 @@ test('城镇移动归一化且不穿墙，长帧不会跨过建筑', () => {
   assert.deepEqual(moveInTown({ x: 600, y: 450 }, { x: 0, y: -1 }, 100), { x: 600, y: 450 });
   assert.deepEqual(moveInTown(TOWN_START, { x: 0, y: 0 }, 1), TOWN_START);
 });
+test('风雷翅使镇上与坊市步行速度提高两成，未持有时保持原速', () => {
+  const save = freshSave();
+  const base = moveInTown(TOWN_START, { x: 1, y: 0 }, 0.05).x - TOWN_START.x;
+  assert.equal(windWingsWalk(save), 1);
+  assert.equal(moveInTown(TOWN_START, { x: 1, y: 0 }, 0.05).x - TOWN_START.x, base);
+  grantCurio(save, 'wind-wings');
+  assert.equal(windWingsWalk(save), 1.2);
+  const fast =
+    moveInTown(
+      TOWN_START,
+      { x: 1, y: 0 },
+      0.05,
+      TOWN_BUILDINGS,
+      305,
+      TOWN_WALK_SPEED * windWingsWalk(save),
+    ).x - TOWN_START.x;
+  assert.ok(Math.abs(fast - base * 1.2) < 1e-9);
+});
+
 test('九位职业镇民与十二位村民均在可达街巷，走近可触发对应交谈', () => {
   assert.equal(TOWN_NPCS.length, 21);
   assert.equal(nearbyTownNpc({ x: 1740, y: 2350 }), undefined);

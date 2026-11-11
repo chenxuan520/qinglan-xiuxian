@@ -24,7 +24,7 @@ import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
 import { ModuleSource, retryModule } from '../core/module-source.ts';
 import { BattleResolution } from './battle-resolution.ts';
 import { altarDefinition } from './altar-ui.ts';
-import { bossGuardedByHearts, heartGuardReady } from './boss-mechanics.ts';
+import { bossGuardedByHearts, heartGuardReady, summonLinkAlpha } from './boss-mechanics.ts';
 
 type BattleArt = typeof import('./battle-art.ts');
 interface SpriteTexture {
@@ -622,6 +622,9 @@ export class Renderer {
       c.lineWidth = 1.5;
       for (const child of game.enemies) {
         if (child.dead || child.summonedBy !== e.id || !this.visible(child, p, 100)) continue;
+        const fade = summonLinkAlpha(e, child);
+        if (!fade) continue;
+        c.globalAlpha = fade;
         c.beginPath();
         c.moveTo(e.x, e.y);
         c.lineTo(child.x, child.y);
@@ -738,15 +741,19 @@ export class Renderer {
         if (game.stage === 4 && e.summonedBy !== undefined) {
           const owner = game.enemies.find((v) => v.id === e.summonedBy && !v.dead);
           if (owner) {
-            c.save();
-            c.strokeStyle = '#c3a4e380';
-            c.lineWidth = 2;
-            c.setLineDash([5, 7]);
-            c.beginPath();
-            c.moveTo(owner.x, owner.y);
-            c.lineTo(e.x, e.y);
-            c.stroke();
-            c.restore();
+            const fade = summonLinkAlpha(owner, e);
+            if (fade) {
+              c.save();
+              c.strokeStyle = '#c3a4e380';
+              c.lineWidth = 2;
+              c.setLineDash([5, 7]);
+              c.globalAlpha = fade;
+              c.beginPath();
+              c.moveTo(owner.x, owner.y);
+              c.lineTo(e.x, e.y);
+              c.stroke();
+              c.restore();
+            }
           }
         }
         const guarded = e.boss && 'id' in e && bossGuardedByHearts(game.enemies, e.id);
