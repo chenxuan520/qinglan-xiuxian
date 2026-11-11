@@ -53,7 +53,7 @@
 - README 保持简短，只放封面、唯一官网 `https://xiuxian.011203.xyz/`、核心特色和开发入口；详细玩法同步 [玩法详解](docs/gameplay.md) 和游戏内指南，部署细节维护 [开发与部署](docs/development.md)。实际验证记录按 [docs/verification.md](docs/verification.md) 的「记录规则」追加到 `docs/verification/` 当月文件，不要把预计结果写成已通过。
 - 验证记录：只追加到 docs/verification/当月.md 末尾，标题 "## YYYY-MM-DD · 简述"，每条≤10行，不改旧记录、不贴完整报告；详见 docs/verification.md「记录规则」。
 - 法宝数值、机制或自动优选名单改动推送后，必须立即手动触发 `gh workflow run weapon-benchmark.yml --ref master`，确认 16 个分片、47,120/47,120 样本、合并与发布完成；不能只等每日定时任务。
-- **推送不等于完成。** 每次推送后必须主动监控本次提交触发的所有 GitHub Actions 到终态，不能只确认 `queued` / `in_progress` 就结束。用 `gh run list --commit <sha>` 列出全部运行，并对每个未成功项持续查看 `conclusion`；任一 job 失败必须读取失败 job 日志定位。法宝测评还必须确认 16/16 分片、合并 `47,120/47,120`、`publish-report` 成功，并读取线上 `summary.json` 验证 `state=complete`、`commit=<sha>`。外部服务故障（如 artifact 下载 503 egress 限额）也要报告具体错误并等恢复后重跑，不能把失败报告或“已触发”当成完成。
+- **推送不等于完成，必须盯到 CI 终态。** 每次推送后先取完整 40 位 SHA（`SHA=$(git rev-parse HEAD)`），用完整 SHA 或 run ID 查运行，**禁止用短 SHA 过滤 `headSha`**。对本次 push 的每个 run 用 `gh run watch <run-id> --exit-status` 盯到 `completed`；后台监控必须按 run ID 或完整 SHA，且匹配不到任何运行时在 5 分钟内报错退出，不能无限空转。任一 job 失败必须读取失败 job 日志定位；法宝测评还必须确认 16/16 分片、合并 `47,120/47,120`、`publish-report` 成功，并读取线上 `summary.json` 验证 `state=complete`、`commit=<完整SHA>`。外部服务故障（如 artifact 下载 503 egress 限额）也要报告具体错误并等恢复后重跑，不能把失败报告、“已触发”或 `queued` 当成完成。
 
 ## 领域细则
 
