@@ -109,7 +109,29 @@ for (let borrowed = 0; borrowed < 6; borrowed++)
     if (borrowed === 0) assert.ok(zones.every((z) => z.damage === c.e.damage * 0.55));
     if (borrowed === 1) assert.ok(shots.every((b) => b.damage === c.e.damage * 0.6));
     if (borrowed === 2) assert.ok(children.every((e) => e.maxHp >= c.e.maxHp * 0.08));
-    if (borrowed === 3) assert.ok(zones.every((z) => z.damage === c.e.damage && z.life === 12));
+    if (borrowed === 3) {
+      assert.ok(
+        zones.every(
+          (z) =>
+            z.damage === c.e.damage &&
+            z.life === 6 &&
+            z.settle === true &&
+            z.color === SOVEREIGN_GOLD,
+        ),
+      );
+      c.g.player.x = 10000;
+      c.g.player.y = 10000;
+      c.g.updateZones(2);
+      c.g.updateZones(6.1);
+      const settled = c.g.zones.filter((z) => z.kind === 'boss-miasma' && !z.settle);
+      assert.equal(settled.length, 3);
+      assert.ok(
+        settled.every(
+          (z) =>
+            z.color === SOVEREIGN_GOLD && z.life === 5 && z.delay === 0.3 && z.vx === undefined,
+        ),
+      );
+    }
     if (borrowed === 4) assert.ok(children.every((child) => child.illusionOf === c.e.id));
     if (borrowed === 5)
       assert.ok(zones.every((z) => z.kind === 'boss-sweep' && z.damage === c.e.damage));

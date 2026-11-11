@@ -91,7 +91,11 @@ for (let origin = 0; origin < 6; origin++)
       }
       if (origin === 3) {
         assert.equal(g.zones.length, 3);
-        assert.ok(g.zones.every((z) => z.life === 12 && Math.hypot(z.vx!, z.vy!) === 95));
+        assert.ok(
+          g.zones.every(
+            (z) => z.life === 6 && z.settle === true && Math.hypot(z.vx!, z.vy!) === 95,
+          ),
+        );
       }
       if (origin === 4) {
         assert.equal(g.shots.length, 5);
@@ -444,7 +448,7 @@ test('星珠绕固定星位旋转，五颗按1.3/1.65/2/2.35/2.7秒错拍释放�
   assert.ok(Math.hypot(before.x - after.x, before.y - after.y) < 0.001);
 });
 
-test('第四境十二秒漂移毒瘴：预警时不漂移、不伤人；激活后按95速度移动，仍不是条带', () => {
+test('第四境六秒漂移毒瘴：预警时不漂移、不伤人；激活后按95速度移动，仍不是条带', () => {
   const { g } = cast(3);
   const z = g.zones[1],
     x = z.x,
@@ -458,7 +462,8 @@ test('第四境十二秒漂移毒瘴：预警时不漂移、不伤人；激活�
   g.updateZones(0.2);
   assert.equal(z.x, x);
   assert.ok(Math.abs(z.y - y - 95 * 0.2) < 1e-8);
-  assert.equal(z.life, 11.8);
+  assert.equal(z.life, 5.8);
+  assert.equal(z.settle, true);
   assert.equal(z.endX, undefined);
 });
 

@@ -110,7 +110,7 @@ for (const arena of [4, 6])
     assert.ok(g.zones.every((z) => z.endX === undefined));
   });
 
-test('原生与终关远距十二秒追云使用相同参数，冥主瞬移不变，均无条带', () => {
+test('原生与终关远距六秒追云使用相同参数，冥主瞬移不变，均无条带', () => {
   for (const origin of [3, 4])
     for (const arena of [origin, 6]) {
       const { g, e } = encounter(origin, 0, arena);
@@ -121,7 +121,8 @@ test('原生与终关远距十二秒追云使用相同参数，冥主瞬移不�
       if (origin === 3) {
         const z = g.zones[0];
         assert.ok(z);
-        assert.equal(z.life, 12);
+        assert.equal(z.life, 6);
+        assert.equal(z.settle, true);
         assert.equal(z.radius, 70);
         assert.equal(z.vx, 120);
         assert.equal(z.vy, 0);

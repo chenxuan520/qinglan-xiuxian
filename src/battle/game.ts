@@ -1898,11 +1898,16 @@ export class Game {
     const summons = (count: number) => {
       const pool =
         stage === FINAL_TRIAL_STAGE ? [24, 25] : enemyRoster(stage, STAGES[stage].minutes * 60);
-      for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++)
-        this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], true, false, {
+      const spawned: Enemy[] = [];
+      for (let i = 0; i < count && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++) {
+        const enemy = this.spawnEnemy(pool[Math.floor(this.random() * pool.length)], true, false, {
           x: e.x + Math.cos((i / count) * TAU) * 90,
           y: e.y + Math.sin((i / count) * TAU) * 90,
-        }).summonedBy = e.id;
+        });
+        enemy.summonedBy = e.id;
+        spawned.push(enemy);
+      }
+      return spawned;
     };
     if (stage === FINAL_TRIAL_STAGE && phase >= 6) {
       if (phase === 6) {
@@ -2025,7 +2030,10 @@ export class Game {
               shot.miasmaArrow = true;
               shot.miasmaDamage = e.damage;
             }
-        } else summons(4);
+        } else {
+          const guards = summons(4);
+          if (!this.tribulation) for (const guard of guards) guard.deathMiasma = e.damage;
+        }
         break;
       case 4:
         if (phase === 0) summons(6);
@@ -2186,7 +2194,9 @@ export class Game {
         1.2,
         true,
       );
-      Object.assign(this.zones.at(-1)!, { vx: nx * speed, vy: ny * speed });
+      const z = this.zones.at(-1)!;
+      Object.assign(z, { vx: nx * speed, vy: ny * speed });
+      if (native) z.settle = true;
     } else {
       this.#effect(e.x, e.y, 0.7, e.radius, STAGES[4].color, 'pulse');
       e.x = this.player.x - nx * 260;
@@ -2275,6 +2285,7 @@ export class Game {
         const z = this.zones.at(-1)!;
         z.vx = -ny * Math.sign(side || 1) * speed;
         z.vy = nx * Math.sign(side || 1) * speed;
+        if (native) z.settle = true;
       }
     } else if (stage === 4) {
       const count = Math.min(
@@ -2975,6 +2986,8 @@ export class Game {
     this.shots = this.shots.filter((b) => b.life > 0);
   }
   private updateZones(dt: number) {
+    const settleZones: { x: number; y: number; radius: number; damage: number; color: string }[] =
+      [];
     for (const z of this.zones) {
       if (z.sourceId !== undefined && !this.enemies.some((e) => e.id === z.sourceId && !e.dead)) {
         z.life = 0;
@@ -3003,6 +3016,16 @@ export class Game {
       rotateZone(z, dt);
       z.life -= dt;
       z.tick -= dt;
+      if (z.settle && z.life <= 0) {
+        settleZones.push({
+          x: z.x,
+          y: z.y,
+          radius: z.radius,
+          damage: z.damage,
+          color: z.color,
+        });
+        continue;
+      }
       if (z.kind === 'boss-sweep') {
         z.hitCooldown = Math.max(0, (z.hitCooldown ?? 0) - dt);
         // 线段圆帽与角色碰撞余量不得侵入贴身安全区。
@@ -3086,6 +3109,18 @@ export class Game {
         }
       }
     }
+    for (const s of settleZones)
+      this.zone(
+        s.x,
+        s.y,
+        s.radius,
+        BOSS_MECHANICS.miasmaSettleLife,
+        s.damage,
+        s.color,
+        'boss-miasma',
+        BOSS_MECHANICS.miasmaSettleDelay,
+        true,
+      );
     this.zones = this.zones.filter((z) => z.life > 0);
   }
   private updatePickups(dt: number) {
@@ -3258,7 +3293,7 @@ export class Game {
       true,
     );
   }
-  private enemyDeath(e: Enemy) {
+  private enemyDeath(e: Enemy, killedByPlayer = false) {
     delete e.judgements;
     delete e.gravityUntil;
     if (e.boss)
@@ -3284,7 +3319,7 @@ export class Game {
     }
     if (e.boss || e.bossSummon) return;
     const tactics = ENEMY_TACTICS[e.type];
-    if (tactics.deathMiasma)
+    if (tactics.deathMiasma && !(killedByPlayer && e.deathMiasma !== undefined))
       this.enemyField(e, 0, 0, 50, 2.4, e.damage * 0.35, '#bdcc79', 'enemy-miasma');
     if (tactics.boundSummons)
       for (const child of this.enemies) if (child.summonedBy === e.id) child.dead = true;
@@ -3723,7 +3758,19 @@ export class Game {
     }
     if (e.hp <= 0) {
       e.dead = true;
-      this.enemyDeath(e);
+      this.enemyDeath(e, true);
+      if (e.deathMiasma !== undefined)
+        this.zone(
+          e.x,
+          e.y,
+          40,
+          BOSS_MECHANICS.miasmaSettleLife,
+          e.deathMiasma,
+          STAGES[3].color,
+          'boss-miasma',
+          BOSS_MECHANICS.miasmaSettleDelay,
+          true,
+        );
       if (e.cacheGuardian || e.bossSummon?.kind === 'heart') {
         if (e.bossSummon?.kind === 'heart')
           this.#float({ x: e.x, y: e.y - 24 }, '木心碎', '#d1e7a5');

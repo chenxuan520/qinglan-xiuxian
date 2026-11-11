@@ -155,8 +155,5 @@ test('妖物志妖王招式说明覆盖全部名称且卡片按特性与招式�
   assert.match(card(3), /游瘴驱逐/);
   assert.match(card(4, 6), /幽影追踪/);
   assert.match(card(4), /幽影追踪/);
-  assert.match(
-    trialPoison,
-    new RegExp(`持续<span class="combat-unit">${BOSS_MECHANICS.nativeMiasmaLife}秒</span>`),
-  );
+  assert.match(trialPoison, new RegExp(`${BOSS_MECHANICS.nativeMiasmaLife}秒</span>后落地化瘴`));
 });

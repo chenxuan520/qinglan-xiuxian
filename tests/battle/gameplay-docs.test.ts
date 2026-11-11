@@ -455,7 +455,7 @@ test('妖王原招式及间隔在帮助、图鉴与玩法文档中对照实际�
   assert.ok(text.includes(`气血分别再乘${hp}`));
   for (const enraged of [false, true])
     assert.ok(text.includes(`${bossPursuitCooldown(enraged)}秒`));
-  assert.ok(text.includes('原生与终关的毒君使用十二秒漂移追云、冥主瞬移追近'));
+  assert.ok(text.includes('原生与终关的毒君使用六秒漂移追云、漂尽落地化瘴，冥主瞬移追近'));
   assert.ok(text.includes('追云与瞬移追近同样不占技能轮转'));
   for (const source of [combat, book]) assert.ok(source.includes('各有不同的圆阵、弹幕与特色招式'));
   assert.ok(text.includes('非条带特色招式'));

@@ -33,7 +33,7 @@ function encounter(arena = 3, difficulty = 0) {
   return { g, boss };
 }
 
-test('第四境三团毒瘴持续十二秒、速度95、半径75，三种难度与各方向相同，终关同值', () => {
+test('第四境三团毒瘴漂移六秒、速度95、半径75，三种难度与各方向相同，终关同值', () => {
   for (const difficulty of [0, 1, 2])
     for (const [nx, ny] of [
       [1, 0],
@@ -50,8 +50,9 @@ test('第四境三团毒瘴持续十二秒、速度95、半径75，三种难度�
           [1.45, 1.2, 1.45],
         );
         for (const z of g.zones) {
-          assert.equal(z.life, 12);
+          assert.equal(z.life, 6);
           assert.equal(z.maxLife, z.life);
+          assert.equal(z.settle, true);
           assert.ok(Math.abs(Math.hypot(z.vx!, z.vy!) - 95) < 1e-8);
           assert.equal(z.damage, boss.damage);
           assert.equal(z.radius, 75);
@@ -67,15 +68,16 @@ test('第四境三团毒瘴持续十二秒、速度95、半径75，三种难度�
       }
 });
 
-test('第四境真实远距追袭生成十二秒、速度120、半径70的追云，终关同值', () => {
+test('第四境真实远距追袭生成六秒、速度120、半径70的追云，终关同值', () => {
   for (const difficulty of [0, 1, 2]) {
     const { g, boss } = encounter(3, difficulty);
     boss.pursuitCooldown = 0;
     g.update(0.01);
     assert.equal(g.zones.length, 1);
     const z = g.zones[0];
-    assert.equal(z.life, 12);
-    assert.equal(z.maxLife, 12);
+    assert.equal(z.life, 6);
+    assert.equal(z.maxLife, 6);
+    assert.equal(z.settle, true);
     assert.equal(z.vx, 120);
     assert.equal(z.vy, 0);
     assert.equal(z.castDelay, 1.2);
@@ -85,7 +87,8 @@ test('第四境真实远距追袭生成十二秒、速度120、半径70的追云
     trial.boss.pursuitCooldown = 0;
     trial.g.update(0.01);
     const old = trial.g.zones[0];
-    assert.equal(old.life, 12);
+    assert.equal(old.life, 6);
+    assert.equal(old.settle, true);
     assert.ok(Math.abs(Math.hypot(old.vx!, old.vy!) - 120) < 1e-8);
     assert.equal(old.vx, 120);
     assert.equal(old.vy, 0);
@@ -132,6 +135,7 @@ test('独立天劫保留毒瘴24/32速度、62/58半径及六秒时长，方向�
         assert.equal(z.radius, 62);
         assert.equal(z.life, 6);
         assert.equal(z.maxLife, 6);
+        assert.equal(z.settle, undefined);
         assert.equal(z.damage, boss.damage);
         assert.equal(z.vx, -ny * Math.sign(side || 1) * 24);
         assert.equal(z.vy, nx * Math.sign(side || 1) * 24);
@@ -143,6 +147,7 @@ test('独立天劫保留毒瘴24/32速度、62/58半径及六秒时长，方向�
       assert.equal(z.radius, 58);
       assert.equal(z.life, 6);
       assert.equal(z.maxLife, 6);
+      assert.equal(z.settle, undefined);
       assert.equal(z.castDelay, 1.2);
       assert.equal(z.damage, boss.damage * 0.8);
       assert.equal(z.x, boss.x + nx * 165);
@@ -152,7 +157,7 @@ test('独立天劫保留毒瘴24/32速度、62/58半径及六秒时长，方向�
     }
 });
 
-test('移动毒瘴预警冻结生命与位置，激活后持续十二秒并按既有周期伤害', () => {
+test('移动毒瘴预警冻结生命与位置，激活后漂移六秒并落地化瘴五秒', () => {
   const { g, boss } = encounter();
   g.castBossSkill(boss, 1, 0);
   const z = g.zones[1];
@@ -160,7 +165,7 @@ test('移动毒瘴预警冻结生命与位置，激活后持续十二秒并按�
   const hp = g.player.hp;
   const before = { x: z.x, y: z.y };
   for (let i = 0; i < 10; i++) g.updateZones(0.05);
-  assert.equal(z.life, 12);
+  assert.equal(z.life, 6);
   assert.deepEqual({ x: z.x, y: z.y }, before);
   assert.equal(g.player.hp, hp);
   z.delay = 0;
@@ -171,11 +176,22 @@ test('移动毒瘴预警冻结生命与位置，激活后持续十二秒并按�
   g.updateZones(0.05);
   assert.equal(g.player.hp, injured);
   Object.assign(g.player, { x: 10000, y: 10000 });
-  for (let i = 0; i < 120; i++) g.updateZones(0.05);
-  assert.ok(g.zones.includes(z), '原六秒结束后仍有毒瘴');
-  assert.ok(Math.abs(z.y - before.y - 95 * 6.1) < 1e-7);
+  let settles = 0;
+  while (g.zones.length === 1 && g.zones[0].settle && settles++ < 130) g.updateZones(0.05);
+  assert.equal(g.zones.length, 1, '漂移区域落地为静止毒瘴');
+  const settled = g.zones[0];
+  assert.equal(settled.kind, 'boss-miasma');
+  assert.equal(settled.radius, z.radius);
+  assert.equal(settled.damage, z.damage);
+  assert.equal(settled.color, z.color);
+  assert.equal(settled.life, 5);
+  assert.equal(settled.delay, 0.3);
+  assert.equal(settled.settle, undefined);
+  assert.equal(settled.vx, undefined);
+  const drift = settled.y - before.y;
+  assert.ok(drift >= 95 * 6 - 1e-6 && drift <= 95 * 6.05 + 1e-6);
   for (let i = 0; i < 119; i++) g.updateZones(0.05);
-  assert.equal(g.zones.length, 0, '十二秒后消散');
+  assert.equal(g.zones.length, 0, '落地毒瘴五秒后消散');
 });
 
 test('两种加速毒瘴暂停、刷新续局和导入往返保留速度与剩余时长', () => {
@@ -195,7 +211,7 @@ test('两种加速毒瘴暂停、刷新续局和导入往返保留速度与剩�
       restored.resume();
       restored.update(0.05);
       assert.ok(
-        restored.zones.every((z) => z.life === 12),
+        restored.zones.every((z) => z.life === 6),
         '预警尚未结束',
       );
     }
@@ -223,6 +239,91 @@ test('旧毒瘴快照的72/96速度和62/58半径继续按原记录恢复，不�
     }
 });
 
+test('万蛊复生的蛊卫身死化瘴，独立天劫与其他召唤物不带此字段', () => {
+  const { g, boss } = encounter();
+  boss.skillStep = 2;
+  g.castBossSkill(boss, 1, 0);
+  const guards = g.enemies.filter((e) => e.summonedBy === boss.id && !e.bossSummon);
+  assert.equal(guards.length, 4);
+  assert.ok(guards.every((e) => e.deathMiasma === boss.damage));
+  const guard = guards[0];
+  guard.type = 54;
+  g.hitEnemy(guard, guard.hp, false, 'sword');
+  const zones = g.zones.filter((z) => z.kind === 'boss-miasma');
+  assert.equal(zones.length, 1);
+  assert.ok(!g.zones.some((z) => z.kind === 'enemy-miasma'), '蛊卫不再叠小瘴云');
+  assert.equal(zones[0].radius, 40);
+  assert.equal(zones[0].life, 5);
+  assert.equal(zones[0].maxLife, 5);
+  assert.equal(zones[0].delay, 0.3);
+  assert.equal(zones[0].hostile, true);
+  assert.equal(zones[0].damage, boss.damage);
+  const second = guards[1];
+  second.dead = true;
+  g.updateZones(0.01);
+  assert.equal(g.zones.filter((z) => z.kind === 'boss-miasma').length, 1, '非击杀消失不化瘴');
+
+  const { g: boom, boss: boomBoss } = encounter();
+  boomBoss.skillStep = 2;
+  boom.castBossSkill(boomBoss, 1, 0);
+  const exploding = boom.enemies.find((e) => e.summonedBy === boomBoss.id && !e.bossSummon)!;
+  exploding.type = 54;
+  Object.assign(exploding, { x: boom.player.x, y: boom.player.y });
+  boom.updateEnemies(0.016);
+  assert.ok(
+    boom.zones.some((z) => z.kind === 'enemy-miasma'),
+    '自爆仍保留类型自带小瘴云',
+  );
+  assert.ok(!boom.zones.some((z) => z.kind === 'boss-miasma'), '自爆不生成击杀化瘴');
+
+  const { g: source } = encounter();
+  const tribulation = Game.createTribulation(structuredClone(source.save), source);
+  tribulation.boss!.bossStage = 3;
+  tribulation.boss!.skillStep = 2;
+  tribulation.castBossSkill(tribulation.boss!, 1, 0);
+  const summoned = tribulation.enemies.filter(
+    (e) => e.summonedBy === tribulation.boss!.id && !e.bossSummon,
+  );
+  assert.equal(summoned.length, 4);
+  assert.ok(summoned.every((e) => e.deathMiasma === undefined));
+});
+
+test('settle 与 deathMiasma 快照往返，非法值拒绝，旧长时游瘴可读入', () => {
+  const { g, boss } = encounter();
+  g.castBossSkill(boss, 1, 0);
+  g.pause();
+  const raw = g.snapshot();
+  assert.ok(raw.zones.every((z) => z.settle === true));
+  const restored = Game.restore(g.save, raw);
+  assert.ok(restored);
+  assert.ok(restored.zones.every((z) => z.settle === true));
+
+  const invalid = structuredClone(raw);
+  invalid.zones[0].kind = 'boss-frost';
+  assert.equal(Game.restore(g.save, invalid), null, 'settle 只允许 boss-miasma');
+  const unpaused = structuredClone(raw);
+  unpaused.zones[0].hostile = false;
+  assert.equal(Game.restore(g.save, unpaused), null, 'settle 只允许敌方区域');
+
+  const old = structuredClone(raw);
+  for (const z of old.zones) {
+    delete z.settle;
+    z.life = 12;
+    z.maxLife = 12;
+  }
+  assert.ok(Game.restore(g.save, old), '旧长时游瘴仍可读入');
+
+  const { g: guarded, boss: poison } = encounter();
+  poison.skillStep = 2;
+  guarded.castBossSkill(poison, 1, 0);
+  guarded.pause();
+  const guardSnapshot = guarded.snapshot();
+  assert.ok(guardSnapshot.enemies.some((e) => e.deathMiasma === poison.damage));
+  const badDeath = structuredClone(guardSnapshot);
+  badDeath.enemies.find((e) => e.deathMiasma !== undefined)!.deathMiasma = 0;
+  assert.equal(Game.restore(guarded.save, badDeath), null, 'deathMiasma 必须是正数');
+});
+
 test('续局只允许第四境与终关妖王毒瘴的合法速度，不放行其他危险区与非有限速度', () => {
   for (const [arena, kind, speed] of [
     [3, 'boss-miasma', 120.01],
@@ -241,7 +342,7 @@ test('续局只允许第四境与终关妖王毒瘴的合法速度，不放行�
   }
 });
 
-test('固定毒池保持，小怪瘴云提速150%，图鉴中第四境和终关时长一致', () => {
+test('固定毒池保持，小怪瘴云提速150%，图鉴与帮助说明六秒落地化瘴', () => {
   const { g, boss } = encounter();
   boss.skillStep = 0;
   g.castBossSkill(boss, 1, 0);
@@ -255,17 +356,18 @@ test('固定毒池保持，小怪瘴云提速150%，图鉴中第四境和终关�
   assert.equal(cloud.radius, 50);
   assert.equal(cloud.x, enemy.x + 75);
   assert.equal(cloud.y, enemy.y);
-  const poison = /五毒游瘴<\/span> 三团漂移毒瘴，持续<span class="combat-unit">12秒<\/span>/;
+  const poison = /五毒游瘴<\/span> 三团漂移毒瘴，<span class="combat-unit">6秒<\/span>后落地化瘴/;
   assert.match(bestiaryPanel(3).body, poison);
   assert.match(bestiaryPanel(6).body, poison);
-  assert.doesNotMatch(bestiaryPanel(6).body, /持续<span class="combat-unit">6秒<\/span>/);
   const guide = guideContent('combat');
   const gameplay = readFileSync(new URL('../../docs/gameplay.md', import.meta.url), 'utf8');
   assert.match(
     guide,
-    /第四境毒君的毒矢飞远后落地化瘴，另有更大更快的三团漂移毒瘴，游瘴与追云均持续12秒/,
+    /第四境毒君的毒矢飞远后落地化瘴，另有更大更快的三团漂移毒瘴，游瘴与追云均持续6秒，漂尽原地化瘴；终关毒君的漂移毒瘴与追云同样持续6秒并落地化瘴；独立天劫的游瘴仍为6秒但不化瘴；万蛊复生的蛊卫身死时也会化为毒瘴/,
   );
-  assert.match(guide, /终关毒君的漂移毒瘴与追云同样持续12秒/);
-  assert.match(gameplay, /第四境毒君的三团漂移毒瘴与远距追云持续12秒/);
-  assert.match(gameplay, /终关毒君的两种移动毒瘴同样持续12秒/);
+  assert.match(
+    gameplay,
+    /第四境毒君的三团漂移毒瘴与远距追云持续6秒，漂尽后原地化为持续5秒、预警0.3秒的毒瘴；终关毒君的两种移动毒瘴同样持续6秒并落地化瘴/,
+  );
+  assert.match(gameplay, /万蛊复生的蛊卫身死时化为半径40、持续5秒、预警0.3秒的毒瘴/);
 });

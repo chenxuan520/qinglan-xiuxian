@@ -37,6 +37,7 @@ export interface Enemy extends Point {
   illusionOf?: number;
   chargeFollowup?: boolean;
   cacheGuardian?: boolean;
+  deathMiasma?: number;
   cooldown: number;
   slow: number;
   flash: number;
@@ -95,6 +96,7 @@ export interface Zone extends Point {
   castDelay?: number;
   castAngle?: number;
   castEvolved?: boolean;
+  settle?: true;
 }
 export interface Effect extends Point {
   life: number;

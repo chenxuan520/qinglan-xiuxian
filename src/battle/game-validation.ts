@@ -339,6 +339,7 @@ export function validateRunSnapshot(
               e.pendingSkill,
             )) &&
           (e.cacheGuardian === undefined || typeof e.cacheGuardian === 'boolean') &&
+          (e.deathMiasma === undefined || (Number.isFinite(e.deathMiasma) && e.deathMiasma > 0)) &&
           (e.summonedBy === undefined ||
             (Number.isSafeInteger(e.summonedBy) && e.summonedBy > 0)) &&
           (e.pursuitCooldown === undefined || Number.isFinite(e.pursuitCooldown)) &&
@@ -580,7 +581,9 @@ export function validateRunSnapshot(
           (z.castDelay === undefined || (Number.isFinite(z.castDelay) && z.castDelay >= 0)) &&
           (z.castAngle === undefined ||
             (Number.isFinite(z.castAngle) && Math.abs(z.castAngle) <= Math.PI)) &&
-          (z.castEvolved === undefined || typeof z.castEvolved === 'boolean'),
+          (z.castEvolved === undefined || typeof z.castEvolved === 'boolean') &&
+          (z.settle === undefined ||
+            (z.settle === true && z.hostile === true && z.kind === 'boss-miasma')),
       )
     )
       return null;

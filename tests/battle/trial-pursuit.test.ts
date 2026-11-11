@@ -27,7 +27,8 @@ test('终关毒君、冥主远离时改用原生同款追击，不再占用技�
   assert.equal(trialPoison.e.charge, 0);
   assert.equal(nativePoison.g.zones.length, 1);
   assert.equal(trialPoison.g.zones.length, 1);
-  assert.equal(trialPoison.g.zones[0].life, 12);
+  assert.equal(trialPoison.g.zones[0].life, 6);
+  assert.equal(trialPoison.g.zones[0].settle, true);
   assert.equal(trialPoison.g.zones[0].radius, 70);
   assert.equal(trialPoison.g.zones[0].vx, 120);
   assert.equal(trialPoison.e.cooldown, nativePoison.e.cooldown);
