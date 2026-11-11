@@ -301,10 +301,7 @@ function autoplayDirection(g: Game) {
     preferred = { x: sx / length, y: sy / length };
   }
   const movingShots = g.shots.filter(
-    (b) =>
-      b.kind === 'hostile' &&
-      (b.bossMotion || g.tribulation || b.bossStage !== undefined) &&
-      Math.hypot(b.x - p.x, b.y - p.y) < 420,
+    (b) => b.kind === 'hostile' && Math.hypot(b.x - p.x, b.y - p.y) < 420,
   );
   const charges = g.enemies.filter(
     (e) =>
@@ -377,8 +374,8 @@ function autoplayDirection(g: Game) {
     }
     shotSamples.set(b, { weight: b.bossMotion ? 2 : 4, points });
   }
-  // 危险附近才比较方向；毒圈还比较原方向和等待，不能把所有有风险的方向一律拒绝。
-  for (let i = 0; i < (zones.length ? 18 : 16); i++) {
+  // 保留精确目标方向，避免安全的拾取路线被量化到16个方向；地面危险附近也比较等待。
+  for (let i = 0; i < (zones.length ? 18 : 17); i++) {
     const x = i === 17 ? 0 : i === 16 ? preferred.x : Math.cos((i * Math.PI) / 8),
       y = i === 17 ? 0 : i === 16 ? preferred.y : Math.sin((i * Math.PI) / 8);
     // 天劫弹幕持续推进，不能把等待当作躲过最后一招的方案。
@@ -454,6 +451,8 @@ function autoplayDirection(g: Game) {
     }
     // 无伤路线优先于拾取；所有方向都有风险时仍按累计损失选，而非停住。
     score += risk > 0 ? 1 + risk : 0;
+    // 预测窗口短于受伤无敌期；普通弹取最危险的一次，避免密集弹幕压过地面危险。
+    let ordinaryShotRisk = 0;
     for (const b of movingShots) {
       const samples = shotSamples.get(b);
       if (samples) {
@@ -462,7 +461,10 @@ function autoplayDirection(g: Game) {
             p.x + x * speed * at.seconds - at.x,
             p.y + y * speed * at.seconds - at.y,
           );
-          score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * samples.weight;
+          const value =
+            Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * samples.weight;
+          if (b.bossMotion) score += value;
+          else ordinaryShotRisk = Math.max(ordinaryShotRisk, value);
         }
         continue;
       }
@@ -476,10 +478,14 @@ function autoplayDirection(g: Game) {
           Math.min(0.6, b.life, -(rx * vx + ry * vy) / (vx * vx + vy * vy || 1)),
         );
         const separation = Math.hypot(rx + vx * closest, ry + vy * closest);
-        score += Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 4;
+        ordinaryShotRisk = Math.max(
+          ordinaryShotRisk,
+          Math.max(0, 1 - separation / (b.radius + 12 + speed * 0.12)) * 4,
+        );
         continue;
       }
     }
+    score += ordinaryShotRisk;
     for (const e of charges) {
       for (const seconds of [0.12, 0.24, 0.36]) {
         const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);

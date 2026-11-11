@@ -39,3 +39,46 @@ test('人流沿可走街巷折返，迁城后的顾客仍在实际店铺门口',
       }
     }
 });
+
+test('路径距离优化保持轴向、原地和斜线的停步、折返与朝向逐值一致', () => {
+  const original = (npc: ReturnType<typeof townCrowd>[number], seconds: number) => {
+    const dx = npc.destination.x - npc.x;
+    const dy = npc.destination.y - npc.y;
+    const duration = Math.hypot(dx, dy) / npc.speed;
+    if (!duration) return { x: npc.x, y: npc.y, facing: 1 };
+    const half = duration + 1;
+    const time = (seconds + npc.phase) % (half * 2);
+    const forward = time < half;
+    const fraction = Math.min(1, (forward ? time : time - half) / duration);
+    const progress = forward ? fraction : 1 - fraction;
+    return { x: npc.x + dx * progress, y: npc.y + dy * progress, facing: forward ? 1 : -1 };
+  };
+  for (const seed of [0, 12345, 0xffffffff])
+    for (const revision of [0, 1, 2, 100]) {
+      const crowd = townCrowd(seed, townLayout(seed, revision).buildings);
+      // 包含未来可能增加的反向和斜线路线，不把当前地图约定写死到算法。
+      for (const [dx, dy] of [
+        [-210, 0],
+        [0, -220],
+        [120, 160],
+        [-120, -160],
+      ])
+        crowd.push({ ...crowd[0], destination: { x: crowd[0].x + dx, y: crowd[0].y + dy } });
+      for (const npc of crowd) {
+        const duration =
+          Math.hypot(npc.destination.x - npc.x, npc.destination.y - npc.y) / npc.speed;
+        const half = duration + 1;
+        const times = [0, 1 / 60, 3, 100, 10000];
+        for (const turn of [duration, half, half + duration, half * 2])
+          for (const offset of [-1e-9, 0, 1e-9]) times.push(turn - npc.phase + half * 200 + offset);
+        for (const seconds of times)
+          assert.deepEqual(townCrowdPosition(npc, seconds), original(npc, seconds));
+        // 没有按对象身份缓存：同一对象的坐标、终点、速度和相位修改后即刻生效。
+        npc.x += 17;
+        npc.destination.y -= 13;
+        npc.speed += 3;
+        npc.phase += 0.5;
+        assert.deepEqual(townCrowdPosition(npc, 9), original(npc, 9));
+      }
+    }
+});
