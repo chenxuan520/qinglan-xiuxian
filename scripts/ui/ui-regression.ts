@@ -29,6 +29,7 @@ import { JOURNEY_APPRAISAL_SETTINGS, NPC_AI_SETTINGS } from '../../src/core/sett
 import { assertLocalPage, openUiBrowser, optionalFontFailures } from './ui-browser.ts';
 import { UI_AD_FIXTURE } from './ui-ad-fixture.ts';
 import { uiRegressionPlan } from './ui-regression-plan.ts';
+import { uiClickTarget, uiClickResult } from './ui-click-target.ts';
 
 const baseUrl = new URL(process.env.UI_BASE_URL || 'http://localhost:5173/').href;
 assertLocalPage(baseUrl);
@@ -102,7 +103,20 @@ async function elementId(selector: string) {
 }
 
 async function click(selector: string) {
-  await browser.call('click', { pageId, uid: await elementId(selector) });
+  // 导览在window捕获阶段截断事件；这些演练按钮保留原UID点击，不依赖事后事件监听。
+  if (selector.startsWith('[data-tour=') || selector === '.choice-card') {
+    await browser.call('click', { pageId, uid: await elementId(selector) });
+    return;
+  }
+  // 点击仍由 MCP 发送真实指针事件；定位只读取布局，不改标签或逐次抓整棵可访问性树。
+  const { x, y, token } = await evaluate(`() => (${uiClickTarget})(${JSON.stringify(selector)})`);
+  try {
+    await browser.call('click_at', { pageId, x, y });
+  } catch (error) {
+    await evaluate(`() => (${uiClickResult})(${JSON.stringify(token)})`).catch(() => {});
+    throw error;
+  }
+  await evaluate(`() => (${uiClickResult})(${JSON.stringify(token)})`);
 }
 
 async function saved(): Promise<SaveData> {
