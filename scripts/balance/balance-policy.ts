@@ -29,7 +29,7 @@ export const LIMITS = {
   supplies: 2000,
   borrows: MAX_LIFESPAN_ADS,
   ratePoints: 0.1,
-  starterRatePoints: 0.2,
+  starterRatePoints: 0.3,
   medianTime: 0.2,
   tailTime: 0.25,
   bossMedian: 0.25,

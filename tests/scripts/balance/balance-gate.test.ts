@@ -8,7 +8,6 @@ import {
   balanceCases,
   caseKey,
   FULL_SEEDS,
-  LIMITS,
 } from '../../../scripts/balance/balance-policy.ts';
 import {
   acceptanceFailures,
@@ -292,9 +291,37 @@ test('妖王存活P90按新走位放宽：前六境与终关旧王120秒、仙�
   }
 });
 
-test('放宽后的本命容差覆盖双灵根100%与三灵根75%，不再产生分组Warning', () => {
-  assert.ok(1 <= Math.min(1, BARE_CLEAR_TARGETS.dual.max + LIMITS.starterRatePoints));
-  assert.ok(0.75 <= Math.min(1, BARE_CLEAR_TARGETS.triple.max + LIMITS.starterRatePoints));
+test('本命分组容差±30点：三灵根83.3%不报、91.7%仍报，四灵根下限封底不变', () => {
+  const rowsFor = (root: 'triple' | 'quad', nailWins = 0) => {
+    const rows = balanceCases(true, [0])
+      .filter((c) => c.root === root && c.profile === 'bare')
+      .map(
+        (c) =>
+          ({
+            case: c,
+            key: caseKey(c),
+            cleared: 0,
+            complete: false,
+            battles: [],
+            ads: { supplies: 0, borrow: 0, revive: 0 },
+            stop: 'lost',
+            seconds: 0,
+            adSeconds: 0,
+            cultivation: 0,
+          }) as CampaignSample,
+      );
+    for (const row of rows.filter((r) => r.case.starter === 'nail').slice(0, nailWins))
+      row.cleared = 6;
+    return rows;
+  };
+  const failures = (root: 'triple' | 'quad', wins: number) =>
+    acceptanceFailures(rowsFor(root, wins)).filter((f) => f.startsWith(`${root}/nail：本命裸开荒`));
+  assert.deepEqual(failures('triple', 10), []);
+  assert.equal(failures('triple', 11).length, 1);
+  assert.deepEqual(
+    acceptanceFailures(rowsFor('quad')).filter((f) => f.startsWith('quad/')),
+    [],
+  );
 });
 
 test('模拟异常保留计划分母和异常数，不能从通关比例里偷偷删除', () => {
