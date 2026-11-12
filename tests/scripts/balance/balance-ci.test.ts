@@ -10,6 +10,33 @@ import { caseKey } from '../../../scripts/balance/balance-policy.ts';
 import { summarize, verifyCoverage } from '../../../scripts/balance/balance-metrics.ts';
 import type { CampaignSample } from '../../../scripts/balance/balance-simulation.ts';
 import { simulateCampaign } from '../../../scripts/balance/balance-simulation.ts';
+import { executionHash } from '../../../scripts/balance/balance-gate.ts';
+
+test('快检分别保存引擎与调度身份，worker参数转发变化必然改变调度摘要', () => {
+  const root = mkdtempSync(join(tmpdir(), 'qinglan-ci-worker-hash-'));
+  try {
+    mkdirSync(join(root, 'scripts/balance'), { recursive: true });
+    for (const file of [
+      'balance-gate.ts',
+      'balance-worker.ts',
+      'balance-shards.ts',
+      'balance-policy.ts',
+      'balance-metrics.ts',
+      'balance-simulation.ts',
+    ])
+      writeFileSync(join(root, 'scripts/balance', file), 'export const n = 1;');
+    const engine = simulationHash(root),
+      execution = executionHash(root);
+    const worker = join(root, 'scripts/balance/balance-worker.ts');
+    writeFileSync(worker, 'simulateCampaign(c, 7);');
+    assert.equal(simulationHash(root).hash, engine.hash);
+    assert.notEqual(executionHash(root), execution);
+    rmSync(worker);
+    assert.throws(() => executionHash(root), /ENOENT/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test('真实模拟依赖可完整验证，共用广告时长不引入浏览器播放与动态加载模块', () => {
   const result = simulationHash(fileURLToPath(new URL('../../..', import.meta.url)));

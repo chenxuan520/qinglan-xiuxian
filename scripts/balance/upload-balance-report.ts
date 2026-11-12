@@ -115,11 +115,11 @@ function simulationDependencies(files: Map<string, GitFile>) {
     if (!file || !/^100(644|755)$/.test(file.mode))
       throw new Error(`模拟依赖缺失或类型不支持：${path}`);
     dependencies.add(path);
-    // src 已整体比较；脚本的相对导入继续追踪，新增 helper 同样受版本核验。
+    // src 已整体比较；继续追踪相对导入及通过 new URL 加载的 worker。
     if (path.startsWith('src/')) return;
     for (const match of file.bytes
       .toString('utf8')
-      .matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"](\.[^'"]+)['"]/g)) {
+      .matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\bnew\s+URL\s*\(\s*)['"](\.[^'"]+)['"]/g)) {
       const dependency = posix.normalize(posix.join(posix.dirname(path), match[1]));
       if (!dependency.startsWith('src/') && !dependency.startsWith('scripts/'))
         throw new Error('模拟依赖超出 src/scripts');

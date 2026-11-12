@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,7 +29,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run full matrix shard
-        run: npm run balance:gate:full -- --shard=${{ matrix.shard }}/8 --report=artifacts/balance-shards/shard-${{ matrix.shard }}.json
+        run: npm run balance:gate:full -- --shard=${{ matrix.shard }}/16 --report=artifacts/balance-shards/shard-${{ matrix.shard }}.json
       - name: Preserve raw shard
         if: always() && !cancelled()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -72,7 +72,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: gh run download "$REPORT_RUN" --repo "$REPOSITORY" --pattern 'balance-shard-*' --dir artifacts/balance-shards
       - name: Merge and validate full matrix
-        run: npm run balance:gate:full -- --merge-shards=artifacts/balance-shards --shard-count=8
+        run: npm run balance:gate:full -- --merge-shards=artifacts/balance-shards --shard-count=16
       - name: Generate daily web report even on failure
         if: always() && !cancelled()
         run: |

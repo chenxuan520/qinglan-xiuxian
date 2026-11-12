@@ -26,6 +26,7 @@ test('隔离CLI夹具：八片原样落盘并合并，真正执行旧验收，�
     mkdirSync(scripts, { recursive: true });
     for (const name of [
       'balance-gate.ts',
+      'balance-worker.ts',
       'balance-shards.ts',
       'balance-policy.ts',
       'balance-metrics.ts',
@@ -57,16 +58,15 @@ test('隔离CLI夹具：八片原样落盘并合并，真正执行旧验收，�
     writeFileSync(
       join(scripts, 'balance-simulation.ts'),
       `
-      import { isMainThread, parentPort, workerData } from 'node:worker_threads';
       import { caseKey } from './balance-policy.ts';
       export function simulateFarm() { throw Error('此裸开荒夹具不包含farm'); }
       export function growthShape() { return []; }
-      if (!isMainThread) for (const c of workerData.cases) parentPort.postMessage({
+      export function simulateCampaign(c) { return {
         case:c,key:caseKey(c),complete:false,cleared:0,stop:'lost',seconds:1,adSeconds:0,cultivation:0,
         ads:{supplies:0,borrow:0,revive:0},battles:[{stage:0,attempt:1,state:'lost',seconds:1,
           entryStep:0,exitStep:0,cultivation:0,at90:null,trials:[],maxAliveBosses:0,
           firstClearCultivation:0,bosses:[]}]
-      });
+      }; }
     `,
     );
     execFileSync('git', ['init', '-q'], { cwd: root });

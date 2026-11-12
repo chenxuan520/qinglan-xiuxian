@@ -12,7 +12,7 @@ import {
   BARE_CLEAR_TARGETS,
   balanceCases,
 } from './balance-policy.ts';
-import { runCases } from './balance-gate.ts';
+import { executionHash, runCases } from './balance-gate.ts';
 import { acceptanceFailures, quantile, summarize } from './balance-metrics.ts';
 import type { CampaignSample } from './balance-simulation.ts';
 
@@ -265,7 +265,8 @@ export async function main(args: string[]) {
     }),
   );
   try {
-    const currentSource = simulationHash(repository);
+    const currentSource = simulationHash(repository),
+      currentExecutionHash = executionHash();
     console.log(`前六关快检：${cases.length} 条，${jobs} worker，初入仙途无辅助。`);
     const current = await runCases(cases, repository, jobs, '当前前六关', 6);
     const currentMetrics = summarize(current.results, cases, 6);
@@ -275,6 +276,7 @@ export async function main(args: string[]) {
     ];
     if (simulationHash(repository).hash !== currentSource.hash)
       failures.push('测试期间模拟源码改变');
+    if (executionHash() !== currentExecutionHash) failures.push('测试期间模拟调度源码改变');
     const elapsedSeconds = (Date.now() - started) / 1000;
     const report = {
       protocol: BALANCE_PROTOCOL,
@@ -285,6 +287,7 @@ export async function main(args: string[]) {
       jobs,
       elapsedSeconds,
       currentSource,
+      executionHash: currentExecutionHash,
       currentMetrics,
       current: current.results,
       simulationErrors: current.errors,

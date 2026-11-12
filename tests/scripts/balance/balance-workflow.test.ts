@@ -294,11 +294,14 @@ test('本地可复用全量透传日报ID，调用作业只保留合法关键字
   );
 });
 
-test('八分片互不取消且使用全部可用CPU，报告路径与唯一可重试artifact逐片对应', () => {
+test('十六分片互不取消且使用全部可用CPU，报告路径与唯一可重试artifact逐片对应', () => {
   assert.match(shardJob, /fail-fast: false/);
   assert.doesNotMatch(fullWorkflow, /max-parallel:|--jobs[=\s]/);
   const indices = JSON.parse(shardJob.match(/^        shard: (.+)$/m)![1]) as number[];
-  assert.deepEqual(indices, [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(
+    indices,
+    Array.from({ length: 16 }, (_, i) => i),
+  );
   const command = shardJob.match(/^        run: (npm run balance:gate:full .+)$/m)![1];
   const artifact = shardJob.match(/^          name: (balance-shard-.+)$/m)![1];
   const file = shardJob.match(/^          path: (.+)$/m)![1];
@@ -307,12 +310,12 @@ test('八分片互不取消且使用全部可用CPU，报告路径与唯一可�
     const expand = (text: string) => text.replaceAll('${{ matrix.shard }}', String(index));
     assert.equal(
       expand(command),
-      `npm run balance:gate:full -- --shard=${index}/8 --report=${expand(file)}`,
+      `npm run balance:gate:full -- --shard=${index}/16 --report=${expand(file)}`,
     );
     assert.equal(expand(file), `artifacts/balance-shards/shard-${index}.json`);
     names.add(expand(artifact));
   }
-  assert.equal(names.size, 8);
+  assert.equal(names.size, 16);
   assert.match(shardJob, /node-version: '22'/);
   assert.match(shardJob, /- run: npm ci/);
   assert.match(shardJob, /if-no-files-found: error\n\s+overwrite: true\n\s+retention-days: 14/);
@@ -364,7 +367,7 @@ test('合并等待全部分片，失败仍收尾，下载绑定本run且下载�
   assert.match(aggregateJob, /- run: npm ci/);
   assert.match(
     aggregateJob,
-    /run: npm run balance:gate:full -- --merge-shards=artifacts\/balance-shards --shard-count=8$/m,
+    /run: npm run balance:gate:full -- --merge-shards=artifacts\/balance-shards --shard-count=16$/m,
   );
   const command = aggregateJob.match(/^        run: (gh run download .+)$/m)![1];
   const root = mkdtempSync(join(tmpdir(), 'qinglan-shard-download-'));

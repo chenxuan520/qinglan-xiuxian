@@ -57,7 +57,7 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 `balance:ci` 每次提交只运行 840 条**前六关、初入仙途、无辅助**真实路线：七种灵根 × 正/魔/兼修 × 手机/电脑 × 20 固定种子，合法本命轮换，共覆盖十种五行本命。无广告、训练、炼器、丹药、宗门或重试，成功为 `cleared >= 6`，不能称作成仙。本轮新规则单独运行实测 Node 24 约 2.2 分钟、Node 22 约 2.6 分钟，逐局数据完全一致；GitHub 托管机器实测约 5 分钟，与完整矩阵并发的本机实测约 6.2 分钟。耗时按实际日志记录，不能保证所有机器固定两分钟完成。当前引擎只跑一遍，源依赖摘要用于记录和防止运行中源码变化，不再为快检追加旧引擎或长矩阵。
 
-快检与完整模拟默认使用 Node.js `availableParallelism()` 返回的可用并行度，不设固定 worker 数量上限。完整模拟可用 `npm run balance:gate:full -- --jobs=N` 指定并行数，按输入的正整数执行，不再截断；正在执行的作业继续使用启动时配置。
+快检与完整模拟默认使用 Node.js `availableParallelism()` 返回的可用并行度，不设固定 worker 数量上限。完整模拟可用 `npm run balance:gate:full -- --jobs=N` 指定并行数，按输入的正整数执行，不再截断；正在执行的作业继续使用启动时配置。worker 完成一条后从公共队列领取下一条，减少快 worker 等待慢批次的时间；保留原样本计划、固定种子及单条模拟规则，最终按样本键排序并校验覆盖，异常与提前退出仍保留原始诊断。历史对照仍加载指定工作树的模拟器。快检分别记录引擎依赖摘要与包含 worker 的执行脚本摘要，开跑与收尾均核验；完整分片和本地报告导入也把 worker 纳入版本一致性检查。
 
 用户最新确认的整体通过率硬门槛（绝对百分点，覆盖旧七关目标）：天灵根 70–100%、异灵根 50–100%、双灵根 20–85%、三灵根 2–60%、四灵根 0–30%、五灵根 0–25%、无灵根 **0–10%**。2026-11-12 起按新走位（76ba7df）放宽异 / 双 / 三灵根上限；快检代表熟练走位，防止改动崩坏，不代表普通玩家通过率。异常、漏样本、重复样本、错误妖王身份/死亡记录及越界通过率都非零退出。计划分母不因缺失样本减少。路线、本命和手机/电脑分别打印；分组差异单独诊断，不混入玩家未授权的额外整体目标。
 
@@ -65,9 +65,9 @@ npm run check:npc-ai # 生成 Worker 类型并检查独立后端
 
 每天**北京时间 12:00**（UTC cron `0 4 * * *`，可能排队延迟）运行 `balance:gate:full`；也能在 Balance gate 手动选择 full。完整矩阵共 10,080 条：七根 × 三路 × 两场地 × 四种投入 × 三难度 × 20 固定种子。裸开荒一试即停，收益养成、仅广告复活/借寿、理论上限（广告物资不计冷却、根基与炼器尽量修满，寿元不足时为出战预留年岁）分别统计，其他投入至多每关 5 次且有有限操作预算。记录七关进入率、累计连通率、成功/失败耗时、90 秒修为/境界、每只妖王实际出场、击杀或存活观测下界，不能把未进入或未击杀记成零秒击杀。另做真实重复首关，首通修为只能领一次。默认完整命令只验收当前矩阵，保留前六关通过率、首关天灵根 90 秒九成中期、跨大境界至少五倍和技术完整性硬门槛；终关按用户确认只展示实测，妖王演出和本命差异列诊断。
 
-GitHub 全量通过本地可复用工作流 `balance-full.yml` 分为 8 片（零起算，编号 0–7），每片独立安装 Node 22 与依赖，运行 `npm run balance:gate:full -- --shard=INDEX/8 --report=artifacts/balance-shards/shard-INDEX.json`；不设置矩阵 `max-parallel` 或额外 CPU 上限，单片仍使用全部可用并行度，失败不会取消其他片。`balance-shards.ts` 按 `caseKey` 的 SHA256 排序后轮转分配原固定计划，每片 1,260 条，避免原种子、设备或路线排列造成慢样本集中；不改变游戏、AI、种子、10,080 样本或验收范围。每片原始 JSON 保留提交 `commit`、源码 `currentHash`、模拟控制脚本 `executionHash`、全计划 `planHash` 身份及原样结果与异常，上传为 `balance-shard-INDEX`，保留 14 天并允许同 run 重试覆盖。分片失败且未取消时，另将实际存在的 `/tmp/qinglan-balance-failed-*/samples.json` 上传为独立的 `balance-diagnostics-INDEX`，保留 14 天且支持重试覆盖；没有诊断文件时忽略，不伪造文件。诊断 artifact 不匹配正式合并输入的 `balance-shard-*`，不会把 worker 崩溃时的部分样本当作正式分片。
+GitHub 全量通过本地可复用工作流 `balance-full.yml` 分为 16 片（零起算，编号 0–15），每片独立安装 Node 22 与依赖，运行 `npm run balance:gate:full -- --shard=INDEX/16 --report=artifacts/balance-shards/shard-INDEX.json`；不设置矩阵 `max-parallel` 或额外 CPU 上限，单片仍使用全部可用并行度，失败不会取消其他片。`balance-shards.ts` 按 `caseKey` 的 SHA256 排序后轮转分配原固定计划，每片 630 条，避免原种子、设备或路线排列造成慢样本集中；不改变游戏、AI、种子、10,080 样本或验收范围。每片原始 JSON 保留提交 `commit`、源码 `currentHash`、模拟控制脚本 `executionHash`、全计划 `planHash` 身份及原样结果与异常，上传为 `balance-shard-INDEX`，保留 14 天并允许同 run 重试覆盖。分片失败且未取消时，另将实际存在的 `/tmp/qinglan-balance-failed-*/samples.json` 上传为独立的 `balance-diagnostics-INDEX`，保留 14 天且支持重试覆盖；没有诊断文件时忽略，不伪造文件。诊断 artifact 不匹配正式合并输入的 `balance-shard-*`，不会把 worker 崩溃时的部分样本当作正式分片。
 
-合并作业从本 run 下载全部 `balance-shard-*`，在各 artifact 子目录下递归收集 JSON，执行 `npm run balance:gate:full -- --merge-shards=artifacts/balance-shards --shard-count=8`，显式要求 8 片；缺片、重复片、身份混合或覆盖不符均拒绝合并。全部身份与覆盖核对通过后才执行原有全部指标、42 组重复首关收益测试及门禁，42 组仍在聚合阶段原样运行，再沿用原日报生成、上传及诊断失败链路。可复用工作流通过 `workflow_call.outputs.report-id` 返回日报 artifact ID，原发布作业继续使用 `needs.full.outputs.report-id`；日报与完整结果上传也允许同 run 重试覆盖。
+合并作业从本 run 下载全部 `balance-shard-*`，在各 artifact 子目录下递归收集 JSON，执行 `npm run balance:gate:full -- --merge-shards=artifacts/balance-shards --shard-count=16`，显式要求 16 片；缺片、重复片、身份混合或覆盖不符均拒绝合并。全部身份与覆盖核对通过后才执行原有全部指标、42 组重复首关收益测试及门禁，42 组仍在聚合阶段原样运行，再沿用原日报生成、上传及诊断失败链路。可复用工作流通过 `workflow_call.outputs.report-id` 返回日报 artifact ID，原发布作业继续使用 `needs.full.outputs.report-id`；日报与完整结果上传也允许同 run 重试覆盖。
 
 push / PR 只执行原840条快检、模拟性能及构建体积门禁，不按数值文件变化追加10,080条完整矩阵或渲染采样；旧变更检测作业和脚本已移除。全量与渲染仅每天北京时间12:00定时或手动选择执行；手动full运行完整矩阵与渲染，render_only仅渲染，两者同时选中时以render_only为准。全量作业按「仓库＋分支」共用并发组，同分支新的定时或手动全量取消旧全量及排队任务；普通推送不入组、不打断日测，不同分支和仓库互不取消。GitHub以任务进入并发组的顺序选择保留者，不保证提交时间顺序。
 

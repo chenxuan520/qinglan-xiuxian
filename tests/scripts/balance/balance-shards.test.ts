@@ -82,22 +82,25 @@ function shards() {
   });
 }
 
-test('完整10080计划分成八片，每片1260且没有改动、遗漏或重复任何种子身份', () => {
-  const cases = balanceCases(true);
-  const original = structuredClone(cases);
-  const parts = Array.from({ length: 8 }, (_v, index) => selectShardCases(cases, index, 8));
-  assert.ok(parts.every((part) => part.length === 1260));
-  assert.deepEqual(parts.flat().map(caseKey).sort(), cases.map(caseKey).sort());
-  assert.deepEqual(cases, original);
-  assert.deepEqual(selectShardCases([...cases].reverse(), 0, 8), parts[0]);
-  assert.equal(shardPlanHash(cases), shardPlanHash([...cases].reverse()));
-  for (const part of parts) {
-    assert.equal(new Set(part.map((c) => c.root)).size, 7);
-    assert.equal(new Set(part.map((c) => c.profile)).size, 4);
-    assert.equal(new Set(part.map((c) => c.device)).size, 2);
-    assert.equal(new Set(part.map((c) => c.difficulty)).size, 3);
-  }
-});
+for (const count of [8, 16])
+  test(`完整10080计划分成${count}片，没有改动、遗漏或重复任何种子身份`, () => {
+    const cases = balanceCases(true);
+    const original = structuredClone(cases);
+    const parts = Array.from({ length: count }, (_v, index) =>
+      selectShardCases(cases, index, count),
+    );
+    assert.ok(parts.every((part) => part.length === 10080 / count));
+    assert.deepEqual(parts.flat().map(caseKey).sort(), cases.map(caseKey).sort());
+    assert.deepEqual(cases, original);
+    assert.deepEqual(selectShardCases([...cases].reverse(), 0, count), parts[0]);
+    assert.equal(shardPlanHash(cases), shardPlanHash([...cases].reverse()));
+    for (const part of parts) {
+      assert.equal(new Set(part.map((c) => c.root)).size, 7);
+      assert.equal(new Set(part.map((c) => c.profile)).size, 4);
+      assert.equal(new Set(part.map((c) => c.device)).size, 2);
+      assert.equal(new Set(part.map((c) => c.difficulty)).size, 3);
+    }
+  });
 
 test('非法分片范围、空计划或重复计划不能运行', () => {
   for (const [index, count] of [

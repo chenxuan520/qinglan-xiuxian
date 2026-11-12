@@ -52,6 +52,11 @@ function fixture() {
   write('src/中.ts', 'const 中文 = "原始字节";\n');
   for (const file of BALANCE_SIMULATION_FILES) write(file, 'export const value = 1;\n');
   write(
+    'scripts/balance/balance-gate.ts',
+    "new Worker(new URL('./balance-worker.ts', import.meta.url));\n",
+  );
+  write('scripts/balance/balance-worker.ts', 'export const value = 1;\n');
+  write(
     'scripts/balance/balance-simulation.ts',
     "import { value } from '../simulation-helper.ts';\n",
   );
@@ -218,6 +223,26 @@ test('允许原提交之后仅文档/CI变化；src、模拟根文件或递归he
       f.write(path, before);
       f.commit();
     }
+  } finally {
+    f.dispose();
+  }
+});
+
+test('只改变worker参数转发也不能把旧报告导入为当前master的结果', () => {
+  const f = fixture();
+  try {
+    f.write('scripts/balance/balance-worker.ts', 'simulateCampaign(c, 6);');
+    const masterCommit = f.commit();
+    assert.throws(
+      () => verifyReportSource(f.raw, { root: f.root, masterCommit }),
+      /模拟依赖不一致：scripts\/balance\/balance-worker.ts/,
+    );
+    f.git('rm', 'scripts/balance/balance-worker.ts');
+    const missing = f.commit();
+    assert.throws(
+      () => verifyReportSource(f.raw, { root: f.root, masterCommit: missing }),
+      /模拟依赖缺失或类型不支持：scripts\/balance\/balance-worker.ts/,
+    );
   } finally {
     f.dispose();
   }

@@ -54,17 +54,18 @@ function sourceHash(root: string) {
   visit(join(root, 'src'), 'src');
   return hash.digest('hex');
 }
-function executionHash() {
+export function executionHash(root = repository) {
   const hash = createHash('sha256');
   for (const name of [
     'balance-gate.ts',
+    'balance-worker.ts',
     'balance-shards.ts',
     'balance-policy.ts',
     'balance-metrics.ts',
     'balance-simulation.ts',
   ]) {
     hash.update(name);
-    hash.update(readFileSync(join(repository, 'scripts/balance', name)));
+    hash.update(readFileSync(join(root, 'scripts/balance', name)));
   }
   return hash.digest('hex');
 }
@@ -105,11 +106,11 @@ export async function runCases(
 ) {
   if (!Number.isInteger(stageCount) || stageCount < 1 || stageCount > 7)
     throw new Error('模拟关卡数必须为 1–7');
+  if (!Number.isSafeInteger(jobs) || jobs < 1) throw new Error('并发数必须为正整数');
   const results: CampaignSample[] = [];
   const errors: SimulationError[] = [];
   const received = new Set<string>();
-  const batches = Array.from({ length: jobs }, () => [] as BalanceCase[]);
-  cases.forEach((c, i) => batches[i % jobs].push(c));
+  let next = 0;
   const workers: Worker[] = [];
   const started = Date.now();
   let last = started;
@@ -122,40 +123,50 @@ export async function runCases(
   }
   try {
     await Promise.all(
-      batches
-        .filter((batch) => batch.length)
-        .map(
-          (batch) =>
-            new Promise<void>((complete, reject) => {
-              const worker = new Worker(
-                pathToFileURL(join(root, 'scripts/balance/balance-simulation.ts')),
-                {
-                  workerData: { cases: batch, farms: false, stageCount, autoplayBuild },
-                  execArgv: ['--experimental-strip-types'],
-                },
-              );
-              workers.push(worker);
-              worker.on('message', (result: CampaignSample | SimulationError) => {
-                if (received.has(result.key)) {
-                  reject(new Error(`重复 worker 结果：${result.key}`));
-                  return;
-                }
-                received.add(result.key);
-                if ('error' in result) errors.push(result);
-                else results.push(result);
-                if (Date.now() - last > 15000 || received.size === cases.length) {
-                  console.log(
-                    `${label} ${received.size}/${cases.length}，异常 ${errors.length}，${((Date.now() - started) / 1000).toFixed(1)} 秒`,
-                  );
-                  last = Date.now();
-                }
-              });
-              worker.on('error', reject);
-              worker.on('exit', (code) =>
-                code === 0 ? complete() : reject(new Error(`模拟 worker 退出 ${code}`)),
-              );
-            }),
-        ),
+      Array.from(
+        { length: Math.min(jobs, cases.length) },
+        () =>
+          new Promise<void>((complete, reject) => {
+            const worker = new Worker(new URL('./balance-worker.ts', import.meta.url), {
+              // 空批次兼容历史模拟器；实际样本由空闲 worker 逐条领取。
+              workerData: { root, cases: [], farms: false, stageCount, autoplayBuild },
+              execArgv: ['--experimental-strip-types'],
+            });
+            workers.push(worker);
+            let assigned: BalanceCase | undefined;
+            function dispatch() {
+              assigned = cases[next++];
+              worker.postMessage(assigned ?? null);
+            }
+            worker.on('message', (result: CampaignSample | SimulationError) => {
+              if (!assigned || result?.key !== caseKey(assigned)) {
+                reject(new Error(`worker 返回非当前任务结果：${result?.key}`));
+                return;
+              }
+              if (received.has(result.key)) {
+                reject(new Error(`重复 worker 结果：${result.key}`));
+                return;
+              }
+              received.add(result.key);
+              if ('error' in result) errors.push(result);
+              else results.push(result);
+              if (Date.now() - last > 15000 || received.size === cases.length) {
+                console.log(
+                  `${label} ${received.size}/${cases.length}，异常 ${errors.length}，${((Date.now() - started) / 1000).toFixed(1)} 秒`,
+                );
+                last = Date.now();
+              }
+              dispatch();
+            });
+            worker.on('error', reject);
+            worker.on('exit', (code) => {
+              if (code !== 0) reject(new Error(`模拟 worker 退出 ${code}`));
+              else if (assigned) reject(new Error(`worker 样本缺失：${caseKey(assigned)}`));
+              else complete();
+            });
+            dispatch();
+          }),
+      ),
     );
   } catch (error) {
     await Promise.all(workers.map((worker) => worker.terminate()));
