@@ -19,6 +19,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --experimental-strip-types --test \"tests/**/*.test.ts\"",
     "docs:check": "node --experimental-strip-types --test tests/battle/gameplay-docs.test.ts tests/guide/guide-source.test.ts tests/content/bestiary.test.ts",
+    "check:commits": "node --experimental-strip-types scripts/repo/commit-hygiene.ts",
     "ui:check": "node --experimental-strip-types scripts/ui/ui-regression.ts",
     "ui:hud-safe": "node --experimental-strip-types scripts/ui/ui-safe-area.ts",
     "assets:check": "node --experimental-strip-types scripts/assets/check-binaries.ts",
