@@ -133,6 +133,8 @@ test('妖物志妖王招式说明覆盖全部名称且卡片按特性与招式�
   };
   const wood = card(0);
   assert.match(wood, /<span class="boss-skill-label">特性<\/span>弹幕与藤圈附藤缠/);
+  const rift = card(5);
+  assert.match(rift, /<span class="boss-skill-label">特性<\/span>弹幕与雷网触之定身/);
   const woodSkills = bestiaryBossSkills(0, false);
   assert.ok(
     wood.includes(

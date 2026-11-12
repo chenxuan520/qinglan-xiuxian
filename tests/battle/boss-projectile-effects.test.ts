@@ -216,7 +216,7 @@ test('同一仙尊连续六发逐命中取随机值，发射时不预抽或整�
 });
 
 test('受击护体和佛光挡掉新增效果，仙尊仍按每次几何命中抽取一次效果', () => {
-  for (const stage of [0, 1, 6])
+  for (const stage of [0, 1, 5, 6])
     for (const shield of [false, true]) {
       const c = encounter(stage, stage === 6 ? 6 : stage);
       if (shield) {
@@ -239,8 +239,8 @@ test('受击护体和佛光挡掉新增效果，仙尊仍按每次几何命中�
     }
 });
 
-test('狼王减速、毒君减毒伤蚀体、冥主封宝保持；劫灵弹不新增禁锢', () => {
-  for (const stage of [2, 3, 4, 5]) {
+test('狼王减速、毒君减毒伤蚀体、冥主封宝保持', () => {
+  for (const stage of [2, 3, 4]) {
     const c = encounter(stage, 6);
     c.g.medicine.poison = 0.5;
     const hp = c.g.player.hp;
@@ -253,6 +253,41 @@ test('狼王减速、毒君减毒伤蚀体、冥主封宝保持；劫灵弹不�
     assert.equal(c.g.entangled, 0);
     assert.equal(c.g.burning.life, 0);
   }
+});
+
+test('劫灵弹幕命中定身：原生第六境与终关旧王生效，保护期内不重复，独立天劫不变', () => {
+  for (const [stage, arena] of [
+    [5, 5],
+    [5, FINAL_TRIAL_STAGE],
+  ] as const) {
+    const c = encounter(stage, arena);
+    // 清灵散把定身压到 0.5 秒，保护期仍为 1 秒，才能区分「已定身」与「保护期」。
+    c.g.medicine.poison = 0.5;
+    collide(c);
+    assert.equal(c.g.immobilized, ENEMY_CONTROL.bind / 2);
+    const protection = c.g.nextEnemyBindAt;
+    c.g.immobilized = 0;
+    c.g.time = 0.6;
+    c.g.player.invincible = 0;
+    collide(c);
+    assert.equal(c.g.immobilized, 0, '保护期内不重复定身');
+    assert.equal(c.g.nextEnemyBindAt, protection);
+    c.g.time = 1.1;
+    c.g.player.invincible = 0;
+    collide(c);
+    assert.equal(c.g.immobilized, ENEMY_CONTROL.bind / 2, '保护期结束后可再次定身');
+  }
+  const base = encounter(5);
+  base.g.save.age = base.g.save.nextTribulationAge = 20000;
+  const trial = Game.createTribulation(base.g.save, base.g);
+  const boss = trial.boss!;
+  boss.bossStage = 5;
+  trial.player.invincible = 0;
+  const shot = trial.hostileShot(boss, 1, 0, 0, 10);
+  Object.assign(shot, { x: trial.player.x, y: trial.player.y });
+  assert.equal(shot.bossStage, undefined);
+  trial.updateShots(0);
+  assert.equal(trial.immobilized, 0);
 });
 
 test('小兵火球、冰弹、魂弹沿用原生地域控制，终关小兵火球不附加新灼烧', () => {

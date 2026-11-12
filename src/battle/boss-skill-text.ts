@@ -7,7 +7,7 @@ export const BOSS_TRAITS = [
   '弹幕附减速',
   '毒伤命中后<span class="combat-unit">3秒</span>无法回复，清灵散可减伤并缩短蚀体；半血后毒矢与瘴池齐发',
   '弹幕命中封宝<span class="combat-unit">2秒</span>',
-  '雷网触之定身',
+  '弹幕与雷网触之定身',
   '万劫随身：弹幕暗藏六境劫数；劫息回元：连续<span class="combat-unit">3秒</span>未受伤害则每秒回复<span class="combat-unit">1%</span>气血；半血后部分弹幕更密',
 ];
 

@@ -2924,7 +2924,8 @@ export class Game {
             if (effect === 0) this.enemyEntangle();
             if (b.enemySkill === 'frostbolt' || effect === 2) this.enemySlow();
             if (b.enemySkill === 'soul' || effect === 4) this.enemySeal();
-            if (b.bossStage === FINAL_TRIAL_STAGE && effect === 5) this.enemyBind();
+            if (effect === 5 && (b.bossStage === FINAL_TRIAL_STAGE || !this.tribulation))
+              this.enemyBind();
           }
           this.hurtPlayer(
             b.damage * (b.bossStage === 3 ? this.medicine.poison : 1),
