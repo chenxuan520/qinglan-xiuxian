@@ -89,7 +89,7 @@ test('递减落空仍保留原永久丹抽取的随机步进，首通限时丹�
     assert.deepEqual(
       Object.fromEntries(Object.entries(initial.bag).filter(([id]) => id !== 'peiying')),
       reduced.bag,
-      '只减少抽中的培婴丹，首通另一份丹药的种类与数量保持',
+      '只减少抽中的真魂丹，首通另一份丹药的种类与数量保持',
     );
     assert.equal(initial.bag.peiying, 1);
     assert.equal(reduced.bag.peiying, undefined);

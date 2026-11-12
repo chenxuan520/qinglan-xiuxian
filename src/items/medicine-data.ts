@@ -272,10 +272,10 @@ export const MEDICINES: Medicine[] = [
   },
   {
     id: 'peiying',
-    name: '培婴丹',
+    name: '真魂丹',
     tier: '珍品',
     years: 0,
-    desc: '本世气血上限、基础恢复速度各 +15%，每世最多三次。',
+    desc: '真仙界灵丹，壮大神魂：本世气血上限 +30%、基础恢复速度 +20%、法宝伤害 +10%，每世最多三枚。',
     stage: 4,
     price: 0,
     craftYears: 0,
@@ -402,13 +402,14 @@ export function medicineEffects(s: MedicineState, age: number) {
   return {
     expiresAt: Math.min(Infinity, ...Object.values(s.active).filter((end) => end > age)),
     damage:
+      (1 + (s.used.peiying || 0) * 0.1) *
       (has('huanglong') ? 1.1 : 1) *
       (has('heqi') ? 1.18 : 1) *
       (has('dulong') ? 1.3 : 1) *
       (has('wuchang') ? 1.2 : 1) *
       (has('chousui') ? 1.18 : 1),
     hp:
-      (1 + (s.used.peiying || 0) * 0.15) *
+      (1 + (s.used.peiying || 0) * 0.3) *
       (has('jinsui') ? 1.1 : 1) *
       (has('zhenyuan') ? 1.18 : 1) *
       (has('dingling') ? 1.3 : 1) *
@@ -416,7 +417,7 @@ export function medicineEffects(s: MedicineState, age: number) {
       (has('bigu') ? 1.05 : 1) *
       (has('chousui') ? 0.92 : 1),
     regen:
-      (1 + (s.used.peiying || 0) * 0.15) *
+      (1 + (s.used.peiying || 0) * 0.2) *
       (has('yangjing') ? 1.3 : 1) *
       (has('zhenyuan') ? 1.2 : 1) *
       (has('dingling') ? 1.6 : 1) *

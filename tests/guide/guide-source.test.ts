@@ -54,7 +54,10 @@ test('全部帮助分类不出现广告文案；指南保留主动进入导览�
 test('本世珍品帮助说明强化后的实际增幅、次数与占位，保留未知药谱的丹名', () => {
   const medicine = guide.guideContent('medicine');
   assert.match(medicine, /服用时所在境界基础寿元的 30%，每世最多两次，长生后不可服用/);
-  assert.match(medicine, /气血上限、基础恢复速度各提高 15%，每世最多三份，合计提高 45%/);
+  assert.match(
+    medicine,
+    /气血上限提高 30%、基础恢复速度提高 20%、法宝伤害提高 10%，每世最多三份，合计提高 90%、60% 与 30%/,
+  );
   assert.match(medicine, /不占三种限时药效的位置/);
   assert.doesNotMatch(medicine, /回阳水|培婴丹/);
 });

@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   MEDICINES,
   freshMedicine,
@@ -52,6 +55,39 @@ const quiet = (s = rich(), stage = 0) => {
   return g;
 };
 const approx = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
+
+const srcRoot = fileURLToPath(new URL('../../src', import.meta.url));
+const walkSrc = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name);
+    return entry.isDirectory() ? walkSrc(path) : [path];
+  });
+
+test('真魂丹更名与加强：每枚气血30%、恢复20%、伤害10%，源码不再出现旧名', () => {
+  const medicine = MEDICINES.find((m) => m.id === 'peiying')!;
+  assert.equal(medicine.name, '真魂丹');
+  assert.equal(
+    medicine.desc,
+    '真仙界灵丹，壮大神魂：本世气血上限 +30%、基础恢复速度 +20%、法宝伤害 +10%，每世最多三枚。',
+  );
+  const state = freshMedicine(() => 0.5);
+  for (const [used, hp, regen, damage] of [
+    [0, 1, 1, 1],
+    [1, 1.3, 1.2, 1.1],
+    [3, 1.9, 1.6, 1.3],
+  ] as const) {
+    state.used.peiying = used;
+    const effects = medicineEffects(state, 0);
+    approx(effects.hp, hp);
+    approx(effects.regen, regen);
+    approx(effects.damage, damage);
+  }
+  state.used.peiying = 3;
+  state.active.dulong = 100;
+  approx(medicineEffects(state, 0).damage, 1.3 * 1.3);
+  const hits = walkSrc(srcRoot).filter((file) => readFileSync(file, 'utf8').includes('培婴丹'));
+  assert.deepEqual(hits, []);
+});
 
 test('两品阶灵气丹保留原效果并增加局内经验，不改斩妖永久修为，全部灵根难度共用', () => {
   for (const [id, factor, cooldown] of [
@@ -193,14 +229,14 @@ test('品级筛选不混入其他品级，未得本世珍品完全隐藏，吃�
   assert.equal(s.chronicle.milestones['permanent-medicine'], s.age);
   const restored = parseSave(JSON.stringify(s));
   const visible = medicineContent(restored, 0, 'bag', false, false, '珍品');
-  assert.match(visible, /培婴丹/);
+  assert.match(visible, /真魂丹/);
   assert.match(visible, /本世珍品/);
   assert.doesNotMatch(visible, /永久珍品|永久机缘/);
   assert.match(visible, /本世已用 1 \/ 3 次/);
   assert.equal((visible.match(/<article /g) || []).length, 9);
   for (const m of hidden.filter((m) => m.id !== 'peiying')) assert.ok(!visible.includes(m.name));
   const crafts = medicineContent(restored, 0, 'craft', false, false, '珍品');
-  assert.ok(!crafts.includes('培婴丹'));
+  assert.ok(!crafts.includes('真魂丹'));
   assert.equal((crafts.match(/<article /g) || []).length, 8);
 });
 
@@ -475,7 +511,7 @@ test('补天丹严格提升一个品质档并收束灵根数量，不降级、�
       }
     }
 });
-test('永久丹药每世次数与境界门槛生效，培婴百分比作用于真实战斗属性', () => {
+test('永久丹药每世次数与境界门槛生效，真魂丹加成作用于真实战斗属性', () => {
   const s = rich();
   s.cultivation = 0;
   for (let i = 0; i < 2; i++) assert.equal(useMedicine(s, 'huiyang').ok, true);
@@ -483,16 +519,20 @@ test('永久丹药每世次数与境界门槛生效，培婴百分比作用于�
   assert.equal(useMedicine(s, 'huiyang').ok, false);
   const base = new Game(s, 0, 0);
   for (let i = 1; i <= 3; i++) {
-    assert.equal(useMedicine(s, 'peiying').ok, true);
+    const use = useMedicine(s, 'peiying');
+    assert.equal(use.ok, true);
+    assert.equal(use.message, '真魂丹已服用，本世气血上限 +30%、基础恢复速度 +20%、法宝伤害 +10%');
     const restored = parseSave(JSON.stringify(s));
     const current = new Game(restored, 0, 0);
-    assert.equal(current.player.maxHp, Math.round(base.player.maxHp * (1 + i * 0.15)));
-    approx(current.stats.regen, base.stats.regen * (1 + i * 0.15));
+    assert.equal(current.player.maxHp, Math.round(base.player.maxHp * (1 + i * 0.3)));
+    approx(current.stats.regen, base.stats.regen * (1 + i * 0.2));
+    approx(current.stats.damage, base.stats.damage * (1 + i * 0.1));
   }
   assert.equal(useMedicine(s, 'peiying').ok, false);
   const g = new Game(s, 0, 0);
-  assert.equal(g.player.maxHp, Math.round(base.player.maxHp * 1.45));
-  approx(g.stats.regen, base.stats.regen * 1.45);
+  assert.equal(g.player.maxHp, Math.round(base.player.maxHp * 1.9));
+  approx(g.stats.regen, base.stats.regen * 1.6);
+  approx(g.stats.damage, base.stats.damage * 1.3);
   assert.equal(useMedicine(s, 'jiuqu').ok, true);
   assert.equal(useMedicine(s, 'jiuqu').ok, false);
   assert.equal(s.cultivation, Math.floor((realmCost(0) + realmCost(1) + realmCost(2)) * 0.25));

@@ -102,7 +102,7 @@ export function powerBreakdown(save: SaveData) {
       s.tribulations = 0;
     });
   if (save.medicine.used.peiying)
-    add('peiying', '培婴丹药力', `本世已服${save.medicine.used.peiying}枚`, (s) => {
+    add('peiying', '真魂丹药力', `本世已服${save.medicine.used.peiying}枚`, (s) => {
       s.medicine.used.peiying = 0;
     });
   for (const medicine of activeMedicines(save.medicine, save.age))

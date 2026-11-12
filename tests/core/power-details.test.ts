@@ -136,7 +136,7 @@ test('只计算实际入场本命，路线不符时回退的法宝与炼器一�
   assert.match(powerDetailsContent(s), /青霄剑一重未觉醒/);
 });
 
-test('暴击按百分点、毒伤含全局减伤，特殊打王药力与永久培婴丹可见且过期排除', () => {
+test('暴击按百分点、毒伤含全局减伤，特殊打王药力与真魂丹可见且过期排除', () => {
   const s = fixture();
   s.medicine.active.mingqing = s.age + 100;
   s.medicine.active.xuepo = s.age + 100;
@@ -149,9 +149,11 @@ test('暴击按百分点、毒伤含全局减伤，特殊打王药力与永久�
     r.rows.find((r) => r.id === 'medicine:mingqing')!.changes.find((c) => c.key === 'crit')!.delta,
     0.06,
   );
-  assert.ok(
-    r.rows.find((r) => r.id === 'peiying')!.changes.some((c) => c.key === 'hp' && c.delta > 0),
-  );
+  const peiying = r.rows.find((r) => r.id === 'peiying')!;
+  assert.equal(peiying.name, '真魂丹药力');
+  assert.ok(peiying.changes.some((c) => c.key === 'hp' && c.delta > 0));
+  assert.ok(peiying.changes.some((c) => c.key === 'regen' && c.delta > 0));
+  assert.ok(peiying.changes.some((c) => c.key === 'weaponDamage' && c.delta > 0));
   const html = powerDetailsContent(s);
   assert.match(html, /暴击率 \+6 个百分点/);
   assert.match(html, /明清灵水/);

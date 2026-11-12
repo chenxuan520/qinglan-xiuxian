@@ -103,7 +103,7 @@ export function useMedicine(
     message += `，寿元增加 ${years} 年`;
   } else if (id === 'peiying') {
     save.medicine.used.peiying = (save.medicine.used.peiying || 0) + 1;
-    message += '，本世气血与基础恢复各 +15%';
+    message += '，本世气血上限 +30%、基础恢复速度 +20%、法宝伤害 +10%';
   } else if (id === 'jiuqu') {
     const major = realmInfo(save.cultivation).index;
     const amount = Math.floor(
