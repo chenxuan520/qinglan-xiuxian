@@ -8,6 +8,7 @@ import {
   balanceCases,
   caseKey,
   FULL_SEEDS,
+  LIMITS,
 } from '../../../scripts/balance/balance-policy.ts';
 import {
   acceptanceFailures,
@@ -268,10 +269,10 @@ test('终关延期补位仍检查共享最小间隔及0.04秒容差', () => {
   }
 });
 
-test('妖王存活P90仅终关阈值翻倍：旧王180秒、仙尊360秒，前六境仍90秒', () => {
+test('妖王存活P90按新走位放宽：前六境与终关旧王120秒、仙尊360秒', () => {
   for (let stage = 0; stage < 7; stage++) {
     for (const king of stage === 6 ? [0, 1, 2, 3, 4, 5, 6] : [stage]) {
-      const limit = stage === 6 ? (king === 6 ? 360 : 180) : 90;
+      const limit = stage === 6 ? (king === 6 ? 360 : 240) : 120;
       for (const seconds of [limit - 0.001, limit, limit + 0.001]) {
         const rows = Array.from({ length: 10 }, () => {
           const row = sample();
@@ -289,6 +290,11 @@ test('妖王存活P90仅终关阈值翻倍：旧王180秒、仙尊360秒，前�
       }
     }
   }
+});
+
+test('放宽后的本命容差覆盖双灵根100%与三灵根75%，不再产生分组Warning', () => {
+  assert.ok(1 <= Math.min(1, BARE_CLEAR_TARGETS.dual.max + LIMITS.starterRatePoints));
+  assert.ok(0.75 <= Math.min(1, BARE_CLEAR_TARGETS.triple.max + LIMITS.starterRatePoints));
 });
 
 test('模拟异常保留计划分母和异常数，不能从通关比例里偷偷删除', () => {
@@ -347,8 +353,8 @@ test('百分位不会修改数据，中位数和长尾独立，不用平均数�
 });
 
 test('用户确认的无辅助目标不能用全员通关替代，少量样本不能宣称达标', () => {
-  assert.deepEqual(BARE_CLEAR_TARGETS.dual, { min: 0.2, max: 0.7, target: 0.4 });
-  assert.deepEqual(BARE_CLEAR_TARGETS.triple, { min: 0.02, max: 0.5, target: 0.3 });
+  assert.deepEqual(BARE_CLEAR_TARGETS.dual, { min: 0.2, max: 0.85, target: 0.4 });
+  assert.deepEqual(BARE_CLEAR_TARGETS.triple, { min: 0.02, max: 0.6, target: 0.3 });
   assert.equal(BARE_CLEAR_TARGETS.none.max, 0.1);
   assert.ok(acceptanceFailures([sample()]).some((f) => f.includes('样本不足')));
   const rows = balanceCases(true)

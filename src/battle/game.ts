@@ -2018,23 +2018,33 @@ export class Game {
           fan(2, 0.38, 130);
         } else ringZones(8, 145, 46, 2, 0.4);
         break;
-      case 3:
-        if (phase === 0) {
+      case 3: {
+        const pools = () => {
           blast(p.x, p.y, 62, 5);
           for (const x of [-100, 100])
             for (const y of [-75, 75]) blast(p.x + x, p.y + y, 62, 5, 1.25);
-        } else if (phase === 1) {
+        };
+        const arrows = () => {
           const shots = fan(5, 0.75, this.tribulation ? 160 : 190);
           if (!this.tribulation)
             for (const shot of shots) {
               shot.miasmaArrow = true;
               shot.miasmaDamage = e.damage;
             }
+        };
+        const together = enraged && !this.tribulation;
+        if (phase === 0) {
+          pools();
+          if (together) arrows();
+        } else if (phase === 1) {
+          arrows();
+          if (together) pools();
         } else {
           const guards = summons(4);
           if (!this.tribulation) for (const guard of guards) guard.deathMiasma = e.damage;
         }
         break;
+      }
       case 4:
         if (phase === 0) summons(6);
         else if (phase === 1) ring(20, 200);

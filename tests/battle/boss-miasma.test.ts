@@ -98,6 +98,51 @@ test('第四境真实远距追袭生成六秒、速度120、半径70的追云，
   }
 });
 
+test('毒君半血后五毒瘴池与蚀骨毒矢齐发，半血前与独立天劫仍单招', () => {
+  const dual = (phase: number, arena = 3) => {
+    const { g, boss } = encounter(arena);
+    boss.hp = boss.maxHp / 2 - 1;
+    boss.skillStep = phase;
+    g.castBossSkill(boss, 1, 0);
+    return g;
+  };
+  for (const phase of [0, 1]) {
+    const g = dual(phase);
+    assert.equal(g.zones.length, 5, `phase ${phase} 瘴池`);
+    assert.equal(g.shots.length, 5, `phase ${phase} 毒矢`);
+    assert.ok(g.shots.every((shot) => shot.miasmaArrow && shot.miasmaDamage > 0));
+    const trial = dual(phase, 6);
+    assert.equal(trial.zones.length, 5, `终关 phase ${phase} 瘴池`);
+    assert.equal(trial.shots.length, 5, `终关 phase ${phase} 毒矢`);
+  }
+  const summon = dual(2);
+  assert.equal(summon.zones.length, 0);
+  assert.equal(summon.shots.length, 0);
+  assert.equal(summon.enemies.filter((e) => e.summonedBy !== undefined).length, 4);
+
+  for (const phase of [0, 1]) {
+    const { g, boss } = encounter();
+    boss.skillStep = phase;
+    g.castBossSkill(boss, 1, 0);
+    assert.equal(g.zones.length, phase === 0 ? 5 : 0);
+    assert.equal(g.shots.length, phase === 1 ? 5 : 0);
+  }
+
+  const { g: source } = encounter();
+  const tribulation = Game.createTribulation(structuredClone(source.save), source);
+  tribulation.boss!.bossStage = 3;
+  tribulation.boss!.hp = tribulation.boss!.maxHp / 2 - 1;
+  tribulation.boss!.skillStep = 0;
+  tribulation.castBossSkill(tribulation.boss!, 1, 0);
+  assert.equal(tribulation.zones.length, 5);
+  assert.equal(tribulation.shots.length, 0);
+  tribulation.zones = [];
+  tribulation.boss!.skillStep = 1;
+  tribulation.castBossSkill(tribulation.boss!, 1, 0);
+  assert.equal(tribulation.zones.length, 0);
+  assert.equal(tribulation.shots.length, 5);
+});
+
 test('毒君原生气血按3.8倍率出生，未计难度及区域境界倍率的基础目标为18.62万', () => {
   for (const [difficulty, rules] of DIFFICULTIES.entries()) {
     const { boss } = encounter(3, difficulty);

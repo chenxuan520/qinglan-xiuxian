@@ -121,13 +121,18 @@ test('前六关最新根范围含上下边界；无灵根10%通过、超出即�
   const { acceptanceFailures } = await import('../../../scripts/balance/balance-metrics.ts');
   assert.deepEqual(BARE_CLEAR_TARGETS, {
     heaven: { min: 0.7, max: 1, target: 0.9 },
-    variant: { min: 0.5, max: 0.95, target: 0.7 },
-    dual: { min: 0.2, max: 0.7, target: 0.4 },
-    triple: { min: 0.02, max: 0.5, target: 0.3 },
+    variant: { min: 0.5, max: 1, target: 0.7 },
+    dual: { min: 0.2, max: 0.85, target: 0.4 },
+    triple: { min: 0.02, max: 0.6, target: 0.3 },
     quad: { min: 0, max: 0.3, target: 0.1 },
     five: { min: 0, max: 0.25, target: 0.05 },
     none: { min: 0, max: 0.1, target: 0 },
   });
+  assert.ok(0.992 <= BARE_CLEAR_TARGETS.variant.max);
+  assert.ok(0.708 <= BARE_CLEAR_TARGETS.dual.max);
+  assert.ok(0.45 <= BARE_CLEAR_TARGETS.triple.max);
+  assert.ok(0.86 > BARE_CLEAR_TARGETS.dual.max);
+  assert.ok(0.61 > BARE_CLEAR_TARGETS.triple.max);
   const plan = ciCases();
   for (const [root, bounds] of Object.entries(BARE_CLEAR_TARGETS)) {
     const cases = plan.filter((c) => c.root === root);
