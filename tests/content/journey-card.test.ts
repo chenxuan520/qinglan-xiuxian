@@ -100,12 +100,15 @@ test('真仙与叩门状态分开，历史未知年岁不编造，六仙器只�
   assert.equal(ascendingCard.realmIndex, 7);
   assert.equal(ascendingCard.realmVerse, '雷叩仙关 · 生死一念');
   assert.equal(ascendingCard.ended, false);
+  assert.equal(ascendingCard.ascended, false);
   save.completed = [0, 1, 2, 3, 4, 5, 6];
   save.age = 17421;
   assert.equal(journeyCardData(save).realm, '真仙');
   assert.equal(journeyCardData(save).realmIndex, 8);
   assert.equal(journeyCardData(save).realmVerse, '长生已证 · 犹念人间');
   assert.equal(journeyCardData(save).ended, false);
+  assert.equal(journeyCardData(save).ending, 'ongoing');
+  assert.equal(journeyCardData(save).ascended, true);
   save.chronicle.milestones['six-immortals'] = null;
   assert.ok(journeyCardData(save).memories.some((m) => m.title === '六仙同御'));
   assert.equal(enterImmortalGate(save), true);

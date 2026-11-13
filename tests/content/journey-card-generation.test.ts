@@ -1,8 +1,8 @@
 import { ACHIEVEMENT_SCORES, journeyScore } from '../../src/content/journey-score.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createJourneyCard } from '../../src/content/journey-card.ts';
-import { freshSave, IMMORTAL_CULTIVATION } from '../../src/core/progress.ts';
+import { createJourneyCard, journeyCardData } from '../../src/content/journey-card.ts';
+import { freshSave, IMMORTAL_CULTIVATION, enterImmortalGate } from '../../src/core/progress.ts';
 import { TREASURES } from '../../src/core/data.ts';
 import { CURIO_IDS } from '../../src/items/curio-data.ts';
 import { SECTS } from '../../src/town/mortal-data.ts';
@@ -128,6 +128,52 @@ test('仅极限模式在留影右上绘入金色一命问道印记，适用于�
       assert.ok(seal.every((text) => text.color === '#efd48a'));
       assert.equal(JSON.stringify(save), before);
     }
+  }
+});
+
+test('成仙未叩门使用浅色仙境底图与成仙印文，叩门后仍为圆满', async (t) => {
+  const p = platform(t);
+  const save = freshSave();
+  save.completed = [0, 1, 2, 3, 4, 5, 6];
+  save.cultivation = IMMORTAL_CULTIVATION;
+  const card = journeyCardData(save);
+  assert.equal(card.ending, 'ongoing');
+  assert.equal(card.ascended, true);
+  p.images.length = 0;
+  p.texts.length = 0;
+  await createJourneyCard(save);
+  assert.equal(p.images[0].source, '/assets/qinglan-prologue.webp');
+  assert.equal(p.texts.find((text) => text.x === 913 && text.y === 182)!.value, '成仙');
+  assert.equal(p.texts.find((text) => text.x === 80 && text.y === 1658)!.value, '已证真仙');
+
+  assert.equal(enterImmortalGate(save), true);
+  p.images.length = 0;
+  p.texts.length = 0;
+  await createJourneyCard(save);
+  assert.equal(p.images[0].source, '/assets/qinglan-prologue.webp');
+  assert.equal(p.texts.find((text) => text.x === 913 && text.y === 182)!.value, '圆满');
+  assert.equal(p.texts.find((text) => text.x === 80 && text.y === 1658)!.value, '已叩入仙门');
+
+  const expected = {
+    ongoing: ['未竟', '仙途未尽'],
+    lifespan: ['寿终', '此世寿终'],
+    tribulation: ['劫殒', '止于天劫'],
+    ambush: ['身陨', '殒于劫修'],
+    extreme: ['身陨', '一命问道'],
+  } as const;
+  for (const ending of Object.keys(expected) as Array<keyof typeof expected>) {
+    p.images.length = 0;
+    p.texts.length = 0;
+    await createJourneyCard(freshSave(), ending);
+    assert.equal(p.images[0].source, '/assets/qinglan-prologue-dark.webp', ending);
+    assert.equal(
+      p.texts.find((text) => text.x === 913 && text.y === 182)!.value,
+      expected[ending][0],
+    );
+    assert.equal(
+      p.texts.find((text) => text.x === 80 && text.y === 1658)!.value,
+      expected[ending][1],
+    );
   }
 });
 

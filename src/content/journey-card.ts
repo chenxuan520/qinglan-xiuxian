@@ -393,6 +393,7 @@ export function journeyCardData(save: SaveData, ending?: JourneyCardEnding) {
     },
     identity: `${pathInfo(save.path).name} · ${sect ? `${sect.name} · ${sectRole(save)}` : '散修'}`,
     ending: state,
+    ascended: realm.max,
     extreme: isExtremeLife(save),
     ended: save.journeyEnded && realm.max,
     progress: { count: save.completed.length, deepest: deepest < 0 ? null : STAGES[deepest].name },
@@ -417,7 +418,7 @@ export async function createJourneyCard(
     try {
       return await Promise.all([
         loadImage(
-          card.ending === 'immortal'
+          card.ending === 'immortal' || (card.ending === 'ongoing' && card.ascended)
             ? '/assets/qinglan-prologue.webp'
             : '/assets/qinglan-prologue-dark.webp',
           children.signal,
@@ -530,14 +531,17 @@ export async function createJourneyCard(
       c.lineTo(1000, y);
       c.stroke();
     };
-    const state = {
-      immortal: ['圆满', '已叩入仙门'],
-      lifespan: ['寿终', '此世寿终'],
-      tribulation: ['劫殒', '止于天劫'],
-      ambush: ['身陨', '殒于劫修'],
-      extreme: ['身陨', '一命问道'],
-      ongoing: ['未竟', '仙途未尽'],
-    }[card.ending];
+    const state =
+      card.ending === 'ongoing' && card.ascended
+        ? ['成仙', '已证真仙']
+        : {
+            immortal: ['圆满', '已叩入仙门'],
+            lifespan: ['寿终', '此世寿终'],
+            tribulation: ['劫殒', '止于天劫'],
+            ambush: ['身陨', '殒于劫修'],
+            extreme: ['身陨', '一命问道'],
+            ongoing: ['未竟', '仙途未尽'],
+          }[card.ending];
     text('叩仙门 · 青岚纪', 80, 106, 27, '#d8c998');
     text('此 世 留 影', 80, 171, 48);
     c.fillStyle = '#794b37dd';
