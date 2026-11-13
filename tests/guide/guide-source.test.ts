@@ -62,6 +62,19 @@ test('本世珍品帮助说明强化后的实际增幅、次数与占位，保�
   assert.doesNotMatch(medicine, /回阳水|培婴丹/);
 });
 
+test('指南初入难度说明覆盖第二至第六境，问道与天劫仍只列第二、三、四、六境', () => {
+  const combat = guide.guideContent('combat');
+  assert.match(combat, /初入仙途下，第一境常态每1\.785秒出招、半血后0\.936秒/);
+  assert.match(
+    combat,
+    /第二至第六境的原生妖王出招更快、弹幕更快，同五境普通妖物与精英也更硬（血量与伤害分别 ×1\.15 \/ 1\.2 \/ 1\.25 \/ 1\.2 \/ 1\.2）/,
+  );
+  assert.match(combat, /适合首次历练；第二至第六境妖物略强、妖王出招略快/);
+  assert.match(combat, /怪群更密集，第二、三、四、六境原生妖王出招与弹幕更快/);
+  assert.match(combat, /妖物气血与伤害显著提升，第二、三、四、六境原生妖王出招与弹幕更快/);
+  assert.match(combat, /天劫下第二、三、四、六境妖王更快/);
+});
+
 test('帮助将三成边界限定为功法合计系数，并说明奇物另算', () => {
   const builds = guide.guideContent('builds');
   assert.match(builds, /施法间隔与承伤的功法合计系数各最低取基础的 30%/);

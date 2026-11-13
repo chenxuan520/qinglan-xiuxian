@@ -10,7 +10,8 @@ import {
 import { bossShotPose } from '../../src/battle/boss-mechanics.ts';
 import { freshSave } from '../../src/core/progress.ts';
 
-const affected = (stage: number) => [1, 2, 3, 5].includes(stage);
+const affected = (stage: number, difficulty: number) =>
+  [1, 2, 3, 5].includes(stage) || (difficulty === 0 && stage === 4);
 const near = (actual: number, expected: number) =>
   assert.ok(Math.abs(actual - expected) <= Math.max(1, Math.abs(expected)) * 1e-12);
 function encounter(stage: number, difficulty: number, arena = stage) {
@@ -41,11 +42,23 @@ test('三档七境妖王出招与弹速倍率符合方案，不新增伤害倍�
     ] as const) {
       assert.deepEqual(
         rules[field],
-        Array.from({ length: 7 }, (_, stage) => (affected(stage) ? factor : 1)),
+        Array.from({ length: 7 }, (_, stage) => (affected(stage, difficulty) ? factor : 1)),
       );
     }
     assert.equal('bossDamage' in rules, false);
   }
+});
+
+test('初入第五境与相邻关卡对齐，问道与天劫数组保持原值', () => {
+  assert.equal(DIFFICULTIES[0].bossCooldown[4], 0.9);
+  assert.equal(DIFFICULTIES[0].bossShotSpeed[4], 1.1);
+  assert.equal(DIFFICULTIES[0].stageRamp[4], 1.2);
+  assert.deepEqual(DIFFICULTIES[1].bossCooldown, [1, 0.9, 0.9, 0.9, 1, 0.9, 1]);
+  assert.deepEqual(DIFFICULTIES[1].bossShotSpeed, [1, 1.1, 1.1, 1.1, 1, 1.1, 1]);
+  assert.deepEqual(DIFFICULTIES[1].stageRamp, [1, 1.15, 1.5, 1.7, 1.6, 1.6, 1]);
+  assert.deepEqual(DIFFICULTIES[2].bossCooldown, [1, 0.8, 0.8, 0.8, 1, 0.8, 1]);
+  assert.deepEqual(DIFFICULTIES[2].bossShotSpeed, [1, 1.2, 1.2, 1.2, 1, 1.2, 1]);
+  assert.deepEqual(DIFFICULTIES[2].stageRamp, [1, 1.65, 2.2, 2.7, 3.1, 2.6, 1]);
 });
 
 test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七王保持基础值', () => {
@@ -65,7 +78,7 @@ test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七�
         for (const half of [false, true]) {
           const c = encounter(stage, difficulty, arena);
           cast(c, phase, half);
-          const active = arena !== 6 && affected(stage);
+          const active = arena !== 6 && affected(stage, difficulty);
           const speedFactor = active ? [1.1, 1.1, 1.2][difficulty] : 1;
           const cooldownFactor = active ? [0.9, 0.9, 0.8][difficulty] : 1;
           const expectedSpeeds = stage === 6 && half ? Array(32).fill(185) : speeds;

@@ -99,8 +99,9 @@ test('冥主摄魂灵轮20发速度200，百鬼召六只精英，毒君仍召四
   for (const arena of [4, 6]) {
     const { g, boss } = cast(4, arena, 1);
     assert.equal(g.shots.length, 20);
+    const speedFactor = arena === 6 ? 1 : DIFFICULTIES[0].bossShotSpeed[4];
     for (const shot of g.shots) {
-      near(Math.hypot(shot.vx, shot.vy), 200);
+      near(Math.hypot(shot.vx, shot.vy), 200 * speedFactor);
       assert.equal(shot.damage, boss.damage * 0.75);
       assert.equal(shot.bossMotion, undefined, '环弹不新增回程');
     }
@@ -192,7 +193,7 @@ test('问道和天劫七境妖王血量表精确生效，首境不跳过，冥�
     [2.2, 8, 8.4, 11.5, 13, 3.4, 1],
   ];
   const ramps = [
-    [1, 1.15, 1.2, 1.25, 1, 1.2, 1],
+    [1, 1.15, 1.2, 1.25, 1.2, 1.2, 1],
     [1, 1.15, 1.5, 1.7, 1.6, 1.6, 1],
     [1, 1.65, 2.2, 2.7, 3.1, 2.6, 1],
   ];
@@ -224,9 +225,9 @@ test('问道与天劫只加难第二至第六境，首末关和初入仙途不�
     name: '初入仙途',
     label: '从容修行',
     bossHp: [1, 1.2, 1.2, 1.2, 1.2, 1.2, 1],
-    bossCooldown: [1, 0.9, 0.9, 0.9, 1, 0.9, 1],
-    bossShotSpeed: [1, 1.1, 1.1, 1.1, 1, 1.1, 1],
-    stageRamp: [1, 1.15, 1.2, 1.25, 1, 1.2, 1],
+    bossCooldown: [1, 0.9, 0.9, 0.9, 0.9, 0.9, 1],
+    bossShotSpeed: [1, 1.1, 1.1, 1.1, 1.1, 1.1, 1],
+    stageRamp: [1, 1.15, 1.2, 1.25, 1.2, 1.2, 1],
     hp: 0.85 * 1.03,
     damage: 0.72 * 1.02,
     amount: 0.9,
