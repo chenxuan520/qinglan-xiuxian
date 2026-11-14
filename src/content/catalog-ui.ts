@@ -53,6 +53,7 @@ export function catalogPanel(save: SaveData, view: CatalogView): PanelDefinition
       id,
       view.weapons?.some((w) => w.id === id) ?? false,
       view.weapons?.some((w) => w.id === id && w.evolved) ?? false,
+      view.weapons?.map((w) => w.id) ?? [],
     );
   const visibleTreasures = catalogTreasures
     .map((t) => display(t.id))

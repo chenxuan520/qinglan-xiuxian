@@ -196,6 +196,7 @@ export function choiceCard(game: Game | null, save: SaveData, c: Choice, i: numb
           c.id,
           game?.weapons.some((w) => w.id === c.id) ?? false,
           game?.weapons.some((w) => w.id === c.id && w.evolved) ?? false,
+          game?.weapons.map((w) => w.id) ?? [],
         )
       : null;
   const item =

@@ -7,39 +7,42 @@ const COMBOS: Record<string, { curio: CurioId; notice: string; desc: string; nam
     curio: 'thunder-bamboo',
     name: '青竹蜂云剑',
     notice: '金雷入剑 · 青竹蜂云剑',
-    desc: '金雷竹细叶炼入剑身，飞剑出则如蜂群，挟金雷而去；伤害提高 20%。',
+    desc: '九天玄刹化为神雷，煌煌天威以剑引之；伤害提高 20%。',
   },
   fan: {
     curio: 'jade-ruyi',
     notice: '如意随风 · 拾取范围扩大',
-    desc: '扇风过处，连远处的灵物也被轻轻送到手边；拾取范围扩大 40%。',
+    desc: '八荒风起扇底相随，如意一指万宝来归；拾取范围扩大 40%。',
   },
   beads: {
     curio: 'sacred-fragment',
     notice: '梵音护体 · 佛光挡劫',
-    desc: '梵圣真片的道纹映入念珠，佛光绕身；每 12 秒可替你挡下一次伤害。',
+    desc: '梵圣真文铸我金身，劫火焚天不染纤尘；每 12 秒可替你挡下一次伤害。',
   },
   brush: {
     curio: 'jade-book',
     notice: '玉书落墨 · 判笔添字',
-    desc: '金阙玉书的古字随笔而下，沿目标方向连书四道墨印，依次爆发范围伤害。',
+    desc: '金阙玉书古字为凭，一笔四印判尽天刑；沿目标方向连书四道墨印，依次爆发范围伤害。',
   },
   bloodpool: {
     curio: 'spirit-spring',
     notice: '灵泉入盏 · 血池回春',
-    desc: '灵眼之泉的清光注入血盏，血池持续伤敌；命中时每半秒回复最大气血的 0.2%。',
+    desc: '血海翻涌杀伐无休，一泓灵泉化作春流；命中时每半秒回复最大气血的 0.2%。',
   },
   talisman: {
     curio: 'soul-wood',
     notice: '魂木生息 · 镇魂符更盛',
-    desc: '养魂木温养符中魂意，镇魂符可多穿透一只妖物，伤害提高 15%。',
+    desc: '魂木养魄千年不散，一符既落百鬼皆寒；镇魂符可多穿透一只妖物，伤害提高 15%。',
   },
   vortex: {
     curio: 'heaven-house',
     notice: '天机入阵 · 阴阳流转',
-    desc: '天机屋的推演之术映入阵盘，阴阳法阵更广，牵引更急。',
+    desc: '天机推演阴阳流转，方寸之间尽纳大千；阴阳法阵更广，牵引更急。',
   },
 };
+
+export const WIND_THUNDER_VERSE =
+  '雷鹏振翼风雷相从，一扇挥出万里长空；同持风雷翅时，历练移速由 15% 提高到 20%。';
 
 // 调用者须传入本局已取得的法宝；永久收藏不代表本局已经取得。
 export function curioCombo(save: Pick<SaveData, 'curios'>, id: string) {
@@ -58,10 +61,18 @@ export function comboTreasure(
   id: string,
   acquired = true,
   evolved = false,
+  weaponIds: string[] = [],
 ) {
   const item = treasure(id);
   const combo = acquired && !(id === 'brush' && evolved) && curioCombo(save, id);
-  return combo ? { ...item, name: combo.name ?? item.name, desc: combo.desc } : item;
+  const verse =
+    acquired &&
+    (id === 'fan' || id === 'lightning') &&
+    windThunderCombo(save, weaponIds.length ? weaponIds : [id])
+      ? WIND_THUNDER_VERSE
+      : '';
+  const desc = [combo ? combo.desc : item.desc, verse].filter(Boolean).join('\n');
+  return combo ? { ...item, name: combo.name ?? item.name, desc } : { ...item, desc };
 }
 
 export function treasureDisplayName(save: Pick<SaveData, 'curios'>, id: string, evolved = false) {

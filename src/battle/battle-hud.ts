@@ -302,7 +302,13 @@ export class BattleHud {
           const w = game!.weapons[i];
           if (!w)
             return '<div class="equipped-slot empty"><span>＋</span><small>待悟法宝</small></div>';
-          const t = comboTreasure(save, w.id, true, w.evolved);
+          const t = comboTreasure(
+            save,
+            w.id,
+            true,
+            w.evolved,
+            game!.weapons.map((weapon) => weapon.id),
+          );
           if (this.compact)
             return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}" aria-label="${w.evolved ? t.evolution : t.name} · ${w.evolved ? '觉醒' : `${w.level}重`}">${icon(t.id, t.color)}<b class="loadout-rank">${w.evolved ? '觉' : w.level}</b></div>`;
           return `<div class="equipped-slot ${w.evolved ? 'evolved' : ''}" title="${t.desc}">${icon(t.id, t.color)}<div><strong>${w.evolved ? t.evolution : t.name}</strong><span>${w.evolved ? '仙器 · 觉醒' : `${['', '一', '二', '三', '四', '五', '六'][w.level]}重`}<i>${'·'.repeat(w.level)}</i></span></div></div>`;

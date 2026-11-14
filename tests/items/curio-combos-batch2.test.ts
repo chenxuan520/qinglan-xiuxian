@@ -270,11 +270,13 @@ test('判天笔觉醒说明保留原文，基础态说明显示定稿，不泄�
   assert.ok(!catalogPanel(g.save, view).body.includes('连书四道'));
   g.weapons[0].evolved = false;
   const html = choiceCard(g, g.save, { type: 'weapon', id: 'brush', level: 2 }, 0);
-  assert.ok(html.includes('金阙玉书的古字随笔而下，沿目标方向连书四道墨印，依次爆发范围伤害。'));
+  assert.ok(
+    html.includes('金阙玉书古字为凭，一笔四印判尽天刑；沿目标方向连书四道墨印，依次爆发范围伤害。'),
+  );
   g.weapons = [];
   assert.ok(
     !choiceCard(g, g.save, { type: 'weapon', id: 'brush', level: 1 }, 0).includes(
-      '金阙玉书的古字随笔',
+      '金阙玉书古字为凭',
     ),
   );
 });

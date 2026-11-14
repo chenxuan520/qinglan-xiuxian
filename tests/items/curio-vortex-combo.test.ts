@@ -11,7 +11,7 @@ import { exportSave, importSave } from '../../src/core/save-transfer.ts';
 import { guideContent, GUIDE_TABS } from '../../src/guide/guide-content.ts';
 
 const notice = '天机入阵 · 阴阳流转';
-const desc = '天机屋的推演之术映入阵盘，阴阳法阵更广，牵引更急。';
+const desc = '天机推演阴阳流转，方寸之间尽纳大千；阴阳法阵更广，牵引更急。';
 const near = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 function fixture(held = true, acquired = true, evolved = false) {
   const save = freshSave('none', [], 'dual', () => 0.5);

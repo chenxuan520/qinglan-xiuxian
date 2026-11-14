@@ -2,9 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, type Weapon } from '../../src/battle/game.ts';
 import { freshSave } from '../../src/core/progress.ts';
-import { grantCurio } from '../../src/items/curio-data.ts';
+import { grantCurio, type CurioId } from '../../src/items/curio-data.ts';
 import { AWAKENING_BURST, TREASURES, treasure, type WeaponKind } from '../../src/core/data.ts';
-import { comboTreasure, treasureDisplayName } from '../../src/items/curio-combos.ts';
+import {
+  comboTreasure,
+  treasureDisplayName,
+  WIND_THUNDER_VERSE,
+} from '../../src/items/curio-combos.ts';
 import { choiceCard, damageReport } from '../../src/ui/common-ui.ts';
 import { pausePanel, settlementModal } from '../../src/ui/lobby-ui.ts';
 import { catalogPanel } from '../../src/content/catalog-ui.ts';
@@ -248,4 +252,65 @@ test('船客传闻新增三条原文，无条件保留在随机池', () => {
     for (const [, id] of pairs) grantCurio(save, id);
     assert.equal(dockRumorPool(save).find((r) => r.key === key)?.text, text);
   }
+});
+
+const comboTexts: readonly [WeaponKind, CurioId, string][] = [
+  ['sword', 'thunder-bamboo', '九天玄刹化为神雷，煌煌天威以剑引之；伤害提高 20%。'],
+  ['fan', 'jade-ruyi', '八荒风起扇底相随，如意一指万宝来归；拾取范围扩大 40%。'],
+  ['beads', 'sacred-fragment', '梵圣真文铸我金身，劫火焚天不染纤尘；每 12 秒可替你挡下一次伤害。'],
+  [
+    'brush',
+    'jade-book',
+    '金阙玉书古字为凭，一笔四印判尽天刑；沿目标方向连书四道墨印，依次爆发范围伤害。',
+  ],
+  [
+    'bloodpool',
+    'spirit-spring',
+    '血海翻涌杀伐无休，一泓灵泉化作春流；命中时每半秒回复最大气血的 0.2%。',
+  ],
+  [
+    'talisman',
+    'soul-wood',
+    '魂木养魄千年不散，一符既落百鬼皆寒；镇魂符可多穿透一只妖物，伤害提高 15%。',
+  ],
+  ['vortex', 'heaven-house', '天机推演阴阳流转，方寸之间尽纳大千；阴阳法阵更广，牵引更急。'],
+];
+
+test('七组奇物联动说明逐字使用定稿韵句，未持奇物时不显示', () => {
+  for (const [id, curio, desc] of comboTexts) {
+    const save = freshSave('none', [], 'dual', () => 0.5);
+    assert.equal(comboTreasure(save, id).desc, treasure(id).desc);
+    grantCurio(save, curio);
+    assert.equal(comboTreasure(save, id).desc, desc);
+    delete save.curios.bag[curio];
+    assert.equal(comboTreasure(save, id).desc, treasure(id).desc);
+  }
+});
+
+test('风雷翅说明接在芭蕉扇与雷符详情末尾，玉如意说明排在前面', () => {
+  const save = freshSave('none', [], 'dual', () => 0.5);
+  const fan = '八荒风起扇底相随，如意一指万宝来归；拾取范围扩大 40%。';
+  grantCurio(save, 'wind-wings');
+  assert.equal(comboTreasure(save, 'fan').desc, `${treasure('fan').desc}\n${WIND_THUNDER_VERSE}`);
+  assert.equal(
+    comboTreasure(save, 'lightning', true, false, ['fan', 'lightning']).desc,
+    `${treasure('lightning').desc}\n${WIND_THUNDER_VERSE}`,
+  );
+  grantCurio(save, 'jade-ruyi');
+  assert.equal(comboTreasure(save, 'fan').desc, `${fan}\n${WIND_THUNDER_VERSE}`);
+  const view = {
+    panel: 'treasure-detail',
+    catalogTreasures: TREASURES,
+    schoolFilter: 'all',
+    selectedTreasure: 'fan',
+    bookTab: 'treasures',
+    weapons: [{ id: 'fan', level: 1, evolved: false, timer: 0 }],
+  } as const;
+  const body = catalogPanel(save, view).body;
+  assert.ok(body.includes(fan));
+  assert.ok(body.includes(WIND_THUNDER_VERSE));
+  assert.equal(comboTreasure(save, 'sword').desc, treasure('sword').desc);
+  delete save.curios.bag['wind-wings'];
+  assert.equal(comboTreasure(save, 'fan').desc, fan);
+  assert.equal(comboTreasure(save, 'fan', false).desc, treasure('fan').desc);
 });
