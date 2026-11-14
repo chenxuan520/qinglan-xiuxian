@@ -1054,6 +1054,7 @@ export class Game {
     this.updateCacheChallenge();
     this.updatePickups(dt);
     this.#updateAltar(dt);
+    this.#anchorHearts();
     for (const e of this.effects) {
       e.life -= dt;
       if (e.kind === 'text') e.y -= dt * 28;
@@ -2373,7 +2374,10 @@ export class Game {
       e.dead = true;
       return;
     }
-    if (state.kind === 'heart') return;
+    if (state.kind === 'heart') {
+      this.#anchorHeart(e);
+      return;
+    }
     state.round = before + dt;
     if (state.round < BOSS_MECHANICS.wolfFlank) {
       const angle = Math.atan2(this.player.y - owner.y, this.player.x - owner.x);
@@ -2403,6 +2407,17 @@ export class Game {
         this.hurtPlayer(e.damage);
       if (e.charge === 0) state.round = 0;
     }
+  }
+  #anchorHeart(e: Enemy) {
+    // 木心扎根于藤圈中心，不受击退与牵引影响。
+    const root = this.zones.find((z) => z.sourceId === e.id);
+    if (!root) return;
+    e.x = root.x;
+    e.y = root.y;
+  }
+  #anchorHearts() {
+    for (const e of this.enemies)
+      if (!e.dead && e.bossSummon?.kind === 'heart') this.#anchorHeart(e);
   }
   #nearest(at: Point, excluded = new Set<number>(), range = 950) {
     let result: Enemy | undefined,

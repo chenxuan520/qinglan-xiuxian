@@ -118,6 +118,95 @@ for (let origin = 0; origin < 6; origin++)
       );
     });
 
+test('木心被击退或牵引后仍固定在藤圈圆心，其他妖物位移不变', () => {
+  const { g } = cast(0);
+  const [heart] = actors(g);
+  const root = g.zones.find((z) => z.sourceId === heart.id)!;
+  heart.bossSummon!.age = R.heartGrow;
+  heart.hp = heart.maxHp = 1e9;
+  g.weapons = [];
+  g.spawnBudget = -10000;
+  g.player.invincible = 99999;
+  const offset = () => Math.hypot(heart.x - root.x, heart.y - root.y);
+
+  // 游龙尺命中击退 25 像素。
+  Object.assign(g.player, { x: root.x - 300, y: root.y });
+  g.shots = [
+    {
+      x: root.x,
+      y: root.y,
+      vx: 0,
+      vy: 0,
+      life: 1,
+      radius: 18,
+      damage: 1,
+      color: '#ffffff',
+      kind: 'dragon',
+      pierce: 1,
+      hit: new Set<number>(),
+      origin: { x: root.x, y: root.y },
+      age: 0,
+      bounce: 0,
+      crit: false,
+    },
+  ];
+  g.update(0.001);
+  assert.ok(offset() < 0.5, `游龙尺击退后偏离藤圈圆心 ${offset().toFixed(2)} 像素`);
+
+  // pulse 范围伤害击退 70 像素。
+  Object.assign(g.player, { x: root.x - 60, y: root.y });
+  g.weapons = [{ id: 'pulse', level: 1, evolved: false, timer: 0 }];
+  g.cast(g.weapons[0]);
+  g.weapons[0].timer = 9999;
+  g.update(0.001);
+  assert.ok(offset() < 0.5, `pulse 击退后偏离藤圈圆心 ${offset().toFixed(2)} 像素`);
+
+  // 阴阳盘牵引：木心归位，普通妖物仍被拉动。
+  g.weapons = [];
+  g.zones.push({
+    x: root.x - 40,
+    y: root.y,
+    radius: 120,
+    life: 1,
+    maxLife: 1,
+    damage: 0,
+    tick: 99,
+    color: '#ffffff',
+    kind: 'vortex',
+    delay: 0,
+    hostile: false,
+  });
+  const bystander = g.spawnEnemy(10, false, false, { x: root.x - 40, y: root.y + 60 });
+  Object.assign(bystander, { speed: 0, cooldown: 9999, pursuitCooldown: 9999 });
+  const before = { x: bystander.x, y: bystander.y };
+  g.update(0.05);
+  assert.ok(offset() < 0.5, `牵引后偏离藤圈圆心 ${offset().toFixed(2)} 像素`);
+  assert.ok(
+    Math.hypot(bystander.x - before.x, bystander.y - before.y) > 0,
+    '普通妖物仍受阴阳盘牵引',
+  );
+
+  // 绘制坐标取木心本体，字样仍以本体中心对齐。
+  const translates: number[][] = [];
+  const c = new Proxy({} as CanvasRenderingContext2D, {
+    get:
+      (_, method: string) =>
+      (...args: unknown[]) => {
+        if (method === 'translate') translates.push(args as number[]);
+      },
+  });
+  drawBossSummon(c, heart);
+  assert.deepEqual(translates, [[root.x, root.y]]);
+
+  // 快照往返后仍在藤圈圆心。
+  g.weapons = [{ id: 'sword', level: 1, evolved: false, timer: 9999 }];
+  g.pause();
+  const restored = Game.restore(g.save, g.snapshot())!;
+  const restoredHeart = restored.enemies.find((e) => e.id === heart.id)!;
+  const restoredRoot = restored.zones.find((z) => z.sourceId === heart.id)!;
+  assert.ok(Math.hypot(restoredHeart.x - restoredRoot.x, restoredHeart.y - restoredRoot.y) < 0.5);
+});
+
 test('木心全程可打碎，扎根前不伤人，击碎即散阵，无击杀/经验/材料/回血收益', () => {
   const { g } = cast(0);
   const [heart] = actors(g);
