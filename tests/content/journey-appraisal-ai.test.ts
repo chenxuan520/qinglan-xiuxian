@@ -521,6 +521,142 @@ test('极限身陨评语不接纳仍然活着的断言', () => {
   assert.equal(validJourneyAppraisal(localJourneyAppraisal(input), input), true);
 });
 
+function sixRealmExtremeFacts() {
+  const save = freshSave('triple', ['metal', 'earth', 'fire'], 'orthodox', () => 0);
+  save.cultivation = 1e9;
+  save.completed = [0, 1, 2, 3, 4, 5];
+  save.age = 9630.5;
+  save.forge.sword = 7;
+  save.lifeMode = 'extreme';
+  save.pendingReincarnation = 'extreme';
+  return {
+    ...journeyAppraisalFacts(save, 'extreme'),
+    ties: ['home-reunion', 'friend-met', 'friend-letter-unread'],
+  };
+}
+const screenshotParts = {
+  title: '青岚问道',
+  ending: '六境已破，青岚剑鸣，一命问道的路已无悔落幕。',
+  cultivation: '青岚竹海至太虚天境六境已通关，青霄剑成，渡劫境未成仙。',
+  ties: '回青岚见亲人，船头结识渔友，旧信未展读。',
+};
+const clearDeathParts = {
+  ...screenshotParts,
+  ending: '一命问道，终在险境身陨，求道心意仍留山河。',
+  cultivation: '此前已过六境，青霄剑随行，渡劫是此世所至。',
+};
+const joined = (parts: typeof screenshotParts) => ({
+  title: parts.title,
+  detail: parts.ending + parts.cultivation + parts.ties,
+});
+
+test('截图回归：六境战绩不能代替身陨结局，端到端校验拒绝含糊落幕', () => {
+  const input = sixRealmExtremeFacts();
+  assert.equal(input.realmIndex, 7);
+  assert.equal(input.ascending, true);
+  assert.deepEqual(input.stages, [0, 1, 2, 3, 4, 5]);
+  assert.equal(validJourneyAppraisal(joined(screenshotParts), input), false);
+  const rejected: string[] = [];
+  assert.equal(
+    extractJourneyAppraisal({ response: screenshotParts }, input, (reason) =>
+      rejected.push(reason),
+    ),
+    null,
+  );
+  assert.deepEqual(rejected, ['facts']);
+  assert.deepEqual(
+    extractJourneyAppraisal({ response: clearDeathParts }, input),
+    joined(clearDeathParts),
+  );
+  assert.equal(validJourneyAppraisal(joined(clearDeathParts), input), true);
+  const prompt = JSON.parse(journeyAppraisalMessages(input)[1].content);
+  assert.match(prompt.outcome, /已经身陨/);
+  assert.match(prompt.endingRequirement, /此前战绩/);
+  assert.equal(prompt.clearedStages.length, 6);
+});
+
+test('极限结局句自身必须明确身陨，否认死亡、圆满落幕和将死亡藏进成果句均拒绝', () => {
+  const input = sixRealmExtremeFacts();
+  for (const ending of [
+    screenshotParts.ending,
+    '此世圆满落幕，虽已身陨，问道功业却已大功告成。',
+    '功成身退，此身已陨落，青岚长路留下此世的回声。',
+    '此世尚未身陨，青霄剑在手，问道的心意仍有回声。',
+    '此世并非身陨，青霄剑在手，问道的心意仍有回声。',
+    '此世尚未真正身陨，青霄剑在手，求道的脚步还在山河间延伸。',
+    '此世并未在险境中身陨，青霄剑在手，问道的心意仍有回声。',
+    '此世尚未真的在险境中身陨，青霄剑在手，问道的心意仍有回声。',
+    '此世圆满收官，虽已身陨，求道的心意仍有回声。',
+  ]) {
+    const parts = { ...clearDeathParts, ending };
+    assert.equal(validJourneyAppraisal(joined(parts), input), false, ending);
+    assert.equal(extractJourneyAppraisal({ response: parts }, input), null, ending);
+  }
+  const misplaced = {
+    ...clearDeathParts,
+    ending: screenshotParts.ending,
+    cultivation: '身陨之前曾过六境，青霄剑相伴，渡劫是此世所至。',
+  };
+  assert.equal(extractJourneyAppraisal({ response: misplaced }, input), null);
+  const pastAchievement = {
+    ...clearDeathParts,
+    cultivation: '此前六境圆满收官，青霄剑随行，渡劫是此世所至。',
+  };
+  assert.equal(validJourneyAppraisal(joined(pastAchievement), input), true);
+  assert.deepEqual(
+    extractJourneyAppraisal({ response: pastAchievement }, input),
+    joined(pastAchievement),
+  );
+  for (const ending of [
+    '此世身陨，此前六境圆满收官，求道心意仍留山河。',
+    '此前六境圆满收官，此世身陨，求道心意仍留山河。',
+  ]) {
+    const parts = { ...clearDeathParts, ending };
+    assert.equal(validJourneyAppraisal(joined(parts), input), true);
+    assert.deepEqual(extractJourneyAppraisal({ response: parts }, input), joined(parts));
+  }
+});
+
+test('Worker对含糊落幕重试纠正身陨；客户端拒绝旧错误回复并使用明确身陨的兜底', async () => {
+  const input = sixRealmExtremeFacts();
+  let calls = 0;
+  const result = await worker.fetch(
+    request(input),
+    env(async (_model, options) => {
+      calls++;
+      if (calls === 1) return { response: screenshotParts };
+      const correction = options.messages.at(-1).content;
+      assert.match(correction, /ending.*已经身陨/);
+      assert.match(correction, /此前战绩/);
+      return { response: clearDeathParts };
+    }),
+  );
+  assert.equal(result.status, 200);
+  assert.equal(calls, 2);
+  assert.deepEqual(await result.json(), { appraisal: joined(clearDeathParts) });
+  let fetches = 0;
+  const fallback = await resolveJourneyAppraisal(input, new AbortController().signal, {
+    origin,
+    fetcher: async () => {
+      fetches++;
+      return response(joined(screenshotParts));
+    },
+  });
+  assert.deepEqual(fallback, localJourneyAppraisal(input));
+  assert.match(fallback.detail, /^此世身陨。/);
+  assert.deepEqual(
+    await resolveJourneyAppraisal(input, new AbortController().signal, {
+      origin,
+      fetcher: async () => {
+        fetches++;
+        return response(joined(clearDeathParts));
+      },
+    }),
+    joined(clearDeathParts),
+  );
+  assert.equal(fetches, 2);
+});
+
 test('评语输出拒绝日志记录同一固定原因，不泄露模型正文或此世摘要，也不混入后续请求', async (t) => {
   const warning = t.mock.method(console, 'warn', () => {});
   const ray = '1234567890abcdef-SJC';

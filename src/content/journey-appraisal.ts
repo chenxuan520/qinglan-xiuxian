@@ -532,6 +532,10 @@ export function localJourneyAppraisal(f: JourneyAppraisalFacts): JourneyAppraisa
     return words[seed % words.length];
   };
   const ending = endingWords(f, pick);
+  if (f.ending === 'extreme') {
+    for (const key of ['full', 'compact'] as const) ending[key] = '此世身陨。' + ending[key];
+    ending.brief = '此世身陨。';
+  }
   const cultivation = cultivationWords(f, pick);
   const ties = tiesWords(f, pick);
   const parts = [ending.full, cultivation.full, ties.full];

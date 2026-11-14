@@ -14,8 +14,22 @@ const plain = (value: unknown, min: number, max: number): value is string =>
   value.length <= max &&
   /^[\p{Script=Han}\p{Number}，。！？；：、·「」《》“”‘’（）—…]+$/u.test(value);
 
+function explicitExtremeDeath(text: string) {
+  const asserted = text.replace(
+    /(?:尚未|还未|仍未|未曾|不曾|没有|并未|并非|不是|未|不会|不)(?:真正|真的|已经|就此|再|曾经|不幸)*(?:在[^，。！？；：]{0,12})?(?:身陨|身殒|身亡|殒命|身死|战死|丧命)/g,
+    '',
+  );
+  return (
+    /身陨|身殒|身亡|殒命|身死|战死|丧命/.test(asserted) &&
+    !/(?:圆满|功成)(?:落幕|结束)|功成身退|大功告成|(?:此世|此生|一命问道)[^，。！？；：]{0,12}圆满收官/.test(
+      text,
+    )
+  );
+}
+
 function fitsFacts(appraisal: JourneyAppraisal, facts: JourneyAppraisalFacts) {
   const text = appraisal.title + appraisal.detail;
+  if (facts.ending === 'extreme' && !explicitExtremeDeath(appraisal.detail)) return false;
   // 成品是人生评语，不向玩家解释摘要、存档缺项或生成过程。
   if (
     /记载|记录|存档|数据|资料|信息|字段|摘要|档案|缘簿|纪事|留白|空白|未载|未录|不详|无从考证/.test(
@@ -157,7 +171,7 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
     tribulation: '此世已殒于天劫',
     ambush: '此世在坊外遭劫修袭杀而身陨，已经结束；不是寿尽、天劫或成功脱身',
     extreme:
-      '此世选择一命问道的极限修行，已在险境中落幕；不编造具体死因，不是寿尽，也不能说仍可继续修行',
+      '此世选择一命问道的极限修行，已经身陨，此世结束；ending 必须明确写出身陨，不能只写无悔落幕；不编造具体死因，不是寿尽或圆满通关，也不能说仍可继续修行',
     immortal: '已证真仙并叩入仙门，此世圆满结束',
   }[facts.ending];
   const ref = localJourneyAppraisal(facts);
@@ -177,6 +191,12 @@ export function journeyAppraisalMessages(facts: JourneyAppraisalFacts) {
       content: JSON.stringify({
         ...facts,
         outcome: ending,
+        ...(facts.ending === 'extreme'
+          ? {
+              endingRequirement:
+                '结局句 ending 必须明确表达已经身陨，不得写成圆满落幕、功成身退或胜利结局；已通过秘境只作为此前战绩，不能代替此世结局。',
+            }
+          : {}),
         realm: facts.ascending ? '渡劫' : facts.mortal ? '凡人' : REALMS[facts.realmIndex],
         realmStatus: isImmortalRealm ? '已证真仙' : '尚未成仙',
         currentRoot: spiritRootInfo(facts.root).name,
@@ -232,6 +252,10 @@ export function journeyAppraisalRetryMessage(
     hint = 'title 必须是单个 2 至 6 个纯汉字的字符串，不能是数组或备选列表。';
   } else if (reason === 'facts' && facts) {
     const issues: string[] = [];
+    if (facts.ending === 'extreme')
+      issues.push(
+        '本次是极限身陨结局，ending 必须明确写出已经身陨，不可只写无悔落幕或写成圆满通关；已通过的秘境仅是此前战绩，不编造具体死因；',
+      );
     if (
       facts.realmIndex < 8 &&
       /(?:已成|终成|终于成|已证|证得|证就|修成)真仙|真仙(?:已成|已证|得证|之境已证)|(?:已证|证得|终得)长生|长生(?:已证|已经证得|已得|得证)|(?:已|终|终于|业已)成仙|凡骨登仙|飞升成仙/.test(
@@ -378,6 +402,8 @@ export function extractJourneyAppraisal(
       return reject('title-format');
     if (!plain(appraisal.detail, 30, JOURNEY_APPRAISAL_SETTINGS.maxDetailLength))
       return reject('detail-format');
+    if (facts.ending === 'extreme' && !explicitExtremeDeath(parsed.ending as string))
+      return reject('facts');
     return validJourneyAppraisal(appraisal, facts) ? appraisal : reject('facts');
   } catch {
     return reject('json');

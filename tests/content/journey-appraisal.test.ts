@@ -29,6 +29,54 @@ function assertLength(f: JourneyAppraisalFacts) {
   assert.doesNotMatch(appraisal.detail, /记载|记录|存档|数据|缘簿|纪事|留白|空白|未载/);
   return appraisal;
 }
+test('极限身陨兜底始终明确身陨，长成就与多牵挂压缩后仍保留结局', () => {
+  for (let age = 15; age < 115; age++) {
+    const f = facts({
+      ending: 'extreme',
+      age,
+      realmIndex: 7,
+      ascending: true,
+      stages: [0, 1, 2, 3, 4, 5],
+      feats: ['six-immortals', 'forge', 'collection'],
+      ties: [
+        'home-reunion',
+        'companion-met',
+        'companion-bond',
+        'friend-met',
+        'friend-river',
+        'student-met',
+        'student-teach',
+      ],
+    });
+    assert.match(assertLength(f).detail, /^此世身陨。/);
+    assert.match(assertLength({ ...f, feats: [], ties: [] }).detail, /^此世身陨。/);
+    assert.match(
+      assertLength({
+        ...f,
+        root: 'none',
+        realmIndex: 8,
+        ascending: false,
+        stages: [0, 1, 2, 3, 4, 5, 6],
+        tribulations: 5,
+        feats: ['peerless', 'curio-three', 'hard-immortal', 'rootless-immortal'],
+        ties: [
+          'home-letter-found',
+          'home-letter-read',
+          'companion-met',
+          'companion-bond',
+          'companion-letter-read',
+          'friend-met',
+          'friend-river',
+          'friend-letter-unread',
+          'student-met',
+          'student-teach',
+          'student-letter-read',
+        ],
+      }).detail,
+      /^此世身陨。/,
+    );
+  }
+});
 test('零修为纪念评语使用凡人事实，获得修为后才称炼气，原摘要协议仍能读取', () => {
   const save = freshSave();
   const mortal = journeyAppraisalFacts(save, 'ongoing');
