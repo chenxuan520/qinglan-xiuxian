@@ -192,8 +192,10 @@ export function drawPlayerAilments(
   reduced: boolean,
 ) {
   const p = game.player;
+  const slow = game.slowStatus;
   if (
-    !game.slowed &&
+    !slow.enemy &&
+    !slow.altar &&
     !game.burning.life &&
     !game.immobilized &&
     !game.sealed &&
@@ -206,8 +208,9 @@ export function drawPlayerAilments(
   c.textAlign = 'center';
   c.lineWidth = 3;
   c.strokeStyle = '#173e4e';
-  if (game.slowed > 0) {
-    const label = '迟滞 · 移速 −25%';
+  if (slow.enemy || slow.altar) {
+    const name = slow.enemy && slow.altar ? '迟滞 + 冰封反噬' : slow.altar ? '冰封反噬' : '迟滞';
+    const label = `${name} · 移速 −${slow.percent}%`;
     c.fillStyle = '#d3f1ff';
     c.strokeText(label, p.x, p.y + 46);
     c.fillText(label, p.x, p.y + 46);
@@ -217,7 +220,7 @@ export function drawPlayerAilments(
     c.ellipse(p.x, p.y + 12, 25, 10, 0, 0, Math.PI * 2);
     c.stroke();
   }
-  let labelY = p.y + (game.slowed > 0 ? 62 : 46);
+  let labelY = p.y + (slow.enemy || slow.altar ? 62 : 46);
   for (const [active, label] of [
     [game.immobilized, '雷麻 · 禁锢'],
     [game.sealed, '封宝 · 无法施法'],

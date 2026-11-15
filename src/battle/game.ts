@@ -2440,6 +2440,13 @@ export class Game {
       )
     );
   }
+  /** 人物脚下减速标签所需：妖物迟滞、冰封反噬是否生效，以及合计减速百分比（取整） */
+  get slowStatus() {
+    const enemy = this.slowed > 0;
+    const altar = (this.altar?.slowUntil ?? 0) > this.time;
+    const factor = (enemy ? 1 - 0.25 * this.medicine.drawback : 1) * (altar ? 0.75 : 1);
+    return { enemy, altar, percent: Math.round((1 - factor) * 100) };
+  }
   get buddhaShieldReady() {
     return !!this.#activeCombo('beads') && this.#buddhaCooldown <= 0;
   }

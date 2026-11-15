@@ -5,6 +5,7 @@ import { freshSave } from '../../src/core/progress.ts';
 import { ENEMIES, ENEMY_TACTICS } from '../../src/core/data.ts';
 import { regionalEnemyFields } from '../../src/battle/regional-combat.ts';
 import { drawPlayerAilments } from '../../src/battle/regional-render.ts';
+import { altarHudStatus } from '../../src/battle/altar-ui.ts';
 import { autoplayInput } from '../../src/battle/autoplay.ts';
 
 function arena(stage = 1) {
@@ -226,6 +227,71 @@ test('AI按可见错拍预警换位，画面在减少动态下也能区分灼烧
   assert.ok(labels.includes('雷麻 · 禁锢'));
   assert.ok(labels.includes('灼烧'));
   assert.equal(ENEMIES[e.type].name, '曜日星灵');
+});
+
+test('冰封反噬与妖物迟滞叠加显示实际合计减速，移速公式不变', () => {
+  const g = arena(2);
+  const base = g.stats.speed;
+  assert.deepEqual(g.slowStatus, { enemy: false, altar: false, percent: 0 });
+  g.slowed = 1;
+  assert.deepEqual(g.slowStatus, { enemy: true, altar: false, percent: 25 });
+  assert.ok(Math.abs(g.stats.speed - base * 0.75) < 1e-9);
+
+  const labels: string[] = [];
+  const labelY = new Map<string, number>();
+  let ellipses = 0;
+  const c = new Proxy({} as CanvasRenderingContext2D, {
+    get:
+      (_, method: string) =>
+      (...args: unknown[]) => {
+        if (method === 'fillText') {
+          labels.push(String(args[0]));
+          labelY.set(String(args[0]), Number(args[2]));
+        }
+        if (method === 'ellipse') ellipses++;
+        for (const arg of args) if (typeof arg === 'number') assert.ok(Number.isFinite(arg));
+      },
+  });
+  drawPlayerAilments(c, g, 1, false);
+  assert.ok(labels.includes('迟滞 · 移速 −25%'));
+
+  g.altar!.slowUntil = g.time + 20;
+  assert.deepEqual(g.slowStatus, { enemy: true, altar: true, percent: 44 });
+  assert.ok(Math.abs(g.stats.speed - base * 0.75 * 0.75) < 1e-9);
+  labels.length = 0;
+  ellipses = 0;
+  drawPlayerAilments(c, g, 1, false);
+  assert.ok(labels.includes('迟滞 + 冰封反噬 · 移速 −44%'));
+  assert.equal(ellipses, 1, '减速时应绘制冰蓝椭圆');
+  g.immobilized = 1;
+  labels.length = 0;
+  drawPlayerAilments(c, g, 1, false);
+  assert.equal(labelY.get('雷麻 · 禁锢'), g.player.y + 62);
+  g.immobilized = 0;
+
+  g.slowed = 0;
+  labels.length = 0;
+  drawPlayerAilments(c, g, 1, false);
+  assert.ok(labels.includes('冰封反噬 · 移速 −25%'));
+
+  g.medicine.drawback = 0.8;
+  g.slowed = 1;
+  assert.equal(g.slowStatus.percent, 40);
+  labels.length = 0;
+  drawPlayerAilments(c, g, 1, false);
+  assert.ok(labels.includes('迟滞 + 冰封反噬 · 移速 −40%'));
+  g.medicine.drawback = 1;
+
+  g.altar!.phase = 'accepted';
+  assert.equal(altarHudStatus(g), '冰封万里 · 剩余 20 秒');
+  g.time += 20.1;
+  g.slowed = 0;
+  labels.length = 0;
+  ellipses = 0;
+  drawPlayerAilments(c, g, 1, false);
+  assert.ok(!labels.some((label) => label.includes('冰封反噬')));
+  assert.equal(ellipses, 0, '减速结束后不再绘制椭圆');
+  assert.equal(altarHudStatus(g), '');
 });
 
 test('小怪漂移瘴云保持4.8秒并提速150%，妖王仍为五处固定瘴池', () => {
