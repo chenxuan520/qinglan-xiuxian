@@ -3,12 +3,12 @@ import { BOSS_MECHANICS } from './boss-mechanics.ts';
 // 妖物志妖王卡片：特性一句话，招式按名称逐条说明。
 export const BOSS_TRAITS = [
   '弹幕与藤圈附藤缠，<span class="combat-unit">3秒</span>暂难拾取',
-  '弹幕附灼烧',
+  '弹幕与地火附灼烧',
   '弹幕附减速',
   '毒伤命中后<span class="combat-unit">3秒</span>无法回复，清灵散可减伤并缩短蚀体；半血后毒矢与瘴池齐发',
-  '弹幕命中封宝<span class="combat-unit">2秒</span>',
-  '弹幕与雷网触之定身',
-  '万劫随身：弹幕暗藏六境劫数；劫息回元：连续<span class="combat-unit">3秒</span>未受伤害则每秒回复<span class="combat-unit">1%</span>气血；半血后部分弹幕更密',
+  '魂弹与鬼牢附封宝<span class="combat-unit">2秒</span>',
+  '弹幕、雷网与落雷触之定身',
+  '万劫随身：弹幕暗藏六境劫数；劫息回元：连续<span class="combat-unit">3秒</span>未受伤害则每秒回复<span class="combat-unit">1%</span>气血；半血后部分弹幕更密；落雷亦附六境之效',
 ];
 
 export const BOSS_SKILL_TEXT: Record<string, string> = {

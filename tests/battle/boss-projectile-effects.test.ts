@@ -537,3 +537,173 @@ test('5支毒矢同时在500像素处化瘴，相邻毒池圆心距离与两池�
     );
   }
 });
+
+function groundAt(stage: number, kind: string, damage = 1, arena = stage) {
+  const c = encounter(stage, arena);
+  c.g.zone(c.g.player.x, c.g.player.y, 60, 1, damage, '#ffffff', kind, 0, true);
+  c.g.updateZones(0.001);
+  return c;
+}
+
+test('妖王地面阵命中附本境弹幕效果，周天星轨只扣血', () => {
+  for (const [kind, duration, key] of [
+    ['boss-flame', ENEMY_CONTROL.burn, 'burning'],
+    ['boss-soul', ENEMY_CONTROL.seal, 'sealed'],
+    ['boss-rift', ENEMY_CONTROL.bind, 'immobilized'],
+  ] as const) {
+    const c = groundAt(4, kind);
+    if (key === 'burning') {
+      assert.equal(c.g.burning.life, duration);
+      assert.ok(c.g.burning.damage > 0);
+    } else assert.equal(c.g[key], duration);
+    assert.ok(c.g.player.hp < c.g.player.maxHp, `${kind} 命中应扣血`);
+  }
+
+  for (const kind of ['boss-thunder', 'boss-judgement'])
+    for (let effect = 0; effect < 6; effect++) {
+      const c = encounter(6, 6);
+      c.g.random = () => (effect + 0.5) / 6;
+      c.g.zone(c.g.player.x, c.g.player.y, 60, 1, 1, '#ffffff', kind, 0, true);
+      c.g.updateZones(0.001);
+      const ailments = [
+        c.g.entangled,
+        c.g.burning.life,
+        c.g.slowed,
+        c.g.corroded,
+        c.g.sealed,
+        c.g.immobilized,
+      ];
+      assert.ok(ailments[effect] > 0, `${kind} 随机效果 ${effect} 未生效`);
+      assert.ok(ailments.every((value, index) => index === effect || value === 0));
+    }
+
+  const sweep = encounter(5, 5);
+  cast(sweep, 4);
+  const zone = sweep.g.zones.find((z) => z.kind === 'boss-sweep')!;
+  zone.delay = 0;
+  Object.assign(sweep.g.player, {
+    x: (zone.x + zone.endX!) / 2,
+    y: (zone.y + zone.endY!) / 2,
+    invincible: 0,
+  });
+  const hp = sweep.g.player.hp;
+  sweep.g.updateZones(0.001);
+  assert.ok(sweep.g.player.hp < hp, '周天星轨应造成伤害');
+  assert.equal(sweep.g.immobilized, 0, '周天星轨不附加定身');
+});
+
+test('藤圈、冰牢、毒瘴沿用原效果，封宝与定身遵守保护期', () => {
+  const roots = groundAt(0, 'boss-roots');
+  assert.equal(roots.g.entangled, ENEMY_CONTROL.entangle);
+  const protection = roots.g.nextEnemyEntangleAt;
+  roots.g.player.invincible = 0;
+  roots.g.updateZones(0.5);
+  assert.equal(roots.g.entangled, ENEMY_CONTROL.entangle);
+  assert.equal(roots.g.nextEnemyEntangleAt, protection);
+
+  assert.equal(groundAt(2, 'boss-frost').g.slowed, ENEMY_CONTROL.slow);
+  assert.equal(groundAt(3, 'boss-miasma').g.corroded, ENEMY_CONTROL.corrode);
+
+  for (const [kind, key] of [
+    ['boss-soul', 'sealed'],
+    ['boss-rift', 'immobilized'],
+  ] as const) {
+    const c = groundAt(4, kind);
+    const before = c.g[key];
+    const next = key === 'sealed' ? c.g.nextEnemySealAt : c.g.nextEnemyBindAt;
+    c.g.player.invincible = 0;
+    c.g.updateZones(0.5);
+    assert.equal(c.g[key], before, `${kind} 保护期内不重复施加`);
+    assert.equal(key === 'sealed' ? c.g.nextEnemySealAt : c.g.nextEnemyBindAt, next);
+  }
+});
+
+test('无敌与佛光挡劫不附加地面阵效果', () => {
+  const invincible = encounter(4, 4);
+  invincible.g.player.invincible = 1;
+  const hp = invincible.g.player.hp;
+  invincible.g.zone(
+    invincible.g.player.x,
+    invincible.g.player.y,
+    60,
+    1,
+    1,
+    '#ffffff',
+    'boss-rift',
+    0,
+    true,
+  );
+  invincible.g.updateZones(0.001);
+  assert.equal(invincible.g.player.hp, hp);
+  assert.equal(invincible.g.immobilized, 0);
+
+  const shielded = encounter(4, 4);
+  shielded.g.weapons = [{ id: 'beads', level: 1, evolved: false, timer: 99999 }];
+  grantCurio(shielded.g.save, 'sacred-fragment');
+  assert.equal(shielded.g.buddhaShieldReady, true);
+  const shieldedHp = shielded.g.player.hp;
+  shielded.g.zone(
+    shielded.g.player.x,
+    shielded.g.player.y,
+    60,
+    1,
+    1,
+    '#ffffff',
+    'boss-soul',
+    0,
+    true,
+  );
+  shielded.g.updateZones(0.001);
+  assert.equal(shielded.g.player.hp, shieldedHp);
+  assert.equal(shielded.g.sealed, 0);
+});
+
+test('独立天劫中的旧王地面阵不附新效果', () => {
+  const base = encounter(4, 4);
+  base.g.save.age = base.g.save.nextTribulationAge = 20000;
+  const g = Game.createTribulation(base.g.save, base.g);
+  g.boss!.bossStage = 4;
+  g.player.invincible = 0;
+  g.zone(g.player.x, g.player.y, 60, 1, 1, '#ffffff', 'boss-rift', 0, true);
+  const hp = g.player.hp;
+  g.updateZones(0.001);
+  assert.ok(g.player.hp < hp);
+  assert.equal(g.immobilized, 0);
+});
+
+test('真实出招生成的地面阵与本境弹幕效果一一对应', () => {
+  const flame = encounter(1);
+  cast(flame, 1);
+  const flameZone = flame.g.zones.find((z) => z.kind === 'boss-flame')!;
+  flameZone.delay = 0;
+  Object.assign(flame.g.player, { x: flameZone.x, y: flameZone.y, invincible: 0 });
+  flame.g.updateZones(0.001);
+  assert.ok(flame.g.burning.life > 0, '焚天火径应附灼烧');
+
+  const soul = encounter(4);
+  cast(soul, 2);
+  const soulZone = soul.g.zones.find((z) => z.kind === 'boss-soul')!;
+  soulZone.delay = 0;
+  Object.assign(soul.g.player, { x: soulZone.x, y: soulZone.y, invincible: 0 });
+  soul.g.updateZones(0.001);
+  assert.equal(soul.g.sealed, ENEMY_CONTROL.seal, '六道鬼牢应附封宝');
+
+  for (const phase of [0, 2]) {
+    const rift = encounter(5);
+    cast(rift, phase);
+    const riftZone = rift.g.zones.find((z) => z.kind === 'boss-rift')!;
+    riftZone.delay = 0;
+    Object.assign(rift.g.player, { x: riftZone.x, y: riftZone.y, invincible: 0 });
+    rift.g.updateZones(0.001);
+    assert.equal(rift.g.immobilized, ENEMY_CONTROL.bind, `阶段 ${phase} 落雷应附定身`);
+  }
+
+  const thunder = encounter(6);
+  thunder.g.random = () => 0.5;
+  cast(thunder, 1);
+  const thunderZone = thunder.g.zones.find((z) => z.kind === 'boss-thunder')!;
+  thunderZone.delay = 0;
+  Object.assign(thunder.g.player, { x: thunderZone.x, y: thunderZone.y, invincible: 0 });
+  thunder.g.updateZones(0.001);
+  assert.equal(thunder.g.corroded, ENEMY_CONTROL.corrode, '仙尊落雷应附随机六境之一');
+});

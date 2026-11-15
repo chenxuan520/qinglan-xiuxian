@@ -3111,10 +3111,15 @@ export class Game {
             this.#effect(z.x, z.y, 0.45, z.radius, z.color, 'lightning');
           if (z.life > 0 && hazardDistance(z, this.player) < z.radius + 8) {
             const poison = poisonousHazard(z);
+            const groundEffect =
+              this.player.invincible <= 0 && !this.buddhaShieldReady
+                ? this.#bossGroundEffect(z)
+                : null;
+            if (groundEffect !== null) this.#applyBossEffect(groundEffect);
             this.hurtPlayer(
               z.damage * (poison ? this.medicine.poison : 1),
-              this.stage === 1 && z.kind === 'enemy-firepath',
-              poison,
+              (this.stage === 1 && z.kind === 'enemy-firepath') || groundEffect === 1,
+              poison || groundEffect === 3,
             );
           }
         } else if (z.kind === 'pagoda') {
@@ -3967,6 +3972,31 @@ export class Game {
     this.state = cleared ? 'won' : 'playing';
     this.announce('重燃道心 · 满血复活 · 三息护体');
     return true;
+  }
+  /** 妖王地面阵对应的弹幕效果编号（0 藤缠 1 灼烧 2 减速 3 蚀体 4 封宝 5 定身），无则 null */
+  #bossGroundEffect(z: Zone): number | null {
+    if (this.tribulation) return null; // 独立天劫保持旧王原参数
+    switch (z.kind) {
+      case 'boss-flame':
+        return 1;
+      case 'boss-soul':
+        return 4;
+      case 'boss-rift':
+        return 5;
+      case 'boss-thunder':
+      case 'boss-judgement':
+        return Math.floor(this.random() * 6);
+      default:
+        return null; // 藤缠、减速、蚀体沿用现有判定，不重复施加
+    }
+  }
+  /** 与弹幕命中相同的效果施加 */
+  #applyBossEffect(effect: number) {
+    if (effect === 0) this.enemyEntangle();
+    else if (effect === 2) this.enemySlow();
+    else if (effect === 4) this.enemySeal();
+    else if (effect === 5) this.enemyBind();
+    // 1 灼烧、3 蚀体经由 hurtPlayer 的 burn / poison 参数施加
   }
   hurtPlayer(damage: number, burn = false, poison = false) {
     if (this.player.invincible > 0 || this.state !== 'playing') return;
