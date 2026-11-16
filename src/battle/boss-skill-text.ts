@@ -8,7 +8,7 @@ export const BOSS_TRAITS = [
   '毒伤命中后<span class="combat-unit">3秒</span>无法回复，清灵散可减伤并缩短蚀体；半血后毒矢与瘴池齐发',
   '魂弹与鬼牢附封宝<span class="combat-unit">2秒</span>',
   '弹幕、雷网与落雷触之定身',
-  '万劫随身：弹幕暗藏六境劫数；劫息回元：连续<span class="combat-unit">3秒</span>未受伤害则每秒回复<span class="combat-unit">1%</span>气血；半血后部分弹幕更密；落雷亦附六境之效',
+  '万劫随身：弹幕暗藏六境劫数；劫息回元：连续<span class="combat-unit">3秒</span>未受伤害则每秒回复<span class="combat-unit">1%</span>气血，半血后等待缩短为<span class="combat-unit">1.5秒</span>；半血后部分弹幕更密；落雷亦附六境之效',
 ];
 
 export const BOSS_SKILL_TEXT: Record<string, string> = {

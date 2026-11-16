@@ -146,6 +146,8 @@ import {
 const distanceSquared = (a: Point, b: Point) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const SOVEREIGN_RECOVERY_NOTICE = '九天执劫仙尊 · 劫息回元';
+const SOVEREIGN_RECOVERY_DELAY = 3;
+const SOVEREIGN_ENRAGED_RECOVERY_DELAY = 1.5;
 // 模拟器会临时替换 Math.random；祭坛默认源保留独立引用，不进入该随机序列。
 const defaultAltarRandom = Math.random;
 
@@ -1372,7 +1374,8 @@ export class Game {
         e.bossStage === FINAL_TRIAL_STAGE &&
         e.hp > 0 &&
         e.hp < e.maxHp &&
-        this.time - (e.lastHurtAt ?? this.time) >= 3
+        this.time - (e.lastHurtAt ?? this.time) >=
+          (e.hp < e.maxHp / 2 ? SOVEREIGN_ENRAGED_RECOVERY_DELAY : SOVEREIGN_RECOVERY_DELAY)
       ) {
         const hp = e.hp;
         e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.01 * dt);

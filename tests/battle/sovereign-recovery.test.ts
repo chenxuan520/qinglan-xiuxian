@@ -59,6 +59,27 @@ test('仙尊从登场起等待三秒，每秒恢复最大气血的百分之一',
   assert.equal(game.pendingSovereignRecoveryNotice, '九天执劫仙尊 · 劫息回元');
 });
 
+test('半血以下等待缩短为一秒半，速率仍为每秒百分之一', () => {
+  const { game, boss } = encounter();
+  boss.hp = boss.maxHp * 0.4;
+  const initial = boss.hp;
+  advance(game, 1.5 - 1 / 32);
+  assert.equal(boss.hp, initial);
+  advance(game, 0.5);
+  near(boss.hp, initial + boss.maxHp * 0.005);
+  advance(game, 0.5);
+  near(boss.hp, initial + boss.maxHp * 0.01);
+});
+
+test('跨过一秒半门槛的整帧也立即回血', () => {
+  const { game, boss } = encounter();
+  boss.hp = boss.maxHp * 0.49;
+  game.time = boss.lastHurtAt! + 1.5 - 1 / 32;
+  game.update(1 / 32);
+  assert.equal(game.time - boss.lastHurtAt!, 1.5);
+  near(boss.hp, boss.maxHp * 0.49 + (boss.maxHp * 0.01) / 32);
+});
+
 test('跨过三秒门槛后按完整 dt 回血，等于三秒也恢复整帧', () => {
   const { game, boss } = encounter();
   boss.hp = boss.maxHp / 2;
@@ -76,7 +97,7 @@ test('跨过三秒门槛后按完整 dt 回血，等于三秒也恢复整帧', (
 
 test('实际正伤记录战斗时间，并重新开始三秒等待，持续正伤阻止回血', () => {
   const { game, boss } = encounter();
-  boss.hp = boss.maxHp / 2;
+  boss.hp = boss.maxHp * 0.75;
   for (let i = 0; i < 3; i++) {
     const before = boss.hp;
     advance(game, 2);
