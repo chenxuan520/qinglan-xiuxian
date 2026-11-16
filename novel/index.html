@@ -91,6 +91,28 @@
           </button>
           <span class="reading-caption" id="reading-caption">青岚纪 · 不系舟</span>
           <div class="reading-controls">
+            <button
+              type="button"
+              class="search-toggle"
+              id="search-toggle"
+              aria-haspopup="dialog"
+              aria-label="全文搜索"
+              title="全文搜索"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="6" />
+                <path d="m16 16 4 4" />
+              </svg>
+            </button>
             <button type="button" id="theme-toggle" aria-label="切换暗色书页" aria-pressed="false">
               <svg
                 width="20"
@@ -147,6 +169,24 @@
       <div class="dialog-toolbar">
         <span>翻阅卷目</span
         ><button type="button" id="contents-close" aria-label="关闭目录">关闭 ×</button>
+      </div>
+    </dialog>
+    <dialog class="search-dialog" id="search-dialog" aria-label="全文搜索">
+      <div class="dialog-toolbar">
+        <span>全文搜索</span
+        ><button type="button" id="search-close" aria-label="关闭搜索">关闭 ×</button>
+      </div>
+      <div class="search-body">
+        <input
+          id="search-input"
+          type="search"
+          placeholder="搜索本书标题与正文…"
+          aria-label="搜索本书标题与正文"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="search-status" id="search-status" role="status"></p>
+        <ol class="search-results" id="search-results"></ol>
       </div>
     </dialog>
     <script type="module" src="/src/content/novel.ts"></script>

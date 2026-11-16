@@ -494,8 +494,121 @@ button:not(:disabled):hover {
   box-shadow: 0 18px 60px #091d2580;
   overscroll-behavior: contain;
 }
-.contents-dialog::backdrop {
+.contents-dialog::backdrop,
+.search-dialog::backdrop {
   background: #0b201bc9;
+}
+.search-dialog {
+  width: min(92vw, 560px);
+  max-height: 84dvh;
+  color: var(--ink);
+  padding: 0;
+  border: 1px solid #afa58a;
+  background: var(--paper);
+  box-shadow: 0 18px 60px #091d2580;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+.search-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.search-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 4px 24px 20px;
+}
+#search-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  background: #fffaf20d;
+  color: var(--ink);
+  font: inherit;
+}
+.search-status {
+  min-height: 1.5em;
+  margin: 0;
+  font-size: 12px;
+  color: #7c7962;
+}
+#search-input:focus-visible {
+  outline: 2px solid #8f6b39;
+  outline-offset: 2px;
+}
+.search-results {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 45px;
+}
+.search-results li + li {
+  border-top: 1px solid var(--rule);
+}
+.search-results button {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 8px;
+  border: 0;
+  text-align: left;
+}
+.search-results strong {
+  display: block;
+  color: #314636;
+  font-size: 13px;
+  font-weight: 500;
+}
+.search-results span {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.search-results mark {
+  background: #8b5b4355;
+  color: inherit;
+}
+.search-more-row {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--paper);
+}
+.search-results .search-more {
+  color: #8b5b43;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.search-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 44px;
+  padding: 6px 9px;
+}
+.chapter-prose p.search-hit {
+  border-radius: 2px;
+  background: #8b5b4324;
+  box-shadow: 0 0 0 4px #8b5b4324;
+  transition:
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.chapter-prose p.search-hit:focus {
+  outline: none;
 }
 .contents-dialog .contents-inner {
   padding-top: 16px;
@@ -538,7 +651,8 @@ button:not(:disabled):hover {
   background: radial-gradient(ellipse at 45% 0, #28423866, transparent 65%);
 }
 [data-theme='dark'] .book,
-[data-theme='dark'] .contents-dialog {
+[data-theme='dark'] .contents-dialog,
+[data-theme='dark'] .search-dialog {
   border-color: #55644e;
 }
 [data-theme='dark'] .book-contents {
@@ -566,6 +680,23 @@ button:not(:disabled):hover {
     .dialog-toolbar
   ) {
   color: var(--muted);
+}
+[data-theme='dark'] .search-results strong {
+  color: #d9c88e;
+}
+[data-theme='dark'] .search-status {
+  color: var(--muted);
+}
+[data-theme='dark'] #search-input:focus-visible {
+  outline-color: #d9c88e;
+}
+[data-theme='dark'] .search-results .search-more {
+  color: #d9c88e;
+}
+[data-theme='dark'] .search-results mark,
+[data-theme='dark'] .chapter-prose p.search-hit {
+  background: #ac99615c;
+  box-shadow: 0 0 0 4px #ac99615c;
 }
 [data-theme='dark'] .chapter-link {
   color: #b9c2ae;
@@ -620,6 +751,13 @@ button:not(:disabled):hover {
   outline-color: #d9c88e;
 }
 @media (max-width: 760px) {
+  .search-dialog {
+    width: calc(100vw - 24px);
+    max-height: 86dvh;
+  }
+  .search-body {
+    padding: 2px 24px 20px;
+  }
   body {
     padding: 10px 15px 14px 11px;
   }
@@ -726,5 +864,32 @@ button:not(:disabled):hover {
   }
   .chapter-heading {
     margin: 25px 0;
+  }
+}
+
+@media (max-width: 390px) {
+  .reading-toolbar {
+    gap: 4px;
+  }
+  .reading-controls {
+    gap: 4px;
+  }
+  .contents-toggle {
+    min-width: 48px;
+    padding: 4px 6px;
+  }
+  .search-toggle,
+  #theme-toggle {
+    min-width: 44px;
+    padding: 4px 6px;
+  }
+  .type-controls {
+    gap: 2px;
+  }
+  .type-controls button {
+    min-width: 40px;
+  }
+  .type-controls span {
+    width: 18px;
   }
 }

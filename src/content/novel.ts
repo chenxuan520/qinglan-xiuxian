@@ -3,6 +3,7 @@ import buxizhouManuscriptUrl from '../../docs/novel.md?url';
 import cunyinManuscript from '../../docs/novel-2.md?raw';
 import cunyinManuscriptUrl from '../../docs/novel-2.md?url';
 import { parseNovel, type Novel } from './novel-content.ts';
+import { searchNovel, type NovelSearchHit } from './novel-search.ts';
 import './novel.css';
 
 type BookId = 'buxizhou' | 'cunyin';
@@ -70,6 +71,11 @@ const contents = get<HTMLElement>('contents-inner');
 const sidebar = document.querySelector('.book-contents')!;
 const dialog = get<HTMLDialogElement>('contents-dialog');
 const toggle = get<HTMLButtonElement>('contents-toggle');
+const searchDialog = get<HTMLDialogElement>('search-dialog');
+const searchToggle = get<HTMLButtonElement>('search-toggle');
+const searchInput = get<HTMLInputElement>('search-input');
+const searchStatus = get<HTMLElement>('search-status');
+const searchResults = get<HTMLElement>('search-results');
 const smaller = get<HTMLButtonElement>('type-smaller');
 const larger = get<HTMLButtonElement>('type-larger');
 const themeToggle = get<HTMLButtonElement>('theme-toggle');
@@ -165,6 +171,109 @@ function updateTheme() {
 function closeContents() {
   if (dialog.open) dialog.close();
 }
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let hitTimer: ReturnType<typeof setTimeout> | undefined;
+let searchHits: NovelSearchHit[] = [];
+let searchShown = 0;
+let searchMoreRow: HTMLLIElement | null = null;
+const SEARCH_PAGE = 60;
+function highlightHit(target: HTMLElement) {
+  prose.querySelector('.search-hit')?.classList.remove('search-hit');
+  clearTimeout(hitTimer);
+  target.tabIndex = -1;
+  target.focus({ preventScroll: true });
+  target.classList.add('search-hit');
+  target.scrollIntoView({ block: 'center' });
+  hitTimer = setTimeout(() => target.classList.remove('search-hit'), 2200);
+}
+function jumpToHit(hit: NovelSearchHit) {
+  remember();
+  closeSearch();
+  const scrollToHit = () => {
+    const target =
+      hit.paragraphIndex >= 0
+        ? prose.querySelector<HTMLElement>(`[data-paragraph="${hit.paragraphIndex}"]`)
+        : null;
+    if (target) highlightHit(target);
+    else page.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  if (hit.chapterIndex === index) {
+    scrollToHit();
+    return;
+  }
+  history.pushState(null, '', `#${book.chapters[hit.chapterIndex].id}`);
+  renderChapter(hit.chapterIndex, 0, true);
+  requestAnimationFrame(scrollToHit);
+}
+function searchResultItem(hit: NovelSearchHit) {
+  const li = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  const head = document.createElement('strong');
+  head.textContent = `第 ${hit.chapterNumber} 章 · ${hit.chapterTitle}`;
+  const snippet = document.createElement('span');
+  snippet.append(document.createTextNode(hit.before));
+  const mark = document.createElement('mark');
+  mark.textContent = hit.match;
+  snippet.append(mark, document.createTextNode(hit.after));
+  button.append(head, snippet);
+  button.addEventListener('click', () => jumpToHit(hit));
+  li.append(button);
+  return li;
+}
+function appendSearchPage() {
+  const end = Math.min(searchHits.length, searchShown + SEARCH_PAGE);
+  for (const hit of searchHits.slice(searchShown, end))
+    searchResults.insertBefore(searchResultItem(hit), searchMoreRow);
+  searchShown = end;
+  const button = searchMoreRow?.querySelector('button');
+  if (!button) return;
+  button.disabled = searchShown >= searchHits.length;
+  button.textContent =
+    searchShown >= searchHits.length
+      ? `已显示全部 ${searchHits.length} 条`
+      : `显示更多（剩余 ${searchHits.length - searchShown} 条）`;
+}
+function createMoreRow() {
+  const li = document.createElement('li');
+  li.className = 'search-more-row';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'search-more';
+  button.addEventListener('click', appendSearchPage);
+  li.append(button);
+  return li;
+}
+function renderSearch() {
+  const query = searchInput.value;
+  searchResults.replaceChildren();
+  searchResults.scrollTop = 0;
+  searchHits = [];
+  searchShown = 0;
+  searchMoreRow = null;
+  if (!query.trim()) {
+    searchStatus.textContent = `在《${active.shortTitle}》中搜索标题与正文。`;
+    return;
+  }
+  searchHits = searchNovel(book, query, Infinity);
+  if (!searchHits.length) {
+    searchStatus.textContent = `《${active.shortTitle}》中未找到「${query.trim()}」。`;
+    return;
+  }
+  searchStatus.textContent = `《${active.shortTitle}》共 ${searchHits.length} 条命中`;
+  searchMoreRow = createMoreRow();
+  searchResults.append(searchMoreRow);
+  appendSearchPage();
+}
+function openSearch() {
+  searchDialog.showModal();
+  searchInput.focus();
+  searchInput.select();
+  renderSearch();
+}
+function closeSearch() {
+  if (searchDialog.open) searchDialog.close();
+}
 function chapterAtHash() {
   return book.chapters.findIndex((chapter) => `#${chapter.id}` === location.hash);
 }
@@ -179,17 +288,18 @@ function renderChapter(target: number, fraction = 0, focus = false) {
   get('reading-caption').textContent = active.label;
   document.title = `${chapter.label} · ${active.shortTitle}`;
   const paragraphs = document.createDocumentFragment();
-  for (const text of chapter.paragraphs) {
+  chapter.paragraphs.forEach((text, paragraphIndex) => {
     if (text === '---') {
       const separator = document.createElement('hr');
       separator.className = 'scene-break';
       paragraphs.append(separator);
-      continue;
+      return;
     }
     const p = document.createElement('p');
+    p.dataset.paragraph = String(paragraphIndex);
     p.textContent = text;
     paragraphs.append(p);
-  }
+  });
   prose.replaceChildren(paragraphs);
   get('book-ending').textContent = active.ending;
   get('book-ending').hidden = index !== book.chapters.length - 1;
@@ -283,6 +393,7 @@ function switchBook(
 ) {
   if (targetId === bookId) return;
   clearTimeout(scrollTimer);
+  closeSearch();
   remember();
   const place = places[targetId];
   const target =
@@ -365,6 +476,28 @@ toggle.addEventListener('click', () => {
   dialog.append(contents);
   dialog.showModal();
   list.querySelector<HTMLElement>('[aria-current=page]')?.scrollIntoView({ block: 'nearest' });
+});
+searchToggle.addEventListener('click', openSearch);
+get('search-close').addEventListener('click', closeSearch);
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderSearch, 120);
+});
+searchInput.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  clearTimeout(searchTimer);
+  renderSearch();
+});
+searchDialog.addEventListener('click', (event) => {
+  if (event.target !== searchDialog) return;
+  const rect = searchDialog.getBoundingClientRect();
+  if (
+    event.clientX < rect.left ||
+    event.clientX > rect.right ||
+    event.clientY < rect.top ||
+    event.clientY > rect.bottom
+  )
+    closeSearch();
 });
 get('contents-close').addEventListener('click', closeContents);
 dialog.addEventListener('close', () => {
