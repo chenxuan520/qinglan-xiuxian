@@ -1401,7 +1401,7 @@ export class Game {
               e,
               Math.cos(angle),
               Math.sin(angle),
-              155,
+              170,
               owner.damage * 0.35,
             );
             shot.enemySkill = 'soul';
@@ -1996,7 +1996,7 @@ export class Game {
     switch (stage) {
       case 0:
         if (phase === 0) ringZones(6, 130, 42, 2, 0.3);
-        else if (phase === 1) fan(7, 1.15, 165);
+        else if (phase === 1) fan(7, 1.15, 170);
         else summons(3);
         break;
       case 1:

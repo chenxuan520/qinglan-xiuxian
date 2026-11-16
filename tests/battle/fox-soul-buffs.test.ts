@@ -143,7 +143,7 @@ test('三具幻影0.8秒前预警，满时各放八发魂弹后消失，不能�
     assert.equal(g.shots.length, 24);
     assert.ok(shadows.every((e) => e.dead));
     for (const shot of g.shots) {
-      near(Math.hypot(shot.vx, shot.vy), 155);
+      near(Math.hypot(shot.vx, shot.vy), 170);
       assert.equal(shot.damage, boss.damage * 0.35);
       assert.equal(shot.color, '#baa2d0');
       assert.equal(shot.enemySkill, 'soul');

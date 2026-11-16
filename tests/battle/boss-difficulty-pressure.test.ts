@@ -63,7 +63,7 @@ test('初入第五境与相邻关卡对齐，问道与天劫数组保持原值',
 
 test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七王保持基础值', () => {
   const patterns: [number, number, number[]][] = [
-    [0, 1, Array(7).fill(165)],
+    [0, 1, Array(7).fill(170)],
     [1, 0, [...Array(9).fill(200), ...Array(8).fill(145)]],
     [1, 2, [...Array(20).fill(180), ...Array(20).fill(130)]],
     [2, 1, [...Array(3).fill(240), ...Array(2).fill(180), ...Array(2).fill(130)]],
