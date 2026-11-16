@@ -206,16 +206,12 @@ test('万劫归一异常路径仍恢复仙尊身份；回焰及召物保留各�
   }
 });
 
-test('天劫审判3秒后按到期落脚点/输入落三雷，半径60、错拍预警、1.2倍伤害', () => {
+test('天劫审判立即按当前落脚点/输入落三雷，半径60、错拍预警、1.2倍伤害', () => {
   const c = encounter();
-  cast(c, 7);
-  assert.deepEqual(c.e.judgements, [403]);
   c.g.input = { x: 0.6, y: 0.8 };
-  advance(c.g, 2.9);
-  assert.equal(c.g.zones.length, 0);
   const p = { x: c.g.player.x, y: c.g.player.y };
-  c.g.time = 403;
-  c.g.updateSovereignSkills(0);
+  cast(c, 7);
+  assert.equal(c.e.judgements, undefined, '不再留下三秒后的劫印');
   assert.equal(c.g.zones.length, 3);
   c.g.zones.forEach((z, i) => {
     near(z.x, p.x + 0.6 * 65 * i);
@@ -225,7 +221,6 @@ test('天劫审判3秒后按到期落脚点/输入落三雷，半径60、错拍�
     assert.equal(z.damage, c.e.damage * 1.2);
     assert.equal(z.color, '#d2b5ff');
   });
-  assert.equal(c.e.judgements, undefined);
   c.g.player.invincible = 0;
   c.g.updateZones(0.01);
   assert.equal(c.g.effects.filter((e) => e.kind === 'lightning').length, 0);
@@ -233,28 +228,25 @@ test('天劫审判3秒后按到期落脚点/输入落三雷，半径60、错拍�
   assert.ok(c.g.effects.some((e) => e.kind === 'lightning'));
 });
 
-test('短间隔两次审判各在施法后三秒落雷，不吞掉前一次；暂停与升级冻结劫印', () => {
+test('连续两次天劫审判都立即落雷，不吞掉前一次；暂停与升级冻结雷区', () => {
   const c = encounter();
   cast(c, 7);
-  advance(c.g, 1.2);
+  assert.equal(c.g.zones.length, 3);
+  advance(c.g, 0.2);
   cast(c, 7);
-  assert.equal(c.e.judgements!.length, 2);
+  assert.equal(c.g.zones.length, 6);
   const raw = c.g.snapshot();
   c.g.pause();
   c.g.update(1);
   assert.equal(c.g.time, raw.time);
-  assert.deepEqual(c.e.judgements, raw.enemies[0].judgements);
+  assert.deepEqual(c.g.zones, raw.zones);
   c.g.state = 'upgrade';
   c.g.update(1);
   assert.equal(c.g.time, raw.time);
+  assert.deepEqual(c.g.zones, raw.zones);
   c.g.state = 'playing';
-  advance(c.g, 1.81);
-  assert.equal(c.g.zones.length, 3);
-  assert.equal(c.e.judgements!.length, 1);
-  c.g.zones = [];
-  advance(c.g, 1.2);
-  assert.equal(c.g.zones.length, 3);
-  assert.equal(c.e.judgements, undefined);
+  advance(c.g, 0.01);
+  assert.equal(c.g.zones.length, 6);
 });
 
 test('归墟引力完整两秒拉180像素，零时和一秒各24弹，结束后不再拉', () => {
@@ -303,7 +295,7 @@ test('引力叠加在自身移动之后，定身不拉，不穿过仙尊，不�
   assert.equal(close.g.player.hp, hp);
 });
 
-test('审判/引力续局与导入保留剩余时刻且深克隆，第二环在读档前后都只发一次', () => {
+test('审判雷区与引力续局/导入保留剩余时刻，第二环在读档前后都只发一次', () => {
   for (const seconds of [0.6, 1.2]) {
     const c = encounter();
     c.e.hp *= 0.4;
@@ -313,12 +305,14 @@ test('审判/引力续局与导入保留剩余时刻且深克隆，第二环在�
     c.g.shots = [];
     c.g.pause();
     const raw = c.g.snapshot();
-    assert.notEqual(raw.enemies[0].judgements, c.e.judgements);
+    assert.equal(c.e.judgements, undefined);
+    assert.ok(raw.zones.length > 0);
+    assert.notEqual(raw.zones, c.g.zones);
     for (const g of [Game.restore(c.g.save, raw), importSave(exportSave(c.g.save, c.g)).run]) {
       assert.ok(g);
       const e = g.boss!;
-      assert.deepEqual(e.judgements, c.e.judgements);
-      assert.notEqual(e.judgements, raw.enemies[0].judgements);
+      assert.equal(e.judgements, undefined);
+      assert.deepEqual(g.zones, raw.zones);
       assert.equal(e.gravityUntil, c.e.gravityUntil);
       const x = g.player.x;
       advance(g, 1);
@@ -331,13 +325,31 @@ test('审判/引力续局与导入保留剩余时刻且深克隆，第二环在�
       assert.equal(e.gravityUntil, undefined);
       advance(g, 1.01);
       assert.equal(e.judgements, undefined);
-      assert.equal(g.zones.length, 3);
     }
   }
   assert.equal(SAVE_SCHEMA, 48);
   const old = freshSave();
   old.schema = SAVE_SCHEMA - 1;
   assert.equal(readSave(JSON.stringify(old)).status, 'ok');
+});
+
+test('旧存档三秒劫印仍按到期时刻结算一次，续局不重复', () => {
+  const c = encounter();
+  c.g.input = { x: 0.6, y: 0.8 };
+  c.e.judgements = [402];
+  c.g.updateSovereignSkills(0);
+  assert.equal(c.g.zones.length, 0);
+  const restored = Game.restore(c.g.save, c.g.snapshot())!;
+  const boss = restored.boss!;
+  restored.time = 401.99;
+  restored.updateSovereignSkills(0);
+  assert.equal(restored.zones.length, 0);
+  restored.time = 402;
+  restored.updateSovereignSkills(0);
+  assert.equal(restored.zones.length, 3);
+  restored.updateSovereignSkills(0);
+  assert.equal(restored.zones.length, 3, '同一次旧劫印只结算一次');
+  assert.equal(boss.judgements, undefined);
 });
 
 test('仙尊死亡、寿尽、灼烧及普通战败清除全部计时；旧王和独立天劫拒绝伪造计时', () => {
@@ -386,34 +398,26 @@ test('仙尊死亡、寿尽、灼烧及普通战败清除全部计时；旧王�
   assert.equal(Game.restore(native.g.save, native.g.snapshot()), null);
 });
 
-test('周期天劫中断恰好跨过第二环/劫印到期时，保存合法且归来不漏招、不重发', () => {
-  for (const seconds of [0.99, 2.99]) {
-    const c = encounter();
-    c.e.hp *= 0.4;
-    cast(c, 7);
-    cast(c, 8);
-    advance(c.g, seconds);
-    c.g.shots = [];
-    const before = c.g.time;
-    c.g.save.nextTribulationAge = c.g.save.age + 1e-6;
-    c.g.update(0.01);
-    assert.equal(c.g.state, 'paused');
-    near(c.g.time, before + 0.01);
-    assert.ok(Game.restore(c.g.save, c.g.snapshot()));
-    assert.equal(c.g.zones.length, 0);
-    assert.equal(completeTribulation(c.g.save, c.g.save.tribulations + 1), true);
-    c.g.resume();
-    advance(c.g, 0.03);
-    if (seconds < 1) {
-      assert.equal(c.g.shots.length, 24);
-      advance(c.g, 1.01);
-      assert.equal(c.e.gravityUntil, undefined);
-      near(c.g.player.x, -180);
-    } else {
-      assert.equal(c.g.zones.length, 3);
-      assert.equal(c.e.judgements, undefined);
-    }
-  }
+test('周期天劫中断跨过第二环时保存合法，归来不漏招、不重发', () => {
+  const c = encounter();
+  c.e.hp *= 0.4;
+  cast(c, 8);
+  advance(c.g, 0.99);
+  c.g.shots = [];
+  const before = c.g.time;
+  c.g.save.nextTribulationAge = c.g.save.age + 1e-6;
+  c.g.update(0.01);
+  assert.equal(c.g.state, 'paused');
+  near(c.g.time, before + 0.01);
+  assert.ok(Game.restore(c.g.save, c.g.snapshot()));
+  assert.equal(c.g.zones.length, 0);
+  assert.equal(completeTribulation(c.g.save, c.g.save.tribulations + 1), true);
+  c.g.resume();
+  advance(c.g, 0.03);
+  assert.equal(c.g.shots.length, 24);
+  advance(c.g, 1.01);
+  assert.equal(c.e.gravityUntil, undefined);
+  near(c.g.player.x, -180);
 });
 
 test('双狼原生/终关与仙尊借用都至少施放者8%气血，标准精英若更高则保留；木心不改', () => {

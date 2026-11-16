@@ -1935,8 +1935,8 @@ export class Game {
           `${STAGES[stage].boss} · 万劫归一 · ${bossSkills(borrowed, false)[borrowed >= 4 ? 4 : 3]}`,
         );
       } else if (phase === 7) {
-        (e.judgements ??= []).push(this.time + 3);
-        this.announce('九天执劫仙尊 · 天劫审判 · 三息之后雷落');
+        this.#sovereignJudgement(e);
+        this.announce('九天执劫仙尊 · 天劫审判 · 雷落');
       } else {
         e.gravityUntil = this.time + 2;
         this.gravityRing(e);
@@ -2138,6 +2138,20 @@ export class Game {
         )
       : undefined;
   }
+  #sovereignJudgement(e: Enemy) {
+    for (let i = 0; i < 3; i++)
+      this.zone(
+        this.player.x + this.input.x * 65 * i,
+        this.player.y + this.input.y * 65 * i,
+        60,
+        0.5,
+        e.damage * 1.2,
+        '#d2b5ff',
+        'boss-judgement',
+        0.8 + i * 0.4,
+        true,
+      );
+  }
   private gravityRing(e: Enemy) {
     for (let i = 0; i < 24; i++) {
       const angle = this.time * 0.25 + (i / 23 - 0.5) * ((TAU * 23) / 24);
@@ -2174,20 +2188,7 @@ export class Game {
         if (this.time >= e.gravityUntil) delete e.gravityUntil;
       }
       if (e.judgements) {
-        for (const at of e.judgements)
-          if (this.time >= at)
-            for (let i = 0; i < 3; i++)
-              this.zone(
-                this.player.x + this.input.x * 65 * i,
-                this.player.y + this.input.y * 65 * i,
-                60,
-                0.5,
-                e.damage * 1.2,
-                '#d2b5ff',
-                'boss-judgement',
-                0.8 + i * 0.4,
-                true,
-              );
+        for (const at of e.judgements) if (this.time >= at) this.#sovereignJudgement(e);
         e.judgements = e.judgements.filter((at) => at > this.time);
         if (!e.judgements.length) delete e.judgements;
       }
