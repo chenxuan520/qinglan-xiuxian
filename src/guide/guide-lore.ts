@@ -1,5 +1,6 @@
 import { assetUrl } from '../core/asset-url.ts';
 import { STANDALONE } from '../core/build-mode.ts';
+import { COMIC_SITE_URL } from '../core/setting.ts';
 
 export function guideLoreContent(): string {
   return `<div class="guide-lore">
@@ -10,6 +11,7 @@ export function guideLoreContent(): string {
 <div class="guide-book-links" aria-label="青岚纪藏书">
 <a class="secondary-button" href="${assetUrl('novel/')}" target="_blank" rel="noopener">阅读《青岚纪·不系舟》 <span aria-hidden="true">↗</span></a>
 <a class="secondary-button" href="${assetUrl('novel/?book=cunyin')}" target="_blank" rel="noopener">阅读《青岚纪·寸阴炉》 <span aria-hidden="true">↗</span></a>
+${STANDALONE ? '' : `<a class="secondary-button" href="${COMIC_SITE_URL}" target="_blank" rel="noopener">观看《不系舟》漫画版 <span aria-hidden="true">↗</span></a>`}
 </div>
 ${STANDALONE ? '' : '<qinglan-film></qinglan-film>'}
 <details class="disclosure guide-lore-section" data-disclosure="lore-world">

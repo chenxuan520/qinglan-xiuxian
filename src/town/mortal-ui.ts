@@ -7,6 +7,7 @@ import { playerSpriteBackground } from '../battle/player-appearance.ts';
 import { SECT_SPECIALTIES } from '../sect/sect-service-data.ts';
 import { ironMarketContent } from '../market/iron-market-ui.ts';
 import { assetUrl } from '../core/asset-url.ts';
+import { STANDALONE } from '../core/build-mode.ts';
 import {
   passive,
   REALMS,
@@ -28,7 +29,7 @@ import { entryCost, masteryBonus, sectDues, sectRole, studyPlan } from './mortal
 import { icon, smallIcon } from '../core/icons.ts';
 import { type TownResident } from './town-population.ts';
 import { npcDefaultLine, type NpcDialogueRequest } from './npc-dialogue.ts';
-import { NPC_AI_SETTINGS } from '../core/setting.ts';
+import { COMIC_SITE_URL, NPC_AI_SETTINGS } from '../core/setting.ts';
 import { sectMarketOpen } from '../sect/sect-market.ts';
 import { isMarketCultivatorId, isMarketTraderId } from '../sect/sect-market-data.ts';
 import { smithAt, smithStoryView } from './town-story.ts';
@@ -174,7 +175,7 @@ export function townEventContent(save: SaveData, npc: TownResident) {
     const job = TOWN_JOBS[jobId];
     actions = `<p>${job.desc}</p><p class="panel-note">消耗 ${job.years} 年 · ${job.stones ? `${job.stones} 灵石${job.iron ? ` + ${job.iron} 玄铁` : ''}` : '30% 概率获赠 8 灵石'}<br>点击即增加年岁并结算收益，完成后不自动重复。</p>${npc.id === 'herbs' ? '<div class="town-event-actions">' : ''}<button class="primary-button" data-action="mortal-activity" data-id="${jobId}" ${save.mortal.activity ? 'disabled' : ''}>${save.mortal.activity ? '有事项待结算' : npc.id === 'tea' ? '入座听书' : '接下这件事'}</button>${npc.id === 'herbs' ? '<button class="secondary-button" data-action="medicine-shop">药铺 · 看看本批丹药</button></div>' : ''}`;
   }
-  return `${npc.id === 'tea' ? `<p class="panel-note">案头旧书《不系舟》里，也有从青岚渡口出发的少年。</p><a class="secondary-button" href="${assetUrl('novel/')}" target="_blank" rel="noopener">翻阅《青岚纪·不系舟》 ↗</a><p class="panel-note">随手翻阅，不耗年岁。</p>` : ''}<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}${HUMAN_STORY_IDS.filter(
+  return `${npc.id === 'tea' ? `<p class="panel-note">案头旧书《不系舟》里，也有从青岚渡口出发的少年。</p><a class="secondary-button" href="${assetUrl('novel/')}" target="_blank" rel="noopener">翻阅《青岚纪·不系舟》 ↗</a>${STANDALONE ? '' : `<a class="secondary-button" style="margin-top:10px" href="${COMIC_SITE_URL}" target="_blank" rel="noopener">翻看《不系舟》画册 ↗</a>`}<p class="panel-note">随手翻阅，不耗年岁。</p>` : ''}<p class="panel-note">凡人 · ${npc.role}${npc.generation > 0 ? ' · 旧人已远，烟火相传。如今在这里的是一张新的面孔。' : ''}</p>${npc.id === 'smith' ? smithStoryContent(save) : ''}${HUMAN_STORY_IDS.filter(
     (id) => HUMAN_STORIES[id].npcId === npc.id,
   )
     .map((id) => humanStoryContent(save, id, true))

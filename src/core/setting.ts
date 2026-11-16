@@ -1,5 +1,6 @@
 import { STANDALONE } from './build-mode.ts';
 export const GAME_SITE_URL = 'https://xiuxian.011203.xyz/';
+export const COMIC_SITE_URL = 'https://qinglan-comic.011203.xyz/';
 // 微信赞赏码是小程序码，二维码库无法重新生成；更换时直接替换这张图片。
 export const SUPPORT_CODE_IMAGE = '/assets/support-wechat.webp';
 

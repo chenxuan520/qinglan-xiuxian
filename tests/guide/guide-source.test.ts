@@ -206,3 +206,16 @@ test('人间宗门帮助说明旧器同途与渡口旧玉的触发条件、炼�
   assert.match(mortal, /玉如意.*码头与渔夫交谈.*渡口旧玉.*当前本命法宝免费提升一阶炼器.*15枚玄铁/);
   assert.match(mortal, /不耗年岁与灵石，本世各限一次/);
 });
+
+test('青岚纪引导在两卷藏书后提供不系舟漫画版外链', () => {
+  const lore = guide.guideContent('lore');
+  const buxizhou = lore.indexOf('阅读《青岚纪·不系舟》');
+  const cunyin = lore.indexOf('阅读《青岚纪·寸阴炉》');
+  const comic = lore.indexOf('观看《不系舟》漫画版');
+  assert.ok(buxizhou >= 0 && cunyin > buxizhou, '两卷小说入口顺序不变');
+  assert.ok(comic > cunyin, '漫画入口在寸阴炉之后');
+  assert.match(
+    lore,
+    /<a class="secondary-button" href="https:\/\/qinglan-comic\.011203\.xyz\/" target="_blank" rel="noopener">观看《不系舟》漫画版 <span aria-hidden="true">↗<\/span><\/a>/,
+  );
+});

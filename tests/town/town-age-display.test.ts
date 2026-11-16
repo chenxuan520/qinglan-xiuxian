@@ -74,3 +74,22 @@ test('实际闲逛与办事仍按完整精度扣龄，展示不改变供奉、�
   assert.equal(lifespanInfo(save).remaining, 0);
   assert.equal(save.age, 100);
 });
+
+test('茶铺面板在小说入口之后提供不系舟画册外链，说明仍在最后', () => {
+  const save = freshSave();
+  save.mortal.hometown!.stage = 'departed';
+  save.mortal.population = freshTownPopulation(save.age, () => 0.5);
+  const residents = townResidents(save.mortal.population, save.age);
+  const tea = residents.find((npc) => npc.id === 'tea')!;
+  const panel = townEventContent(save, tea);
+  const novel = panel.indexOf('翻阅《青岚纪·不系舟》');
+  const comic = panel.indexOf('翻看《不系舟》画册');
+  const note = panel.indexOf('随手翻阅，不耗年岁。');
+  assert.ok(novel >= 0 && comic > novel && note > comic);
+  assert.match(
+    panel,
+    /<a class="secondary-button" style="margin-top:10px" href="https:\/\/qinglan-comic\.011203\.xyz\/" target="_blank" rel="noopener">翻看《不系舟》画册 ↗<\/a>/,
+  );
+  const herbalist = residents.find((npc) => npc.id === 'herbs')!;
+  assert.doesNotMatch(townEventContent(save, herbalist), /qinglan-comic/);
+});

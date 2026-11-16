@@ -199,3 +199,18 @@ test('单机指南不渲染问一问入口，即使传入在线域名也不提�
   await assert.rejects(requestGuideAnswer('丹药怎么吃', [], new AbortController().signal, fetcher));
   assert.equal(requests, before);
 });
+
+test('单机版不显示不系舟漫画版外链', async () => {
+  const { townEventContent } = await import('../../src/town/mortal-ui.ts');
+  const { freshTownPopulation, townResidents } = await import('../../src/town/town-population.ts');
+  const lore = guideContent('lore');
+  assert.match(lore, /阅读《青岚纪·不系舟》/);
+  assert.doesNotMatch(lore, /qinglan-comic/);
+  const save = freshSave();
+  save.mortal.hometown!.stage = 'departed';
+  save.mortal.population = freshTownPopulation(save.age, () => 0.5);
+  const tea = townResidents(save.mortal.population, save.age).find((npc) => npc.id === 'tea')!;
+  const panel = townEventContent(save, tea);
+  assert.match(panel, /翻阅《青岚纪·不系舟》/);
+  assert.doesNotMatch(panel, /qinglan-comic/);
+});

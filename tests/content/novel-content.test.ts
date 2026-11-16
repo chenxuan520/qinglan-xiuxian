@@ -112,3 +112,17 @@ test('空章、空卷、缺书名与未知标题不会生成貌似完整的阅�
   assert.throws(() => parseNovel('# 只有书名'), /缺少卷章正文/);
   assert.throws(() => parseNovel(opening + '正文\n\n### 漏掉章号'), /不支持的标题/);
 });
+
+test('阅读器顶栏始终提供青岚首页与不系舟漫画版外链，返回路径不变', () => {
+  const html = readFileSync(new URL('../../novel/index.html', import.meta.url), 'utf8');
+  const masthead = html.slice(
+    html.indexOf('<header class="reading-masthead">'),
+    html.indexOf('</header>'),
+  );
+  assert.match(masthead, /<a href="\.\.\/" class="home-link">← 青岚首页<\/a>/);
+  assert.match(
+    masthead,
+    /href="https:\/\/qinglan-comic\.011203\.xyz\/" class="home-link" target="_blank" rel="noopener"[\s\S]*?>《不系舟》漫画版 ↗<\/a/,
+  );
+  assert.match(masthead, /山河旧闻 · 藏书/);
+});
