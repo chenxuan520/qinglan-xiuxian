@@ -92,7 +92,21 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run perf:render
+      - name: Run npm run perf:render (retry up to 3)
+        run: |
+          for attempt in 1 2 3; do
+            echo "perf:render attempt ${attempt}/3"
+            if npm run perf:render; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              rm -rf artifacts/perf-render
+              echo "perf:render attempt ${attempt} failed; retrying"
+              sleep 5
+            fi
+          done
+          echo "perf:render failed after 3 attempts"
+          exit 1
       - name: Publish render summary
         if: always() && !cancelled()
         run: |

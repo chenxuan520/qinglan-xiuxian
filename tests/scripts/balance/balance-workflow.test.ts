@@ -474,3 +474,11 @@ test('已取消的全量/渲染不能发布，真实失败日报及render-only�
   assert.equal(publish('skipped', 'success', false, true), true);
   assert.equal(publish('skipped'), false);
 });
+
+test('渲染实测在 CI 内最多自动重试三次，失败后清理半成品', () => {
+  const renderJob = workflow.match(/^  perf-render:\n([^]*?)(?=^  [a-z-]+:)/m)![0];
+  assert.match(renderJob, /for attempt in 1 2 3; do/);
+  assert.match(renderJob, /if npm run perf:render; then/);
+  assert.match(renderJob, /if \[ "\$attempt" -lt 3 \]; then\n\s+rm -rf artifacts\/perf-render/);
+  assert.match(renderJob, /done\n\s+echo "perf:render failed after 3 attempts"\n\s+exit 1/);
+});

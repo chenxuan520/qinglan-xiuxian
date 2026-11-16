@@ -299,24 +299,44 @@ async function launchChrome(
     { stdio: ['ignore', 'ignore', 'pipe'] },
   );
   const wsUrl = await new Promise<string>((ok, fail) => {
+    let stderr = '';
+    let timedOut = false;
+    const detail = () => (stderr.trim() ? `：${stderr.trim().slice(-800)}` : '');
+    const terminate = () =>
+      new Promise<void>((done) => {
+        if (chrome.exitCode !== null || chrome.signalCode !== null) return done();
+        let fallback: ReturnType<typeof setTimeout> | undefined;
+        const finish = () => {
+          if (fallback) clearTimeout(fallback);
+          chrome.off('exit', finish);
+          done();
+        };
+        chrome.once('exit', finish);
+        chrome.kill('SIGKILL');
+        fallback = setTimeout(finish, 2_000);
+      });
     const timer = setTimeout(() => {
-      chrome.kill(); // 超时立即回收进程，避免无头 Chrome 残留在本机
-      fail(new Error('Chrome 15 秒未输出 DevTools 地址'));
-    }, 15_000);
+      timedOut = true;
+      // 等进程真正退出再重试，避免下一次采样与残留 Chrome 争用。
+      void terminate().then(() => fail(new Error(`Chrome 30 秒未输出 DevTools 地址${detail()}`)));
+    }, 30_000);
     chrome.stderr!.on('data', (chunk) => {
+      stderr = (stderr + String(chunk)).slice(-2000);
       const match = String(chunk).match(/DevTools listening on (ws:\/\/\S+)/);
       if (match) {
         clearTimeout(timer);
         ok(match[1]);
       }
     });
-    chrome.on('error', () => {
+    chrome.on('error', (error) => {
+      if (timedOut) return;
       clearTimeout(timer);
-      fail(new Error('Chrome 启动失败'));
+      fail(new Error(`Chrome 启动失败：${error.message}${detail()}`));
     });
     chrome.on('exit', (code) => {
+      if (timedOut) return;
       clearTimeout(timer);
-      fail(new Error(`Chrome 提前退出（${code}）`));
+      fail(new Error(`Chrome 提前退出（${code}）${detail()}`));
     });
   });
   return { chrome, devtoolsPort: new URL(wsUrl).port };
