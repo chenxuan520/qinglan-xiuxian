@@ -12,6 +12,15 @@ export const BOSS_MECHANICS = {
   wolfDash: 0.55,
   wolfLife: 6,
   wolfLimit: 2,
+  soldierCount: 6,
+  soldierRing: 190,
+  soldierHp: 0.04,
+  soldierDamage: 0.65,
+  swordWarmup: 0.5,
+  swordWarmupEnraged: 0.3,
+  swordSpeed: 1200,
+  swordFlight: 1.2,
+  swordDamage: 2.5,
   nativeMiasmaLife: 6,
   miasmaSettleLife: 5,
   miasmaSettleDelay: 0.3,
@@ -48,13 +57,16 @@ export function summonLinkAlpha(a: Point, b: Point) {
 export type BossMotion =
   | { kind: 'return'; velocity: Point }
   | { kind: 'memory'; path: Point[]; warmup: number; locked?: boolean }
-  | { kind: 'star'; center: Point; angle: number; launchAt: number };
+  | { kind: 'star'; center: Point; angle: number; launchAt: number }
+  | { kind: 'sword'; direction: Point; launchAt: number };
 export interface BossSummon {
   kind: 'heart' | 'wolf';
   age: number;
   round?: number;
   side: number;
   color?: string;
+  /** 天兵合围阵位 0–5；未设置即原双狼合猎。 */
+  slot?: number;
 }
 export interface TrailPoint extends Point {
   time: number;
@@ -69,6 +81,16 @@ export function bossReturnOut(b: Shot) {
     )
     ? BOSS_MECHANICS.nativeReturnOut
     : BOSS_MECHANICS.returnOut;
+}
+
+// 点 p 到线段 a→z 的最短距离；高速直线弹用它判定命中，避免逐帧点判定穿透。
+export function segmentDistance(p: Point, a: Point, z: Point) {
+  const dx = z.x - a.x,
+    dy = z.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
+  return Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t));
 }
 
 // 同一条轨迹供模拟、画面方向和自动走位预测使用，不读取未来选招。
@@ -102,6 +124,16 @@ export function bossShotPose(b: Shot, age = b.age) {
       active: age >= m.launchAt,
     };
   }
+  if (m.kind === 'sword') {
+    const d = Math.max(0, age - m.launchAt) * BOSS_MECHANICS.swordSpeed;
+    return {
+      x: b.origin.x + m.direction.x * d,
+      y: b.origin.y + m.direction.y * d,
+      vx: age < m.launchAt ? 0 : m.direction.x * BOSS_MECHANICS.swordSpeed,
+      vy: age < m.launchAt ? 0 : m.direction.y * BOSS_MECHANICS.swordSpeed,
+      active: age >= m.launchAt,
+    };
+  }
   let travel = Math.max(0, age - m.warmup) * BOSS_MECHANICS.memorySpeed;
   for (let i = 1; i < m.path.length; i++) {
     const a = m.path[i - 1],
@@ -122,6 +154,7 @@ export function bossShotPose(b: Shot, age = b.age) {
 export function cloneBossMotion(m: BossMotion): BossMotion {
   if (m.kind === 'memory') return { ...m, path: m.path.map((p) => ({ ...p })) };
   if (m.kind === 'return') return { ...m, velocity: { ...m.velocity } };
+  if (m.kind === 'sword') return { ...m, direction: { ...m.direction } };
   return { ...m, center: { ...m.center } };
 }
 
@@ -150,6 +183,15 @@ export function validBossMotion(m: BossMotion, stage: number | undefined) {
         BOSS_MECHANICS.nativeReturnSpeed,
         BOSS_MECHANICS.nativeReturnSpeedLegacy,
       ].some((speed) => Math.abs(Math.hypot(m.velocity.x, m.velocity.y) - speed) < 1e-6)
+    );
+  if (m.kind === 'sword')
+    return (
+      stage === 6 &&
+      point(m.direction) &&
+      Math.abs(Math.hypot(m.direction.x, m.direction.y) - 1) < 1e-6 &&
+      [BOSS_MECHANICS.swordWarmup, BOSS_MECHANICS.swordWarmupEnraged].some(
+        (warmup) => Math.abs(m.launchAt - warmup) < 1e-8,
+      )
     );
   if (m.kind === 'star')
     return (

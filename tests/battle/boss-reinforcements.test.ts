@@ -40,9 +40,12 @@ for (const [origin, phase, count] of [
       for (const child of children) {
         assert.equal(child.summonedBy, boss.id);
         assert.equal(child.elite, true);
-        const standard = enemyCombatStats(arena, 0, g.time, child.type, true, false);
-        assert.equal(child.maxHp, standard.hp);
-        assert.equal(child.damage, standard.damage);
+        // 仙尊天兵按仙尊气血与伤害换算，其余妖王召唤物仍为同类型标准精英。
+        if (origin !== 6) {
+          const standard = enemyCombatStats(arena, 0, g.time, child.type, true, false);
+          assert.equal(child.maxHp, standard.hp);
+          assert.equal(child.damage, standard.damage);
+        }
       }
       const restored = Game.restore(g.save, g.snapshot());
       assert.ok(restored);

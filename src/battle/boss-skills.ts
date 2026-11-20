@@ -1,6 +1,6 @@
 import { STAGES } from '../core/data.ts';
 
-// 原三招固定在0～2号，已认可的新机制只追加；仙尊原六招保留，追加三招招牌技。
+// 原三招固定在0～2号，已认可的新机制只追加；仙尊原六招保留，追加四招招牌技。
 const additions = [
   ['落种成林'],
   ['九尾回焰'],
@@ -12,7 +12,7 @@ const additions = [
 const native = STAGES.map((stage, id) =>
   id < 6
     ? [...stage.skills, ...additions[id]]
-    : [...stage.skills, '万劫归一', '天劫审判', '归墟引力'],
+    : [...stage.skills, '万劫归一', '天劫审判', '归墟引力', '诛仙一剑'],
 );
 export function bossSkills(stage: number, _finalTrial: boolean) {
   return native[stage];

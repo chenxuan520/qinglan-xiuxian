@@ -5,6 +5,7 @@ import {
   bossReturnOut,
   bossShotPose,
   cloneBossMotion,
+  segmentDistance,
   validMemoryShape,
   validMemoryWarmup,
   type TrailPoint,
@@ -1943,10 +1944,13 @@ export class Game {
       } else if (phase === 7) {
         this.#sovereignJudgement(e);
         this.announce('九天执劫仙尊 · 天劫审判 · 雷落');
-      } else {
+      } else if (phase === 8) {
         e.gravityUntil = this.time + 2;
         this.gravityRing(e);
         this.announce('九天执劫仙尊 · 归墟引力 · 逆着引力走出去');
+      } else {
+        this.#zhuxianSword(e);
+        this.announce('九天执劫仙尊 · 诛仙一剑');
       }
       return;
     }
@@ -2083,7 +2087,7 @@ export class Game {
         } else if (phase === 3) {
           fan(enraged ? 15 : 11, Math.PI * 1.2, 230);
         } else if (phase === 4) {
-          summons(6);
+          this.#heavenlySoldiers(e);
         } else {
           this.startBossCharge(e, nx, ny, 1);
           blast(e.x, e.y, 85);
@@ -2135,6 +2139,60 @@ export class Game {
       rotateZone(this.zones.at(-1)!);
     }
     this.announce('太虚劫灵 · 周天星轨 · 看箭头，随轨而行');
+  }
+
+  #zhuxianSword(e: Enemy) {
+    const d = distance(e, this.player) || 1;
+    const direction =
+      d > 1 ? { x: (this.player.x - e.x) / d, y: (this.player.y - e.y) / d } : { x: 1, y: 0 };
+    const shot = this.hostileShot(
+      e,
+      direction.x,
+      direction.y,
+      0,
+      e.damage * BOSS_MECHANICS.swordDamage,
+    );
+    const launchAt =
+      e.hp < e.maxHp / 2 ? BOSS_MECHANICS.swordWarmupEnraged : BOSS_MECHANICS.swordWarmup;
+    shot.bossMotion = { kind: 'sword', direction, launchAt };
+    shot.life = launchAt + BOSS_MECHANICS.swordFlight;
+    shot.radius = 9;
+    shot.color = SOVEREIGN_GOLD;
+    const { x, y, vx, vy } = bossShotPose(shot);
+    Object.assign(shot, { x, y, vx, vy });
+  }
+
+  #heavenlySoldiers(e: Enemy) {
+    const rules = BOSS_MECHANICS;
+    const taken = new Set(
+      this.enemies
+        .filter((c) => !c.dead && c.summonedBy === e.id && c.bossSummon?.slot !== undefined)
+        .map((c) => c.bossSummon!.slot!),
+    );
+    const base = Math.atan2(this.player.y - e.y, this.player.x - e.x);
+    for (let slot = 0; slot < rules.soldierCount; slot++) {
+      if (taken.has(slot) || this.enemies.length >= 210) continue;
+      const a = base + (slot / rules.soldierCount) * TAU;
+      const child = this.spawnEnemy(
+        24,
+        true,
+        false,
+        {
+          x: this.player.x + Math.cos(a) * (rules.soldierRing + 120),
+          y: this.player.y + Math.sin(a) * (rules.soldierRing + 120),
+        },
+        undefined,
+        false,
+      );
+      child.summonedBy = e.id;
+      child.bossSummon = { kind: 'wolf', age: 0, side: 1, round: 0, slot, color: SOVEREIGN_GOLD };
+      child.hp = child.maxHp = e.maxHp * rules.soldierHp;
+      child.damage = e.damage * rules.soldierDamage;
+      child.speed = Math.max(child.speed, 210);
+      child.radius = 26;
+      child.cooldown = 99;
+      this.#effect(child.x, child.y, 0.5, child.radius, SOVEREIGN_GOLD, 'pulse');
+    }
   }
   get gravityBoss() {
     return this.isFinalTrial && this.state !== 'won' && this.state !== 'lost'
@@ -2242,7 +2300,12 @@ export class Game {
       const limit = stage === 0 ? rules.heartLimit : rules.wolfLimit;
       const alive = countMatching(
         this.enemies,
-        (c) => !c.dead && c.bossSummon?.kind === kind && c.summonedBy === e.id,
+        (c) =>
+          !c.dead &&
+          c.bossSummon?.kind === kind &&
+          c.summonedBy === e.id &&
+          // 仙尊天兵复用 wolf 状态机，但不是双狼合猎召唤物，不占狼的数量上限。
+          (kind !== 'wolf' || c.bossSummon.slot === undefined),
       );
       for (let i = alive; i < limit && this.enemies.length < (this.isFinalTrial ? 210 : 240); i++) {
         const side = i % 2 ? -1 : 1;
@@ -2391,8 +2454,20 @@ export class Game {
     state.round = before + dt;
     if (state.round < BOSS_MECHANICS.wolfFlank) {
       const angle = Math.atan2(this.player.y - owner.y, this.player.x - owner.x);
-      const tx = this.player.x - Math.sin(angle) * state.side * 145,
-        ty = this.player.y + Math.cos(angle) * state.side * 145;
+      const [tx, ty] =
+        state.slot !== undefined
+          ? [
+              this.player.x +
+                Math.cos(angle + (state.slot / BOSS_MECHANICS.soldierCount) * TAU) *
+                  BOSS_MECHANICS.soldierRing,
+              this.player.y +
+                Math.sin(angle + (state.slot / BOSS_MECHANICS.soldierCount) * TAU) *
+                  BOSS_MECHANICS.soldierRing,
+            ]
+          : [
+              this.player.x - Math.sin(angle) * state.side * 145,
+              this.player.y + Math.cos(angle) * state.side * 145,
+            ];
       const d = Math.hypot(tx - e.x, ty - e.y) || 1,
         travel = Math.min(d, e.speed * dt);
       e.x += ((tx - e.x) / d) * travel;
@@ -2949,7 +3024,12 @@ export class Game {
       if (b.life <= 0) continue;
       if (b.kind === 'hostile') {
         if (b.bossMotion && !bossShotPose(b).active) continue;
-        if (distance(b, this.player) < b.radius + 12) {
+        const sword = b.bossMotion?.kind === 'sword';
+        const hit = sword
+          ? segmentDistance(this.player, bossShotPose(b, Math.max(0, b.age - dt)), b) <
+            b.radius + 12
+          : distance(b, this.player) < b.radius + 12;
+        if (hit) {
           const effect =
             b.bossStage === FINAL_TRIAL_STAGE ? Math.floor(this.random() * 6) : b.bossStage;
           if (!this.buddhaShieldReady) {

@@ -51,10 +51,15 @@ function advance(g: Game, seconds: number) {
   for (let t = 0; t < seconds - 1e-9; t += 0.01) g.update(Math.min(0.01, seconds - t));
 }
 
-test('仙尊保留原六招，下标6/7/8追加三招；半血前引力回退仍只消耗所抽队列位置', () => {
+test('仙尊保留原六招，下标6/7/8/9追加四招；半血前引力回退仍只消耗所抽队列位置', () => {
   for (const final of [false, true]) {
     assert.deepEqual(bossSkills(6, final).slice(0, 6), STAGES[6].skills);
-    assert.deepEqual(bossSkills(6, final).slice(6), ['万劫归一', '天劫审判', '归墟引力']);
+    assert.deepEqual(bossSkills(6, final).slice(6), [
+      '万劫归一',
+      '天劫审判',
+      '归墟引力',
+      '诛仙一剑',
+    ]);
   }
   for (const hp of [1, 0.5]) {
     const c = encounter();
@@ -64,7 +69,7 @@ test('仙尊保留原六招，下标6/7/8追加三招；半血前引力回退仍
     assert.equal(c.g.shots.length, 0);
     assert.equal(c.g.zones.length, 3);
     assert.equal(c.g.notice, '九天执劫仙尊 · 万劫归一 · 五毒游瘴');
-    assert.deepEqual([c.e.skillStep, ...c.e.bossSkillQueue!], [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.deepEqual([c.e.skillStep, ...c.e.bossSkillQueue!], [0, 1, 2, 3, 4, 5, 6, 7, 9]);
   }
   const c = encounter();
   c.e.hp = c.e.maxHp * 0.499;

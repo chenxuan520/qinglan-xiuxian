@@ -31,7 +31,9 @@ function advance(game: Game, seconds: number) {
 }
 
 function near(actual: number, expected: number) {
-  assert.ok(Math.abs(actual - expected) <= 1e-6, `${actual} != ${expected}`);
+  // 仙尊气血提高后绝对值更大，保留 1e-6 下限并按量级放宽相对容差。
+  const tolerance = Math.max(1e-6, Math.abs(expected) * 1e-12);
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${actual} != ${expected}`);
 }
 
 function recoveryWithCast() {

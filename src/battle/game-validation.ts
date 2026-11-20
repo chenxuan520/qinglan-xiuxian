@@ -318,6 +318,11 @@ export function validateRunSnapshot(
                   e.bossSummon.round >= 0 &&
                   // 旧蓄势为 1.4 秒，schema 46 的合法 round 可达 2.6；恢复时归一到新蓄力起点。
                   e.bossSummon.round <= 2.6)) &&
+              (e.bossSummon.slot === undefined ||
+                (e.bossSummon.kind === 'wolf' &&
+                  Number.isInteger(e.bossSummon.slot) &&
+                  e.bossSummon.slot >= 0 &&
+                  e.bossSummon.slot < BOSS_MECHANICS.soldierCount)) &&
               [-1, 1].includes(e.bossSummon.side) &&
               Number.isSafeInteger(e.summonedBy) &&
               e.summonedBy! > 0)) &&

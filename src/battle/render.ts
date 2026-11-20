@@ -14,7 +14,7 @@ import {
   TAU,
 } from '../core/data.ts';
 import type { CultivationPath, ElementId } from '../core/data.ts';
-import type { Enemy, Game, Point } from './game.ts';
+import type { Enemy, Game, Point, Shot } from './game.ts';
 import { spriteFrame } from './sprites.ts';
 import { assetUrl } from '../core/asset-url.ts';
 import { sceneAssets } from './scene-assets.ts';
@@ -24,7 +24,12 @@ import { playerHomeOffset, playerSpriteFrame } from './player-appearance.ts';
 import { ModuleSource, retryModule } from '../core/module-source.ts';
 import { BattleResolution } from './battle-resolution.ts';
 import { altarDefinition } from './altar-ui.ts';
-import { bossGuardedByHearts, heartGuardReady, summonLinkAlpha } from './boss-mechanics.ts';
+import {
+  bossGuardedByHearts,
+  heartGuardReady,
+  SOVEREIGN_GOLD,
+  summonLinkAlpha,
+} from './boss-mechanics.ts';
 
 type BattleArt = typeof import('./battle-art.ts');
 interface SpriteTexture {
@@ -657,7 +662,16 @@ export class Renderer {
         dy: 0,
         maxHp: p.maxHp,
       },
-    ].sort((a, b) => a.y - b.y);
+    ].sort((a, b) => {
+      // 天兵冲到修士身前时垫在角色下方绘制，避免六名召唤物同时遮住玩家。
+      const depth = (e: (typeof entities)[number]) =>
+        'bossSummon' in e &&
+        e.bossSummon?.slot !== undefined &&
+        Math.hypot(e.x - p.x, e.y - p.y) < 70
+          ? -1e9
+          : e.y;
+      return depth(a) - depth(b);
+    });
     for (const e of entities) {
       if (e.type === -1) {
         const altar = game.altar;
@@ -862,7 +876,8 @@ export class Renderer {
       }
     }
     for (const shot of game.shots) {
-      if (!this.visible(shot, p)) continue;
+      // 诛仙一剑的预警线从施放点跨屏延伸，即使仙尊在视口外也要画出。
+      if (!this.visible(shot, p) && shot.bossMotion?.kind !== 'sword') continue;
       const a = Math.atan2(shot.vy, shot.vx);
       const shotType = shot.kind === 'hostile' ? (shot.enemySkill ?? 'hostile') : shot.kind;
       const shotColor = soulCombo && shot.kind === 'talisman' ? '#b9ead4' : shot.color;
@@ -875,7 +890,8 @@ export class Renderer {
         c.rotate(a);
         if (shot.kind === 'blade') c.rotate(time * 12);
         if (shot.kind === 'hostile' && shot.bossStage !== undefined) {
-          if (shot.bossMotion) {
+          if (shot.bossMotion?.kind === 'sword') this.sovereignSword(c, shot);
+          else if (shot.bossMotion) {
             c.save();
             this.battleArt!.drawBossShot(c, shot);
             c.restore();
@@ -1330,6 +1346,57 @@ export class Renderer {
     }
     c.restore();
   }
+  private sovereignSword(c: CanvasRenderingContext2D, shot: Shot) {
+    const motion = shot.bossMotion;
+    if (motion?.kind !== 'sword') return;
+    if (shot.age < motion.launchAt) {
+      const progress = Math.min(1, shot.age / motion.launchAt);
+      c.save();
+      c.rotate(Math.atan2(motion.direction.y, motion.direction.x) - Math.atan2(shot.vy, shot.vx));
+      c.globalAlpha = this.reducedMotion.matches
+        ? 0.6
+        : 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(shot.age * (24 + 48 * progress)));
+      c.strokeStyle = SOVEREIGN_GOLD;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.lineTo(1400, 0);
+      c.stroke();
+      c.restore();
+      return;
+    }
+    // 剑身朝向已由外层 rotate(a) 对齐飞行方向，+x 为前进方向。
+    const body = c.createLinearGradient(-110, 0, 0, 0);
+    body.addColorStop(0, SOVEREIGN_GOLD + '22');
+    body.addColorStop(0.55, SOVEREIGN_GOLD + '99');
+    body.addColorStop(1, SOVEREIGN_GOLD);
+    c.fillStyle = body;
+    c.fillRect(-110, -3, 98, 6);
+    c.strokeStyle = '#fff6d8';
+    c.globalAlpha = 0.6;
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(-104, 0);
+    c.lineTo(-6, 0);
+    c.stroke();
+    c.globalAlpha = 1;
+    if (!this.reducedMotion.matches) {
+      const trail = c.createLinearGradient(-170, 0, -110, 0);
+      trail.addColorStop(0, SOVEREIGN_GOLD + '00');
+      trail.addColorStop(1, SOVEREIGN_GOLD + '66');
+      c.fillStyle = trail;
+      c.fillRect(-170, -2, 60, 4);
+    }
+    // 收拢的窄锋与亮脊让飞行体读作飞剑，而不是方向箭头。
+    c.fillStyle = SOVEREIGN_GOLD;
+    c.beginPath();
+    c.moveTo(8, 0);
+    c.lineTo(-12, -4);
+    c.lineTo(-12, 4);
+    c.closePath();
+    c.fill();
+  }
+
   private sword(x: number, y: number, angle: number, color: string, scale = 1) {
     const c = this.ctx;
     c.save();
