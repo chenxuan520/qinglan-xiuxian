@@ -4,7 +4,7 @@ export const SOVEREIGN_GOLD = '#e8d69c';
 
 export const BOSS_MECHANICS = {
   heartGrow: 1.2,
-  heartGuard: 0.3,
+  heartGuard: 0.5,
   heartLife: 10,
   heartLimit: 3,
   wolfFlank: 1.2,

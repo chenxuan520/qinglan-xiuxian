@@ -297,7 +297,7 @@ function strike(g: Game, target: any, amount = 100) {
   return before - target.hp;
 }
 
-test('木心长成后为施法者减伤三成，全碎或到时后恢复', () => {
+test('木心长成后为施法者减伤五成，全碎或到时后恢复', () => {
   const { g, e } = cast(0);
   const hearts = actors(g);
   const open = strike(g, e);
@@ -334,7 +334,7 @@ test('木心减伤只作用于施法者本体，小怪、木心与其他妖王�
   const controlBoss = strike(control.g, control.e);
   const controlOtherDamage = strike(control.g, controlOther);
   const controlHeart = strike(control.g, actors(control.g)[0], 10);
-  assert.ok(Math.abs(guardedBoss - controlBoss * 0.7) < 1e-9);
+  assert.ok(Math.abs(guardedBoss - controlBoss * (1 - R.heartGuard)) < 1e-9);
   assert.equal(guardedOther, controlOtherDamage);
   assert.equal(guardedHeart, controlHeart);
 });

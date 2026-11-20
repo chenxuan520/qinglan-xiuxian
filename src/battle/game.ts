@@ -344,6 +344,10 @@ export class Game {
   get isFinalTrial() {
     return this.stage === FINAL_TRIAL_STAGE && !this.tribulation;
   }
+  /** 终关第七劫仙尊已登场：此后不再自然刷新小怪 */
+  get sovereignArrived() {
+    return this.isFinalTrial && this.trialBossesSpawned >= TRIAL_BOSS_STAGES.length;
+  }
   get encounterName() {
     return this.tribulation ? `天劫 · 第 ${this.tribulation} 劫` : STAGES[this.stage].name;
   }
@@ -1008,16 +1012,18 @@ export class Game {
       if (this.boss) this.boss.flash = Math.max(0, this.boss.flash - dt);
       this.updateTribulation();
     } else {
-      this.spawnBudget +=
-        dt *
-        (this.isFinalTrial
-          ? 1 + 8 * progress ** 1.3
-          : 0.85 +
-            this.stage * 0.12 +
-            (STAGES[this.stage].minutes * 60 * 0.017 + this.stage * 0.18 + 0.45) *
-              progress ** 1.3) *
-        DIFFICULTIES[this.difficulty].amount *
-        (this.isFinalTrial ? (this.boss ? 0.7 : 1) : (this.bossSpawned ? 0.32 : 1) * 1.25);
+      if (this.sovereignArrived) this.spawnBudget = 0;
+      else
+        this.spawnBudget +=
+          dt *
+          (this.isFinalTrial
+            ? 1 + 8 * progress ** 1.3
+            : 0.85 +
+              this.stage * 0.12 +
+              (STAGES[this.stage].minutes * 60 * 0.017 + this.stage * 0.18 + 0.45) *
+                progress ** 1.3) *
+          DIFFICULTIES[this.difficulty].amount *
+          (this.isFinalTrial ? (this.boss ? 0.7 : 1) : (this.bossSpawned ? 0.32 : 1) * 1.25);
       while (this.spawnBudget >= 1) {
         this.spawnBudget--;
         if (this.enemies.length < (this.isFinalTrial ? 210 : 240)) this.spawnEnemy();
