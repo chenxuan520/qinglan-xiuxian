@@ -174,9 +174,11 @@ export function normalizeSource(spec: SourceSpec, data: unknown, at: string): Ob
           source.state === 'failed',
         );
       }
+      // 模拟与体积摘要只在代码推送时重算，安静期的旧时间戳不代表异常；失败与缺失仍由 source.state 报告。
       if (
-        !source.generatedAt ||
-        Date.parse(at) - Date.parse(source.generatedAt) > spec.maxAgeHours * 3600000
+        kind === 'render' &&
+        (!source.generatedAt ||
+          Date.parse(at) - Date.parse(source.generatedAt) > spec.maxAgeHours * 3600000)
       )
         add(
           `stale-${kind}`,

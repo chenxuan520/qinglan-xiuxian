@@ -306,10 +306,9 @@ test('report validation failure is not described as a numeric balance regression
   assert.match(o.signals[0].detail, /不等同于通关率下降/);
 });
 
-test('performance metrics use actual sample counts and source timestamps, not publication time', () => {
-  const generatedAt = '2026-11-05T11:00:00Z';
+function performanceSnapshot(generatedAt: string) {
   const commit = 'a'.repeat(40);
-  const data = {
+  return {
     schemaVersion: 1,
     publishedAt: at,
     sources: {
@@ -365,6 +364,11 @@ test('performance metrics use actual sample counts and source timestamps, not pu
       ),
     },
   };
+}
+
+test('performance metrics use actual sample counts and source timestamps, not publication time', () => {
+  const generatedAt = '2026-11-05T11:00:00Z';
+  const data = performanceSnapshot(generatedAt);
   const o = normalizeSource({ ...spec, kind: 'performance' }, data, at);
   assert.equal(o.status, 'ready');
   assert.ok(o.metrics.length >= 6);
@@ -372,6 +376,24 @@ test('performance metrics use actual sample counts and source timestamps, not pu
     assert.equal(metric.generatedAt, generatedAt);
     assert.equal(metric.sampleSize, metric.id.startsWith('render-') ? 3600 : 900);
   }
+});
+
+test('模拟与体积摘要随代码推送更新，安静期陈旧不告警；渲染仍按时限检查', () => {
+  const recent = '2026-11-05T11:00:00Z';
+  const old = performanceSnapshot('2026-10-01T00:00:00Z');
+  // 11-20 的线上形态：渲染是当天，模拟与体积停在四天前。
+  const quiet = normalizeSource(
+    { ...spec, kind: 'performance' },
+    { ...old, sources: { ...old.sources, render: performanceSnapshot(recent).sources.render } },
+    at,
+  );
+  assert.equal(quiet.status, 'ready');
+  assert.deepEqual(quiet.signals, []);
+  const staleRender = normalizeSource({ ...spec, kind: 'performance' }, old, at);
+  assert.deepEqual(
+    staleRender.signals.map((signal) => signal.id),
+    ['stale-render'],
+  );
 });
 
 test('first restore writes a bootstrap state so installation failure cannot erase history', async () => {
