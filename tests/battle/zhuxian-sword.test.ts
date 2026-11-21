@@ -47,13 +47,14 @@ function advance(g: Game, seconds: number, step = 0.01) {
 }
 
 test('仙尊招式表扩到十招，诛仙一剑在索引 9 且有说明', () => {
+  assert.equal(R.swordSpeed, 1500);
   assert.equal(bossSkills(6, true).length, 10);
   assert.equal(bossSkills(6, true)[9], '诛仙一剑');
   assert.match(BOSS_SKILL_TEXT['诛仙一剑'], /金线锁定修士方向，片刻后一剑疾飞，伤害极高/);
   for (const stage of [0, 1, 2, 3, 4, 5]) assert.ok(!bossSkills(stage, true).includes('诛仙一剑'));
 });
 
-test('仙尊半血以上预警 0.5 秒、半血后 0.3 秒，飞行 1200 像素每秒并按时消失', () => {
+test('仙尊半血以上预警 0.5 秒、半血后 0.3 秒，飞行 1500 像素每秒并按时消失', () => {
   const full = encounter();
   const shot = cast(full);
   assert.equal(shot.color, SOVEREIGN_GOLD);

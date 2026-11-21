@@ -7,7 +7,7 @@ import {
   bossSkillCooldown,
   bossPursuitCooldown,
 } from '../../src/battle/boss-skills.ts';
-import { bossShotPose } from '../../src/battle/boss-mechanics.ts';
+import { BOSS_MECHANICS as R, bossShotPose } from '../../src/battle/boss-mechanics.ts';
 import { freshSave } from '../../src/core/progress.ts';
 
 const affected = (stage: number, difficulty: number) =>
@@ -61,7 +61,7 @@ test('初入第五境与相邻关卡对齐，问道与天劫数组保持原值',
   assert.deepEqual(DIFFICULTIES[2].stageRamp, [1, 1.65, 2.2, 2.7, 3.1, 2.6, 1]);
 });
 
-test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七王保持基础值', () => {
+test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关旧王保持基础值、仙尊提速 1.2 倍', () => {
   const patterns: [number, number, number[]][] = [
     [0, 1, Array(7).fill(170)],
     [1, 0, [...Array(9).fill(200), ...Array(8).fill(145)]],
@@ -79,7 +79,14 @@ test('原生妖王扇射/环射按难度提速及缩短常规冷却，终关七�
           const c = encounter(stage, difficulty, arena);
           cast(c, phase, half);
           const active = arena !== 6 && affected(stage, difficulty);
-          const speedFactor = active ? [1.1, 1.1, 1.2][difficulty] : 1;
+          const speedFactor =
+            arena === 6
+              ? stage === 6
+                ? R.sovereignShotSpeed
+                : 1
+              : active
+                ? [1.1, 1.1, 1.2][difficulty]
+                : 1;
           const cooldownFactor = active ? [0.9, 0.9, 0.8][difficulty] : 1;
           const expectedSpeeds = stage === 6 && half ? Array(32).fill(185) : speeds;
           assert.equal(c.g.shots.length, expectedSpeeds.length);

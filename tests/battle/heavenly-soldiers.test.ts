@@ -54,7 +54,7 @@ const soldiers = (g: Game) => g.enemies.filter((e) => !e.dead && e.bossSummon?.s
 
 test('终关仙尊气血为原值的 1.5 倍，其他旧王与倍率表前六项不变', () => {
   assert.deepEqual(BOSS_COMBAT.trialKingHp, [1, 1, 1.3, 1.4, 1.25, 1.25, 1.5]);
-  assert.equal(R.soldierHp, 0.02);
+  assert.equal(R.soldierHp, 0.04);
   const { e } = trial();
   const base =
     560000 *

@@ -1865,9 +1865,12 @@ export class Game {
         : DIFFICULTIES[this.difficulty].bossCooldown[stage]);
     const p = { x: this.player.x, y: this.player.y };
     const angle = Math.atan2(ny, nx);
-    const shotSpeed =
-      this.isFinalTrial || this.tribulation
-        ? 1
+    const shotSpeed = this.tribulation
+      ? 1
+      : this.isFinalTrial
+        ? stage === FINAL_TRIAL_STAGE
+          ? BOSS_MECHANICS.sovereignShotSpeed
+          : 1
         : DIFFICULTIES[this.difficulty].bossShotSpeed[stage];
     const fan = (count: number, spread: number, speed: number, center = angle) => {
       const shots: Shot[] = [];

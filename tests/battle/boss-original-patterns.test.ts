@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Game } from '../../src/battle/game.ts';
 import { DIFFICULTIES, STAGES } from '../../src/core/data.ts';
 import { bossSkills, bossSkillCooldown } from '../../src/battle/boss-skills.ts';
+import { BOSS_MECHANICS as R } from '../../src/battle/boss-mechanics.ts';
 import { freshSave } from '../../src/core/progress.ts';
 import { exportSave, importSave } from '../../src/core/save-transfer.ts';
 import { bestiaryPanel } from '../../src/content/bestiary-ui.ts';
@@ -339,7 +340,12 @@ test('原环射保持完整360度和均匀缺口，扇射不偷偷变成条带�
       const { g, e } = encounter(origin, phase, arena);
       g.castBossSkill(e, 1, 0);
       assert.equal(g.shots.length, count * speeds.length);
-      const speedFactor = arena === 6 ? 1 : DIFFICULTIES[0].bossShotSpeed[origin];
+      const speedFactor =
+        arena === 6
+          ? origin === 6
+            ? R.sovereignShotSpeed
+            : 1
+          : DIFFICULTIES[0].bossShotSpeed[origin];
       for (const [layer, speed] of speeds.entries()) {
         const shots = g.shots.slice(layer * count, (layer + 1) * count);
         const angles = shots.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);

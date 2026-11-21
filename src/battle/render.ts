@@ -25,6 +25,7 @@ import { ModuleSource, retryModule } from '../core/module-source.ts';
 import { BattleResolution } from './battle-resolution.ts';
 import { altarDefinition } from './altar-ui.ts';
 import {
+  BOSS_MECHANICS,
   bossGuardedByHearts,
   heartGuardReady,
   SOVEREIGN_GOLD,
@@ -1361,7 +1362,7 @@ export class Renderer {
       c.lineWidth = 2;
       c.beginPath();
       c.moveTo(0, 0);
-      c.lineTo(1400, 0);
+      c.lineTo(BOSS_MECHANICS.swordSpeed * BOSS_MECHANICS.swordFlight, 0);
       c.stroke();
       c.restore();
       return;
