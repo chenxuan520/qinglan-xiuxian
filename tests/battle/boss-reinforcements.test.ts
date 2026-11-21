@@ -33,7 +33,7 @@ for (const [origin, phase, count] of [
   [6, 4, 6],
 ])
   for (const arena of origin === 6 ? [6] : [origin, 6])
-    test(`第${arena + 1}境妖王${origin}召唤${count}只精英，击杀给正常灵气且不掉宝匣`, () => {
+    test(`第${arena + 1}境妖王${origin}召唤${count}只精英，击杀按类型给灵气且不掉宝匣`, () => {
       const { g, boss } = encounter(origin, phase, arena);
       const children = g.enemies.filter((e) => !e.boss);
       assert.equal(children.length, count);
@@ -57,7 +57,14 @@ for (const [origin, phase, count] of [
       assert.equal(g.kills, 1);
       assert.deepEqual(
         g.pickups.filter((p) => p.kind === 'xp').map(({ kind, value }) => ({ kind, value })),
-        [{ kind: 'xp', value: Math.round(ENEMIES[child.type].xp * (1 + arena * 0.16) * 8) }],
+        [
+          {
+            kind: 'xp',
+            value: Math.round(
+              ENEMIES[child.type].xp * (1 + arena * 0.16) * 8 * (origin === 6 ? R.soldierXp : 1),
+            ),
+          },
+        ],
       );
       assert.equal(
         g.pickups.some((p) => p.kind === 'chest'),

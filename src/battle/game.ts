@@ -3937,7 +3937,15 @@ export class Game {
               (type) => Math.round(ENEMIES[type].xp * (1 + this.stage * 0.16) * 8) * 30,
             ),
           )
-        : Math.round(ENEMIES[e.type].xp * (1 + this.stage * 0.16) * (e.elite ? 8 : 1));
+        : Math.round(
+            ENEMIES[e.type].xp *
+              (1 + this.stage * 0.16) *
+              (e.elite ? 8 : 1) *
+              // 天兵按实力给经验：同类精英的 soldierXp 倍。
+              (e.bossSummon?.kind === 'wolf' && e.bossSummon.slot !== undefined
+                ? BOSS_MECHANICS.soldierXp
+                : 1),
+          );
       // 基础击杀收益保留，额外修为按地域与怪物强度结算。
       const rate = cultivationRate(this.stage);
       // 终关全员精英属于战斗强度：永久修为按普通倍率，局内灵气仍按精英给。

@@ -5,9 +5,12 @@ import { freshSave, realmDamageMultiplier } from '../../src/core/progress.ts';
 import {
   BOSS_COMBAT,
   DIFFICULTIES,
+  ENEMIES,
+  MAX_RUN_LEVEL,
   STAGE_COMBAT_SCALING,
   STAGE_REALM_STEPS,
   TAU,
+  cultivationRate,
   type Enemy,
 } from '../../src/core/data.ts';
 import { bossSkills } from '../../src/battle/boss-skills.ts';
@@ -314,6 +317,62 @@ test('天兵存活时万劫归一借双狼仍生成两只狼，不占狼的数�
   );
   assert.equal(wolves.length, 2);
   assert.equal(soldiers(c.g).length, R.soldierCount);
+});
+
+test('击碎天兵掉同类精英 10 倍局内经验，永久修为与宝匣规则不变', () => {
+  const c = trial();
+  cast(c, 4);
+  const soldier = soldiers(c.g)[0];
+  const type = soldier.type;
+  const beforeCultivation = c.g.combatCultivation;
+  c.g.pickups = [];
+  c.g.hitEnemy(soldier, soldier.maxHp * 100, false, 'sword');
+  const xp = c.g.pickups.filter((p) => p.kind === 'xp');
+  assert.deepEqual(
+    xp.map((p) => p.value),
+    [Math.round(ENEMIES[type].xp * (1 + 6 * 0.16) * 8 * R.soldierXp)],
+  );
+  const expectedCultivation =
+    Math.max(0, (ENEMIES[type].xp / 3) * 0.7 * (1 + 6 * 0.6) - 0.7) * cultivationRate(6);
+  near(c.g.combatCultivation - beforeCultivation, expectedCultivation, 1e-6);
+  assert.equal(
+    c.g.pickups.some((p) => p.kind === 'chest'),
+    false,
+  );
+});
+
+test('终关双狼与普通精英的经验保持原值，满级天兵不掉经验珠', () => {
+  const wolves = trial();
+  wolves.e.bossStage = 2;
+  cast(wolves, 3);
+  const wolf = wolves.g.enemies.find(
+    (e) => e.bossSummon?.kind === 'wolf' && e.bossSummon.slot === undefined,
+  )!;
+  wolves.g.pickups = [];
+  wolves.g.hitEnemy(wolf, wolf.maxHp * 100, false, 'sword');
+  assert.deepEqual(
+    wolves.g.pickups.filter((p) => p.kind === 'xp').map((p) => p.value),
+    [Math.round(ENEMIES[wolf.type].xp * (1 + 6 * 0.16) * 8)],
+  );
+
+  const elite = trial();
+  const mob = elite.g.spawnEnemy(65, false, false, { x: 200, y: 0 });
+  elite.g.pickups = [];
+  elite.g.hitEnemy(mob, mob.maxHp * 100, false, 'sword');
+  assert.deepEqual(
+    elite.g.pickups.filter((p) => p.kind === 'xp').map((p) => p.value),
+    [Math.round(ENEMIES[65].xp * (1 + 6 * 0.16) * 8)],
+  );
+
+  const capped = trial();
+  cast(capped, 4);
+  capped.g.level = MAX_RUN_LEVEL;
+  capped.g.pickups = [];
+  capped.g.hitEnemy(soldiers(capped.g)[0], 1e9, false, 'sword');
+  assert.equal(
+    capped.g.pickups.some((p) => p.kind === 'xp'),
+    false,
+  );
 });
 
 test('双狼合猎未设置阵位，仍按原左右绕位目标行动', () => {
