@@ -55,6 +55,7 @@
 - README 保持简短，只放封面、唯一官网 `https://xiuxian.011203.xyz/`、核心特色和开发入口；详细玩法同步 [玩法详解](docs/gameplay.md) 和游戏内指南，部署细节维护 [开发与部署](docs/development.md)。实际验证记录按 [docs/verification.md](docs/verification.md) 的「记录规则」追加到 `docs/verification/` 当月文件，不要把预计结果写成已通过。
 - 验证记录：只追加到 docs/verification/当月.md 末尾，标题 "## YYYY-MM-DD · 简述"，每条≤10行，不改旧记录、不贴完整报告；详见 docs/verification.md「记录规则」。
 - 法宝数值、机制或自动优选名单改动推送后，必须立即手动触发 `gh workflow run weapon-benchmark.yml --ref master`，确认 16 个分片、47,120/47,120 样本、合并与发布完成；不能只等每日定时任务。
+- **涉及平衡的改动推送后必须立即手动触发全量平衡 CI。** 战斗、成长、妖王、法宝/功法、自动策略、刷怪或其他影响通关率的数值与机制改动，除定向测试、`npm run balance:ci` 与 [docs/rules/balance-ci.md](docs/rules/balance-ci.md) 规定的检查外，推送后必须立即运行 `gh workflow run balance.yml --ref master -f full=true --repo chenxuan520/qinglan-xiuxian`，并确认 16 个分片、10,080/10,080 样本、`aggregate` 与 `publish-report` 完成，线上 `balance-report/diagnostics.json` 的 `commit` 等于本次完整 SHA；不能只等每日北京 12:00 定时，也不能把「已触发」或 `queued` 当成完成。
 - **推送不等于完成，必须盯到 CI 终态。** 每次推送后先取完整 40 位 SHA（`SHA=$(git rev-parse HEAD)`），用完整 SHA 或 run ID 查运行，**禁止用短 SHA 过滤 `headSha`**。对本次 push 的每个 run 用 `gh run watch <run-id> --exit-status` 盯到 `completed`；后台监控必须按 run ID 或完整 SHA，且匹配不到任何运行时在 5 分钟内报错退出，不能无限空转。任一 job 失败必须读取失败 job 日志定位；法宝测评还必须确认 16/16 分片、合并 `47,120/47,120`、`publish-report` 成功，并读取线上 `summary.json` 验证 `state=complete`、`commit=<完整SHA>`。外部服务故障（如 artifact 下载 503 egress 限额）也要报告具体错误并等恢复后重跑，不能把失败报告、“已触发”或 `queued` 当成完成。
 
 ## 领域细则
