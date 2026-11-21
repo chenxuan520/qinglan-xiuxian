@@ -717,7 +717,8 @@ export class Renderer {
             this.drawFrozenHeart(e);
             continue;
           }
-          this.battleArt!.drawBossSummon(c, e);
+          const labelY = e.y - (e.radius * 3.2 + 10);
+          this.battleArt!.drawBossSummon(c, e, (labelY - p.y) * this.scale + this.height / 2 > 220);
           if (e.bossSummon.kind === 'heart') continue;
         }
         if (e.illusionOf !== undefined) {

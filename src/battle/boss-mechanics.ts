@@ -14,7 +14,7 @@ export const BOSS_MECHANICS = {
   wolfLimit: 2,
   soldierCount: 6,
   soldierRing: 190,
-  soldierHp: 0.04,
+  soldierHp: 0.02,
   soldierDamage: 0.65,
   swordWarmup: 0.5,
   swordWarmupEnraged: 0.3,

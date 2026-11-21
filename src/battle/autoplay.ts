@@ -301,7 +301,14 @@ function autoplayDirection(g: Game) {
     preferred = { x: sx / length, y: sy / length };
   }
   const movingShots = g.shots.filter(
-    (b) => b.kind === 'hostile' && Math.hypot(b.x - p.x, b.y - p.y) < 420,
+    (b) =>
+      b.kind === 'hostile' &&
+      b.bossMotion?.kind !== 'sword' &&
+      Math.hypot(b.x - p.x, b.y - p.y) < 420,
+  );
+  // 诛仙一剑：从预警起按整条剑路计算，不受 420 像素范围限制。
+  const swords = g.shots.filter(
+    (b) => b.kind === 'hostile' && b.bossMotion?.kind === 'sword' && b.life > 0,
   );
   const charges = g.enemies.filter(
     (e) =>
@@ -319,7 +326,7 @@ function autoplayDirection(g: Game) {
         : hazardDistance(z, p) <
           z.radius + 8 + speed * 1.6 + Math.hypot(z.vx || 0, z.vy || 0) * 1.6),
   );
-  if (!charges.length && !zones.length && !movingShots.length) return preferred;
+  if (!charges.length && !zones.length && !movingShots.length && !swords.length) return preferred;
   // 按剩余冲程计算整条危险带；预留两次120ms决策的移动距离，避免拾取目标把人拉回线内。
   const clearance = (e: (typeof charges)[number]) => e.radius + 13 + speed * 0.24;
   const distanceToPath = (x: number, y: number, e: (typeof charges)[number]) => {
@@ -334,6 +341,7 @@ function autoplayDirection(g: Game) {
   };
   if (
     !movingShots.length &&
+    !swords.length &&
     !zones.length &&
     !charges.some((e) => distanceToPath(p.x, p.y, e) < clearance(e))
   )
@@ -490,6 +498,26 @@ function autoplayDirection(g: Game) {
       for (const seconds of [0.12, 0.24, 0.36]) {
         const distance = distanceToPath(p.x + x * speed * seconds, p.y + y * speed * seconds, e);
         score += Math.max(0, 1 - distance / clearance(e));
+      }
+    }
+    for (const b of swords) {
+      const motion = b.bossMotion;
+      if (motion?.kind !== 'sword') continue;
+      const length = BOSS_MECHANICS.swordSpeed * BOSS_MECHANICS.swordFlight;
+      const reach = b.radius + 12 + speed * 0.12;
+      for (const seconds of [0.12, 0.24, 0.36, 0.6, 0.9]) {
+        const qx = p.x + x * speed * seconds,
+          qy = p.y + y * speed * seconds;
+        const rx = qx - b.origin.x,
+          ry = qy - b.origin.y;
+        const along = rx * motion.direction.x + ry * motion.direction.y;
+        if (along < -reach || along > length + reach) continue;
+        const side = Math.abs(rx * motion.direction.y - ry * motion.direction.x);
+        if (side >= reach) continue;
+        // 剑尖到达该投影点的时刻（相对现在）；已飞过则无害，尚未到达时站在剑路上仍危险。
+        const arrive = motion.launchAt - b.age + Math.max(0, along) / BOSS_MECHANICS.swordSpeed;
+        if (arrive < 0 || arrive < seconds - 0.12) continue;
+        score += (1 - side / reach) * 6;
       }
     }
     if (score < bestScore) {

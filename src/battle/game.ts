@@ -1368,7 +1368,7 @@ export class Game {
         if (e.bossSummon?.kind === 'wolf') {
           e.bossSummon.age += dt;
           if (
-            e.bossSummon.age > BOSS_MECHANICS.wolfLife ||
+            (e.bossSummon.slot === undefined && e.bossSummon.age > BOSS_MECHANICS.wolfLife) ||
             !this.enemies.some((owner) => owner.id === e.summonedBy && !owner.dead)
           )
             e.dead = true;
@@ -2442,7 +2442,9 @@ export class Game {
     const owner = this.enemies.find((b) => b.id === e.summonedBy && !b.dead);
     if (
       !owner ||
-      state.age > (state.kind === 'heart' ? BOSS_MECHANICS.heartLife : BOSS_MECHANICS.wolfLife)
+      (state.kind === 'heart'
+        ? state.age > BOSS_MECHANICS.heartLife
+        : state.slot === undefined && state.age > BOSS_MECHANICS.wolfLife)
     ) {
       e.dead = true;
       return;
@@ -2476,8 +2478,12 @@ export class Game {
       const previous = chargeSpan - Math.max(0, before - BOSS_MECHANICS.wolfFlank);
       e.charge = Math.max(0, chargeSpan - (state.round - BOSS_MECHANICS.wolfFlank));
       if (e.charge < 1e-9) e.charge = 0;
-      // 蓄力期间每帧追瞄；越过扑击起点后不再改变方向。
-      if (previous > BOSS_MECHANICS.wolfDash) {
+      // 双狼蓄力期间每帧追瞄；天兵只在进入蓄力的第一帧瞄准一次，之后方向固定。
+      if (
+        state.slot !== undefined
+          ? before <= BOSS_MECHANICS.wolfFlank
+          : previous > BOSS_MECHANICS.wolfDash
+      ) {
         const d = distance(e, this.player) || 1;
         e.dx = (this.player.x - e.x) / d;
         e.dy = (this.player.y - e.y) / d;

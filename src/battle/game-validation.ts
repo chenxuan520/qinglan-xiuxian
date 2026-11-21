@@ -308,10 +308,11 @@ export function validateRunSnapshot(
               (e.bossSummon.color === undefined || e.bossSummon.color === SOVEREIGN_GOLD) &&
               Number.isFinite(e.bossSummon.age) &&
               e.bossSummon.age >= 0 &&
-              e.bossSummon.age <=
-                (e.bossSummon.kind === 'wolf'
-                  ? BOSS_MECHANICS.wolfLife
-                  : BOSS_MECHANICS.heartLife) &&
+              (e.bossSummon.slot !== undefined ||
+                e.bossSummon.age <=
+                  (e.bossSummon.kind === 'wolf'
+                    ? BOSS_MECHANICS.wolfLife
+                    : BOSS_MECHANICS.heartLife)) &&
               (e.bossSummon.round === undefined ||
                 (e.bossSummon.kind === 'wolf' &&
                   Number.isFinite(e.bossSummon.round) &&

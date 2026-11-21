@@ -12,6 +12,7 @@ import {
 } from '../../src/core/data.ts';
 import { bossSkills } from '../../src/battle/boss-skills.ts';
 import { BOSS_MECHANICS as R, SOVEREIGN_GOLD } from '../../src/battle/boss-mechanics.ts';
+import { drawBossSummon } from '../../src/battle/boss-mechanics-render.ts';
 
 const near = (actual: number, expected: number, tolerance = 1e-6) =>
   assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`);
@@ -53,6 +54,7 @@ const soldiers = (g: Game) => g.enemies.filter((e) => !e.dead && e.bossSummon?.s
 
 test('终关仙尊气血为原值的 1.5 倍，其他旧王与倍率表前六项不变', () => {
   assert.deepEqual(BOSS_COMBAT.trialKingHp, [1, 1, 1.3, 1.4, 1.25, 1.25, 1.5]);
+  assert.equal(R.soldierHp, 0.02);
   const { e } = trial();
   const base =
     560000 *
@@ -123,17 +125,22 @@ test('已有存活天兵时只补空缺阵位，总数不超过六名', () => {
   );
 });
 
-test('仙尊倒下或六秒存续结束后天兵全部消失', () => {
+test('仙尊倒下后天兵消失，超过六秒仍常驻并继续冲杀', () => {
   const owner = trial();
   cast(owner, 4);
   owner.e.dead = true;
   owner.g.update(0.01);
   assert.equal(soldiers(owner.g).length, 0);
 
-  const timeout = trial();
-  cast(timeout, 4);
-  advance(timeout.g, R.wolfLife + 0.1);
-  assert.equal(soldiers(timeout.g).length, 0);
+  const enduring = trial();
+  cast(enduring, 4);
+  advance(enduring.g, R.wolfLife + 0.5);
+  assert.equal(soldiers(enduring.g).length, R.soldierCount);
+  const before = soldiers(enduring.g).map((e) => e.bossSummon!.age);
+  advance(enduring.g, 2);
+  assert.equal(soldiers(enduring.g).length, R.soldierCount);
+  assert.ok(soldiers(enduring.g).every((e) => e.bossSummon!.age > 0));
+  assert.ok(soldiers(enduring.g).every((e, i) => e.bossSummon!.age > before[i]));
 });
 
 test('天兵阵位、round 与颜色可续局；非法 slot 被存档校验拒绝', () => {
@@ -170,6 +177,124 @@ test('天兵阵位、round 与颜色可续局；非法 slot 被存档校验拒�
   target.bossSummon.kind = 'heart';
   delete target.bossSummon.round;
   assert.equal(Game.restore(c.g.save, heart), null, 'heart 带 slot');
+});
+
+test('天兵进入蓄力首帧锁定方向，蓄力期间修士移动也不改；双狼仍逐帧追瞄', () => {
+  const c = trial();
+  cast(c, 4);
+  advance(c.g, R.wolfFlank - 0.01);
+  c.g.player.x = 100;
+  c.g.player.y = 50;
+  advance(c.g, 0.02);
+  const first = soldiers(c.g)[0];
+  const locked = { x: first.dx, y: first.dy };
+  const aim = Math.atan2(50 - first.y, 100 - first.x);
+  near(Math.atan2(locked.y, locked.x), aim, 1e-6);
+  c.g.player.x = -900;
+  c.g.player.y = -400;
+  advance(c.g, 0.2);
+  assert.deepEqual({ x: first.dx, y: first.dy }, locked);
+
+  const wolves = trial(2);
+  cast(wolves, 3);
+  advance(wolves.g, R.wolfFlank + 0.05);
+  const wolf = wolves.g.enemies.find(
+    (e) => e.bossSummon?.kind === 'wolf' && e.bossSummon.slot === undefined,
+  )!;
+  const before = { x: wolf.dx, y: wolf.dy };
+  wolves.g.player.x = 900;
+  wolves.g.player.y = 300;
+  advance(wolves.g, 0.15);
+  assert.notDeepEqual({ x: wolf.dx, y: wolf.dy }, before);
+  const desired = Math.atan2(wolves.g.player.y - wolf.y, wolves.g.player.x - wolf.x);
+  near(Math.atan2(wolf.dy, wolf.dx), desired, 0.2);
+});
+
+test('修士沿相邻天兵中缝以 160 移速跑出，整轮不被扑中', () => {
+  const c = trial();
+  cast(c, 4);
+  advance(c.g, R.wolfFlank - 0.01);
+  c.g.player.invincible = 0;
+  c.g.player.hp = c.g.player.maxHp = 1e9;
+  const angle = Math.PI / 6;
+  c.g.input = { x: Math.cos(angle), y: Math.sin(angle) };
+  advance(c.g, R.wolfWindup + R.wolfDash + 0.1);
+  assert.equal(c.g.player.hp, 1e9);
+});
+
+test('天兵 age 超过六秒仍可续局，蓄力中途恢复后方向不变', () => {
+  const c = trial();
+  cast(c, 4);
+  advance(c.g, R.wolfLife + 0.5);
+  c.g.player.invincible = 99999;
+  const raw = JSON.parse(JSON.stringify(c.g.snapshot()));
+  const restored = Game.restore(c.g.save, raw)!;
+  assert.ok(restored);
+  assert.equal(soldiers(restored).length, R.soldierCount);
+  const aged = JSON.parse(JSON.stringify(raw));
+  const target = aged.enemies.find(
+    (e: { bossSummon?: { slot?: number } }) => e.bossSummon?.slot === 0,
+  );
+  target.bossSummon.age = 7.5;
+  assert.ok(Game.restore(c.g.save, aged));
+
+  const charging = trial();
+  cast(charging, 4);
+  advance(charging.g, R.wolfFlank + 0.1);
+  const soldier = soldiers(charging.g)[0];
+  const locked = { x: soldier.dx, y: soldier.dy };
+  const resume = Game.restore(charging.g.save, JSON.parse(JSON.stringify(charging.g.snapshot())))!;
+  resume.resume();
+  resume.player.invincible = 99999;
+  resume.player.x = 800;
+  const again = soldiers(resume).find((e) => e.bossSummon!.slot === 0)!;
+  advance(resume, 0.1);
+  assert.deepEqual({ x: again.dx, y: again.dy }, locked);
+});
+
+test('天兵蓄力时画金色冲程虚线与天兵标签，双狼仍是猎', () => {
+  const calls: string[] = [];
+  const context = {
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    stroke() {},
+    fill() {},
+    closePath() {},
+    arc() {},
+    fillText(text: string) {
+      calls.push(`text:${text}`);
+    },
+    strokeText(text: string) {
+      calls.push(`stroke:${text}`);
+    },
+    setLineDash(dash: number[]) {
+      calls.push(`dash:${dash.join(',')}`);
+    },
+    set fillStyle(_v: string) {},
+    set strokeStyle(_v: string) {},
+    set lineWidth(_v: number) {},
+    set globalAlpha(_v: number) {},
+    set font(_v: string) {},
+    set textAlign(_v: string) {},
+  } as unknown as CanvasRenderingContext2D;
+  const c = trial();
+  cast(c, 4);
+  advance(c.g, R.wolfFlank + 0.05);
+  drawBossSummon(context, soldiers(c.g)[0]);
+  assert.ok(calls.includes('text:天兵'));
+  assert.ok(calls.includes('stroke:天兵'));
+  assert.ok(calls.includes('dash:10,8'));
+  calls.length = 0;
+  const wolves = trial(2);
+  cast(wolves, 3);
+  drawBossSummon(context, wolves.g.enemies.find((e) => e.bossSummon?.kind === 'wolf')!);
+  assert.ok(calls.includes('text:猎'));
+  assert.ok(!calls.includes('dash:10,8'));
 });
 
 test('天兵存活时万劫归一借双狼仍生成两只狼，不占狼的数量上限', () => {

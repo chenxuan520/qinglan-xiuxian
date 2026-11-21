@@ -2,7 +2,7 @@ import type { Enemy, Shot } from './game-types.ts';
 import { BOSS_MECHANICS, SOVEREIGN_GOLD, bossReturnOut, bossShotPose } from './boss-mechanics.ts';
 import { FINAL_TRIAL_STAGE, STAGES, TAU } from '../core/data.ts';
 
-export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
+export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy, showLabel = true) {
   const state = e.bossSummon!;
   c.save();
   c.translate(e.x, e.y);
@@ -44,6 +44,19 @@ export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
     if (e.charge > BOSS_MECHANICS.wolfDash) {
       c.save();
       c.rotate(Math.atan2(e.dy, e.dx));
+      if (state.slot !== undefined) {
+        // 天兵蓄力即锁定方向，虚线与箭头一起预示这一轮冲程。
+        c.setLineDash([10, 8]);
+        c.strokeStyle = SOVEREIGN_GOLD;
+        c.globalAlpha = 0.6;
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(e.radius + 4, 0);
+        c.lineTo(BOSS_MECHANICS.wolfDash * 380, 0);
+        c.stroke();
+        c.setLineDash([]);
+        c.globalAlpha = 1;
+      }
       c.fillStyle = '#f5d18a';
       c.beginPath();
       c.moveTo(42, 0);
@@ -56,8 +69,23 @@ export function drawBossSummon(c: CanvasRenderingContext2D, e: Enemy) {
   }
   c.font = '14px serif';
   c.textAlign = 'center';
-  c.fillStyle = state.kind === 'heart' ? '#d1e7a5' : '#b9ebff';
-  c.fillText(state.kind === 'heart' ? '木心' : '猎', 0, state.kind === 'heart' ? 43 : -42);
+  if (state.kind === 'heart') {
+    c.fillStyle = '#d1e7a5';
+    c.fillText('木心', 0, 43);
+  } else if (state.slot !== undefined) {
+    // 只在蓄力阶段显示：六名天兵仍在 190 阵位，标签不会在合围时叠成一团。
+    // showLabel 由渲染层按屏幕安全区传入，避免顶部两名天兵的标签压进 HUD。
+    if (showLabel && e.charge > BOSS_MECHANICS.wolfDash) {
+      c.strokeStyle = '#142623cc';
+      c.lineWidth = 3;
+      c.strokeText('天兵', 0, -(e.radius * 3.2 + 10));
+      c.fillStyle = state.color ?? SOVEREIGN_GOLD;
+      c.fillText('天兵', 0, -(e.radius * 3.2 + 10));
+    }
+  } else {
+    c.fillStyle = '#b9ebff';
+    c.fillText('猎', 0, -42);
+  }
   c.restore();
 }
 
