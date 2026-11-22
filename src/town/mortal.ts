@@ -83,9 +83,9 @@ export function studyPlan(save: SaveData, withCurio = true) {
     years: withCurio ? curioTrainingYears(save, years) : years,
   };
 }
-function log(save: SaveData, text: string) {
+function log(save: SaveData, text: string, prefix = `${save.age.toFixed(1)} 岁`) {
   recordChronicle(save, '人间行迹', text);
-  save.mortal.events.unshift(`人间 ${save.mortal.years.toFixed(1)} 年 · ${text}`);
+  save.mortal.events.unshift(`${prefix} · ${text}`);
   save.mortal.events.length = Math.min(6, save.mortal.events.length);
 }
 function canAct(save: SaveData) {
@@ -292,6 +292,7 @@ function completeActivity(save: SaveData, random: () => number) {
       log(
         save,
         `${passive(id).name}精研至 ${world.mastery[id]} 阶，本门正向效果 +${Math.round(world.mastery[id] * MASTERY_PER_LEVEL * 100)}%。${reward}`,
+        `耗时 ${activity.total} 年`,
       );
       if (world.mastery[id] === MAX_MASTERY)
         recordChronicle(save, '一脉真传', `${passive(id).name}已精研至十阶。`, 'mastery');
@@ -311,6 +312,7 @@ function completeActivity(save: SaveData, random: () => number) {
       log(
         save,
         `${firstFishingMedicine ? FIRST_FISHING_MEDICINE : ''}${job.name}结束：${stones || job.iron ? `灵石 +${stones}${job.iron ? `、玄铁 +${job.iron}` : ''}` : '听了一段旧事'}${medicine ? `、${medicine}` : ''}。`,
+        `耗时 ${activity.total} 年`,
       );
     }
     return true;

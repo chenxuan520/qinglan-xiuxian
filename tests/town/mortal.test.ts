@@ -865,3 +865,24 @@ test('即时办事遇寿尽或天劫只消耗至边界，处理后立即完成�
   assert.equal(t.iron, 1);
   assert.equal(resolveActivity(t), false);
 });
+
+test('人间活动结算日志显示本次耗时，不再用累计游历年数当提示', () => {
+  const tea = freshSave();
+  tea.mortal.years = 26;
+  startActivity(tea, 'tea', () => 0.9);
+  assert.equal(tea.mortal.events[0], '耗时 0.5 年 · 茶馆听书结束：听了一段旧事。');
+  assert.doesNotMatch(tea.mortal.events[0], /人间 26\.0 年/);
+
+  const herbs = freshSave();
+  herbs.mortal.years = 9;
+  startActivity(herbs, 'herbs', () => 0.9);
+  assert.equal(herbs.mortal.events[0], '耗时 1 年 · 药铺采药结束：灵石 +18。');
+
+  // 没有持续时间的其他事件改用当前年岁，不再显示累计游历年数。
+  const joined = wealthy();
+  joined.age = 63.4;
+  joined.mortal.years = 12;
+  assert.equal(joinSect(joined, 'power'), true);
+  assert.match(joined.mortal.events[0], /^63\.4 岁 · /);
+  assert.doesNotMatch(joined.mortal.events[0], /人间 12\.0 年/);
+});
