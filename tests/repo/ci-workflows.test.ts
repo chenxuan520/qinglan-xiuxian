@@ -90,10 +90,9 @@ test('所有Pages日报发布保留公开巡检结果，sparse工具同时包含
   assert.match(source, /head_repository.full_name == github.repository/);
   assert.match(source, /repository.full_name == github.repository/);
   assert.match(source, /conclusion != 'cancelled'/);
-  assert.doesNotMatch(
-    source,
-    /conclusion == 'success'|workflow_run.head_sha|secrets\.|continue-on-error/,
-  );
+  assert.doesNotMatch(source, /conclusion == 'success'|workflow_run.head_sha|secrets\./);
+  // Pages 部署允许原地重试；两次 continue-on-error 只用于前两次尝试，最终失败仍让 job 失败。
+  assert.equal(source.match(/continue-on-error: true/g)?.length, 2);
   assert.match(source, /group: pages\s+cancel-in-progress: false/);
   assert.match(source, /--workflow pages.yml --branch master --status success/);
   assert.match(source, /ref: \$\{\{ steps.game.outputs.sha \}\}/);
@@ -192,4 +191,37 @@ test('广告 Worker 不再绑定 ads.txt 路由', () => {
     'utf8',
   );
   assert.ok(!source.includes('ads.txt'));
+});
+
+test('所有 Pages 发布链的部署步骤在瞬时失败时自动重试两次', () => {
+  for (const name of [
+    'autoplay-balance.yml',
+    'balance-import.yml',
+    'balance.yml',
+    'observer-report.yml',
+    'pages.yml',
+    'weapon-benchmark.yml',
+  ]) {
+    const source = read(name);
+    assert.match(
+      source,
+      /- name: Deploy\n\s+id: deployment\n\s+continue-on-error: true\n\s+uses: actions\/deploy-pages@[0-9a-f]{40}/,
+      name,
+    );
+    assert.match(
+      source,
+      /id: deployment-retry\n\s+if: steps\.deployment\.outcome == 'failure'\n\s+continue-on-error: true\n\s+uses: actions\/deploy-pages@[0-9a-f]{40}/,
+      name,
+    );
+    assert.match(
+      source,
+      /id: deployment-retry-2\n\s+if: steps\.deployment-retry\.outcome == 'failure'\n\s+uses: actions\/deploy-pages@[0-9a-f]{40}/,
+      name,
+    );
+    assert.match(
+      source,
+      /url: \$\{\{ steps\.deployment\.outputs\.page_url \|\| steps\.deployment-retry\.outputs\.page_url \|\| steps\.deployment-retry-2\.outputs\.page_url \}\}/,
+      name,
+    );
+  }
 });

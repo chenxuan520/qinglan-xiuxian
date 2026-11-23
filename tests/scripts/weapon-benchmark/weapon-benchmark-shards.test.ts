@@ -404,5 +404,7 @@ test('法宝CI十六片并行保留原始失败证据，合并失败仍上传公
     source,
     /concurrency:[\s\S]*group: weapon-benchmark-\$\{\{ github.repository \}\}-\$\{\{ github.ref \}\}\s+cancel-in-progress: true/,
   );
-  assert.doesNotMatch(source, /continue-on-error/);
+  // 仅 Pages 部署的前两次尝试允许失败并重试，最终失败仍让任务失败。
+  assert.equal(source.match(/continue-on-error: true/g)?.length, 2);
+  assert.equal(source.match(/continue-on-error/g)?.length, 2);
 });
