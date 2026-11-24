@@ -210,12 +210,32 @@ test('所有 Pages 发布链的部署步骤在瞬时失败时自动重试两次'
     );
     assert.match(
       source,
+      /- name: Wait before retrying deploy\n\s+if: steps\.deployment\.outcome == 'failure'\n\s+run: sleep 15/,
+      name,
+    );
+    assert.match(
+      source,
       /id: deployment-retry\n\s+if: steps\.deployment\.outcome == 'failure'\n\s+continue-on-error: true\n\s+uses: actions\/deploy-pages@[0-9a-f]{40}/,
       name,
     );
     assert.match(
       source,
+      /- name: Wait before retrying deploy again\n\s+if: steps\.deployment-retry\.outcome == 'failure'\n\s+run: sleep 30/,
+      name,
+    );
+    assert.match(
+      source,
       /id: deployment-retry-2\n\s+if: steps\.deployment-retry\.outcome == 'failure'\n\s+uses: actions\/deploy-pages@[0-9a-f]{40}/,
+      name,
+    );
+    assert.ok(
+      source.indexOf('name: Wait before retrying deploy\n') <
+        source.indexOf('id: deployment-retry'),
+      name,
+    );
+    assert.ok(
+      source.indexOf('name: Wait before retrying deploy again\n') <
+        source.indexOf('id: deployment-retry-2'),
       name,
     );
     assert.match(

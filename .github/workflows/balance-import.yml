@@ -145,16 +145,22 @@ jobs:
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist
-      # GitHub Pages 的产物元数据偶发瞬时失败，自动重试两次再判定失败。
+      # GitHub Pages 的产物元数据偶发瞬时失败，间隔重试两次再判定失败。
       - name: Deploy
         id: deployment
         continue-on-error: true
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Wait before retrying deploy
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 15
       - name: Retry deploy after transient failure
         id: deployment-retry
         if: steps.deployment.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+      - name: Wait before retrying deploy again
+        if: steps.deployment-retry.outcome == 'failure'
+        run: sleep 30
       - name: Retry deploy again after transient failure
         id: deployment-retry-2
         if: steps.deployment-retry.outcome == 'failure'
