@@ -205,6 +205,29 @@ test('所有 Pages 发布链的部署步骤在瞬时失败时自动重试两次'
     const source = read(name);
     assert.match(
       source,
+      /- name: Wait for Pages artifact visibility\n\s+env:\n\s+GH_TOKEN: \$\{\{ github\.token \}\}\n\s+run: \|/,
+      name,
+    );
+    assert.ok(
+      source.indexOf('name: Wait for Pages artifact visibility\n') <
+        source.indexOf('id: deployment'),
+      name,
+    );
+    assert.match(
+      source,
+      /actions\/runs\/\$\{\{ github\.run_id \}\}\/artifacts\?name=github-pages/,
+      name,
+    );
+    assert.match(source, /seq 1 24/, name);
+    assert.ok(
+      source.indexOf('upload-pages-artifact@') <
+        source.indexOf('name: Wait for Pages artifact visibility\n'),
+      name,
+    );
+    assert.match(source, /not visible after 120 seconds[\s\S]*exit 1/, name);
+    assert.match(source, /sleep 5/, name);
+    assert.match(
+      source,
       /- name: Deploy\n\s+id: deployment\n\s+continue-on-error: true\n\s+uses: actions\/deploy-pages@[0-9a-f]{40}/,
       name,
     );
